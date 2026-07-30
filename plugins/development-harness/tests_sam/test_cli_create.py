@@ -1,6 +1,6 @@
 """Tests for sam CLI ``create`` command.
 
-Tests: Plan creation via CLI with stdin YAML, slug, goal, context, and issue options.
+Tests: Plan creation via CLI with typed slug, goal, task, context, and issue options.
 How: Invoke ``sam create`` via CliRunner, verify JSON output and file creation.
 Why: ``create`` is the entry point for all new plan files -- errors here prevent
 plan creation across the entire SAM pipeline.
@@ -38,37 +38,6 @@ def plan_dir(tmp_path: Path) -> Path:
     return d
 
 
-MINIMAL_TASKS_YAML = """\
-tasks:
-  - task: T1
-    title: First task
-    status: not-started
-    agent: test-agent
-    dependencies: []
-    priority: 3
-    complexity: medium
-  - task: T2
-    title: Second task
-    status: not-started
-    agent: test-agent
-    dependencies:
-      - T1
-    priority: 3
-    complexity: medium
-"""
-
-BARE_LIST_YAML = """\
-- task: T1
-  title: Solo task
-  status: not-started
-  agent: test-agent
-  dependencies: []
-  priority: 3
-  complexity: medium
-"""
-
-
-# ---------------------------------------------------------------------------
 # sam create -- basic creation
 # ---------------------------------------------------------------------------
 
@@ -92,13 +61,12 @@ class TestSamCreateBasic:
         # Act
         result = runner.invoke(
             app,
-            ["create", "my-feature", "--goal", "Implement feature X", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "my-feature", "--goal", "Implement feature X", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
-        assert "path" in data
         assert "plan_id" in data
         assert "task_count" in data
         assert data["task_count"] == 0
@@ -113,7 +81,9 @@ class TestSamCreateBasic:
         # Arrange -- empty plan_dir
         # Act
         result = runner.invoke(
-            app, ["create", "first-plan", "--goal", "Goal", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "create", "--slug", "first-plan", "--goal", "Goal", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
@@ -130,12 +100,14 @@ class TestSamCreateBasic:
         # Arrange
         # Act
         result = runner.invoke(
-            app, ["create", "disk-test", "--goal", "Test goal", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "create", "--slug", "disk-test", "--goal", "Test goal", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
-        data = json.loads(result.output)
-        assert Path(data["path"]).exists()
+        json.loads(result.output)
+        assert len(list(plan_dir.glob("*.yaml"))) == 1
 
     def test_create_file_has_yaml_extension(self, plan_dir: Path) -> None:
         """Created file uses .yaml extension.
@@ -146,12 +118,14 @@ class TestSamCreateBasic:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["create", "ext-test", "--goal", "Goal", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "create", "--slug", "ext-test", "--goal", "Goal", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
-        data = json.loads(result.output)
-        assert data["path"].endswith(".yaml")
+        json.loads(result.output)
+        assert next(plan_dir.glob("*.yaml")).suffix == ".yaml"
 
     def test_create_assigns_unique_plan_ids(self, plan_dir: Path) -> None:
         """Two consecutive creates produce distinct UUID plan_ids.
@@ -162,11 +136,15 @@ class TestSamCreateBasic:
         """
         # Arrange / Act -- create first plan
         r1 = runner.invoke(
-            app, ["create", "first", "--goal", "First", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "create", "--slug", "first", "--goal", "First", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Act -- create second plan
         r2 = runner.invoke(
-            app, ["create", "second", "--goal", "Second", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "create", "--slug", "second", "--goal", "Second", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert r1.exit_code == 0
@@ -179,114 +157,84 @@ class TestSamCreateBasic:
 
 
 # ---------------------------------------------------------------------------
-# sam create -- with stdin tasks
+# plan create -- typed task options and removed ingestion flags
 # ---------------------------------------------------------------------------
 
 
-class TestSamCreateWithStdin:
-    """Test ``sam create --stdin`` for reading tasks from stdin.
+class TestSamCreateTypedTask:
+    """Test task creation through the named, typed create options."""
 
-    Tests: Task ingestion from stdin YAML.
-    How: Pass YAML via CliRunner input parameter, verify task_count in output.
-    Why: ``--stdin`` is how task planners feed structured tasks into new plans.
-    """
-
-    def test_create_with_stdin_tasks_dict_format(self, plan_dir: Path) -> None:
-        """Create with --stdin reads tasks from a YAML dict with 'tasks' key.
-
-        Tests: Dict-format stdin parsing.
-        How: Pass YAML with top-level ``tasks:`` list.
-        Why: This is the canonical stdin format.
-        """
-        # Arrange
-        # Act
+    def test_create_with_typed_task_options_round_trips_task(self, plan_dir: Path) -> None:
+        """Typed task options persist all supported task fields."""
         result = runner.invoke(
             app,
-            ["create", "stdin-test", "--goal", "Goal", "--stdin", "--plan-dir", str(plan_dir)],
-            input=MINIMAL_TASKS_YAML,
+            [
+                "plan",
+                "create",
+                "--slug",
+                "typed-task",
+                "--goal",
+                "Goal",
+                "--task-id",
+                "T1",
+                "--task-title",
+                "First task",
+                "--task-status",
+                "not-started",
+                "--task-agent",
+                "test-agent",
+                "--task-dependency",
+                "T0",
+                "--task-priority",
+                "3",
+                "--task-complexity",
+                "medium",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
-        # Assert
         assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        assert data["task_count"] == 2
-
-    def test_create_with_stdin_bare_list_format(self, plan_dir: Path) -> None:
-        """Create with --stdin reads tasks from a bare YAML list.
-
-        Tests: Bare-list stdin parsing.
-        How: Pass YAML that is a list of task dicts (no top-level key).
-        Why: Some task generators emit bare lists without a ``tasks:`` wrapper.
-        """
-        # Arrange / Act
-        result = runner.invoke(
-            app,
-            ["create", "bare-list", "--goal", "Goal", "--stdin", "--plan-dir", str(plan_dir)],
-            input=BARE_LIST_YAML,
-            env={"NO_COLOR": "1"},
-        )
-        # Assert
-        assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
+        assert ": " not in result.stdout
+        assert ", " not in result.stdout
+        data = json.loads(result.stdout)
         assert data["task_count"] == 1
-
-    def test_create_with_stdin_empty_input_creates_zero_tasks(self, plan_dir: Path) -> None:
-        """Create with --stdin and empty input creates plan with 0 tasks.
-
-        Tests: Empty stdin handling.
-        How: Pass empty string as stdin.
-        Why: Edge case -- must not crash on empty input.
-        """
-        # Arrange / Act
-        result = runner.invoke(
+        read_result = runner.invoke(
             app,
-            ["create", "empty-stdin", "--goal", "Goal", "--stdin", "--plan-dir", str(plan_dir)],
-            input="",
+            ["plan", "read", "--address", f"{data['plan_id']}/T1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
-        # Assert
-        assert result.exit_code == 0
-        data = json.loads(result.output)
-        assert data["task_count"] == 0
+        assert read_result.exit_code == 0, read_result.output
+        task = json.loads(read_result.stdout)["task"]
+        assert task["id"] == "T1"
+        assert task["title"] == "First task"
+        assert task["dependencies"] == ["T0"]
+        assert task["priority"] == 3
 
-    def test_create_with_stdin_invalid_yaml_exits_with_error(self, plan_dir: Path) -> None:
-        """Create with --stdin and invalid YAML structure exits 1.
-
-        Tests: Invalid stdin rejection.
-        How: Pass a YAML scalar (not list or dict) via stdin.
-        Why: Malformed stdin must produce a clear error, not a crash.
-        """
-        # Arrange / Act
+    @pytest.mark.parametrize("removed_flag", ["--stdin", "--task-json"])
+    def test_create_rejects_removed_ingestion_flags(self, plan_dir: Path, removed_flag: str) -> None:
+        """Routine plan creation rejects the removed stdin/JSON ingestion flags."""
         result = runner.invoke(
             app,
-            ["create", "bad-stdin", "--goal", "Goal", "--stdin", "--plan-dir", str(plan_dir)],
-            input="just a string, not a list or dict",
+            ["plan", "create", "--slug", "rejected", "--goal", "Goal", removed_flag, "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
-        # Assert
-        assert result.exit_code == 1
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert result.stderr
 
-    def test_create_with_stdin_invalid_task_schema_exits_with_error(self, plan_dir: Path) -> None:
-        """Create with --stdin containing invalid task schema exits 1.
-
-        Tests: Task validation during create.
-        How: Pass a task dict missing required ``title`` field.
-        Why: Invalid tasks must be rejected at creation time.
-        """
-        # Arrange
-        bad_task = "tasks:\n  - task: T1\n    status: not-started\n"
-        # Act
+    def test_create_rejects_incomplete_typed_task(self, plan_dir: Path) -> None:
+        """A task id without its required title is rejected by typed validation."""
         result = runner.invoke(
             app,
-            ["create", "bad-schema", "--goal", "Goal", "--stdin", "--plan-dir", str(plan_dir)],
-            input=bad_task,
+            ["plan", "create", "--slug", "bad-task", "--goal", "Goal", "--task-id", "T1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
-        # Assert
-        assert result.exit_code == 1
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert result.stderr
 
 
-# ---------------------------------------------------------------------------
 # sam create -- optional fields
 # ---------------------------------------------------------------------------
 
@@ -309,14 +257,27 @@ class TestSamCreateOptionalFields:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["create", "ctx-test", "--goal", "Goal", "--context", "Some shared context", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "create",
+                "--slug",
+                "ctx-test",
+                "--goal",
+                "Goal",
+                "--context",
+                "Some shared context",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
         plan_id = json.loads(result.output)["plan_id"]
         # Verify by reading back using the UUID plan_id
-        read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
         # read_plan returns ReadResult; plan fields are nested under "plan".
@@ -332,14 +293,16 @@ class TestSamCreateOptionalFields:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["create", "issue-test", "--goal", "Goal", "--issue", "42", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "issue-test", "--goal", "Goal", "--issue", "42", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
         plan_id = json.loads(result.output)["plan_id"]
         # Read back using the UUID plan_id
-        read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
         assert plan_data["plan"].get("issue") == "42"
@@ -359,7 +322,7 @@ class TestSamCreateRoundTrip:
     """
 
     def test_create_then_read_preserves_task_data(self, plan_dir: Path) -> None:
-        """Tasks created via stdin can be read back with identical fields.
+        """Tasks created with typed options can be read back with identical fields.
 
         Tests: Task data round-trip fidelity.
         How: Create with tasks, read {plan_id}/T1, verify fields match.
@@ -368,15 +331,37 @@ class TestSamCreateRoundTrip:
         # Arrange / Act -- create
         create_result = runner.invoke(
             app,
-            ["create", "roundtrip", "--goal", "Round-trip test", "--stdin", "--plan-dir", str(plan_dir)],
-            input=MINIMAL_TASKS_YAML,
+            [
+                "plan",
+                "create",
+                "--slug",
+                "roundtrip",
+                "--goal",
+                "Round-trip test",
+                "--task-id",
+                "T1",
+                "--task-title",
+                "First task",
+                "--task-status",
+                "not-started",
+                "--task-agent",
+                "test-agent",
+                "--task-priority",
+                "3",
+                "--task-complexity",
+                "medium",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         assert create_result.exit_code == 0, create_result.output
         plan_id = json.loads(create_result.output)["plan_id"]
 
         # Act -- read back
-        read_result = runner.invoke(app, ["read", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert read_result.exit_code == 0, read_result.output
         data = json.loads(read_result.output)
@@ -395,20 +380,42 @@ class TestSamCreateRoundTrip:
         # Arrange / Act -- create
         create_result = runner.invoke(
             app,
-            ["create", "count-test", "--goal", "Count test", "--stdin", "--plan-dir", str(plan_dir)],
-            input=MINIMAL_TASKS_YAML,
+            [
+                "plan",
+                "create",
+                "--slug",
+                "count-test",
+                "--goal",
+                "Count test",
+                "--task-id",
+                "T1",
+                "--task-title",
+                "First task",
+                "--task-status",
+                "not-started",
+                "--task-agent",
+                "test-agent",
+                "--task-priority",
+                "3",
+                "--task-complexity",
+                "medium",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         assert create_result.exit_code == 0, create_result.output
         plan_id = json.loads(create_result.output)["plan_id"]
 
         # Act -- read plan-level
-        read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
         # read_plan returns ReadResult; tasks are nested under plan.tasks.
-        assert len(plan_data["plan"].get("tasks", [])) == 2
+        assert len(plan_data["plan"].get("tasks", [])) == 1
 
     def test_create_then_read_assignment_includes_plan_goal(self, plan_dir: Path) -> None:
         """TaskAssignment from read includes the plan goal set during create.
@@ -420,64 +427,89 @@ class TestSamCreateRoundTrip:
         # Arrange / Act
         create_result = runner.invoke(
             app,
-            ["create", "goal-test", "--goal", "My specific goal", "--stdin", "--plan-dir", str(plan_dir)],
-            input=MINIMAL_TASKS_YAML,
+            [
+                "plan",
+                "create",
+                "--slug",
+                "goal-test",
+                "--goal",
+                "My specific goal",
+                "--task-id",
+                "T1",
+                "--task-title",
+                "First task",
+                "--task-status",
+                "not-started",
+                "--task-agent",
+                "test-agent",
+                "--task-priority",
+                "3",
+                "--task-complexity",
+                "medium",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         assert create_result.exit_code == 0, create_result.output
         plan_id = json.loads(create_result.output)["plan_id"]
 
-        read_result = runner.invoke(app, ["read", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert read_result.exit_code == 0, read_result.output
         data = json.loads(read_result.output)
         # TaskAssignment now serializes with alias field names (by_alias=True).
         assert data.get("plan-goal") == "My specific goal"
 
-    def test_create_with_stdin_preserves_task_body_content(self, plan_dir: Path) -> None:
-        """Task ``body`` field round-trips through create -> read without data loss.
+    def test_create_with_typed_fields_preserves_task_content(self, plan_dir: Path) -> None:
+        """Typed task fields round-trip through create -> read without data loss.
 
-        Tests: body field preservation during stdin create.
-        How: Create with a task containing a multiline body, read back {plan_id}/T1, verify body.
-        Why: Pydantic drops unknown fields silently -- body was missing from Task model,
-             causing body content to be discarded at validation time (reproduced on P577, P964).
+        Tests: typed task field preservation during create.
+        How: Create with typed task fields, read {plan_id}/T1, verify the fields survive.
+                Why: Typed task values must remain intact across the create/read boundary.
         """
-        # Arrange
-        tasks_with_body = """\
-tasks:
-  - task: T1
-    title: Body preservation test
-    status: not-started
-    agent: python-cli-architect
-    dependencies: []
-    priority: 3
-    complexity: medium
-    body: |
-      ## Objective
-      This is a test body that should be preserved.
-
-      ## Acceptance Criteria
-      - Body content is not empty after create
-"""
-        # Act -- create
+        # Act -- create with the supported typed task fields.
         create_result = runner.invoke(
             app,
-            ["create", "body-test", "--goal", "Test body preservation", "--stdin", "--plan-dir", str(plan_dir)],
-            input=tasks_with_body,
+            [
+                "plan",
+                "create",
+                "--slug",
+                "body-test",
+                "--goal",
+                "Test body preservation",
+                "--task-id",
+                "T1",
+                "--task-title",
+                "Body preservation test",
+                "--task-status",
+                "not-started",
+                "--task-agent",
+                "python-cli-architect",
+                "--task-priority",
+                "3",
+                "--task-complexity",
+                "medium",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         assert create_result.exit_code == 0, create_result.output
         plan_id = json.loads(create_result.output)["plan_id"]
 
         # Act -- read back
-        read_result = runner.invoke(app, ["read", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", f"{plan_id}/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert read_result.exit_code == 0, read_result.output
         data = json.loads(read_result.output)
         task = data["task"]
-        assert task.get("body"), "body field is empty -- content was dropped at model validation"
-        assert "## Objective" in task["body"]
-        assert "This is a test body that should be preserved." in task["body"]
+        assert task["title"] == "Body preservation test"
+        assert task["agent"] == "python-cli-architect"
 
     def test_create_plan_dir_auto_created_if_missing(self, tmp_path: Path) -> None:
         """Plan directory is auto-created if it does not exist.
@@ -491,7 +523,9 @@ tasks:
         assert not new_dir.exists()
         # Act
         result = runner.invoke(
-            app, ["create", "auto-dir", "--goal", "Goal", "--plan-dir", str(new_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "create", "--slug", "auto-dir", "--goal", "Goal", "--plan-dir", str(new_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
@@ -522,14 +556,14 @@ class TestSamCreateWithIssue:
         # Act
         result = runner.invoke(
             app,
-            ["create", "my-feature", "--goal", "Test", "--issue", "951", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "my-feature", "--goal", "Test", "--issue", "951", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0, result.output
         data = json.loads(result.output)
         assert _UUID_PLAN_ID_RE.match(data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
-        assert Path(data["path"]).exists()
+        assert len(list(plan_dir.glob("*.yaml"))) == 1
 
     def test_create_with_issue_file_exists_at_reported_path(self, plan_dir: Path) -> None:
         """File created with --issue exists on disk at the path returned in JSON.
@@ -541,13 +575,13 @@ class TestSamCreateWithIssue:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["create", "disk-check", "--goal", "Test", "--issue", "42", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "disk-check", "--goal", "Test", "--issue", "42", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0, result.output
-        data = json.loads(result.output)
-        assert Path(data["path"]).exists()
+        json.loads(result.output)
+        assert len(list(plan_dir.glob("*.yaml"))) == 1
 
     def test_create_with_issue_stores_issue_in_plan(self, plan_dir: Path) -> None:
         """--issue value is persisted inside the plan file.
@@ -559,14 +593,16 @@ class TestSamCreateWithIssue:
         # Arrange
         result = runner.invoke(
             app,
-            ["create", "with-issue", "--goal", "Test", "--issue", "951", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "with-issue", "--goal", "Test", "--issue", "951", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         assert result.exit_code == 0, result.output
         plan_id = json.loads(result.output)["plan_id"]
 
         # Act -- read back
-        read_result = runner.invoke(app, ["read", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        read_result = runner.invoke(
+            app, ["plan", "read", "--address", plan_id, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         assert read_result.exit_code == 0, read_result.output
         plan_data = json.loads(read_result.output)
         assert plan_data["plan"].get("issue") == "951"
@@ -581,12 +617,12 @@ class TestSamCreateWithIssue:
         # Arrange / Act
         r1 = runner.invoke(
             app,
-            ["create", "first", "--goal", "First", "--issue", "500", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "first", "--goal", "First", "--issue", "500", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         r2 = runner.invoke(
             app,
-            ["create", "second", "--goal", "Second", "--issue", "500", "--plan-dir", str(plan_dir)],
+            ["plan", "create", "--slug", "second", "--goal", "Second", "--issue", "500", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         assert r1.exit_code == 0, r1.output
