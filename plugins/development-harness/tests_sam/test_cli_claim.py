@@ -1,7 +1,7 @@
 """Tests for sam CLI ``claim`` command.
 
-Tests: Task claiming (transition to in-progress) via ``sam claim``.
-How: Invoke ``sam claim`` via CliRunner on tasks in various states, verify
+Tests: Task claiming (transition to in-progress) via ``plan claim``.
+How: Invoke ``plan claim`` via CliRunner on tasks in various states, verify
 JSON output, exit codes, and file mutation.
 Why: ``claim`` is the concurrency guard -- double-claiming a task causes
 duplicate execution, wasted compute, and conflicting file edits.
@@ -80,12 +80,12 @@ def _load_yaml(path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# sam claim -- success case
+# plan claim -- success case
 # ---------------------------------------------------------------------------
 
 
 class TestSamClaimSuccess:
-    """Test ``sam claim`` on a claimable (not-started) task.
+    """Test ``plan claim`` on a claimable (not-started) task.
 
     Tests: Successful task claiming.
     How: Claim an unclaimed task, verify JSON output and file mutation.
@@ -100,7 +100,9 @@ class TestSamClaimSuccess:
         Why: Exit 0 signals success to the calling orchestrator.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 0, result.output
 
@@ -112,7 +114,9 @@ class TestSamClaimSuccess:
         Why: Orchestrator checks ``claimed`` to confirm acquisition.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         data = json.loads(result.output)
         assert data["claimed"] is True
@@ -125,7 +129,9 @@ class TestSamClaimSuccess:
         Why: Callers need task_id for subsequent operations.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         data = json.loads(result.output)
         assert data["task_id"] == "T1"
@@ -138,7 +144,9 @@ class TestSamClaimSuccess:
         Why: Started timestamp is used for SLA tracking and hook operations.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         data = json.loads(result.output)
         assert data["started"] is not None
@@ -152,7 +160,7 @@ class TestSamClaimSuccess:
         Why: Status must persist -- in-memory-only claim is useless.
         """
         # Arrange / Act
-        runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         # Assert
         plan_data = _load_yaml(plan_dir / "P001-claim-test.yaml")
         assert plan_data["tasks"][0]["status"] == "in-progress"
@@ -165,7 +173,7 @@ class TestSamClaimSuccess:
         Why: Started timestamp drives activity tracking.
         """
         # Arrange / Act
-        runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         # Assert
         plan_data = _load_yaml(plan_dir / "P001-claim-test.yaml")
         assert plan_data["tasks"][0].get("started") is not None
@@ -178,7 +186,7 @@ class TestSamClaimSuccess:
         Why: Cross-task mutation is a critical data corruption bug.
         """
         # Arrange / Act
-        runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
         # Assert
         plan_data = _load_yaml(plan_dir / "P001-claim-test.yaml")
         assert plan_data["tasks"][1]["status"] == "in-progress"  # T2 was already in-progress
@@ -186,12 +194,12 @@ class TestSamClaimSuccess:
 
 
 # ---------------------------------------------------------------------------
-# sam claim -- already claimed (exit 1)
+# plan claim -- already claimed (graceful claimed=false)
 # ---------------------------------------------------------------------------
 
 
 class TestSamClaimAlreadyClaimed:
-    """Test ``sam claim`` on a task already in ``in-progress`` state.
+    """Test ``plan claim`` on a task already in ``in-progress`` state.
 
     Tests: Double-claim prevention.
     How: Attempt to claim T2 (already in-progress), expect exit 1.
@@ -208,7 +216,9 @@ class TestSamClaimAlreadyClaimed:
              can inspect the JSON and skip the task.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
@@ -224,7 +234,9 @@ class TestSamClaimAlreadyClaimed:
              exception, so the orchestrator reads the JSON envelope to decide.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T3", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T3", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
@@ -232,17 +244,20 @@ class TestSamClaimAlreadyClaimed:
         assert payload["task_id"] == "T3"
 
     def test_claim_in_progress_task_shows_error_message(self, plan_dir: Path) -> None:
-        """Claiming an in-progress task prints an error message to stderr.
+        """Claiming an in-progress task includes a status warning in JSON.
 
         Tests: Error message clarity.
-        How: Check stderr contains the expected status.
+        How: Check the JSON warning contains the expected status.
         Why: Agent needs to understand why the claim failed.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
-        combined = result.output or ""
-        assert "in-progress" in combined.lower() or "Error" in combined
+        payload = json.loads(result.stdout)
+        assert any("in-progress" in warning for warning in payload["warnings"])
+        assert result.stderr == ""
 
     def test_double_claim_same_task_returns_graceful(self, plan_dir: Path) -> None:
         """Claiming the same task twice -- second attempt returns claimed=false, exit 0.
@@ -254,11 +269,15 @@ class TestSamClaimAlreadyClaimed:
              orchestrator reads the JSON envelope and skips the task.
         """
         # Arrange -- first claim succeeds
-        first = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        first = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         assert first.exit_code == 0
 
         # Act -- second claim is rejected gracefully
-        second = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        second = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert second.exit_code == 0, second.output
         payload = json.loads(second.output)
@@ -267,12 +286,12 @@ class TestSamClaimAlreadyClaimed:
 
 
 # ---------------------------------------------------------------------------
-# sam claim -- nonexistent task (exit 1)
+# plan claim -- nonexistent task (exit 1)
 # ---------------------------------------------------------------------------
 
 
 class TestSamClaimNonexistent:
-    """Test ``sam claim`` on nonexistent plan or task.
+    """Test ``plan claim`` on nonexistent plan or task.
 
     Tests: Error handling for invalid addresses.
     How: Attempt to claim nonexistent plans and tasks, expect exit 1.
@@ -287,7 +306,9 @@ class TestSamClaimNonexistent:
         Why: Must surface error for wrong plan.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P99/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P99/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 1
 
@@ -299,7 +320,9 @@ class TestSamClaimNonexistent:
         Why: Must surface error for wrong task ID.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1/T99", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T99", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 1
 
@@ -311,7 +334,9 @@ class TestSamClaimNonexistent:
         Why: Claiming requires a task -- plan-only is invalid.
         """
         # Arrange / Act
-        result = runner.invoke(app, ["claim", "P1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 1
 
@@ -325,6 +350,28 @@ class TestSamClaimNonexistent:
         # Arrange
         missing = tmp_path / "no-such-dir"
         # Act
-        result = runner.invoke(app, ["claim", "P1/T1", "--plan-dir", str(missing)], env={"NO_COLOR": "1"})
+        result = runner.invoke(
+            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(missing)], env={"NO_COLOR": "1"}
+        )
         # Assert
         assert result.exit_code == 1
+
+
+class TestSamClaimParser:
+    """Test named-only parsing for ``plan claim``."""
+
+    def test_positional_address_is_rejected(self) -> None:
+        """A claim address must be supplied with ``--address``."""
+        result = runner.invoke(app, ["plan", "claim", "P1/T1"], env={"NO_COLOR": "1"})
+
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert "address" in result.stderr.lower()
+
+    def test_unknown_option_is_rejected(self) -> None:
+        """Removed or misspelled options must fail in the parser."""
+        result = runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--unknown-option"], env={"NO_COLOR": "1"})
+
+        assert result.exit_code != 0
+        assert result.stdout == ""
+        assert "unknown" in result.stderr.lower() or "no such option" in result.stderr.lower()
