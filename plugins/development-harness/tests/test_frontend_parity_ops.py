@@ -58,7 +58,7 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:500]}")
+        raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:5000]}")
     return json.loads(result.stdout)
 
 
@@ -934,14 +934,14 @@ async def test_task_append_section_parity(dh_env: dict[str, str], tmp_path: Path
 async def test_active_task_get_parity(dh_env: dict[str, str]) -> None:
     """CLI ``active-task get`` and MCP ``sam_active_task(action='get')`` return the same result."""
     # Both report None when nothing is set
-    cli_get = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    cli_get = _run_cli(["active-task", "get"], env=dh_env)
     mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
     assert cli_get["active_task"] is None
     assert mcp_get["active_task"] is None
 
     # Set via CLI and both read it back
-    _run_cli(["active-task", "set", "P1/T3", "--format", "json"], env=dh_env)
-    cli_get2 = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    _run_cli(["active-task", "set", "--address", "P1/T3"], env=dh_env)
+    cli_get2 = _run_cli(["active-task", "get"], env=dh_env)
     mcp_get2 = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
     assert cli_get2["active_task"]["plan"] == mcp_get2["active_task"]["plan"]
     assert cli_get2["active_task"]["task"] == mcp_get2["active_task"]["task"]
@@ -950,7 +950,7 @@ async def test_active_task_get_parity(dh_env: dict[str, str]) -> None:
 async def test_active_task_set_parity(dh_env: dict[str, str]) -> None:
     """CLI set → MCP get and MCP set → CLI get produce identical active task context."""
     # CLI sets, MCP reads
-    cli_set = _run_cli(["active-task", "set", "P5/T7", "--format", "json"], env=dh_env)
+    cli_set = _run_cli(["active-task", "set", "--address", "P5/T7"], env=dh_env)
     mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}})
     assert mcp_get["active_task"]["plan"] == cli_set["active_task"]["plan"]
     assert mcp_get["active_task"]["task"] == cli_set["active_task"]["task"]
@@ -959,27 +959,24 @@ async def test_active_task_set_parity(dh_env: dict[str, str]) -> None:
     mcp_set = await call_mcp_tool(
         _sam_mcp, "sam_active_task", {"config": {"action": "set", "plan": "P9", "task": "T2"}}
     )
-    cli_get = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    cli_get = _run_cli(["active-task", "get"], env=dh_env)
     assert cli_get["active_task"]["plan"] == mcp_set["active_task"]["plan"]
     assert cli_get["active_task"]["task"] == mcp_set["active_task"]["task"]
 
 
 async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
     """CLI active-task update and MCP sam_active_task update produce equivalent results."""
-    import json
-
     plan_dir = str(tmp_path / "plan")
     Path(plan_dir).mkdir(parents=True, exist_ok=True)
 
     cli_create = _run_cli(
-        ["create", "at-update", "--goal", "AT update goal", "--plan-dir", plan_dir, "--format", "json"], env=dh_env
+        ["plan", "create", "--slug", "at-update", "--goal", "AT update goal", "--plan-dir", plan_dir], env=dh_env
     )
     plan_id = cli_create["plan_id"]
     _run_cli(
-        ["append-task", plan_id, "--plan-dir", plan_dir, "--task-json", json.dumps(_TASK_DEF), "--format", "json"],
-        env=dh_env,
+        ["plan", "append-task", "--plan-address", plan_id, *_task_args(_TASK_DEF), "--plan-dir", plan_dir], env=dh_env
     )
-    _run_cli(["finalize", plan_id, "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
+    _run_cli(["plan", "finalize", "--plan-address", plan_id, "--plan-dir", plan_dir], env=dh_env)
 
     # Set active task via MCP (preserves 'T01' prefix that plan file uses)
     await call_mcp_tool(
@@ -987,40 +984,39 @@ async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path)
     )
 
     # CLI update
-    cli_update = _run_cli(
-        ["active-task", "update", "--set-fields-json", json.dumps({"priority": 8}), "--format", "json"], env=dh_env
-    )
+    cli_update = _run_cli(["active-task", "update", "--set-fields-json", '{"priority":5}'], env=dh_env)
     assert cli_update["updated"] is True
 
     # MCP read verifies the update
     mcp_read = await call_mcp_tool(
         _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
-    assert mcp_read["task"]["priority"] == 8
+    assert mcp_read["task"]["priority"] == 5
 
     # Reset priority for reverse direction
     _run_cli(
-        ["update", f"{plan_id}/T01", "--plan-dir", plan_dir, "--set", "priority=1", "--format", "json"], env=dh_env
+        ["plan", "update", "--plan-address", plan_id, "--task-id", "T01", "--plan-dir", plan_dir, "--priority", "1"],
+        env=dh_env,
     )
 
     # MCP update
     mcp_update = await call_mcp_tool(
-        _sam_mcp, "sam_active_task", {"config": {"action": "update", "set_fields_json": {"priority": 9}}}
+        _sam_mcp, "sam_active_task", {"config": {"action": "update", "set_fields_json": {"priority": 4}}}
     )
     assert mcp_update["updated"] is True
 
     # CLI read verifies
-    cli_read = _run_cli(["read", f"{plan_id}/T01", "--plan-dir", plan_dir, "--format", "json"], env=dh_env)
-    assert cli_read["task"]["priority"] == 9
+    cli_read = _run_cli(["plan", "read", "--address", f"{plan_id}/T01", "--plan-dir", plan_dir], env=dh_env)
+    assert cli_read["task"]["priority"] == 4
 
 
 async def test_active_task_clear_parity(dh_env: dict[str, str]) -> None:
     """CLI clear → MCP get returns null, and MCP clear → CLI get returns null."""
     # Set via CLI
-    _run_cli(["active-task", "set", "P3/T5", "--format", "json"], env=dh_env)
+    _run_cli(["active-task", "set", "--address", "P3/T5"], env=dh_env)
 
     # CLI clear
-    cli_clear = _run_cli(["active-task", "clear", "--format", "json"], env=dh_env)
+    cli_clear = _run_cli(["active-task", "clear"], env=dh_env)
     assert cli_clear["cleared"] is True
 
     # MCP get returns null
@@ -1032,5 +1028,5 @@ async def test_active_task_clear_parity(dh_env: dict[str, str]) -> None:
     mcp_clear = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "clear"}})
     assert mcp_clear["cleared"] is True
 
-    cli_get = _run_cli(["active-task", "get", "--format", "json"], env=dh_env)
+    cli_get = _run_cli(["active-task", "get"], env=dh_env)
     assert cli_get["active_task"] is None
