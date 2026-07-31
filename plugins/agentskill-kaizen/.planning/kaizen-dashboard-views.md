@@ -300,12 +300,12 @@ New: `KaizenDB.sentiment()` queries DuckDB and returns DataFrame with identical 
 
 ```python
 pn.template.FastListTemplate(
-    title="Kaizen Findings Dashboard",    # renamed from "Kaizen Sentiment Dashboard"
+    title="Kaizen Findings Dashboard",  # renamed from "Kaizen Sentiment Dashboard"
     main=[dashboard_container],
     accent="#4c78a8",
     main_layout=None,
     theme="default",
-    header_background="#2c3e50",           # darker header for forensic tool feel
+    header_background="#2c3e50",  # darker header for forensic tool feel
 )
 ```
 

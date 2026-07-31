@@ -71,8 +71,10 @@ For now, the flag is plumbing only — it validates, resolves, and prints the re
 ```python
 import enum  # add to stdlib imports at top of file
 
+
 class ScopeTarget(str, enum.Enum):
     """Output scope for lesson files."""
+
     user = "user"
     project = "project"
     local = "local"
@@ -116,7 +118,7 @@ scope: Annotated[
         ),
         rich_help_panel="Output Options",
     ),
-] = None,
+] = (None,)
 ```
 
 **Step 4: Add scope path resolution and reporting in the `score()` function body**
@@ -126,9 +128,7 @@ After the `_write_duckdb` call (around line 617), add:
 ```python
 if scope is not None:
     scope_path = _resolve_scope_path(scope)
-    stderr.print(
-        f"[dim]Lesson scope:[/dim] [cyan]{scope.value}[/cyan] → {scope_path}"
-    )
+    stderr.print(f"[dim]Lesson scope:[/dim] [cyan]{scope.value}[/cyan] → {scope_path}")
 ```
 
 **Step 5: Verify the CLI help renders correctly**

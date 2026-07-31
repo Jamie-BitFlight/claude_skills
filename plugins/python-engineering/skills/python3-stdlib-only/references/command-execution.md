@@ -23,6 +23,7 @@ from typing import TypeAlias
 StrPath: TypeAlias = str | os.PathLike[str]
 Cmd: TypeAlias = Sequence[StrPath]
 
+
 def run_cmd(cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
     """Run a command with timeout and text capture."""
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
@@ -37,7 +38,7 @@ def run_cmd_elevated(cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProc
         return run_cmd(cmd, timeout)
     if os.geteuid() == 0:
         return run_cmd(cmd, timeout)
-    if (sudo := which("sudo")):
+    if sudo := which("sudo"):
         return run_cmd([sudo, "-n", *map(str, cmd)], timeout)
     return run_cmd(cmd, timeout)
 ```
@@ -51,11 +52,13 @@ Keep log messages side-effect free. Log the joined command using `map(str, cmd)`
 ```python
 from typing import Protocol
 
+
 class LoggerLike(Protocol):
     def debug(self, msg: str) -> None: ...
     def info(self, msg: str) -> None: ...
     def warning(self, msg: str) -> None: ...
     def error(self, msg: str) -> None: ...
+
 
 def run_with_log(logger: LoggerLike, cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
     logger.info(f"running: {' '.join(map(str, cmd))} (timeout {timeout}s)")
@@ -81,13 +84,16 @@ from typing import TypeAlias, Protocol
 StrPath: TypeAlias = str | os.PathLike[str]
 Cmd: TypeAlias = Sequence[StrPath]
 
+
 class LoggerLike(Protocol):
     def info(self, msg: str) -> None: ...
     def error(self, msg: str) -> None: ...
 
+
 def run_cmd(cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
     """Run command with timeout."""
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+
 
 def run_cmd_elevated(cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
     """Run with privilege elevation if needed."""
@@ -95,9 +101,10 @@ def run_cmd_elevated(cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProc
         return run_cmd(cmd, timeout)
     if os.geteuid() == 0:
         return run_cmd(cmd, timeout)
-    if (sudo := which("sudo")):
+    if sudo := which("sudo"):
         return run_cmd([sudo, "-n", *map(str, cmd)], timeout)
     return run_cmd(cmd, timeout)
+
 
 def run_with_log(logger: LoggerLike, cmd: Cmd, timeout: float = 5.0) -> subprocess.CompletedProcess[str]:
     """Run command with logging."""

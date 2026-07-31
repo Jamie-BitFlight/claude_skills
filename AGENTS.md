@@ -217,14 +217,14 @@ Quality Gate requires ALL of these to pass:
 
 ## Backlog & Planning System
 
-### Backlog (MCP-driven)
+### Backlog (provider-native plus structured MCP operations)
 
-The backlog system uses MCP tools (prefix: `mcp__plugin_dh_backlog__`) — **never edit `.claude/backlog/` files directly**.
+The backlog system uses the configured provider's native interface and selected structured MCP tools (prefix: `mcp__plugin_dh_backlog__`) — **never edit `.claude/backlog/` files directly**. In a Beads workspace, use `bd` directly for Beads-native issue, status, dependency, readiness, notes, and metadata operations.
 
 Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `backlog_close`
 
-- GitHub Issues are the source of truth; `.claude/backlog/` is local cache
-- Before starting multi-step work: create a backlog item via `backlog_add`
+- The selected backend is the source of truth; in the default deployment this is GitHub Issues, while `.claude/backlog/` is local cache
+- Before starting multi-step work: create a backlog item through the selected backend or its structured `backlog_add` operation
 - Use `backlog_groom` with `append=True` for incremental section writes
 
 ### Planning Artifacts

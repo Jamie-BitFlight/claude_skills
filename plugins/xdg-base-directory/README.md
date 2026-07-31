@@ -57,18 +57,19 @@ Install and ask Claude to write code that stores files. The skill activates auto
 Without this plugin:
 
 ```python
-config_file = Path.home() / '.myapp' / 'config.toml'  # pollutes home dir
+config_file = Path.home() / ".myapp" / "config.toml"  # pollutes home dir
 ```
 
 With this plugin:
 
 ```python
 def get_config_dir() -> Path:
-    xdg = os.environ.get('XDG_CONFIG_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.config'
-    return base / 'myapp'
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".config"
+    return base / "myapp"
 
-config_file = get_config_dir() / 'config.toml'
+
+config_file = get_config_dir() / "config.toml"
 ```
 
 Clean home directory. Respects user customization. Compliant with the specification.

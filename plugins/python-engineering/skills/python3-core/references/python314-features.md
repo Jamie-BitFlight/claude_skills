@@ -13,6 +13,7 @@ Annotations no longer evaluated eagerly. Forward references no longer need quoti
 class Node:
     children: list[Node]  # no NameError
 
+
 # Pre-3.14 — quoting required
 class Node:
     children: "list[Node]"
@@ -22,9 +23,13 @@ Introspecting annotations:
 
 ```python
 from annotationlib import get_annotations, Format
+
+
 def func(arg: Undefined): ...
+
+
 get_annotations(func, format=Format.FORWARDREF)  # {'arg': ForwardRef('Undefined')}
-get_annotations(func, format=Format.STRING)       # {'arg': 'Undefined'}
+get_annotations(func, format=Format.STRING)  # {'arg': 'Undefined'}
 ```
 
 ### `typing.Union` and `types.UnionType` unified (PEP 749)
@@ -49,10 +54,9 @@ from string.templatelib import Interpolation
 tmpl = t"Hello {name}!"
 # type(tmpl) == string.templatelib.Template — NOT a str
 
+
 def render_upper(tmpl):
-    return "".join(
-        str(p.value).upper() if isinstance(p, Interpolation) else p for p in tmpl
-    )
+    return "".join(str(p.value).upper() if isinstance(p, Interpolation) else p for p in tmpl)
 ```
 
 No pre-3.14 equivalent — required third-party libraries.
@@ -69,6 +73,7 @@ New `compression` package re-exports `lzma`, `bz2`, `gzip`, `zlib`. New `compres
 
 ```python
 from compression import zstd
+
 compressed = zstd.compress(b"data " * 100)
 ```
 
@@ -78,15 +83,16 @@ True multi-core parallelism in one process (like `multiprocessing` but stays in-
 
 ```python
 import concurrent.interpreters
+
 interp = concurrent.interpreters.create()
 ```
 
 ### `pathlib.Path` — Recursive copy/move methods
 
 ```python
-Path("./data").copy(Path("./backup"))         # recursive copy
+Path("./data").copy(Path("./backup"))  # recursive copy
 Path("./data").copy_into(Path("./archives"))  # copy into dir
-Path("./data").move(Path("./new_loc"))        # recursive move
+Path("./data").move(Path("./new_loc"))  # recursive move
 ```
 
 Pre-3.14: `shutil.copytree()` / `shutil.move()`.

@@ -57,10 +57,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/user/mypackage",
     license="MIT",
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Programming Language :: Python :: 3",
-    ],
+    classifiers=["Development Status :: 4 - Beta", "Programming Language :: Python :: 3"],
 )
 ```
 
@@ -89,14 +86,8 @@ Homepage = "https://github.com/user/mypackage"
 
 ```python
 setup(
-    install_requires=[
-        "requests>=2.20",
-        "click>=7.0,<8.0",
-    ],
-    extras_require={
-        "dev": ["pytest>=6.0", "black"],
-        "docs": ["sphinx"],
-    },
+    install_requires=["requests>=2.20", "click>=7.0,<8.0"],
+    extras_require={"dev": ["pytest>=6.0", "black"], "docs": ["sphinx"]},
     python_requires=">=3.8",
 )
 ```
@@ -123,13 +114,9 @@ docs = ["sphinx"]
 ```python
 setup(
     entry_points={
-        "console_scripts": [
-            "mycommand=mypackage.cli:main",
-        ],
-        "mygroup.subgroup": [
-            "plugin1=mypackage.plugins:plugin1",
-        ],
-    },
+        "console_scripts": ["mycommand=mypackage.cli:main"],
+        "mygroup.subgroup": ["plugin1=mypackage.plugins:plugin1"],
+    }
 )
 ```
 
@@ -150,10 +137,7 @@ plugin1 = "mypackage.plugins:plugin1"
 ```python
 from setuptools import find_packages
 
-setup(
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
-)
+setup(packages=find_packages(where="src"), package_dir={"": "src"})
 ```
 
 **To pyproject.toml** (hatchling auto-discovers):
@@ -261,19 +245,9 @@ setup(
     python_requires=">=3.8",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
-    install_requires=[
-        "requests>=2.25.0",
-        "pydantic>=1.8.0",
-    ],
-    extras_require={
-        "dev": ["pytest>=6.0", "black", "mypy"],
-        "docs": ["sphinx", "sphinx-rtd-theme"],
-    },
-    entry_points={
-        "console_scripts": [
-            "example-cli=example_pkg.cli:main",
-        ],
-    },
+    install_requires=["requests>=2.25.0", "pydantic>=1.8.0"],
+    extras_require={"dev": ["pytest>=6.0", "black", "mypy"], "docs": ["sphinx", "sphinx-rtd-theme"]},
+    entry_points={"console_scripts": ["example-cli=example_pkg.cli:main"]},
 )
 ```
 

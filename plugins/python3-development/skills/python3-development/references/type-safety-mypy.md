@@ -26,7 +26,8 @@ Use generics for type-safe container classes and functions that work with multip
 ```python
 from typing import TypeVar, Generic, Sequence
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class Stack(Generic[T]):
     def __init__(self) -> None:
@@ -37,6 +38,7 @@ class Stack(Generic[T]):
 
     def pop(self) -> T:
         return self._items.pop()
+
 
 def first(seq: Sequence[T]) -> T:
     return seq[0]
@@ -55,6 +57,7 @@ class Stack[T]:
     def pop(self) -> T:
         return self._items.pop()
 
+
 def first[T](seq: Sequence[T]) -> T:
     return seq[0]
 ```
@@ -65,8 +68,10 @@ def first[T](seq: Sequence[T]) -> T:
 from collections.abc import Sequence
 from typing import Protocol
 
+
 class SupportsAbs[T](Protocol):
     def __abs__(self) -> T: ...
+
 
 def max_by_abs[T: SupportsAbs[float]](*xs: T) -> T:
     return max(xs, key=abs)
@@ -83,6 +88,7 @@ def concat[S: (str, bytes)](x: S, y: S) -> S:
 
 ```python
 from typing import Self
+
 
 class Shape:
     scale: float = 1.0
@@ -110,16 +116,20 @@ Use protocols for structural subtyping when you need duck typing with type safet
 ```python
 from typing import Protocol
 
+
 class SupportsClose(Protocol):
     def close(self) -> None: ...
 
+
 def close_resource(resource: SupportsClose) -> None:
     resource.close()  # Works with ANY object having close() method
+
 
 # No inheritance needed - structural match
 class FileHandler:
     def close(self) -> None:
         print("Closing file")
+
 
 close_resource(FileHandler())  # Type-safe
 ```
@@ -128,6 +138,7 @@ close_resource(FileHandler())  # Type-safe
 
 ```python
 from typing import Protocol
+
 
 class Named(Protocol):
     @property
@@ -138,6 +149,7 @@ class Named(Protocol):
 
 ```python
 from typing import Protocol
+
 
 class TreeLike(Protocol):
     value: int
@@ -154,9 +166,11 @@ class TreeLike(Protocol):
 ```python
 from typing import Protocol, runtime_checkable
 
+
 @runtime_checkable
 class Drawable(Protocol):
     def draw(self) -> None: ...
+
 
 def render(obj: object) -> None:
     if isinstance(obj, Drawable):  # Runtime check enabled
@@ -183,16 +197,14 @@ Use TypedDict for dictionaries with fixed schemas and string keys where each key
 ```python
 from typing import TypedDict
 
+
 class Movie(TypedDict):
     name: str
     year: int
     director: str
 
-movie: Movie = {
-    "name": "Blade Runner",
-    "year": 1982,
-    "director": "Ridley Scott"
-}  # All keys required
+
+movie: Movie = {"name": "Blade Runner", "year": 1982, "director": "Ridley Scott"}  # All keys required
 ```
 
 **Optional Fields Pattern** (total=False):
@@ -200,9 +212,11 @@ movie: Movie = {
 ```python
 from typing import TypedDict
 
+
 class MovieOptions(TypedDict, total=False):
     subtitles: bool
     audio_language: str
+
 
 options: MovieOptions = {}  # Empty dict valid
 options2: MovieOptions = {"subtitles": True}  # Partial valid
@@ -213,13 +227,16 @@ options2: MovieOptions = {"subtitles": True}  # Partial valid
 ```python
 from typing import TypedDict
 
+
 class MovieBase(TypedDict):
     name: str  # Required
     year: int  # Required
 
+
 class Movie(MovieBase, total=False):
     director: str  # Optional
     rating: float  # Optional
+
 
 movie: Movie = {"name": "Alien", "year": 1979}  # Valid
 ```
@@ -271,8 +288,10 @@ def greet(name: str | None) -> str:
 ```python
 from typing import TypeGuard
 
+
 def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
     return all(isinstance(x, str) for x in val)
+
 
 def process(values: list[object]) -> None:
     if is_str_list(values):
@@ -285,8 +304,10 @@ def process(values: list[object]) -> None:
 ```python
 from typing import TypeIs
 
+
 def is_str(val: object) -> TypeIs[str]:
     return isinstance(val, str)
+
 
 def process(val: str | int) -> None:
     if is_str(val):
@@ -317,6 +338,7 @@ def process(val: str | int) -> None:
 ```python
 from attrs import define, field
 
+
 @define
 class User:
     name: str
@@ -330,6 +352,7 @@ class User:
 
 ```python
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True, slots=True)
 class User:
@@ -347,16 +370,17 @@ class User:
 ```python
 from pydantic import BaseModel, Field, field_validator
 
+
 class User(BaseModel):
     name: str
     age: int = Field(ge=0)
     email: str | None = None
 
-    @field_validator('age')
+    @field_validator("age")
     @classmethod
     def validate_age(cls, v: int) -> int:
         if v < 0:
-            raise ValueError('Age must be non-negative')
+            raise ValueError("Age must be non-negative")
         return v
 ```
 
@@ -378,11 +402,13 @@ class User(BaseModel):
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 @dataclass
 class Box(Generic[T]):
     value: T
+
 
 int_box: Box[int] = Box(value=42)
 str_box: Box[str] = Box(value="hello")
@@ -393,6 +419,7 @@ str_box: Box[str] = Box(value="hello")
 ```python
 from typing import Self
 
+
 class Builder:
     def set_name(self, name: str) -> Self:
         self.name = name
@@ -401,6 +428,7 @@ class Builder:
     def set_value(self, value: int) -> Self:
         self.value = value
         return self
+
 
 # Type-safe chaining
 builder = Builder().set_name("test").set_value(42)

@@ -162,6 +162,7 @@ client = Client("https://example.com/mcp")
 # Local Python script — stdio transport inferred from file path
 client = Client("my_mcp_server.py")
 
+
 async def main():
     async with client:
         await client.ping()
@@ -183,9 +184,11 @@ from fastmcp import FastMCP, Client
 
 mcp = FastMCP("TestServer")
 
+
 @mcp.tool
 def greet(name: str) -> str:
     return f"Hello, {name}!"
+
 
 client = Client(mcp)
 
@@ -207,7 +210,7 @@ transport = StdioTransport(
     command="python",
     args=["my_server.py", "--verbose"],
     env={"API_KEY": "secret", "LOG_LEVEL": "DEBUG"},
-    cwd="/path/to/server"
+    cwd="/path/to/server",
 )
 client = Client(transport)
 ```
@@ -240,11 +243,7 @@ from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
 transport = StreamableHttpTransport(
-    url="https://api.example.com/mcp",
-    headers={
-        "Authorization": "Bearer your-token-here",
-        "X-Custom-Header": "value"
-    }
+    url="https://api.example.com/mcp", headers={"Authorization": "Bearer your-token-here", "X-Custom-Header": "value"}
 )
 client = Client(transport)
 ```
@@ -260,15 +259,8 @@ from fastmcp import Client
 
 config = {
     "mcpServers": {
-        "weather": {
-            "url": "https://weather.example.com/mcp",
-            "transport": "http"
-        },
-        "assistant": {
-            "command": "python",
-            "args": ["./assistant.py"],
-            "env": {"LOG_LEVEL": "INFO"}
-        }
+        "weather": {"url": "https://weather.example.com/mcp", "transport": "http"},
+        "assistant": {"command": "python", "args": ["./assistant.py"], "env": {"LOG_LEVEL": "INFO"}},
     }
 }
 
@@ -287,7 +279,7 @@ config = {
     "mcpServers": {
         "weather": {
             "url": "https://weather.example.com/mcp",
-            "include_tags": ["forecast"]  # Only tools tagged "forecast"
+            "include_tags": ["forecast"],  # Only tools tagged "forecast"
         }
     }
 }
@@ -354,10 +346,7 @@ PATTERN: Pass a string token directly — FastMCP adds the `Bearer` prefix autom
 ```python
 from fastmcp import Client
 
-async with Client(
-    "https://your-server.fastmcp.app/mcp",
-    auth="<your-token>",
-) as client:
+async with Client("https://your-server.fastmcp.app/mcp", auth="<your-token>") as client:
     await client.ping()
 ```
 
@@ -367,10 +356,7 @@ PATTERN: Use `BearerAuth` class for explicit control:
 from fastmcp import Client
 from fastmcp.client.auth import BearerAuth
 
-async with Client(
-    "https://your-server.fastmcp.app/mcp",
-    auth=BearerAuth(token="<your-token>"),
-) as client:
+async with Client("https://your-server.fastmcp.app/mcp", auth=BearerAuth(token="<your-token>")) as client:
     await client.ping()
 ```
 
@@ -381,10 +367,7 @@ from fastmcp import Client
 from fastmcp.client.transports import StreamableHttpTransport
 
 async with Client(
-    transport=StreamableHttpTransport(
-        "https://your-server.fastmcp.app/mcp",
-        headers={"X-API-Key": "<your-token>"},
-    ),
+    transport=StreamableHttpTransport("https://your-server.fastmcp.app/mcp", headers={"X-API-Key": "<your-token>"})
 ) as client:
     await client.ping()
 ```
@@ -437,8 +420,7 @@ from cryptography.fernet import Fernet
 import os
 
 encrypted_storage = FernetEncryptionWrapper(
-    key_value=DiskStore(directory="~/.fastmcp/oauth-tokens"),
-    fernet=Fernet(os.environ["OAUTH_STORAGE_ENCRYPTION_KEY"])
+    key_value=DiskStore(directory="~/.fastmcp/oauth-tokens"), fernet=Fernet(os.environ["OAUTH_STORAGE_ENCRYPTION_KEY"])
 )
 
 oauth = OAuth(token_storage=encrypted_storage)
@@ -453,10 +435,7 @@ from fastmcp import Client
 from fastmcp.client.auth import OAuth
 
 async with Client(
-    "https://mcp-server.example.com/mcp",
-    auth=OAuth(
-        client_metadata_url="https://myapp.example.com/oauth/client.json",
-    ),
+    "https://mcp-server.example.com/mcp", auth=OAuth(client_metadata_url="https://myapp.example.com/oauth/client.json")
 ) as client:
     await client.ping()
 ```
@@ -488,19 +467,14 @@ PATTERN: Implement a `sampling_handler` to respond to server-initiated LLM compl
 from fastmcp import Client
 from fastmcp.client.sampling import SamplingMessage, SamplingParams, RequestContext
 
-async def sampling_handler(
-    messages: list[SamplingMessage],
-    params: SamplingParams,
-    context: RequestContext
-) -> str:
+
+async def sampling_handler(messages: list[SamplingMessage], params: SamplingParams, context: RequestContext) -> str:
     system_prompt = params.systemPrompt or "You are a helpful assistant."
     # Integrate with your LLM service here
     return "Generated response based on the messages"
 
-client = Client(
-    "my_mcp_server.py",
-    sampling_handler=sampling_handler,
-)
+
+client = Client("my_mcp_server.py", sampling_handler=sampling_handler)
 ```
 
 PATTERN: Use built-in handlers for common LLM providers. Requires the corresponding extra package.
@@ -510,20 +484,14 @@ from fastmcp import Client
 from fastmcp.client.sampling.handlers.openai import OpenAISamplingHandler
 
 # Install: pip install "fastmcp[openai]"
-client = Client(
-    "my_mcp_server.py",
-    sampling_handler=OpenAISamplingHandler(default_model="gpt-4o"),
-)
+client = Client("my_mcp_server.py", sampling_handler=OpenAISamplingHandler(default_model="gpt-4o"))
 ```
 
 ```python
 from fastmcp.client.sampling.handlers.anthropic import AnthropicSamplingHandler
 
 # Install: pip install "fastmcp[anthropic]"
-client = Client(
-    "my_mcp_server.py",
-    sampling_handler=AnthropicSamplingHandler(default_model="claude-sonnet-4-5"),
-)
+client = Client("my_mcp_server.py", sampling_handler=AnthropicSamplingHandler(default_model="claude-sonnet-4-5"))
 ```
 
 RULE: When you provide a `sampling_handler`, FastMCP automatically advertises full sampling capabilities (including tool support) to the server. [8]
@@ -538,11 +506,9 @@ PATTERN: Implement an `elicitation_handler` to respond to server requests for st
 from fastmcp import Client
 from fastmcp.client.elicitation import ElicitResult, ElicitRequestParams, RequestContext
 
+
 async def elicitation_handler(
-    message: str,
-    response_type: type | None,
-    params: ElicitRequestParams,
-    context: RequestContext
+    message: str, response_type: type | None, params: ElicitRequestParams, context: RequestContext
 ) -> ElicitResult | object:
     user_input = input(f"{message}: ")
 
@@ -551,10 +517,8 @@ async def elicitation_handler(
 
     return response_type(value=user_input)
 
-client = Client(
-    "my_mcp_server.py",
-    elicitation_handler=elicitation_handler,
-)
+
+client = Client("my_mcp_server.py", elicitation_handler=elicitation_handler)
 ```
 
 PATTERN: Return `ElicitResult` for explicit action control:
@@ -562,19 +526,17 @@ PATTERN: Return `ElicitResult` for explicit action control:
 ```python
 from fastmcp.client.elicitation import ElicitResult
 
+
 async def elicitation_handler(message, response_type, params, context):
     user_input = input(f"{message}: ")
 
     if not user_input:
-        return ElicitResult(action="decline")   # User declined — no data
+        return ElicitResult(action="decline")  # User declined — no data
 
     if user_input == "cancel":
-        return ElicitResult(action="cancel")    # Cancel entire operation
+        return ElicitResult(action="cancel")  # Cancel entire operation
 
-    return ElicitResult(
-        action="accept",
-        content=response_type(value=user_input)
-    )
+    return ElicitResult(action="accept", content=response_type(value=user_input))
 ```
 
 RULE: Action types — `accept` (include data in `content`), `decline` (omit `content`), `cancel` (omit `content`, abort operation). [9]
@@ -615,6 +577,7 @@ Control client-side log verbosity:
 
 ```python
 import logging
+
 client = Client("https://example.com/mcp", client_log_level=logging.DEBUG)
 ```
 

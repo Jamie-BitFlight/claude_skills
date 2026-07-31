@@ -43,13 +43,16 @@ from fastmcp import FastMCP
 weather = FastMCP("Weather")
 calendar = FastMCP("Calendar")
 
+
 @weather.tool
 def get_data() -> str:
     return "Weather data"
 
+
 @calendar.tool
 def get_data() -> str:
     return "Calendar data"
+
 
 # Without namespacing, both tools are named "get_data" — conflict
 main = FastMCP("Main")
@@ -75,9 +78,11 @@ from fastmcp.server.transforms import Namespace
 
 mcp = FastMCP("Server")
 
+
 @mcp.tool
 def greet(name: str) -> str:
     return f"Hello, {name}!"
+
 
 mcp.add_transform(Namespace("v1"))
 
@@ -97,17 +102,18 @@ from fastmcp.tools.tool_transform import ToolTransformConfig
 
 mcp = FastMCP("Server")
 
+
 @mcp.tool
 def verbose_internal_data_fetcher(query: str) -> str:
     """Fetches data from the internal database."""
     return f"Results for: {query}"
 
-mcp.add_transform(ToolTransform({
-    "verbose_internal_data_fetcher": ToolTransformConfig(
-        name="search",
-        description="Search the database.",
-    )
-}))
+
+mcp.add_transform(
+    ToolTransform({
+        "verbose_internal_data_fetcher": ToolTransformConfig(name="search", description="Search the database.")
+    })
+)
 
 # Clients see "search" with the cleaner description
 ```
@@ -118,10 +124,12 @@ PATTERN: Use `Tool.from_tool()` for immediate transformation when you have direc
 from fastmcp.tools import Tool, tool
 from fastmcp.tools.tool_transform import ArgTransform
 
+
 @tool
 def search(q: str, limit: int = 10) -> list[str]:
     """Search for items."""
     return [f"Result {i} for {q}" for i in range(limit)]
+
 
 better_search = Tool.from_tool(
     search,
@@ -184,24 +192,24 @@ For advanced scenarios, provide a `transform_fn` that intercepts tool execution.
 from fastmcp.tools import Tool, tool
 from fastmcp.tools.tool_transform import forward, ArgTransform
 
+
 @tool
 def divide(a: float, b: float) -> float:
     """Divide a by b."""
     return a / b
+
 
 async def safe_divide(numerator: float, denominator: float) -> float:
     if denominator == 0:
         raise ValueError("Cannot divide by zero")
     return await forward(numerator=numerator, denominator=denominator)
 
+
 safe_division = Tool.from_tool(
     divide,
     name="safe_divide",
     transform_fn=safe_divide,
-    transform_args={
-        "a": ArgTransform(name="numerator"),
-        "b": ArgTransform(name="denominator"),
-    },
+    transform_args={"a": ArgTransform(name="numerator"), "b": ArgTransform(name="denominator")},
 )
 ```
 
@@ -216,10 +224,12 @@ from fastmcp import FastMCP
 from fastmcp.tools import Tool, tool
 from fastmcp.tools.tool_transform import ArgTransform
 
+
 @tool
 def get_user_data(user_id: str, query: str) -> str:
     """Fetch data for a specific user."""
     return f"Data for user {user_id}: {query}"
+
 
 def create_user_tool(user_id: str) -> Tool:
     """Factory that creates a user-specific version of get_user_data."""
@@ -227,10 +237,9 @@ def create_user_tool(user_id: str) -> Tool:
         get_user_data,
         name="get_my_data",
         description="Fetch your data. No need to specify a user ID.",
-        transform_args={
-            "user_id": ArgTransform(hide=True, default=user_id),
-        },
+        transform_args={"user_id": ArgTransform(hide=True, default=user_id)},
     )
+
 
 mcp = FastMCP("User Server")
 current_user_id = "user-123"  # from auth context
@@ -252,13 +261,16 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("MyServer")
 
+
 @mcp.tool(tags={"admin"})
 def delete_all() -> str:
     return "Deleted"
 
+
 @mcp.tool(tags={"public"})
 def get_status() -> str:
     return "OK"
+
 
 # Disable by tag
 mcp.disable(tags={"admin"})
@@ -274,6 +286,7 @@ PATTERN: Control visibility per-session using `ctx.enable_components()` and `ctx
 
 ```python
 from fastmcp import FastMCP, Context
+
 
 @mcp.tool
 async def activate_namespace(namespace: str, ctx: Context) -> str:
@@ -299,15 +312,18 @@ from fastmcp.server.transforms import ResourcesAsTools
 
 mcp = FastMCP("My Server")
 
+
 @mcp.resource("config://app")
 def app_config() -> str:
     """Application configuration."""
     return '{"app_name": "My App", "version": "1.0.0"}'
 
+
 @mcp.resource("user://{user_id}/profile")
 def user_profile(user_id: str) -> str:
     """Get a user's profile by ID."""
     return f'{{"user_id": "{user_id}"}}'
+
 
 # Add the transform — creates list_resources and read_resource tools
 mcp.add_transform(ResourcesAsTools(mcp))
@@ -332,10 +348,12 @@ from fastmcp.server.transforms import PromptsAsTools
 
 mcp = FastMCP("My Server")
 
+
 @mcp.prompt
 def analyze_code(code: str, language: str = "python") -> str:
     """Analyze code for potential issues."""
     return f"Analyze this {language} code:\n{code}"
+
 
 # Add the transform — creates list_prompts and get_prompt tools
 mcp.add_transform(PromptsAsTools(mcp))
@@ -356,15 +374,15 @@ from fastmcp.tools.tool_transform import ToolTransformConfig
 
 sub_server = FastMCP("Sub")
 
+
 @sub_server.tool
 def process(data: str) -> str:
     return f"Processed: {data}"
 
+
 provider = FastMCPProvider(sub_server)
 provider.add_transform(Namespace("api"))
-provider.add_transform(ToolTransform({
-    "api_process": ToolTransformConfig(description="Process data through the API"),
-}))
+provider.add_transform(ToolTransform({"api_process": ToolTransformConfig(description="Process data through the API")}))
 
 main = FastMCP("Main", providers=[provider])
 # Tool is now: api_process with updated description
@@ -399,10 +417,12 @@ mcp = FastMCP("Server", transforms=[BM25SearchTransform()])
 Transforms stack in the order added. First added is innermost (closest to the provider).
 
 ```python
-provider.add_transform(Namespace("api"))           # Applied first
-provider.add_transform(ToolTransform({             # Sees namespaced names
-    "api_verbose_name": ToolTransformConfig(name="short"),
-}))
+provider.add_transform(Namespace("api"))  # Applied first
+provider.add_transform(
+    ToolTransform({  # Sees namespaced names
+        "api_verbose_name": ToolTransformConfig(name="short")
+    })
+)
 
 # Flow: "verbose_name" -> "api_verbose_name" -> "short"
 ```
@@ -417,6 +437,7 @@ Subclass `Transform` and override the methods you need. Leave unneeded methods a
 from collections.abc import Sequence
 from fastmcp.server.transforms import Transform, GetToolNext
 from fastmcp.tools.tool import Tool
+
 
 class TagFilter(Transform):
     """Filter tools to only those with specific tags."""
@@ -462,7 +483,7 @@ class PrefixTransform(Transform):
     async def get_tool(self, name: str, call_next: GetToolNext) -> Tool | None:
         if not name.startswith(f"{self.prefix}_"):
             return None
-        original = name[len(self.prefix) + 1:]
+        original = name[len(self.prefix) + 1 :]
         tool = await call_next(original)
         if tool:
             return tool.model_copy(update={"name": name})
@@ -494,10 +515,12 @@ from fastmcp.server.transforms.search import RegexSearchTransform
 
 mcp = FastMCP("My Server", transforms=[RegexSearchTransform()])
 
+
 @mcp.tool
 def search_database(query: str, limit: int = 10) -> list[dict]:
     """Search the database for records matching the query."""
     ...
+
 
 @mcp.tool
 def send_email(to: str, subject: str, body: str) -> bool:
@@ -531,9 +554,7 @@ mcp = FastMCP("My Server", transforms=[BM25SearchTransform()])
 
 ```python
 # LLM calls search_tools with natural language
-result = await client.call_tool("search_tools", {
-    "query": "tools for deleting things from the database"
-})
+result = await client.call_tool("search_tools", {"query": "tools for deleting things from the database"})
 # Returns: delete_record ranked first
 ```
 
@@ -550,13 +571,15 @@ Both transforms accept the same options:
 ```python
 from fastmcp.server.transforms.search import RegexSearchTransform
 
-mcp.add_transform(RegexSearchTransform(
-    max_results=10,                  # default 5; top N results
-    always_visible=["help", "status"],  # pinned tools always in list_tools
-    search_tool_name="find_tools",   # rename to avoid conflicts
-    call_tool_name="run_tool",       # rename to avoid conflicts
-    search_result_serializer=my_fn,  # custom output format (see below)
-))
+mcp.add_transform(
+    RegexSearchTransform(
+        max_results=10,  # default 5; top N results
+        always_visible=["help", "status"],  # pinned tools always in list_tools
+        search_tool_name="find_tools",  # rename to avoid conflicts
+        call_tool_name="run_tool",  # rename to avoid conflicts
+        search_result_serializer=my_fn,  # custom output format (see below)
+    )
+)
 ```
 
 | Option | Default | Description |
@@ -580,9 +603,7 @@ Override how search results are formatted by providing a callable. The callable 
 from fastmcp.server.transforms.search.base import serialize_tools_for_output_markdown
 from fastmcp.server.transforms.search import BM25SearchTransform
 
-mcp.add_transform(BM25SearchTransform(
-    search_result_serializer=serialize_tools_for_output_markdown,
-))
+mcp.add_transform(BM25SearchTransform(search_result_serializer=serialize_tools_for_output_markdown))
 ```
 
 Custom serializers can be sync or async:
@@ -590,6 +611,7 @@ Custom serializers can be sync or async:
 ```python
 async def my_serializer(tools):
     return [{"name": t.name, "summary": t.description} for t in tools]
+
 
 mcp.add_transform(RegexSearchTransform(search_result_serializer=my_serializer))
 ```
@@ -611,7 +633,7 @@ from fastmcp.server.transforms.search import RegexSearchTransform
 mcp = FastMCP("My Server")
 
 mcp.add_transform(Visibility(False, tags={"admin"}))  # admin tools hidden
-mcp.add_transform(RegexSearchTransform())              # search sees only visible tools
+mcp.add_transform(RegexSearchTransform())  # search sees only visible tools
 ```
 
 Session-level visibility changes via `ctx.disable_components()` are reflected immediately in search results.
@@ -634,10 +656,12 @@ from fastmcp.experimental.transforms.code_mode import CodeMode
 
 mcp = FastMCP("Server", transforms=[CodeMode()])
 
+
 @mcp.tool
 def add(x: int, y: int) -> int:
     """Add two numbers."""
     return x + y
+
 
 @mcp.tool
 def multiply(x: int, y: int) -> int:
@@ -715,9 +739,7 @@ Not included by default — add it when browsing by category helps orient the LL
 ```python
 from fastmcp.experimental.transforms.code_mode import CodeMode, ListTools, GetSchemas
 
-code_mode = CodeMode(
-    discovery_tools=[ListTools(), GetSchemas()],
-)
+code_mode = CodeMode(discovery_tools=[ListTools(), GetSchemas()])
 ```
 
 ### Discovery Patterns
@@ -733,9 +755,7 @@ mcp = FastMCP("Server", transforms=[CodeMode()])
 ```python
 from fastmcp.experimental.transforms.code_mode import CodeMode, GetTags, Search, GetSchemas
 
-code_mode = CodeMode(
-    discovery_tools=[GetTags(), Search(), GetSchemas()],
-)
+code_mode = CodeMode(discovery_tools=[GetTags(), Search(), GetSchemas()])
 mcp = FastMCP("Server", transforms=[code_mode])
 ```
 
@@ -744,9 +764,7 @@ mcp = FastMCP("Server", transforms=[code_mode])
 ```python
 from fastmcp.experimental.transforms.code_mode import CodeMode, Search, GetSchemas
 
-code_mode = CodeMode(
-    discovery_tools=[Search(default_detail="detailed"), GetSchemas()],
-)
+code_mode = CodeMode(discovery_tools=[Search(default_detail="detailed"), GetSchemas()])
 mcp = FastMCP("Server", transforms=[code_mode])
 ```
 
@@ -775,6 +793,7 @@ from fastmcp.experimental.transforms.code_mode import CodeMode, GetToolCatalog, 
 from fastmcp.server.context import Context
 from fastmcp.tools.tool import Tool
 
+
 def list_all_tools(get_catalog: GetToolCatalog) -> Tool:
     async def list_tools(ctx: Context) -> str:
         """List all available tool names."""
@@ -782,6 +801,7 @@ def list_all_tools(get_catalog: GetToolCatalog) -> Tool:
         return ", ".join(t.name for t in tools)
 
     return Tool.from_function(fn=list_tools, name="list_tools")
+
 
 code_mode = CodeMode(discovery_tools=[list_all_tools, GetSchemas()])
 ```
@@ -795,9 +815,7 @@ The default `MontySandboxProvider` enforces execution limits. Without limits, LL
 ```python
 from fastmcp.experimental.transforms.code_mode import CodeMode, MontySandboxProvider
 
-sandbox = MontySandboxProvider(
-    limits={"max_duration_secs": 10, "max_memory": 50_000_000},
-)
+sandbox = MontySandboxProvider(limits={"max_duration_secs": 10, "max_memory": 50_000_000})
 
 mcp = FastMCP("Server", transforms=[CodeMode(sandbox_provider=sandbox)])
 ```
@@ -822,6 +840,7 @@ from typing import Any
 
 from fastmcp.experimental.transforms.code_mode import CodeMode, SandboxProvider
 
+
 class RemoteSandboxProvider:
     async def run(
         self,
@@ -832,6 +851,7 @@ class RemoteSandboxProvider:
     ) -> Any:
         # Send code to your remote sandbox runtime
         ...
+
 
 mcp = FastMCP("Server", transforms=[CodeMode(sandbox_provider=RemoteSandboxProvider())])
 ```
@@ -844,11 +864,7 @@ The `external_functions` dict contains async callables injected into the sandbox
 from fastmcp.experimental.transforms.code_mode import CodeMode, Search, GetSchemas
 
 code_mode = CodeMode(
-    discovery_tools=[
-        Search(name="find_tools"),
-        GetSchemas(name="describe"),
-    ],
-    execute_tool_name="run_workflow",
+    discovery_tools=[Search(name="find_tools"), GetSchemas(name="describe")], execute_tool_name="run_workflow"
 )
 ```
 

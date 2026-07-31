@@ -207,37 +207,33 @@ from hatchling.builders.plugin.interface import BuilderInterface
 
 
 class CustomBuilder(BuilderInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def get_version_api(self):
-        return {
-            'minimal': self.build_minimal,
-            'standard': self.build_standard,
-            'extended': self.build_extended,
-        }
+        return {"minimal": self.build_minimal, "standard": self.build_standard, "extended": self.build_extended}
 
     def build_minimal(self, directory, **kwargs):
         """Build with minimal features."""
-        config = self.get_version_config('minimal')
+        config = self.get_version_config("minimal")
         # Minimal build logic
         return artifact_path
 
     def build_standard(self, directory, **kwargs):
         """Build with standard features."""
-        config = self.get_version_config('standard')
+        config = self.get_version_config("standard")
         # Standard build logic
         return artifact_path
 
     def build_extended(self, directory, **kwargs):
         """Build with extended features."""
-        config = self.get_version_config('extended')
+        config = self.get_version_config("extended")
         # Extended build logic
         return artifact_path
 
     def get_version_config(self, version):
         """Get configuration for specific version."""
         base_config = self.target_config.copy()
-        version_config = self.target_config.get('versions', {}).get(version, {})
+        version_config = self.target_config.get("versions", {}).get(version, {})
         return {**base_config, **version_config}
 ```
 
@@ -283,19 +279,12 @@ Create a build script to build all versions:
 import subprocess
 import sys
 
-targets = {
-    'wheel': ['minimal', 'standard', 'full'],
-    'binary': ['standalone', 'portable'],
-}
+targets = {"wheel": ["minimal", "standard", "full"], "binary": ["standalone", "portable"]}
 
 for target, versions in targets.items():
     for version in versions:
         print(f"Building {target}:{version}")
-        result = subprocess.run(
-            ['hatch', 'build', '-t', f'{target}:{version}'],
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["hatch", "build", "-t", f"{target}:{version}"], capture_output=True, text=True)
         if result.returncode != 0:
             print(f"Failed to build {target}:{version}")
             print(result.stderr)
@@ -315,12 +304,12 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 class ConditionalVersionHook(BuildHookInterface):
     def initialize(self, version, build_data):
-        env = os.environ.get('BUILD_ENV', 'dev')
+        env = os.environ.get("BUILD_ENV", "dev")
 
-        if env == 'production' and version == 'dev':
+        if env == "production" and version == "dev":
             raise ValueError("Cannot build dev version in production")
 
-        if env == 'dev' and version == 'prod':
+        if env == "dev" and version == "prod":
             self.app.display_warning("Building production version in dev environment")
 ```
 
@@ -335,17 +324,15 @@ class PlatformVersionHook(BuildHookInterface):
         system = platform.system().lower()
 
         version_platforms = {
-            'windows': ['Windows'],
-            'linux': ['Linux'],
-            'macos': ['Darwin'],
-            'universal': ['Windows', 'Linux', 'Darwin'],
+            "windows": ["Windows"],
+            "linux": ["Linux"],
+            "macos": ["Darwin"],
+            "universal": ["Windows", "Linux", "Darwin"],
         }
 
         if version in version_platforms:
             if platform.system() not in version_platforms[version]:
-                raise ValueError(
-                    f"Version '{version}' not supported on {platform.system()}"
-                )
+                raise ValueError(f"Version '{version}' not supported on {platform.system()}")
 ```
 
 ## Version Naming Conventions
@@ -409,9 +396,9 @@ To avoid overwrites, use build hooks to customize names:
 ```python
 class VersionNameHook(BuildHookInterface):
     def finalize(self, version, build_data):
-        if version != 'standard':
+        if version != "standard":
             # Modify artifact name to include version
-            build_data['tag'] = f"{build_data.get('tag', '')}.{version}"
+            build_data["tag"] = f"{build_data.get('tag', '')}.{version}"
 ```
 
 Results in:
@@ -437,24 +424,19 @@ from pathlib import Path
 @pytest.mark.parametrize("version", ["minimal", "standard", "full"])
 def test_wheel_versions(tmp_path, version):
     """Test building different wheel versions."""
-    result = subprocess.run(
-        ['hatch', 'build', '-t', f'wheel:{version}'],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path
-    )
+    result = subprocess.run(["hatch", "build", "-t", f"wheel:{version}"], capture_output=True, text=True, cwd=tmp_path)
 
     assert result.returncode == 0
-    assert Path(tmp_path / 'dist').exists()
+    assert Path(tmp_path / "dist").exists()
 
     # Version-specific assertions
-    if version == 'minimal':
+    if version == "minimal":
         # Check minimal version specifics
         pass
-    elif version == 'standard':
+    elif version == "standard":
         # Check standard version specifics
         pass
-    elif version == 'full':
+    elif version == "full":
         # Check full version specifics
         pass
 ```
@@ -464,18 +446,19 @@ def test_wheel_versions(tmp_path, version):
 ```python
 def test_version_compatibility():
     """Ensure all versions maintain API compatibility."""
-    versions = ['minimal', 'standard', 'full']
+    versions = ["minimal", "standard", "full"]
 
     for version in versions:
         # Build version
-        subprocess.run(['hatch', 'build', '-t', f'wheel:{version}'])
+        subprocess.run(["hatch", "build", "-t", f"wheel:{version}"])
 
         # Install and test
-        subprocess.run(['pip', 'install', f'dist/*{version}*.whl'])
+        subprocess.run(["pip", "install", f"dist/*{version}*.whl"])
 
         # Run compatibility tests
         import mypackage
-        assert hasattr(mypackage, 'core_function')
+
+        assert hasattr(mypackage, "core_function")
         # Additional compatibility checks
 ```
 
@@ -491,11 +474,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 def build_version(version):
-    subprocess.run(['hatch', 'build', '-t', f'wheel:{version}'])
+    subprocess.run(["hatch", "build", "-t", f"wheel:{version}"])
 
 
 with ThreadPoolExecutor(max_workers=4) as executor:
-    versions = ['minimal', 'standard', 'full', 'extended']
+    versions = ["minimal", "standard", "full", "extended"]
     executor.map(build_version, versions)
 ```
 
@@ -509,11 +492,11 @@ import shutil
 from pathlib import Path
 
 
-def clean_old_versions(dist_dir='dist'):
+def clean_old_versions(dist_dir="dist"):
     dist_path = Path(dist_dir)
     if dist_path.exists():
-        for file in dist_path.glob('*.whl'):
-            if any(v in file.name for v in ['minimal', 'full']):
+        for file in dist_path.glob("*.whl"):
+            if any(v in file.name for v in ["minimal", "full"]):
                 file.unlink()
 ```
 
@@ -541,14 +524,14 @@ def validate_versions():
     """Validate all version configurations."""
     import tomli
 
-    with open('pyproject.toml', 'rb') as f:
+    with open("pyproject.toml", "rb") as f:
         config = tomli.load(f)
 
-    wheel_config = config['tool']['hatch']['build']['targets']['wheel']
-    versions = wheel_config.get('versions', [])
+    wheel_config = config["tool"]["hatch"]["build"]["targets"]["wheel"]
+    versions = wheel_config.get("versions", [])
 
     for version in versions:
-        version_config = wheel_config.get('versions', {}).get(version)
+        version_config = wheel_config.get("versions", {}).get(version)
         if not version_config:
             print(f"Warning: Version '{version}' has no configuration")
 ```

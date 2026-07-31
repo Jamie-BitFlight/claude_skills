@@ -72,11 +72,7 @@ console.print(text)
 ### assemble() class method
 
 ```python
-text = Text.assemble(
-    ("Hello", "bold magenta"),
-    " ",
-    ("World", "bold"),
-)
+text = Text.assemble(("Hello", "bold magenta"), " ", ("World", "bold"))
 console.print(text)
 ```
 
@@ -198,9 +194,9 @@ pprint(locals())
 Truncation examples:
 
 ```python
-pprint(locals(), max_length=2)       # truncate containers > 2 elements
-pprint("long string", max_string=21) # truncate strings > 21 chars
-pprint(data, expand_all=True)        # always expand everything
+pprint(locals(), max_length=2)  # truncate containers > 2 elements
+pprint("long string", max_string=21)  # truncate strings > 21 chars
+pprint(data, expand_all=True)  # always expand everything
 ```
 
 ### Pretty Renderable
@@ -221,6 +217,7 @@ print(panel)
 
 ```python
 from rich import pretty
+
 pretty.install()  # auto-pretty-prints all REPL output
 ```
 
@@ -237,9 +234,9 @@ class Bird:
         self.extinct = extinct
 
     def __rich_repr__(self):
-        yield self.name               # positional argument
-        yield "eats", self.eats       # keyword argument
-        yield "fly", self.fly, True   # keyword; only shown if not equal to default
+        yield self.name  # positional argument
+        yield "eats", self.eats  # keyword argument
+        yield "fly", self.fly, True  # keyword; only shown if not equal to default
         yield "extinct", self.extinct, False
 
     # Optional: angular bracket style
@@ -258,6 +255,7 @@ Yield tuple rules:
 ```python
 import rich.repr
 
+
 @rich.repr.auto
 class Bird:
     def __init__(self, name, eats=None, fly=True, extinct=False):
@@ -266,10 +264,10 @@ class Bird:
         self.fly = fly
         self.extinct = extinct
 
+
 # Angular bracket style
 @rich.repr.auto(angular=True)
-class Bird:
-    ...
+class Bird: ...
 ```
 
 `@rich.repr.auto` requires that `__init__` parameter names match attribute names. Also generates `__repr__`.
@@ -292,6 +290,7 @@ console.log(JSON('{"key": "value"}'))
 
 # Convenience function
 from rich import print_json
+
 print_json('[false, true, null, "foo"]')
 
 # Or via console

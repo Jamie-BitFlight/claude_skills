@@ -106,13 +106,13 @@ Without GitPython, you would need to @[github.com/README.md]:
 from git import Repo
 
 # Clone repository
-repo = Repo.clone_from('https://github.com/user/repo.git', '/local/path')
+repo = Repo.clone_from("https://github.com/user/repo.git", "/local/path")
 
 # Initialize new repository
-repo = Repo.init('/path/to/new/repo')
+repo = Repo.init("/path/to/new/repo")
 
 # Open existing repository
-repo = Repo('/path/to/existing/repo')
+repo = Repo("/path/to/existing/repo")
 ```
 
 @[Context7/tutorial.rst]
@@ -122,7 +122,7 @@ repo = Repo('/path/to/existing/repo')
 ```python
 from git import Repo
 
-repo = Repo('/path/to/repo')
+repo = Repo("/path/to/repo")
 
 # Get active branch
 active_branch = repo.active_branch
@@ -142,13 +142,13 @@ latest_commit = repo.head.commit
 ```python
 from git import Repo
 
-repo = Repo('/path/to/repo')
+repo = Repo("/path/to/repo")
 
 # Stage files
-repo.index.add(['file1.txt', 'file2.py'])
+repo.index.add(["file1.txt", "file2.py"])
 
 # Create commit
-repo.index.commit('Commit message')
+repo.index.commit("Commit message")
 
 # Access commit metadata
 commit = repo.head.commit
@@ -165,16 +165,16 @@ print(commit.hexsha)
 ```python
 from git import Repo
 
-repo = Repo('/path/to/repo')
+repo = Repo("/path/to/repo")
 
 # List all branches
 branches = repo.heads
 
 # Create new branch
-new_branch = repo.create_head('feature-branch')
+new_branch = repo.create_head("feature-branch")
 
 # Checkout branch (safer method)
-repo.git.checkout('branch-name')
+repo.git.checkout("branch-name")
 
 # Access branch commit
 commit = repo.heads.main.commit
@@ -187,14 +187,14 @@ commit = repo.heads.main.commit
 ```python
 from git import Repo
 
-repo = Repo('/path/to/repo')
+repo = Repo("/path/to/repo")
 
 # Iterate through commits
-for commit in repo.iter_commits('main', max_count=50):
+for commit in repo.iter_commits("main", max_count=50):
     print(f"{commit.hexsha[:7]}: {commit.summary}")
 
 # Get commits for specific file
-commits = repo.iter_commits(paths='specific/file.py')
+commits = repo.iter_commits(paths="specific/file.py")
 
 # Access commit tree and changes
 for commit in repo.iter_commits():
@@ -222,8 +222,9 @@ GitPython provides abstractions for repository operations @[Context7/tutorial.rs
 ```python
 from git import Repo
 
+
 def deploy_on_commit():
-    repo = Repo('/app/source')
+    repo = Repo("/app/source")
 
     # Fetch latest changes
     origin = repo.remotes.origin
@@ -240,6 +241,7 @@ def deploy_on_commit():
 from git import Repo
 from collections import defaultdict
 
+
 def analyze_contributors(repo_path):
     repo = Repo(repo_path)
     contributions = defaultdict(int)
@@ -255,10 +257,11 @@ def analyze_contributors(repo_path):
 ```python
 from git import Repo
 
+
 def create_version_tag(version):
-    repo = Repo('.')
-    repo.create_tag(f'v{version}', message=f'Release {version}')
-    repo.remotes.origin.push(f'v{version}')
+    repo = Repo(".")
+    repo.create_tag(f"v{version}", message=f"Release {version}")
+    repo.remotes.origin.push(f"v{version}")
 ```
 
 ## Python Version Compatibility
@@ -303,7 +306,7 @@ repo = Repo("/path/to/bare/repo", bare=True)
 ```python
 from git import Repo
 
-repo = Repo('.')
+repo = Repo(".")
 
 # Get latest commit
 commit = repo.head.commit
@@ -326,7 +329,7 @@ for item in tree:
 ```python
 from git import Repo
 
-repo = Repo('.')
+repo = Repo(".")
 commit = repo.head.commit
 
 # Diff commit against working tree
@@ -348,11 +351,13 @@ for diff_item in diff_worktree:
 ```python
 from git import Repo, RemoteProgress
 
+
 class ProgressPrinter(RemoteProgress):
-    def update(self, op_code, cur_count, max_count=None, message=''):
+    def update(self, op_code, cur_count, max_count=None, message=""):
         print(f"Progress: {cur_count}/{max_count}")
 
-repo = Repo('/path/to/repo')
+
+repo = Repo("/path/to/repo")
 origin = repo.remotes.origin
 
 # Fetch with progress
@@ -430,15 +435,14 @@ If you cannot have system dependencies:
 ```python
 # USE GITPYTHON:
 # - Iterate commits with filtering
-for commit in repo.iter_commits('main', max_count=100):
-    if commit.author.email == 'specific@email.com':
+for commit in repo.iter_commits("main", max_count=100):
+    if commit.author.email == "specific@email.com":
         analyze_commit(commit)
 
 # USE SUBPROCESS:
 # - Simple status check
-result = subprocess.run(['git', 'status', '--short'],
-                       capture_output=True, text=True)
-if 'M' in result.stdout:
+result = subprocess.run(["git", "status", "--short"], capture_output=True, text=True)
+if "M" in result.stdout:
     print("Modified files detected")
 
 # USE GITPYTHON:
@@ -449,7 +453,7 @@ if repo.is_dirty(untracked_files=True):
 
 # USE SUBPROCESS:
 # - Performance-critical bulk operation
-subprocess.run(['git', 'gc', '--aggressive'])
+subprocess.run(["git", "gc", "--aggressive"])
 ```
 
 ## Critical Limitations

@@ -48,8 +48,11 @@ def test_link_followup_persists_and_list_followups_queries(write_test_item) -> N
     # Queryability: list_followups returns the linked item.
     listed = list_followups("P1")
     assert listed["count"] == 1
-    items = list(listed["items"])
-    item = items[0]
+    raw_items = listed["items"]
+    assert isinstance(raw_items, list)
+    assert len(raw_items) == 1
+    item = raw_items[0]
+    assert isinstance(item, dict)
     assert item["title"] == "Follow-up task"
     assert item["followup_to"] == "P1"
 

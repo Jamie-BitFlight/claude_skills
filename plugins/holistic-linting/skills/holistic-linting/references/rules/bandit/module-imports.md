@@ -29,11 +29,13 @@ Importing these modules is acceptable when used securely:
 ```python
 # Safe - pickle your own data
 import pickle
+
 data = pickle.dumps(my_object)
 restored = pickle.loads(data)  # Secure - your data
 
 # Safe - subprocess with proper usage
 import subprocess
+
 subprocess.run(["ls", "-la"], check=True)  # No shell=True, safe
 ```
 
@@ -98,9 +100,7 @@ import requests
 
 # RIGHT - REST API with HTTPS
 response = requests.post(
-    "https://api.example.com/v1/resource",
-    json={"name": "value"},
-    headers={"Authorization": "Bearer token"}
+    "https://api.example.com/v1/resource", json={"name": "value"}, headers={"Authorization": "Bearer token"}
 )
 data = response.json()
 
@@ -144,6 +144,7 @@ cgi_script = CGIScript()
 
 # In your application
 from flask import Flask
+
 app = Flask(__name__)
 
 # Run with: gunicorn app:app
@@ -206,11 +207,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import hashes
 
 # Modern, maintained, secure
-private_key = rsa.generate_private_key(
-    public_exponent=65537,
-    key_size=2048,
-    backend=default_backend(),
-)
+private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
 ```
 
 **Alternative: Use Fernet** (High-Level):
@@ -267,11 +264,7 @@ stdin, stdout, stderr = client.exec_command("reboot")
 # Option 2: HTTPS-based management APIs
 import requests
 
-response = requests.post(
-    "https://mgmt.example.com:8443/api/reboot",
-    auth=("admin", "password"),
-    verify=True
-)
+response = requests.post("https://mgmt.example.com:8443/api/reboot", auth=("admin", "password"), verify=True)
 
 # Option 3: SSH + VPN for secure access
 # Manage IPMI only through secure tunnel

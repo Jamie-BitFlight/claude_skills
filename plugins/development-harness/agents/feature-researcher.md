@@ -158,7 +158,7 @@ Read the input from your prompt. It will be one of:
 
 ```python
 def detect_input_type(input_text: str) -> str:
-    if input_text.endswith('.md') and '/' in input_text:
+    if input_text.endswith(".md") and "/" in input_text:
         if file_exists(input_text):
             return "existing_document"
     return "simple_description"

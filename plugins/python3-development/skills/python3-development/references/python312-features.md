@@ -15,17 +15,27 @@ Type parameters declared inline on class and function definitions. Replaces `Typ
 ```python
 # 3.11
 from typing import TypeVar, Generic
+
 T = TypeVar("T")
+
+
 class Stack(Generic[T]):
     def push(self, item: T) -> None: ...
+
 
 # 3.12
 class Stack[T]:
     def push(self, item: T) -> None: ...
 
-def first[T](items: list[T]) -> T: return items[0]          # generic function
-class NumberStack[T: (int, float)]: ...                      # constrained
-class Sortable[T: Comparable]: ...                           # bounded
+
+def first[T](items: list[T]) -> T:
+    return items[0]  # generic function
+
+
+class NumberStack[T: (int, float)]: ...  # constrained
+
+
+class Sortable[T: Comparable]: ...  # bounded
 ```
 
 ### `type` statement — PEP 695
@@ -35,6 +45,7 @@ Explicit type alias declaration. Replaces `TypeAlias` annotation.
 ```python
 # 3.11
 from typing import TypeAlias
+
 Vector: TypeAlias = list[float]
 Matrix: TypeAlias = list[list[float]]
 
@@ -53,11 +64,12 @@ no matching parent method is found, catching rename-without-update bugs.
 ```python
 from typing import override
 
+
 class Child(Base):
     @override
-    def process(self) -> None: ...   # type checker verifies Base.process exists
+    def process(self) -> None: ...  # type checker verifies Base.process exists
     @override
-    def missing(self) -> None: ...   # ERROR: no parent method named 'missing'
+    def missing(self) -> None: ...  # ERROR: no parent method named 'missing'
 ```
 
 ### Typed `**kwargs` via `Unpack[TypedDict]` — PEP 692
@@ -67,11 +79,15 @@ Precise typing for keyword-only argument forwarding.
 ```python
 from typing import Unpack, TypedDict
 
+
 class Options(TypedDict, total=False):
     timeout: int
     retries: int
 
+
 def fetch(url: str, **kwargs: Unpack[Options]) -> str: ...
+
+
 # fetch("...", unknown=True)  # ERROR: unexpected keyword argument
 ```
 
@@ -85,8 +101,10 @@ Batch an iterable into fixed-size tuples. The final batch may be shorter than `n
 
 ```python
 from itertools import batched
+
 list(batched("ABCDEFG", 3))  # [('A', 'B', 'C'), ('D', 'E', 'F'), ('G',)]
-for chunk in batched(records, 100): db.bulk_insert(chunk)
+for chunk in batched(records, 100):
+    db.bulk_insert(chunk)
 ```
 
 3.11 equivalent: manual `zip(*[iter(it)] * n)` or a generator function.
@@ -100,6 +118,7 @@ from pathlib import Path
 
 # 3.11
 import os
+
 for root, dirs, files in os.walk("src"):
     for name in files:
         print(os.path.join(root, name))
@@ -123,7 +142,7 @@ msg = f"{'hello'}"
 
 # 3.12 — valid
 msg = f"{'hello'}"
-nested = f"{f"{name}"}"
+nested = f"{f'{name}'}"
 total = f"Total: {sum(x.price for x in cart if x.in_stock)}"
 ```
 
@@ -137,7 +156,10 @@ total = f"Total: {sum(x.price for x in cart if x.in_stock)}"
 
 ```python
 from collections.abc import Buffer
-def process(data: Buffer) -> None: view = memoryview(data)
+
+
+def process(data: Buffer) -> None:
+    view = memoryview(data)
 ```
 
 ### Per-interpreter GIL — PEP 684

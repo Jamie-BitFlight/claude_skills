@@ -86,13 +86,12 @@ For other fields or complex logic, implement a custom metadata hook:
 # hatch_build.py
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         # metadata is a dict; modify it in place
         metadata["version"] = "1.2.3"
-        metadata["authors"] = [
-            {"name": "Author Name", "email": "author@example.com"}
-        ]
+        metadata["authors"] = [{"name": "Author Name", "email": "author@example.com"}]
 ```
 
 Configure it in `pyproject.toml`:
@@ -113,6 +112,7 @@ Read metadata from JSON, TOML, or YAML files:
 import json
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class JSONMetadataHook(MetadataHookInterface):
     def update(self, metadata):
@@ -158,6 +158,7 @@ In the hook:
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class DynamicDepsHook(MetadataHookInterface):
     def update(self, metadata):
         root = Path(self.root)
@@ -169,14 +170,8 @@ class DynamicDepsHook(MetadataHookInterface):
         ]
 
         metadata["optional-dependencies"] = {
-            "dev": [
-                "pytest",
-                f"test-utils @ {root}/test-utils",
-            ],
-            "docs": [
-                "sphinx",
-                f"api-docs @ {root}/docs/api-docs",
-            ],
+            "dev": ["pytest", f"test-utils @ {root}/test-utils"],
+            "docs": ["sphinx", f"api-docs @ {root}/docs/api-docs"],
         }
 ```
 
@@ -192,6 +187,7 @@ import os
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class EnvAwareMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         root = Path(self.root)
@@ -199,25 +195,13 @@ class EnvAwareMetadataHook(MetadataHookInterface):
 
         # Base metadata
         metadata["version"] = self._get_version()
-        metadata["authors"] = [
-            {"name": "Project Team", "email": "team@example.com"}
-        ]
+        metadata["authors"] = [{"name": "Project Team", "email": "team@example.com"}]
 
         # Environment-specific dependencies
         if env == "dev":
-            metadata["optional-dependencies"] = {
-                "dev": [
-                    "pytest",
-                    f"dev-tools @ {root}/tools/dev",
-                ]
-            }
+            metadata["optional-dependencies"] = {"dev": ["pytest", f"dev-tools @ {root}/tools/dev"]}
         elif env == "prod":
-            metadata["optional-dependencies"] = {
-                "prod": [
-                    "gunicorn",
-                    "psycopg2",
-                ]
-            }
+            metadata["optional-dependencies"] = {"prod": ["gunicorn", "psycopg2"]}
 
     def _get_version(self):
         # Try multiple sources
@@ -235,6 +219,7 @@ class EnvAwareMetadataHook(MetadataHookInterface):
 
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class MyMetadataHook(MetadataHookInterface):
     def __init__(self, root, config):
@@ -369,6 +354,7 @@ import json
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class SinceMetadataHook(MetadataHookInterface):
     """Read all metadata from a single metadata.json file."""
 
@@ -382,10 +368,7 @@ class SinceMetadataHook(MetadataHookInterface):
         metadata["version"] = info["version"]
         metadata["description"] = info["description"]
         metadata["license"] = {"text": info["license"]}
-        metadata["authors"] = [
-            {"name": author["name"], "email": author["email"]}
-            for author in info.get("authors", [])
-        ]
+        metadata["authors"] = [{"name": author["name"], "email": author["email"]} for author in info.get("authors", [])]
         metadata["urls"] = info.get("urls", {})
         metadata["keywords"] = info.get("keywords", [])
 ```
@@ -400,16 +383,15 @@ import subprocess
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class GitVersionHook(MetadataHookInterface):
     def update(self, metadata):
         try:
             version = subprocess.check_output(
-                ["git", "describe", "--tags", "--abbrev=0"],
-                cwd=self.root,
-                text=True
+                ["git", "describe", "--tags", "--abbrev=0"], cwd=self.root, text=True
             ).strip()
             # Remove 'v' prefix if present
-            version = version.lstrip('v')
+            version = version.lstrip("v")
             metadata["version"] = version
         except subprocess.CalledProcessError:
             # No tags; use development version
@@ -426,6 +408,7 @@ import os
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class ConditionalMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         metadata["version"] = self._get_version()
@@ -433,21 +416,13 @@ class ConditionalMetadataHook(MetadataHookInterface):
         # Build context dependent
         build_type = os.getenv("BUILD_TYPE", "local")
 
-        metadata["optional-dependencies"] = {
-            "dev": ["pytest", "pytest-cov"],
-        }
+        metadata["optional-dependencies"] = {"dev": ["pytest", "pytest-cov"]}
 
         if build_type == "ci":
-            metadata["optional-dependencies"]["ci"] = [
-                "coverage",
-                "codecov",
-            ]
+            metadata["optional-dependencies"]["ci"] = ["coverage", "codecov"]
 
         if build_type == "release":
-            metadata["optional-dependencies"]["release"] = [
-                "build",
-                "twine",
-            ]
+            metadata["optional-dependencies"]["release"] = ["build", "twine"]
 
     def _get_version(self):
         # Production: from VERSION file

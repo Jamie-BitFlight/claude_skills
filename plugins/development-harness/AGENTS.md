@@ -91,7 +91,7 @@ Skills and agents access plan artifacts via MCP tools — not via `dh_paths` dir
 - `plan/P{id}-{slug}.yaml` - task plan
 - `plan/T0-baseline-{slug}.yaml` - pre-implementation baseline
 - `plan/TN-verification-{slug}.yaml` - post-implementation verification
-- `backlog/*.md` - backlog item cache (synced from GitHub Issues)
+- `backlog/*.md` - backlog item cache (synced from the selected backend; GitHub Issues by default)
 - `context/active-task-{session-id}.json` - ephemeral task execution context
 
 The `.dh/` directory in the repository root (Tier 1) holds committed project configuration. State files live outside the repo at `~/.dh/`, preventing pollution of the working tree.
@@ -131,7 +131,7 @@ Two distinct types of plan data exist:
 
 ## Artifact Manifest System
 
-Plan artifacts are registered in a structured manifest stored in the GitHub Issue body. The manifest is the discovery mechanism — consumers query it via MCP to find artifacts for an issue.
+Plan artifacts are registered in a structured manifest stored by the active artifact provider (the GitHub Issue body in the default deployment). The manifest is the discovery mechanism — consumers query it via MCP to find artifacts for a work item.
 
 **MCP tools (on backlog server) — Artifact Management:**
 
@@ -159,7 +159,7 @@ Plan artifacts are registered in a structured manifest stored in the GitHub Issu
 
 **Consumer discovery:** Consumers (including worktree-isolated agents) call `artifact_list` then `artifact_read` instead of filesystem access — plan files are in the root worktree and not visible inside isolated worktrees.
 
-**MCP-native rule for agents:** Agents store system artifacts exclusively via `artifact_register` with `content=` — the content is uploaded to the GitHub issue comment and retrievable from any environment. The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation files committed to the repo). Filesystem paths under `~/.dh/` are an implementation detail of the MCP servers, not a stable agent interface.
+**MCP-native rule for agents:** Agents store system artifacts exclusively via `artifact_register` with `content=` — the content is uploaded to the active artifact provider and retrievable through its configured access path. The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation files committed to the repo). Filesystem paths under `~/.dh/` are an implementation detail of the MCP servers, not a stable agent interface.
 
 **Prohibited patterns — do not write these in agent instructions or tool calls:**
 
@@ -206,7 +206,7 @@ flowchart TD
 - Process orchestration (stage sequencing, gating, looping)
 - Human touchpoint decisions (ARL constraint analysis)
 - Artifact management (naming, storage, cross-referencing)
-- Fallback behavior (general-purpose agents when no manifest exists)
+- Fallback behavior (`dh:task-worker` when no manifest exists)
 
 **What language plugins own:**
 
@@ -225,13 +225,13 @@ The manifest schema is documented in [./skills/development-harness/references/la
 
 **`dh:task-worker` is the universal dispatch agent for all dh workflows. It must be used for every agent dispatch — no exceptions.**
 
-**`general-purpose` must never be dispatched from any dh skill or extension point.**
+**Every dh skill and extension point dispatches `dh:task-worker`; specialist behavior is loaded internally through the task's `agent:` profile.**
 
 ### Why
 
 `dh:task-worker` carries full dh tool permissions (SAM MCP, backlog MCP). When a task's `agent:` field is set, `task-worker` reads it via SAM MCP and passes it to `profile_load` to load specialist behavior internally. This ensures the SAM lifecycle (claim → execute → sam_state) is always owned by an agent that has the tools to execute it.
 
-A `general-purpose` agent dispatched from a dh skill does not have SAM or backlog MCP access and cannot execute the SAM lifecycle. It will silently fail to update task state.
+Dispatching `dh:task-worker` preserves SAM and backlog MCP access so the worker can execute the complete SAM lifecycle and update task state.
 
 ### The `agent:` field in SAM task YAML is not an orchestrator routing directive
 
@@ -251,7 +251,7 @@ flowchart TD
 When adding a new dispatch step to any dh skill, reference file, or workflow document:
 
 - Dispatch `subagent_type="dh:task-worker"` — always
-- Never substitute `subagent_type="general-purpose"` regardless of task complexity
+- Keep `subagent_type="dh:task-worker"` regardless of task complexity
 - The `agent:` field in the task YAML selects the specialist; the orchestrator does not
 
 ---
@@ -358,8 +358,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 
 **Execution:**
 
-- `@dh:generic-stage-agent` - Generic agent for pipeline stages
-- `@dh:task-worker` - Execute individual tasks
+- `@dh:task-worker` - Universal dispatch and task executor; loads specialist profiles through each task's `agent:` field
 - `@dh:backlog-item-groomer` - Groom a backlog item with RT-ICA assessment and resource map
 
 ---

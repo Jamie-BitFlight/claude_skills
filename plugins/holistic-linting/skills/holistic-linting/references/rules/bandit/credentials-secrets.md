@@ -23,15 +23,14 @@ Any password literal in source code is exposed to:
 database_password = "super_secret_password_123"
 db_connection = connect(host="localhost", password="super_secret_password_123")
 
+
 # VULNERABLE - In function arguments
 def login(username, password="default_password"):
     authenticate(username, password)
 
+
 # VULNERABLE - In configuration strings
-config = {
-    "db_password": "mypassword",
-    "api_key": "sk_live_abc123xyz"
-}
+config = {"db_password": "mypassword", "api_key": "sk_live_abc123xyz"}
 ```
 
 ### When This Is NOT a Vulnerability
@@ -115,6 +114,7 @@ def connect_to_database(host, user, password="admin123"):
     """Connect to database."""
     # ...
 
+
 # VULNERABLE - Even in private functions
 def _internal_authenticate(api_key="sk_live_secret_key"):
     return validate(api_key)
@@ -139,6 +139,7 @@ def test_login(username, password="test_user_password"):
 ```python
 import os
 
+
 def connect_to_database(host, user, password=None):
     """Connect to database."""
     if password is None:
@@ -156,6 +157,7 @@ def connect_to_database(host, user, password=None):
 from dataclasses import dataclass
 import os
 
+
 @dataclass
 class DatabaseConfig:
     host: str
@@ -165,6 +167,7 @@ class DatabaseConfig:
     def __post_init__(self):
         if self.password is None:
             self.password = os.environ.get("DB_PASSWORD")
+
 
 def connect_to_database(config: DatabaseConfig):
     """Connect using config object."""
@@ -187,6 +190,7 @@ This catches hardcoded password assignments in variable initialization:
 # VULNERABLE - Direct assignment with hardcoded default
 DEFAULT_PASSWORD = "hardcoded_password"
 admin_password = admin_password or "fallback_admin_pass"
+
 
 # VULNERABLE - In class defaults
 class DatabaseConnector:
@@ -218,6 +222,7 @@ import os
 DEFAULT_PASSWORD = os.environ.get("DB_PASSWORD")
 if not DEFAULT_PASSWORD:
     raise RuntimeError("DB_PASSWORD environment variable must be set")
+
 
 class DatabaseConnector:
     def __init__(self, password=None):
@@ -260,6 +265,7 @@ DATABASE_PASSWORD = "connection_password"
 ```python
 # Safe - third-party libraries handle this
 from some_library import Config
+
 config = Config(password="from_env_or_secret_manager")  # Handled by library
 ```
 
@@ -285,8 +291,10 @@ DATABASES = {
 ```python
 import os
 
+
 class Config:
     """Configuration marked with environment variables."""
+
     SECRET_KEY = os.environ.get("SECRET_KEY")
     DB_PASSWORD = os.environ.get("DB_PASSWORD")
     API_KEY = os.environ.get("API_KEY")
@@ -298,9 +306,11 @@ class Config:
 from typing import Optional
 from dataclasses import dataclass, field
 
+
 @dataclass
 class SecureConfig:
     """Configuration with marked secrets."""
+
     database_password: Optional[str] = field(default=None, metadata={"secret": True})
     api_key: Optional[str] = field(default=None, metadata={"secret": True})
 
@@ -331,6 +341,7 @@ Telnet transmits all data, including passwords, in cleartext. An attacker on the
 # VULNERABLE - Telnet import
 import telnetlib
 
+
 def remote_command(host, username, password, command):
     tn = telnetlib.Telnet(host)
     tn.read_until(b"login: ")
@@ -351,6 +362,7 @@ Telnet should never be used in production systems. Even in isolated networks, SS
 ```python
 import paramiko
 
+
 def remote_command(host, username, password, command):
     """Execute remote command over SSH (encrypted)."""
     client = paramiko.SSHClient()
@@ -368,6 +380,7 @@ def remote_command(host, username, password, command):
 
 ```python
 import subprocess
+
 
 def remote_command(host, username, command):
     """Execute remote command via SSH subprocess."""
@@ -396,6 +409,7 @@ FTP transmits credentials and data in plaintext:
 # VULNERABLE - FTP with cleartext credentials
 import ftplib
 
+
 def upload_file(host, username, password, local_file, remote_file):
     ftp = ftplib.FTP(host)
     ftp.login(username, password)  # Credentials in cleartext!
@@ -416,6 +430,7 @@ FTP should not be used. Even FTPS (FTP over SSL) is deprecated in favor of SFTP.
 import paramiko
 from io import BytesIO
 
+
 def upload_file(host, username, password, local_file, remote_file):
     """Upload file via SFTP (encrypted)."""
     transport = paramiko.Transport((host, 22))
@@ -433,6 +448,7 @@ def upload_file(host, username, password, local_file, remote_file):
 
 ```python
 import subprocess
+
 
 def upload_file(host, username, local_file, remote_file):
     """Upload file via scp (SSH copy)."""

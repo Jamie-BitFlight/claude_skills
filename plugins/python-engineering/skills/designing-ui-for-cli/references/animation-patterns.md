@@ -16,6 +16,7 @@ import time
 
 console = Console()
 
+
 def show_splash_screen():
     """Display animated splash screen."""
     console.clear()
@@ -38,7 +39,7 @@ def show_splash_screen():
         border_style="bright_cyan",
         padding=(2, 4),
         title="[bold]Welcome[/bold]",
-        subtitle="[dim]Press ENTER to continue[/dim]"
+        subtitle="[dim]Press ENTER to continue[/dim]",
     )
 
     console.print(panel)
@@ -50,17 +51,18 @@ def show_splash_screen():
 ```python
 # Available fonts to try:
 COOL_FONTS = [
-    "banner3-D",   # 3D block letters
-    "slant",       # Slanted text
-    "doom",        # DOOM game style
-    "big",         # Large letters
-    "digital",     # Digital clock style
-    "standard",    # Classic figlet
-    "small",       # Compact
-    "smslant",     # Small slant
+    "banner3-D",  # 3D block letters
+    "slant",  # Slanted text
+    "doom",  # DOOM game style
+    "big",  # Large letters
+    "digital",  # Digital clock style
+    "standard",  # Classic figlet
+    "small",  # Compact
+    "smslant",  # Small slant
     "cyberlarge",  # Cyberpunk style
-    "cybermedium", # Medium cyberpunk
+    "cybermedium",  # Medium cyberpunk
 ]
+
 
 def generate_banner(text: str, font: str = "slant") -> str:
     """Generate ASCII banner with specified font."""
@@ -75,12 +77,11 @@ def generate_banner(text: str, font: str = "slant") -> str:
 from rich.progress import Progress, SpinnerColumn, TextColumn
 import time
 
+
 def show_loading(message: str = "Loading", duration: float = 2.0):
     """Show animated loading spinner."""
     with Progress(
-        SpinnerColumn("dots"),
-        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
-        transient=True
+        SpinnerColumn("dots"), TextColumn("[bold cyan]{task.description}[/bold cyan]"), transient=True
     ) as progress:
         task = progress.add_task(message, total=None)
         # NOTE: time.sleep() is correct in a synchronous CLI script.
@@ -88,6 +89,7 @@ def show_loading(message: str = "Loading", duration: float = 2.0):
         # instead — time.sleep() blocks the event loop and freezes the UI.
         # SOURCE: https://textual.textualize.io/guide/workers/ (accessed 2026-05-07)
         time.sleep(duration)
+
 
 def show_typing_effect(text: str, delay: float = 0.03):
     """Display text with typing effect."""
@@ -104,15 +106,14 @@ def show_typing_effect(text: str, delay: float = 0.03):
 from rich.progress import Progress, SpinnerColumn, TextColumn
 import time
 
+
 def animated_welcome():
     """Animated welcome sequence."""
     console.clear()
 
     # Text-based spinner using SpinnerColumn (same pattern as show_loading)
     with Progress(
-        SpinnerColumn("dots"),
-        TextColumn("[bold cyan]{task.description}[/bold cyan]"),
-        transient=True
+        SpinnerColumn("dots"), TextColumn("[bold cyan]{task.description}[/bold cyan]"), transient=True
     ) as progress:
         task = progress.add_task("Loading", total=None)
         # NOTE: time.sleep() blocks the asyncio event loop in Textual apps.
@@ -135,7 +136,7 @@ def create_fancy_box(content: str, title: str = "") -> Panel:
         title=f"[bold magenta]╔═ {title} ═╗[/bold magenta]",
         border_style="bright_cyan",
         padding=(1, 3),
-        subtitle="[dim cyan]═══════════════[/dim cyan]"
+        subtitle="[dim cyan]═══════════════[/dim cyan]",
     )
 ```
 
@@ -164,12 +165,14 @@ FALLBACK_LOGO = """
    ╚═╝    ╚═════╝ ╚═════╝  ╚═════╝
 """
 
+
 def get_logo() -> str:
     """Get ASCII logo, with fallback."""
     try:
         return pyfiglet.figlet_format("TODO", font="banner3-D")
     except pyfiglet.FontNotFound:
         return FALLBACK_LOGO
+
 
 def show_splash():
     """Main splash screen."""
@@ -190,13 +193,14 @@ def show_splash():
         border_style="bright_cyan",
         padding=(1, 4),
         title="[bold]Welcome[/bold]",
-        subtitle="[dim white][ Press ENTER to continue ][/dim white]"
+        subtitle="[dim white][ Press ENTER to continue ][/dim white]",
     )
 
     # Animate border colors (simple version)
     console.print(panel)
     input()
     console.clear()
+
 
 def show_goodbye():
     """Goodbye screen."""
@@ -212,14 +216,11 @@ def show_goodbye():
     content.append("See you next time!", style="dim")
     content.append("\n")
 
-    panel = Panel(
-        Align.center(content),
-        border_style="cyan",
-        padding=(1, 4)
-    )
+    panel = Panel(Align.center(content), border_style="cyan", padding=(1, 4))
 
     console.print(panel)
     time.sleep(1)
+
 
 if __name__ == "__main__":
     show_splash()

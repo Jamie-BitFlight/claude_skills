@@ -1801,20 +1801,23 @@ python_versions: [3.11, 3.12, 3.13]
 
 from pathlib import Path
 
+
 def extract_dependencies(doc_path: Path) -> dict:
     """Extract dependencies from document frontmatter."""
     content = doc_path.read_text()
 
     # Extract YAML frontmatter
-    if content.startswith('---'):
-        end = content.find('---', 3)
+    if content.startswith("---"):
+        end = content.find("---", 3)
         if end > 0:
             from ruamel.yaml import YAML
+
             yaml = YAML(typ="safe")
             frontmatter = yaml.load(content[3:end])
             return frontmatter
 
     return {}
+
 
 def find_dependent_documents(target_doc: Path, skill_root: Path) -> list[Path]:
     """Find all documents that depend on target document."""
@@ -1822,14 +1825,15 @@ def find_dependent_documents(target_doc: Path, skill_root: Path) -> list[Path]:
 
     for doc_path in skill_root.rglob("*.md"):
         deps = extract_dependencies(doc_path)
-        related = deps.get('related_docs', [])
+        related = deps.get("related_docs", [])
 
         # Check if target_doc in related_docs
         target_ref = str(target_doc.relative_to(skill_root))
-        if f"@{target_ref}" in ' '.join(related):
+        if f"@{target_ref}" in " ".join(related):
             dependents.append(doc_path)
 
     return dependents
+
 
 # Usage: When updating type-hints.md find all dependents
 # Generate review checklist for each dependent
@@ -2308,6 +2312,7 @@ gantt
 from pathlib import Path
 import time
 
+
 def test_cli_tool_creation_sequence():
     """Test loading sequence for CLI tool creation."""
     skill_root = Path("/path/to/skill")
@@ -2340,16 +2345,19 @@ def test_cli_tool_creation_sequence():
 
     print(f"✅ CLI tool creation: {duration:.2f}s {total_kb:.1f} KB")
 
+
 def test_code_review_sequence():
     """Test loading sequence for code review."""
     # Similar structure
     pass
+
 
 def test_all_sequences():
     """Run all loading sequence tests."""
     test_cli_tool_creation_sequence()
     test_code_review_sequence()
     # ... other sequences
+
 
 if __name__ == "__main__":
     test_all_sequences()

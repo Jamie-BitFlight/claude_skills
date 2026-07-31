@@ -68,10 +68,12 @@ pip install attrs cattrs
 ```python
 from attrs import define, field
 
+
 @define
 class Point:
     x: int
     y: int
+
 
 # Automatically generates __init__, __repr__, __eq__, etc.
 p = Point(1, 2)
@@ -86,10 +88,12 @@ print(p == Point(1, 2))  # True
 ```python
 from attrs import define, field, Factory
 
+
 @define
 class SomeClass:
     a_number: int = 42
     list_of_numbers: list[int] = Factory(list)
+
 
 # Factory prevents mutable default gotchas
 sc1 = SomeClass()
@@ -105,16 +109,12 @@ print(sc2.list_of_numbers)  # [] - separate instances
 ```python
 from attrs import define, field, validators
 
+
 @define
 class User:
-    email: str = field(validator=validators.matches_re(
-        r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-    ))
-    age: int = field(validator=[
-        validators.instance_of(int),
-        validators.ge(0),
-        validators.lt(150)
-    ])
+    email: str = field(validator=validators.matches_re(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"))
+    age: int = field(validator=[validators.instance_of(int), validators.ge(0), validators.lt(150)])
+
 
 # Custom validator with decorator
 @define
@@ -135,17 +135,21 @@ class BoundedValue:
 ```python
 from attrs import define, field, converters
 
+
 @define
 class C:
     x: int = field(converter=int)
 
+
 c = C("42")
 print(c.x)  # 42 (converted from string)
+
 
 # Optional converter
 @define
 class OptionalInt:
     x: int | None = field(converter=converters.optional(int))
+
 
 OptionalInt(None)  # Valid
 OptionalInt("42")  # Converts to 42
@@ -158,13 +162,16 @@ OptionalInt("42")  # Converts to 42
 ```python
 from attrs import frozen, field
 
+
 @frozen
 class Coordinates:
     x: int
     y: int
 
+
 c = Coordinates(1, 2)
 # c.x = 3  # Raises FrozenInstanceError
+
 
 # Post-init with frozen classes
 @frozen
@@ -184,11 +191,13 @@ class FrozenWithDerived:
 ```python
 from attrs import define
 
+
 # Slots enabled by default with @define
 @define
 class SlottedClass:
     x: int
     y: int
+
 
 # More memory efficient, faster attribute access
 # Cannot add attributes not defined in class
@@ -200,6 +209,7 @@ class SlottedClass:
 
 ```python
 from attrs import define, field
+
 
 @define
 class NoAnnotations:
@@ -234,15 +244,13 @@ class NoAnnotations:
 ```python
 from attrs import define, field, validators
 
+
 @define
 class Measurement:
     tags: dict = field(
         validator=validators.deep_mapping(
-            key_validator=validators.not_(
-                validators.in_({"id", "time", "source"}),
-                msg="reserved tag key"
-            ),
-            value_validator=validators.instance_of((str, int))
+            key_validator=validators.not_(validators.in_({"id", "time", "source"}), msg="reserved tag key"),
+            value_validator=validators.instance_of((str, int)),
         )
     )
 ```
@@ -254,6 +262,7 @@ class Measurement:
 ```python
 import numpy as np
 from attrs import define, field, cmp_using
+
 
 @define
 class ArrayContainer:
@@ -267,10 +276,12 @@ class ArrayContainer:
 ```python
 from attrs import define, field
 
+
 @define
 class User:
     username: str
-    password: str = field(repr=lambda value: '***')
+    password: str = field(repr=lambda value: "***")
+
 
 User("admin", "secret123")
 # Output: User(username='admin', password=***)
@@ -286,10 +297,12 @@ User("admin", "secret123")
 from attrs import define
 from cattrs import structure, unstructure
 
+
 @define
 class Person:
     name: str
     age: int
+
 
 # Serialize to dict
 data = unstructure(Person("Alice", 30))
@@ -307,23 +320,26 @@ person = structure({"name": "Bob", "age": 25}, Person)
 from attrs import define, frozen, field
 from datetime import datetime
 
+
 def auto_convert_datetime(cls, fields):
     results = []
     for f in fields:
         if f.converter is not None:
             results.append(f)
             continue
-        if f.type in {datetime, 'datetime'}:
+        if f.type in {datetime, "datetime"}:
             converter = lambda d: datetime.fromisoformat(d) if isinstance(d, str) else d
         else:
             converter = None
         results.append(f.evolve(converter=converter))
     return results
 
+
 @frozen(field_transformer=auto_convert_datetime)
 class Event:
     name: str
     timestamp: datetime
+
 
 # Automatically converts ISO strings to datetime
 event = Event(name="deploy", timestamp="2025-10-21T10:00:00")
@@ -431,13 +447,16 @@ event = Event(name="deploy", timestamp="2025-10-21T10:00:00")
 # Before (dataclass)
 from dataclasses import dataclass
 
+
 @dataclass
 class Point:
     x: int
     y: int = 0
 
+
 # After (attrs)
 from attrs import define
+
 
 @define
 class Point:
@@ -453,26 +472,26 @@ Minimal changes required; attrs is largely a drop-in replacement with more featu
 # Before (Pydantic)
 from pydantic import BaseModel, validator
 
+
 class User(BaseModel):
     name: str
     age: int
 
-    @validator('age')
+    @validator("age")
     def check_age(cls, v):
         if v < 0:
-            raise ValueError('age must be positive')
+            raise ValueError("age must be positive")
         return v
+
 
 # After (attrs + cattrs for serialization)
 from attrs import define, field, validators
 
+
 @define
 class User:
     name: str
-    age: int = field(validator=[
-        validators.instance_of(int),
-        validators.ge(0)
-    ])
+    age: int = field(validator=[validators.instance_of(int), validators.ge(0)])
 ```
 
 Note: Pydantic does automatic validation; attrs requires explicit calls.

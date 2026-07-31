@@ -270,6 +270,7 @@ Write the following script to `/tmp/cycle_detect.py` and execute it with `python
 ```python
 #!/usr/bin/env python3
 """Cycle detection for architecture audit. Reads adjacency JSON from stdin."""
+
 import json, sys
 from collections import defaultdict
 
@@ -277,6 +278,7 @@ data = json.loads(sys.stdin.read())  # {module: [dep, dep, ...]}
 graph = {k: set(v) for k, v in data.items()}
 
 visited, in_stack, cycles = set(), set(), []
+
 
 def dfs(node, path):
     if node in in_stack:
@@ -293,6 +295,7 @@ def dfs(node, path):
             dfs(neighbor, path)
     path.pop()
     in_stack.discard(node)
+
 
 for m in graph:
     if m not in visited:

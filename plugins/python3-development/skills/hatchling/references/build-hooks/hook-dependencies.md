@@ -131,14 +131,11 @@ require-runtime-features = ["docs", "testing"]
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
         """Declare dependencies required by this hook"""
-        return [
-            "jinja2>=2.11",
-            "pillow>=8.0",
-            "ruamel.yaml>=0.18",
-        ]
+        return ["jinja2>=2.11", "pillow>=8.0", "ruamel.yaml>=0.18"]
 
     def initialize(self, version: str, build_data: dict) -> None:
         # These imports are safe now - dependencies are installed
@@ -147,8 +144,8 @@ class CustomBuildHook(BuildHookInterface):
         from ruamel.yaml import YAML
 
         # Use the libraries
-        env = Environment(loader=FileSystemLoader('templates'))
-        template = env.get_template('build.jinja2')
+        env = Environment(loader=FileSystemLoader("templates"))
+        template = env.get_template("build.jinja2")
 ```
 
 ### Lazy Imports
@@ -163,10 +160,13 @@ class CustomBuildHook(BuildHookInterface):
 
     def initialize(self, version: str, build_data: dict) -> None:
         from jinja2 import Template  # Safe here
+
         template = Template(...)
+
 
 # BAD: Import at module level
 from jinja2 import Template  # May fail if hook is disabled
+
 
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
@@ -186,10 +186,10 @@ class CustomBuildHook(BuildHookInterface):
         """Dependencies depend on configuration"""
         deps = []
 
-        if self.config.get('enable-cython'):
+        if self.config.get("enable-cython"):
             deps.append("cython>=0.29")
 
-        if self.config.get('enable-numpy'):
+        if self.config.get("enable-numpy"):
             deps.append("numpy>=1.19")
 
         return deps
@@ -215,6 +215,7 @@ class CustomBuildHook(BuildHookInterface):
 
     def initialize(self, version: str, build_data: dict) -> None:
         import subprocess
+
         subprocess.run(["sass", "styles/main.scss:dist/main.css"], check=True)
 ```
 
@@ -230,12 +231,7 @@ dependencies = ["sass>=1.50"]
 ```python
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
-        return [
-            "jinja2>=2.11",
-            "pillow>=8.0",
-            "click>=7.0,<9.0",
-            "ruamel.yaml>=0.18",
-        ]
+        return ["jinja2>=2.11", "pillow>=8.0", "click>=7.0,<9.0", "ruamel.yaml>=0.18"]
 
     def initialize(self, version: str, build_data: dict) -> None:
         from jinja2 import Environment, FileSystemLoader
@@ -252,6 +248,7 @@ class CustomBuildHook(BuildHookInterface):
 
 ```python
 import platform
+
 
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
@@ -272,10 +269,10 @@ class CustomBuildHook(BuildHookInterface):
         deps = ["jinja2>=2.11"]
 
         # Configuration-driven dependencies
-        if self.config.get('enable-pdf'):
+        if self.config.get("enable-pdf"):
             deps.append("reportlab>=3.5")
 
-        if self.config.get('enable-compression'):
+        if self.config.get("enable-compression"):
             deps.append("lz4>=3.1")
 
         return deps
@@ -283,7 +280,7 @@ class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         from jinja2 import Template
 
-        if self.config.get('enable-pdf'):
+        if self.config.get("enable-pdf"):
             from reportlab.pdfgen import canvas
 ```
 
@@ -396,8 +393,10 @@ Always lazy-import (inside methods) any packages declared as dependencies:
 def initialize(self, version: str, build_data: dict) -> None:
     from jinja2 import Template  # Imported here
 
+
 # Incorrect: Import at module level
 from jinja2 import Template  # May fail if dependencies not installed
+
 
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
@@ -430,13 +429,14 @@ Ensure you're using configuration, not environment:
 ```python
 # Correct: Use self.config
 def dependencies(self) -> list[str]:
-    if self.config.get('enable-cython'):
+    if self.config.get("enable-cython"):
         return ["cython"]
     return []
 
+
 # Incorrect: Using environment variables
 def dependencies(self) -> list[str]:
-    if os.getenv('ENABLE_CYTHON'):
+    if os.getenv("ENABLE_CYTHON"):
         return ["cython"]  # Environment not available yet
     return []
 ```

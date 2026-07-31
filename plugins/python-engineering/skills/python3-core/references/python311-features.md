@@ -17,6 +17,7 @@ Return type annotation for methods that return an instance of the enclosing clas
 from __future__ import annotations
 from typing import Self
 
+
 class Builder:
     def set_name(self, name: str) -> Self:
         self._name = name
@@ -28,7 +29,10 @@ Do NOT use:
 ```python
 # old pattern — verbose and error-prone
 from typing import TypeVar
+
 T = TypeVar("T", bound="Builder")
+
+
 def set_name(self: T, name: str) -> T: ...
 ```
 
@@ -40,10 +44,12 @@ Use for status codes, rule IDs, categories, and CLI option choices.
 ```python
 from enum import StrEnum
 
+
 class Status(StrEnum):
     PENDING = "pending"
     COMPLETE = "complete"
     FAILED = "failed"
+
 
 assert Status.PENDING == "pending"  # True
 ```
@@ -88,6 +94,7 @@ from typing import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
 
+
 def first(items: tuple[*Ts]) -> tuple[*Ts]:
     return items
 ```
@@ -100,11 +107,13 @@ Prevents SQL injection and shell injection at the type level.
 ```python
 from typing import LiteralString
 
+
 def execute(query: LiteralString) -> None:
     db.run(query)
 
-execute("SELECT * FROM users")        # OK
-execute("SELECT * FROM " + table)     # type error
+
+execute("SELECT * FROM users")  # OK
+execute("SELECT * FROM " + table)  # type error
 ```
 
 ### `Never` — PEP 655
@@ -113,6 +122,7 @@ Return type for functions that never return normally (always raise or loop forev
 
 ```python
 from typing import Never
+
 
 def abort(msg: str) -> Never:
     raise SystemExit(msg)
@@ -125,6 +135,7 @@ Mark individual fields as required or optional without defining two separate Typ
 ```python
 from typing import TypedDict, Required, NotRequired
 
+
 class Config(TypedDict, total=False):
     host: Required[str]
     port: NotRequired[int]
@@ -136,6 +147,7 @@ Runtime type narrowing for type checkers. Use when narrowing cannot be inferred 
 
 ```python
 from typing import TypeGuard
+
 
 def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
     return all(isinstance(x, str) for x in val)
@@ -152,15 +164,18 @@ understand custom ORMs and frameworks that generate `__init__`, `__eq__`, etc.
 ```python
 from typing import dataclass_transform
 
+
 @dataclass_transform()
 def my_model(cls: type) -> type:
     # Framework generates __init__, __eq__, etc.
     return cls
 
+
 @my_model
 class User:
     name: str
     age: int
+
 
 User(name="Alice", age=30)  # type checker understands this
 ```
@@ -190,6 +205,7 @@ Structured concurrency. Replaces manual `asyncio.gather()` with explicit error g
 ```python
 import asyncio
 
+
 async def main() -> None:
     async with asyncio.TaskGroup() as tg:
         tg.create_task(work_a())
@@ -218,6 +234,7 @@ Do NOT use:
 
 ```python
 from datetime import timezone
+
 datetime.now(timezone.utc)  # still valid but verbose
 ```
 

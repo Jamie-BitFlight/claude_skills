@@ -60,6 +60,7 @@ def process() -> int:
     # Error: Statement is unreachable [unreachable]
     print("never runs")
 
+
 if True:
     return 0
 # Error: Statement is unreachable [unreachable]
@@ -72,6 +73,7 @@ process()
 def process() -> int:
     return 42
     # Remove unreachable code
+
 
 if condition:
     return 0
@@ -154,7 +156,7 @@ enable_error_code = possibly-undefined
 ```python
 from decimal import Decimal
 
-value = Decimal('0')
+value = Decimal("0")
 # Error: Expression of type "Decimal" cannot be used as a boolean [truthy-bool]
 if value:
     print("truthy")
@@ -165,7 +167,7 @@ if value:
 ```python
 from decimal import Decimal
 
-value = Decimal('0')
+value = Decimal("0")
 if value != 0:
     print("non-zero")
 
@@ -280,10 +282,12 @@ enable_error_code = exhaustive-match
 from enum import Enum
 from typing import Union
 
+
 class Status(Enum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETE = "complete"
+
 
 def handle_status(status: Status) -> str:
     # With enum, match can be exhaustive

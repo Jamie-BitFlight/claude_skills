@@ -42,6 +42,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
 
 import dashboard
 
+
+class _TestableHealthHandler(dashboard.HealthHandler):
+    """Test-only subclass that captures headers and body without Tornado HTTP machinery."""
+
+    _headers: dict[str, str]
+    _response_body: str
+
+    def initialize(self, *args: Any, **kwargs: Any) -> None:
+        """Set up capture state and delegate to the real initializer."""
+        self._headers = {}
+        self._response_body = ""
+        super().initialize(*args, **kwargs)
+
+    def set_header(self, name: str, value: object) -> None:
+        """Capture a response header by string value."""
+        self._headers[name] = str(value)
+
+    def write(self, chunk: object) -> None:
+        """Accumulate written chunks into the response body."""
+        if isinstance(chunk, bytes):
+            text = chunk.decode("utf-8")
+        elif isinstance(chunk, str):
+            text = chunk
+        else:
+            text = json.dumps(chunk)
+        self._response_body += text
+        self._body = self._response_body
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -128,21 +157,7 @@ class TestHealthHandler:
         set_header and write are patched at the instance level to capture
         response headers and body without Tornado's HTTP machinery.
         """
-        handler = dashboard.HealthHandler.__new__(dashboard.HealthHandler)
-        handler._headers: dict[str, str] = {}  # type: ignore[assignment]
-        handler._body: str = ""  # type: ignore[assignment]
-
-        def _set_header(name: str, value: str) -> None:
-            handler._headers[name] = value  # type: ignore[index]
-
-        def _write(chunk: str | bytes) -> None:
-            if isinstance(chunk, bytes):
-                chunk = chunk.decode("utf-8")
-            handler._body += chunk  # type: ignore[operator]
-
-        handler.set_header = _set_header  # type: ignore[method-assign]
-        handler.write = _write  # type: ignore[method-assign]
-
+        handler = _TestableHealthHandler.__new__(_TestableHealthHandler)
         handler.initialize(
             get_port=lambda: port,
             get_start_time=lambda: start_time,
@@ -169,7 +184,7 @@ class TestHealthHandler:
 
         # Assert
         assert handler._headers["Content-Type"] == "application/json"
-        body = json.loads(handler._body)
+        body: dict[str, Any] = json.loads(handler._body)
         assert body["status"] == "ok"
         assert body["port"] == 49152
         assert body["pid"] == os.getpid()
@@ -197,7 +212,7 @@ class TestHealthHandler:
         handler.get()
 
         # Assert
-        body = json.loads(handler._body)
+        body: dict[str, Any] = json.loads(handler._body)
         assert body["status"] == "ok"
         assert body["csv_exists"] is False
         assert body["csv_rows"] is None
@@ -217,7 +232,7 @@ class TestHealthHandler:
         handler.get()
 
         # Assert
-        body = json.loads(handler._body)
+        body: dict[str, Any] = json.loads(handler._body)
         assert body["uptime_seconds"] >= 4.0
         assert body["uptime_seconds"] < 60.0  # Sanity upper bound
 
@@ -525,20 +540,7 @@ class TestStateLock:
         # Arrange — build handler using explicit lambda accessors
         csv_file = tmp_path / "s.csv"
         csv_file.write_text("h\nrow\n", encoding="utf-8")
-        handler = dashboard.HealthHandler.__new__(dashboard.HealthHandler)
-        handler._headers: dict[str, str] = {}  # type: ignore[assignment]
-        handler._body: str = ""  # type: ignore[assignment]
-
-        def _set_header(name: str, value: str) -> None:
-            handler._headers[name] = value  # type: ignore[index]
-
-        def _write(chunk: str | bytes) -> None:
-            if isinstance(chunk, bytes):
-                chunk = chunk.decode("utf-8")
-            handler._body += chunk  # type: ignore[operator]
-
-        handler.set_header = _set_header  # type: ignore[method-assign]
-        handler.write = _write  # type: ignore[method-assign]
+        handler = _TestableHealthHandler.__new__(_TestableHealthHandler)
         handler.initialize(
             get_port=lambda: 7777, get_start_time=lambda: None, get_csv_path=lambda: csv_file, get_csv_rows=lambda: 1
         )
@@ -555,7 +557,7 @@ class TestStateLock:
         mock_lock.__enter__.assert_not_called()
         mock_lock.__exit__.assert_not_called()
         # Response is correct
-        body = json.loads(handler._body)
+        body: dict[str, Any] = json.loads(handler._body)
         assert body["status"] == "ok"
         assert body["port"] == 7777
 

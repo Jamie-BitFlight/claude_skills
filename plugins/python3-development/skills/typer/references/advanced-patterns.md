@@ -24,10 +24,12 @@ import typer
 
 app = typer.Typer()
 
+
 @app.callback()
 def main(ctx: typer.Context, verbose: bool = False):
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
+
 
 @app.command()
 def process(ctx: typer.Context):
@@ -56,17 +58,16 @@ from typing import Annotated, Optional
 
 __version__ = "1.0.0"
 
+
 def version_callback(value: bool):
     if value:
         typer.echo(f"Version: {__version__}")
         raise typer.Exit()
 
+
 @app.command()
 def main(
-    version: Annotated[
-        Optional[bool],
-        typer.Option("--version", callback=version_callback, is_eager=True),
-    ] = None,
+    version: Annotated[Optional[bool], typer.Option("--version", callback=version_callback, is_eager=True)] = None,
     name: str = "World",
 ):
     typer.echo(f"Hello {name}")
@@ -81,7 +82,7 @@ def main(
 `typer.echo()` prints to stdout by default. Pass `err=True` to print to stderr:
 
 ```python
-typer.echo("Normal output")          # stdout
+typer.echo("Normal output")  # stdout
 typer.echo("Error message", err=True)  # stderr
 ```
 
@@ -112,6 +113,7 @@ typer.secho("Done!", fg=typer.colors.GREEN, bold=True)
 ```python
 import typer
 import time
+
 
 @app.command()
 def process(total: int = 100):
@@ -200,10 +202,9 @@ def complete_name(ctx, param, incomplete):
     names = ["Alice", "Bob", "Camila"]
     return [n for n in names if n.startswith(incomplete)]
 
+
 @app.command()
-def main(
-    name: Annotated[str, typer.Argument(autocompletion=complete_name)],
-):
+def main(name: Annotated[str, typer.Argument(autocompletion=complete_name)]):
     typer.echo(f"Hello {name}")
 ```
 

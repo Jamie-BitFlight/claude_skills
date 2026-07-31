@@ -120,6 +120,7 @@ from string import Template
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
+
 @pytest.fixture
 def mock_binary(tmp_path: Path) -> Path:
     """Create mock binary from external template.
@@ -145,6 +146,7 @@ def database_connection() -> Generator[Connection, None, None]:
     conn = connect_to_db()
     yield conn
     conn.close()
+
 
 @pytest.fixture
 def database_with_users(database_connection: Connection) -> Generator[Connection, None, None]:

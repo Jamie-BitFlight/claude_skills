@@ -113,10 +113,10 @@ VALIDATION REPORT:
 ```python
 import argparse
 
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Tool description",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Tool description", formatter_class=argparse.RawDescriptionHelpFormatter
     )
     return parser
 ```
@@ -126,6 +126,7 @@ def create_parser() -> argparse.ArgumentParser:
 ```python
 import logging
 from pathlib import Path
+
 
 def setup_logging(level: str = "INFO", log_file: Path | None = None) -> None:
     handlers: list[logging.Handler] = [logging.StreamHandler()]
@@ -144,6 +145,7 @@ def setup_logging(level: str = "INFO", log_file: Path | None = None) -> None:
 import json, configparser, tomllib
 from pathlib import Path
 from typing import Any
+
 
 def load_config(path: Path) -> dict[str, Any]:
     ext = path.suffix.lower()
@@ -165,12 +167,13 @@ def load_config(path: Path) -> dict[str, Any]:
 from shutil import which
 import os, subprocess
 
+
 def run_privileged_command(cmd: str, args: list[str]) -> subprocess.CompletedProcess[str]:
     if os.name != "posix":
         return subprocess.run([cmd, *args], capture_output=True, text=True)
     if os.geteuid() == 0:
         full = [cmd, *args]
-    elif (sudo := which("sudo")):
+    elif sudo := which("sudo"):
         full = [sudo, "-n", cmd, *args]
     else:
         full = [cmd, *args]
@@ -182,8 +185,10 @@ def run_privileged_command(cmd: str, args: list[str]) -> subprocess.CompletedPro
 ```python
 import logging, sys
 
+
 class ScriptError(Exception):
     """Base error for script-related failures."""
+
 
 def handle_error(err: Exception, logger: logging.Logger) -> None:
     logger.error(f"Error: {err}")
@@ -198,6 +203,7 @@ def handle_error(err: Exception, logger: logging.Logger) -> None:
 import asyncio
 from collections.abc import Coroutine
 from typing import Any
+
 
 async def run_async(tasks: list[Coroutine[Any, Any, Any]]) -> list[Any]:
     return await asyncio.gather(*tasks, return_exceptions=True)
@@ -247,6 +253,7 @@ Pytest with coverage of normal, edge, and error cases.
 import json
 from pathlib import Path
 from module import load_config
+
 
 def test_load_json(tmp_path: Path) -> None:
     path = tmp_path / "c.json"

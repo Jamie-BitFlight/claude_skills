@@ -62,6 +62,7 @@ Paths are relative to the project root.
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Called before each build"""
@@ -80,13 +81,16 @@ If your custom hook file contains multiple subclasses of `BuildHookInterface`, y
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class WheelBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         print("Preparing wheel build")
 
+
 class SdistBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         print("Preparing sdist build")
+
 
 def get_build_hook():
     """Return the appropriate hook"""
@@ -105,19 +109,20 @@ Generate source files or artifacts before the build:
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Generate version file
         version_file = os.path.join(self.root, "src", "myproject", "__version__.py")
         os.makedirs(os.path.dirname(version_file), exist_ok=True)
 
-        with open(version_file, 'w') as f:
+        with open(version_file, "w") as f:
             f.write(f'__version__ = "{version}"\n')
 
         # Include in build
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
-        build_data['artifacts'].append('src/myproject/__version__.py')
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
+        build_data["artifacts"].append("src/myproject/__version__.py")
 ```
 
 Configuration:
@@ -137,22 +142,19 @@ import subprocess
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Compile assets
         assets_dir = os.path.join(self.root, "assets")
         output_dir = os.path.join(self.root, "src/myproject/static")
 
-        subprocess.run([
-            "sass",
-            "--load-path", assets_dir,
-            f"{assets_dir}/main.scss:{output_dir}/main.css"
-        ], check=True)
+        subprocess.run(["sass", "--load-path", assets_dir, f"{assets_dir}/main.scss:{output_dir}/main.css"], check=True)
 
         # Include compiled assets
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
-        build_data['artifacts'].append('src/myproject/static/**/*.css')
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
+        build_data["artifacts"].append("src/myproject/static/**/*.css")
 ```
 
 ### Conditional Logic Based on Target
@@ -164,12 +166,13 @@ Run different code for different build targets:
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        if self.target_name == 'wheel':
+        if self.target_name == "wheel":
             # Wheel-specific setup
             self.prepare_wheel_build()
-        elif self.target_name == 'sdist':
+        elif self.target_name == "sdist":
             # Sdist-specific setup
             self.prepare_sdist_build()
 
@@ -192,21 +195,22 @@ import os
 import hashlib
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
         """Create checksums after build"""
         checksum = self.compute_checksum(artifact_path)
         checksum_file = f"{artifact_path}.sha256"
 
-        with open(checksum_file, 'w') as f:
+        with open(checksum_file, "w") as f:
             f.write(f"{checksum}  {os.path.basename(artifact_path)}\n")
 
         print(f"Checksum written to {checksum_file}")
 
     def compute_checksum(self, file_path: str) -> str:
         sha256 = hashlib.sha256()
-        with open(file_path, 'rb') as f:
-            for block in iter(lambda: f.read(4096), b''):
+        with open(file_path, "rb") as f:
+            for block in iter(lambda: f.read(4096), b""):
                 sha256.update(block)
         return sha256.hexdigest()
 ```
@@ -226,10 +230,11 @@ verbose = true
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        output_dir = self.config.get('output-dir', 'dist')
-        verbose = self.config.get('verbose', False)
+        output_dir = self.config.get("output-dir", "dist")
+        verbose = self.config.get("verbose", False)
 
         if verbose:
             print(f"Output directory: {output_dir}")
@@ -242,6 +247,7 @@ If your hook needs external packages, declare them:
 ```python
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
 
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
@@ -274,6 +280,7 @@ import shutil
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def clean(self, versions: list[str]) -> None:
         """Remove hook-generated files"""
@@ -292,10 +299,10 @@ Called before the build starts. Modify `build_data` to influence the build:
 ```python
 def initialize(self, version: str, build_data: dict) -> None:
     # Add artifacts
-    build_data['artifacts'].append('generated/**/*.py')
+    build_data["artifacts"].append("generated/**/*.py")
 
     # Add forced inclusions
-    build_data['force_include']['external/lib.so'] = 'mylib/lib.so'
+    build_data["force_include"]["external/lib.so"] = "mylib/lib.so"
 ```
 
 ### finalize(version: str, build_data: dict, artifact_path: str)
@@ -317,15 +324,17 @@ Define different behavior for different build targets:
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class WheelHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        if self.target_name == 'wheel':
+        if self.target_name == "wheel":
             print("Building wheel")
             # Compile extensions, create .so files, etc.
 
+
 class SdistHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        if self.target_name == 'sdist':
+        if self.target_name == "sdist":
             print("Building sdist")
             # Include source templates, build scripts, etc.
 ```
@@ -348,15 +357,13 @@ Raise exceptions to fail the build:
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         required_file = os.path.join(self.root, "version.txt")
 
         if not os.path.exists(required_file):
-            raise RuntimeError(
-                f"Required file not found: {required_file}\n"
-                "Run 'generate-version' script first."
-            )
+            raise RuntimeError(f"Required file not found: {required_file}\nRun 'generate-version' script first.")
 ```
 
 ## Best Practices
@@ -370,6 +377,7 @@ Hooks should do one thing well:
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         self.generate_version_file(version)
+
 
 # Less ideal: Multiple unrelated operations
 class CustomBuildHook(BuildHookInterface):
@@ -419,9 +427,10 @@ class CustomBuildHook(BuildHookInterface):
         - template-dir: Directory containing templates (default: templates)
         - output-file: Output file path (default: src/version.py)
     """
+
     def initialize(self, version: str, build_data: dict) -> None:
-        template_dir = self.config.get('template-dir', 'templates')
-        output_file = self.config.get('output-file', 'src/version.py')
+        template_dir = self.config.get("template-dir", "templates")
+        output_file = self.config.get("output-file", "src/version.py")
 ```
 
 ### 5. Make Hooks Idempotent
@@ -430,11 +439,11 @@ Hooks should work correctly when run multiple times:
 
 ```python
 def initialize(self, version: str, build_data: dict) -> None:
-    output_file = os.path.join(self.root, 'generated.py')
+    output_file = os.path.join(self.root, "generated.py")
     # Create parent directories if they don't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     # Overwrite existing file without error
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         f.write(...)
 ```
 

@@ -147,7 +147,7 @@ def linear_graphql_request(api_key: str, query: str, variables: dict[str, Any] |
         raise BacklogError(msg)
 
     data = body.get("data")
-    if not isinstance(data, dict):
+    if not _is_dict_of_object(data):
         msg = f"Unexpected Linear API response shape: {body!r}"
         raise BacklogError(msg)
 

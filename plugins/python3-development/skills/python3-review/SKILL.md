@@ -45,6 +45,7 @@ Consult `../python3-development/references/python3-standards.md` when checking c
 def process(data):
     return data.get("value")
 
+
 # Good - complete types
 def process(data: dict[str, int]) -> int | None:
     return data.get("value")

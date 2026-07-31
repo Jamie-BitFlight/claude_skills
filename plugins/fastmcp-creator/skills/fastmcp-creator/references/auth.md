@@ -75,11 +75,7 @@ public_key_pem = """-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...
 -----END PUBLIC KEY-----"""
 
-verifier = JWTVerifier(
-    public_key=public_key_pem,
-    issuer="https://auth.yourcompany.com",
-    audience="mcp-production-api",
-)
+verifier = JWTVerifier(public_key=public_key_pem, issuer="https://auth.yourcompany.com", audience="mcp-production-api")
 ```
 
 ### Opaque Token Verification (Token Introspection)
@@ -133,10 +129,7 @@ from fastmcp.server.auth.providers.debug import DebugTokenVerifier
 verifier = DebugTokenVerifier()
 
 # Or custom validation logic (sync)
-verifier = DebugTokenVerifier(
-    validate=lambda token: token.startswith("dev-"),
-    scopes=["read", "write"],
-)
+verifier = DebugTokenVerifier(validate=lambda token: token.startswith("dev-"), scopes=["read", "write"])
 ```
 
 PATTERN: The `validate` callable can be `async` for database lookups or external service checks:
@@ -145,11 +138,8 @@ PATTERN: The `validate` callable can be `async` for database lookups or external
 async def validate_token(token: str) -> bool:
     return await redis.exists(f"valid_tokens:{token}")
 
-verifier = DebugTokenVerifier(
-    validate=validate_token,
-    client_id="api-client",
-    scopes=["api:access"],
-)
+
+verifier = DebugTokenVerifier(validate=validate_token, client_id="api-client", scopes=["api:access"])
 ```
 
 CONSTRAINT: `StaticTokenVerifier` and `DebugTokenVerifier` are for development and testing only. Never use in production.
@@ -162,9 +152,7 @@ from fastmcp.server.auth.providers.jwt import JWTVerifier, RSAKeyPair
 key_pair = RSAKeyPair.generate()
 
 verifier = JWTVerifier(
-    public_key=key_pair.public_key,
-    issuer="https://test.yourcompany.com",
-    audience="test-mcp-server",
+    public_key=key_pair.public_key, issuer="https://test.yourcompany.com", audience="test-mcp-server"
 )
 
 test_token = key_pair.create_token(
@@ -265,10 +253,7 @@ Use `RemoteAuthProvider` for identity providers that support Dynamic Client Regi
 from fastmcp import FastMCP
 from fastmcp.server.auth.providers.workos import AuthKitProvider
 
-auth = AuthKitProvider(
-    authkit_domain="https://your-project.authkit.app",
-    base_url="https://your-fastmcp-server.com",
-)
+auth = AuthKitProvider(authkit_domain="https://your-project.authkit.app", base_url="https://your-fastmcp-server.com")
 
 mcp = FastMCP(name="Enterprise Server", auth=auth)
 ```
@@ -302,7 +287,7 @@ auth = MultiAuth(
             jwks_uri="https://internal-issuer.example.com/.well-known/jwks.json",
             issuer="https://internal-issuer.example.com",
             audience="my-mcp-server",
-        ),
+        )
     ],
 )
 
@@ -336,7 +321,7 @@ auth = MultiAuth(
             issuer="https://issuer-b.example.com",
             audience="my-server",
         ),
-    ],
+    ]
 )
 
 mcp = FastMCP("Multi-Issuer Server", auth=auth)
@@ -367,8 +352,8 @@ from fastmcp import FastMCP
 from fastmcp.server.auth.providers.propelauth import PropelAuthProvider
 
 auth_provider = PropelAuthProvider(
-    auth_url=os.environ["PROPELAUTH_AUTH_URL"],                            # From PropelAuth Backend Integration page
-    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],     # From MCP > Request Validation
+    auth_url=os.environ["PROPELAUTH_AUTH_URL"],  # From PropelAuth Backend Integration page
+    introspection_client_id=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_ID"],  # From MCP > Request Validation
     introspection_client_secret=os.environ["PROPELAUTH_INTROSPECTION_CLIENT_SECRET"],
     base_url=os.environ["SERVER_URL"],
     required_scopes=["read:user_data"],  # Optional
@@ -399,9 +384,9 @@ auth = PropelAuthProvider(
     required_scopes=["read:user_data"],
     resource="https://your-server.com/mcp",  # Restrict to tokens for this server (RFC 8707)
     token_introspection_overrides={
-        "cache_ttl_seconds": 300,    # Cache introspection results for 5 minutes
-        "max_cache_size": 1000,      # Maximum number of cached tokens
-        "timeout_seconds": 15,       # HTTP request timeout
+        "cache_ttl_seconds": 300,  # Cache introspection results for 5 minutes
+        "max_cache_size": 1000,  # Maximum number of cached tokens
+        "timeout_seconds": 15,  # HTTP request timeout
     },
 )
 ```
@@ -427,6 +412,7 @@ auth = PropelAuthProvider(
 )
 
 mcp = FastMCP(name="My PropelAuth Protected Server", auth=auth)
+
 
 @mcp.tool
 def whoami() -> dict:
@@ -491,10 +477,12 @@ from fastmcp.server.auth import require_scopes
 
 mcp = FastMCP("Scoped Server")
 
+
 @mcp.tool(auth=require_scopes("admin"))
 def admin_operation() -> str:
     """Requires the 'admin' scope."""
     return "Admin action completed"
+
 
 @mcp.tool(auth=require_scopes("read", "write"))
 def read_write_operation() -> str:
@@ -508,6 +496,7 @@ PATTERN: Apply auth to resources and prompts too.
 @mcp.resource("secret://data", auth=require_scopes("read"))
 def secret_resource() -> str:
     return "Secret data"
+
 
 @mcp.prompt(auth=require_scopes("admin"))
 def admin_prompt() -> str:
@@ -535,15 +524,18 @@ mcp = FastMCP(
     ],
 )
 
+
 @mcp.tool(tags={"admin"})
 def delete_all_data() -> str:
     """Requires 'admin' scope."""
     return "Deleted"
 
+
 @mcp.tool(tags={"write"})
 def update_record(id: str, data: str) -> str:
     """Requires 'write' scope."""
     return f"Updated {id}"
+
 
 @mcp.tool
 def read_record(id: str) -> str:
@@ -560,11 +552,13 @@ Any callable that accepts `AuthContext` and returns `bool` is a valid auth check
 ```python
 from fastmcp.server.auth import AuthContext
 
+
 def require_premium_user(ctx: AuthContext) -> bool:
     """Check for premium user status in token claims."""
     if ctx.token is None:
         return False
     return ctx.token.claims.get("premium", False) is True
+
 
 @mcp.tool(auth=require_premium_user)
 def premium_feature() -> str:
@@ -590,6 +584,7 @@ async def check_user_permissions(ctx: AuthContext) -> bool:
     permissions = await fetch_user_permissions(user_id)
     return "admin" in permissions
 
+
 @mcp.tool(auth=check_user_permissions)
 def admin_tool() -> str:
     return "Admin action completed"
@@ -599,6 +594,7 @@ PATTERN: Raise `AuthorizationError` for explicit denial with a custom message.
 
 ```python
 from fastmcp.exceptions import AuthorizationError
+
 
 def require_verified_email(ctx: AuthContext) -> bool:
     if ctx.token is None:
@@ -620,6 +616,7 @@ from fastmcp.server.dependencies import get_access_token
 
 mcp = FastMCP("Token Access Server")
 
+
 @mcp.tool
 def personalized_greeting() -> str:
     """Greet the user based on their token claims."""
@@ -629,17 +626,14 @@ def personalized_greeting() -> str:
     name = token.claims.get("name", "user")
     return f"Hello, {name}!"
 
+
 @mcp.tool
 def user_dashboard() -> dict:
     """Return user-specific data based on token."""
     token = get_access_token()
     if token is None:
         return {"error": "Not authenticated"}
-    return {
-        "client_id": token.client_id,
-        "scopes": token.scopes,
-        "claims": token.claims,
-    }
+    return {"client_id": token.client_id, "scopes": token.scopes, "claims": token.claims}
 ```
 
 `AccessToken` properties: `token` (raw string), `client_id`, `scopes` (list), `expires_at`, `claims` (dict)
@@ -684,10 +678,7 @@ PATTERN: Provide a shared `httpx.AsyncClient` to verifiers that make HTTP calls,
 import httpx
 from fastmcp.server.auth.providers.introspection import IntrospectionTokenVerifier
 
-http_client = httpx.AsyncClient(
-    timeout=10,
-    limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-)
+http_client = httpx.AsyncClient(timeout=10, limits=httpx.Limits(max_connections=20, max_keepalive_connections=10))
 
 verifier = IntrospectionTokenVerifier(
     introspection_url="https://auth.yourcompany.com/oauth/introspect",
@@ -726,10 +717,12 @@ verifier = IntrospectionTokenVerifier(
     http_client=http_client,
 )
 
+
 @asynccontextmanager
 async def lifespan(app):
     yield
     await http_client.aclose()
+
 
 mcp = FastMCP(name="My API", auth=verifier, lifespan=lifespan)
 ```
@@ -766,12 +759,12 @@ flowchart TD
 
 ```python
 from fastmcp.server.auth import (
-    AccessToken,       # .token, .client_id, .scopes, .expires_at, .claims
-    AuthContext,       # .token, .component
-    AuthCheck,         # Type alias: Callable[[AuthContext], bool]
-    require_scopes,    # Built-in: check specific scopes
-    restrict_tag,      # Built-in: tag-based scope requirements
-    run_auth_checks,   # Utility: run checks with AND logic
+    AccessToken,  # .token, .client_id, .scopes, .expires_at, .claims
+    AuthContext,  # .token, .component
+    AuthCheck,  # Type alias: Callable[[AuthContext], bool]
+    require_scopes,  # Built-in: check specific scopes
+    restrict_tag,  # Built-in: tag-based scope requirements
+    run_auth_checks,  # Utility: run checks with AND logic
 )
 
 from fastmcp.server.middleware import AuthMiddleware

@@ -96,16 +96,18 @@ from typing import Annotated
 
 app = typer.Typer()
 
+
 @app.command()
 def main(
-    name: str,                                          # required argument
-    count: Annotated[int, typer.Option()] = 1,          # optional option
-    formal: bool = False,                               # --formal / --no-formal
+    name: str,  # required argument
+    count: Annotated[int, typer.Option()] = 1,  # optional option
+    formal: bool = False,  # --formal / --no-formal
 ):
     """Greet NAME."""
     for _ in range(count):
         greeting = f"Good day, {name}." if formal else f"Hello {name}"
         typer.echo(greeting)
+
 
 if __name__ == "__main__":
     app()

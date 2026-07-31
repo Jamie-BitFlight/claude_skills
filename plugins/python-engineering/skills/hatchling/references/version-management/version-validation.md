@@ -15,42 +15,44 @@ All versions in Hatchling must comply with [PEP 440](https://peps.python.org/pep
 
 ```python
 # Release versions
-"1.2.3"              # Standard
-"2024.12.1"          # Calendar
-"1.2"                # Short form (normalized to 1.2.0)
+"1.2.3"  # Standard
+
+"2024.12.1"  # Calendar
+"1.2"  # Short form (normalized to 1.2.0)
 
 # Pre-releases
-"1.0a1"              # Alpha
-"1.0b2"              # Beta
-"1.0rc3"             # Release candidate
+"1.0a1"  # Alpha
+"1.0b2"  # Beta
+"1.0rc3"  # Release candidate
 
 # Development
-"1.0.dev0"           # Development
+"1.0.dev0"  # Development
 
 # Post-releases
-"1.0.post1"          # Post release
+"1.0.post1"  # Post release
 
 # Combinations
-"1.0a1.dev0"         # Dev version of alpha
-"1.0rc1.post2"       # Post release of RC
+"1.0a1.dev0"  # Dev version of alpha
+"1.0rc1.post2"  # Post release of RC
 
 # Epochs
-"1!2.0.0"            # Version 2.0.0, epoch 1
+"1!2.0.0"  # Version 2.0.0, epoch 1
 
 # Local versions
-"1.0+local"          # With local identifier
-"1.0+ubuntu1"        # Distribution specific
+"1.0+local"  # With local identifier
+"1.0+ubuntu1"  # Distribution specific
 ```
 
 ### Invalid Formats
 
 ```python
 # These will cause errors
-"v1.2.3"             # No 'v' prefix
-"1.2.3-alpha"        # Wrong pre-release format
-"latest"             # Not a version
-"1.x"                # No wildcards
-"1.2.3.4.5"          # Too many segments (without .dev/.post)
+"v1.2.3"  # No 'v' prefix
+
+"1.2.3-alpha"  # Wrong pre-release format
+"latest"  # Not a version
+"1.x"  # No wildcards
+"1.2.3.4.5"  # Too many segments (without .dev/.post)
 ```
 
 ## Validate-Bump Configuration
@@ -103,17 +105,17 @@ from packaging.version import Version
 
 # Comparison order (lowest to highest)
 versions = [
-    "1.0.dev0",      # Development releases (lowest)
-    "1.0a1.dev0",    # Dev of pre-release
-    "1.0a1",         # Alpha releases
+    "1.0.dev0",  # Development releases (lowest)
+    "1.0a1.dev0",  # Dev of pre-release
+    "1.0a1",  # Alpha releases
     "1.0a2",
-    "1.0b1",         # Beta releases
+    "1.0b1",  # Beta releases
     "1.0b2",
-    "1.0rc1",        # Release candidates
+    "1.0rc1",  # Release candidates
     "1.0rc2",
-    "1.0",           # Final release
-    "1.0.post1",     # Post releases
-    "1!0.0",         # Epoch 1 (always higher)
+    "1.0",  # Final release
+    "1.0.post1",  # Post releases
+    "1!0.0",  # Epoch 1 (always higher)
 ]
 
 # Sort versions
@@ -126,8 +128,8 @@ Epochs override all other version components:
 
 ```python
 "1!0.0" > "99.99.99"  # True - epoch 1 is higher
-"2!0.0" > "1!99.99"   # True - epoch 2 > epoch 1
-"0!2.0" < "1!1.0"     # True - epoch 0 < epoch 1
+"2!0.0" > "1!99.99"  # True - epoch 2 > epoch 1
+"0!2.0" < "1!1.0"  # True - epoch 0 < epoch 1
 ```
 
 ### Local Version Comparison
@@ -135,9 +137,9 @@ Epochs override all other version components:
 Local versions are higher than their base:
 
 ```python
-"1.0+local" > "1.0"           # True
-"1.0+a" < "1.0+b"            # True - alphabetical
-"1.0+1" < "1.0+2"            # True - numerical
+"1.0+local" > "1.0"  # True
+"1.0+a" < "1.0+b"  # True - alphabetical
+"1.0+1" < "1.0+2"  # True - numerical
 ```
 
 ## Bumping Validation
@@ -301,13 +303,10 @@ import subprocess
 import sys
 from packaging.version import Version, InvalidVersion
 
+
 def main():
     # Get current version
-    result = subprocess.run(
-        ["hatch", "version"],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["hatch", "version"], capture_output=True, text=True)
     version_str = result.stdout.strip()
 
     # Validate format
@@ -329,6 +328,7 @@ def main():
     print(f"✓ Valid version: {version}")
     return 0
 
+
 if __name__ == "__main__":
     sys.exit(main())
 ```
@@ -340,6 +340,7 @@ if __name__ == "__main__":
 ```python
 # validate_version_policy.py
 from packaging.version import Version
+
 
 def validate_version(version_str: str) -> bool:
     """Validate version against org policy."""
@@ -364,11 +365,8 @@ def validate_version(version_str: str) -> bool:
     # Rule 4: No dev versions in main branch
     if version.is_devrelease:
         import subprocess
-        result = subprocess.run(
-            ["git", "branch", "--show-current"],
-            capture_output=True,
-            text=True
-        )
+
+        result = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True)
         if result.stdout.strip() == "main":
             print("ERROR: Dev versions not allowed on main")
             return False

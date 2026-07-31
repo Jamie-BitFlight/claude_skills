@@ -136,22 +136,21 @@ Without httpx, you would need to:
 # Pattern 1: Synchronous API client wrapper
 import httpx
 
+
 class APIClient:
     def __init__(self, base_url: str, api_key: str):
-        self.client = httpx.Client(
-            base_url=base_url,
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=30.0
-        )
+        self.client = httpx.Client(base_url=base_url, headers={"Authorization": f"Bearer {api_key}"}, timeout=30.0)
 
     def get_resource(self, resource_id: str):
         response = self.client.get(f"/resources/{resource_id}")
         response.raise_for_status()
         return response.json()
 
+
 # Pattern 2: Async concurrent requests
 import asyncio
 import httpx
+
 
 async def fetch_all(urls: list[str]) -> list[dict]:
     async with httpx.AsyncClient() as client:
@@ -159,17 +158,20 @@ async def fetch_all(urls: list[str]) -> list[dict]:
         responses = await asyncio.gather(*tasks)
         return [r.json() for r in responses]
 
+
 # Pattern 3: FastAPI integration with async httpx
 from fastapi import FastAPI
 import httpx
 
 app = FastAPI()
 
+
 @app.get("/proxy/{path:path}")
 async def proxy_request(path: str):
     async with httpx.AsyncClient() as client:
         response = await client.get(f"https://api.example.com/{path}")
         return response.json()
+
 
 # Pattern 4: HTTP/2 with connection pooling
 import httpx
@@ -208,13 +210,16 @@ import httpx
 
 app = FastAPI()
 
+
 @app.on_event("startup")
 async def startup_event():
     app.state.http_client = httpx.AsyncClient()
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await app.state.http_client.aclose()
+
 
 @app.get("/data")
 async def get_data(request: Request):
@@ -230,8 +235,10 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 import httpx
 
+
 async def homepage(request):
     return {"message": "Hello, world"}
+
 
 app = Starlette(routes=[Route("/", homepage)])
 
@@ -247,10 +254,12 @@ with httpx.Client(transport=httpx.ASGITransport(app=app)) as client:
 import httpx
 import trio
 
+
 async def main():
     async with httpx.AsyncClient() as client:
-        response = await client.get('https://www.example.com/')
+        response = await client.get("https://www.example.com/")
         print(response)
+
 
 trio.run(main)
 ```
@@ -296,20 +305,20 @@ uv add 'httpx[http2]'  # With HTTP/2 support
 import httpx
 
 # Simple GET request
-response = httpx.get('https://httpbin.org/get')
+response = httpx.get("https://httpbin.org/get")
 print(response.status_code)  # 200
 print(response.json())
 
 # POST with data
-response = httpx.post('https://httpbin.org/post', data={'key': 'value'})
+response = httpx.post("https://httpbin.org/post", data={"key": "value"})
 
 # Custom headers
-headers = {'user-agent': 'my-app/0.0.1'}
-response = httpx.get('https://httpbin.org/headers', headers=headers)
+headers = {"user-agent": "my-app/0.0.1"}
+response = httpx.get("https://httpbin.org/headers", headers=headers)
 
 # Query parameters
-params = {'key1': 'value1', 'key2': 'value2'}
-response = httpx.get('https://httpbin.org/get', params=params)
+params = {"key1": "value1", "key2": "value2"}
+response = httpx.get("https://httpbin.org/get", params=params)
 ```
 
 ### Asynchronous Requests @ python-httpx.org/async
@@ -318,22 +327,25 @@ response = httpx.get('https://httpbin.org/get', params=params)
 import httpx
 import asyncio
 
+
 async def fetch_data():
     async with httpx.AsyncClient() as client:
-        response = await client.get('https://www.example.com/')
+        response = await client.get("https://www.example.com/")
         print(response.status_code)
         return response.json()
 
+
 # Run async function
 asyncio.run(fetch_data())
+
 
 # Concurrent requests
 async def fetch_multiple():
     async with httpx.AsyncClient() as client:
         tasks = [
-            client.get('https://httpbin.org/get'),
-            client.get('https://httpbin.org/headers'),
-            client.get('https://httpbin.org/user-agent')
+            client.get("https://httpbin.org/get"),
+            client.get("https://httpbin.org/headers"),
+            client.get("https://httpbin.org/user-agent"),
         ]
         responses = await asyncio.gather(*tasks)
         return [r.json() for r in responses]
@@ -346,23 +358,23 @@ import httpx
 
 # Create configured client
 client = httpx.Client(
-    base_url='https://api.example.com',
-    headers={'Authorization': 'Bearer token123'},
+    base_url="https://api.example.com",
+    headers={"Authorization": "Bearer token123"},
     timeout=30.0,
-    follow_redirects=True
+    follow_redirects=True,
 )
 
 try:
     # Make requests using the client
-    response = client.get('/users/me')
+    response = client.get("/users/me")
     response.raise_for_status()
     print(response.json())
 finally:
     client.close()
 
 # Context manager (automatic cleanup)
-with httpx.Client(base_url='https://api.example.com') as client:
-    response = client.get('/data')
+with httpx.Client(base_url="https://api.example.com") as client:
+    response = client.get("/data")
 ```
 
 ### HTTP/2 Support @ python-httpx.org/http2
@@ -374,15 +386,15 @@ import httpx
 client = httpx.Client(http2=True)
 
 try:
-    response = client.get('https://www.google.com')
-    print(response.extensions['http_version'])  # b'HTTP/2'
+    response = client.get("https://www.google.com")
+    print(response.extensions["http_version"])  # b'HTTP/2'
 finally:
     client.close()
 
 # Async HTTP/2
 async with httpx.AsyncClient(http2=True) as client:
-    response = await client.get('https://www.google.com')
-    print(response.extensions['http_version'])
+    response = await client.get("https://www.google.com")
+    print(response.extensions["http_version"])
 ```
 
 ### Streaming Responses @ python-httpx.org/quickstart
@@ -402,7 +414,7 @@ with httpx.stream("GET", "https://www.example.com/log") as response:
 
 # Conditional loading
 with httpx.stream("GET", "https://www.example.com/file") as response:
-    if int(response.headers['Content-Length']) < 10_000_000:  # 10MB
+    if int(response.headers["Content-Length"]) < 10_000_000:  # 10MB
         content = response.read()
         print(content)
 ```
@@ -429,10 +441,7 @@ except httpx.HTTPError as exc:
 import httpx
 
 # Basic authentication
-response = httpx.get(
-    "https://example.com",
-    auth=("username", "password")
-)
+response = httpx.get("https://example.com", auth=("username", "password"))
 
 # Digest authentication
 auth = httpx.DigestAuth("username", "password")
@@ -487,16 +496,16 @@ httpx provides broad compatibility with requests, but with key differences:
 
 ```python
 # requests: Auto-redirects by default
-requests.get('http://github.com/')  # Follows to HTTPS
+requests.get("http://github.com/")  # Follows to HTTPS
 
 # httpx: Explicit redirect handling
-httpx.get('http://github.com/', follow_redirects=True)
+httpx.get("http://github.com/", follow_redirects=True)
 
 # requests: No timeouts by default
-requests.get('https://example.com')
+requests.get("https://example.com")
 
 # httpx: 5-second default timeout
-httpx.get('https://example.com')  # 5s timeout
+httpx.get("https://example.com")  # 5s timeout
 
 # requests: Session object
 session = requests.Session()
@@ -539,6 +548,7 @@ client = httpx.Client()
 import httpx
 import respx
 
+
 @respx.mock
 async def test_api_call():
     async with httpx.AsyncClient() as client:
@@ -553,6 +563,7 @@ async def test_api_call():
 ```python
 import httpx
 import pytest
+
 
 def test_with_httpx(httpx_mock):
     httpx_mock.add_response(url="https://example.com/", json={"status": "ok"})
@@ -575,9 +586,7 @@ for i in range(100):
 client.close()
 
 # Async with connection limits
-async with httpx.AsyncClient(
-    limits=httpx.Limits(max_keepalive_connections=20, max_connections=100)
-) as client:
+async with httpx.AsyncClient(limits=httpx.Limits(max_keepalive_connections=20, max_connections=100)) as client:
     # Efficient connection reuse
     tasks = [client.get(url) for url in urls]
     responses = await asyncio.gather(*tasks)
@@ -591,9 +600,9 @@ import httpx
 # Fine-grained timeouts
 timeout = httpx.Timeout(
     connect=5.0,  # Connection timeout
-    read=10.0,    # Read timeout
-    write=10.0,   # Write timeout
-    pool=None     # Pool acquisition timeout
+    read=10.0,  # Read timeout
+    write=10.0,  # Write timeout
+    pool=None,  # Pool acquisition timeout
 )
 
 client = httpx.Client(timeout=timeout)

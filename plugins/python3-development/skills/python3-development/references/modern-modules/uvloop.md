@@ -52,13 +52,16 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
 
+
 # Run with uvloop
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000, loop="uvloop")
 ```
 
@@ -72,11 +75,13 @@ from sanic import Sanic, response
 
 app = Sanic("websocket_app")
 
+
 @app.websocket("/feed")
 async def feed(request, ws):
     while True:
         data = await ws.recv()
         await ws.send(data)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
@@ -91,11 +96,13 @@ import asyncio
 import uvloop
 import aiohttp
 
+
 async def fetch_many(urls):
     async with aiohttp.ClientSession() as session:
         tasks = [session.get(url) for url in urls]
         responses = await asyncio.gather(*tasks)
         return responses
+
 
 # Use uvloop for 2-4x faster concurrent requests
 uvloop.run(fetch_many(["https://example.com"] * 1000))
@@ -112,9 +119,11 @@ import uvloop
 # Install uvloop as default event loop policy
 uvloop.install()
 
+
 async def main():
     # Your async code here
     await asyncio.sleep(1)
+
 
 # Now all asyncio.run() calls use uvloop
 asyncio.run(main())
@@ -125,9 +134,11 @@ asyncio.run(main())
 ```python
 import uvloop
 
+
 async def main():
     # Your async application entry point
     pass
+
 
 # Simplest usage - replaces asyncio.run()
 # @ https://github.com/MagicStack/uvloop/blob/master/README.rst
@@ -141,9 +152,11 @@ import asyncio
 import sys
 import uvloop
 
+
 async def main():
     # Application logic
     pass
+
 
 # Python 3.11+ with explicit loop factory
 if sys.version_info >= (3, 11):
@@ -162,13 +175,16 @@ import os
 
 # Only use uvloop on POSIX systems (Linux/macOS)
 # @ https://github.com/wanZzz6/Modules-Learn
-if os.name == 'posix':
+if os.name == "posix":
     import uvloop
+
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
 
 # Windows will use default asyncio (proactor loop)
 async def main():
     pass
+
 
 asyncio.run(main())
 ```
@@ -189,11 +205,13 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 app = FastAPI()
 
+
 @app.get("/api/data")
 async def handle_data():
     # Simulate async database query
     await asyncio.sleep(0.1)
     return {"message": "Hello from Python"}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=3000, loop="uvloop")
@@ -208,6 +226,7 @@ import os
 
 if os.name != "nt":  # Not Windows
     import uvloop
+
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 # Discord bot code follows - automatic 2-4x performance boost
@@ -221,16 +240,18 @@ import asyncio
 import uvloop
 import aiohttp
 
+
 async def handle_response(session, url):
     async with session.get(url) as response:
         return await response.text()
 
+
 async def main():
     async with aiohttp.ClientSession() as session:
-        tasks = [handle_response(session, f"https://api.example.com/item/{i}")
-                 for i in range(1000)]
+        tasks = [handle_response(session, f"https://api.example.com/item/{i}") for i in range(1000)]
         results = await asyncio.gather(*tasks)
     return results
+
 
 # Install and run
 uvloop.install()
@@ -284,12 +305,15 @@ From @ [magic.io/blog/uvloop](https://magic.io/blog/uvloop-blazing-fast-python-n
 ```python
 # BAD: uvloop doesn't work on Windows
 import uvloop
+
 uvloop.install()  # Will fail on Windows
 
 # GOOD: Platform detection
 import os
-if os.name == 'posix':
+
+if os.name == "posix":
     import uvloop
+
     uvloop.install()
 ```
 
@@ -302,6 +326,7 @@ uvloop optimizes I/O operations but won't speed up CPU-intensive work:
 async def cpu_intensive():
     result = sum(i**2 for i in range(10_000_000))
     return result
+
 
 # Use multiprocessing instead for CPU-bound work
 ```
@@ -325,6 +350,7 @@ asyncio.run(main(), debug=True)  # Better error messages with standard loop
 async def simple_task():
     await asyncio.sleep(1)
     print("Done")
+
 
 # uvloop adds minimal value here - overhead not justified
 ```
@@ -420,14 +446,18 @@ AsyncIOMainLoop().install()
 ```python
 # BAD: Event loop already created
 import asyncio
+
 loop = asyncio.get_event_loop()  # Creates default loop
 import uvloop
+
 uvloop.install()  # Too late!
 
 # GOOD: Install before any event loop operations
 import uvloop
+
 uvloop.install()
 import asyncio
+
 loop = asyncio.get_event_loop()  # Now uses uvloop
 ```
 
@@ -436,12 +466,15 @@ loop = asyncio.get_event_loop()  # Now uses uvloop
 ```python
 # BAD: Crashes on Windows
 import uvloop
+
 uvloop.install()
 
 # GOOD: Platform check
 import sys
-if sys.platform != 'win32':
+
+if sys.platform != "win32":
     import uvloop
+
     uvloop.install()
 ```
 
@@ -451,6 +484,7 @@ if sys.platform != 'win32':
 # BAD: uvloop won't help CPU-bound code
 async def calculate_primes(n):
     return [i for i in range(2, n) if all(i % j != 0 for j in range(2, i))]
+
 
 # uvloop provides NO benefit for pure computation
 ```

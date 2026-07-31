@@ -63,10 +63,7 @@ from project_name import MainClass, utility_function
 data = utility_function(source="data.csv")
 instance = MainClass(data=data)
 
-results = instance.process(
-    option1=True,
-    option2="custom"
-)
+results = instance.process(option1=True, option2="custom")
 
 for result in results:
     print(result)
@@ -77,15 +74,12 @@ for result in results:
 ```python
 from project_name import MainClass, AsyncProcessor
 
+
 async def advanced_workflow():
     processor = AsyncProcessor()
 
     async with processor:
-        results = await processor.batch_process([
-            "item1",
-            "item2",
-            "item3"
-        ])
+        results = await processor.batch_process(["item1", "item2", "item3"])
 
     return results
 ```

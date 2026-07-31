@@ -176,9 +176,8 @@ class ConditionalSourcesHook(BuildHookInterface):
         # Note: sources itself is not in build_data,
         # but you can add files via force_include
 
-        if os.path.exists('src/mypackage/_compiled'):
-            build_data['force_include']['src/mypackage/_compiled'] = \
-                'mypackage/_compiled'
+        if os.path.exists("src/mypackage/_compiled"):
+            build_data["force_include"]["src/mypackage/_compiled"] = "mypackage/_compiled"
 ```
 
 ### Multi-Distribution Targets

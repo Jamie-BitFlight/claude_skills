@@ -61,7 +61,7 @@ model = config.model_tier  # "haiku" | "sonnet" | "opus"
 response = client.messages.create(
     model="claude-sonnet-latest",
     temperature=0,  # deterministic — this is a classification task
-    messages=[...]
+    messages=[...],
 )
 ```
 
@@ -105,14 +105,14 @@ for attempt in range(3):
     try:
         return client.messages.create(...)
     except APIError:  # catches 400 context limit AND 429 rate limit
-        time.sleep(2 ** attempt)
+        time.sleep(2**attempt)
 
 # RIGHT: only retry transient errors
 for attempt in range(3):
     try:
         return client.messages.create(...)
     except RateLimitError:
-        time.sleep(2 ** attempt + random.random())
+        time.sleep(2**attempt + random.random())
     except APIError:
         raise  # non-retryable — propagate immediately
 ```

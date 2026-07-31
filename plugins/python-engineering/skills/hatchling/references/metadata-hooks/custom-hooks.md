@@ -17,6 +17,7 @@ Create a Python file (typically `hatch_build.py` in project root):
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         # Modify metadata dictionary in-place
@@ -63,10 +64,7 @@ Optional method returning a list of valid classifiers for validation. Hatchling 
 
 ```python
 def get_known_classifiers(self):
-    return [
-        "Development Status :: 5 - Production/Stable",
-        "Custom :: MyClassifier",
-    ]
+    return ["Development Status :: 5 - Production/Stable", "Custom :: MyClassifier"]
 ```
 
 ## Complete Examples
@@ -80,15 +78,13 @@ import re
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class VersionHook(MetadataHookInterface):
     def update(self, metadata):
         version_file = self.root / "src" / "mypackage" / "__about__.py"
         content = version_file.read_text(encoding="utf-8")
 
-        match = re.search(
-            r'__version__\s*=\s*["\']([^"\']+)["\']',
-            content
-        )
+        match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
         if match:
             metadata["version"] = match.group(1)
 ```
@@ -101,6 +97,7 @@ Generate Python version classifiers based on the `requires-python` field:
 
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class ClassifiersHook(MetadataHookInterface):
     def update(self, metadata):
@@ -119,9 +116,7 @@ class ClassifiersHook(MetadataHookInterface):
 
         for version, included in version_ranges.items():
             if included:
-                classifiers.append(
-                    f"Programming Language :: Python :: {version}"
-                )
+                classifiers.append(f"Programming Language :: Python :: {version}")
 
         metadata.setdefault("classifiers", []).extend(classifiers)
 ```
@@ -135,6 +130,7 @@ Load metadata from an external JSON configuration file:
 ```python
 import json
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class JSONMetadataHook(MetadataHookInterface):
     def update(self, metadata):
@@ -156,19 +152,16 @@ Customize metadata based on build environment variables:
 import os
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class EnvironmentHook(MetadataHookInterface):
     def update(self, metadata):
         # Customize metadata based on build environment
         build_env = os.getenv("BUILD_ENV", "dev")
 
         if build_env == "production":
-            metadata["classifiers"] = [
-                "Development Status :: 5 - Production/Stable",
-            ]
+            metadata["classifiers"] = ["Development Status :: 5 - Production/Stable"]
         else:
-            metadata["classifiers"] = [
-                "Development Status :: 4 - Beta",
-            ]
+            metadata["classifiers"] = ["Development Status :: 4 - Beta"]
 ```
 
 This pattern allows metadata to vary based on the build environment, enabling different metadata for development and production builds.
@@ -179,6 +172,7 @@ Handle multiple dynamic metadata fields with helper methods:
 
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class AdvancedHook(MetadataHookInterface):
     def update(self, metadata):
@@ -206,10 +200,7 @@ class AdvancedHook(MetadataHookInterface):
         return "No description available"
 
     def _add_classifiers(self, metadata):
-        base_classifiers = [
-            "Development Status :: 4 - Beta",
-            "Programming Language :: Python :: 3",
-        ]
+        base_classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python :: 3"]
         metadata.setdefault("classifiers", []).extend(base_classifiers)
 ```
 
@@ -245,6 +236,7 @@ Handle file not found and other errors gracefully:
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class SafeHook(MetadataHookInterface):
     def update(self, metadata):
         try:
@@ -256,6 +248,7 @@ class SafeHook(MetadataHookInterface):
         except Exception as e:
             # Log error and provide fallback
             import sys
+
             print(f"Warning: Failed to read version: {e}", file=sys.stderr)
             metadata["version"] = "0.0.0.dev0"
 ```
@@ -269,6 +262,7 @@ Print debug information during hook execution:
 ```python
 import sys
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class DebugHook(MetadataHookInterface):
     def update(self, metadata):

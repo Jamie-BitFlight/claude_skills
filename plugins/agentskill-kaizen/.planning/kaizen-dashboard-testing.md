@@ -95,6 +95,7 @@ def test_findings_tab_structure(kaizen_db):
     # Assert: contains Tabulator widget
     # Assert: Tabulator has expected columns
 
+
 def test_findings_tab_empty_state(empty_kaizen_db):
     tab = _build_findings_tab(empty_kaizen_db)
     # Assert: contains Markdown pane with "No Findings" message

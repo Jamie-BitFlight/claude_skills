@@ -21,9 +21,10 @@ class Resource:
     def __init__(self, name: str) -> None:
         self.name = name
 
-r = Resource('A')
 
-r.name = 'B'  # OK
+r = Resource("A")
+
+r.name = "B"  # OK
 
 # Error: Incompatible types in assignment (expression has type "int",
 #        variable has type "str") [assignment]
@@ -56,8 +57,10 @@ name = "Bob"  # OK
 class Animal:
     pass
 
+
 class Dog(Animal):
     pass
+
 
 pet: Animal = Dog()  # OK - Dog is subclass of Animal
 ```
@@ -67,7 +70,7 @@ pet: Animal = Dog()  # OK - Dog is subclass of Animal
 ```python
 items: list[int] = []
 # Error: Incompatible types in assignment [assignment]
-items = ['a', 'b', 'c']
+items = ["a", "b", "c"]
 
 count: int = 0
 # Error: Incompatible types in assignment [assignment]
@@ -81,7 +84,7 @@ items: list[int] = []
 items = [1, 2, 3]  # OK
 
 items_str: list[str] = []
-items_str = ['a', 'b', 'c']  # OK
+items_str = ["a", "b", "c"]  # OK
 
 count: int = 0
 count = 5  # OK
@@ -118,10 +121,16 @@ Assigning to a method on a class object or instance (monkey-patching) is ambiguo
 
 ```python
 class A:
-    def f(self) -> None: pass
-    def g(self) -> None: pass
+    def f(self) -> None:
+        pass
 
-def h(self: A) -> None: pass
+    def g(self) -> None:
+        pass
+
+
+def h(self: A) -> None:
+    pass
+
 
 A.f = h  # Error: Cannot assign to method "f" [method-assign]
 A().f()
@@ -135,6 +144,7 @@ A().f()
 class A:
     x = 5
 
+
 A.x = 10  # OK - x is an attribute, not a method
 ```
 
@@ -145,8 +155,10 @@ class Calculator:
     def add(self, x: int, y: int) -> int:
         return x + y
 
+
 def new_add(self, a: float, b: float) -> float:
     return a + b
+
 
 # Error: Cannot assign to method [method-assign]
 Calculator.add = new_add
@@ -160,14 +172,17 @@ class Calculator:
     def add(self, x: int, y: int) -> int:
         return x + y
 
+
 class AdvancedCalculator(Calculator):
     def add(self, x: int | float, y: int | float) -> int | float:
         return x + y  # OK - override in subclass
+
 
 # Or use composition
 class Calculator:
     def add(self, x: int, y: int) -> int:
         return x + y
+
 
 class AdvancedCalculator:
     def __init__(self):
@@ -205,21 +220,20 @@ MyPy checks that an overridden method or attribute is compatible with the base c
 
 ```python
 class Base:
-    def method(self, arg: int) -> int | None:
-        ...
+    def method(self, arg: int) -> int | None: ...
+
 
 class DerivedBad(Base):
     # Error: Argument 1 of "method" is incompatible with "Base" [override]
-    def method(self, arg: bool) -> int:
-        ...
+    def method(self, arg: bool) -> int: ...
 ```
 
 #### More specific return type (OK, covariant)
 
 ```python
 class Base:
-    def method(self, arg: int) -> int | None:
-        ...
+    def method(self, arg: int) -> int | None: ...
+
 
 class Derived(Base):
     def method(self, arg: int) -> int:  # OK - more specific return type
@@ -230,8 +244,8 @@ class Derived(Base):
 
 ```python
 class Base:
-    def method(self, arg: int) -> int | None:
-        ...
+    def method(self, arg: int) -> int | None: ...
+
 
 class Derived(Base):
     def method(self, arg: int | str) -> int | None:  # OK - accepts more
@@ -246,12 +260,15 @@ class Derived(Base):
 class Animal:
     pass
 
+
 class Dog(Animal):
     pass
+
 
 class Provider:
     def get_pet(self) -> Animal:
         return Animal()
+
 
 class DogProvider(Provider):
     def get_pet(self) -> Dog:  # OK - Dog is subclass of Animal
@@ -262,8 +279,8 @@ class DogProvider(Provider):
 
 ```python
 class Processor:
-    def process(self, value: object) -> None:
-        ...
+    def process(self, value: object) -> None: ...
+
 
 class SpecificProcessor(Processor):
     def process(self, value: int) -> None:  # OK - accepts subset
@@ -276,6 +293,7 @@ class SpecificProcessor(Processor):
 class Logger:
     def log(self, message: str) -> None:
         print(message)
+
 
 class StrictLogger(Logger):
     # Error: Argument 1 of "log" is incompatible [override]
@@ -290,9 +308,11 @@ class Logger:
     def log(self, message: str) -> None:
         print(message)
 
+
 class StrictLogger(Logger):
     def log(self, message: str) -> None:  # OK - matches signature
         print(f"LOG: {message}")
+
 
 class FlexibleLogger(Logger):
     def log(self, message: object) -> None:  # OK - accepts more
@@ -332,14 +352,16 @@ from datetime import datetime
 from typing import TypedDict
 from typing_extensions import ReadOnly
 
+
 class User(TypedDict):
     username: ReadOnly[str]
     last_active: datetime
 
-user: User = {'username': 'foobar', 'last_active': datetime.now()}
-user['last_active'] = datetime.now()  # OK
+
+user: User = {"username": "foobar", "last_active": datetime.now()}
+user["last_active"] = datetime.now()  # OK
 # Error: ReadOnly TypedDict key "username" is mutated [typeddict-readonly-mutated]
-user['username'] = 'other'
+user["username"] = "other"
 ```
 
 ### When THIS IS NOT an Error
@@ -351,12 +373,14 @@ from datetime import datetime
 from typing import TypedDict
 from typing_extensions import ReadOnly
 
+
 class User(TypedDict):
     username: ReadOnly[str]
     last_active: datetime
 
-user: User = {'username': 'foobar', 'last_active': datetime.now()}
-user['last_active'] = datetime.now()  # OK - not ReadOnly
+
+user: User = {"username": "foobar", "last_active": datetime.now()}
+user["last_active"] = datetime.now()  # OK - not ReadOnly
 ```
 
 ### Examples of Error-Producing Code
@@ -365,15 +389,17 @@ user['last_active'] = datetime.now()  # OK - not ReadOnly
 from typing import TypedDict
 from typing_extensions import ReadOnly
 
+
 class Config(TypedDict):
     api_key: ReadOnly[str]
     timeout: int
 
-config: Config = {'api_key': 'secret', 'timeout': 30}
-# Error: ReadOnly key "api_key" is mutated [typeddict-readonly-mutated]
-config['api_key'] = 'new_secret'
 
-config['timeout'] = 60  # OK - not ReadOnly
+config: Config = {"api_key": "secret", "timeout": 30}
+# Error: ReadOnly key "api_key" is mutated [typeddict-readonly-mutated]
+config["api_key"] = "new_secret"
+
+config["timeout"] = 60  # OK - not ReadOnly
 ```
 
 ### Examples of Corrected Code
@@ -382,17 +408,19 @@ config['timeout'] = 60  # OK - not ReadOnly
 from typing import TypedDict
 from typing_extensions import ReadOnly
 
+
 class Config(TypedDict):
     api_key: ReadOnly[str]
     timeout: int
 
-config: Config = {'api_key': 'secret', 'timeout': 30}
+
+config: Config = {"api_key": "secret", "timeout": 30}
 
 # Only modify non-ReadOnly fields
-config['timeout'] = 60  # OK
+config["timeout"] = 60  # OK
 
 # Create new config for different API key
-config = {'api_key': 'new_secret', 'timeout': 60}  # OK
+config = {"api_key": "new_secret", "timeout": 60}  # OK
 ```
 
 ### Configuration Options
@@ -400,5 +428,5 @@ config = {'api_key': 'new_secret', 'timeout': 60}  # OK
 This error is enabled by default. Suppress specific instances:
 
 ```python
-user['username'] = 'other'  # type: ignore[typeddict-readonly-mutated]
+user["username"] = "other"  # type: ignore[typeddict-readonly-mutated]
 ```

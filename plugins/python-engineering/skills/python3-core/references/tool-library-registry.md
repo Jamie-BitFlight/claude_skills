@@ -288,8 +288,11 @@ max-complexity = 12
 def process(items: list[str]) -> dict[str, int]:  # ✓
     pass
 
+
 # FORBIDDEN: Legacy typing
 from typing import List, Dict
+
+
 def process(items: List[str]) -> Dict[str, int]:  # ✗
     pass
 ```
@@ -378,9 +381,11 @@ def authenticate_user(username: str, password: str) -> AuthResult:
     """Authenticate user credentials."""
     pass
 
+
 # REQUIRED: Generator fixtures with full typing
 from typing import Generator
 from pytest import fixture
+
 
 @fixture
 def database_connection() -> Generator[Connection, None, None]:
@@ -389,12 +394,16 @@ def database_connection() -> Generator[Connection, None, None]:
     yield conn
     conn.close()
 
+
 # REQUIRED: Modern union syntax
 def get_user(user_id: int) -> User | None:  # ✓
     pass
 
+
 # FORBIDDEN: Legacy Optional
 from typing import Optional
+
+
 def get_user(user_id: int) -> Optional[User]:  # ✗
     pass
 ```
@@ -798,6 +807,7 @@ password = "secret123"  # B105
 
 # PREFER: Environment variables
 import os
+
 password = os.getenv("DB_PASSWORD")
 
 # AVOID: Shell injection
@@ -808,10 +818,12 @@ subprocess.run(["ls", user_input], shell=False)
 
 # AVOID: Insecure random
 import random
+
 token = random.randint(0, 1000000)  # B311
 
 # PREFER: Cryptographically secure random
 import secrets
+
 token = secrets.token_hex(16)
 ```
 
@@ -945,10 +957,12 @@ def test_user_authentication() -> None:
     assert response.token is not None
     assert response.expires_at > datetime.now()
 
+
 # REQUIRED: Type annotations
 def test_data_processing(tmp_path: Path) -> None:
     """Test data processing with temporary files."""
     pass
+
 
 # REQUIRED: Comprehensive docstrings
 def test_edge_case_handling() -> None:
@@ -1005,6 +1019,7 @@ alternatives:
 ```python
 from pytest_mock import MockerFixture
 
+
 def test_external_api(mocker: MockerFixture) -> None:
     """Test external API integration with mock."""
     # Mock external service
@@ -1020,6 +1035,7 @@ def test_external_api(mocker: MockerFixture) -> None:
     # Verify
     assert result["status"] == "ok"
     mock_get.assert_called_once_with("https://api.example.com")
+
 
 def test_database_operations(mocker: MockerFixture) -> None:
     """Test database operations with mocked connection."""
@@ -1052,16 +1068,21 @@ def test_database_operations(mocker: MockerFixture) -> None:
 def test_with_mock(mocker: MockerFixture) -> None:  # ✓
     mock = mocker.patch("module.function")
 
+
 # FORBIDDEN: Direct unittest.mock import
 from unittest.mock import patch  # ✗
+
+
 @patch("module.function")
 def test_with_patch(mock):
     pass
+
 
 # REQUIRED: mocker.Mock() not Mock()
 def test_mock_object(mocker: MockerFixture) -> None:
     mock_obj = mocker.Mock()  # ✓
     mock_obj.method.return_value = 42
+
 
 # REQUIRED: mocker.spy() for partial mocking
 def test_spy_on_method(mocker: MockerFixture) -> None:
@@ -1174,9 +1195,11 @@ def __repr__(self) -> str:  # pragma: no cover
     """String representation."""
     return f"User({self.name})"
 
+
 # Type checking blocks
 if TYPE_CHECKING:  # pragma: no cover
     from .models import User
+
 
 # Abstract methods
 @abstractmethod
@@ -1226,15 +1249,18 @@ alternatives:
 ```python
 from hypothesis import given, strategies as st
 
+
 @given(st.integers())
 def test_absolute_value_always_positive(n: int) -> None:
     """Test that absolute value is always positive."""
     assert abs(n) >= 0
 
+
 @given(st.lists(st.integers()))
 def test_reverse_twice_is_identity(lst: list[int]) -> None:
     """Test that reversing twice returns original list."""
     assert list(reversed(list(reversed(lst)))) == lst
+
 
 @given(st.text(min_size=1, max_size=100))
 def test_email_validation(email_input: str) -> None:
@@ -1261,14 +1287,16 @@ from datetime import date, timedelta
 email_strategy = st.builds(
     lambda name, domain: f"{name}@{domain}",
     name=st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("Ll", "Nd"))),
-    domain=st.sampled_from(["example.com", "test.org", "demo.net"])
+    domain=st.sampled_from(["example.com", "test.org", "demo.net"]),
 )
+
 
 @given(email_strategy)
 def test_email_domain_validation(email: str) -> None:
     """Test email domain validation."""
     result = validate_email_domain(email)
     assert result.domain in ["example.com", "test.org", "demo.net"]
+
 
 # Composite strategies
 @st.composite
@@ -1278,6 +1306,7 @@ def date_range(draw):
     days = draw(st.integers(min_value=1, max_value=365))
     end = start + timedelta(days=days)
     return (start, end)
+
 
 @given(date_range())
 def test_date_range_processing(dates: tuple[date, date]) -> None:
@@ -1398,11 +1427,13 @@ def calculate_total(items: list[Item], tax_rate: float) -> Decimal:
     total = subtotal + tax
     return total.quantize(Decimal("0.01"))
 
+
 # Tests MUST kill all mutants:
 # - Operator changes (+ to -, * to /)
 # - Number changes (tax_rate to 0, to 1)
 # - Decimal precision changes
 # - Boundary conditions
+
 
 def test_calculate_total_normal() -> None:
     """Test normal calculation."""
@@ -1410,11 +1441,13 @@ def test_calculate_total_normal() -> None:
     total = calculate_total(items, 0.08)
     assert total == Decimal("21.60")  # 20.00 + 1.60 tax
 
+
 def test_calculate_total_zero_tax() -> None:
     """Test with zero tax rate."""
     items = [Item(price=Decimal("10.00"), quantity=1)]
     total = calculate_total(items, 0.0)
     assert total == Decimal("10.00")
+
 
 def test_calculate_total_precision() -> None:
     """Test decimal precision handling."""
@@ -1551,6 +1584,7 @@ import pytest
 from httpx import AsyncClient
 from app import app
 
+
 @pytest.mark.asyncio
 async def test_async_endpoint() -> None:
     """Test async API endpoint."""
@@ -1558,6 +1592,7 @@ async def test_async_endpoint() -> None:
         response = await client.get("/users/1")
         assert response.status_code == 200
         assert response.json()["id"] == 1
+
 
 @pytest.mark.asyncio
 async def test_concurrent_operations() -> None:
@@ -1570,11 +1605,7 @@ async def test_concurrent_operations() -> None:
         return {"id": user_id}
 
     # Test concurrent execution
-    results = await asyncio.gather(
-        fetch_user(1),
-        fetch_user(2),
-        fetch_user(3),
-    )
+    results = await asyncio.gather(fetch_user(1), fetch_user(2), fetch_user(3))
 
     assert len(results) == 3
     assert results[0]["id"] == 1
@@ -1651,25 +1682,30 @@ from pytest_bdd import scenarios, given, when, then, parsers
 
 scenarios("features/auth.feature")
 
+
 @given("I am on the login page")
 def login_page(browser):
     """Navigate to login page."""
     browser.get("https://example.com/login")
+
 
 @when(parsers.parse('I enter username "{username}"'))
 def enter_username(browser, username: str) -> None:
     """Enter username."""
     browser.find_element_by_id("username").send_keys(username)
 
+
 @when(parsers.parse('I enter password "{password}"'))
 def enter_password(browser, password: str) -> None:
     """Enter password."""
     browser.find_element_by_id("password").send_keys(password)
 
+
 @when("I click the login button")
 def click_login(browser) -> None:
     """Click login button."""
     browser.find_element_by_id("login").click()
+
 
 @then(parsers.parse('I should see "{text}"'))
 def should_see_text(browser, text: str) -> None:
@@ -1723,14 +1759,17 @@ def test_list_comprehension_performance(benchmark):
 
     assert len(result) == 1000
 
+
 def test_algorithm_comparison(benchmark):
     """Compare sorting algorithms."""
     import random
+
     data = [random.randint(0, 1000) for _ in range(1000)]
 
     result = benchmark(sorted, data)
 
     assert result == sorted(data)
+
 
 # Run benchmarks
 # pytest --benchmark-only
@@ -1806,6 +1845,7 @@ from rich.console import Console
 app = typer.Typer(rich_markup_mode="rich")
 console = Console()
 
+
 @app.command()
 def process(
     input_file: Annotated[Path, typer.Argument(help="Input file to process")],
@@ -1818,6 +1858,7 @@ def process(
 
     # Processing logic
     console.print("[green]:white_check_mark:[/green] Done!")
+
 
 if __name__ == "__main__":
     app()
@@ -1838,28 +1879,25 @@ from enum import Enum
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+
 # Enum for choices
 class OutputFormat(str, Enum):
     JSON = "json"
     YAML = "yaml"
     CSV = "csv"
 
+
 @app.command()
-def export(
-    format: Annotated[OutputFormat, typer.Option(help="Output format")] = OutputFormat.JSON,
-) -> None:
+def export(format: Annotated[OutputFormat, typer.Option(help="Output format")] = OutputFormat.JSON) -> None:
     """Export data in specified format."""
     console.print(f"Exporting as {format.value}")
+
 
 # Progress bars
 @app.command()
 def download() -> None:
     """Download files with progress."""
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
         task = progress.add_task("Downloading...", total=None)
         # Download logic
         progress.update(task, completed=True)
@@ -1935,14 +1973,11 @@ console.print("[bold green]Success![/bold green]")
 console.print(":white_check_mark: Task completed")
 
 # Tables
-table = Table(
-    title=":sparkles: Results",
-    box=box.MINIMAL_DOUBLE_HEAD,
-    title_style="bold blue"
-)
+table = Table(title=":sparkles: Results", box=box.MINIMAL_DOUBLE_HEAD, title_style="bold blue")
 table.add_column("Name", style="cyan", no_wrap=True)
 table.add_column("Status", style="magenta")
 table.add_row("Task 1", "✓ Complete")
+
 
 # CRITICAL: Measure and set table width
 def _get_table_width(table: Table) -> int:
@@ -1951,16 +1986,11 @@ def _get_table_width(table: Table) -> int:
     measurement = Measurement.get(temp_console, temp_console.options, table)
     return int(measurement.maximum)
 
+
 table.width = _get_table_width(table)
 
 # Print with specific parameters to prevent wrapping
-console.print(
-    table,
-    crop=False,
-    overflow="ignore",
-    no_wrap=True,
-    soft_wrap=True
-)
+console.print(table, crop=False, overflow="ignore", no_wrap=True, soft_wrap=True)
 ```
 
 **Rich Components**:
@@ -1976,10 +2006,7 @@ from rich.measure import Measurement
 from rich import box
 
 # Progress bars
-with Progress(
-    SpinnerColumn(),
-    TextColumn("[progress.description]{task.description}"),
-) as progress:
+with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}")) as progress:
     task = progress.add_task("Processing...", total=100)
     for i in range(100):
         progress.update(task, advance=1)
@@ -1988,10 +2015,10 @@ with Progress(
 console.print(Panel("Important message", title="Warning", border_style="yellow"))
 
 # Syntax highlighting
-code = '''
+code = """
 def hello():
     print("Hello, world!")
-'''
+"""
 syntax = Syntax(code, "python", theme="monokai")
 console.print(syntax)
 
@@ -2060,31 +2087,18 @@ alternatives:
 import argparse
 from pathlib import Path
 
+
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Process files",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
+    parser = argparse.ArgumentParser(description="Process files", formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument("input", type=Path, help="Input file to process")
 
     parser.add_argument(
-        "input",
-        type=Path,
-        help="Input file to process"
+        "-o", "--output", type=Path, default=Path("."), help="Output directory (default: current directory)"
     )
 
-    parser.add_argument(
-        "-o", "--output",
-        type=Path,
-        default=Path("."),
-        help="Output directory (default: current directory)"
-    )
-
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Verbose output"
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
 
     args = parser.parse_args()
 
@@ -2093,6 +2107,7 @@ def main() -> None:
 
     # Processing logic
     print("Done!")
+
 
 if __name__ == "__main__":
     main()
@@ -2180,6 +2195,7 @@ alternatives:
 from textual.app import App
 from textual.widgets import Header, Footer, Button
 
+
 class MyApp(App):
     """Textual application."""
 
@@ -2192,6 +2208,7 @@ class MyApp(App):
     def on_button_pressed(self) -> None:
         """Handle button press."""
         self.exit()
+
 
 if __name__ == "__main__":
     app = MyApp()
@@ -2362,16 +2379,19 @@ data = response.json()
 # Async usage
 import asyncio
 
+
 async def fetch_users():
     async with httpx.AsyncClient() as client:
         response = await client.get("https://api.example.com/users")
         return response.json()
+
 
 users = asyncio.run(fetch_users())
 
 # Testing FastAPI
 from httpx import AsyncClient
 from app import app
+
 
 async def test_endpoint():
     async with AsyncClient(app=app, base_url="http://test") as client:
@@ -2483,8 +2503,10 @@ alternatives:
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
 
+
 class User(BaseModel):
     """User model with validation."""
+
     id: int
     name: str = Field(..., min_length=1, max_length=100)
     email: str
@@ -2497,6 +2519,7 @@ class User(BaseModel):
         if "@" not in v:
             raise ValueError("Invalid email address")
         return v.lower()
+
 
 # Usage
 user = User(id=1, name="Alice", email="alice@example.com")
@@ -2553,11 +2576,13 @@ alternatives:
 ```python
 from prefect import flow, task
 
+
 @task
 def extract_data(source: str) -> list:
     """Extract data from source."""
     # Extraction logic
     return data
+
 
 @task
 def transform_data(data: list) -> list:
@@ -2565,11 +2590,13 @@ def transform_data(data: list) -> list:
     # Transformation logic
     return transformed
 
+
 @task
 def load_data(data: list, destination: str) -> None:
     """Load data to destination."""
     # Loading logic
     pass
+
 
 @flow
 def etl_pipeline(source: str, destination: str) -> None:
@@ -2577,6 +2604,7 @@ def etl_pipeline(source: str, destination: str) -> None:
     raw_data = extract_data(source)
     clean_data = transform_data(raw_data)
     load_data(clean_data, destination)
+
 
 # Run flow
 if __name__ == "__main__":
@@ -2624,6 +2652,7 @@ alternatives:
 ```python
 from fabric import Connection, task
 
+
 @task
 def deploy(c):
     """Deploy application to server."""
@@ -2638,8 +2667,10 @@ def deploy(c):
         # Restart service
         conn.sudo("systemctl restart myapp")
 
+
 # Multiple servers
 from fabric import SerialGroup
+
 
 def deploy_cluster():
     """Deploy to cluster."""
@@ -2762,15 +2793,18 @@ alternatives:
 # tasks.py
 from invoke import task
 
+
 @task
 def clean(c):
     """Clean build artifacts."""
     c.run("rm -rf build dist *.egg-info")
 
+
 @task
 def test(c):
     """Run tests."""
     c.run("pytest")
+
 
 @task
 def lint(c):
@@ -2778,10 +2812,12 @@ def lint(c):
     c.run("ruff check .")
     c.run("mypy .")
 
+
 @task(pre=[clean, test, lint])
 def build(c):
     """Build package."""
     c.run("uv build")
+
 
 # Run: invoke build
 ```
@@ -2828,14 +2864,17 @@ alternatives:
 ```python
 import paho.mqtt.client as mqtt
 
+
 def on_connect(client, userdata, flags, rc):
     """Callback for connection."""
     print(f"Connected with result code {rc}")
     client.subscribe("sensors/temperature")
 
+
 def on_message(client, userdata, msg):
     """Callback for messages."""
     print(f"{msg.topic}: {msg.payload.decode()}")
+
 
 # Create client
 client = mqtt.Client()
@@ -2845,6 +2884,7 @@ client.on_message = on_message
 # Connect and loop
 client.connect("mqtt.example.com", 1883, 60)
 client.loop_forever()
+
 
 # Publishing
 def publish_temperature(temp: float) -> None:
@@ -2899,25 +2939,30 @@ from blinker import signal
 user_logged_in = signal("user-logged-in")
 data_processed = signal("data-processed")
 
+
 # Connect handlers
 @user_logged_in.connect
 def on_user_login(sender, user_id):
     """Handle user login event."""
     print(f"User {user_id} logged in")
 
+
 @data_processed.connect
 def on_data_processed(sender, record_count):
     """Handle data processing completion."""
     print(f"Processed {record_count} records")
 
+
 # Emit signals
 user_logged_in.send("auth-system", user_id=123)
 data_processed.send("processor", record_count=1000)
+
 
 # Named receivers
 def log_user_activity(sender, user_id):
     """Log user activity."""
     pass
+
 
 user_logged_in.connect(log_user_activity, sender="auth-system")
 ```
@@ -3223,21 +3268,16 @@ alternatives:
 
 ```python
 # Tool call
-context7_docs = mcp__context7__get-library-docs(
-    context7CompatibleLibraryID="/astral-sh/ruff",
-    topic="ANN201 rule",
-    tokens=5000
+context7_docs = (
+    mcp__context7__get - library - docs(context7CompatibleLibraryID="/astral-sh/ruff", topic="ANN201 rule", tokens=5000)
 )
 
 # Use case: Linting investigation
 # Step 1: Resolve library ID
-library_id = mcp__context7__resolve-library-id(libraryName="ruff")
+library_id = mcp__context7__resolve - library - id(libraryName="ruff")
 
 # Step 2: Get specific documentation
-docs = mcp__context7__get-library-docs(
-    context7CompatibleLibraryID=library_id,
-    topic="type annotation rules"
-)
+docs = mcp__context7__get - library - docs(context7CompatibleLibraryID=library_id, topic="type annotation rules")
 ```
 
 **Related Standards**:
@@ -3280,14 +3320,10 @@ alternatives:
 
 ```python
 # Search Python docs
-python_docs = mcp__Ref__ref_search_documentation(
-    query="asyncio gather Python 3.11"
-)
+python_docs = mcp__Ref__ref_search_documentation(query="asyncio gather Python 3.11")
 
 # Search framework docs
-fastapi_docs = mcp__Ref__ref_search_documentation(
-    query="FastAPI dependency injection"
-)
+fastapi_docs = mcp__Ref__ref_search_documentation(query="FastAPI dependency injection")
 ```
 
 **Related Standards**:
@@ -3330,14 +3366,10 @@ alternatives:
 
 ```python
 # Get code context
-code_examples = mcp__exa__get_code_context_exa(
-    query="pytest-mock fixture usage examples"
-)
+code_examples = mcp__exa__get_code_context_exa(query="pytest-mock fixture usage examples")
 
 # Library integration
-integration = mcp__exa__get_code_context_exa(
-    query="FastAPI with SQLAlchemy async"
-)
+integration = mcp__exa__get_code_context_exa(query="FastAPI with SQLAlchemy async")
 ```
 
 **Related Standards**:
@@ -3380,14 +3412,10 @@ alternatives:
 
 ```python
 # Search for pattern
-examples = mcp__github__search_code(
-    query="pytest-mock mocker.patch language:python"
-)
+examples = mcp__github__search_code(query="pytest-mock mocker.patch language:python")
 
 # Find error solutions
-solutions = mcp__github__search_code(
-    query="ruff ANN201 fix examples"
-)
+solutions = mcp__github__search_code(query="ruff ANN201 fix examples")
 ```
 
 **Related Standards**:
@@ -3973,10 +4001,13 @@ from rich.console import Console
 app = typer.Typer(rich_markup_mode="rich")
 console = Console()
 
+
 class Config(BaseModel):
     """Configuration model."""
+
     api_url: str = Field(..., description="API base URL")
     timeout: int = Field(default=30, ge=1, le=300)
+
 
 @app.command()
 def fetch(
@@ -3992,6 +4023,7 @@ def fetch(
     response.raise_for_status()
 
     console.print("[green]:white_check_mark:[/green] Success!")
+
 
 if __name__ == "__main__":
     app()
@@ -4022,6 +4054,7 @@ from pytest_mock import MockerFixture
 from app.auth import authenticate_user, AuthResult
 from app.models import User
 
+
 @pytest.fixture
 def mock_database(mocker: MockerFixture) -> MockerFixture:
     """Mock database connection.
@@ -4038,6 +4071,7 @@ def mock_database(mocker: MockerFixture) -> MockerFixture:
     )
     return mocker.patch("app.auth.db", mock_db)
 
+
 @pytest.fixture
 def sample_user() -> User:
     """Provide sample user for testing.
@@ -4045,16 +4079,10 @@ def sample_user() -> User:
     Returns:
         User instance with test data.
     """
-    return User(
-        id=1,
-        username="testuser",
-        email="test@example.com",
-    )
+    return User(id=1, username="testuser", email="test@example.com")
 
-def test_authenticate_valid_credentials(
-    mock_database: MockerFixture,
-    sample_user: User,
-) -> None:
+
+def test_authenticate_valid_credentials(mock_database: MockerFixture, sample_user: User) -> None:
     """Test authentication with valid credentials.
 
     Tests: User authentication flow
@@ -4073,6 +4101,7 @@ def test_authenticate_valid_credentials(
     assert result.token is not None
     assert result.user_id == sample_user.id
     mock_database.get_user.assert_called_once_with(username)
+
 
 def test_authenticate_invalid_password(mock_database: MockerFixture) -> None:
     """Test authentication with invalid password.
@@ -4093,16 +4122,17 @@ def test_authenticate_invalid_password(mock_database: MockerFixture) -> None:
     assert result.token is None
     assert "invalid credentials" in result.error.lower()
 
-@pytest.mark.parametrize("invalid_input", [
-    "",
-    None,
-    " " * 10,
-    "a",  # Too short
-])
-def test_authenticate_invalid_input(
-    invalid_input: str | None,
-    mock_database: MockerFixture,
-) -> None:
+
+@pytest.mark.parametrize(
+    "invalid_input",
+    [
+        "",
+        None,
+        " " * 10,
+        "a",  # Too short
+    ],
+)
+def test_authenticate_invalid_input(invalid_input: str | None, mock_database: MockerFixture) -> None:
     """Test authentication with invalid inputs.
 
     Tests: Input validation
@@ -4177,20 +4207,13 @@ Need to...
 
 ```python
 # Get latest documentation
-docs = mcp__context7__get-library-docs(
-    context7CompatibleLibraryID="/astral-sh/ruff",
-    topic="configuration"
-)
+docs = mcp__context7__get - library - docs(context7CompatibleLibraryID="/astral-sh/ruff", topic="configuration")
 
 # Search official docs
-ref = mcp__Ref__ref_search_documentation(
-    query="pytest fixtures best practices"
-)
+ref = mcp__Ref__ref_search_documentation(query="pytest fixtures best practices")
 
 # Get code examples
-examples = mcp__exa__get_code_context_exa(
-    query="typer CLI with Rich tables"
-)
+examples = mcp__exa__get_code_context_exa(query="typer CLI with Rich tables")
 ```
 
 ---

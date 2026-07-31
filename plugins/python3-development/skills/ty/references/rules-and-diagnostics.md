@@ -83,15 +83,11 @@ Suppress on the first or last line of the violation:
 ```python
 # On the first line:
 sum_three_numbers(  # ty: ignore[missing-argument]
-    3,
-    2
+    3, 2
 )
 
 # Or on the last line:
-sum_three_numbers(
-    3,
-    2
-)  # ty: ignore[missing-argument]
+sum_three_numbers(3, 2)  # ty: ignore[missing-argument]
 ```
 
 ### Multiple rules on one line
@@ -143,8 +139,10 @@ Suppresses all ty violations inside a function:
 ```python
 from typing import no_type_check
 
+
 def sum_three_numbers(a: int, b: int, c: int) -> int:
     return a + b + c
+
 
 @no_type_check
 def main():

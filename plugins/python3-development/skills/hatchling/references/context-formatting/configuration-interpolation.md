@@ -335,6 +335,7 @@ import os
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class ValidatingMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         # Get path with fallback
@@ -344,9 +345,7 @@ class ValidatingMetadataHook(MetadataHookInterface):
         if not Path(pkg_path).exists():
             raise ValueError(f"Package path does not exist: {pkg_path}")
 
-        metadata["dependencies"] = [
-            f"pkg @ {pkg_path}/pkg",
-        ]
+        metadata["dependencies"] = [f"pkg @ {pkg_path}/pkg"]
 ```
 
 ### Use Relative Paths Over Absolute

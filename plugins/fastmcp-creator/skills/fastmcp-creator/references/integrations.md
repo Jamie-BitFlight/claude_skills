@@ -22,16 +22,8 @@ response = client.beta.messages.create(
     model="claude-sonnet-4-20250514",
     max_tokens=1000,
     messages=[{"role": "user", "content": "Roll some dice!"}],
-    mcp_servers=[
-        {
-            "type": "url",
-            "url": f"{url}/mcp/",
-            "name": "dice-server",
-        }
-    ],
-    extra_headers={
-        "anthropic-beta": "mcp-client-2025-04-04"
-    },
+    mcp_servers=[{"type": "url", "url": f"{url}/mcp/", "name": "dice-server"}],
+    extra_headers={"anthropic-beta": "mcp-client-2025-04-04"},
 )
 ```
 
@@ -44,14 +36,7 @@ response = client.beta.messages.create(
     model="claude-sonnet-4-20250514",
     max_tokens=1000,
     messages=[{"role": "user", "content": "Roll some dice!"}],
-    mcp_servers=[
-        {
-            "type": "url",
-            "url": f"{url}/mcp/",
-            "name": "dice-server",
-            "authorization_token": access_token,
-        }
-    ],
+    mcp_servers=[{"type": "url", "url": f"{url}/mcp/", "name": "dice-server", "authorization_token": access_token}],
     extra_headers={"anthropic-beta": "mcp-client-2025-04-04"},
 )
 ```
@@ -86,14 +71,7 @@ client = OpenAI()
 
 resp = client.responses.create(
     model="gpt-4.1",
-    tools=[
-        {
-            "type": "mcp",
-            "server_label": "my_server",
-            "server_url": f"{url}/mcp/",
-            "require_approval": "never",
-        },
-    ],
+    tools=[{"type": "mcp", "server_label": "my_server", "server_url": f"{url}/mcp/", "require_approval": "never"}],
     input="Roll some dice!",
 )
 print(resp.output_text)
@@ -112,10 +90,8 @@ resp = client.responses.create(
             "server_label": "my_server",
             "server_url": f"{url}/mcp/",
             "require_approval": "never",
-            "headers": {
-                "Authorization": f"Bearer {access_token}",
-            },
-        },
+            "headers": {"Authorization": f"Bearer {access_token}"},
+        }
     ],
     input="Do something!",
 )
@@ -136,20 +112,19 @@ from fastmcp import Client
 from google import genai
 import asyncio
 
-mcp_client = Client("server.py")   # local stdio server
+mcp_client = Client("server.py")  # local stdio server
 gemini_client = genai.Client()
+
 
 async def main():
     async with mcp_client:
         response = await gemini_client.aio.models.generate_content(
             model="gemini-2.0-flash",
             contents="Roll 3 dice!",
-            config=genai.types.GenerateContentConfig(
-                temperature=0,
-                tools=[mcp_client.session],
-            ),
+            config=genai.types.GenerateContentConfig(temperature=0, tools=[mcp_client.session]),
         )
         print(response.text)
+
 
 asyncio.run(main())
 ```
@@ -160,10 +135,7 @@ For remote/authenticated servers, change only the client configuration:
 from fastmcp import Client
 from fastmcp.client.auth import BearerAuth
 
-mcp_client = Client(
-    "https://my-server.com/mcp/",
-    auth=BearerAuth("<your-token>"),
-)
+mcp_client = Client("https://my-server.com/mcp/", auth=BearerAuth("<your-token>"))
 ```
 
 ---
@@ -210,10 +182,12 @@ from fastapi import FastAPI
 
 mcp = FastMCP("Analytics Tools")
 
+
 @mcp.tool
 def analyze_data(category: str) -> dict:
     """Analyze data for a category."""
     return {"category": category, "count": 42}
+
 
 mcp_app = mcp.http_app(path="/mcp")
 
@@ -235,11 +209,13 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
     # startup
     yield
     # shutdown
+
 
 mcp = FastMCP("Tools")
 mcp_app = mcp.http_app(path="/")
@@ -258,9 +234,7 @@ mcp = FastMCP.from_fastapi(app=app, name="E-commerce MCP")
 mcp_app = mcp.http_app(path="/mcp")
 
 combined_app = FastAPI(
-    title="E-commerce API with MCP",
-    routes=[*mcp_app.routes, *app.routes],
-    lifespan=mcp_app.lifespan,
+    title="E-commerce API with MCP", routes=[*mcp_app.routes, *app.routes], lifespan=mcp_app.lifespan
 )
 ```
 
@@ -341,6 +315,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("Dashboard")
 
+
 @mcp.tool(app=True)
 def revenue_chart(year: int) -> PrefabApp:
     """Show annual revenue as an interactive bar chart."""
@@ -353,11 +328,7 @@ def revenue_chart(year: int) -> PrefabApp:
 
     with Column(gap=4, css_class="p-6") as view:
         Heading(f"{year} Revenue")
-        BarChart(
-            data=data,
-            series=[ChartSeries(data_key="revenue", label="Revenue")],
-            x_axis="quarter",
-        )
+        BarChart(data=data, series=[ChartSeries(data_key="revenue", label="Revenue")], x_axis="quarter")
 
     return PrefabApp(view=view)
 ```

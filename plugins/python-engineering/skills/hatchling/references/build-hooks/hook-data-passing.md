@@ -57,25 +57,26 @@ path = "hooks/compile.py"
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class GenerateHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Generate source code"""
         # Create generated directory
-        gen_dir = os.path.join(self.root, 'generated')
+        gen_dir = os.path.join(self.root, "generated")
         os.makedirs(gen_dir, exist_ok=True)
 
         # Generate files
-        code_file = os.path.join(gen_dir, 'codegen.py')
-        with open(code_file, 'w') as f:
+        code_file = os.path.join(gen_dir, "codegen.py")
+        with open(code_file, "w") as f:
             f.write(f'''# Generated code for version {version}
 def generated_version():
     return "{version}"
 ''')
 
         # Signal to next hook that we generated code
-        if 'generated_files' not in build_data:
-            build_data['generated_files'] = []
-        build_data['generated_files'].append(code_file)
+        if "generated_files" not in build_data:
+            build_data["generated_files"] = []
+        build_data["generated_files"].append(code_file)
 
         print("✓ Code generation complete")
 ```
@@ -87,11 +88,12 @@ def generated_version():
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CompileHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Compile generated code"""
         # Check if generation hook ran and created files
-        generated_files = build_data.get('generated_files', [])
+        generated_files = build_data.get("generated_files", [])
 
         if not generated_files:
             print("⚠ No generated files found")
@@ -103,14 +105,14 @@ class CompileHook(BuildHookInterface):
             print(f"✓ Compiled {gen_file} → {compiled}")
 
         # Include compiled files
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
-        build_data['artifacts'].append('generated/**/*.pyc')
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
+        build_data["artifacts"].append("generated/**/*.pyc")
 
     def compile_file(self, file_path: str) -> str:
         """Hypothetical compilation function"""
         # This would be your actual compilation logic
-        return file_path + '.compiled'
+        return file_path + ".compiled"
 ```
 
 **Execution order**:
@@ -129,20 +131,17 @@ Add arbitrary fields to `build_data` for inter-hook communication:
 class Hook1(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Create custom field for other hooks
-        build_data['my_data'] = {
-            'generated_files': ['file1.py', 'file2.py'],
-            'compiled_assets': [],
-            'version': version,
-        }
+        build_data["my_data"] = {"generated_files": ["file1.py", "file2.py"], "compiled_assets": [], "version": version}
+
 
 class Hook2(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Read and modify custom field
-        if 'my_data' in build_data:
-            my_data = build_data['my_data']
-            for file in my_data['generated_files']:
+        if "my_data" in build_data:
+            my_data = build_data["my_data"]
+            for file in my_data["generated_files"]:
                 compiled = self.compile(file)
-                my_data['compiled_assets'].append(compiled)
+                my_data["compiled_assets"].append(compiled)
 ```
 
 ### Building on Artifacts
@@ -152,16 +151,17 @@ Hook A adds artifacts, Hook B adds more:
 ```python
 class Hook1(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
-        build_data['artifacts'].append('generated/**/*.py')
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
+        build_data["artifacts"].append("generated/**/*.py")
+
 
 class Hook2(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
         # Add more artifacts
-        build_data['artifacts'].append('compiled/**/*.so')
+        build_data["artifacts"].append("compiled/**/*.so")
         # Both are now included
 ```
 
@@ -172,12 +172,12 @@ Check which hooks are running before making decisions:
 ```python
 class ConditionalHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
-        hooks = build_data['build_hooks']
+        hooks = build_data["build_hooks"]
 
-        if 'generate' in hooks:
+        if "generate" in hooks:
             # Generation hook is present, use its output
             self.process_generated_files()
-        elif 'custom' in hooks:
+        elif "custom" in hooks:
             # No generation, but custom hook is present
             self.process_custom_output()
         else:
@@ -209,22 +209,23 @@ path = "build_steps/postbuild.py"
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class PreBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Prepare build environment"""
         # Create build directories
         dirs = {
-            'generated': os.path.join(self.root, 'generated'),
-            'built': os.path.join(self.root, 'built'),
-            'artifacts': os.path.join(self.root, 'artifacts'),
+            "generated": os.path.join(self.root, "generated"),
+            "built": os.path.join(self.root, "built"),
+            "artifacts": os.path.join(self.root, "artifacts"),
         }
 
         for dir_name, dir_path in dirs.items():
             os.makedirs(dir_path, exist_ok=True)
 
         # Share directory paths with other hooks
-        build_data['build_dirs'] = dirs
-        build_data['build_status'] = {'prebuild': True}
+        build_data["build_dirs"] = dirs
+        build_data["build_status"] = {"prebuild": True}
 ```
 
 ### Step 2: Build
@@ -234,28 +235,29 @@ class PreBuildHook(BuildHookInterface):
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class BuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Execute build steps"""
         # Get directories from prebuild hook
-        build_dirs = build_data.get('build_dirs', {})
+        build_dirs = build_data.get("build_dirs", {})
 
         if not build_dirs:
             raise RuntimeError("Prebuild hook must run first")
 
         # Build in generated directory
-        gen_dir = build_dirs['generated']
+        gen_dir = build_dirs["generated"]
         self.run_build(gen_dir, version)
 
         # Update status
-        status = build_data.get('build_status', {})
-        status['build'] = True
-        build_data['build_status'] = status
+        status = build_data.get("build_status", {})
+        status["build"] = True
+        build_data["build_status"] = status
 
         # Add generated files to artifacts
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
-        build_data['artifacts'].append('generated/**/*')
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
+        build_data["artifacts"].append("generated/**/*")
 
     def run_build(self, output_dir: str, version: str) -> None:
         """Hypothetical build process"""
@@ -269,26 +271,27 @@ class BuildHook(BuildHookInterface):
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class PostBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Finalize build artifacts"""
         # Verify previous hooks ran
-        status = build_data.get('build_status', {})
+        status = build_data.get("build_status", {})
 
-        if not status.get('prebuild') or not status.get('build'):
+        if not status.get("prebuild") or not status.get("build"):
             raise RuntimeError("Previous build hooks must complete first")
 
         # Copy final artifacts
-        build_dirs = build_data['build_dirs']
-        built_dir = build_dirs['built']
-        artifacts_dir = build_dirs['artifacts']
+        build_dirs = build_data["build_dirs"]
+        built_dir = build_dirs["built"]
+        artifacts_dir = build_dirs["artifacts"]
 
         self.copy_artifacts(built_dir, artifacts_dir)
 
         # Include final artifacts
-        if 'artifacts' not in build_data:
-            build_data['artifacts'] = []
-        build_data['artifacts'].append('artifacts/**/*')
+        if "artifacts" not in build_data:
+            build_data["artifacts"] = []
+        build_data["artifacts"].append("artifacts/**/*")
 
         print(f"✓ Build complete for version {version}")
 
@@ -305,16 +308,13 @@ Data persists within the `build_data` dictionary across all hooks:
 class MultiMethodHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Store information
-        build_data['my_state'] = {
-            'version': version,
-            'initialized': True,
-        }
+        build_data["my_state"] = {"version": version, "initialized": True}
 
     def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
         # Retrieve information from initialize
-        my_state = build_data.get('my_state', {})
+        my_state = build_data.get("my_state", {})
 
-        if my_state.get('initialized'):
+        if my_state.get("initialized"):
             print(f"Hook initialized for version {my_state['version']}")
             print(f"Built artifact: {artifact_path}")
 ```
@@ -325,12 +325,12 @@ class MultiMethodHook(BuildHookInterface):
 
 ```python
 # Good: Descriptive field names
-build_data['generated_source_files'] = ['file1.py', 'file2.py']
-build_data['compiled_extensions'] = {'lib.so': '/path/to/lib.so'}
+build_data["generated_source_files"] = ["file1.py", "file2.py"]
+build_data["compiled_extensions"] = {"lib.so": "/path/to/lib.so"}
 
 # Less clear
-build_data['gen'] = [...]
-build_data['comp'] = [...]
+build_data["gen"] = [...]
+build_data["comp"] = [...]
 ```
 
 ### 2. Document Custom Fields
@@ -344,9 +344,9 @@ class GeneratingHook(BuildHookInterface):
         Other hooks can check for this field and use its contents.
         Format: List of absolute paths to generated files.
         """
-        if 'generated_files' not in build_data:
-            build_data['generated_files'] = []
-        build_data['generated_files'].append(...)
+        if "generated_files" not in build_data:
+            build_data["generated_files"] = []
+        build_data["generated_files"].append(...)
 ```
 
 ### 3. Handle Missing Dependencies Gracefully
@@ -355,7 +355,7 @@ class GeneratingHook(BuildHookInterface):
 class DependentHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         """Handle case where prerequisite hook didn't run"""
-        generated_files = build_data.get('generated_files', [])
+        generated_files = build_data.get("generated_files", [])
 
         if not generated_files:
             # Gracefully handle missing prerequisite
@@ -386,11 +386,11 @@ Ensure each hook can run independently:
 class RobustHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Works with or without previous hooks
-        my_data = build_data.get('my_data', {})
+        my_data = build_data.get("my_data", {})
 
         # Provide defaults if needed
         if not my_data:
-            build_data['my_data'] = self.get_defaults()
+            build_data["my_data"] = self.get_defaults()
 ```
 
 ## Debugging Inter-Hook Communication
@@ -415,7 +415,7 @@ def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
     print("=== Hook Finalize ===")
     print(f"Artifact: {artifact_path}")
 
-    artifacts = build_data.get('artifacts', [])
+    artifacts = build_data.get("artifacts", [])
     print(f"Total artifacts: {len(artifacts)}")
 
     for artifact in artifacts:

@@ -39,6 +39,7 @@ restored = pickle.loads(pickled)
 import hmac
 import hashlib
 
+
 def safe_loads(data, key):
     """Load pickle only if HMAC signature is valid."""
     signature = data[:32]
@@ -76,18 +77,17 @@ user_data = json.loads(untrusted_string)
 import pickle
 import io
 
+
 def restricted_loads(data):
     """Load pickle with restricted unpickler."""
 
     class RestrictedUnpickler(pickle.Unpickler):
         def find_class(self, module, name):
             # Only allow safe types
-            SAFE_MODULES = {'__main__', 'collections', 'datetime'}
+            SAFE_MODULES = {"__main__", "collections", "datetime"}
 
             if module not in SAFE_MODULES:
-                raise pickle.UnpicklingError(
-                    f"Unpickling of module {module} is not allowed"
-                )
+                raise pickle.UnpicklingError(f"Unpickling of module {module} is not allowed")
             return super().find_class(module, name)
 
     return RestrictedUnpickler(io.BytesIO(data)).load()
@@ -105,9 +105,11 @@ restored = msgpack.unpackb(data, raw=False)
 # Use pydantic for validation
 from pydantic import BaseModel, ValidationError
 
+
 class User(BaseModel):
     username: str
     age: int
+
 
 try:
     user = User(**json.loads(untrusted_json))
@@ -155,6 +157,7 @@ restored = json.loads(data)
 ```python
 # Use cloudpickle with validation
 import cloudpickle
+
 
 def safe_function_load(data, allowed_names):
     """Load function but verify it matches allowed list."""
@@ -223,6 +226,7 @@ config = yaml.load(config_string)
 from ruamel.yaml import YAML
 from datetime import datetime
 
+
 def create_safe_yaml():
     """Create ruamel.yaml instance with safe custom types."""
     yaml = YAML(typ="safe")
@@ -233,6 +237,7 @@ def create_safe_yaml():
 
     yaml.constructor.add_constructor("!date", date_constructor)
     return yaml
+
 
 # Use custom safe loader
 yaml = create_safe_yaml()

@@ -177,7 +177,7 @@ response = litellm.completion(
     messages=[{"role": "user", "content": "Hello, world!"}],
     api_base="http://localhost:8080/v1",  # MUST include /v1 suffix
     temperature=0.3,
-    max_tokens=200
+    max_tokens=200,
 )
 
 print(response.choices[0].message.content)
@@ -204,16 +204,14 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:8080/v1",  # MUST include /v1
-    api_key="sk-no-key-required"  # Any value works
+    api_key="sk-no-key-required",  # Any value works
 )
 
 response = client.chat.completions.create(
     model="local-model",  # Model name is flexible
-    messages=[
-        {"role": "user", "content": "Hello, world!"}
-    ],
+    messages=[{"role": "user", "content": "Hello, world!"}],
     temperature=0.3,
-    max_tokens=200
+    max_tokens=200,
 )
 
 print(response.choices[0].message.content)
@@ -257,26 +255,13 @@ import subprocess
 import time
 import httpx
 
+
 def start_llamafile(
-    llamafile_path: str,
-    model_path: str,
-    port: int = 8080,
-    host: str = "127.0.0.1"
+    llamafile_path: str, model_path: str, port: int = 8080, host: str = "127.0.0.1"
 ) -> subprocess.Popen:
     """Start llamafile server as background process."""
-    cmd = [
-        llamafile_path,
-        "--server",
-        "-m", model_path,
-        "--nobrowser",
-        "--port", str(port),
-        "--host", host,
-    ]
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    cmd = [llamafile_path, "--server", "-m", model_path, "--nobrowser", "--port", str(port), "--host", host]
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     _wait_for_server(host, port)
     return process
 

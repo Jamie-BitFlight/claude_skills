@@ -23,7 +23,7 @@ class ContextAwareHook(BuildHookInterface):
     def initialize(self, version, build_data):
         project_root = self.directory
         # Access files relative to project root
-        config = os.path.join(project_root, 'build_config.json')
+        config = os.path.join(project_root, "build_config.json")
 ```
 
 Type: `str` (absolute filesystem path)
@@ -81,13 +81,14 @@ Access to all environment variables from build shell:
 ```python
 import os
 
+
 def initialize(self, version, build_data):
     # Read custom build variables
-    build_variant = os.getenv('BUILD_VARIANT', 'release')
-    include_debug = os.getenv('DEBUG_BUILD', '0') == '1'
+    build_variant = os.getenv("BUILD_VARIANT", "release")
+    include_debug = os.getenv("DEBUG_BUILD", "0") == "1"
 
     if include_debug:
-        build_data['artifacts']['wheel'].append('mypackage/_debug.py')
+        build_data["artifacts"]["wheel"].append("mypackage/_debug.py")
 ```
 
 ### System Information
@@ -96,13 +97,14 @@ def initialize(self, version, build_data):
 import sys
 import platform
 
+
 def initialize(self, version, build_data):
     python_version = sys.version_info
     platform_name = platform.system()
 
     # Conditional behavior based on platform
-    if platform_name == 'Windows':
-        build_data['force_include']['windows/lib.dll'] = 'mypackage/lib.dll'
+    if platform_name == "Windows":
+        build_data["force_include"]["windows/lib.dll"] = "mypackage/lib.dll"
 ```
 
 ## Version Parameter
@@ -119,7 +121,7 @@ def initialize(self, version, build_data):
     print(f"Building version: {version}")
 
     # Use version in generated code
-    with open('mypackage/_version.py', 'w') as f:
+    with open("mypackage/_version.py", "w") as f:
         f.write(f'__version__ = "{version}"\n')
 ```
 
@@ -137,7 +139,7 @@ class TargetAwareHook(BuildHookInterface):
     def finalize(self, version, build_data, artifact):
         # The 'artifact' parameter indicates build result path
         # Use this to detect what was built
-        if artifact.endswith('.whl'):
+        if artifact.endswith(".whl"):
             print("Built a wheel")
         else:
             print("Built a source distribution")
@@ -151,18 +153,18 @@ Hooks have full filesystem access relative to project root:
 class FileSystemHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Read project configuration
-        with open(os.path.join(self.directory, 'myconfig.json')) as f:
+        with open(os.path.join(self.directory, "myconfig.json")) as f:
             config = json.load(f)
 
         # Create directories
-        os.makedirs('build/artifacts', exist_ok=True)
+        os.makedirs("build/artifacts", exist_ok=True)
 
         # Write generated files
-        with open('mypackage/_generated.py', 'w') as f:
-            f.write(f'CONFIG = {config!r}\n')
+        with open("mypackage/_generated.py", "w") as f:
+            f.write(f"CONFIG = {config!r}\n")
 
         # Add to distribution
-        build_data['artifacts']['wheel'].append('mypackage/_generated.py')
+        build_data["artifacts"]["wheel"].append("mypackage/_generated.py")
 ```
 
 ## Hook Execution Context
@@ -201,8 +203,9 @@ def clean(self, version, build_data):
     # Called for 'hatch build --target=wheel -c'
     # Clean up build artifacts
     import shutil
-    if os.path.exists('build/generated'):
-        shutil.rmtree('build/generated')
+
+    if os.path.exists("build/generated"):
+        shutil.rmtree("build/generated")
 ```
 
 ## Practical Examples
@@ -212,18 +215,19 @@ def clean(self, version, build_data):
 ```python
 import toml
 
+
 class ConfigAwareHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Read pyproject.toml
-        config_path = os.path.join(self.directory, 'pyproject.toml')
+        config_path = os.path.join(self.directory, "pyproject.toml")
         config = toml.load(config_path)
 
         # Access custom configuration
-        build_config = config.get('tool', {}).get('myapp', {})
-        include_benchmarks = build_config.get('include_benchmarks', False)
+        build_config = config.get("tool", {}).get("myapp", {})
+        include_benchmarks = build_config.get("include_benchmarks", False)
 
         if include_benchmarks:
-            build_data['force_include']['benchmarks'] = 'mypackage/benchmarks'
+            build_data["force_include"]["benchmarks"] = "mypackage/benchmarks"
 ```
 
 ### Conditional Features Based on Environment
@@ -234,16 +238,17 @@ class FeatureHook(BuildHookInterface):
         # Check for optional build dependencies
         try:
             import cython
+
             has_cython = True
         except ImportError:
             has_cython = False
 
         if has_cython:
             # Compile Cython extensions
-            build_data['force_include']['dist/compiled.so'] = 'mypackage/compiled.so'
+            build_data["force_include"]["dist/compiled.so"] = "mypackage/compiled.so"
         else:
             # Use pure Python fallback
-            build_data['artifacts']['wheel'].append('mypackage/_pure_python.py')
+            build_data["artifacts"]["wheel"].append("mypackage/_pure_python.py")
 ```
 
 ### Version Injection
@@ -255,15 +260,15 @@ class VersionHook(BuildHookInterface):
         import datetime
 
         version_info = {
-            'version': version,
-            'build_time': datetime.datetime.utcnow().isoformat(),
-            'platform': platform.system(),
+            "version": version,
+            "build_time": datetime.datetime.utcnow().isoformat(),
+            "platform": platform.system(),
         }
 
-        with open('mypackage/_build_info.py', 'w') as f:
-            f.write(f'BUILD_INFO = {version_info!r}\n')
+        with open("mypackage/_build_info.py", "w") as f:
+            f.write(f"BUILD_INFO = {version_info!r}\n")
 
-        build_data['artifacts']['wheel'].append('mypackage/_build_info.py')
+        build_data["artifacts"]["wheel"].append("mypackage/_build_info.py")
 ```
 
 ## Best Practices
@@ -283,18 +288,19 @@ Print context information for troubleshooting:
 ```python
 import json
 
+
 class DebugContextHook(BuildHookInterface):
     def initialize(self, version, build_data):
         context_info = {
-            'version': version,
-            'directory': self.directory,
-            'cwd': os.getcwd(),
-            'python': sys.version_info,
-            'platform': platform.system(),
-            'environ': dict(os.environ)
+            "version": version,
+            "directory": self.directory,
+            "cwd": os.getcwd(),
+            "python": sys.version_info,
+            "platform": platform.system(),
+            "environ": dict(os.environ),
         }
 
-        with open('build/context_debug.json', 'w') as f:
+        with open("build/context_debug.json", "w") as f:
             json.dump(context_info, f, indent=2, default=str)
 ```
 

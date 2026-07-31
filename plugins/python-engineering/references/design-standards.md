@@ -58,9 +58,11 @@ def get_user(id: str) -> User:
 ```python
 from typing import Protocol
 
+
 class Repository(Protocol):
     def get(self, id: str) -> User: ...
     def save(self, user: User) -> None: ...
+
 
 def create_user(repo: Repository, data: UserInput) -> User:
     user = User(**data)

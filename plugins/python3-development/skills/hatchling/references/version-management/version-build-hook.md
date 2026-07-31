@@ -102,6 +102,7 @@ Result:
 
 ```python
 """Version information."""
+
 __version__ = "1.2.3"
 __version_tuple__ = (1, 2, 3)
 ```
@@ -258,6 +259,7 @@ path = "hatch_build.py"
 # hatch_build.py
 from pathlib import Path
 
+
 def initialize(version, build_config):
     """Create additional version files."""
 
@@ -292,6 +294,7 @@ except ImportError:
     # Development mode - version file not created yet
     try:
         from importlib import metadata
+
         __version__ = metadata.version("my-package")
     except Exception:
         __version__ = "0.0.0+dev"
@@ -358,14 +361,11 @@ For monorepos or complex projects:
 # hatch_build.py
 from pathlib import Path
 
+
 def initialize(version, build_config):
     """Write version to multiple locations."""
 
-    locations = [
-        "packages/core/version.py",
-        "packages/cli/version.py",
-        "packages/api/version.py",
-    ]
+    locations = ["packages/core/version.py", "packages/cli/version.py", "packages/api/version.py"]
 
     template = f'__version__ = "{version}"'
 
@@ -385,6 +385,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+
 def initialize(version, build_config):
     """Create version file with build metadata."""
 
@@ -398,11 +399,11 @@ def initialize(version, build_config):
 
     template = f"""
 # Automatically generated build information
-__version__ = "{build_info['version']}"
-__build_date__ = "{build_info['build_date']}"
-__build_host__ = "{build_info['build_host']}"
-__build_user__ = "{build_info['build_user']}"
-__ci_build__ = {build_info['ci_build']}
+__version__ = "{build_info["version"]}"
+__build_date__ = "{build_info["build_date"]}"
+__build_host__ = "{build_info["build_host"]}"
+__build_user__ = "{build_info["build_user"]}"
+__ci_build__ = {build_info["ci_build"]}
 """
 
     version_file = Path("src/my_package/_build_info.py")
@@ -501,6 +502,7 @@ Debug pattern:
 
 ```python
 import re
+
 pattern = r"__version__ = ['\"](?P<version>[^'\"]+)['\"]"
 content = open("src/my_package/__init__.py").read()
 match = re.search(pattern, content)
@@ -562,6 +564,7 @@ Add tests for version availability:
 def test_version():
     """Test that version is accessible."""
     import my_package
+
     assert hasattr(my_package, "__version__")
     assert my_package.__version__ != "unknown"
 ```

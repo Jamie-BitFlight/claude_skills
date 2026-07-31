@@ -69,15 +69,19 @@ Use match-case when using elif. Use if/elif only for inequalities or boolean ope
 ```python
 # Modern (for any elif pattern)
 match status_code:
-    case 200: return "OK"
-    case 404: return "Not Found"
-    case _: return "Unknown"
+    case 200:
+        return "OK"
+    case 404:
+        return "Not Found"
+    case _:
+        return "Unknown"
 ```
 
 ### Self Type (PEP 673)
 
 ```python
 from typing import Self
+
 
 class Builder:
     def add(self, x: int) -> Self:
@@ -97,6 +101,7 @@ except FileNotFoundError as e:
 
 ```python
 from enum import StrEnum
+
 
 class Status(StrEnum):
     PENDING = "pending"
@@ -125,8 +130,9 @@ from unittest.mock import Mock, patch
 # Modern (ALWAYS use)
 from pytest_mock import MockerFixture
 
+
 def test_feature(mocker: MockerFixture) -> None:
-    mock_func = mocker.patch('module.function', return_value=42)
+    mock_func = mocker.patch("module.function", return_value=42)
 ```
 
 ---
@@ -140,6 +146,7 @@ ALWAYS use Annotated syntax:
 ```python
 from typing import Annotated
 import typer
+
 
 @app.command()
 def process(
@@ -158,6 +165,7 @@ Use explicit width control for production CLIs:
 from rich.console import Console
 from rich.table import Table
 from rich.measure import Measurement
+
 
 def _get_table_width(table: Table) -> int:
     temp_console = Console(width=9999)

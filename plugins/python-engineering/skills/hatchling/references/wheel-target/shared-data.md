@@ -162,15 +162,16 @@ Explain that shared data location is platform-specific, so code needs to handle 
 ```python
 import site
 
+
 def get_shared_data_path():
     # Standard locations for shared data
     for base in site.PREFIXES:
-        path = os.path.join(base, 'share', 'mypackage')
+        path = os.path.join(base, "share", "mypackage")
         if os.path.exists(path):
             return path
 
     # Fallback to site-packages
-    return os.path.join(site.getsitepackages()[0], 'mypackage', 'data')
+    return os.path.join(site.getsitepackages()[0], "mypackage", "data")
 ```
 
 Or using importlib.resources for package data (the modern approach):

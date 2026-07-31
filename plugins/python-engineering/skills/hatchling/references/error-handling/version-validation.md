@@ -24,26 +24,28 @@ ValueError: Invalid version: 'x.y.z'
 
 ```python
 # Invalid versions
-"1.0"           # Missing patch (should be "1.0.0")
-"v1.0.0"        # 'v' prefix not allowed
-"1.0.0-SNAPSHOT" # Invalid pre-release identifier
-"1.0.0.0"       # Too many components (without epoch)
-"1.0.0-x-y-z.–" # Invalid characters
-"1_0_0"         # Underscores not allowed
+"1.0"  # Missing patch (should be "1.0.0")
+
+"v1.0.0"  # 'v' prefix not allowed
+"1.0.0-SNAPSHOT"  # Invalid pre-release identifier
+"1.0.0.0"  # Too many components (without epoch)
+"1.0.0-x-y-z.–"  # Invalid characters
+"1_0_0"  # Underscores not allowed
 ```
 
 **Valid PEP 440 Formats:**
 
 ```python
 # Valid versions
-"1.0.0"         # Standard
-"2.1.3"         # Semantic versioning
-"1.0.0a1"       # Alpha pre-release
-"1.0.0b2"       # Beta pre-release
-"1.0.0rc3"      # Release candidate
-"1.0.0.dev4"    # Development release
-"1.0.0.post5"   # Post-release
-"1!1.0.0"       # Version with epoch
+"1.0.0"  # Standard
+
+"2.1.3"  # Semantic versioning
+"1.0.0a1"  # Alpha pre-release
+"1.0.0b2"  # Beta pre-release
+"1.0.0rc3"  # Release candidate
+"1.0.0.dev4"  # Development release
+"1.0.0.post5"  # Post-release
+"1!1.0.0"  # Version with epoch
 ```
 
 ## Standard Version Scheme
@@ -191,6 +193,7 @@ import re
 import sys
 from packaging.version import Version, InvalidVersion
 
+
 def validate_version(version_string):
     """Validate PEP 440 compliance."""
     try:
@@ -206,6 +209,7 @@ def validate_version(version_string):
         print(f"Invalid version: {e}")
         return False
 
+
 if __name__ == "__main__":
     version = sys.argv[1] if len(sys.argv) > 1 else "1.0.0"
     if not validate_version(version):
@@ -219,6 +223,7 @@ if __name__ == "__main__":
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 from packaging.version import Version, InvalidVersion
 
+
 class VersionValidationHook(BuildHookInterface):
     def initialize(self, version, build_data):
         """Validate version during build."""
@@ -227,14 +232,10 @@ class VersionValidationHook(BuildHookInterface):
 
             # Custom validation rules
             if v.pre and v.dev:
-                raise ValueError(
-                    "Cannot have both pre-release and dev markers"
-                )
+                raise ValueError("Cannot have both pre-release and dev markers")
 
             if v.local:
-                raise ValueError(
-                    "Local version identifiers not allowed in builds"
-                )
+                raise ValueError("Local version identifiers not allowed in builds")
 
         except InvalidVersion:
             raise ValueError(f"Invalid PEP 440 version: {version}")
@@ -250,6 +251,7 @@ class VersionValidationHook(BuildHookInterface):
 
 from packaging.version import Version
 
+
 def bump_version(current: str, bump_type: str) -> str:
     """Bump version following semantic versioning."""
     v = Version(current)
@@ -260,19 +262,19 @@ def bump_version(current: str, bump_type: str) -> str:
     else:
         base = str(v)
 
-    major, minor, patch = map(int, base.split('.'))
+    major, minor, patch = map(int, base.split("."))
 
-    if bump_type == 'major':
+    if bump_type == "major":
         return f"{major + 1}.0.0"
-    elif bump_type == 'minor':
+    elif bump_type == "minor":
         return f"{major}.{minor + 1}.0"
-    elif bump_type == 'patch':
+    elif bump_type == "patch":
         return f"{major}.{minor}.{patch + 1}"
-    elif bump_type == 'alpha':
+    elif bump_type == "alpha":
         return f"{major}.{minor}.{patch + 1}a1"
-    elif bump_type == 'beta':
+    elif bump_type == "beta":
         return f"{major}.{minor}.{patch + 1}b1"
-    elif bump_type == 'rc':
+    elif bump_type == "rc":
         return f"{major}.{minor}.{patch + 1}rc1"
     else:
         raise ValueError(f"Unknown bump type: {bump_type}")
@@ -290,11 +292,11 @@ def next_prerelease(current: str) -> str:
         return f"{v.base_version}a1"
 
     phase, number = v.pre
-    if phase == 'a':  # Alpha
+    if phase == "a":  # Alpha
         return f"{v.base_version}a{number + 1}"
-    elif phase == 'b':  # Beta
+    elif phase == "b":  # Beta
         return f"{v.base_version}b{number + 1}"
-    elif phase == 'rc':  # Release Candidate
+    elif phase == "rc":  # Release Candidate
         return f"{v.base_version}rc{number + 1}"
 ```
 

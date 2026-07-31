@@ -22,12 +22,7 @@ import logging
 from rich.logging import RichHandler
 
 FORMAT = "%(message)s"
-logging.basicConfig(
-    level="NOTSET",
-    format=FORMAT,
-    datefmt="[%X]",
-    handlers=[RichHandler()]
-)
+logging.basicConfig(level="NOTSET", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()])
 
 log = logging.getLogger("rich")
 log.info("Hello, World!")
@@ -89,12 +84,7 @@ log.error("123 will not be highlighted", extra={"highlighter": None})
 import logging
 from rich.logging import RichHandler
 
-logging.basicConfig(
-    level="NOTSET",
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True)]
-)
+logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(rich_tracebacks=True)])
 
 log = logging.getLogger("rich")
 try:
@@ -118,7 +108,7 @@ logging.basicConfig(
     level="NOTSET",
     format="%(message)s",
     datefmt="[%X]",
-    handlers=[RichHandler(rich_tracebacks=True, tracebacks_suppress=[click])]
+    handlers=[RichHandler(rich_tracebacks=True, tracebacks_suppress=[click])],
 )
 ```
 
@@ -132,6 +122,7 @@ Install Rich as the global exception handler so all uncaught exceptions render w
 
 ```python
 from rich.traceback import install
+
 install(show_locals=True)
 ```
 
@@ -162,6 +153,7 @@ touch .venv/lib/python3.9/site-packages/sitecustomize.py
 ```python
 # .venv/lib/python3.9/site-packages/sitecustomize.py
 from rich.traceback import install
+
 install(show_locals=True)
 ```
 
@@ -196,6 +188,7 @@ Suppress framework frames:
 
 ```python
 import click
+
 try:
     run_app()
 except Exception:

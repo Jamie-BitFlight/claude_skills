@@ -93,6 +93,7 @@ from rich.measure import Measurement
 from rich.panel import Panel
 from rich.table import Table
 
+
 def get_rendered_width(renderable: RenderableType) -> int:
     """Get actual rendered width of any Rich renderable.
 
@@ -102,6 +103,7 @@ def get_rendered_width(renderable: RenderableType) -> int:
     temp_console = Console(width=99999)
     measurement = Measurement.get(temp_console, temp_console.options, renderable)
     return int(measurement.maximum)
+
 
 console = Console()
 

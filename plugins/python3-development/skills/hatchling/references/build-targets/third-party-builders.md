@@ -202,10 +202,10 @@ from hatchling.builders.plugin.interface import BuilderInterface
 
 
 class MyCustomBuilder(BuilderInterface):
-    PLUGIN_NAME = 'my-builder'
+    PLUGIN_NAME = "my-builder"
 
     def get_version_api(self):
-        return {'standard': self.build_standard}
+        return {"standard": self.build_standard}
 
     def build_standard(self, directory, **kwargs):
         # Custom build logic
@@ -234,17 +234,14 @@ my-builder = "my_builder_plugin:MyCustomBuilder"
 
 ```python
 class CythonBuilder(BuilderInterface):
-    PLUGIN_NAME = 'cython'
+    PLUGIN_NAME = "cython"
 
     def build_standard(self, directory, **kwargs):
         from Cython.Build import cythonize
         import subprocess
 
         # Cythonize .pyx files
-        extensions = cythonize(
-            self.get_pyx_files(),
-            compiler_directives={'language_level': '3'}
-        )
+        extensions = cythonize(self.get_pyx_files(), compiler_directives={"language_level": "3"})
 
         # Build extensions
         for ext in extensions:
@@ -257,18 +254,15 @@ class CythonBuilder(BuilderInterface):
 
 ```python
 class GoBuilder(BuilderInterface):
-    PLUGIN_NAME = 'go'
+    PLUGIN_NAME = "go"
 
     def build_standard(self, directory, **kwargs):
         import subprocess
 
         # Build Go module
-        subprocess.run([
-            'go', 'build',
-            '-buildmode=c-shared',
-            '-o', f'{directory}/mypackage/_go.so',
-            './...'
-        ], check=True)
+        subprocess.run(
+            ["go", "build", "-buildmode=c-shared", "-o", f"{directory}/mypackage/_go.so", "./..."], check=True
+        )
 
         return self.create_wheel(directory)
 ```
@@ -279,14 +273,14 @@ class GoBuilder(BuilderInterface):
 
 ```python
 class DjangoBuilder(BuilderInterface):
-    PLUGIN_NAME = 'django'
+    PLUGIN_NAME = "django"
 
     def build_standard(self, directory, **kwargs):
         # Collect static files
-        self.run_management_command('collectstatic', '--noinput')
+        self.run_management_command("collectstatic", "--noinput")
 
         # Compile messages
-        self.run_management_command('compilemessages')
+        self.run_management_command("compilemessages")
 
         # Build package
         return super().build_standard(directory, **kwargs)
@@ -296,7 +290,7 @@ class DjangoBuilder(BuilderInterface):
 
 ```python
 class FlaskBuilder(BuilderInterface):
-    PLUGIN_NAME = 'flask'
+    PLUGIN_NAME = "flask"
 
     def build_standard(self, directory, **kwargs):
         # Bundle assets
@@ -382,7 +376,7 @@ class PlatformSpecificBuilder(BuilderInterface):
             raise RuntimeError(f"Platform {sys.platform} not supported")
 
     def is_platform_supported(self):
-        return sys.platform in ['linux', 'darwin']
+        return sys.platform in ["linux", "darwin"]
 ```
 
 ## Testing with Third-Party Builders
@@ -398,15 +392,15 @@ from unittest.mock import Mock
 @pytest.fixture
 def mock_builder():
     builder = Mock(spec=BuilderInterface)
-    builder.PLUGIN_NAME = 'test-builder'
-    builder.build_standard = Mock(return_value='/path/to/artifact')
+    builder.PLUGIN_NAME = "test-builder"
+    builder.build_standard = Mock(return_value="/path/to/artifact")
     return builder
 
 
 def test_third_party_builder_integration(mock_builder, tmp_path):
     # Test your package with the mock builder
     result = mock_builder.build_standard(tmp_path)
-    assert result == '/path/to/artifact'
+    assert result == "/path/to/artifact"
 ```
 
 ### Integration Tests
@@ -414,10 +408,10 @@ def test_third_party_builder_integration(mock_builder, tmp_path):
 ```python
 def test_real_builder_integration(tmp_path):
     # Create test project
-    project = tmp_path / 'test_project'
+    project = tmp_path / "test_project"
     project.mkdir()
 
-    (project / 'pyproject.toml').write_text("""
+    (project / "pyproject.toml").write_text("""
 [build-system]
 requires = ["hatchling", "third-party-builder"]
 build-backend = "hatchling.build"
@@ -427,10 +421,10 @@ build-backend = "hatchling.build"
     """)
 
     # Run build
-    subprocess.run(['hatch', 'build', '-t', 'custom'], cwd=project)
+    subprocess.run(["hatch", "build", "-t", "custom"], cwd=project)
 
     # Verify output
-    assert (project / 'dist').exists()
+    assert (project / "dist").exists()
 ```
 
 ## Performance Optimization
@@ -440,11 +434,11 @@ build-backend = "hatchling.build"
 ```python
 class CachingBuilder(BuilderInterface):
     def build_standard(self, directory, **kwargs):
-        cache_dir = Path.home() / '.cache' / 'hatch-builds'
+        cache_dir = Path.home() / ".cache" / "hatch-builds"
         cache_key = self.get_cache_key()
         cached = cache_dir / cache_key
 
-        if cached.exists() and not kwargs.get('no-cache'):
+        if cached.exists() and not kwargs.get("no-cache"):
             shutil.copy(cached, directory)
             return str(directory / cached.name)
 
@@ -533,12 +527,12 @@ requires = [
 class EnvironmentAwareBuilder(BuilderInterface):
     def build_standard(self, directory, **kwargs):
         # Verify required tools
-        for tool in ['tool1', 'tool2']:
+        for tool in ["tool1", "tool2"]:
             if not shutil.which(tool):
                 raise RuntimeError(f"Required tool '{tool}' not found")
 
         # Check environment variables
-        required_vars = ['VAR1', 'VAR2']
+        required_vars = ["VAR1", "VAR2"]
         missing = [v for v in required_vars if v not in os.environ]
         if missing:
             raise RuntimeError(f"Missing environment variables: {missing}")

@@ -242,6 +242,7 @@ test = "pytest tests/ --cov=mypackage"
 import pytest
 from mypackage import MyClass  # Clean import
 
+
 def test_something():
     assert MyClass().method() == expected
 ```

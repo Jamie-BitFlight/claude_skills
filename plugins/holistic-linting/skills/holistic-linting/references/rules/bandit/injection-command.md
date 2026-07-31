@@ -35,6 +35,7 @@ subprocess.Popen("ls -la", shell=True)
 
 # Safe - input strictly validated to alphanumeric
 import re
+
 if re.match(r"^[a-zA-Z0-9_]+$", filename):
     subprocess.Popen(f"ls {filename}", shell=True)
 ```
@@ -161,14 +162,13 @@ results = cursor.fetchall()
 
 # Django ORM (automatic parameterization)
 from django.contrib.auth.models import User
+
 users = User.objects.filter(username=user_input)
 
 # SQLAlchemy (parameterized)
 from sqlalchemy import text
-result = db.session.execute(
-    text("SELECT * FROM users WHERE username = :username"),
-    {"username": user_input}
-)
+
+result = db.session.execute(text("SELECT * FROM users WHERE username = :username"), {"username": user_input})
 ```
 
 ---
@@ -248,10 +248,8 @@ users = User.objects.filter(Q(id=user_id) | Q(username=username))
 
 # If raw SQL is necessary
 from django.db.models import Model
-users = User.objects.raw(
-    "SELECT * FROM auth_user WHERE id = %s",
-    [user_id]
-)
+
+users = User.objects.raw("SELECT * FROM auth_user WHERE id = %s", [user_id])
 ```
 
 ---
@@ -282,10 +280,7 @@ users = User.objects.raw(f"SELECT * FROM auth_user WHERE username = '{user_input
 from django.contrib.auth.models import User
 
 # RIGHT - Parameterized raw SQL
-users = User.objects.raw(
-    "SELECT * FROM auth_user WHERE username = %s",
-    [user_input]
-)
+users = User.objects.raw("SELECT * FROM auth_user WHERE username = %s", [user_input])
 ```
 
 ---
@@ -317,13 +312,14 @@ model = torch.load("user_uploaded_model.pth")
 import torch
 
 # RIGHT - Use map_location to restrict loading
-model = torch.load("model.pth", map_location=torch.device('cpu'))
+model = torch.load("model.pth", map_location=torch.device("cpu"))
 
 # RIGHT - Use weights_only=True (PyTorch 2.13+)
 model = torch.load("model.pth", weights_only=True)
 
 # RIGHT - Verify model source and signature
 import hashlib
+
 expected_hash = "abc123def456"
 with open("model.pth", "rb") as f:
     actual_hash = hashlib.sha256(f.read()).hexdigest()
@@ -367,6 +363,7 @@ model = AutoModel.from_pretrained("huggingface/bert-base-uncased")
 
 # RIGHT - With cache verification
 import torch
+
 model = AutoModel.from_pretrained(
     "bert-base-uncased",
     trust_remote_code=False,  # Don't execute remote code

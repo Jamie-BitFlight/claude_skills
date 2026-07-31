@@ -42,6 +42,7 @@ handler = xml.sax.parse(untrusted_xml_file, MyHandler())
 
 # B315: xml.dom.expatbuilder
 from xml.dom.expatbuilder import parse as expat_parse
+
 expat_parse(untrusted_xml_file)
 
 # B316: xml.dom.minidom
@@ -49,6 +50,7 @@ dom = minidom.parse(untrusted_xml_file)
 
 # B317: xml.dom.pulldom
 from xml.dom.pulldom import parse as pulldom_parse
+
 pulldom_parse(untrusted_xml_file)
 
 # B318: xml.sax.parse with handler
@@ -98,6 +100,7 @@ from defusedxml import pulldom
 ```python
 import xml.etree.ElementTree as ET
 
+
 def parse_safe_xml(filename):
     """Parse XML with XXE protection."""
     parser = ET.XMLParser()
@@ -118,9 +121,11 @@ def parse_safe_xml(filename):
 import xml.sax
 from defusedxml.sax import parse
 
+
 class MyHandler(xml.sax.ContentHandler):
     def startElement(self, name, attrs):
         print(f"Element: {name}")
+
 
 # RIGHT - Use defusedxml SAX
 parse(untrusted_xml_file, MyHandler())

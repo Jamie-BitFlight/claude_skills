@@ -73,7 +73,9 @@ Read the completed file. Confirm:
 
 ```python
 # Step 2: Write skeleton under 5K chars
-Write(file_path="plan/architect-auth-system.md", content="""---
+Write(
+    file_path="plan/architect-auth-system.md",
+    content="""---
 title: Auth System Architecture
 ---
 
@@ -98,12 +100,15 @@ title: Auth System Architecture
 ## Error Handling
 
 <!-- PENDING: Error taxonomy and recovery strategies -->
-""")
+""",
+)
 
 # Step 3: Fill each section individually — one Edit per section
-Edit(file_path="plan/architect-auth-system.md",
-     old_string="<!-- PENDING: System overview and goals -->",
-     new_string="The auth system provides token-based authentication...")
+Edit(
+    file_path="plan/architect-auth-system.md",
+    old_string="<!-- PENDING: System overview and goals -->",
+    new_string="The auth system provides token-based authentication...",
+)
 
 # ... one Edit per section ...
 

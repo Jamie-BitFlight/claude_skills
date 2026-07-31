@@ -26,7 +26,7 @@ x = 1
 ```python
 import os
 
-path = os.path.join('a', 'b')
+path = os.path.join("a", "b")
 ```
 
 **Special case - Re-exports**:
@@ -35,7 +35,7 @@ path = os.path.join('a', 'b')
 # In a package __init__.py, importing for re-export is OK
 from .module import some_function  # Exposed via __all__
 
-__all__ = ['some_function']
+__all__ = ["some_function"]
 ```
 
 **Safe to auto-fix**: Yes
@@ -84,8 +84,8 @@ for item in range(10):
 from os.path import *
 
 # Now referencing functions like:
-join('a', 'b')  # F405 - undefined name 'join'
-exists('file')  # F405 - undefined name 'exists'
+join("a", "b")  # F405 - undefined name 'join'
+exists("file")  # F405 - undefined name 'exists'
 ```
 
 **When it's NOT a violation**:
@@ -93,7 +93,7 @@ exists('file')  # F405 - undefined name 'exists'
 ```python
 from os.path import join, exists
 
-result = join('a', 'b')
+result = join("a", "b")
 ```
 
 **Note**: F403 warns about `import *`, while F405 warns about undefined names from it.
@@ -137,7 +137,7 @@ import os
 from os import *
 
 # References to undefined names:
-path.join('a', 'b')  # 'path' not explicitly imported
+path.join("a", "b")  # 'path' not explicitly imported
 ```
 
 **When it's NOT a violation**:
@@ -145,7 +145,7 @@ path.join('a', 'b')  # 'path' not explicitly imported
 ```python
 from os import path
 
-path.join('a', 'b')
+path.join("a", "b")
 ```
 
 ---
@@ -179,7 +179,9 @@ def func():
 ```python
 def func():
     x = 1  # noqa: F841  - Will use in debugger
-    import pdb; pdb.set_trace()
+    import pdb
+
+    pdb.set_trace()
 ```
 
 **Underscore convention**:
@@ -204,6 +206,7 @@ def unpack():
 def func():
     return undefined_variable  # Name not defined
 
+
 print(NonExistentClass())  # Class not defined
 ```
 
@@ -212,11 +215,14 @@ print(NonExistentClass())  # Class not defined
 ```python
 x = 1
 
+
 def func():
     return x  # Global x is defined
 
+
 class MyClass:
     pass
+
 
 obj = MyClass()
 ```
@@ -254,12 +260,15 @@ def func():
 ```python
 x = 1
 
+
 def func():
     global x
     print(x)  # OK - using global
 
+
 def nested():
     x = 2
+
     def inner():
         nonlocal x
         print(x)  # OK - using nonlocal from enclosing scope
@@ -301,8 +310,10 @@ def abstract_method():
 def func():
     pass
 
+
 def func():  # Redefined without using first version
     pass
+
 
 x = 1
 x = 2  # Redefined without using first value
@@ -314,8 +325,10 @@ x = 2  # Redefined without using first value
 def func(version=1):
     pass
 
+
 def func(version=2):  # Deliberate overload
     pass
+
 
 x = 1
 y = x + 1  # Use before redefine
@@ -327,11 +340,14 @@ x = 2
 ```python
 from typing import overload
 
+
 @overload
 def process(x: int) -> int: ...
 
+
 @overload
 def process(x: str) -> str: ...
+
 
 def process(x):
     return x
@@ -423,7 +439,7 @@ if (x, y):  # Tuple is always truthy
 if x and y:
     pass
 
-if (x, y,):  # With trailing comma - still tuple
+if (x, y):  # With trailing comma - still tuple
     pass
 ```
 
@@ -445,6 +461,7 @@ return x  # Can't return from module level
 ```python
 def func():
     return 1
+
 
 x = func()
 ```
@@ -501,6 +518,7 @@ def generator():
     yield 1
     return  # Bare return is OK
 
+
 def generator_with_return():
     yield 1
     return  # Just exit generator
@@ -543,13 +561,13 @@ finally:
 **When it's a violation**:
 
 ```python
-d = {'a': 1, 'b': 2, 'a': 3}  # 'a' appears twice
+d = {"a": 1, "b": 2, "a": 3}  # 'a' appears twice
 ```
 
 **When it's NOT a violation**:
 
 ```python
-d = {'a': 1, 'b': 2}  # All unique keys
+d = {"a": 1, "b": 2}  # All unique keys
 ```
 
 ---
@@ -561,8 +579,8 @@ d = {'a': 1, 'b': 2}  # All unique keys
 **When it's a violation**:
 
 ```python
-key = 'a'
-d = {key: 1, 'b': 2, key: 3}  # 'key' used twice
+key = "a"
+d = {key: 1, "b": 2, key: 3}  # 'key' used twice
 ```
 
 ---

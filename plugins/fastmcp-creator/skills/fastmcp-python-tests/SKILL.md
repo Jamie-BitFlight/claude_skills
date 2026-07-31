@@ -23,6 +23,7 @@ def test_user_creation_sets_defaults():
     assert user.id is not None
     assert user.created_at is not None
 
+
 # Bad: If this fails, what behavior is broken?
 def test_user():
     user = User(name="Alice")
@@ -37,12 +38,8 @@ def test_user():
 ```python
 import pytest
 
-@pytest.mark.parametrize("input,expected", [
-    ("hello", "HELLO"),
-    ("World", "WORLD"),
-    ("", ""),
-    ("123", "123"),
-])
+
+@pytest.mark.parametrize("input,expected", [("hello", "HELLO"), ("World", "WORLD"), ("", ""), ("123", "123")])
 def test_uppercase_conversion(input, expected):
     assert input.upper() == expected
 ```
@@ -63,10 +60,10 @@ async def test_async_operation():
     result = await some_async_function()
     assert result == expected
 
+
 # Wrong - don't add this
 @pytest.mark.asyncio
-async def test_async_operation():
-    ...
+async def test_async_operation(): ...
 ```
 
 ### Imports at module level
@@ -79,13 +76,16 @@ import pytest
 from fastmcp import FastMCP
 from fastmcp.client import Client
 
+
 async def test_something():
     mcp = FastMCP("test")
     ...
 
+
 # Wrong - no local imports
 async def test_something():
     from fastmcp import FastMCP  # Don't do this
+
     ...
 ```
 
@@ -99,9 +99,11 @@ from fastmcp.client import Client
 
 mcp = FastMCP("TestServer")
 
+
 @mcp.tool
 def greet(name: str) -> str:
     return f"Hello, {name}!"
+
 
 async def test_greet_tool():
     async with Client(mcp) as client:
@@ -120,6 +122,7 @@ Use `inline-snapshot` for testing JSON schemas and complex structures:
 ```python
 from inline_snapshot import snapshot
 
+
 def test_schema_generation():
     schema = generate_schema(MyModel)
     assert schema == snapshot()  # Will auto-populate on first run
@@ -137,6 +140,7 @@ Commands:
 @pytest.fixture
 def client():
     return Client()
+
 
 async def test_with_client(client):
     result = await client.ping()
@@ -158,6 +162,7 @@ def test_file_writing(tmp_path):
 
 ```python
 from unittest.mock import patch, AsyncMock
+
 
 async def test_external_api_call():
     with patch("mymodule.external_client.fetch", new_callable=AsyncMock) as mock:
@@ -191,9 +196,11 @@ def test_delete():
 ```python
 import pytest
 
+
 def test_raises_on_invalid_input():
     with pytest.raises(ValueError, match="must be positive"):
         calculate(-1)
+
 
 async def test_async_raises():
     with pytest.raises(ConnectionError):

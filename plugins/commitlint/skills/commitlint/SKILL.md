@@ -375,40 +375,41 @@ Generate LLM-friendly constraints from commitlint config:
 ```python
 def extract_rules_for_prompt(config: dict) -> str:
     """Extract commitlint rules into LLM-friendly format."""
-    rules = config.get('rules', {})
+    rules = config.get("rules", {})
     prompt_parts = []
 
     # Extract type-enum if present
-    if 'type-enum' in rules:
-        level, applicability, types = rules['type-enum']
-        if level > 0 and applicability == 'always':
+    if "type-enum" in rules:
+        level, applicability, types = rules["type-enum"]
+        if level > 0 and applicability == "always":
             prompt_parts.append(f"Allowed commit types: {', '.join(types)}")
 
     # Extract scope-enum if present
-    if 'scope-enum' in rules:
-        level, applicability, scopes = rules['scope-enum']
-        if level > 0 and applicability == 'always' and scopes:
+    if "scope-enum" in rules:
+        level, applicability, scopes = rules["scope-enum"]
+        if level > 0 and applicability == "always" and scopes:
             prompt_parts.append(f"Allowed scopes: {', '.join(scopes)}")
 
     # Extract header-max-length
-    if 'header-max-length' in rules:
-        level, applicability, length = rules['header-max-length']
+    if "header-max-length" in rules:
+        level, applicability, length = rules["header-max-length"]
         if level > 0:
             prompt_parts.append(f"Header must be {length} characters or less")
 
     # Extract subject-case
-    if 'subject-case' in rules:
-        level, applicability, cases = rules['subject-case']
-        if level > 0 and applicability == 'never':
+    if "subject-case" in rules:
+        level, applicability, cases = rules["subject-case"]
+        if level > 0 and applicability == "never":
             prompt_parts.append(f"Subject must NOT use: {', '.join(cases)}")
 
-    return '\n'.join(prompt_parts)
+    return "\n".join(prompt_parts)
 ```
 
 ### Validation Loop
 
 ```python
 import subprocess
+
 
 async def validate_with_commitlint(message: str, cwd: Path | None = None) -> tuple[bool, list[str]]:
     """
@@ -421,19 +422,13 @@ async def validate_with_commitlint(message: str, cwd: Path | None = None) -> tup
     Returns:
         Tuple of (is_valid, error_messages)
     """
-    result = subprocess.run(
-        ['npx', 'commitlint'],
-        input=message,
-        capture_output=True,
-        text=True,
-        cwd=cwd,
-    )
+    result = subprocess.run(["npx", "commitlint"], input=message, capture_output=True, text=True, cwd=cwd)
 
     if result.returncode == 0:
         return True, []
 
     # Parse errors from stderr
-    errors = [line.strip() for line in result.stderr.split('\n') if line.strip()]
+    errors = [line.strip() for line in result.stderr.split("\n") if line.strip()]
     return False, errors
 ```
 

@@ -157,9 +157,9 @@ x = foo()  # ty: ignore[invalid-argument-type]  # fmt: skip
 # Suppress inside decorated function (all violations)
 from typing import no_type_check
 
+
 @no_type_check
-def legacy_function():
-    ...
+def legacy_function(): ...
 ```
 
 ## Common Configuration Patterns

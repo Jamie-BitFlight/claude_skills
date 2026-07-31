@@ -102,6 +102,7 @@ if __name__ == "__main__":
     app = MyApp()
     app.run()
     import sys
+
     sys.exit(app.return_code or 0)
 ```
 
@@ -196,8 +197,8 @@ flowchart TD
 
 ```python
 # Push: add a screen on top
-self.app.push_screen("bsod")           # by name (must be in SCREENS or installed)
-self.app.push_screen(BSODScreen())     # by instance
+self.app.push_screen("bsod")  # by name (must be in SCREENS or installed)
+self.app.push_screen(BSODScreen())  # by instance
 
 # Pop: remove top screen
 self.app.pop_screen()
@@ -298,11 +299,7 @@ Modes are named screen stacks. Each mode maintains its own independent stack.
 
 ```python
 class MyApp(App):
-    MODES = {
-        "dashboard": DashboardScreen,
-        "settings": SettingsScreen,
-        "help": HelpScreen,
-    }
+    MODES = {"dashboard": DashboardScreen, "settings": SettingsScreen, "help": HelpScreen}
     DEFAULT_MODE = "dashboard"
 
     BINDINGS = [

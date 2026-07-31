@@ -316,12 +316,12 @@ class TestTaskRequiredFields:
     def test_missing_id_raises_validation_error(self) -> None:
         """Verify missing 'id' raises ValidationError."""
         with pytest.raises(ValidationError):
-            Task(title="No ID", status=TaskStatus.NOT_STARTED)
+            Task.model_validate({"title": "No ID", "status": TaskStatus.NOT_STARTED})
 
     def test_missing_title_raises_validation_error(self) -> None:
         """Verify missing 'title' raises ValidationError."""
         with pytest.raises(ValidationError):
-            Task(id="T1", status=TaskStatus.NOT_STARTED)
+            Task.model_validate({"id": "T1", "status": TaskStatus.NOT_STARTED})
 
     def test_missing_status_raises_validation_error(self) -> None:
         """Verify missing 'status' raises ValidationError."""
@@ -833,7 +833,7 @@ class TestAcceptanceCriterionModel:
         Why: Criteria without IDs cannot be tracked across T0/TN.
         """
         with pytest.raises(ValidationError):
-            AcceptanceCriterion(check_command="uv run pytest")
+            AcceptanceCriterion.model_validate({"check_command": "uv run pytest"})
 
     def test_missing_check_command_raises_validation_error(self) -> None:
         """Verify missing check_command raises ValidationError.
@@ -843,7 +843,7 @@ class TestAcceptanceCriterionModel:
         Why: Criteria without commands cannot be executed by T0/TN agents.
         """
         with pytest.raises(ValidationError):
-            AcceptanceCriterion(criterion_id="AC-1")
+            AcceptanceCriterion.model_validate({"criterion_id": "AC-1"})
 
     def test_model_dump_by_alias(self) -> None:
         """Verify model_dump with by_alias=True produces kebab-case keys.

@@ -283,6 +283,7 @@ The `prepare-commit-msg` hook receives:
 ```python
 #!/usr/bin/env python3
 """Hook entry point for prepare-commit-msg stage."""
+
 import os
 import sys
 
@@ -301,11 +302,11 @@ def main() -> int:
     commit_msg_file = sys.argv[1]
 
     # Get optional environment info
-    source = os.environ.get('PRE_COMMIT_COMMIT_MSG_SOURCE', '')
-    commit_sha = os.environ.get('PRE_COMMIT_COMMIT_OBJECT_NAME', '')
+    source = os.environ.get("PRE_COMMIT_COMMIT_MSG_SOURCE", "")
+    commit_sha = os.environ.get("PRE_COMMIT_COMMIT_OBJECT_NAME", "")
 
     # Read current message
-    with open(commit_msg_file, encoding='utf-8') as f:
+    with open(commit_msg_file, encoding="utf-8") as f:
         original_message = f.read()
 
     # Skip if message is empty
@@ -316,7 +317,7 @@ def main() -> int:
     new_message = process_commit_message(original_message)
 
     # Write back modified message
-    with open(commit_msg_file, 'w', encoding='utf-8') as f:
+    with open(commit_msg_file, "w", encoding="utf-8") as f:
         f.write(new_message)
 
     return 0  # Success - commit proceeds

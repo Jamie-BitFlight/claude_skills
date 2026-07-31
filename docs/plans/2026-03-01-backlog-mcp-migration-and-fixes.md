@@ -32,6 +32,7 @@ def test_append_or_replace_section_with_backslash_in_content():
     result = append_or_replace_section(body, "Fact-Check", content_with_backslash)
     assert r"\1" in result
 
+
 def test_append_or_replace_section_subsection_with_backslash():
     body = "## Groomed (2026-01-01)\n\n### Priority\n\nOld\n"
     content = r"High \g<name> priority"
@@ -132,6 +133,7 @@ def test_update_item_title(tmp_backlog):
     result = operations.update_item(selector="Old Title", title="New Title")
     assert result["title"] == "New Title"
 
+
 def test_update_item_description(tmp_backlog):
     result = operations.update_item(selector="Test Item", description="Updated description text")
     assert "description" in result
@@ -187,7 +189,7 @@ def _rename_item(item: BacklogItem, new_title: str, repo: str, output: Output) -
     path = Path(item.file_path)
     text = path.read_text()
     # Update title in frontmatter
-    text = re.sub(r'^(title:\s*).*$', f'\\1{new_title}', text, count=1, flags=re.MULTILINE)
+    text = re.sub(r"^(title:\s*).*$", f"\\1{new_title}", text, count=1, flags=re.MULTILINE)
     path.write_text(text)
     if item.issue:
         issue_num = int(item.issue.lstrip("#"))
@@ -195,6 +197,7 @@ def _rename_item(item: BacklogItem, new_title: str, repo: str, output: Output) -
         gh_issue = repository.get_issue(issue_num)
         gh_issue.edit(title=new_title)
     output.info(f"  Renamed: {item.title!r} → {new_title!r}")
+
 
 def _update_description(item: BacklogItem, description: str, repo: str, output: Output) -> None:
     """Update description field in frontmatter."""
@@ -204,7 +207,7 @@ def _update_description(item: BacklogItem, description: str, repo: str, output: 
     text = path.read_text()
     # Replace description in frontmatter (may be multi-line)
     text = re.sub(
-        r'^(description:\s*).*?(?=\n\w|\Z)',
+        r"^(description:\s*).*?(?=\n\w|\Z)",
         lambda m: f"{m.group(1)}{description}",
         text,
         count=1,
@@ -275,6 +278,7 @@ git push
 def test_list_items_filter_by_section():
     result = operations.list_items(section="P0")
     assert all(item["section"] == "P0" for item in result["items"])
+
 
 def test_list_items_filter_by_status():
     result = operations.list_items(status="needs-grooming")

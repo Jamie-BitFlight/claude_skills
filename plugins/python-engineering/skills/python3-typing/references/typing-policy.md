@@ -40,10 +40,12 @@ Or live in directories named `boundary/`, `validators/`, `parsers/`, `adapters/`
 from typing import TypedDict, NotRequired, TypeAlias
 from dataclasses import dataclass
 
+
 class _RawIncoming(TypedDict):
     user_id: int
     email: str
     metadata: NotRequired[dict[str, str]]
+
 
 @dataclass(frozen=True, slots=True)
 class IncomingPayload:
@@ -51,13 +53,10 @@ class IncomingPayload:
     email: str
     metadata: dict[str, str]
 
+
 def parse_incoming(data: _RawIncoming) -> IncomingPayload:
     """Convert raw typed dict to validated internal model."""
-    return IncomingPayload(
-        user_id=data["user_id"],
-        email=data["email"],
-        metadata=data.get("metadata", {}),
-    )
+    return IncomingPayload(user_id=data["user_id"], email=data["email"], metadata=data.get("metadata", {}))
 ```
 
 ## Example: Pydantic boundary
@@ -66,11 +65,13 @@ def parse_incoming(data: _RawIncoming) -> IncomingPayload:
 # boundary/validator.py
 from pydantic import BaseModel, Field
 
+
 class IncomingPayload(BaseModel):
     user_id: int
     email: str = Field(pattern=r"^[\w.-]+@[\w.-]+\.\w+$")
     metadata: dict[str, str] = {}
     model_config = {"strict": True}
+
 
 def validate_incoming(data: dict[str, object]) -> IncomingPayload:
     """Validate raw dict with Pydantic."""

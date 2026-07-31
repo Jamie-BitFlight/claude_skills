@@ -118,9 +118,9 @@ def reduce(findings, keep_threshold=1):
     #    `group` is the orchestrator-assigned id, identical across workers, so it collides.
     merged = {}
     for f in violations:
-        key = (f["group"], normalize(f["location"]))   # group is the stable corroboration key
+        key = (f["group"], normalize(f["location"]))  # group is the stable corroboration key
         m = merged.setdefault(key, {"agents": set(), "evidence": [], "severity": "low"})
-        m["agents"].add(f["worker_id"])                # weight = number of DISTINCT workers
+        m["agents"].add(f["worker_id"])  # weight = number of DISTINCT workers
         m["evidence"].append(f["evidence"])
         m["severity"] = max_sev(m["severity"], f.get("severity"))
 

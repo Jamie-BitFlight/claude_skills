@@ -254,9 +254,9 @@ For platform-specific wheels, ensure build hooks properly set the tag:
 ```python
 # In your build hook
 def initialize(self, version, build_data):
-    build_data['tag'] = 'cp39-cp39-linux_x86_64'
+    build_data["tag"] = "cp39-cp39-linux_x86_64"
     # Or let it be inferred
-    build_data['infer_tag'] = True
+    build_data["infer_tag"] = True
 ```
 
 ## See Also

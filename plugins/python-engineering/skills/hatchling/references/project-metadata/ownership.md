@@ -148,18 +148,13 @@ path = "hatch_build.py"
 Then in `hatch_build.py`:
 
 ```python
-
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
-        metadata["authors"] = [
-            {"name": "John Doe", "email": "john@example.com"}
-        ]
-        metadata["maintainers"] = [
-            {"name": "Jane Smith", "email": "jane@example.com"}
-        ]
-
+        metadata["authors"] = [{"name": "John Doe", "email": "john@example.com"}]
+        metadata["maintainers"] = [{"name": "Jane Smith", "email": "jane@example.com"}]
 ```
 
 ## Related Configuration

@@ -136,18 +136,18 @@ Without diskcache, you would need to:
 # Pattern 1: Basic Cache Operations
 from diskcache import Cache
 
-cache = Cache('/tmp/mycache')
+cache = Cache("/tmp/mycache")
 
 # Dictionary-like interface
-cache['key'] = 'value'
-print(cache['key'])  # 'value'
-print('key' in cache)  # True
-del cache['key']
+cache["key"] = "value"
+print(cache["key"])  # 'value'
+print("key" in cache)  # True
+del cache["key"]
 
 # Method-based interface with expiration
-cache.set('key', 'value', expire=300)  # 5 minutes
-value = cache.get('key')
-cache.delete('key')
+cache.set("key", "value", expire=300)  # 5 minutes
+value = cache.get("key")
+cache.delete("key")
 
 # Cleanup
 cache.close()
@@ -155,14 +155,17 @@ cache.close()
 # Pattern 2: Function Memoization with Cache Decorator
 from diskcache import Cache
 
-cache = Cache('/tmp/mycache')
+cache = Cache("/tmp/mycache")
+
 
 @cache.memoize()
 def expensive_function(x, y):
     # Expensive computation
     import time
+
     time.sleep(2)
     return x + y
+
 
 # First call takes 2 seconds
 result = expensive_function(1, 2)  # Slow
@@ -174,13 +177,15 @@ result = expensive_function(1, 2)  # Fast!
 from diskcache import Cache, memoize_stampede
 import time
 
-cache = Cache('/tmp/mycache')
+cache = Cache("/tmp/mycache")
+
 
 @memoize_stampede(cache, expire=60, beta=0.3)
 def generate_landing_page():
     """Prevents thundering herd when cache expires"""
     time.sleep(0.2)  # Simulate expensive computation
     return "<html>Landing Page</html>"
+
 
 # Multiple concurrent requests won't cause stampede
 result = generate_landing_page()
@@ -189,81 +194,81 @@ result = generate_landing_page()
 from diskcache import FanoutCache
 
 # Sharded cache for concurrent writes
-cache = FanoutCache('/tmp/mycache', shards=8, timeout=1.0)
+cache = FanoutCache("/tmp/mycache", shards=8, timeout=1.0)
 
 # Same API as Cache but with better write concurrency
-cache.set('key', 'value')
-value = cache.get('key')
+cache.set("key", "value")
+value = cache.get("key")
 
 # Pattern 5: Tag-Based Eviction
 from diskcache import Cache
 from io import BytesIO
 
-cache = Cache('/tmp/mycache', tag_index=True)  # Enable tag index
+cache = Cache("/tmp/mycache", tag_index=True)  # Enable tag index
 
 # Set items with tags
-cache.set('user:1:profile', data1, tag='user:1')
-cache.set('user:1:posts', data2, tag='user:1')
-cache.set('user:1:friends', data3, tag='user:1')
+cache.set("user:1:profile", data1, tag="user:1")
+cache.set("user:1:posts", data2, tag="user:1")
+cache.set("user:1:friends", data3, tag="user:1")
 
 # Evict all items for a specific tag
-cache.evict('user:1')
+cache.evict("user:1")
 
 # Pattern 6: Web Crawler with Persistent Storage
 from diskcache import Index
 
 # Persistent dictionary for crawled URLs
-results = Index('data/results')
+results = Index("data/results")
 
 # Store crawled data
-results['https://example.com'] = {
-    'html': '<html>...</html>',
-    'timestamp': '2025-10-21',
-    'status': 200
-}
+results["https://example.com"] = {"html": "<html>...</html>", "timestamp": "2025-10-21", "status": 200}
 
 # Query persistent results
 print(len(results))
-if 'https://example.com' in results:
-    data = results['https://example.com']
+if "https://example.com" in results:
+    data = results["https://example.com"]
 
 # Pattern 7: Django Cache Configuration
 # settings.py
 CACHES = {
-    'default': {
-        'BACKEND': 'diskcache.DjangoCache',
-        'LOCATION': '/var/cache/django',
-        'TIMEOUT': 300,
-        'SHARDS': 8,
-        'DATABASE_TIMEOUT': 0.010,  # 10 milliseconds
-        'OPTIONS': {
-            'size_limit': 2 ** 30  # 1 GB
+    "default": {
+        "BACKEND": "diskcache.DjangoCache",
+        "LOCATION": "/var/cache/django",
+        "TIMEOUT": 300,
+        "SHARDS": 8,
+        "DATABASE_TIMEOUT": 0.010,  # 10 milliseconds
+        "OPTIONS": {
+            "size_limit": 2**30  # 1 GB
         },
-    },
+    }
 }
 
 # Pattern 8: Async Operation with asyncio
 import asyncio
 from diskcache import Cache
 
-cache = Cache('/tmp/mycache')
+cache = Cache("/tmp/mycache")
+
 
 async def set_async(key, value):
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, cache.set, key, value)
 
+
 async def get_async(key):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, cache.get, key)
 
+
 # Use in async functions
-await set_async('test-key', 'test-value')
-value = await get_async('test-key')
+await set_async("test-key", "test-value")
+value = await get_async("test-key")
 
 # Pattern 9: Custom Serialization with JSONDisk
 import json
 import zlib
 from diskcache import Cache, Disk, UNKNOWN
+
 
 class JSONDisk(Disk):
     def __init__(self, directory, compress_level=1, **kwargs):
@@ -271,34 +276,35 @@ class JSONDisk(Disk):
         super().__init__(directory, **kwargs)
 
     def put(self, key):
-        json_bytes = json.dumps(key).encode('utf-8')
+        json_bytes = json.dumps(key).encode("utf-8")
         data = zlib.compress(json_bytes, self.compress_level)
         return super().put(data)
 
     def get(self, key, raw):
         data = super().get(key, raw)
-        return json.loads(zlib.decompress(data).decode('utf-8'))
+        return json.loads(zlib.decompress(data).decode("utf-8"))
 
     def store(self, value, read, key=UNKNOWN):
         if not read:
-            json_bytes = json.dumps(value).encode('utf-8')
+            json_bytes = json.dumps(value).encode("utf-8")
             value = zlib.compress(json_bytes, self.compress_level)
         return super().store(value, read, key=key)
 
     def fetch(self, mode, filename, value, read):
         data = super().fetch(mode, filename, value, read)
         if not read:
-            data = json.loads(zlib.decompress(data).decode('utf-8'))
+            data = json.loads(zlib.decompress(data).decode("utf-8"))
         return data
 
+
 # Use custom disk implementation
-cache = Cache('/tmp/mycache', disk=JSONDisk, disk_compress_level=6)
+cache = Cache("/tmp/mycache", disk=JSONDisk, disk_compress_level=6)
 
 # Pattern 10: Cross-Process Locking
 from diskcache import Lock
 import time
 
-lock = Lock(cache, 'resource-name')
+lock = Lock(cache, "resource-name")
 
 with lock:
     # Critical section - only one process executes at a time
@@ -308,10 +314,12 @@ with lock:
 # Pattern 11: Rate Limiting / Throttling
 from diskcache import throttle
 
+
 @throttle(cache, count=10, seconds=60)
 def api_call():
     """Allow only 10 calls per minute"""
     return make_expensive_api_request()
+
 
 # Raises exception if rate limit exceeded
 try:
@@ -329,26 +337,27 @@ except Exception:
 ```python
 # settings.py
 CACHES = {
-    'default': {
-        'BACKEND': 'diskcache.DjangoCache',
-        'LOCATION': '/path/to/cache/directory',
-        'TIMEOUT': 300,
-        'SHARDS': 8,
-        'DATABASE_TIMEOUT': 0.010,
-        'OPTIONS': {
-            'size_limit': 2 ** 30   # 1 gigabyte
+    "default": {
+        "BACKEND": "diskcache.DjangoCache",
+        "LOCATION": "/path/to/cache/directory",
+        "TIMEOUT": 300,
+        "SHARDS": 8,
+        "DATABASE_TIMEOUT": 0.010,
+        "OPTIONS": {
+            "size_limit": 2**30  # 1 gigabyte
         },
-    },
+    }
 }
 
 # Usage in views
 from django.core.cache import cache
 
+
 def my_view(request):
-    result = cache.get('my_key')
+    result = cache.get("my_key")
     if result is None:
         result = expensive_computation()
-        cache.set('my_key', result, timeout=300)
+        cache.set("my_key", result, timeout=300)
     return result
 ```
 
@@ -361,21 +370,23 @@ from diskcache import Cache
 import asyncio
 
 app = FastAPI()
-cache = Cache('/tmp/api_cache')
+cache = Cache("/tmp/api_cache")
+
 
 async def cached_api_call(url: str):
     # Check cache
     if url in cache:
-        print(f'Using cached content for {url}')
+        print(f"Using cached content for {url}")
         return cache[url]
 
-    print(f'Making new request for {url}')
+    print(f"Making new request for {url}")
     # Make async request
     async with httpx.AsyncClient(timeout=10) as client:
         response = await client.get(url)
         html = response.text
         cache[url] = html
         return html
+
 
 @app.get("/fetch")
 async def fetch_data(url: str):
@@ -391,8 +402,9 @@ from multiprocessing import Process
 import requests
 
 # Shared queue and results across processes
-todo = Deque('data/todo')
-results = Index('data/results')
+todo = Deque("data/todo")
+results = Index("data/results")
+
 
 def crawl():
     while True:
@@ -407,6 +419,7 @@ def crawl():
         # Add discovered URLs to queue
         for link in extract_links(response.text):
             todo.append(link)
+
 
 # Start multiple crawler processes
 processes = [Process(target=crawl) for _ in range(4)]
@@ -450,25 +463,24 @@ The basic cache implementation backed by SQLite.
 from diskcache import Cache
 
 # Initialize cache
-cache = Cache(directory='/tmp/mycache')
+cache = Cache(directory="/tmp/mycache")
 
 # Dictionary-like operations
-cache['key'] = 'value'
-value = cache['key']
-'key' in cache  # True
-del cache['key']
+cache["key"] = "value"
+value = cache["key"]
+"key" in cache  # True
+del cache["key"]
 
 # Method-based operations
-cache.set('key', 'value', expire=60, tag='category')
-value = cache.get('key', default=None, read=False,
-                  expire_time=False, tag=False)
-cache.delete('key')
+cache.set("key", "value", expire=60, tag="category")
+value = cache.get("key", default=None, read=False, expire_time=False, tag=False)
+cache.delete("key")
 cache.clear()
 
 # Statistics and management
 cache.volume()  # Estimated disk usage
 cache.stats(enable=True, reset=False)  # (hits, misses)
-cache.evict('tag')  # Remove all entries with tag
+cache.evict("tag")  # Remove all entries with tag
 cache.expire()  # Remove expired entries
 cache.close()
 ```
@@ -481,17 +493,11 @@ Sharded cache for high-concurrency write scenarios.
 from diskcache import FanoutCache
 
 # Sharded cache (default 8 shards)
-cache = FanoutCache(
-    directory='/tmp/mycache',
-    shards=8,
-    timeout=1.0,
-    disk=Disk,
-    disk_min_file_size=2 ** 15
-)
+cache = FanoutCache(directory="/tmp/mycache", shards=8, timeout=1.0, disk=Disk, disk_min_file_size=2**15)
 
 # Same API as Cache
-cache.set('key', 'value')
-value = cache.get('key')
+cache.set("key", "value")
+value = cache.get("key")
 ```
 
 ### Eviction Policies @ grantjenks.com/docs/diskcache/tutorial.html
@@ -502,16 +508,16 @@ Four eviction policies control what happens when cache size limit is reached:
 from diskcache import Cache
 
 # least-recently-stored (default) - fastest
-cache = Cache(eviction_policy='least-recently-stored')
+cache = Cache(eviction_policy="least-recently-stored")
 
 # least-recently-used - updates on read
-cache = Cache(eviction_policy='least-recently-used')
+cache = Cache(eviction_policy="least-recently-used")
 
 # least-frequently-used - tracks access count
-cache = Cache(eviction_policy='least-frequently-used')
+cache = Cache(eviction_policy="least-frequently-used")
 
 # none - no eviction, unbounded growth
-cache = Cache(eviction_policy='none')
+cache = Cache(eviction_policy="none")
 ```
 
 **Performance Characteristics:**
@@ -529,16 +535,16 @@ Persistent, process-safe data structures.
 from diskcache import Deque, Index
 
 # Persistent deque (FIFO queue)
-deque = Deque('data/queue')
-deque.append('item')
-deque.appendleft('item')
+deque = Deque("data/queue")
+deque.append("item")
+deque.appendleft("item")
 item = deque.pop()
 item = deque.popleft()
 
 # Persistent dictionary
-index = Index('data/index')
-index['key'] = 'value'
-value = index['key']
+index = Index("data/index")
+index["key"] = "value"
+value = index["key"]
 ```
 
 ## Performance Benchmarks
@@ -663,11 +669,13 @@ All operations are atomic and safe for concurrent access:
 from diskcache import Cache
 from multiprocessing import Process
 
-cache = Cache('/tmp/shared')
+cache = Cache("/tmp/shared")
+
 
 def worker(worker_id):
     for i in range(1000):
-        cache[f'worker_{worker_id}_key_{i}'] = f'value_{i}'
+        cache[f"worker_{worker_id}_key_{i}"] = f"value_{i}"
+
 
 # Safe concurrent writes from multiple processes
 processes = [Process(target=worker, args=(i,)) for i in range(4)]
@@ -686,10 +694,10 @@ import time
 cache = Cache()
 
 # Set with expiration
-cache.set('key', 'value', expire=5)  # 5 seconds
+cache.set("key", "value", expire=5)  # 5 seconds
 
 time.sleep(6)
-print(cache.get('key'))  # None (expired)
+print(cache.get("key"))  # None (expired)
 
 # Manual expiration cleanup
 cache.expire()  # Remove all expired entries
@@ -703,12 +711,12 @@ from diskcache import Cache
 cache = Cache(tag_index=True)  # Enable tag index for performance
 
 # Tag cache entries
-cache.set('user:1:profile', data1, tag='user:1')
-cache.set('user:1:settings', data2, tag='user:1')
-cache.set('user:2:profile', data3, tag='user:2')
+cache.set("user:1:profile", data1, tag="user:1")
+cache.set("user:1:settings", data2, tag="user:1")
+cache.set("user:2:profile", data3, tag="user:2")
 
 # Evict all entries for a tag
-count = cache.evict('user:1')
+count = cache.evict("user:1")
 print(f"Evicted {count} entries")
 ```
 
@@ -745,6 +753,7 @@ from diskcache import Cache, Disk, UNKNOWN
 import pickle
 import zlib
 
+
 class CompressedDisk(Disk):
     def put(self, key):
         data = pickle.dumps(key)
@@ -755,6 +764,7 @@ class CompressedDisk(Disk):
         compressed = super().get(key, raw)
         data = zlib.decompress(compressed)
         return pickle.loads(data)
+
 
 cache = Cache(disk=CompressedDisk)
 ```
@@ -767,14 +777,17 @@ cache = Cache(disk=CompressedDisk)
 # Before: In-memory only
 from functools import lru_cache
 
+
 @lru_cache(maxsize=128)
 def expensive_function(x):
     return x * 2
 
+
 # After: Persistent across restarts
 from diskcache import Cache
 
-cache = Cache('/tmp/mycache')
+cache = Cache("/tmp/mycache")
+
 
 @cache.memoize()
 def expensive_function(x):
@@ -786,22 +799,17 @@ def expensive_function(x):
 ```python
 # Before: Django's slow file cache
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': '/var/tmp/django_cache',
-    }
+    "default": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache", "LOCATION": "/var/tmp/django_cache"}
 }
 
 # After: Fast diskcache
 CACHES = {
-    'default': {
-        'BACKEND': 'diskcache.DjangoCache',
-        'LOCATION': '/var/tmp/django_cache',
-        'TIMEOUT': 300,
-        'SHARDS': 8,
-        'OPTIONS': {
-            'size_limit': 2 ** 30
-        }
+    "default": {
+        "BACKEND": "diskcache.DjangoCache",
+        "LOCATION": "/var/tmp/django_cache",
+        "TIMEOUT": 300,
+        "SHARDS": 8,
+        "OPTIONS": {"size_limit": 2**30},
     }
 }
 ```
@@ -811,15 +819,17 @@ CACHES = {
 ```python
 # Before: Redis client
 import redis
-r = redis.Redis(host='localhost', port=6379)
-r.set('key', 'value')
-value = r.get('key')
+
+r = redis.Redis(host="localhost", port=6379)
+r.set("key", "value")
+value = r.get("key")
 
 # After: diskcache (no server needed)
 from diskcache import Cache
-cache = Cache('/tmp/mycache')
-cache.set('key', 'value')
-value = cache.get('key')
+
+cache = Cache("/tmp/mycache")
+cache.set("key", "value")
+value = cache.get("key")
 ```
 
 ## Advanced Patterns
@@ -829,15 +839,16 @@ value = cache.get('key')
 ```python
 from diskcache import Cache
 
+
 def warm_cache():
-    cache = Cache('/tmp/mycache')
+    cache = Cache("/tmp/mycache")
 
     # Pre-populate cache with common queries
     common_queries = load_common_queries()
 
     for query in common_queries:
         result = expensive_database_query(query)
-        cache.set(f'query:{query}', result, expire=3600)
+        cache.set(f"query:{query}", result, expire=3600)
 
     print(f"Warmed cache with {len(common_queries)} entries")
 ```
@@ -848,12 +859,14 @@ def warm_cache():
 from functools import lru_cache
 from diskcache import Cache
 
-disk_cache = Cache('/tmp/mycache')
+disk_cache = Cache("/tmp/mycache")
+
 
 @lru_cache(maxsize=100)  # Fast in-memory tier
 def get_from_memory(key):
     # Fall back to disk cache
     return disk_cache.get(key)
+
 
 def get_value(key):
     # Try memory first (fast)
@@ -878,6 +891,7 @@ import tempfile
 import shutil
 from diskcache import Cache
 
+
 def test_cache_operations():
     # Create temporary cache directory
     tmpdir = tempfile.mkdtemp()
@@ -886,8 +900,8 @@ def test_cache_operations():
         cache = Cache(tmpdir)
 
         # Test operations
-        cache.set('key', 'value')
-        assert cache.get('key') == 'value'
+        cache.set("key", "value")
+        assert cache.get("key") == "value"
 
         cache.close()
     finally:
@@ -901,9 +915,9 @@ def test_cache_operations():
 from diskcache import Cache
 
 # Automatic cleanup with context manager
-with Cache('/tmp/mycache') as cache:
-    cache.set('key', 'value')
-    value = cache.get('key')
+with Cache("/tmp/mycache") as cache:
+    cache.set("key", "value")
+    value = cache.get("key")
 # cache.close() called automatically
 ```
 

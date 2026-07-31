@@ -1406,7 +1406,7 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     conflict_groups = analyze_impact_radius_conflicts(items)
     return {
         "milestone_number": milestone_number,
-        "conflict_groups": [dataclasses.asdict(cg) for cg in conflict_groups],
+        "conflict_groups": [cg.model_dump() for cg in conflict_groups],
         "count": len(conflict_groups),
     }
 

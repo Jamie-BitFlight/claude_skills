@@ -13,21 +13,27 @@ from datetime import datetime
 from typing import Optional, List
 from enum import Enum
 
+
 class Priority(str, Enum):
     """Task priority levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     URGENT = "urgent"
 
+
 class TodoStatus(str, Enum):
     """Task status values."""
+
     PENDING = "pending"
     COMPLETED = "completed"
     OVERDUE = "overdue"
 
+
 class RecurrenceType(str, Enum):
     """Task recurrence options."""
+
     NONE = "none"
     DAILY = "daily"
     WEEKLY = "weekly"
@@ -51,24 +57,22 @@ class TodoTask(BaseModel):
     completed_at: Optional[datetime] = None
     recurrence: RecurrenceType = Field(default=RecurrenceType.NONE)
 
-    @field_validator('title')
+    @field_validator("title")
     @classmethod
     def strip_title(cls, v: str) -> str:
         """Strip whitespace from title."""
         return v.strip()
 
-    @field_validator('tags')
+    @field_validator("tags")
     @classmethod
     def normalize_tags(cls, v: List[str]) -> List[str]:
         """Normalize tags to lowercase."""
         return [tag.lower().strip() for tag in v if tag.strip()]
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_overdue(self) -> Self:
         """Auto-set overdue status if past due date."""
-        if (self.due_date and
-            self.due_date < datetime.now() and
-            self.status == TodoStatus.PENDING):
+        if self.due_date and self.due_date < datetime.now() and self.status == TodoStatus.PENDING:
             self.status = TodoStatus.OVERDUE
         return self
 
@@ -84,21 +88,15 @@ class TodoTask(BaseModel):
     model_config = ConfigDict(
         use_enum_values=True,
         validate_assignment=True,
-        json_schema_extra={
-            "example": {
-                "title": "Buy groceries",
-                "priority": "medium",
-                "tags": ["shopping"]
-            }
-        }
+        json_schema_extra={"example": {"title": "Buy groceries", "priority": "medium", "tags": ["shopping"]}},
     )
 
     def to_dict(self) -> dict:
         """Convert to dictionary for storage."""
-        return self.model_dump(mode='json')
+        return self.model_dump(mode="json")
 
     @classmethod
-    def from_dict(cls, data: dict) -> 'TodoTask':
+    def from_dict(cls, data: dict) -> "TodoTask":
         """Create from dictionary."""
         return cls.model_validate(data)
 ```
@@ -107,20 +105,20 @@ class TodoTask(BaseModel):
 
 ### Custom Field Validators
 ```python
-@field_validator('email')
+@field_validator("email")
 @classmethod
 def validate_email(cls, v: str) -> str:
-    if '@' not in v:
-        raise ValueError('Invalid email format')
+    if "@" not in v:
+        raise ValueError("Invalid email format")
     return v.lower()
 ```
 
 ### Cross-field Validation
 ```python
-@model_validator(mode='after')
+@model_validator(mode="after")
 def validate_dates(self) -> Self:
     if self.end_date and self.start_date > self.end_date:
-        raise ValueError('end_date must be after start_date')
+        raise ValueError("end_date must be after start_date")
     return self
 ```
 

@@ -62,13 +62,13 @@ doc = tomlkit.parse(toml_string)
 doc = tomlkit.loads(toml_string)  # Alias for parse()
 
 # From file object
-with open('config.toml', 'r') as f:
+with open("config.toml", "r") as f:
     doc = tomlkit.load(f)
 
 # Using TOMLFile class (convenient)
 from tomlkit import TOMLFile
 
-toml_file = TOMLFile('config.toml')
+toml_file = TOMLFile("config.toml")
 doc = toml_file.read()
 ```
 
@@ -83,13 +83,13 @@ import tomlkit
 toml_string = tomlkit.dumps(data)
 
 # To file object
-with open('config.toml', 'w') as f:
+with open("config.toml", "w") as f:
     tomlkit.dump(data, f)
 
 # Using TOMLFile class
 from tomlkit import TOMLFile
 
-toml_file = TOMLFile('config.toml')
+toml_file = TOMLFile("config.toml")
 toml_file.write(doc)
 ```
 
@@ -112,7 +112,7 @@ doc["database"] = db_config
 
 # Create inline table
 point = inline_table()
-point.update({'x': 1, 'y': 2})
+point.update({"x": 1, "y": 2})
 doc["point"] = point
 
 # Create array
@@ -154,20 +154,20 @@ toml_str = doc.as_string()
 
 ```python
 from tomlkit import (
-    item,          # Auto-detect type
-    string,        # String with options
-    integer,       # Integer
-    float_,        # Float
-    boolean,       # Boolean
-    datetime,      # Datetime
-    date,          # Date
-    time,          # Time
+    item,  # Auto-detect type
+    string,  # String with options
+    integer,  # Integer
+    float_,  # Float
+    boolean,  # Boolean
+    datetime,  # Datetime
+    date,  # Date
+    time,  # Time
 )
 
 # Auto-detect type
 doc["key"] = item(42)
 doc["key"] = item([1, 2, 3])
-doc["key"] = item({'nested': 'table'})
+doc["key"] = item({"nested": "table"})
 
 # Explicit string types
 doc["basic"] = string("text")
@@ -181,11 +181,11 @@ doc["multiline"] = string("line1\nline2", multiline=True)
 
 ```python
 from tomlkit.exceptions import (
-    TOMLKitError,           # Base exception
-    ParseError,             # Syntax errors (has .line and .col)
-    NonExistentKey,         # Missing key access
-    KeyAlreadyPresent,      # Duplicate key
-    ConvertError,           # Type conversion failure
+    TOMLKitError,  # Base exception
+    ParseError,  # Syntax errors (has .line and .col)
+    NonExistentKey,  # Missing key access
+    KeyAlreadyPresent,  # Duplicate key
+    ConvertError,  # Type conversion failure
 )
 
 # Handle parse errors
@@ -202,7 +202,7 @@ except (KeyError, NonExistentKey):
 
 # Handle file not found
 try:
-    with open('config.toml', 'r') as f:
+    with open("config.toml", "r") as f:
         doc = tomlkit.load(f)
 except FileNotFoundError:
     # Create default config
@@ -217,10 +217,11 @@ except FileNotFoundError:
 import tomlkit
 from pathlib import Path
 
+
 def load_or_create_config(path: Path) -> tomlkit.TOMLDocument:
     """Load existing config or create default if missing."""
     if path.exists():
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             return tomlkit.load(f)
 
     # Create default
@@ -233,7 +234,7 @@ def load_or_create_config(path: Path) -> tomlkit.TOMLDocument:
     doc["app"]["version"] = "1.0.0"
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         tomlkit.dump(doc, f)
 
     return doc
@@ -244,9 +245,10 @@ def load_or_create_config(path: Path) -> tomlkit.TOMLDocument:
 ```python
 import tomlkit
 
+
 def update_config_value(path: str, section: str, key: str, value):
     """Update single value while preserving all comments."""
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         doc = tomlkit.load(f)
 
     if section not in doc:
@@ -254,11 +256,12 @@ def update_config_value(path: str, section: str, key: str, value):
 
     doc[section][key] = value
 
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         tomlkit.dump(doc, f)
 
+
 # Usage
-update_config_value('config.toml', 'database', 'port', 5433)
+update_config_value("config.toml", "database", "port", 5433)
 ```
 
 ### Pattern 3: Atomic Updates
@@ -269,9 +272,10 @@ from pathlib import Path
 import tempfile
 import shutil
 
+
 def atomic_config_update(path: Path, updates: dict):
     """Update config atomically to prevent corruption."""
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         doc = tomlkit.load(f)
 
     # Apply updates
@@ -282,9 +286,9 @@ def atomic_config_update(path: Path, updates: dict):
             doc[section][key] = value
 
     # Write to temp file, then atomic move
-    temp_fd, temp_path = tempfile.mkstemp(suffix='.toml')
+    temp_fd, temp_path = tempfile.mkstemp(suffix=".toml")
     try:
-        with open(temp_fd, 'w') as f:
+        with open(temp_fd, "w") as f:
             tomlkit.dump(doc, f)
         shutil.move(temp_path, path)
     except Exception:
@@ -298,23 +302,24 @@ def atomic_config_update(path: Path, updates: dict):
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+
 def validate_config(path: str) -> tuple[bool, str]:
     """Validate config structure. Returns (is_valid, error_message)."""
     try:
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             doc = tomlkit.load(f)
     except FileNotFoundError:
         return False, "Config file not found"
     except ParseError as e:
         return False, f"Invalid TOML at line {e.line}, col {e.col}"
 
-    required_sections = ['app', 'database']
+    required_sections = ["app", "database"]
     missing = [s for s in required_sections if s not in doc]
 
     if missing:
         return False, f"Missing sections: {', '.join(missing)}"
 
-    if 'name' not in doc.get('app', {}):
+    if "name" not in doc.get("app", {}):
         return False, "Missing required key: app.name"
 
     return True, ""
@@ -333,13 +338,15 @@ Skill(skill: "xdg-base-directory:xdg-base-directory")
 ```python
 from pathlib import Path
 
+
 def get_config_path(app_name: str) -> Path:
     """Get XDG-compliant config path."""
-    config_dir = Path.home() / '.config' / app_name
-    return config_dir / 'config.toml'
+    config_dir = Path.home() / ".config" / app_name
+    return config_dir / "config.toml"
+
 
 # Usage
-config_path = get_config_path('myapp')
+config_path = get_config_path("myapp")
 # Returns: ~/.config/myapp/config.toml
 ```
 
@@ -430,7 +437,7 @@ port = 5432
 """
 
 doc = tomlkit.parse(original)
-doc['database']['port'] = 5433
+doc["database"]["port"] = 5433
 
 result = tomlkit.dumps(doc)
 # Comments are preserved in result
@@ -553,11 +560,13 @@ from dataclasses import dataclass
 import tomlkit
 from pathlib import Path
 
+
 @dataclass
 class AppConfig:
     name: str
     version: str
     debug: bool = False
+
 
 @dataclass
 class DatabaseConfig:
@@ -566,45 +575,45 @@ class DatabaseConfig:
     name: str
     pool_size: int = 10
 
+
 @dataclass
 class Config:
     app: AppConfig
     database: DatabaseConfig
 
+
 def load_config(path: Path) -> Config:
     """Load TOML config into dataclasses."""
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         data = tomlkit.load(f)
 
-    return Config(
-        app=AppConfig(**data.get('app', {})),
-        database=DatabaseConfig(**data.get('database', {})),
-    )
+    return Config(app=AppConfig(**data.get("app", {})), database=DatabaseConfig(**data.get("database", {})))
+
 
 def save_config(config: Config, path: Path):
     """Save dataclasses to TOML, preserving existing comments."""
     if path.exists():
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             doc = tomlkit.load(f)
     else:
         doc = tomlkit.document()
 
     # Update from dataclasses
-    if 'app' not in doc:
-        doc['app'] = tomlkit.table()
-    doc['app']['name'] = config.app.name
-    doc['app']['version'] = config.app.version
-    doc['app']['debug'] = config.app.debug
+    if "app" not in doc:
+        doc["app"] = tomlkit.table()
+    doc["app"]["name"] = config.app.name
+    doc["app"]["version"] = config.app.version
+    doc["app"]["debug"] = config.app.debug
 
-    if 'database' not in doc:
-        doc['database'] = tomlkit.table()
-    doc['database']['host'] = config.database.host
-    doc['database']['port'] = config.database.port
-    doc['database']['name'] = config.database.name
-    doc['database']['pool_size'] = config.database.pool_size
+    if "database" not in doc:
+        doc["database"] = tomlkit.table()
+    doc["database"]["host"] = config.database.host
+    doc["database"]["port"] = config.database.port
+    doc["database"]["name"] = config.database.name
+    doc["database"]["pool_size"] = config.database.pool_size
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         tomlkit.dump(doc, f)
 ```
 

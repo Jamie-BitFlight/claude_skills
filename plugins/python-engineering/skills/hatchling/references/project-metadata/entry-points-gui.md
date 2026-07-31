@@ -39,15 +39,14 @@ myapp = "myapp.gui:main"
 With implementation:
 
 ```python
-
 import tkinter as tk
+
 
 def main():
     root = tk.Tk()
     root.title("My App")
     root.mainloop()
     return 0
-
 ```
 
 ### PyQt Application

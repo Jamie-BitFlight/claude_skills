@@ -27,12 +27,10 @@ another-command = "my_package.commands:execute"
 When a package with CLI scripts is installed, entry points create executable commands on the user's PATH. Running a CLI script essentially executes:
 
 ```python
-
 import sys
 from my_package.cli import main
 
 sys.exit(main())
-
 ```
 
 ## Examples
@@ -77,20 +75,21 @@ mycli = "mycli.cli:cli"
 With Click implementation:
 
 ```python
-
 import click
+
 
 @click.group()
 def cli():
     pass
 
+
 @cli.command()
 def serve():
     click.echo("Starting server...")
 
+
 if __name__ == "__main__":
     cli()
-
 ```
 
 ## Function Requirements
@@ -105,17 +104,17 @@ The referenced function should:
 ### Valid Function Signatures
 
 ```python
-
 def main():
     return 0
+
 
 def cli():
     print("Hello")
     return None  # Defaults to exit code 0
 
+
 def run(argv=None):
     return process(argv or sys.argv[1:])
-
 ```
 
 ## Platform-Specific Behavior

@@ -16,15 +16,18 @@ weather_server = FastMCP("WeatherServer")
 database_server = FastMCP("DatabaseServer")
 auth_server = FastMCP("AuthServer")
 
+
 @weather_server.tool
 def get_temperature(city: str) -> dict:
     """Get current temperature for a city."""
     return {"city": city, "temp": 72}
 
+
 @database_server.tool
 def query_users(limit: int = 10) -> list:
     """Query user records."""
     return []
+
 
 # Main server composes all sub-servers
 main = FastMCP("MainServer")
@@ -69,16 +72,10 @@ from pathlib import Path
 mcp = FastMCP("DocsServer")
 
 # Development — hot-reload enabled
-docs_provider = FileSystemProvider(
-    path=Path("./docs"),
-    reload=True,
-)
+docs_provider = FileSystemProvider(path=Path("./docs"), reload=True)
 
 # Production — reload disabled
-docs_provider = FileSystemProvider(
-    path=Path("./docs"),
-    reload=False,
-)
+docs_provider = FileSystemProvider(path=Path("./docs"), reload=False)
 
 mcp.add_provider(docs_provider)
 ```
@@ -117,6 +114,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("WorkerServer")
 
+
 @mcp.tool(task=True)
 def process_large_dataset(file_path: str) -> dict:
     """Process a large dataset in the background."""
@@ -141,16 +139,19 @@ from fastmcp.server.auth import require_scopes
 
 mcp = FastMCP("GatedServer")
 
+
 @mcp.tool(tags={"premium"})
 def premium_analysis(data: str) -> str:
     """Advanced analysis — premium feature."""
     return f"Analysis: {data}"
+
 
 @mcp.tool
 async def unlock_premium(ctx: Context) -> str:
     """Unlock premium features for this session."""
     ctx.enable_components(tags={"premium"})
     return "Premium features unlocked."
+
 
 @mcp.tool(auth=require_scopes("write"))
 def admin_action() -> str:
@@ -224,6 +225,7 @@ When `fastmcp run` ignores `if __name__ == "__main__"` blocks, use factory funct
 
 ```python
 from fastmcp import FastMCP
+
 
 async def create_server() -> FastMCP:
     mcp = FastMCP("MyServer")
@@ -308,22 +310,26 @@ auth_mcp = FastMCP("Auth")
 data_mcp = FastMCP("Data")
 admin_mcp = FastMCP("Admin")
 
+
 # Register tools on sub-servers
 @auth_mcp.tool
 def login(username: str, password: str) -> dict:
     """Authenticate a user."""
     return {"token": "..."}
 
+
 @data_mcp.tool
 def get_records(limit: int = 10) -> list:
     """Retrieve records."""
     return []
+
 
 # Compose into main server
 main = FastMCP("ProductionServer")
 main.mount(auth_mcp, namespace="auth")
 main.mount(data_mcp, namespace="data")
 main.mount(admin_mcp, namespace="admin")
+
 
 # Test each domain independently
 async def test_auth_domain():

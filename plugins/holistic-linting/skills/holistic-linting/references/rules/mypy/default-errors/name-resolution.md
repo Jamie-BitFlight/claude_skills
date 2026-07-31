@@ -36,7 +36,7 @@ sorted_data = soted(data)  # Error: Name "soted" is not defined [name-defined]
 #### Missing imports
 
 ```python
-df = pd.DataFrame({'x': [1, 2, 3]})  # Error: Name "pd" is not defined [name-defined]
+df = pd.DataFrame({"x": [1, 2, 3]})  # Error: Name "pd" is not defined [name-defined]
 ```
 
 ### When This Is NOT an Error
@@ -52,6 +52,7 @@ result = x + 10  # OK
 
 ```python
 from typing import List
+
 
 def process(items: List[int]) -> int:
     return sum(items)  # OK - List is imported
@@ -69,16 +70,20 @@ value = max([1, 5, 3])  # OK - max is built-in
 ```python
 # Missing import
 from datetime import datetime
+
 timestamp = datetime.now()
 formatted = timestamp.format_date()  # Error: might work if method exists
+
 
 # Typo in name
 def calculate_sum(numbers):
     return summ(numbers)  # Error: Name "summ" is not defined [name-defined]
 
+
 # Forward reference without import
 def process():
     return load_data()  # Error if load_data not defined yet
+
 
 # Undefined class
 obj = MyClass()  # Error: Name "MyClass" is not defined [name-defined]
@@ -89,21 +94,27 @@ obj = MyClass()  # Error: Name "MyClass" is not defined [name-defined]
 ```python
 # Import the name
 from datetime import datetime
+
 timestamp = datetime.now()
+
 
 # Fix typo
 def calculate_sum(numbers):
     return sum(numbers)  # OK
 
+
 # Define before use or import
 def load_data():
-    return {'key': 'value'}
+    return {"key": "value"}
+
 
 def process():
     return load_data()
 
+
 # Import the class
 from mymodule import MyClass
+
 obj = MyClass()
 ```
 
@@ -145,6 +156,7 @@ x = 123
 def create_user(name: str) -> User:
     return User(name=name)  # Error: Name "User" is used before definition [used-before-def]
 
+
 class User:
     def __init__(self, name: str):
         self.name = name
@@ -154,6 +166,7 @@ class User:
 
 ```python
 result = helper()  # Error: Name "helper" is used before definition [used-before-def]
+
 
 def helper() -> int:
     return 42
@@ -167,7 +180,9 @@ def helper() -> int:
 def outer() -> int:
     def inner() -> int:
         return 42
+
     return inner()  # OK - inner defined earlier in the function
+
 
 class MyClass:
     def method_a(self) -> int:
@@ -180,11 +195,11 @@ class MyClass:
 #### Forward references in type annotations
 
 ```python
-def process(value: 'User') -> None:  # OK - string annotation
+def process(value: "User") -> None:  # OK - string annotation
     ...
 
-class User:
-    ...
+
+class User: ...
 ```
 
 #### Type annotation with string forward reference
@@ -192,11 +207,12 @@ class User:
 ```python
 from __future__ import annotations  # Allows forward references
 
+
 def process(value: User) -> None:  # OK with __future__ import
     ...
 
-class User:
-    ...
+
+class User: ...
 ```
 
 ### Examples of Error-Producing Code
@@ -208,12 +224,15 @@ def calculate() -> int:
     items = [1, 2, 3, 4, 5]
     return total
 
+
 # Function called before definition
 def run():
     return process_data()  # Error: Name "process_data" is used before definition [used-before-def]
 
+
 def process_data():
     return [1, 2, 3]
+
 
 # Exception from undefined variable in condition
 def get_value():
@@ -232,18 +251,22 @@ def calculate() -> int:
     total = sum(items)  # OK
     return total
 
+
 # Define function before use (at module level)
 def process_data():
     return [1, 2, 3]
 
+
 def run():
     return process_data()  # OK
+
 
 # Or import from typing for forward references
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mymodule import User
+
 
 def process(user: User) -> None:  # OK in TYPE_CHECKING block
     ...
@@ -255,11 +278,12 @@ This error is enabled by default. Suppress specific instances:
 
 ```python
 # Use forward reference in quotes
-def func(value: 'UndefinedClass') -> None:
-    ...
+def func(value: "UndefinedClass") -> None: ...
+
 
 # Or import TYPE_CHECKING
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from module import UndefinedClass
 ```
@@ -288,28 +312,31 @@ If you silence this error, all references to the defined name refer to the first
 class A:
     def __init__(self, x: int) -> None: ...
 
+
 class A:  # Error: Name "A" already defined on line 1 [no-redef]
     def __init__(self, x: str) -> None: ...
 
+
 # MyPy uses first definition
-A('x')  # Error: Argument 1 to "A" has incompatible type "str"; expected "int"
+A("x")  # Error: Argument 1 to "A" has incompatible type "str"; expected "int"
 ```
 
 #### Redefining a function
 
 ```python
 def greet(name: str) -> str:
-    return f'Hello, {name}!'
+    return f"Hello, {name}!"
 
-def greet(name: str, greeting: str = 'Hi') -> str:  # Error: Name "greet" already defined [no-redef]
-    return f'{greeting}, {name}!'
+
+def greet(name: str, greeting: str = "Hi") -> str:  # Error: Name "greet" already defined [no-redef]
+    return f"{greeting}, {name}!"
 ```
 
 #### Redefining a variable
 
 ```python
 x = 5
-x = 'string'  # Error: Name "x" already defined [no-redef]
+x = "string"  # Error: Name "x" already defined [no-redef]
 ```
 
 ### When This Is NOT an Error
@@ -319,7 +346,7 @@ x = 'string'  # Error: Name "x" already defined [no-redef]
 ```python
 x = 5
 if some_condition:
-    x = 'string'  # Reassignment in conditional, OK in Python semantics
+    x = "string"  # Reassignment in conditional, OK in Python semantics
 
 # MyPy handles this with type narrowing
 ```
@@ -329,7 +356,7 @@ if some_condition:
 ```python
 import platform
 
-if platform.system() == 'Windows':
+if platform.system() == "Windows":
     import winreg as registry  # OK - conditional
 else:
     import pathlib as registry  # OK - different condition
@@ -342,11 +369,14 @@ else:
 ```python
 from typing import overload
 
+
 @overload
 def func(value: int) -> int: ...
 
+
 @overload
 def func(value: str) -> str: ...
+
 
 def func(value):  # OK - implementation of overload
     return value
@@ -360,13 +390,16 @@ class User:
     def authenticate(self) -> bool:
         return True
 
+
 class User:  # Error: Name "User" already defined [no-redef]
     def authenticate(self) -> bool:
         return False
 
+
 # Duplicate function with signature change
 def process(data: list) -> list:
     return sorted(data)
+
 
 def process(data: list, reverse: bool = False) -> list:  # Error: already defined [no-redef]
     return sorted(data, reverse=reverse)
@@ -380,22 +413,28 @@ class User:
     def authenticate(self) -> bool:
         return True
 
+
 class AdminUser:  # Different name
     def authenticate(self) -> bool:
         return False
+
 
 # Or update the single definition
 def process(data: list, reverse: bool = False) -> list:
     return sorted(data, reverse=reverse)
 
+
 # For overloads, use @overload decorator
 from typing import overload
+
 
 @overload
 def func(value: int) -> int: ...
 
+
 @overload
 def func(value: str) -> str: ...
+
 
 def func(value: int | str) -> int | str:  # Single implementation
     return value
@@ -407,8 +446,8 @@ This error is enabled by default and cannot be disabled. Suppress specific insta
 
 ```python
 # Type ignore for the redefinition
-class A:
-    ...
+class A: ...
+
 
 class A:  # type: ignore[no-redef]
     ...

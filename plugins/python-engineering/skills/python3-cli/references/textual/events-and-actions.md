@@ -53,6 +53,7 @@ To check the handler name programmatically:
 
 ```python
 from textual.widgets import Input
+
 print(Input.Changed.handler_name)  # 'on_input_changed'
 ```
 
@@ -119,9 +120,11 @@ def home_tab(self) -> None:
 def on_button_pressed(self, event: Button.Pressed) -> None:
     self.log(f"Button id: {event.button.id}")
 
+
 # Without argument — when event data is not needed
 def on_button_pressed(self) -> None:
     self.bell()
+
 
 # With @on decorator
 @on(Button.Pressed)
@@ -322,17 +325,14 @@ class MyApp(App):
 class PagerApp(App):
     page_no: reactive[int] = reactive(0, bindings=True)
 
-    BINDINGS = [
-        Binding("n", "next_page", "Next"),
-        Binding("p", "prev_page", "Previous"),
-    ]
+    BINDINGS = [Binding("n", "next_page", "Next"), Binding("p", "prev_page", "Previous")]
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
         if action == "next_page" and self.page_no >= MAX_PAGE:
-            return None   # disabled (shown dimmed in footer)
+            return None  # disabled (shown dimmed in footer)
         if action == "prev_page" and self.page_no <= 0:
             return False  # hidden from footer entirely
-        return True       # shown and active
+        return True  # shown and active
 ```
 
 - `check_action(action, parameters)` gates actions before they run.

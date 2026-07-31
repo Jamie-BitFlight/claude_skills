@@ -20,6 +20,7 @@ selector. This eliminates `if event.button.id == "..."` chains in handlers.
 from textual import on
 from textual.widgets import Button
 
+
 class MyApp(App):
     def compose(self) -> ComposeResult:
         yield Button("Bell", id="bell")
@@ -105,6 +106,7 @@ direct rendering effect.
 
 ```python
 from textual.reactive import var
+
 
 class MyWidget(Widget):
     internal_counter = var(0)  # watcher fires, but no refresh/layout
@@ -226,6 +228,7 @@ unidirectional: parent changes flow to child, not the reverse.
 class WorldClock(Widget):
     clock_time: reactive[datetime] = reactive(datetime.now)
 
+
 class WorldClockApp(App):
     time: reactive[datetime] = reactive(datetime.now)
 
@@ -274,6 +277,7 @@ no `await` is needed at the call site.
 ```python
 from textual import work
 
+
 class WeatherApp(App):
     # Async worker — for I/O-bound tasks using async libraries
     @work(exclusive=True)
@@ -298,6 +302,7 @@ exception if `@work` is applied to a non-async function without `thread=True`.
 
 ```python
 from textual.worker import get_current_worker
+
 
 class FileApp(App):
     @work(exclusive=True, thread=True)
@@ -324,6 +329,7 @@ the worker has been cancelled.
 ```python
 from textual.worker import get_current_worker
 
+
 @work(thread=True)
 def stream_results(self) -> None:
     worker = get_current_worker()
@@ -349,10 +355,12 @@ to the UI, posting custom messages is preferred over multiple `call_from_thread(
 ```python
 from textual.message import Message
 
+
 class ResultChunk(Message):
     def __init__(self, data: str) -> None:
         self.data = data
         super().__init__()
+
 
 class ProcessorApp(App):
     @work(thread=True)
@@ -383,6 +391,7 @@ alive and handle the failure via `on_worker_state_changed`.
 async def risky_fetch(self) -> None:
     result = await unreliable_api()
     self.display(result)
+
 
 def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
     if event.state == WorkerState.ERROR:
@@ -420,9 +429,9 @@ without disturbing the other stacks.
 ```python
 class MyApp(App):
     MODES = {
-        "dashboard": DashboardScreen,   # pass the class, not an instance
-        "settings":  SettingsScreen,
-        "help":      HelpScreen,
+        "dashboard": DashboardScreen,  # pass the class, not an instance
+        "settings": SettingsScreen,
+        "help": HelpScreen,
     }
     DEFAULT_MODE = "dashboard"
 
@@ -457,6 +466,7 @@ updates.
 from textual import work
 from textual.screen import ModalScreen
 
+
 class ConfirmDialog(ModalScreen[bool]):
     def compose(self) -> ComposeResult:
         yield Button("Yes", id="yes")
@@ -464,6 +474,7 @@ class ConfirmDialog(ModalScreen[bool]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "yes")
+
 
 class MyApp(App):
     @work
@@ -493,10 +504,12 @@ With this configuration all async test functions run automatically without decor
 ```python
 from my_app import MyApp
 
+
 async def test_app_starts():
     app = MyApp()
     async with app.run_test() as pilot:
         assert app.screen is not None
+
 
 async def test_button_click():
     app = MyApp()
@@ -504,6 +517,7 @@ async def test_button_click():
         await pilot.click("#submit")
         await pilot.pause()  # wait for all pending messages to process
         assert app.query_one("#result").renderable == "done"
+
 
 async def test_custom_size():
     app = MyApp()
@@ -521,7 +535,7 @@ SOURCE: <https://textual.textualize.io/guide/testing/> (accessed 2026-05-07)
 after any action that posts messages before asserting state.
 
 ```python
-await pilot.pause()           # flush all pending messages
+await pilot.pause()  # flush all pending messages
 await pilot.pause(delay=0.5)  # sleep 0.5 s, then flush messages
 ```
 
@@ -535,9 +549,9 @@ await pilot.hover("#number-5")
 `pilot.click()` supports offset positioning and keyboard modifiers:
 
 ```python
-await pilot.click("#slider", offset=(10, 0))    # click 10 cells right of widget origin
-await pilot.click(Button, times=2)              # double-click
-await pilot.click(Button, control=True)         # Ctrl+click
+await pilot.click("#slider", offset=(10, 0))  # click 10 cells right of widget origin
+await pilot.click(Button, times=2)  # double-click
+await pilot.click(Button, control=True)  # Ctrl+click
 ```
 
 SOURCE: <https://textual.textualize.io/guide/testing/> (accessed 2026-05-07)

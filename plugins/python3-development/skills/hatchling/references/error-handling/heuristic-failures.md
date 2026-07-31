@@ -158,6 +158,7 @@ def normalize_name(name: str) -> str:
     """PEP 503 normalization."""
     return re.sub(r"[-_.]+", "-", name).lower()
 
+
 # Examples:
 # "My-Package" → "my-package"
 # "my_package" → "my-package"
@@ -233,9 +234,7 @@ packages = ["src/company"]
 class GenerateVersion(BuildHookInterface):
     def initialize(self, version, build_data):
         # Generate version file
-        Path("src/package/_version.py").write_text(
-            f'__version__ = "{version}"'
-        )
+        Path("src/package/_version.py").write_text(f'__version__ = "{version}"')
 ```
 
 **Heuristic Issue:** File doesn't exist during initial detection
@@ -322,6 +321,7 @@ pattern = 'VERSION = "{version}"'    # Non-standard variable
 from pathlib import Path
 import tomllib
 
+
 def diagnose_heuristics():
     """Check what Hatchling will detect."""
     root = Path.cwd()
@@ -354,6 +354,7 @@ def diagnose_heuristics():
     if not detected:
         print("\n⚠️  No standard layout detected!")
         print("Explicit configuration required in pyproject.toml")
+
 
 if __name__ == "__main__":
     diagnose_heuristics()

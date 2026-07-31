@@ -216,12 +216,8 @@ from fastmcp.exceptions import ToolError
 
 mcp = FastMCP("plugin-name", mask_error_details=False)
 
-_READONLY_ANNOTATIONS = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
-}
+_READONLY_ANNOTATIONS = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
+
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def tool_name(param: str, *, context: Context) -> dict:
@@ -240,6 +236,7 @@ async def tool_name(param: str, *, context: Context) -> dict:
     await context.info("Starting operation...")
     # Implementation
     return {"result": "data"}
+
 
 if __name__ == "__main__":
     mcp.run()
@@ -304,6 +301,7 @@ Create pytest tests in `plugins/plugin-name/tests/test_mcp.py`:
 ```python
 import pytest
 from mcp.server import mcp
+
 
 @pytest.mark.asyncio
 async def test_tool_name():

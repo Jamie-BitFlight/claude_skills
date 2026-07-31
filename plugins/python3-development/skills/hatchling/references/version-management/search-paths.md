@@ -146,6 +146,7 @@ Search for different version file names:
 # hatch_build.py
 from pathlib import Path
 
+
 def get_version_paths():
     """Get potential version file locations."""
     search_paths = ["src", "lib", ".", "build"]
@@ -159,6 +160,7 @@ def get_version_paths():
 
     raise FileNotFoundError("No version file found")
 
+
 # Use in version source configuration
 ```
 
@@ -170,6 +172,7 @@ Generate search paths based on project structure:
 # version_helper.py
 import os
 from pathlib import Path
+
 
 def find_version_file():
     """Dynamically find version file."""
@@ -186,17 +189,14 @@ def find_version_file():
             return version_file
 
     # Fallback locations
-    fallbacks = [
-        Path("VERSION"),
-        Path(".version"),
-        Path("version.txt"),
-    ]
+    fallbacks = [Path("VERSION"), Path(".version"), Path("version.txt")]
 
     for fallback in fallbacks:
         if fallback.exists():
             return fallback
 
     raise FileNotFoundError("No version file found")
+
 
 # Read version from found file
 version_file = find_version_file()
@@ -211,6 +211,7 @@ Search based on environment:
 # version_loader.py
 import os
 from pathlib import Path
+
 
 def get_version():
     """Get version from appropriate source."""
@@ -232,6 +233,7 @@ def get_version():
             return namespace.get("__version__", "0.0.0")
 
     return "0.0.0+unknown"
+
 
 __version__ = get_version()
 ```
@@ -299,6 +301,7 @@ When no file is found in any search path:
 import sys
 from pathlib import Path
 
+
 def find_version():
     """Search for version with fallback."""
     search_paths = ["src", "lib", "build", "."]
@@ -319,6 +322,7 @@ def find_version():
     else:
         return "0.0.0+dev"
 
+
 __version__ = find_version()
 ```
 
@@ -329,6 +333,7 @@ Handle multiple matching files:
 ```python
 # version_resolver.py
 from pathlib import Path
+
 
 def get_version():
     """Get version with conflict resolution."""
@@ -354,6 +359,7 @@ def get_version():
 
     # Use first found (highest priority)
     return found_versions[0][1]
+
 
 __version__ = get_version()
 ```
@@ -417,6 +423,7 @@ Verify search paths work correctly:
 import tempfile
 from pathlib import Path
 
+
 def test_search_paths():
     """Test version file discovery."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -467,6 +474,7 @@ Cache found paths for repeated access:
 from functools import lru_cache
 from pathlib import Path
 
+
 @lru_cache(maxsize=1)
 def find_version_file():
     """Find version file (cached)."""
@@ -477,12 +485,14 @@ def find_version_file():
             return path
     raise FileNotFoundError("Version file not found")
 
+
 def get_version():
     """Get version from cached file location."""
     version_file = find_version_file()
     namespace = {}
     exec(version_file.read_text(), namespace)
     return namespace["__version__"]
+
 
 __version__ = get_version()
 ```
@@ -499,6 +509,7 @@ import os
 from pathlib import Path
 
 DEBUG = os.environ.get("DEBUG_VERSION_SEARCH")
+
 
 def find_version():
     """Find version with debug output."""
@@ -520,9 +531,7 @@ def find_version():
                 print(f"  Found! Using {path}")
             return path
 
-    raise FileNotFoundError(
-        f"Version file not found in: {search_paths}"
-    )
+    raise FileNotFoundError(f"Version file not found in: {search_paths}")
 ```
 
 ## See Also

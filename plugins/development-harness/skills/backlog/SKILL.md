@@ -1,13 +1,13 @@
 ---
 name: backlog
-description: Use when structured backlog operations are needed through MCP or the provider-neutral CLI. For Beads-native issue and dependency work, use the beads-workflow skill and bd directly.
+description: Use when structured backlog operations are needed through MCP or the provider-neutral CLI. For Beads-native issue and dependency work, use bd directly.
 ---
 
 # Backlog
 
 MCP tools are the primary structured interface for provider-neutral backlog operations. They are not a universal proxy for backend-native tools.
 The selected backend provider is authoritative; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache or working state according to that backend.
-For Beads-backed projects, load `beads-workflow` and use `bd` directly for issue creation, inspection, status, dependencies, readiness, labels, notes, and metadata. Use MCP or the CLI for structured plans, artifacts, dispatch, validation, and other operations Beads does not provide. Do not edit derived per-item files directly.
+For Beads-backed projects, use `bd` directly for issue creation, inspection, status, dependencies, readiness, labels, notes, and metadata. Use MCP or the CLI for structured plans, artifacts, dispatch, validation, and other operations Beads does not provide. Do not edit derived per-item files directly.
 
 ## Primary Interface (MCP)
 

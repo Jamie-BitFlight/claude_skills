@@ -372,16 +372,17 @@ Hooks can behave differently based on context:
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class ConditionalHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Determine if editable or distribution build
         builder_name = self.builder.name  # 'wheel' or 'sdist'
 
-        if builder_name == 'wheel':
+        if builder_name == "wheel":
             # For both editable and wheel distribution
             # Generate minimal artifacts
             self._generate_version_file(version)
-        elif builder_name == 'sdist':
+        elif builder_name == "sdist":
             # Only for source distribution
             # Can include more files
             self._include_test_data()
@@ -514,6 +515,7 @@ python -c "import myproject; print(myproject.func())"
 ```python
 import myproject
 import importlib
+
 importlib.reload(myproject)
 print(myproject.func())  # Now shows new behavior
 ```

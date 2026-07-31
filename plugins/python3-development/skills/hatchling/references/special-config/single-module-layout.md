@@ -71,8 +71,10 @@ include = ["mymodule.py"]
 # mytool.py
 """A simple command-line tool."""
 
+
 def main():
     print("Hello from mytool!")
+
 
 if __name__ == "__main__":
     main()
@@ -93,11 +95,14 @@ mytool = "mytool:main"
 # utils.py
 """Utility functions module."""
 
+
 def calculate(x, y):
     return x + y
 
+
 def process(data):
     return data.upper()
+
 
 class Helper:
     def __init__(self):
@@ -128,6 +133,7 @@ After installation:
 
 ```python
 import calculator
+
 result = calculator.add(1, 2)
 ```
 
@@ -238,11 +244,13 @@ import helper
 # cli.py
 import argparse
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('name')
+    parser.add_argument("name")
     args = parser.parse_args()
     print(f"Hello, {args.name}!")
+
 
 if __name__ == "__main__":
     main()
@@ -264,8 +272,10 @@ greet = "cli:main"
 def encrypt():
     print("Encrypting...")
 
+
 def decrypt():
     print("Decrypting...")
+
 
 def hash_file():
     print("Hashing...")
@@ -286,6 +296,7 @@ hash = "tools:hash_file"
 # mymodule.py
 __version__ = "1.0.0"
 
+
 def get_version():
     return __version__
 ```
@@ -304,6 +315,7 @@ path = "mymodule.py"
 ```python
 # tool.py
 import os
+
 __version__ = os.environ.get("TOOL_VERSION", "dev")
 ```
 
@@ -334,9 +346,11 @@ project/
 # tests/test_calculator.py
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import calculator
+
 
 def test_add():
     assert calculator.add(2, 2) == 4
@@ -412,9 +426,11 @@ Consolidate code:
 # Previous __init__.py content
 __version__ = "1.0.0"
 
+
 # Previous core.py content
 def main_function():
     pass
+
 
 class MainClass:
     pass
@@ -476,13 +492,15 @@ import sys
 
 __version__ = "1.0.0"
 
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--version', action='version', version=__version__)
+    parser.add_argument("--version", action="version", version=__version__)
     # Add more arguments
     args = parser.parse_args()
     # Process arguments
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
@@ -494,19 +512,24 @@ if __name__ == "__main__":
 """Library module description."""
 
 __version__ = "1.0.0"
-__all__ = ['function1', 'function2', 'Class1']
+__all__ = ["function1", "function2", "Class1"]
+
 
 def function1(param):
     """Function description."""
     pass
 
+
 def function2(param):
     """Function description."""
     pass
 
+
 class Class1:
     """Class description."""
+
     pass
+
 
 # Private helper
 def _internal_function():
@@ -561,11 +584,13 @@ math-tools/
 
 __version__ = "2.0.0"
 
+
 def factorial(n):
     """Calculate factorial of n."""
     if n <= 1:
         return 1
     return n * factorial(n - 1)
+
 
 def fibonacci(n):
     """Generate fibonacci sequence."""
@@ -573,6 +598,7 @@ def fibonacci(n):
     for _ in range(n):
         yield a
         a, b = b, a + b
+
 
 class Calculator:
     """Simple calculator class."""

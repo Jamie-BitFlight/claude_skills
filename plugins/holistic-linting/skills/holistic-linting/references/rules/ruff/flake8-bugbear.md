@@ -46,6 +46,7 @@ def append_item(item, items=None):
 def func(x=list()):  # Called at definition time
     pass
 
+
 def func(x=datetime.now()):  # Called once, not per call
     pass
 ```
@@ -57,6 +58,7 @@ def func(x=None):
     if x is None:
         x = list()
     pass
+
 
 def func(x=None):
     if x is None:
@@ -95,6 +97,7 @@ except ValueError:  # Duplicate
 
 ```python
 import os
+
 os.environ = {}  # Wrong - overwrites the mapping
 ```
 
@@ -102,7 +105,8 @@ os.environ = {}  # Wrong - overwrites the mapping
 
 ```python
 import os
-os.environ['VAR'] = 'value'  # Correct
+
+os.environ["VAR"] = "value"  # Correct
 ```
 
 ---
@@ -360,8 +364,10 @@ exec("x = 1")  # Dangerous and generally not needed
 ```python
 funcs = []
 for i in range(5):
+
     def func():
         return i  # Always returns 4 (last value)
+
     funcs.append(func)
 ```
 
@@ -370,10 +376,13 @@ for i in range(5):
 ```python
 funcs = []
 for i in range(5):
+
     def make_func(n):
         def func():
             return n
+
         return func
+
     funcs.append(make_func(i))
 ```
 

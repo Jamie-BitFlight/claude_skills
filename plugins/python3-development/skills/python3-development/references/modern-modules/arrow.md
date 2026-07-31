@@ -62,13 +62,13 @@ utc = arrow.utcnow()
 # <Arrow [2013-05-11T21:23:58.970460+00:00]>
 
 # Get current time in specific timezone
-local = arrow.now('US/Pacific')
+local = arrow.now("US/Pacific")
 # <Arrow [2013-05-11T13:23:58.970460-07:00]>
 
 # Convert between timezones effortlessly
 utc_time = arrow.utcnow()
-tokyo_time = utc_time.to('Asia/Tokyo')
-ny_time = tokyo_time.to('America/New_York')
+tokyo_time = utc_time.to("Asia/Tokyo")
+ny_time = tokyo_time.to("America/New_York")
 ```
 
 **Why this matters:** Standard datetime requires verbose pytz.timezone() calls and manual localization. Arrow handles this in one method.
@@ -81,23 +81,23 @@ ny_time = tokyo_time.to('America/New_York')
 import arrow
 
 # Parse ISO 8601 automatically
-arrow.get('2013-05-11T21:23:58.970460+07:00')
+arrow.get("2013-05-11T21:23:58.970460+07:00")
 
 # Parse with format string
-arrow.get('2013-05-05 12:30:45', 'YYYY-MM-DD HH:mm:ss')
+arrow.get("2013-05-05 12:30:45", "YYYY-MM-DD HH:mm:ss")
 
 # Parse Unix timestamps (int or float)
 arrow.get(1368303838)
 arrow.get(1565358758.123413)
 
 # Parse with timezone
-arrow.get('2013-05-11T21:23:58', tzinfo='Europe/Paris')
+arrow.get("2013-05-11T21:23:58", tzinfo="Europe/Paris")
 
 # Handle inconsistent spacing
-arrow.get('Jun 1 2005     1:33PM', 'MMM D YYYY H:mmA', normalize_whitespace=True)
+arrow.get("Jun 1 2005     1:33PM", "MMM D YYYY H:mmA", normalize_whitespace=True)
 
 # Parse ISO week dates
-arrow.get('2013-W29-6', 'W')  # Year-Week-Day format
+arrow.get("2013-W29-6", "W")  # Year-Week-Day format
 ```
 
 **Why this matters:** datetime.strptime() requires exact format matching. Arrow intelligently handles variations and timezone strings directly.
@@ -118,17 +118,17 @@ past.humanize()  # 'an hour ago'
 future.humanize()  # 'in 3 days'
 
 # Localized humanization (75+ locales)
-past.humanize(locale='ko-kr')  # '한시간 전'
-past.humanize(locale='es')  # 'hace una hora'
+past.humanize(locale="ko-kr")  # '한시간 전'
+past.humanize(locale="es")  # 'hace una hora'
 
 # Multiple granularities
 later = arrow.utcnow().shift(hours=2, minutes=19)
-later.humanize(granularity=['hour', 'minute'])
+later.humanize(granularity=["hour", "minute"])
 # 'in 2 hours and 19 minutes'
 
 # Quarter granularity (business applications)
 four_months = now.shift(months=4)
-four_months.humanize(granularity='quarter')  # 'in a quarter'
+four_months.humanize(granularity="quarter")  # 'in a quarter'
 ```
 
 **Why this matters:** Building this with datetime requires third-party libraries or manual logic. Arrow includes it with extensive locale support.
@@ -147,10 +147,10 @@ future = now.shift(years=1, months=-2, days=5, hours=3)
 past = now.shift(weeks=-2)
 
 # Dehumanize - parse human phrases
-base = arrow.get('2020-05-27 10:30:35')
-base.dehumanize('8 hours ago')
-base.dehumanize('in 4 days')
-base.dehumanize('hace 2 años', locale='es')  # Spanish: "2 years ago"
+base = arrow.get("2020-05-27 10:30:35")
+base.dehumanize("8 hours ago")
+base.dehumanize("in 4 days")
+base.dehumanize("hace 2 años", locale="es")  # Spanish: "2 years ago"
 
 # Replace specific components
 now.replace(hour=0, minute=0, second=0)  # Start of day
@@ -172,24 +172,24 @@ start = arrow.get(2020, 5, 5, 12, 30)
 end = arrow.get(2020, 5, 5, 17, 15)
 
 # Iterate by hour
-for hour in arrow.Arrow.range('hour', start, end):
+for hour in arrow.Arrow.range("hour", start, end):
     print(hour)
 
 # Get floor and ceiling (span)
 now = arrow.utcnow()
-now.span('hour')  # Returns (floor, ceiling) tuple
-now.floor('hour')  # Start of current hour
-now.ceil('day')   # End of current day
+now.span("hour")  # Returns (floor, ceiling) tuple
+now.floor("hour")  # Start of current hour
+now.ceil("day")  # End of current day
 
 # Span ranges - generate (start, end) tuples
-for span in arrow.Arrow.span_range('hour', start, end):
+for span in arrow.Arrow.span_range("hour", start, end):
     floor, ceiling = span
     print(f"Hour from {floor} to {ceiling}")
 
 # Handle DST transitions correctly
-before_dst = arrow.get('2018-03-10 23:00:00', tzinfo='US/Pacific')
-after_dst = arrow.get('2018-03-11 04:00:00', tzinfo='US/Pacific')
-for t in arrow.Arrow.range('hour', before_dst, after_dst):
+before_dst = arrow.get("2018-03-10 23:00:00", tzinfo="US/Pacific")
+after_dst = arrow.get("2018-03-11 04:00:00", tzinfo="US/Pacific")
+for t in arrow.Arrow.range("hour", before_dst, after_dst):
     print(f"{t} (UTC: {t.to('UTC')})")
 ```
 
@@ -205,20 +205,20 @@ import arrow
 arw = arrow.utcnow()
 
 # Use predefined format constants
-arw.format(arrow.FORMAT_ATOM)     # '2020-05-27 10:30:35+00:00'
-arw.format(arrow.FORMAT_COOKIE)   # 'Wednesday, 27-May-2020 10:30:35 UTC'
+arw.format(arrow.FORMAT_ATOM)  # '2020-05-27 10:30:35+00:00'
+arw.format(arrow.FORMAT_COOKIE)  # 'Wednesday, 27-May-2020 10:30:35 UTC'
 arw.format(arrow.FORMAT_RFC3339)  # '2020-05-27 10:30:35+00:00'
-arw.format(arrow.FORMAT_W3C)      # '2020-05-27 10:30:35+00:00'
+arw.format(arrow.FORMAT_W3C)  # '2020-05-27 10:30:35+00:00'
 
 # Custom formats with tokens
-arw.format('YYYY-MM-DD HH:mm:ss ZZ')  # '2020-05-27 10:30:35 +00:00'
+arw.format("YYYY-MM-DD HH:mm:ss ZZ")  # '2020-05-27 10:30:35 +00:00'
 
 # Escape literal text in formats
-arw.format('YYYY-MM-DD h [h] m')  # '2020-05-27 10 h 30'
+arw.format("YYYY-MM-DD h [h] m")  # '2020-05-27 10 h 30'
 
 # Timestamp formats
-arw.format('X')   # '1590577835' (seconds)
-arw.format('x')   # '1590577835123456' (microseconds)
+arw.format("X")  # '1590577835' (seconds)
+arw.format("x")  # '1590577835123456' (microseconds)
 ```
 
 **Why this matters:** datetime.strftime() uses different token syntax (%Y vs YYYY). Arrow uses consistent, JavaScript-inspired tokens.
@@ -259,7 +259,7 @@ arrow_time = arrow.utcnow()
 pd.Timestamp(arrow_time.datetime)
 
 # Or use Arrow for timezone-aware operations before pandas
-df['timestamp'] = df['utc_string'].apply(lambda x: arrow.get(x).to('US/Pacific').datetime)
+df["timestamp"] = df["utc_string"].apply(lambda x: arrow.get(x).to("US/Pacific").datetime)
 ```
 
 **Django/Flask** (web frameworks)
@@ -268,6 +268,7 @@ df['timestamp'] = df['utc_string'].apply(lambda x: arrow.get(x).to('US/Pacific')
 # Django models - store as DateTimeField
 from django.db import models
 import arrow
+
 
 class Event(models.Model):
     created_at = models.DateTimeField()
@@ -334,9 +335,11 @@ dependencies = [
 ```python
 # High-performance scenario - use standard library
 import time
+
 timestamp = time.time()  # Fastest for epoch timestamps
 
 import datetime
+
 dt = datetime.datetime.utcnow()  # Faster for datetime objects
 ```
 
@@ -352,8 +355,8 @@ Pandas has highly optimized `datetime64` vectorized operations. Arrow's object-o
 import pandas as pd
 
 # Pandas is optimized for this
-df['date'] = pd.to_datetime(df['date_string'])
-df['hour'] = df['date'].dt.hour  # Vectorized operation
+df["date"] = pd.to_datetime(df["date_string"])
+df["hour"] = df["date"].dt.hour  # Vectorized operation
 
 # Arrow would require row-by-row operations (slow)
 # df['hour'] = df['date'].apply(lambda x: arrow.get(x).hour)
@@ -429,7 +432,7 @@ START: Do you need datetime functionality?
 arrow.now()  # <Arrow [2020-05-27T10:30:35.123456+00:00]>
 
 # For local timezone, be explicit
-arrow.now('local')  # or arrow.now('America/New_York')
+arrow.now("local")  # or arrow.now('America/New_York')
 ```
 
 ### Gotcha 2: Converting to datetime loses Arrow methods
@@ -465,11 +468,11 @@ arrow.get(1565358758)  # ✓ Or pass as int/float directly
 ```python
 # During DST "fall back", 2 AM occurs twice
 # Use fold parameter (PEP 495)
-ambiguous = arrow.Arrow(2017, 10, 29, 2, 0, tzinfo='Europe/Stockholm')
+ambiguous = arrow.Arrow(2017, 10, 29, 2, 0, tzinfo="Europe/Stockholm")
 ambiguous.fold  # 0 (first occurrence)
 
 # Specify which occurrence
-second_occurrence = arrow.Arrow(2017, 10, 29, 2, 0, tzinfo='Europe/Stockholm', fold=1)
+second_occurrence = arrow.Arrow(2017, 10, 29, 2, 0, tzinfo="Europe/Stockholm", fold=1)
 ```
 
 ## Alternatives Comparison
@@ -523,21 +526,26 @@ second_occurrence = arrow.Arrow(2017, 10, 29, 2, 0, tzinfo='Europe/Stockholm', f
 from flask import jsonify
 import arrow
 
-@app.route('/events')
+
+@app.route("/events")
 def get_events():
     events = Event.query.all()
-    return jsonify([{
-        'id': e.id,
-        'name': e.name,
-        'created': arrow.get(e.created_at).humanize(),
-        'start_time': arrow.get(e.start_time).format('YYYY-MM-DD HH:mm ZZ')
-    } for e in events])
+    return jsonify([
+        {
+            "id": e.id,
+            "name": e.name,
+            "created": arrow.get(e.created_at).humanize(),
+            "start_time": arrow.get(e.start_time).format("YYYY-MM-DD HH:mm ZZ"),
+        }
+        for e in events
+    ])
 ```
 
 **Data processing pipelines:**
 
 ```python
 import arrow
+
 
 def process_log_file(log_path):
     with open(log_path) as f:
@@ -547,10 +555,10 @@ def process_log_file(log_path):
             timestamp = arrow.get(timestamp_str, normalize_whitespace=True)
 
             # Convert to consistent timezone
-            utc_time = timestamp.to('UTC')
+            utc_time = timestamp.to("UTC")
 
             # Filter by time range
-            if utc_time >= arrow.get('2025-01-01'):
+            if utc_time >= arrow.get("2025-01-01"):
                 yield utc_time, line
 ```
 

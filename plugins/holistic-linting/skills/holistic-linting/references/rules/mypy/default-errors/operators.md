@@ -12,7 +12,7 @@
 
 ```python
 # Error: Unsupported operand types for + ("int" and "str") [operator]
-1 + 'x'
+1 + "x"
 
 # Error: Unsupported operand types for * ("str" and "list") [operator]
 "text" * [1, 2, 3]
@@ -34,7 +34,7 @@
 Suppress specific instances:
 
 ```python
-result = 1 + 'x'  # type: ignore[operator]
+result = 1 + "x"  # type: ignore[operator]
 ```
 
 ---

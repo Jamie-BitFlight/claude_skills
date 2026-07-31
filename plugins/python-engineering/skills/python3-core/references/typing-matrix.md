@@ -26,10 +26,12 @@ from enum import StrEnum
 ```python
 from pydantic import BaseModel, TypeAdapter, Field
 
+
 class IncomingPayload(BaseModel):
     user_id: int
     email: str
     model_config = {"strict": True}
+
 
 # TypeAdapter for ad-hoc validation
 # validators and serializers
@@ -39,6 +41,7 @@ class IncomingPayload(BaseModel):
 
 ```python
 from hypothesis import given, strategies as st
+
 
 @given(st.from_type(IncomingPayload))
 def test_payload_validates_round_trip(payload: IncomingPayload) -> None:
@@ -62,9 +65,11 @@ type Point[T] = tuple[T, T]
 ```python
 from typing import TypeIs, ReadOnly
 
+
 # TypeIs for bidirectional narrowing (replaces TypeGuard)
 def is_str_list(val: list[object]) -> TypeIs[list[str]]:
     return all(isinstance(x, str) for x in val)
+
 
 # ReadOnly in TypedDict for immutable post-validation fields
 ```

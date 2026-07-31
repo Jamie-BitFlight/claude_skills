@@ -193,7 +193,8 @@ datasette data.db \
 
 ```python
 import sqlite3
-conn = sqlite3.connect('data.db')
+
+conn = sqlite3.connect("data.db")
 # Datasette reads directly
 ```
 
@@ -367,17 +368,17 @@ databases:
 ```python
 from datasette import hookimpl
 
+
 @hookimpl
 def prepare_connection(conn):
     """Add custom SQL functions"""
     conn.create_function("is_even", 1, lambda x: x % 2 == 0)
 
+
 @hookimpl
 def extra_template_vars(request):
     """Add variables to templates"""
-    return {
-        "custom_message": "Hello from plugin!"
-    }
+    return {"custom_message": "Hello from plugin!"}
 ```
 
 **setup.py**:
@@ -387,11 +388,7 @@ setup(
     name="datasette-my-plugin",
     version="0.1",
     py_modules=["datasette_my_plugin"],
-    entry_points={
-        "datasette": [
-            "my_plugin = datasette_my_plugin"
-        ]
-    },
+    entry_points={"datasette": ["my_plugin = datasette_my_plugin"]},
     install_requires=["datasette>=0.60"],
 )
 ```
@@ -404,16 +401,13 @@ setup(
 from datasette.app import Datasette
 import asyncio
 
+
 async def explore_data():
     # Initialize Datasette
     ds = Datasette(files=["data.db"])
 
     # Execute query
-    result = await ds.execute(
-        "data",
-        "SELECT * FROM users WHERE age > :age",
-        {"age": 18}
-    )
+    result = await ds.execute("data", "SELECT * FROM users WHERE age > :age", {"age": 18})
 
     # Access rows
     for row in result.rows:
@@ -423,6 +417,7 @@ async def explore_data():
     db = ds.get_database("data")
     tables = await db.table_names()
     print(f"Tables: {tables}")
+
 
 asyncio.run(explore_data())
 ```
@@ -435,6 +430,7 @@ asyncio.run(explore_data())
 import pytest
 from datasette.app import Datasette
 
+
 @pytest.mark.asyncio
 async def test_homepage():
     ds = Datasette(memory=True)
@@ -444,15 +440,14 @@ async def test_homepage():
     assert response.status_code == 200
     assert "<!DOCTYPE html>" in response.text
 
+
 @pytest.mark.asyncio
 async def test_json_api():
     ds = Datasette(memory=True)
 
     # Create test data
     db = ds.add_database(Database(ds, memory_name="test"))
-    await db.execute_write(
-        "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)"
-    )
+    await db.execute_write("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
 
     # Query via API
     response = await ds.client.get("/test/items.json")

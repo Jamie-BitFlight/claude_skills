@@ -494,6 +494,7 @@ _Testing analysis: [date]_
 # Native generics (Python 3.12+)
 def process(items: list[str]) -> dict[str, int]: ...
 
+
 # Union syntax
 def get_value(key: str) -> str | None: ...
 ```

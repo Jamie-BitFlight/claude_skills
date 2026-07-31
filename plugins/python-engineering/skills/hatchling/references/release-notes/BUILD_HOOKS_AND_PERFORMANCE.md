@@ -348,7 +348,7 @@ Series of refinements to metadata handling:
    ```python
    def dependencies(self):
        # Only include truly necessary dependencies
-       return ['required-package>=1.0']
+       return ["required-package>=1.0"]
    ```
 
 3. **Use Appropriate Hook Type**

@@ -38,6 +38,7 @@ When helping users with packages that include inline type hints, explain that Ha
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
+
 class MyClass:
     def __init__(self, value: int) -> None:
         self.value = value

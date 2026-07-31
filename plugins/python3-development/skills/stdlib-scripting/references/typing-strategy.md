@@ -22,11 +22,14 @@ Use when you only need operations, not identity.
 ```python
 from typing import Protocol
 
+
 class Reader(Protocol):
     def read(self, n: int = -1) -> bytes: ...
 
+
 class Writer(Protocol):
     def write(self, data: bytes) -> int: ...
+
 
 def copy(src: Reader, dst: Writer) -> int:
     buf = src.read()
@@ -43,6 +46,7 @@ from typing import TypeVar, Iterable, Callable
 T = TypeVar("T")
 U = TypeVar("U")
 
+
 def transform(xs: Iterable[T], f: Callable[[T], U]) -> list[U]:
     return [f(x) for x in xs]
 ```
@@ -57,9 +61,11 @@ from typing import Callable, ParamSpec, TypeVar
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def traced(fn: Callable[P, R]) -> Callable[P, R]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return fn(*args, **kwargs)
+
     return wrapper
 ```
 
@@ -73,8 +79,10 @@ def traced(fn: Callable[P, R]) -> Callable[P, R]:
 ```python
 from collections.abc import Sequence, Mapping
 
+
 def first(xs: Sequence[str]) -> str | None:
     return xs[0] if xs else None
+
 
 def keys(m: Mapping[str, int]) -> list[str]:
     return list(m.keys())
@@ -108,8 +116,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+
 def load_json(path: Path) -> Json:
     return json.loads(path.read_text())
+
 
 def load_object(path: Path) -> dict[str, Any]:
     data: Any = load_json(path)
@@ -152,8 +162,10 @@ Cmd: TypeAlias = Sequence[Pathish]
 ```python
 from typing import Protocol
 
+
 class Readable(Protocol):
     def read(self, n: int = -1) -> bytes: ...
+
 
 def digest(stream: Readable) -> bytes:
     data = stream.read()
@@ -167,8 +179,10 @@ def digest(stream: Readable) -> bytes:
 from typing import Protocol
 import os
 
+
 class HasPath(Protocol):
     def __fspath__(self) -> str | bytes: ...
+
 
 def open_text(x: HasPath) -> str:
     with open(os.fspath(x), "rt", encoding="utf-8") as fh:
@@ -189,8 +203,10 @@ def open_text(x: HasPath) -> str:
 ```python
 from collections.abc import Sequence, Mapping
 
+
 def first(xs: Sequence[str]) -> str | None:
     return xs[0] if xs else None
+
 
 def keys(m: Mapping[str, int]) -> list[str]:
     return list(m.keys())
@@ -203,10 +219,12 @@ Use overloads when output type depends on input flags. Keep implementation singl
 ```python
 from typing import overload
 
+
 @overload
 def parse_int(s: str, *, strict: bool) -> int: ...
 @overload
 def parse_int(s: str, *, strict: bool = ...) -> int | None: ...
+
 
 def parse_int(s: str, *, strict: bool = False) -> int | None:
     try:
@@ -227,9 +245,11 @@ from typing import Any, TypedDict, TypeAlias
 
 Json: TypeAlias = dict[str, Any] | list[Any] | str | int | float | bool | None
 
+
 class AppConfig(TypedDict):
     host: str
     port: int
+
 
 def to_app_config(j: Json) -> AppConfig:
     if not isinstance(j, dict):

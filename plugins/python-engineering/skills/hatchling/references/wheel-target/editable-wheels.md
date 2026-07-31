@@ -168,6 +168,7 @@ If code changes aren't visible:
 
    ```python
    import sys
+
    print(sys.path)
    ```
 

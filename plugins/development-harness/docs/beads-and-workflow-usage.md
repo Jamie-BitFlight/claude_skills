@@ -12,7 +12,7 @@ The left column is the Beads-native source of truth. The right column adds the s
 
 | Step | Beads-native operation (`bd`) | Structured workflow operation (CLI/MCP) |
 |---|---|---|
-| Detect the project | `test -d .beads && bd status --json` | No CLI proxy is needed. Select the Beads workflow skill when the project is Beads-backed. |
+| Detect the project | `test -f .beads/dh-backend && bd status --json` | No CLI proxy is needed. Select the configured Beads backend when the project is Beads-backed. |
 | Create the objective | `bd create --title "..." --type epic --priority 1 --json` | Use `plan create` only when a structured SAM plan is required in addition to the Beads epic. Record both logical addresses. |
 | Add work items | `bd create --title "..." --parent <epic-id> --json` | Use `plan append-task` when the task needs typed SAM fields, acceptance criteria, handoff, or verification data. |
 | Set dependencies | `bd dep add <blocked-id> <blocking-id>` | No proxy is needed. The workflow records the Beads IDs and may use structured task addresses for downstream handoffs. |
@@ -70,7 +70,6 @@ Beads is the source of truth for Beads-native issue state. Structured workflow a
 
 ## Related documentation
 
-- [`../skills/beads-workflow/SKILL.md`](../skills/beads-workflow/SKILL.md)
 - [`backend-providers.md`](backend-providers.md)
 - [`TASK_FILE_FORMAT.md`](TASK_FILE_FORMAT.md)
 - [`.hermes/plans/reference/cli-redesign-implementation-plan.md`](../../../.hermes/plans/reference/cli-redesign-implementation-plan.md)

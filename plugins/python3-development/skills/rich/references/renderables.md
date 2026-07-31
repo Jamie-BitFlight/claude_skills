@@ -89,12 +89,7 @@ Column with custom options via `Column` class:
 ```python
 from rich.table import Column, Table
 
-table = Table(
-    "Released",
-    "Title",
-    Column(header="Box Office", justify="right"),
-    title="Star Wars Movies"
-)
+table = Table("Released", "Title", Column(header="Box Office", justify="right"), title="Star Wars Movies")
 ```
 
 Row with section break:
@@ -172,6 +167,7 @@ Vertical alignment per cell using `Align`:
 
 ```python
 from rich.align import Align
+
 table.add_row(Align("Title", vertical="middle"))
 ```
 
@@ -259,9 +255,9 @@ Adds whitespace padding around a renderable.
 from rich.padding import Padding
 from rich import print
 
-print(Padding("Hello", (1, 2)))          # 1 top/bottom, 2 left/right
-print(Padding("Hello", (1, 2, 3, 4)))   # top, right, bottom, left (CSS order)
-print(Padding("Hello", 1))              # 1 on all sides
+print(Padding("Hello", (1, 2)))  # 1 top/bottom, 2 left/right
+print(Padding("Hello", (1, 2, 3, 4)))  # top, right, bottom, left (CSS order)
+print(Padding("Hello", 1))  # 1 on all sides
 ```
 
 `Padding(renderable, pad)` where `pad` is:

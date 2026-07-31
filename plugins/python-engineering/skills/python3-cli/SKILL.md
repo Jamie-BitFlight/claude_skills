@@ -26,6 +26,7 @@ from rich.console import Console
 app = typer.Typer()
 console = Console()
 
+
 @app.command()
 def process(
     input_file: Annotated[Path, typer.Argument(help="Input file")],
@@ -42,6 +43,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.measure import Measurement
 
+
 def get_table_width(table: Table) -> int:
     temp = Console(width=9999)
     m = Measurement.get(temp, temp.options, table)
@@ -54,6 +56,7 @@ def get_table_width(table: Table) -> int:
 from typer.testing import CliRunner
 
 runner = CliRunner()
+
 
 def test_app_runs() -> None:
     result = runner.invoke(app, ["--help"])
@@ -69,15 +72,14 @@ import asyncio
 import typer
 from typing import Annotated
 
+
 @app.command()
-def fetch(
-    urls: Annotated[list[str], typer.Argument()],
-    max_concurrent: Annotated[int, typer.Option()] = 10,
-) -> None:
+def fetch(urls: Annotated[list[str], typer.Argument()], max_concurrent: Annotated[int, typer.Option()] = 10) -> None:
     """Fetch multiple URLs concurrently."""
     results = asyncio.run(_fetch_all(urls, max_concurrent))
     for result in results:
         console.print(result)
+
 
 async def _fetch_all(urls: list[str], limit: int) -> list[str]:
     sem = asyncio.Semaphore(limit)

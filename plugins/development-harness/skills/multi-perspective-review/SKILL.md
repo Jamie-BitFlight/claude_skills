@@ -168,7 +168,7 @@ and must run in parallel. Each worker receives a minimal prompt that invokes `st
 `start-task` owns claim, active-task registration, and execution. The `agent:` field in each
 SAM task tells `dh:task-worker` which specialist profile to load via `profile_load` internally.
 
-**Dispatch `dh:task-worker` exclusively — never `general-purpose`.**
+**Dispatch `dh:task-worker` exclusively; specialist behavior is loaded through each task's profile.**
 
 ```text
 Agent(
@@ -361,7 +361,7 @@ the task reference `{PA}/T{N}` to the worker prompt.
 - **All four verdicts must arrive before the gate runs.** Do not apply the gate on partial results.
 - **Check-or-create prevents plan accumulation.** Always call `sam_plan(action='list')` before
   `sam_plan(action='create')`.
-- **Dispatch uses `dh:task-worker` exclusively.** Never substitute `general-purpose`.
+- **Dispatch uses `dh:task-worker` exclusively.** Specialist behavior is selected through the task profile.
 - **Do not embed the verdict schema or UI pattern list.** Reference
   [./references/verdict-schema.md](./references/verdict-schema.md) for all schema definitions.
 - **Each ephemeral task body must embed the newline-separated changed-files list.** Workers read

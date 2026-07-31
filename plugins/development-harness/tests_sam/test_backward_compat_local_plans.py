@@ -55,15 +55,39 @@ class _EmptyArtifactStore:
         return None
 
 
+class _EmptyArtifactRegistryClient(ArtifactRegistryClient):
+    """ArtifactRegistryClient that delegates reads/writes to an empty in-memory store.
+
+    Using a subclass instead of monkey-patching bound methods keeps the
+    interface contract visible to the type checker (same signatures as the
+    parent) and avoids method-assign diagnostics.
+    """
+
+    def __init__(self, store: _EmptyArtifactStore) -> None:
+        """Initialise with an empty in-memory store."""
+        super().__init__()
+        self._store = store
+
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+        """Delegate to the in-memory store."""
+        self._store.store(issue, content, artifact_type=artifact_type)
+
+    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+        """Delegate to the in-memory store."""
+        return self._store.read(issue, artifact_type)
+
+    def store_index(self, sentinel_issue: int, content: str) -> None:
+        """Delegate to the in-memory store."""
+        self._store.store_index(sentinel_issue, content)
+
+    def read_index(self, sentinel_issue: int) -> str | None:
+        """Delegate to the in-memory store."""
+        return self._store.read_index(sentinel_issue)
+
+
 def _make_empty_client() -> ArtifactRegistryClient:
     """Return an ArtifactRegistryClient backed by an empty store."""
-    store = _EmptyArtifactStore()
-    client = ArtifactRegistryClient.__new__(ArtifactRegistryClient)
-    client.store = store.store  # type: ignore[method-assign]
-    client.read = store.read  # type: ignore[method-assign]
-    client.store_index = store.store_index  # type: ignore[method-assign]
-    client.read_index = store.read_index  # type: ignore[method-assign]
-    return client
+    return _EmptyArtifactRegistryClient(_EmptyArtifactStore())
 
 
 _SENTINEL_ISSUE = 99  # Non-zero sentinel — but read_index returns None, so index is always empty.

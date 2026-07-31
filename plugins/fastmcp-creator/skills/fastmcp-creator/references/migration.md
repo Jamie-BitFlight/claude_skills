@@ -33,6 +33,7 @@ RULE: `@mcp.tool` (no parentheses) is the v3 canonical pattern. `@mcp.tool()` wi
 def my_tool(x: int) -> str:
     return str(x)
 
+
 # v3 — without parentheses (correct)
 @mcp.tool
 def my_tool(x: int) -> str:
@@ -48,13 +49,12 @@ RULE: Use `task=True` in v3. `task=TaskConfig(mode="required")` is the v2 API an
 ```python
 # v2 — old TaskConfig API (breaks in v3)
 @mcp.tool(task=TaskConfig(mode="required"))
-def long_running() -> str:
-    ...
+def long_running() -> str: ...
+
 
 # v3 — correct
 @mcp.tool(task=True)
-def long_running() -> str:
-    ...
+def long_running() -> str: ...
 ```
 
 CONSTRAINT: `task=True` requires `pip install "fastmcp[tasks]"`. Without the extra, this raises an import error at runtime.
@@ -66,15 +66,15 @@ RULE: `require_auth` was removed in v3. Use `require_scopes("scope")` for endpoi
 ```python
 # v2 — removed in v3
 @mcp.tool(require_auth=True)
-def protected_tool() -> str:
-    ...
+def protected_tool() -> str: ...
+
 
 # v3 — correct pattern
 from fastmcp.server.auth import require_scopes
 
+
 @mcp.tool(auth=require_scopes("read"))
-def protected_tool() -> str:
-    ...
+def protected_tool() -> str: ...
 ```
 
 ### 4. Constructor — Transport Settings Removed
@@ -165,12 +165,15 @@ await ctx.set_state("client", my_http_client, serializable=False)
 # v2 — PromptMessage
 from mcp.types import PromptMessage, TextContent
 
+
 @mcp.prompt
 def my_prompt() -> PromptMessage:
     return PromptMessage(role="user", content=TextContent(type="text", text="Hello"))
 
+
 # v3 — Message (simpler)
 from fastmcp.prompts import Message
+
 
 @mcp.prompt
 def my_prompt() -> Message:
@@ -182,10 +185,7 @@ Multi-turn prompts:
 ```python
 @mcp.prompt
 def debug(error: str) -> list[Message]:
-    return [
-        Message(f"I'm seeing: {error}"),
-        Message("I'll help debug that.", role="assistant"),
-    ]
+    return [Message(f"I'm seeing: {error}"), Message("I'll help debug that.", role="assistant")]
 ```
 
 ### 9. Auth Providers No Longer Auto-Load Env Vars
@@ -200,10 +200,7 @@ auth = GitHubProvider()
 import os
 from fastmcp.server.auth.providers.github import GitHubProvider
 
-auth = GitHubProvider(
-    client_id=os.environ["GITHUB_CLIENT_ID"],
-    client_secret=os.environ["GITHUB_CLIENT_SECRET"],
-)
+auth = GitHubProvider(client_id=os.environ["GITHUB_CLIENT_ID"], client_secret=os.environ["GITHUB_CLIENT_SECRET"])
 ```
 
 ### 10. OAuth Default Storage Changed
@@ -217,10 +214,12 @@ Use `StreamableHttpTransport` instead of the removed `WSTransport`.
 ```python
 # v2 — removed
 from fastmcp.client.transports import WSTransport
+
 transport = WSTransport("ws://localhost:8000/ws")
 
 # v3 — correct
 from fastmcp.client.transports import StreamableHttpTransport
+
 transport = StreamableHttpTransport("http://localhost:8000/mcp")
 ```
 
@@ -283,6 +282,7 @@ from fastmcp.server.providers.openapi import OpenAPIProvider
 
 # FastMCPOpenAPI pattern — also deprecated, use provider instead
 from fastmcp import FastMCP
+
 server = FastMCP("my_api", providers=[OpenAPIProvider(spec, client)])
 ```
 
@@ -294,6 +294,7 @@ mcp.add_tool_transformation("name", config)
 
 # New
 from fastmcp.server.transforms import ToolTransform
+
 mcp.add_transform(ToolTransform({"name": config}))
 ```
 
@@ -305,6 +306,7 @@ proxy = FastMCP.as_proxy("http://example.com/mcp")
 
 # New
 from fastmcp.server import create_proxy
+
 proxy = create_proxy("http://example.com/mcp")
 ```
 
@@ -333,6 +335,7 @@ mcp.run(transport="http", host="0.0.0.0", port=8080)
 
 # Prompt returns — plain string works, or use Message
 from fastmcp.prompts import Message
+
 
 @mcp.prompt
 def review(code: str) -> str:
@@ -371,13 +374,11 @@ from mcp.server.stdio import stdio_server
 
 server = Server("my-server")
 
+
 async def main():
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream,
-            write_stream,
-            server.create_initialization_options(),
-        )
+        await server.run(read_stream, write_stream, server.create_initialization_options())
+
 
 asyncio.run(main())
 
@@ -408,15 +409,18 @@ async def list_tools() -> list[types.Tool]:
         )
     ]
 
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict):
     if name == "add":
         return [types.TextContent(type="text", text=str(arguments["a"] + arguments["b"]))]
 
+
 # After — one decorator, type hints become JSON Schema
 from fastmcp import FastMCP
 
 mcp = FastMCP("math")
+
 
 @mcp.tool
 def add(a: float, b: float) -> float:
@@ -443,8 +447,10 @@ def add(a: float, b: float) -> float:
 @server.list_resources()
 async def list_resources(): ...
 
+
 @server.list_resource_templates()
 async def list_resource_templates(): ...
+
 
 @server.read_resource()
 async def read_resource(uri: AnyUrl) -> str:
@@ -452,11 +458,13 @@ async def read_resource(uri: AnyUrl) -> str:
         return json.dumps({"debug": False})
     ...
 
+
 # After — one decorator per resource; {placeholders} auto-register templates
 @mcp.resource("config://app", mime_type="application/json")
 def app_config() -> str:
     """Application configuration"""
     return json.dumps({"debug": False})
+
 
 @mcp.resource("users://{user_id}/profile")
 def user_profile(user_id: str) -> str:
@@ -471,12 +479,14 @@ def user_profile(user_id: str) -> str:
 @server.list_prompts()
 async def list_prompts(): ...
 
+
 @server.get_prompt()
-async def get_prompt(name: str, arguments: dict) -> types.GetPromptResult:
-    ...
+async def get_prompt(name: str, arguments: dict) -> types.GetPromptResult: ...
+
 
 # After — one decorator; return str (auto-wrapped as user message)
 from fastmcp.prompts import Message
+
 
 @mcp.prompt
 def review_code(code: str, language: str | None = None) -> str:
@@ -494,10 +504,12 @@ async def call_tool(name: str, arguments: dict):
     ctx = server.request_context
     await ctx.session.send_log_message(level="info", data="Starting...")
 
+
 # After — FastMCP Context injected by parameter type
 from fastmcp import FastMCP, Context
 
 mcp = FastMCP("worker")
+
 
 @mcp.tool
 async def process(ctx: Context) -> str:

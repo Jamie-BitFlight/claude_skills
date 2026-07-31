@@ -30,6 +30,7 @@ Claude Code sessions do NOT have a TTY attached. When a tool requires a TTY (err
 
    ```python
    import pty, os
+
    master, slave = pty.openpty()
    # slave fd is a real TTY: os.ttyname(slave)
    ```

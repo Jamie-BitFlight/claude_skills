@@ -145,10 +145,7 @@ from textual.binding import Binding
 class Counter(Widget):
     can_focus = True
 
-    BINDINGS = [
-        Binding("up,k", "change_count(1)", "Increment"),
-        Binding("down,j", "change_count(-1)", "Decrement"),
-    ]
+    BINDINGS = [Binding("up,k", "change_count(1)", "Increment"), Binding("down,j", "change_count(-1)", "Decrement")]
 
     count = 0
 
@@ -179,11 +176,7 @@ class FizzBuzzWidget(Widget):
     def render(self) -> Table:
         table = Table("Number", "Fizz", "Buzz")
         for n in range(1, 16):
-            table.add_row(
-                str(n),
-                "Fizz" if n % 3 == 0 else "",
-                "Buzz" if n % 5 == 0 else "",
-            )
+            table.add_row(str(n), "Fizz" if n % 3 == 0 else "", "Buzz" if n % 5 == 0 else "")
         return table
 ```
 

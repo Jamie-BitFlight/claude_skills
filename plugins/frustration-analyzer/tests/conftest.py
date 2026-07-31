@@ -19,7 +19,7 @@ import pytest
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from socket import _Address, _RetAddress
+    from socket import _Address
 
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "localhost.localdomain", ""})
 
@@ -46,6 +46,16 @@ import tiktoken as _tk
 # so the network guard blocks the download.  Try to load the real encoding
 # first; if that fails (no cache + network blocked), fall back to a byte-level
 # mock that can encode any string without the real BPE tables.
+_mock_enc: _tk.Encoding | None = None
+
+
+def _mock_get_encoding(encoding_name: str) -> _tk.Encoding:
+    """Return the byte-level mock encoder used when real BPE tables are unavailable."""
+    if _mock_enc is None:
+        raise RuntimeError("Mock encoding has not been initialized")
+    return _mock_enc
+
+
 try:
     _tk.get_encoding("cl100k_base")
 except OSError:
@@ -55,11 +65,7 @@ except OSError:
         mergeable_ranks={bytes([i]): i for i in range(256)},
         special_tokens={},
     )
-
-    def _mock_get_encoding(name: str, **kwargs: object) -> _tk.Encoding:
-        return _mock_enc
-
-    _tk.get_encoding = _mock_get_encoding
+    _network_patch.setattr(_tk, "get_encoding", _mock_get_encoding)
 
 
 def _is_local(address: _Address) -> bool:
@@ -84,9 +90,7 @@ def _guarded_connect_ex(self: socket.socket, address: _Address) -> int:
     return _real_connect_ex(self, address)
 
 
-def _guarded_getaddrinfo(
-    host: str | bytes | None, port: str | bytes | int | None, *args: int, **kwargs: int
-) -> list[tuple[socket.AddressFamily, socket.SocketKind, int, str, _RetAddress]]:
+def _guarded_getaddrinfo(host: str | bytes | None, port: str | bytes | int | None, *args: int, **kwargs: int):
     if not (_state["allowed"] or _is_local((host, port))):
         msg = f"Blocked DNS resolution of {host!r}. {_ADVICE}"
         raise NetworkBlocked(msg)

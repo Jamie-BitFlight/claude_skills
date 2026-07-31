@@ -106,7 +106,7 @@ class TestRuamelYAMLHandler:
 
         post = load_frontmatter(md)
         result = dump_frontmatter(post)
-        assert 'description: No quotes needed here' in result
+        assert "description: No quotes needed here" in result
         assert '"No quotes needed here"' not in result
         assert "'No quotes needed here'" not in result
 

@@ -72,13 +72,15 @@ Hatchling uses **pluggy** for plugin registration and management:
 from hatchling.plugin import hookimpl
 from .plugin import SpecialBuilder
 
+
 @hookimpl
 def hatch_register_builder():
     return SpecialBuilder
 
+
 # Implementation in plugin.py
 class SpecialBuilder(BuilderInterface):
-    PLUGIN_NAME = 'special'  # User-facing identifier
+    PLUGIN_NAME = "special"  # User-facing identifier
 ```
 
 ### Plugin Categories
@@ -144,11 +146,11 @@ version-file = "src/mypackage/_version.py"
 
 ```python
 class CythonBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'cython'
+    PLUGIN_NAME = "cython"
 
     @staticmethod
     def dependencies():
-        return ['cython>=0.29']
+        return ["cython>=0.29"]
 
     def initialize(self, version, build_data):
         # Compile .pyx files
@@ -163,11 +165,11 @@ class CythonBuildHook(BuildHookInterface):
 
 ```python
 class RequirementsTxtHook(MetadataHookInterface):
-    PLUGIN_NAME = 'requirements-txt'
+    PLUGIN_NAME = "requirements-txt"
 
     def update(self, metadata):
-        with open(os.path.join(self.root, 'requirements.txt')) as f:
-            metadata['dependencies'] = f.read().splitlines()
+        with open(os.path.join(self.root, "requirements.txt")) as f:
+            metadata["dependencies"] = f.read().splitlines()
 ```
 
 ### Example 4: Custom Version Format
@@ -178,7 +180,7 @@ class RequirementsTxtHook(MetadataHookInterface):
 
 ```python
 class CalendarVersionScheme(VersionSchemeInterface):
-    PLUGIN_NAME = 'calver'
+    PLUGIN_NAME = "calver"
 
     def update(self, desired_version, original_version, version_data):
         # Validate calendar version format
@@ -215,8 +217,9 @@ hatch-myfeature/
 # src/hatch_myfeature/plugin.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class MyBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'myfeature'
+    PLUGIN_NAME = "myfeature"
 
     def initialize(self, version, build_data):
         # Implementation
@@ -229,6 +232,7 @@ class MyBuildHook(BuildHookInterface):
 # src/hatch_myfeature/hooks.py
 from hatchling.plugin import hookimpl
 from .plugin import MyBuildHook
+
 
 @hookimpl
 def hatch_register_build_hook():
@@ -270,23 +274,21 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import pytest
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope="session")
 def plugin_dir():
     with TemporaryDirectory() as d:
-        directory = Path(d, 'plugin')
-        shutil.copytree(
-            Path.cwd(),
-            directory,
-            ignore=shutil.ignore_patterns('.git', '.venv')
-        )
+        directory = Path(d, "plugin")
+        shutil.copytree(Path.cwd(), directory, ignore=shutil.ignore_patterns(".git", ".venv"))
         yield directory.resolve()
+
 
 @pytest.fixture
 def new_project(tmp_path, plugin_dir):
-    project_dir = tmp_path / 'my-app'
+    project_dir = tmp_path / "my-app"
     project_dir.mkdir()
-    project_file = project_dir / 'pyproject.toml'
-    project_file.write_text(f'''
+    project_file = project_dir / "pyproject.toml"
+    project_file.write_text(f"""
 [build-system]
 requires = ["hatchling", "hatch-myfeature @ {plugin_dir.as_uri()}"]
 build-backend = "hatchling.build"
@@ -294,7 +296,7 @@ build-backend = "hatchling.build"
 [project]
 name = "my-app"
 version = "0.1.0"
-''')
+""")
     return project_dir
 ```
 

@@ -121,7 +121,7 @@ Focused plugins that teach Claude specific conventions or tools without heavy wo
 
 The SAM (Stateless Agent Methodology) pipeline in a single plugin. Every feature request moves through seven stages that each produce a file artifact: Discovery, Planning (with RT-ICA information completeness analysis), Context Integration, Task Decomposition, Execution, Forensic Review, and Final Verification.
 
-Language plugins like `python3-development` plug into the harness by telling it which specialist agents to use for each task. Without a language plugin, the harness falls back to general-purpose agents.
+Language plugins like `python3-development` plug into the harness by telling it which specialist agents to use for each task. Without a language plugin, the harness falls back to `dh:task-worker`, which executes the task without a specialist profile.
 
 Install name: `dh`
 
@@ -129,7 +129,7 @@ Install name: `dh`
 
 **Agents include:** `@dh:swarm-task-planner`, `@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:feature-verifier`, `@dh:doc-drift-auditor`, and more.
 
-**MCP servers:** Backlog server (GitHub Issues sync, artifact management, dispatch orchestration), sequential-thinking server.
+**MCP servers:** Backlog and SAM servers for selected structured workflow operations, artifact management, and dispatch orchestration; sequential-thinking server. Provider-native operations remain on the configured backend (for example, `bd` in a Beads workspace).
 
 ### python3-development
 

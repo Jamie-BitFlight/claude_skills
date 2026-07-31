@@ -159,6 +159,7 @@ Or using a metadata hook:
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 from pathlib import Path
 
+
 class VersionHook(MetadataHookInterface):
     def update(self, metadata):
         version_file = Path(self.root) / "VERSION"
@@ -290,6 +291,7 @@ All metadata from one JSON file:
 import json
 from pathlib import Path
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class MetadataHook(MetadataHookInterface):
     def update(self, metadata):

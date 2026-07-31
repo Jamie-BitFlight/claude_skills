@@ -119,7 +119,7 @@ routing.
 
 - **Backlog CRUD**: `backlog_add` (`backlog add`), `backlog_list` (`backlog list`), `backlog_view` (`backlog view`), `backlog_update` (`backlog update`), `backlog_close` (`backlog close`), `backlog_resolve` (`backlog resolve`), `backlog_groom` (`backlog groom`), `backlog_sync` (`backlog sync`), `backlog_normalize` (`backlog normalize`), `backlog_pull` (`backlog pull`), `backlog_strike_entry` (`backlog strike`).
 - **Comments**: `backlog_comment_issue` (`comment-issue`), `backlog_list_comments` (`comments`), `backlog_read_comment` (`read-comment`).
-- **GitHub metadata**: `backlog_list_issues` (`issues`), `backlog_list_labels` (`labels`), `backlog_list_milestones` (`milestones`), `backlog_create_milestone` (`create-milestone`), `backlog_list_projects` (`projects`), `backlog_create_project` (`create-project`), `backlog_list_merged_prs` (`merged-prs`), `backlog_get_soonest_milestone` (`soonest-milestone`).
+- **GitHub-specific metadata**: `backlog_list_issues` (`issues`), `backlog_list_labels` (`labels`), `backlog_list_milestones` (`milestones`), `backlog_create_milestone` (`create-milestone`), `backlog_list_projects` (`projects`), `backlog_create_project` (`create-project`), `backlog_list_merged_prs` (`merged-prs`), `backlog_get_soonest_milestone` (`soonest-milestone`).
 - **SAM task bridges**: `backlog_create_sam_task` (`sam-task-create`), `backlog_get_ready_sam_tasks` (`sam-ready-tasks`), `backlog_get_sam_tasks` (`sam-tasks`), `backlog_update_sam_task_status` (`sam-task-status`).
 - **Artifacts**: `artifact_register` (`artifact register`), `artifact_list` (`artifact list`), `artifact_get` (`artifact get`), `artifact_read` (`artifact read`), `artifact_migrate` (`artifact migrate`).
 - **SAM plan/task sub-operations**: the MCP composites `sam_plan` (actions: read, create, list, status, ready, update, append_task, finalize) and `sam_task` (actions: read, claim, state, update) are exposed on the CLI as individual sub-commands (`create`, `read`, `list`, `state`, `ready`, `status`, `update`, `claim`, `append-task`, `finalize`). The CLI does not expose the composite `sam_plan`/`sam_task` verbs themselves, but every composite sub-operation is reachable. The CLI also has a standalone `validate` command (plan-schema validation) that is not a sub-action of either composite.
@@ -145,8 +145,8 @@ Per decision DEC-1 in the remediation plan, `close` (`backlog_close`) and `resol
 
 This section is the single authoritative statement of the current backlog persistence boundary (audit clause B4, verdict `aligns`). It documents current state only; it does not claim the boundary is removed.
 
-- **GitHub Issues are the source of truth for the default backend.** The `github` backend is the default; `~/.dh/projects/{slug}/backlog/` per-item markdown files are a derived local cache updated by `backlog_sync` and `backlog_pull`. When the local cache and the backend disagree, the backend wins.
-- **Only `GitHubBackend` is remote-backed.** Among the four `BacklogBackend` implementations (`github`, `sqlite`, `memory`, `beads`), only `github` writes to a remote platform. `sqlite` and `memory` are local-only; `beads` routes to the local `bd` CLI (the beads issue tracker; storage is the `bd` process's concern, not named here). A deployment that needs cross-environment backlog durability must use the `github` backend.
+- **The active backend is the source of truth.** In the default `github` deployment, GitHub Issues are canonical and `~/.dh/projects/{slug}/backlog/` per-item markdown files are a derived local cache updated by `backlog_sync` and `backlog_pull`. With `sqlite`, `memory`, or `beads`, the corresponding selected backend owns the native state.
+- **Remote and local durability are provider-specific.** Among the current `BacklogBackend` implementations, `github` is remote-backed; `sqlite` and `memory` are local-only; `beads` routes to the local `bd` CLI. A deployment needing cross-environment backlog durability must select a backend that provides it; this is not a universal property of the MCP layer.
 - **Branch operations are not capability-gated.** `create_integration_branch`, `get_integration_branch_status`, `merge_integration_branch`, `delete_integration_branch`, and `list_integration_branches` are `BacklogBackend` Protocol methods, but only `GitHubBackend` implements them. `SQLiteBackend` and `InMemoryBackend` raise `RuntimeError` ("branch operations not supported; use the GitHub backend") rather than reporting unsupported via a capability flag — so callers cannot branch on a capability property to detect support; they must catch the `RuntimeError`. Capability-gating branch ops is the target of task T-P6-PROTOCOL.
 - **This is consistent with PURPOSE.md "Current Boundary"** ("Backlog persistence remains partly GitHub- and filesystem-shaped") and with the audit's high-confidence `aligns` verdict for B4.
 
@@ -398,7 +398,7 @@ How each platform maps to the three SAM primitives:
 
 1. **Follow each platform's native primitive** -- Linear uses Attachments for structured metadata, not fake custom fields. GitLab uses issue description sections until its custom field API matures. Each provider maps to what the platform actually supports.
 
-2. **Backend as source of truth, local files as cache** -- same pattern as the current backlog MCP where GitHub Issues are canonical and `~/.dh/projects/{slug}/backlog/` files are derived. Future backends maintain this direction: the remote platform is authoritative, local state is a sync target.
+2. **Selected backend as source of truth, local files as cache where supported** -- in the default GitHub deployment, GitHub Issues are canonical and `~/.dh/projects/{slug}/backlog/` files are derived. Other providers define their own native durability and synchronization behavior; the MCP layer does not impose a universal remote/cache model.
 
 3. **Protocol-based abstraction** -- consumers call the same MCP tools (`backlog_*`, `sam_*`, `artifact_*`) regardless of which backend is active. Backend selection is a server configuration concern, not a consumer concern.
 
@@ -421,8 +421,9 @@ Defined as `ArtifactBackend` in `backlog_core/artifact_provider.py`. Four provid
 ```python
 @runtime_checkable
 class DocumentBackend(Protocol):
-    def list_documents(self, owner_id: int, owner_type: str = "work_item",
-                       stage: str | None = None, doc_type: str | None = None) -> list[DocumentMeta]:
+    def list_documents(
+        self, owner_id: int, owner_type: str = "work_item", stage: str | None = None, doc_type: str | None = None
+    ) -> list[DocumentMeta]:
         """Return document metadata for the given owner, optionally filtered.
 
         owner_type is "work_item" or "sub_item". stage is S1-S7 or None for all.
@@ -437,9 +438,9 @@ class DocumentBackend(Protocol):
         """
         ...
 
-    def store_document(self, owner_id: int, owner_type: str, stage: str,
-                       doc_type: str, title: str, content: str,
-                       fmt: str = "md") -> DocumentMeta:
+    def store_document(
+        self, owner_id: int, owner_type: str, stage: str, doc_type: str, title: str, content: str, fmt: str = "md"
+    ) -> DocumentMeta:
         """Store a document durably and return its metadata including content_ref.
 
         The backend persists content using its native storage primitive (e.g.
@@ -690,15 +691,12 @@ class TaskBackend(Protocol):
         """Read a plan by backend-assigned identifier (e.g. 'Pd9e0f1a2')."""
         ...
 
-    def list_plans(
-        self, *, search: str | None = None, offset: int = 0, limit: int | None = None
-    ) -> list[PlanSummary]:
+    def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return lightweight summaries, optionally filtered by substring."""
         ...
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None,
-        set_fields: dict[str, str | int | list[str]] | None = None,
+        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
     ) -> None:
         """Update top-level fields on a plan."""
         ...
@@ -720,15 +718,11 @@ class TaskBackend(Protocol):
         """Set task status. Valid: not-started, in-progress, complete, blocked, deferred, skipped."""
         ...
 
-    def update_task_fields(
-        self, plan_id: str, task_id: str, fields: dict[str, str | int | list[str]]
-    ) -> None:
+    def update_task_fields(self, plan_id: str, task_id: str, fields: dict[str, str | int | list[str]]) -> None:
         """Set one or more scalar fields on a task."""
         ...
 
-    def append_task_section(
-        self, plan_id: str, task_id: str, section_name: str, content: str
-    ) -> None:
+    def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append markdown content to a named section of a task body."""
         ...
 
@@ -743,8 +737,7 @@ class TaskBackend(Protocol):
     # -- Documents --
 
     def store_document(
-        self, plan_id: str, task_id: str | None, stage: str, doc_type: str,
-        title: str, content: str, fmt: str = "md",
+        self, plan_id: str, task_id: str | None, stage: str, doc_type: str, title: str, content: str, fmt: str = "md"
     ) -> DocumentHandle:
         """Persist a document and return an opaque retrieval handle."""
         ...

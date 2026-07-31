@@ -19,13 +19,11 @@ To use dynamic dependencies, implement the `dependencies()` method in your custo
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self):
         """Return list of build dependencies required for this hook"""
-        return [
-            'numpy>=1.20.0',
-            'cython>=0.29.0',
-        ]
+        return ["numpy>=1.20.0", "cython>=0.29.0"]
 
     def initialize(self, version, build_data):
         # Your hook initialization code
@@ -56,13 +54,14 @@ path = "hooks/custom.py"
 ```python
 import platform
 
+
 class PlatformSpecificHook(BuildHookInterface):
     def dependencies(self):
         deps = []
-        if platform.system() == 'Windows':
-            deps.append('pywin32>=300')
-        elif platform.system() == 'Darwin':
-            deps.append('pyobjc>=8.0')
+        if platform.system() == "Windows":
+            deps.append("pywin32>=300")
+        elif platform.system() == "Darwin":
+            deps.append("pyobjc>=8.0")
         return deps
 ```
 
@@ -71,11 +70,12 @@ class PlatformSpecificHook(BuildHookInterface):
 ```python
 import sys
 
+
 class VersionSpecificHook(BuildHookInterface):
     def dependencies(self):
-        deps = ['wheel']
+        deps = ["wheel"]
         if sys.version_info < (3, 10):
-            deps.append('typing-extensions>=4.0.0')
+            deps.append("typing-extensions>=4.0.0")
         return deps
 ```
 
@@ -84,10 +84,11 @@ class VersionSpecificHook(BuildHookInterface):
 ```python
 import os
 
+
 class EnvDependentHook(BuildHookInterface):
     def dependencies(self):
-        if os.getenv('BUILD_WITH_CYTHON'):
-            return ['cython>=0.29.0']
+        if os.getenv("BUILD_WITH_CYTHON"):
+            return ["cython>=0.29.0"]
         return []
 ```
 

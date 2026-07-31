@@ -510,7 +510,14 @@ def rank_arms(scored_arms: list[tuple[str, ArmMetrics]]) -> list[ArmRanking]:
             payoffs.append(entry)
 
     # Sort arms with computed payoffs: highest payoff first; tiebreak by name.
-    payoffs.sort(key=lambda r: (-r.payoff_per_cost, r.arm_name))  # type: ignore[operator]
+    def _rank_key(entry: ArmRanking) -> tuple[float, str]:
+        ppc = entry.payoff_per_cost
+        if ppc is None:
+            msg = "expected non-None payoff_per_cost in ranked payoffs"
+            raise ValueError(msg)
+        return (-ppc, entry.arm_name)
+
+    payoffs.sort(key=_rank_key)
 
     ranked: list[ArmRanking] = []
     for position, entry in enumerate(payoffs + no_cost, start=1):

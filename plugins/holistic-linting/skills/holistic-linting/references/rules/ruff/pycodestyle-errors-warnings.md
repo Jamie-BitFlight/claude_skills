@@ -65,6 +65,7 @@ x = 1  # No indentation where expected
 def func():
     x = 1
 
+
 if True:
     x = 1
 ```
@@ -85,9 +86,9 @@ if True:
 **When it's a violation**:
 
 ```python
-func( x, y )  # E201, E202
-x = [ 1, 2, 3 ]  # E201, E202
-result = func( )  # E201, E202
+func(x, y)  # E201, E202
+x = [1, 2, 3]  # E201, E202
+result = func()  # E201, E202
 ```
 
 **When it's NOT a violation**:
@@ -109,10 +110,11 @@ result = func()
 **When it's a violation**:
 
 ```python
-def func (x):
+def func(x):
     pass
 
-func (1, 2)
+
+func(1, 2)
 ```
 
 **When it's NOT a violation**:
@@ -120,6 +122,7 @@ func (1, 2)
 ```python
 def func(x):
     pass
+
 
 func(1, 2)
 ```
@@ -142,10 +145,10 @@ func(1, 2)
 **When it's a violation**:
 
 ```python
-x=1+2  # E225
-x = 1+2  # E225
-x  = 1 + 2  # E221
-x = 1 +  2  # E222
+x = 1 + 2  # E225
+x = 1 + 2  # E225
+x = 1 + 2  # E221
+x = 1 + 2  # E222
 ```
 
 **When it's NOT a violation**:
@@ -167,8 +170,8 @@ result = func(a, b)
 **When it's a violation**:
 
 ```python
-x = [1,2,3]
-func(a,b,c)
+x = [1, 2, 3]
+func(a, b, c)
 ```
 
 **When it's NOT a violation**:
@@ -190,7 +193,7 @@ func(a, b, c)
 **When it's a violation**:
 
 ```python
-x = [1,  2, 3]  # E241
+x = [1, 2, 3]  # E241
 ```
 
 ---
@@ -205,7 +208,7 @@ x = [1,  2, 3]  # E241
 **When it's a violation (E251)**:
 
 ```python
-def func(x = 1):  # Space around = in default parameter
+def func(x=1):  # Space around = in default parameter
     pass
 ```
 
@@ -214,6 +217,7 @@ def func(x = 1):  # Space around = in default parameter
 ```python
 def func(x=1):
     pass
+
 
 # Note: With annotations, spaces are allowed
 def func(x: int = 1):
@@ -235,8 +239,8 @@ def func(x: int = 1):
 
 ```python
 x = 1  # comment  # E261 - should have 2 spaces before
-x = 1 #comment  # E262 - need space after #
-#comment  # E265 - need space after #
+x = 1  # comment  # E262 - need space after #
+# comment  # E265 - need space after #
 ##comment  # E266 - multiple hashes
 ```
 
@@ -262,10 +266,10 @@ x = 1  # comment
 **When it's a violation**:
 
 ```python
-if  x:  # E271
+if x:  # E271
     pass
 
-for  item in items:  # E271
+for item in items:  # E271
     pass
 ```
 
@@ -289,6 +293,8 @@ for  item in items:  # E271
 ```python
 def func1():
     pass
+
+
 def func2():  # Should have 2 blank lines before
     pass
 ```
@@ -397,8 +403,7 @@ result = some_function(arg1, arg2, arg3) + another_function(arg4, arg5, arg6)  #
 **When it's NOT a violation** (with line-length=88):
 
 ```python
-result = some_function(arg1, arg2, arg3) + \
-    another_function(arg4, arg5, arg6)
+result = some_function(arg1, arg2, arg3) + another_function(arg4, arg5, arg6)
 ```
 
 **Note**: Often disabled when using a formatter (Ruff, Black), as formatters handle line length.
@@ -412,18 +417,15 @@ result = some_function(arg1, arg2, arg3) + \
 **When it's a violation**:
 
 ```python
-x = 1 \
-    + 2  # Backslash not needed in parentheses
+x = 1 + 2  # Backslash not needed in parentheses
 ```
 
 **When it's NOT a violation**:
 
 ```python
-x = (1
-     + 2)  # No backslash needed in parentheses
+x = 1 + 2  # No backslash needed in parentheses
 
-x = 1 + \
-    2  # OK when backslash is necessary
+x = 1 + 2  # OK when backslash is necessary
 ```
 
 ---
@@ -441,9 +443,11 @@ x = 1 + \
 **When it's a violation**:
 
 ```python
-if x: y = 1  # E701
-x = 1; y = 2  # E702
-x = 1;  # E703
+if x:
+    y = 1  # E701
+x = 1
+y = 2  # E702
+x = 1  # E703
 ```
 
 **When it's NOT a violation**:

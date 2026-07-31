@@ -251,14 +251,10 @@ python-platform = "linux"
 
     ```python
     result = function_call(  # ty: ignore[missing-argument]
-        arg1,
-        arg2
+        arg1, arg2
     )
     # OR
-    result = function_call(
-        arg1,
-        arg2
-    )  # ty: ignore[missing-argument]
+    result = function_call(arg1, arg2)  # ty: ignore[missing-argument]
     ```
 
 3. **Using `type: ignore[code]` expecting per-rule suppression** — `type: ignore[code]` suppresses ALL violations on the line in ty, not just the named code. Use `ty: ignore[rule]` for targeted suppression.

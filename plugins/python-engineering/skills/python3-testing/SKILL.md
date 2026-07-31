@@ -35,6 +35,7 @@ from string import Template
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
+
 @pytest.fixture
 def mock_binary(tmp_path: Path) -> Path:
     template_path = FIXTURES_DIR / "binaries" / "mock_binary_template.sh"
@@ -81,6 +82,7 @@ When Hypothesis is available:
 
 ```python
 from hypothesis import given, strategies as st
+
 
 @given(st.lists(st.integers()))
 def test_sort_maintains_length(data: list[int]) -> None:

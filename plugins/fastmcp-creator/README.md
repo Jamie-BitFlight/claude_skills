@@ -46,10 +46,12 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("my-server")
 
+
 @mcp.tool  # no parentheses — v3 canonical syntax
 def greet(name: str) -> str:
     """Return a greeting."""
     return f"Hello, {name}!"
+
 
 if __name__ == "__main__":
     mcp.run()
@@ -67,6 +69,7 @@ mcp.mount(sub_server, namespace="github")
 
 ```python
 from fastmcp import create_proxy
+
 mcp = create_proxy("http://remote-service/mcp")
 ```
 
@@ -74,6 +77,7 @@ mcp = create_proxy("http://remote-service/mcp")
 
 ```python
 from fastmcp.providers import FileSystemProvider
+
 mcp = FastMCP("docs", providers=[FileSystemProvider("./docs/")])
 ```
 
@@ -126,9 +130,11 @@ test harness.
 from fastmcp import Client
 import pytest
 
+
 @pytest.fixture
 def client(mcp_server):  # in-memory transport
     return Client(mcp_server)
+
 
 async def test_greet(client):
     result = await client.call_tool("greet", {"name": "world"})

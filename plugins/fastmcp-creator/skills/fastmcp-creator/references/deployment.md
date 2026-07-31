@@ -13,9 +13,11 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("MyServer")
 
+
 @mcp.tool
 def hello(name: str) -> str:
     return f"Hello, {name}!"
+
 
 if __name__ == "__main__":
     mcp.run()  # STDIO transport — default
@@ -42,8 +44,10 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(name="MyServer")
 
+
 async def main():
     await mcp.run_async(transport="http", port=8000)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -102,9 +106,11 @@ from starlette.responses import PlainTextResponse, JSONResponse
 
 mcp = FastMCP("MyServer")
 
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> PlainTextResponse:
     return PlainTextResponse("OK")
+
 
 @mcp.custom_route("/status", methods=["GET"])
 async def status(request: Request) -> JSONResponse:
@@ -126,9 +132,11 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("My Server")
 
+
 @mcp.tool
 def process_data(input: str) -> str:
     return f"Processed: {input}"
+
 
 if __name__ == "__main__":
     mcp.run(transport="http", host="0.0.0.0", port=8000)
@@ -145,9 +153,11 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("My Server")
 
+
 @mcp.tool
 def process_data(input: str) -> str:
     return f"Processed: {input}"
+
 
 app = mcp.http_app()
 ```
@@ -177,12 +187,7 @@ middleware = [
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=[
-            "mcp-protocol-version",
-            "mcp-session-id",
-            "Authorization",
-            "Content-Type",
-        ],
+        allow_headers=["mcp-protocol-version", "mcp-session-id", "Authorization", "Content-Type"],
         expose_headers=["mcp-session-id"],
     )
 ]
@@ -204,12 +209,10 @@ from starlette.applications import Starlette
 from starlette.routing import Mount
 
 mcp = FastMCP("MyServer")
-mcp_app = mcp.http_app(path='/mcp')
+mcp_app = mcp.http_app(path="/mcp")
 
 app = Starlette(
-    routes=[
-        Mount("/mcp-server", app=mcp_app),
-    ],
+    routes=[Mount("/mcp-server", app=mcp_app)],
     lifespan=mcp_app.lifespan,  # Required — must pass lifespan
 )
 ```
@@ -227,9 +230,11 @@ mcp_app = mcp.http_app(path="/")
 
 api = FastAPI(lifespan=mcp_app.lifespan)  # Required — must pass lifespan
 
+
 @api.get("/api/status")
 def status():
     return {"status": "ok"}
+
 
 api.mount("/mcp", mcp_app)
 
@@ -270,6 +275,7 @@ from fastmcp.server.event_store import EventStore
 
 mcp = FastMCP("My Server")
 
+
 @mcp.tool
 async def long_running_task(ctx: Context) -> str:
     for i in range(100):
@@ -278,6 +284,7 @@ async def long_running_task(ctx: Context) -> str:
             await ctx.close_sse_stream()  # Gracefully close, client will reconnect
         await do_expensive_work()
     return "Done!"
+
 
 event_store = EventStore()
 app = mcp.http_app(
@@ -293,11 +300,7 @@ from fastmcp.server.event_store import EventStore
 from key_value.aio.stores.redis import RedisStore
 
 redis_store = RedisStore(url="redis://localhost:6379")
-event_store = EventStore(
-    storage=redis_store,
-    max_events_per_stream=100,
-    ttl=3600,
-)
+event_store = EventStore(storage=redis_store, max_events_per_stream=100, ttl=3600)
 
 app = mcp.http_app(event_store=event_store)
 ```

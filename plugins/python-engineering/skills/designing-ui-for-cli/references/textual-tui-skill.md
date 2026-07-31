@@ -14,6 +14,7 @@ Basic app structure:
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Button
 
+
 class MyApp(App):
     """A simple Textual app."""
 
@@ -26,6 +27,7 @@ class MyApp(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button press."""
         self.exit()
+
 
 if __name__ == "__main__":
     app = MyApp()
@@ -59,16 +61,20 @@ Textual uses an async message queue for all interactions:
 ```python
 from textual.message import Message
 
+
 class CustomMessage(Message):
     """Custom message with data."""
+
     def __init__(self, value: int) -> None:
         self.value = value
         super().__init__()
+
 
 class MyWidget(Widget):
     def on_click(self) -> None:
         # Post message to parent
         self.post_message(CustomMessage(42))
+
 
 class MyApp(App):
     def on_custom_message(self, message: CustomMessage) -> None:
@@ -82,6 +88,7 @@ Use reactive attributes for automatic UI updates:
 
 ```python
 from textual.reactive import reactive
+
 
 class Counter(Widget):
     count = reactive(0)  # Reactive attribute
@@ -201,11 +208,13 @@ Or define custom colors:
 from textual.widgets import Input, Button, Select
 from textual.containers import Container
 
+
 def compose(self) -> ComposeResult:
     with Container(id="form"):
         yield Input(placeholder="Enter name", id="name")
         yield Select(options=[("A", 1), ("B", 2)], id="choice")
         yield Button("Submit", variant="primary")
+
 
 def on_button_pressed(self, event: Button.Pressed) -> None:
     name = self.query_one("#name", Input).value
@@ -235,10 +244,8 @@ log.write_line("Log entry")
 ### Containers and Layout
 
 ```python
-from textual.containers import (
-    Container, Horizontal, Vertical,
-    Grid, ScrollableContainer
-)
+from textual.containers import Container, Horizontal, Vertical, Grid, ScrollableContainer
+
 
 def compose(self) -> ComposeResult:
     with Vertical():
@@ -258,14 +265,17 @@ def compose(self) -> ComposeResult:
 ```python
 from textual.events import Key, Click, Mount
 
+
 def on_mount(self) -> None:
     """Called when widget is mounted."""
     self.log("Widget mounted!")
+
 
 def on_key(self, event: Key) -> None:
     """Handle all key presses."""
     if event.key == "q":
         self.app.exit()
+
 
 def on_click(self, event: Click) -> None:
     """Handle mouse clicks."""
@@ -279,6 +289,7 @@ def on_input_submitted(self, event: Input.Submitted) -> None:
     """Handle input submission."""
     self.query_one(Log).write(event.value)
 
+
 def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
     """Handle table row selection."""
     row_key = event.row_key
@@ -288,11 +299,7 @@ def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
 
 ```python
 class MyApp(App):
-    BINDINGS = [
-        ("q", "quit", "Quit"),
-        ("d", "toggle_dark", "Toggle dark mode"),
-        ("ctrl+s", "save", "Save"),
-    ]
+    BINDINGS = [("q", "quit", "Quit"), ("d", "toggle_dark", "Toggle dark mode"), ("ctrl+s", "save", "Save")]
 
     def action_quit(self) -> None:
         self.exit()
@@ -309,6 +316,7 @@ Create reusable components:
 ```python
 from textual.widget import Widget
 from textual.widgets import Label, Button
+
 
 class StatusCard(Widget):
     """A card showing status info."""
@@ -333,6 +341,7 @@ Run tasks in background threads:
 ```python
 from textual.worker import Worker, WorkerState
 
+
 class MyApp(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         # Start background task
@@ -350,6 +359,7 @@ class MyApp(App):
 Update UI during processing:
 ```python
 from textual.widgets import ProgressBar
+
 
 class MyApp(App):
     def compose(self) -> ComposeResult:
@@ -375,6 +385,7 @@ Use `call_from_thread` for thread-safe UI updates:
 ```python
 import time
 from threading import Thread
+
 
 class MyApp(App):
     def on_mount(self) -> None:
@@ -531,6 +542,7 @@ class MyApp(App):
 ```python
 from textual.screen import ModalScreen
 
+
 class ConfirmDialog(ModalScreen[bool]):
     """Modal confirmation dialog."""
 
@@ -543,6 +555,7 @@ class ConfirmDialog(ModalScreen[bool]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "yes")
+
 
 # Use in app
 # IMPORTANT: push_screen_wait() can only be called from within a worker.
@@ -559,6 +572,7 @@ async def confirm_action(self) -> None:
 ```python
 from textual.screen import Screen
 
+
 class MainScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
@@ -568,6 +582,7 @@ class MainScreen(Screen):
     def on_button_pressed(self) -> None:
         self.app.push_screen("settings")
 
+
 class SettingsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Label("Settings")
@@ -576,14 +591,12 @@ class SettingsScreen(Screen):
     def on_button_pressed(self) -> None:
         self.app.pop_screen()
 
+
 class MyApp(App):
     # SCREENS expects callables (classes), not instances.
     # Type: dict[str, Callable[[], Screen[Any]]]
     # SOURCE: https://textual.textualize.io/api/app/ — SCREENS type annotation
-    SCREENS = {
-        "main": MainScreen,
-        "settings": SettingsScreen,
-    }
+    SCREENS = {"main": MainScreen, "settings": SettingsScreen}
 ```
 
 ## Testing
@@ -607,11 +620,13 @@ import pytest
 from textual.pilot import Pilot
 from my_app import MyApp
 
+
 @pytest.mark.asyncio
 async def test_app_starts():
     app = MyApp()
     async with app.run_test() as pilot:
         assert app.screen is not None
+
 
 @pytest.mark.asyncio
 async def test_button_click():
@@ -619,6 +634,7 @@ async def test_button_click():
     async with app.run_test() as pilot:
         await pilot.click("#my-button")
         # Assert expected state changes
+
 
 @pytest.mark.asyncio
 async def test_keyboard_input():
@@ -649,8 +665,10 @@ async def test_keyboard_input():
 ```python
 from textual.widgets import RichLog
 
+
 def compose(self) -> ComposeResult:
     yield RichLog(id="log")
+
 
 async def action_risky_operation(self) -> None:
     try:

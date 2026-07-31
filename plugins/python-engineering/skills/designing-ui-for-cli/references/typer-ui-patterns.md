@@ -57,10 +57,11 @@ from rich.console import Console
 app = typer.Typer()
 err = Console(stderr=True)
 
+
 @app.command()
 def export(format: str = "json") -> None:
-    err.print("[dim]Exporting...[/dim]")       # stderr: shown to human, invisible to pipes
-    typer.echo(build_output(format))            # stdout: data (pipeable)
+    err.print("[dim]Exporting...[/dim]")  # stderr: shown to human, invisible to pipes
+    typer.echo(build_output(format))  # stdout: data (pipeable)
 ```
 
 SOURCE: `plugins/python-engineering/skills/python3-cli/references/typer-rich-non-tty-patterns.md`
@@ -92,9 +93,7 @@ Default is `"rich"` when Rich is installed. In `"rich"` mode, any `[tag]` in doc
 
 ```python
 @app.command()
-def create(
-    username: Annotated[str, typer.Argument(help="The username to be [green]created[/green]")],
-) -> None:
+def create(username: Annotated[str, typer.Argument(help="The username to be [green]created[/green]")]) -> None:
     """
     [bold green]Create[/bold green] a new [italic]shiny[/italic] user. :sparkles:
 
@@ -112,16 +111,9 @@ def create(
 def deploy(
     env: str,
     dry_run: Annotated[bool, typer.Option(help="Simulate only")] = False,
-    timeout: Annotated[
-        int,
-        typer.Option(help="Max seconds", rich_help_panel="Advanced"),
-    ] = 60,
-    retries: Annotated[
-        int,
-        typer.Option(help="Retry count", rich_help_panel="Advanced"),
-    ] = 3,
-) -> None:
-    ...
+    timeout: Annotated[int, typer.Option(help="Max seconds", rich_help_panel="Advanced")] = 60,
+    retries: Annotated[int, typer.Option(help="Retry count", rich_help_panel="Advanced")] = 3,
+) -> None: ...
 ```
 
 This produces a default `Options` panel for `dry_run` and a separate `Advanced` panel for
@@ -275,9 +267,9 @@ SOURCE: `plugins/python-engineering/skills/python3-cli/references/typer-rich-non
 
 ```python
 app = typer.Typer(
-    pretty_exceptions_enable=True,       # default: True — Rich formats exceptions
-    pretty_exceptions_short=True,        # default: True — hides Typer internals
-    pretty_exceptions_show_locals=False, # default: False since 0.23.0 — security: hides locals
+    pretty_exceptions_enable=True,  # default: True — Rich formats exceptions
+    pretty_exceptions_short=True,  # default: True — hides Typer internals
+    pretty_exceptions_show_locals=False,  # default: False since 0.23.0 — security: hides locals
 )
 ```
 
@@ -296,6 +288,7 @@ the layer that has meaningful context, and raise a typed exit immediately:
 ```python
 import typer
 from pathlib import Path
+
 
 class AppExit(typer.Exit):
     """Graceful exit with a user-facing message. Output in __init__, raise once."""
@@ -317,13 +310,9 @@ import typer
 
 err_console = Console(stderr=True)
 
+
 class AppExitRich(typer.Exit):
-    def __init__(
-        self,
-        code: int | None = None,
-        message: str | None = None,
-        console: Console = err_console,
-    ) -> None:
+    def __init__(self, code: int | None = None, message: str | None = None, console: Console = err_console) -> None:
         if message is not None:
             console.print(message)
         super().__init__(code=code)
@@ -345,9 +334,9 @@ def load_config(path: Path) -> dict:
 ### Exit Codes
 
 ```python
-raise typer.Exit()        # code 0 — success
+raise typer.Exit()  # code 0 — success
 raise typer.Exit(code=1)  # non-zero — error
-raise typer.Abort()       # prints "Aborted!", code 1 — user cancellation
+raise typer.Abort()  # prints "Aborted!", code 1 — user cancellation
 ```
 
 Always use `typer.Exit`, not `sys.exit()`. `CliRunner` captures `typer.Exit`; `sys.exit()`

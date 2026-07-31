@@ -40,16 +40,19 @@ Write workflows as regular Python functions with `@flow` and `@task` decorators:
 from prefect import flow, task
 import httpx
 
+
 @task(log_prints=True)
 def get_stars(repo: str):
     url = f"https://api.github.com/repos/{repo}"
     count = httpx.get(url).json()["stargazers_count"]
     print(f"{repo} has {count} stars!")
 
+
 @flow(name="GitHub Stars")
 def github_stars(repos: list[str]):
     for repo in repos:
         get_stars(repo)
+
 
 # Run directly
 if __name__ == "__main__":
@@ -65,9 +68,11 @@ Create tasks dynamically based on data, not static DAG definitions:
 ```python
 from prefect import task, flow
 
+
 @task
 def process_customer(customer_id: str) -> str:
     return f"Processed {customer_id}"
+
 
 @flow
 def main() -> list[str]:
@@ -89,7 +94,7 @@ if __name__ == "__main__":
     github_stars.serve(
         name="daily-stars",
         cron="0 8 * * *",  # Daily at 8 AM
-        parameters={"repos": ["PrefectHQ/prefect"]}
+        parameters={"repos": ["PrefectHQ/prefect"]},
     )
 ```
 
@@ -97,11 +102,7 @@ if __name__ == "__main__":
 
 ```python
 # Or use interval-based scheduling
-my_flow.deploy(
-    name="my-deployment",
-    work_pool_name="my-work-pool",
-    interval=timedelta(minutes=10)
-)
+my_flow.deploy(name="my-deployment", work_pool_name="my-work-pool", interval=timedelta(minutes=10))
 ```
 
 @[15]
@@ -138,13 +139,7 @@ React to events, not just schedules:
 
 ```python
 # Trigger flows on external events
-my_flow.deploy(
-    triggers=[
-        DeploymentEventTrigger(
-            expect=["s3.file.uploaded"]
-        )
-    ]
-)
+my_flow.deploy(triggers=[DeploymentEventTrigger(expect=["s3.file.uploaded"])])
 ```
 
 @[18]
@@ -158,12 +153,10 @@ Orchestrate dbt transformations within Prefect flows:
 ```python
 from prefect_dbt import DbtCoreOperation
 
+
 @flow
 def dbt_flow():
-    result = DbtCoreOperation(
-        commands=["dbt run", "dbt test"],
-        project_dir="/path/to/dbt/project"
-    ).run()
+    result = DbtCoreOperation(commands=["dbt run", "dbt test"], project_dir="/path/to/dbt/project").run()
     return result
 ```
 
@@ -223,18 +216,22 @@ services:
 from prefect import flow, task
 from prefect.tasks import exponential_backoff
 
+
 @task(retries=3, retry_delay_seconds=exponential_backoff(backoff_factor=2))
 def extract_data(source: str):
     # Fetch from API with automatic retries
     return fetch_api_data(source)
 
+
 @task
 def transform_data(raw_data):
     return clean_and_transform(raw_data)
 
+
 @task
 def load_data(data, destination: str):
     write_to_database(data, destination)
+
 
 @flow(log_prints=True)
 def etl_pipeline():
@@ -254,12 +251,13 @@ def sync_customer_data():
     for customer in customers:
         sync_to_warehouse(customer)
 
+
 # Schedule to run every hour
 if __name__ == "__main__":
     sync_customer_data.serve(
         name="hourly-sync",
         interval=3600,  # Every hour
-        tags=["production", "sync"]
+        tags=["production", "sync"],
     )
 ```
 
@@ -273,9 +271,11 @@ def load_training_data():
     # Expensive data loading - cached for 1 hour
     return load_large_dataset()
 
+
 @task
 def train_model(data):
     return train_ml_model(data)
+
 
 @flow
 def ml_pipeline():

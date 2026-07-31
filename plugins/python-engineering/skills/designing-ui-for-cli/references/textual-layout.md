@@ -210,7 +210,7 @@ Toggle in Python:
 
 ```python
 widget.display = False  # Hide
-widget.display = True   # Show
+widget.display = True  # Show
 ```
 
 ### Visibility

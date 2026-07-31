@@ -34,8 +34,10 @@ And accessed via:
 ```python
 # setup.py or elsewhere
 from package import __version__
+
 # or
 import importlib.metadata
+
 version = importlib.metadata.version("package-name")
 ```
 
@@ -60,8 +62,10 @@ __version__ = "0.2.5"
 
 # Access at runtime
 from . import __version__
+
 # or
 import importlib.metadata
+
 __version__ = importlib.metadata.version("package-name")
 ```
 
@@ -180,16 +184,13 @@ path = "hatch_build.py"
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 import subprocess
 
+
 class DynamicVersionHook(BuildHookInterface):
     def initialize(self, version, build_data):
         if not version or version == "0.0.0":
             # Compute version from git
             try:
-                version = subprocess.check_output(
-                    ["git", "describe", "--tags"],
-                    cwd=self.root,
-                    text=True
-                ).strip()
+                version = subprocess.check_output(["git", "describe", "--tags"], cwd=self.root, text=True).strip()
             except subprocess.CalledProcessError:
                 version = "0.0.0.dev0"
 
@@ -197,9 +198,7 @@ class DynamicVersionHook(BuildHookInterface):
             version_file = self.root / "src/package/_version.py"
             version_file.write_text(f'__version__ = "{version}"\n')
 
-            build_data['force_include'] = {
-                str(version_file): "package/_version.py"
-            }
+            build_data["force_include"] = {str(version_file): "package/_version.py"}
 ```
 
 **Advantages:**
@@ -238,6 +237,7 @@ Or with custom hook:
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class EnvVersionHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Read from environment
@@ -247,9 +247,7 @@ class EnvVersionHook(BuildHookInterface):
             version_file = self.root / "src/package/_version.py"
             version_file.write_text(f'__version__ = "{env_version}"\n')
 
-            build_data['force_include'] = {
-                str(version_file): "package/_version.py"
-            }
+            build_data["force_include"] = {str(version_file): "package/_version.py"}
 ```
 
 **Usage in CI/CD:**
@@ -335,10 +333,12 @@ Ensure applications can determine their version:
 ```python
 # Good: Available via import
 from package import __version__
+
 print(__version__)
 
 # Also good: Available via importlib.metadata
 import importlib.metadata
+
 version = importlib.metadata.version("package-name")
 ```
 
@@ -479,8 +479,10 @@ __version__ = "1.0.0"
 ```python
 # Any file needing version
 from package import __version__
+
 # or
 import importlib.metadata
+
 version = importlib.metadata.version("package-name")
 ```
 
@@ -490,11 +492,7 @@ version = importlib.metadata.version("package-name")
 
 ```python
 # Old setup.py
-setup(
-    name="myproject",
-    version="1.0.0",
-    packages=find_packages(),
-)
+setup(name="myproject", version="1.0.0", packages=find_packages())
 ```
 
 To Hatchling:

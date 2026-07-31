@@ -241,16 +241,18 @@ flowchart TD
 import re
 
 CONVENTIONAL_COMMIT_PATTERN = re.compile(
-    r'^(?P<type>feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)'
-    r'(?:\((?P<scope>[^)]+)\))?'
-    r'(?P<breaking>!)?'
-    r':\s'
-    r'(?P<description>.+)$'
+    r"^(?P<type>feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)"
+    r"(?:\((?P<scope>[^)]+)\))?"
+    r"(?P<breaking>!)?"
+    r":\s"
+    r"(?P<description>.+)$"
 )
+
 
 def validate_header(header: str) -> bool:
     """Validate commit header follows Conventional Commits."""
     return bool(CONVENTIONAL_COMMIT_PATTERN.match(header))
+
 
 def parse_header(header: str) -> dict | None:
     """Parse commit header into components."""
@@ -258,10 +260,10 @@ def parse_header(header: str) -> dict | None:
     if not match:
         return None
     return {
-        'type': match.group('type'),
-        'scope': match.group('scope'),
-        'breaking': bool(match.group('breaking')),
-        'description': match.group('description'),
+        "type": match.group("type"),
+        "scope": match.group("scope"),
+        "breaking": bool(match.group("breaking")),
+        "description": match.group("description"),
     }
 ```
 

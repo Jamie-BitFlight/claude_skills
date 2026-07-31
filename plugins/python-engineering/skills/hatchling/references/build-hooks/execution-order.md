@@ -125,11 +125,11 @@ Each hook can modify the `build_data` dictionary, which influences all subsequen
 
 ```python
 # hook1.initialize()
-build_data['artifacts'].append('*.so')
+build_data["artifacts"].append("*.so")
 
 # hook2.initialize() - sees the modified build_data from hook1
 # Can further modify based on hook1's changes
-build_data['force_include']['/path/to/lib'] = 'lib'
+build_data["force_include"]["/path/to/lib"] = "lib"
 ```
 
 The final build uses the modified `build_data` from all hooks.
@@ -156,7 +156,7 @@ The final build uses the modified `build_data` from all hooks.
 class MyHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Modify build_data BEFORE build
-        build_data['artifacts'].append('generated/*.py')
+        build_data["artifacts"].append("generated/*.py")
 
     def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
         # Observe what was built, perform post-processing

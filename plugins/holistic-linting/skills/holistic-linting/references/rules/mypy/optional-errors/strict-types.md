@@ -19,9 +19,11 @@ Requires that all functions have type annotations (either Python 3 annotations o
 def greet(name):
     return f"Hello, {name}!"
 
+
 # Error: Function is missing parameter type annotations [no-untyped-def]
 def add(x, y):
     return x + y
+
 
 # Error: Missing return type annotation [no-untyped-def]
 def process(data: list):
@@ -36,8 +38,10 @@ def process(data: list):
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
+
 def add(x: int, y: int) -> int:
     return x + y
+
 
 def process(data: list[str]) -> int:
     return len(data)
@@ -58,6 +62,7 @@ def greet(name):
 def calculate(values):
     return sum(values)
 
+
 class DataProcessor:
     # Error: no-untyped-def
     def process(self, data):
@@ -69,6 +74,7 @@ class DataProcessor:
 ```python
 def calculate(values: list[int]) -> int:
     return sum(values)
+
 
 class DataProcessor:
     def process(self, data: list) -> int:
@@ -100,6 +106,7 @@ disallow_untyped_defs = True
 def untyped_function(x):
     return x * 2
 
+
 def typed_function(value: int) -> int:
     # Error: Call to untyped function "untyped_function" in typed context [no-untyped-call]
     return untyped_function(value)
@@ -110,6 +117,7 @@ def typed_function(value: int) -> int:
 ```python
 def typed_function(x: int) -> int:
     return x * 2
+
 
 def caller(value: int) -> int:
     return typed_function(value)  # OK
@@ -139,9 +147,11 @@ disallow_untyped_calls = True
 ```python
 from typing import List
 
+
 # Error: Missing type argument for generic type "list" [type-arg]
 def process(items: list) -> None:
     pass
+
 
 # Error: Missing type argument for generic type "List" [type-arg]
 x: List = [1, 2, 3]
@@ -152,11 +162,13 @@ x: List = [1, 2, 3]
 ```python
 from typing import List
 
+
 def process(items: list[int]) -> None:
     pass
 
+
 x: list[int] = [1, 2, 3]
-y: List[str] = ['a', 'b']
+y: List[str] = ["a", "b"]
 ```
 
 ### Configuration
@@ -183,6 +195,7 @@ disallow_any_generics = True
 ```python
 from typing import Any
 
+
 def process(value: Any) -> int:
     # Error: Returning Any from function declared to return "int" [no-any-return]
     return value
@@ -193,8 +206,10 @@ def process(value: Any) -> int:
 ```python
 from typing import Any
 
+
 def process(value: int) -> int:
     return value
+
 
 # Or explicitly return Any if needed
 def flexible(value: Any) -> Any:
@@ -226,8 +241,10 @@ warn_return_any = True
 # Error: Argument 1 to "process" has type "Any" from an untyped source [no-any-unimported]
 import untyped_module
 
+
 def process(value: int) -> None:
     pass
+
 
 process(untyped_module.something)
 ```
@@ -239,8 +256,10 @@ process(untyped_module.something)
 # pip install types-untyped-module
 import typed_module
 
+
 def process(value: int) -> None:
     pass
+
 
 process(typed_module.value)  # OK - has type information
 ```
@@ -269,6 +288,7 @@ disallow_any_unimported = True
 ```python
 from typing import Any
 
+
 # Error: Explicit "Any" is not allowed [explicit-any]
 def process(value: Any) -> Any:
     return value
@@ -279,10 +299,12 @@ def process(value: Any) -> Any:
 ```python
 from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 def process(value: T) -> T:
     return value
+
 
 # Or use union for known types
 def flexible(value: int | str) -> int | str:

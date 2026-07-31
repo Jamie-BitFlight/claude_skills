@@ -8,6 +8,7 @@ Every Textual app follows this pattern:
 from textual.app import App, ComposeResult
 from textual.widgets import Widget
 
+
 class MyApp(App):
     """Docstring describing the app."""
 
@@ -28,6 +29,7 @@ class MyApp(App):
     def on_mount(self) -> None:
         """Called when app is mounted and ready."""
         pass
+
 
 if __name__ == "__main__":
     app = MyApp()
@@ -63,6 +65,7 @@ Reactive attributes automatically update the UI when changed:
 
 ```python
 from textual.reactive import reactive
+
 
 class Counter(Widget):
     count = reactive(0)  # Initial value
@@ -119,6 +122,7 @@ def on_mount(self) -> None:
     """When mounted."""
     pass
 
+
 def on_key(self, event: events.Key) -> None:
     """Key pressed."""
     if event.key == "escape":
@@ -134,6 +138,7 @@ def on_button_pressed(self, event: Button.Pressed) -> None:
     """Button was clicked."""
     self.notify(f"Button {event.button.id} clicked!")
 
+
 def on_input_changed(self, event: Input.Changed) -> None:
     """Input text changed."""
     self.value = event.value
@@ -146,9 +151,11 @@ Define custom messages in your widgets:
 ```python
 from textual.message import Message
 
+
 class MyWidget(Widget):
     class ValueChanged(Message):
         """Posted when value changes."""
+
         def __init__(self, value: int) -> None:
             super().__init__()
             self.value = value
@@ -156,6 +163,7 @@ class MyWidget(Widget):
     def update_value(self, new_value: int) -> None:
         self.value = new_value
         self.post_message(self.ValueChanged(new_value))
+
 
 # Handle in parent
 def on_my_widget_value_changed(self, event: MyWidget.ValueChanged) -> None:

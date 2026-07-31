@@ -13,14 +13,17 @@
 ```python
 from abc import ABCMeta, abstractmethod
 
+
 class Persistent(metaclass=ABCMeta):
     @abstractmethod
     def save(self) -> None: ...
 
+
 class Thing(Persistent):
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
+
     # Missing "save" method implementation
+
 
 # Error: Cannot instantiate abstract class "Thing" with abstract attribute "save" [abstract]
 t = Thing()
@@ -31,16 +34,18 @@ t = Thing()
 ```python
 from abc import ABCMeta, abstractmethod
 
+
 class Persistent(metaclass=ABCMeta):
     @abstractmethod
     def save(self) -> None: ...
 
+
 class Thing(Persistent):
-    def __init__(self) -> None:
-        ...
+    def __init__(self) -> None: ...
 
     def save(self) -> None:  # OK - implementation provided
         print("Saving...")
+
 
 t = Thing()  # OK
 ```
@@ -68,12 +73,15 @@ t = Thing()  # type: ignore[abstract]
 ```python
 from abc import ABCMeta, abstractmethod
 
+
 class Config(metaclass=ABCMeta):
     @abstractmethod
     def get_value(self, attr: str) -> str: ...
 
+
 def make_many[T](typ: type[T], n: int) -> list[T]:
     return [typ() for _ in range(n)]  # This will raise if typ is abstract
+
 
 # Error: Only concrete class can be given where "type[Config]" is expected [type-abstract]
 make_many(Config, 5)
@@ -84,16 +92,20 @@ make_many(Config, 5)
 ```python
 from abc import ABCMeta, abstractmethod
 
+
 class Config(metaclass=ABCMeta):
     @abstractmethod
     def get_value(self, attr: str) -> str: ...
+
 
 class ConcreteConfig(Config):
     def get_value(self, attr: str) -> str:
         return f"value_{attr}"
 
+
 def make_many[T](typ: type[T], n: int) -> list[T]:
     return [typ() for _ in range(n)]
+
 
 configs = make_many(ConcreteConfig, 5)  # OK
 ```
@@ -121,14 +133,17 @@ make_many(Config, 5)  # type: ignore[type-abstract]
 ```python
 from abc import abstractmethod
 
+
 class Base:
     @abstractmethod
     def foo(self) -> int: ...
+
 
 class Sub(Base):
     def foo(self) -> int:
         # Error: Call to abstract method "foo" of "Base" with trivial body via super() is unsafe [safe-super]
         return super().foo() + 1
+
 
 Sub().foo()  # This will crash at runtime
 ```
@@ -140,10 +155,12 @@ Sub().foo()  # This will crash at runtime
 ```python
 from abc import abstractmethod
 
+
 class Base:
     @abstractmethod
     def foo(self) -> int:
         return 10  # Has implementation
+
 
 class Sub(Base):
     def foo(self) -> int:
@@ -155,14 +172,17 @@ class Sub(Base):
 ```python
 from abc import abstractmethod
 
+
 class Base:
     @abstractmethod
     def foo(self) -> int:
         return 0  # Provide default implementation
 
+
 class Sub(Base):
     def foo(self) -> int:
         return super().foo() + 1  # OK - base has implementation
+
 
 print(Sub().foo())  # OK - will execute
 ```

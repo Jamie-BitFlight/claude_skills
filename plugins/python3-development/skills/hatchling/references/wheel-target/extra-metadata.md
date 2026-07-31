@@ -156,19 +156,22 @@ Explain that accessing extra metadata requires reading from the installed dist-i
 import sys
 from pathlib import Path
 
+
 def get_extra_metadata(filename):
     # Find the dist-info directory
     import mypackage
+
     pkg_path = Path(mypackage.__file__).parent
 
     # Navigate to dist-info
-    dist_info = pkg_path.parent / f'{pkg_path.name}-{__version__}.dist-info'
-    extra_metadata_dir = dist_info / 'extra_metadata'
+    dist_info = pkg_path.parent / f"{pkg_path.name}-{__version__}.dist-info"
+    extra_metadata_dir = dist_info / "extra_metadata"
 
     return extra_metadata_dir / filename
 
+
 # Usage
-build_info = get_extra_metadata('build-info.json').read_text()
+build_info = get_extra_metadata("build-info.json").read_text()
 ```
 
 Or using importlib.metadata (Python 3.8+):
@@ -265,14 +268,10 @@ Explain that version information should match the package version. Consider usin
 def get_wheel_config():
     from mypackage import __version__
 
-    with open('metadata/version.txt', 'w') as f:
+    with open("metadata/version.txt", "w") as f:
         f.write(__version__)
 
-    return {
-        'extra_metadata': {
-            'metadata/version.txt': 'version.txt',
-        }
-    }
+    return {"extra_metadata": {"metadata/version.txt": "version.txt"}}
 ```
 
 ## Common Patterns

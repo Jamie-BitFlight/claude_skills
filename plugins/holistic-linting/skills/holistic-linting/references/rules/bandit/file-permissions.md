@@ -97,6 +97,7 @@ server.listen(1)
 
 # In HTTP frameworks
 from flask import Flask
+
 app = Flask(__name__)
 app.run(host="0.0.0.0", port=5000)  # Exposed!
 
@@ -132,6 +133,7 @@ server.bind(("192.168.1.100", 5000))
 
 # In Flask
 from flask import Flask
+
 app = Flask(__name__)
 
 # Development - localhost only
@@ -202,6 +204,7 @@ with open(tmpfile, "w") as f:
 
 # Clean up when done
 import shutil
+
 shutil.rmtree(tmpdir)
 ```
 
@@ -236,11 +239,7 @@ with open(tmpfile, "w") as f:
 import tempfile
 
 # RIGHT - Secure temporary file
-with tempfile.NamedTemporaryFile(
-    dir="/tmp",
-    prefix="myapp_",
-    delete=False
-) as f:
+with tempfile.NamedTemporaryFile(dir="/tmp", prefix="myapp_", delete=False) as f:
     f.write(b"data")
     tmpfile = f.name
 

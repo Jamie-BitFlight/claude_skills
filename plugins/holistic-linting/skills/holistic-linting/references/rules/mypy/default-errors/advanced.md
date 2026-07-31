@@ -24,6 +24,7 @@ from typing import NamedTuple
 
 Point2D = NamedTuple("Point2D", [("x", int), ("y", int)])  # OK
 
+
 # Or use class syntax
 class Point(NamedTuple):
     x: int
@@ -53,11 +54,14 @@ Point2D = NamedTuple("Point", [("x", int), ("y", int)])  # type: ignore[name-mat
 ```python
 from typing import overload
 
+
 @overload
 def func(value: int) -> int: ...
 
+
 @overload
 def func(value: str) -> str: ...
+
 
 # Missing actual implementation
 ```
@@ -67,11 +71,14 @@ def func(value: str) -> str: ...
 ```python
 from typing import overload
 
+
 @overload
 def func(value: int) -> int: ...
 
+
 @overload
 def func(value: str) -> str: ...
+
 
 def func(value):  # OK - implementation required
     return value
@@ -102,14 +109,19 @@ def func(value):  # type: ignore[no-overload-impl]
 ```python
 from typing import overload
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 @overload
 def foo(x: B) -> int: ...
 # Error: Overloaded function signatures 1 and 2 overlap with incompatible return types [overload-overlap]
 @overload
 def foo(x: A) -> str: ...
+
 
 def foo(x):
     return 1 if isinstance(x, B) else "str"
@@ -120,14 +132,20 @@ def foo(x):
 ```python
 from typing import overload
 
+
 class A: ...
+
+
 class B(A): ...
+
 
 @overload
 def foo(x: A) -> str: ...  # More general first
 
+
 @overload
 def foo(x: B) -> int: ...  # More specific second
+
 
 def foo(x):
     if isinstance(x, B):
@@ -159,12 +177,15 @@ def foo(x: B) -> int: ...  # type: ignore[overload-overlap]
 ```python
 from typing import overload
 
+
 @overload
 def process(response1: object, response2: object) -> object: ...
+
 
 # Error: Overloaded function signature 2 will never be matched [overload-cannot-match]
 @overload
 def process(response1: int, response2: int) -> int: ...
+
 
 def process(response1, response2):
     return response1 + response2
@@ -175,14 +196,18 @@ def process(response1, response2):
 ```python
 from typing import overload
 
+
 @overload
 def process(response1: int, response2: int) -> int: ...
+
 
 @overload
 def process(response1: str, response2: str) -> str: ...
 
+
 @overload
 def process(response1: object, response2: object) -> object: ...
+
 
 def process(response1, response2):
     if isinstance(response1, int):
@@ -216,9 +241,9 @@ def process(response1: int, response2: int) -> int: ...  # type: ignore[overload
 ```python
 from typing_extensions import TypeIs
 
+
 # Error: str is not a subtype of int [narrowed-type-not-subtype]
-def f(x: int) -> TypeIs[str]:
-    ...
+def f(x: int) -> TypeIs[str]: ...
 ```
 
 ### Examples of Corrected Code
@@ -226,8 +251,10 @@ def f(x: int) -> TypeIs[str]:
 ```python
 from typing_extensions import TypeIs
 
+
 def f(x: object) -> TypeIs[str]:  # OK - str is subtype of object
     return isinstance(x, str)
+
 
 def g(x: int | str) -> TypeIs[str]:  # OK - str is subtype of int|str
     return isinstance(x, str)
@@ -257,7 +284,7 @@ def f(x: int) -> TypeIs[str]:  # type: ignore[narrowed-type-not-subtype]
 ```python
 class MyContext:
     def __exit__(self, exc, value, tb) -> bool:  # Error - if always returns False
-        print('exit')
+        print("exit")
         return False
 ```
 
@@ -266,14 +293,16 @@ class MyContext:
 ```python
 from typing import Literal
 
+
 class MyContext:
     def __exit__(self, exc, value, tb) -> Literal[False]:  # OK
-        print('exit')
+        print("exit")
         return False
+
 
 class MyContextOrNone:
     def __exit__(self, exc, value, tb) -> None:  # OK - same as False
-        print('exit')
+        print("exit")
 ```
 
 ### Configuration Options
@@ -338,8 +367,8 @@ assert_type([1], list[str])  # type: ignore[assert-type]
 ### When This IS an Error
 
 ```python
-def f():
-    ...
+def f(): ...
+
 
 # Error: Function "Callable[[], Any]" could always be true in boolean context [truthy-function]
 if f:
@@ -349,8 +378,8 @@ if f:
 ### Examples of Corrected Code
 
 ```python
-def f():
-    ...
+def f(): ...
+
 
 # Call the function
 if f():

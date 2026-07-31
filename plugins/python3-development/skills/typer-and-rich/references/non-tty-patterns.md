@@ -72,6 +72,7 @@ import json
 err_console = Console(stderr=True)
 out_console = Console()  # stdout, no color when piped
 
+
 def process(items: list[dict]) -> None:
     with err_console.status("Processing..."):
         result = [transform(item) for item in items]
@@ -86,6 +87,7 @@ Source: `.claude/worktrees/rich/rich/console.py`, `Console.__init__` `stderr` pa
 ```python
 from io import StringIO
 from rich.console import Console
+
 
 def test_output_contains_warning():
     buf = StringIO()
@@ -175,10 +177,12 @@ console = Console()
 # ALSO BAD: fixed cap loses everything past column 200
 console = Console(width=200)
 
+
 # GOOD: measure natural width on a 9999-col temp console, render at that width
 def get_rendered_width(renderable) -> int:
     temp = Console(width=999999)
     return int(Measurement.get(temp, temp.options, renderable).maximum)
+
 
 table = Table("Name", "Value", "Description")
 table.add_row("item", "value", "long description...")
@@ -230,10 +234,10 @@ from rich.text import Text
 
 console = Console(width=40)
 text = Text("a" * 100)
-console.print(text, overflow="ignore")   # extend past boundary
-console.print(text, overflow="fold")     # wrap at character boundary
-console.print(text, overflow="ellipsis") # truncate with …
-console.print(text, overflow="crop")     # hard cut at width
+console.print(text, overflow="ignore")  # extend past boundary
+console.print(text, overflow="fold")  # wrap at character boundary
+console.print(text, overflow="ellipsis")  # truncate with …
+console.print(text, overflow="crop")  # hard cut at width
 ```
 
 Source: `.claude/worktrees/rich/rich/console.py` — `OverflowMethod` literal type, line 76.
@@ -248,8 +252,8 @@ from rich.table import Table
 
 console = Console(width=80)
 table = Table()
-table.add_column("ID", no_wrap=True, min_width=8)       # never wraps
-table.add_column("Description", ratio=1)                  # flexible
+table.add_column("ID", no_wrap=True, min_width=8)  # never wraps
+table.add_column("Description", ratio=1)  # flexible
 table.add_column("Status", no_wrap=True, min_width=10)  # never wraps
 ```
 
@@ -327,11 +331,7 @@ testing contexts this can interfere with output capture:
 from rich.progress import Progress
 
 # Disable redirection when output capture matters (e.g., pytest)
-with Progress(
-    redirect_stdout=False,
-    redirect_stderr=False,
-    disable=True,
-) as progress:
+with Progress(redirect_stdout=False, redirect_stderr=False, disable=True) as progress:
     ...
 ```
 
@@ -377,10 +377,11 @@ from rich.console import Console
 app = typer.Typer()
 err = Console(stderr=True)
 
+
 @app.command()
 def export(format: str = "json") -> None:
-    err.print("[dim]Exporting...[/dim]")      # stderr: diagnostics
-    typer.echo(build_output(format))           # stdout: data (pipeable)
+    err.print("[dim]Exporting...[/dim]")  # stderr: diagnostics
+    typer.echo(build_output(format))  # stdout: data (pipeable)
 ```
 
 ### Typer `rich_markup_mode` and `no_color`
@@ -411,6 +412,7 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
 def check() -> None:
     if not run_check():
@@ -431,6 +433,7 @@ from typer.testing import CliRunner
 from myapp.cli import app
 
 runner = CliRunner()
+
 
 def test_output():
     result = runner.invoke(app, ["--format", "json"])
@@ -456,6 +459,7 @@ from myapp.cli import app
 
 runner = CliRunner()
 
+
 def test_no_color_env():
     result = runner.invoke(app, ["report"], env={"NO_COLOR": "1"})
     assert "\033[" not in result.output  # no ANSI escape sequences
@@ -468,6 +472,7 @@ capture the result as a string rather than write to a file:
 
 ```python
 from rich.console import Console
+
 
 def test_table_output():
     console = Console(record=True, width=80)
@@ -504,6 +509,7 @@ To compare styled content, export with `styles=True` from a `record=True` consol
 
 ```python
 from rich.console import Console
+
 
 def test_warning_is_yellow():
     console = Console(record=True, force_terminal=True, width=80)
@@ -553,9 +559,11 @@ from rich.console import Console
 from rich.measure import Measurement
 from rich.table import Table
 
+
 def get_rendered_width(renderable) -> int:
     temp = Console(width=999999)
     return int(Measurement.get(temp, temp.options, renderable).maximum)
+
 
 console = Console()  # no explicit width — consumer handles it
 
@@ -612,6 +620,7 @@ import sys
 from rich.console import Console
 
 err = Console(stderr=True)
+
 
 def export(result: dict) -> None:
     err.print("[dim]Exporting...[/dim]")  # stderr: diagnostics, color OK
@@ -675,6 +684,7 @@ Integrate the check into your test suite so regressions are caught automatically
 ```python
 import subprocess
 
+
 def test_env_check_preserves_long_paths(tmp_path, monkeypatch):
     long_path = "/this/is/a/very/long/tool/path/that/exceeds/200/characters/" + "x" * 200
     monkeypatch.setenv("DCF_TOOL", long_path)
@@ -688,8 +698,7 @@ def test_env_check_preserves_long_paths(tmp_path, monkeypatch):
 
     # The full path must be contiguous in the captured output
     assert long_path in result.stdout, (
-        f"Long path was wrapped, truncated, or ellipsized. "
-        f"Captured output: {result.stdout!r}"
+        f"Long path was wrapped, truncated, or ellipsized. Captured output: {result.stdout!r}"
     )
     # No stray ellipsis
     assert "…" not in result.stdout

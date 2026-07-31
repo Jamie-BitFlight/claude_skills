@@ -43,6 +43,7 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
 def main(name: str):
     typer.echo(f"Hello {name}")
@@ -56,6 +57,7 @@ from typing import Annotated
 
 app = typer.Typer()
 
+
 @app.command()
 def main(name: Annotated[str, typer.Argument(help="The name to greet")]):
     typer.echo(f"Hello {name}")
@@ -66,6 +68,7 @@ Optional argument with a default:
 ```python
 import typer
 from typing import Annotated, Optional
+
 
 @app.command()
 def main(name: Annotated[Optional[str], typer.Argument()] = None):
@@ -93,11 +96,9 @@ Declared by using `typer.Option()` or by providing a default value:
 import typer
 from typing import Annotated
 
+
 @app.command()
-def main(
-    name: str,
-    lastname: Annotated[str, typer.Option(help="Last name")] = "",
-):
+def main(name: str, lastname: Annotated[str, typer.Option(help="Last name")] = ""):
     typer.echo(f"Hello {name} {lastname}")
 ```
 
@@ -112,12 +113,11 @@ Typer converts CLI string input to the annotated Python type:
 ```python
 @app.command()
 def main(
-    name: str,           # TEXT
-    age: int = 0,        # INTEGER — validated at CLI
-    height: float = 0.0, # FLOAT — validated at CLI
-    active: bool = True, # FLAG — --active / --no-active
-):
-    ...
+    name: str,  # TEXT
+    age: int = 0,  # INTEGER — validated at CLI
+    height: float = 0.0,  # FLOAT — validated at CLI
+    active: bool = True,  # FLAG — --active / --no-active
+): ...
 ```
 
 Invalid type input produces a CLI error:
@@ -137,12 +137,12 @@ A parameter is required when it has no default. Optional when it has a default (
 import typer
 from typing import Annotated, Optional
 
+
 @app.command()
 def main(
-    name: str,                                             # required argument
+    name: str,  # required argument
     lastname: Annotated[Optional[str], typer.Option()] = None,  # optional option
-):
-    ...
+): ...
 ```
 
 Force a CLI option to be required by using `typer.Option()` with `...` (Ellipsis) as default:
@@ -150,11 +150,11 @@ Force a CLI option to be required by using `typer.Option()` with `...` (Ellipsis
 ```python
 from typing import Annotated
 
+
 @app.command()
 def main(
     name: Annotated[str, typer.Option()],  # required option
-):
-    ...
+): ...
 ```
 
 ---
@@ -167,11 +167,9 @@ Set defaults directly in the function signature or via `typer.Argument()`/`typer
 import typer
 from typing import Annotated
 
+
 @app.command()
-def main(
-    name: str = "World",
-    count: Annotated[int, typer.Option()] = 1,
-):
+def main(name: str = "World", count: Annotated[int, typer.Option()] = 1):
     for _ in range(count):
         typer.echo(f"Hello {name}")
 ```
@@ -185,6 +183,7 @@ Add help text via `typer.Argument(help=...)` or `typer.Option(help=...)`:
 ```python
 import typer
 from typing import Annotated
+
 
 @app.command()
 def main(
@@ -206,11 +205,9 @@ Add `prompt=True` to `typer.Option()` to ask the user for input when the option 
 import typer
 from typing import Annotated
 
+
 @app.command()
-def main(
-    name: str,
-    email: Annotated[str, typer.Option(prompt=True)],
-):
+def main(name: str, email: Annotated[str, typer.Option(prompt=True)]):
     typer.echo(f"Hello {name}, your email is: {email}")
 ```
 
@@ -230,10 +227,10 @@ email: Annotated[str, typer.Option(prompt="Your email address")]
 import typer
 from typing import Annotated
 
+
 @app.command()
 def create(
-    username: str,
-    password: Annotated[str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)],
+    username: str, password: Annotated[str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)]
 ):
     typer.echo(f"Creating {username}")
 ```
@@ -248,10 +245,9 @@ Override CLI option names with a list of strings:
 import typer
 from typing import Annotated
 
+
 @app.command()
-def main(
-    name: Annotated[str, typer.Option("--name", "-n", help="Your name")],
-):
+def main(name: Annotated[str, typer.Option("--name", "-n", help="Your name")]):
     typer.echo(f"Hello {name}")
 ```
 
@@ -267,10 +263,9 @@ Bind a CLI option to an environment variable with `envvar`:
 import typer
 from typing import Annotated
 
+
 @app.command()
-def main(
-    name: Annotated[str, typer.Option(envvar="APP_NAME")],
-):
+def main(name: Annotated[str, typer.Option(envvar="APP_NAME")]):
     typer.echo(f"Hello {name}")
 ```
 
@@ -292,10 +287,9 @@ Accept multiple values for a single option using `List`:
 import typer
 from typing import Annotated, List
 
+
 @app.command()
-def main(
-    names: Annotated[List[str], typer.Option()] = [],
-):
+def main(names: Annotated[List[str], typer.Option()] = []):
     for name in names:
         typer.echo(f"Hello {name}")
 ```
@@ -312,7 +306,7 @@ A `bool` parameter automatically creates paired `--flag` / `--no-flag` options:
 @app.command()
 def main(
     name: str,
-    formal: bool = False,   # creates --formal / --no-formal
+    formal: bool = False,  # creates --formal / --no-formal
 ):
     if formal:
         typer.echo(f"Good day, {name}.")
@@ -334,17 +328,16 @@ from typing import Annotated, Optional
 
 __version__ = "0.1.0"
 
+
 def version_callback(value: bool):
     if value:
         typer.echo(f"My App version: {__version__}")
         raise typer.Exit()
 
+
 @app.command()
 def main(
-    version: Annotated[
-        Optional[bool],
-        typer.Option("--version", callback=version_callback, is_eager=True),
-    ] = None,
+    version: Annotated[Optional[bool], typer.Option("--version", callback=version_callback, is_eager=True)] = None,
 ):
     typer.echo("Running app")
 ```

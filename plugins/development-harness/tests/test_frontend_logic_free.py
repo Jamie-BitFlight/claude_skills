@@ -37,6 +37,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "__future__",
         "io",
         "json",
+        "os",
         "re",
         "shutil",
         "subprocess",

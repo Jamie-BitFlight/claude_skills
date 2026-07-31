@@ -116,7 +116,7 @@ site-packages/mypackage/
 But the import path expected might differ:
 
 ```python
-import MyPackage   # Fails after installation from PyPI
+import MyPackage  # Fails after installation from PyPI
 ```
 
 ### Solution: Canonical Case
@@ -216,7 +216,7 @@ package_dir = os.path.dirname(mypackage.__file__)
 #                   or /usr/local/lib/python3.x/site-packages/mypackage
 
 # Case doesn't matter on macOS/Windows but do for Linux
-data_file = os.path.join(package_dir, 'data/config.json')
+data_file = os.path.join(package_dir, "data/config.json")
 ```
 
 ### Path Joining
@@ -225,10 +225,10 @@ Always use `os.path.join()` for portability:
 
 ```python
 # Good - portable across case-sensitive and insensitive systems
-config_path = os.path.join(package_dir, 'config', 'settings.json')
+config_path = os.path.join(package_dir, "config", "settings.json")
 
 # Risky - may fail on case-sensitive systems if naming differs
-config_path = 'mypackage/config/settings.json'
+config_path = "mypackage/config/settings.json"
 ```
 
 ## Practical Examples
@@ -263,9 +263,9 @@ class CaseValidationHook(BuildHookInterface):
         # Get package names from configuration
         # Compare against expected lowercase versions
 
-        for file in build_data['artifacts']['wheel']:
+        for file in build_data["artifacts"]["wheel"]:
             if file != file.lower():
-                if file.lower() in [f.lower() for f in build_data['artifacts']['wheel']]:
+                if file.lower() in [f.lower() for f in build_data["artifacts"]["wheel"]]:
                     raise ValueError(
                         f"Case mismatch: {file} conflicts with lowercase version. "
                         f"Use lowercase package names for portability."

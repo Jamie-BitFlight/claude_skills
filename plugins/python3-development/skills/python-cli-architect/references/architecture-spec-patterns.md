@@ -157,9 +157,7 @@ ToolError (base)
 ```python
 # RichHandler for console; FileHandler for persistent logs
 logging.basicConfig(
-    level=log_level.upper(),
-    format="%(message)s",
-    handlers=[RichHandler(rich_tracebacks=True, markup=True)]
+    level=log_level.upper(), format="%(message)s", handlers=[RichHandler(rich_tracebacks=True, markup=True)]
 )
 ```
 

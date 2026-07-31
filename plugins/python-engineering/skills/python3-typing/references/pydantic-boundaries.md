@@ -7,6 +7,7 @@ Always use strict mode for boundary models to catch producer bugs:
 ```python
 from pydantic import BaseModel
 
+
 class IncomingPayload(BaseModel):
     user_id: int
     email: str
@@ -27,6 +28,7 @@ users = user_list_adapter.validate_python(raw_data)
 ```python
 from pydantic import BaseModel, field_validator
 
+
 class Config(BaseModel):
     host: str
     port: int
@@ -46,6 +48,7 @@ class Address(BaseModel):
     street: str
     city: str
 
+
 class User(BaseModel):
     name: str
     address: Address  # nested validation
@@ -57,13 +60,16 @@ class User(BaseModel):
 from pydantic import BaseModel, Field
 from typing import Literal
 
+
 class Cat(BaseModel):
     pet_type: Literal["cat"]
     meows: int
 
+
 class Dog(BaseModel):
     pet_type: Literal["dog"]
     barks: float
+
 
 Pet = Cat | Dog
 ```

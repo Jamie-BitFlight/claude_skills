@@ -20,10 +20,7 @@ answer. If the user cancels (Ctrl+C), `.ask()` returns `None`.
 import questionary
 
 answers = questionary.form(
-    title=questionary.text(
-        "Task title:",
-        validate=lambda t: len(t.strip()) > 0 or "Title is required",
-    ),
+    title=questionary.text("Task title:", validate=lambda t: len(t.strip()) > 0 or "Title is required"),
     priority=questionary.select(
         "Priority:",
         choices=[
@@ -96,6 +93,7 @@ Supports the same `validate` parameter as `text()`.
 import re
 import questionary
 
+
 def validate_password(pw: str) -> bool | str:
     if len(pw) < 10:
         return "Password must be at least 10 characters"
@@ -105,10 +103,8 @@ def validate_password(pw: str) -> bool | str:
         return "Password must contain an upper-case letter"
     return True
 
-secret = questionary.password(
-    "Enter password:",
-    validate=validate_password,
-).ask()
+
+secret = questionary.password("Enter password:", validate=validate_password).ask()
 ```
 
 Parameters: `message`, `default`, `validate`, `qmark`, `style`.
@@ -127,9 +123,7 @@ from pathlib import Path
 import questionary
 
 config_path = questionary.path(
-    "Config file path:",
-    validate=lambda p: Path(p).exists() or "File not found",
-    only_directories=False,
+    "Config file path:", validate=lambda p: Path(p).exists() or "File not found", only_directories=False
 ).ask()
 ```
 
@@ -145,8 +139,7 @@ shortcut key and pressing Enter — no arrow keys. Useful in restricted terminal
 
 ```python
 action = questionary.rawselect(
-    "What do you want to do?",
-    choices=["Order a pizza", "Make a reservation", "Ask for opening hours"],
+    "What do you want to do?", choices=["Order a pizza", "Make a reservation", "Ask for opening hours"]
 ).ask()
 ```
 
@@ -196,11 +189,7 @@ else:
     deadline = None
 
 # Use:
-deadline = (
-    questionary.text("Deadline (YYYY-MM-DD):")
-    .skip_if(not show_deadline, default=None)
-    .ask()
-)
+deadline = questionary.text("Deadline (YYYY-MM-DD):").skip_if(not show_deadline, default=None).ask()
 ```
 
 `condition` must be a `bool`, not a callable.
@@ -217,13 +206,12 @@ argument is a prompt_toolkit `Document` object. Access typed text via `document.
 ```python
 from questionary import Validator, ValidationError
 
+
 class NonEmptyValidator(Validator):
     def validate(self, document):
         if len(document.text.strip()) == 0:
-            raise ValidationError(
-                message="Value cannot be empty",
-                cursor_position=len(document.text),
-            )
+            raise ValidationError(message="Value cannot be empty", cursor_position=len(document.text))
+
 
 title = questionary.text("Task title:", validate=NonEmptyValidator).ask()
 ```
@@ -243,9 +231,9 @@ SOURCE: <https://questionary.readthedocs.io/en/stable/pages/advanced.html#valida
 
 ```python
 choices = [
-    questionary.Choice("work", checked=True),    # pre-selected
+    questionary.Choice("work", checked=True),  # pre-selected
     questionary.Choice("personal", checked=False),
-    questionary.Choice("urgent"),                # not pre-selected by default
+    questionary.Choice("urgent"),  # not pre-selected by default
 ]
 tags = questionary.checkbox("Select tags:", choices=choices).ask() or []
 ```
@@ -303,8 +291,8 @@ choice lists. The default text is `"---------------"`. Pass a string to customiz
 choices = [
     questionary.Choice("Low priority"),
     questionary.Choice("Medium priority"),
-    questionary.Separator(),                    # default separator line
-    questionary.Separator("--- Urgent ---"),    # custom separator text
+    questionary.Separator(),  # default separator line
+    questionary.Separator("--- Urgent ---"),  # custom separator text
     questionary.Choice("Critical"),
     questionary.Choice("Blocker (premium)", disabled="Upgrade required"),
 ]
@@ -332,12 +320,7 @@ skipped and no key is added to answers.
 from questionary import prompt, Separator
 
 questions = [
-    {
-        "type": "confirm",
-        "name": "advanced",
-        "message": "Enable advanced options?",
-        "default": False,
-    },
+    {"type": "confirm", "name": "advanced", "message": "Enable advanced options?", "default": False},
     {
         "type": "text",
         "name": "timeout",
@@ -346,12 +329,7 @@ questions = [
         "filter": lambda val: int(val),
         "validate": lambda val: val.isdigit() or "Enter a number",
     },
-    {
-        "type": "select",
-        "name": "format",
-        "message": "Output format:",
-        "choices": ["json", Separator(), "csv", "plain"],
-    },
+    {"type": "select", "name": "format", "message": "Output format:", "choices": ["json", Separator(), "csv", "plain"]},
 ]
 
 answers = prompt(questions)
@@ -386,7 +364,7 @@ custom_style = Style([
     ("separator", "fg:#cc5454"),
     ("instruction", ""),
     ("text", ""),
-    ("disabled", "fg:#858585 italic"),    # for disabled choices
+    ("disabled", "fg:#858585 italic"),  # for disabled choices
 ])
 ```
 

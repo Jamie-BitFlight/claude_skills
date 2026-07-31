@@ -8,9 +8,10 @@ Define keyboard shortcuts:
 from textual.app import App
 from textual.binding import Binding
 
+
 class MyApp(App):
     BINDINGS = [
-        ("q", "quit", "Quit"),                    # key, action, description
+        ("q", "quit", "Quit"),  # key, action, description
         ("s", "save", "Save"),
         ("ctrl+c", "copy", "Copy"),
         Binding("f1", "help", "Help", show=True, priority=True),
@@ -34,8 +35,8 @@ Binding(
     key="f1",
     action="help",
     description="Help",
-    show=True,        # Show in footer (default: True)
-    priority=True,    # Prioritize over widget bindings
+    show=True,  # Show in footer (default: True)
+    priority=True,  # Prioritize over widget bindings
 )
 ```
 
@@ -71,6 +72,7 @@ Handle mouse interactions:
 ```python
 from textual import events
 
+
 class MyWidget(Widget):
     def on_click(self, event: events.Click) -> None:
         """Widget was clicked."""
@@ -96,6 +98,7 @@ Handle key presses:
 ```python
 from textual import events
 
+
 class MyApp(App):
     def on_key(self, event: events.Key) -> None:
         """Any key pressed."""
@@ -118,6 +121,7 @@ def on_focus(self, event: events.Focus) -> None:
     """Widget gained focus."""
     self.border_title = "Focused"
 
+
 def on_blur(self, event: events.Blur) -> None:
     """Widget lost focus."""
     self.border_title = ""
@@ -137,22 +141,27 @@ Handle messages from specific widgets:
 ```python
 from textual.widgets import Button, Input, Switch
 
+
 def on_button_pressed(self, event: Button.Pressed) -> None:
     """Any button pressed."""
     button_id = event.button.id
     self.notify(f"Button {button_id} pressed")
 
+
 def on_input_changed(self, event: Input.Changed) -> None:
     """Input text changed."""
     self.update_preview(event.value)
+
 
 def on_input_submitted(self, event: Input.Submitted) -> None:
     """User pressed Enter in input."""
     self.process(event.value)
 
+
 def on_switch_changed(self, event: Switch.Changed) -> None:
     """Switch toggled."""
     self.feature_enabled = event.value
+
 
 def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
     """Row in table selected."""
@@ -174,9 +183,11 @@ Define custom messages for your widgets:
 from textual.message import Message
 from textual.widget import Widget
 
+
 class Card(Widget):
     class Selected(Message):
         """Posted when card is selected."""
+
         def __init__(self, card_id: str, value: int) -> None:
             super().__init__()
             self.card_id = card_id
@@ -184,6 +195,7 @@ class Card(Widget):
 
     def on_click(self) -> None:
         self.post_message(self.Selected(self.id, self.value))
+
 
 # Handle in parent
 def on_card_selected(self, event: Card.Selected) -> None:
@@ -219,10 +231,7 @@ Actions are methods that can be triggered by bindings or programmatically:
 
 ```python
 class MyApp(App):
-    BINDINGS = [
-        ("n", "next_page", "Next"),
-        ("p", "prev_page", "Previous"),
-    ]
+    BINDINGS = [("n", "next_page", "Next"), ("p", "prev_page", "Previous")]
 
     def action_next_page(self) -> None:
         self.page += 1
@@ -238,11 +247,8 @@ class MyApp(App):
 Pass parameters to actions:
 
 ```python
-BINDINGS = [
-    ("r", "add_color('red')", "Red"),
-    ("g", "add_color('green')", "Green"),
-    ("b", "add_color('blue')", "Blue"),
-]
+BINDINGS = [("r", "add_color('red')", "Red"), ("g", "add_color('green')", "Green"), ("b", "add_color('blue')", "Blue")]
+
 
 def action_add_color(self, color: str) -> None:
     self.add_widget(ColorBar(color))
@@ -273,6 +279,7 @@ Schedule repeated actions:
 def on_mount(self) -> None:
     self.set_interval(1.0, self.update_timer)  # Every 1 second
 
+
 def update_timer(self) -> None:
     self.elapsed += 1
     self.query_one("#timer").update(str(self.elapsed))
@@ -282,6 +289,7 @@ One-time delayed action:
 
 ```python
 self.set_timer(2.0, self.delayed_action)  # After 2 seconds
+
 
 def delayed_action(self) -> None:
     self.notify("Timer complete!")
@@ -295,6 +303,7 @@ from textual.containers import Horizontal
 from textual.widget import Widget
 from textual.widgets import Label, Static
 from textual.message import Message
+
 
 class Card(Widget):
     DEFAULT_CSS = """
@@ -328,6 +337,7 @@ class Card(Widget):
 
     def on_click(self) -> None:
         self.post_message(self.Selected(self))
+
 
 class CardGame(App):
     def compose(self) -> ComposeResult:

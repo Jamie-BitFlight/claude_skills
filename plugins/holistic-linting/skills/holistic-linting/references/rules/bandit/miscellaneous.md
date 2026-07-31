@@ -44,6 +44,7 @@ os.makedirs(tmpdir, exist_ok=True)
 
 # Clean up when done
 import shutil
+
 shutil.rmtree(tmpdir)
 ```
 
@@ -126,7 +127,7 @@ Running code with elevated privileges:
 # VULNERABLE - Running as root
 subprocess.run(
     ["script.sh"],
-    run_as_root=True  # Dangerous!
+    run_as_root=True,  # Dangerous!
 )
 ```
 
@@ -143,6 +144,7 @@ subprocess.run(["script.sh"], check=True)
 
 # RIGHT - Use sudo only when necessary with explicit validation
 import shlex
+
 
 def run_sudo_command(command_args):
     """Run command with sudo only if absolutely necessary."""
@@ -249,7 +251,7 @@ response = requests.get("https://api.example.com/data", timeout=10)
 # RIGHT - Separate connect and read timeouts
 response = requests.get(
     "https://api.example.com/data",
-    timeout=(3.05, 10)  # (connect_timeout, read_timeout)
+    timeout=(3.05, 10),  # (connect_timeout, read_timeout)
 )
 
 # RIGHT - For urllib3

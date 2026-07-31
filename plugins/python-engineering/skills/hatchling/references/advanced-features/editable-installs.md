@@ -103,7 +103,8 @@ The editable install creates a path-based finder that intercepts imports:
 ```python
 # Internal mechanism (conceptual)
 import sys
-sys.path.insert(0, '/path/to/project/src')
+
+sys.path.insert(0, "/path/to/project/src")
 
 # Now 'import mypackage' finds /path/to/project/src/mypackage
 ```
@@ -189,8 +190,9 @@ Non-Python data files in editable installs:
 ```python
 # This works - finding package
 import mypackage
+
 package_dir = os.path.dirname(mypackage.__file__)
-data_file = os.path.join(package_dir, 'data.json')
+data_file = os.path.join(package_dir, "data.json")
 ```
 
 Files must be alongside Python modules in source directory.
@@ -258,7 +260,7 @@ pip install -e .  # Reinstall to update entry point metadata
 ```python
 # src/mycompany/__init__.py
 # For namespace package support
-__path__ = __import__('pkgutil').extend_path(__path__, __name__)
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
 ```
 
 ## See Also

@@ -19,7 +19,6 @@ Tests that bold field extraction from prose works correctly.
 **Dependencies**: None
 **Priority**: 1
 **Complexity**: Low
-**Agent**: general-purpose
 **Skills**: []
 
 ### Context

@@ -25,9 +25,10 @@ v2.
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="MYAPP_",         # reads MYAPP_API_KEY, MYAPP_DATABASE_URL, etc.
+        env_prefix="MYAPP_",  # reads MYAPP_API_KEY, MYAPP_DATABASE_URL, etc.
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
@@ -37,6 +38,7 @@ class AppConfig(BaseSettings):
     database_url: str = Field(default="sqlite:///data.db")
     debug: bool = Field(default=False)
     max_retries: int = Field(default=3, ge=1, le=10)
+
 
 config = AppConfig()  # reads MYAPP_API_KEY etc. from environment automatically
 ```
@@ -58,10 +60,10 @@ config = AppConfig(_cli_parse_args=True)
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     redis_dsn: str = Field(
-        default="redis://localhost:6379/0",
-        validation_alias=AliasChoices("service_redis_dsn", "redis_url"),
+        default="redis://localhost:6379/0", validation_alias=AliasChoices("service_redis_dsn", "redis_url")
     )
 ```
 
@@ -81,12 +83,14 @@ path components), `msg` (human-readable message), `type` (machine-readable error
 from pydantic import BaseModel, ValidationError
 import sys
 
+
 def format_validation_errors(exc: ValidationError) -> str:
     lines = []
     for error in exc.errors(include_url=False):
         location = " -> ".join(str(loc) for loc in error["loc"])
         lines.append(f"  {location}: {error['msg']} (got {error['input']!r})")
     return f"{exc.error_count()} validation error(s):\n" + "\n".join(lines)
+
 
 try:
     task = TodoTask.model_validate(raw_data)
@@ -125,18 +129,16 @@ path to exist and be a directory. Plain `Path` accepts any path string without e
 from pydantic import BaseModel, FilePath, DirectoryPath
 from pathlib import Path
 
+
 class ProcessingArgs(BaseModel):
-    input_file: FilePath           # ValidationError if file does not exist
-    output_dir: DirectoryPath      # ValidationError if directory does not exist
-    log_file: Path                 # any path — no existence check (output may not exist yet)
+    input_file: FilePath  # ValidationError if file does not exist
+    output_dir: DirectoryPath  # ValidationError if directory does not exist
+    log_file: Path  # any path — no existence check (output may not exist yet)
+
 
 # Typical CLI usage
 try:
-    args = ProcessingArgs(
-        input_file=cli_args.input,
-        output_dir=cli_args.output,
-        log_file=cli_args.log,
-    )
+    args = ProcessingArgs(input_file=cli_args.input, output_dir=cli_args.output, log_file=cli_args.log)
 except ValidationError as exc:
     print(format_validation_errors(exc), file=sys.stderr)
     raise SystemExit(1)
@@ -159,6 +161,7 @@ SOURCE: <https://docs.pydantic.dev/latest/api/pydantic/standard_library_types/>
 from pydantic import BaseModel, computed_field
 from datetime import datetime
 
+
 class TodoTask(BaseModel):
     title: str
     created_at: datetime
@@ -173,6 +176,7 @@ class TodoTask(BaseModel):
     @property
     def age_days(self) -> int:
         return (datetime.now() - self.created_at).days
+
 
 task = TodoTask(title="Buy milk", created_at=datetime(2026, 5, 1))
 print(task.model_dump())
@@ -200,19 +204,24 @@ whole. The `@field_validator` decorator approach applies to the entire field val
 from typing import Annotated
 from pydantic import AfterValidator, BeforeValidator, BaseModel
 
+
 def strip_and_lower(v: str) -> str:
     return v.strip().lower()
+
 
 def non_empty(v: str) -> str:
     if not v:
         raise ValueError("must not be empty")
     return v
 
+
 # Reusable type alias — strip/lower before coercion, enforce non-empty after
 CleanTag = Annotated[str, BeforeValidator(strip_and_lower), AfterValidator(non_empty)]
 
+
 class TodoTask(BaseModel):
-    tags: list[CleanTag]   # validator applied per element, not to the whole list
+    tags: list[CleanTag]  # validator applied per element, not to the whole list
+
 
 task = TodoTask(tags=["  Work  ", "PERSONAL"])
 print(task.tags)  # ["work", "personal"]
@@ -239,10 +248,12 @@ means "do not change this field".
 from pydantic import BaseModel
 from typing import Optional
 
+
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     priority: Optional[str] = None
     tags: Optional[list[str]] = None
+
 
 # User explicitly provided only title
 update = TaskUpdate(title="New title")
@@ -275,6 +286,7 @@ SOURCE: <https://docs.pydantic.dev/latest/concepts/serialization/#excluding-and-
 from pydantic import BaseModel, PrivateAttr
 from datetime import datetime
 
+
 class CachedTask(BaseModel):
     title: str
     created_at: datetime
@@ -289,6 +301,7 @@ class CachedTask(BaseModel):
     def get_related(self) -> list:
         self._fetch_count += 1
         return self._cache.get("related", [])
+
 
 task = CachedTask(title="x", created_at=datetime.now())
 task.model_dump()  # {"title": "x", "created_at": ...} — _cache and _fetch_count absent
@@ -314,19 +327,20 @@ Model-wide via `ConfigDict(strict=True)`:
 ```python
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(strict=True)
     id: int
     name: str
-    count: int = Field(strict=False)   # override: lax for this one field
+    count: int = Field(strict=False)  # override: lax for this one field
 ```
 
 Per-field via `Field(strict=True)`:
 
 ```python
 class PartiallyStrict(BaseModel):
-    id: int = Field(strict=True)    # "123" raises ValidationError
-    name: str                       # lax by default — coercion allowed
+    id: int = Field(strict=True)  # "123" raises ValidationError
+    name: str  # lax by default — coercion allowed
 ```
 
 Per-call via `model_validate(..., strict=True)`:

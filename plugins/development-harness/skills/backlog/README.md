@@ -191,11 +191,11 @@ appear in the MCP client's progress stream and do not affect the return value.
 ```python
 mcp__plugin_dh_backlog__backlog_add(
     title="Fix duplicate detection before creating new items",
-    priority="P1",              # P0, P1, P2, or Ideas
+    priority="P1",  # P0, P1, P2, or Ideas
     description="New items can be created without checking for near-duplicates.",
     source="Session observation",
-    type="Bug",                 # Feature, Bug, Refactor, Docs, or Chore
-    force=False,                # skip fuzzy duplicate check
+    type="Bug",  # Feature, Bug, Refactor, Docs, or Chore
+    force=False,  # skip fuzzy duplicate check
 )
 # Returns: {filepath, filename, title, priority, issue_num?, messages, warnings}
 ```
@@ -204,13 +204,13 @@ mcp__plugin_dh_backlog__backlog_add(
 
 ```python
 mcp__plugin_dh_backlog__backlog_list(
-    from_github=False,          # refresh local cache from GitHub first
-    label="priority:p1",        # filter by GitHub label
-    section="P1",               # filter by priority: P0, P1, P2, Ideas
-    status="needs-grooming",    # filter by status value
-    title="duplicate",          # filter by title substring
-    type="Bug",                 # filter by metadata.type — case-insensitive exact match
-    topic="matching",           # filter by metadata.topic — case-insensitive substring match
+    from_github=False,  # refresh local cache from GitHub first
+    label="priority:p1",  # filter by GitHub label
+    section="P1",  # filter by priority: P0, P1, P2, Ideas
+    status="needs-grooming",  # filter by status value
+    title="duplicate",  # filter by title substring
+    type="Bug",  # filter by metadata.type — case-insensitive exact match
+    topic="matching",  # filter by metadata.topic — case-insensitive substring match
 )
 # Every response item always includes state (open/closed) and status (workflow status)
 # Returns: {items: [{title, priority, issue, plan, type, topic}], backend: {...}, messages, warnings}
@@ -223,13 +223,13 @@ It reports the GitHub API availability status checked on every `backlog_list` ca
 # backend dict shape
 {
     "name": "GitHub",
-    "availability": "reachable",   # see BackendAvailability values below
-    "open_count": 47,              # live open issue count (0 when not reachable)
-    "total_count": 123,            # live total issue count (0 when not reachable)
-    "cache_open_count": 45,        # open count from local cache (same filters as items)
-    "cache_total_count": 120,      # total count from local cache
+    "availability": "reachable",  # see BackendAvailability values below
+    "open_count": 47,  # live open issue count (0 when not reachable)
+    "total_count": 123,  # live total issue count (0 when not reachable)
+    "cache_open_count": 45,  # open count from local cache (same filters as items)
+    "cache_total_count": 120,  # total count from local cache
     "last_sync": "2026-03-23T10:30:00Z",  # ISO timestamp of most recent sync (empty string if never synced)
-    "error": "",                   # error message if availability is not "reachable"
+    "error": "",  # error message if availability is not "reachable"
 }
 ```
 
@@ -289,9 +289,9 @@ human-authored backlog titles.
 
 ```python
 mcp__plugin_dh_backlog__backlog_view(
-    selector="#142",            # GitHub issue URL, #N, bare number, or title substring
-    offset=0,                   # skip N entry blocks (for pagination)
-    limit=0,                    # show at most N entry blocks (0 = all, no truncation)
+    selector="#142",  # GitHub issue URL, #N, bare number, or title substring
+    offset=0,  # skip N entry blocks (for pagination)
+    limit=0,  # show at most N entry blocks (0 = all, no truncation)
 )
 # Returns: {title, priority, issue, plan, file_path, body, groomed, messages, warnings}
 ```
@@ -311,11 +311,11 @@ Use for duplicates, out-of-scope items, superseded items, wontfix, or permanentl
 ```python
 mcp__plugin_dh_backlog__backlog_close(
     selector="Fix duplicate detection",
-    reason="duplicate",         # duplicate, out_of_scope, superseded, wontfix, blocked
-    reference="#139",           # related item this duplicates or is superseded by
-    comment="Covered by #139.", # additional context
-    cleanup=False,              # remove local file after close
-    force=False,                # close even if open PRs reference the issue
+    reason="duplicate",  # duplicate, out_of_scope, superseded, wontfix, blocked
+    reference="#139",  # related item this duplicates or is superseded by
+    comment="Covered by #139.",  # additional context
+    cleanup=False,  # remove local file after close
+    force=False,  # close even if open PRs reference the issue
 )
 # Returns: {title, reason, closed, messages, warnings}
 ```
@@ -329,7 +329,7 @@ mcp__plugin_dh_backlog__backlog_resolve(
     plan="plan/tasks-7-duplicate-detection.md",
     method="Levenshtein distance check in add_item()",
     notes="Edge case: exact-match titles with different casing needed normalization.",
-    follow_ups="#155",          # comma-separated follow-up issue refs
+    follow_ups="#155",  # comma-separated follow-up issue refs
     findings="Fuzzy threshold of 0.85 works well for backlog titles.",
     cleanup=False,
     force=False,
@@ -342,14 +342,14 @@ mcp__plugin_dh_backlog__backlog_resolve(
 ```python
 mcp__plugin_dh_backlog__backlog_update(
     selector="#142",
-    plan="plan/tasks-7-slug.md",          # attach a plan file
-    status="in-progress",                  # set item status
-    verified=False,                        # apply status:verified label (SAM items only)
-    groomed_content="### Priority\n...",   # full groomed section replacement
-    section="Priority",                    # incremental section update
-    content="P1 — blocks item creation.", # content for named section
-    title="New title",                     # rename item and GitHub issue
-    description="New description.",        # update description (local only)
+    plan="plan/tasks-7-slug.md",  # attach a plan file
+    status="in-progress",  # set item status
+    verified=False,  # apply status:verified label (SAM items only)
+    groomed_content="### Priority\n...",  # full groomed section replacement
+    section="Priority",  # incremental section update
+    content="P1 — blocks item creation.",  # content for named section
+    title="New title",  # rename item and GitHub issue
+    description="New description.",  # update description (local only)
 )
 # Returns: {title, changes, messages, warnings}
 ```
@@ -366,7 +366,7 @@ after quality gates pass. The `status:verified` label is a prerequisite for
 mcp__plugin_dh_backlog__backlog_groom(
     selector="#142",
     groomed_content="### Priority\nP1...\n### Dependencies\nNone.",  # full replacement
-    section="Dependencies",    # or: incremental section update
+    section="Dependencies",  # or: incremental section update
     content="None.",
 )
 # Returns: {title, synced, messages, warnings}
@@ -392,7 +392,7 @@ mcp__plugin_dh_backlog__backlog_pull(selector="#142")
 # Bulk pull all items
 mcp__plugin_dh_backlog__backlog_pull(
     dry_run=False,
-    force=False,   # overwrite local even if local is newer/longer
+    force=False,  # overwrite local even if local is newer/longer
 )
 # Returns: {pulled, messages, warnings}
 # Progress: emits ctx.info() at start/end; ctx.warning() for each warning

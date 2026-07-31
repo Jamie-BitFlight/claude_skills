@@ -47,8 +47,8 @@ class VersionSourceInterface:
     """Interface for version source plugins."""
 
     PLUGIN_NAME: str  # Unique identifier for the plugin
-    root: Path        # Project root directory
-    config: dict      # Configuration from pyproject.toml
+    root: Path  # Project root directory
+    config: dict  # Configuration from pyproject.toml
 
     def get_version_data(self) -> dict:
         """
@@ -163,7 +163,7 @@ Some sources may return additional metadata:
     "version": "1.2.3",
     "raw_version": "v1.2.3",  # Original format
     "source_file": "/path/to/file",  # Where version was found
-    "timestamp": "2024-01-01T00:00:00Z"  # When determined
+    "timestamp": "2024-01-01T00:00:00Z",  # When determined
 }
 ```
 
@@ -243,6 +243,7 @@ For advanced scenarios, use metadata hooks to modify version data:
 ```python
 # hatch_build.py
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):

@@ -17,9 +17,11 @@ Requires the `@override` decorator when overriding a base class method, making o
 ```python
 from typing import override  # Python 3.12+
 
+
 class Base:
     def method(self) -> int:
         return 42
+
 
 class Derived(Base):
     # Error: Method is not overriding any base class method [explicit-override]
@@ -32,9 +34,11 @@ class Derived(Base):
 ```python
 from typing import override
 
+
 class Base:
     def method(self) -> int:
         return 42
+
 
 class Derived(Base):
     @override
@@ -60,12 +64,14 @@ enable_error_code = explicit-override
 ```python
 from typing import override
 
+
 class Animal:
     def speak(self) -> str:
         return "generic sound"
 
     def move(self) -> None:
         print("moving")
+
 
 class Dog(Animal):
     @override
@@ -93,6 +99,7 @@ class Dog(Animal):
 class Base:
     attr: list[int] = []
 
+
 class Derived(Base):
     # Error: Mutable attribute in override is unsafe [mutable-override]
     attr: list[int] = []
@@ -103,16 +110,20 @@ class Derived(Base):
 ```python
 from typing import ClassVar
 
+
 class Base:
     attr: ClassVar[list[int]] = []
 
+
 class Derived(Base):
     attr: ClassVar[list[int]] = []  # OK - class variable
+
 
 # Or use instance attributes
 class Base:
     def __init__(self):
         self.attr: list[int] = []
+
 
 class Derived(Base):
     def __init__(self):
@@ -149,6 +160,7 @@ reveal_type(x)
 
 ```python
 from typing import reveal_type  # Python 3.11+
+
 # or
 from typing_extensions import reveal_type  # Older Python versions
 
@@ -169,6 +181,7 @@ enable_error_code = unimported-reveal
 
 ```python
 from typing import reveal_type
+
 
 def process(value: int | str) -> None:
     reveal_type(value)  # Shows: int | str
@@ -198,9 +211,11 @@ Flags code using functions or classes decorated with `@warnings.deprecated` or t
 ```python
 import warnings
 
+
 @warnings.deprecated("Use new_function instead", category=DeprecationWarning)
 def old_function():
     return 42
+
 
 # Error: "old_function" is deprecated [deprecated]
 result = old_function()
@@ -211,6 +226,7 @@ result = old_function()
 ```python
 def new_function():
     return 42
+
 
 result = new_function()  # OK - not deprecated
 ```
@@ -230,9 +246,11 @@ enable_error_code = deprecated
 import warnings
 from typing_extensions import deprecated
 
+
 @deprecated("Use process_v2 instead")
 def process_old(data: list) -> int:
     return len(data)
+
 
 def process_v2(data: list) -> int:
     """New implementation with better performance."""

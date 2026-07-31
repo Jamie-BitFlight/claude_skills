@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.table import Table
 
+
 @dataclass
 class Student:
     id: int
@@ -73,6 +74,7 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.segment import Segment
 from rich.style import Style
 
+
 class MyObject:
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         yield Segment("My", Style(color="magenta"))
@@ -89,6 +91,7 @@ When Rich needs to know the character width of a custom renderable (e.g., for ta
 ```python
 from rich.console import Console, ConsoleOptions
 from rich.measure import Measurement
+
 
 class ChessBoard:
     def __rich_measure__(self, console: Console, options: ConsoleOptions) -> Measurement:
@@ -114,17 +117,10 @@ console = Console()
 layout = Layout()
 
 # Split into named panes vertically (top to bottom)
-layout.split_column(
-    Layout(name="header", size=3),
-    Layout(name="body"),
-    Layout(name="footer", size=3),
-)
+layout.split_column(Layout(name="header", size=3), Layout(name="body"), Layout(name="footer", size=3))
 
 # Split body horizontally (left to right)
-layout["body"].split_row(
-    Layout(name="left"),
-    Layout(name="right"),
-)
+layout["body"].split_row(Layout(name="left"), Layout(name="right"))
 
 # Update content in a pane
 layout["header"].update("[bold]My App")
@@ -178,10 +174,13 @@ from rich.highlighter import RegexHighlighter
 from rich.theme import Theme
 from rich.console import Console
 
+
 class EmailHighlighter(RegexHighlighter):
     """Highlights email addresses."""
+
     base_style = "example."
     highlights = [r"(?P<email>[\w-]+@([\w-]+\.)+[\w-]+)"]
+
 
 theme = Theme({"example.email": "bold magenta"})
 console = Console(highlighter=EmailHighlighter(), theme=theme)
@@ -214,7 +213,7 @@ console = Console(highlighter=EmailHighlighter())
 Apply to a specific `print` call:
 
 ```python
-console.print(text, highlight=False)   # disable for this call
+console.print(text, highlight=False)  # disable for this call
 console.print(text, highlighter=EmailHighlighter())  # custom for this call
 ```
 
@@ -263,6 +262,7 @@ Install pretty printing and tracebacks for the interactive REPL:
 
 ```python
 from rich import pretty
+
 pretty.install()
 ```
 

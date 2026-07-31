@@ -182,6 +182,7 @@ NPY_DISABLE_CPU_FEATURES = "AVX512F,AVX512_SKX"
 # setup_hook.py
 from setuptools import Extension
 
+
 def get_extensions():
     return [
         Extension(
@@ -213,6 +214,7 @@ path = "setup_hook.py"
 from setuptools import Extension
 import platform
 
+
 def get_extensions():
     cpp_args = []
     if platform.system() == "Windows":
@@ -222,10 +224,7 @@ def get_extensions():
 
     return [
         Extension(
-            "mypackage._cpp_ext",
-            sources=["src/mypackage/_cpp_ext.cpp"],
-            language="c++",
-            extra_compile_args=cpp_args,
+            "mypackage._cpp_ext", sources=["src/mypackage/_cpp_ext.cpp"], language="c++", extra_compile_args=cpp_args
         )
     ]
 ```

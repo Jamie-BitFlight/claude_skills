@@ -73,7 +73,7 @@ class TestBug1ProseParallelizeWithDroppedTasks:
             **Dependencies**: None
             **Priority**: 1
             **Complexity**: Low
-            **Agent**: general-purpose
+            **Agent**: python3-development:python-cli-architect
             **Skills**: []
             **Can parallelize with**: nothing — T2 depends on this decision
         """)

@@ -145,9 +145,11 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
 def hello(name: str) -> None:
     typer.echo(f"Hello {name}")
+
 
 runner = CliRunner()
 
@@ -176,9 +178,11 @@ from rich import print as rprint
 
 app = typer.Typer()
 
+
 @app.command()
 def status() -> None:
     rprint("[bold green]OK[/bold green]")
+
 
 runner = CliRunner()
 
@@ -211,9 +215,11 @@ console = Console()
 
 app = typer.Typer()
 
+
 @app.command()
 def run() -> None:
     console.print("[italic]running[/italic]")
+
 
 runner = CliRunner()
 
@@ -277,12 +283,11 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
-def greet(
-    name: str,
-    lastname: str = typer.Option(..., prompt=True),
-) -> None:
+def greet(name: str, lastname: str = typer.Option(..., prompt=True)) -> None:
     typer.echo(f"Hello {name} {lastname}")
+
 
 runner = CliRunner()
 
@@ -322,6 +327,7 @@ GOLDEN_DIR = pathlib.Path(__file__).parent / "golden"
 
 def render_report(console: Console, data: dict) -> None:
     from rich.table import Table
+
     table = Table(title="Report")
     table.add_column("Key")
     table.add_column("Value")
@@ -344,8 +350,7 @@ def test_report_golden(request):
 
     expected = golden_path.read_text()
     assert output == expected, (
-        f"Output differs from golden file {golden_path}. "
-        "Delete the golden file and re-run to update."
+        f"Output differs from golden file {golden_path}. Delete the golden file and re-run to update."
     )
 ```
 
@@ -462,19 +467,23 @@ sets `clear=False`, subsequent tests see stale data.
 # Wrong — shared recording console, state leaks between tests
 console = Console(record=True, width=80)
 
+
 def test_a():
     console.print("A")
     assert "A" in console.export_text(clear=False)  # buffer not cleared
 
+
 def test_b():
     console.print("B")
     assert console.export_text() == "B\n"  # fails — "A\n" still in buffer
+
 
 # Correct — construct a fresh console per test
 def test_a():
     console = Console(record=True, width=80)
     console.print("A")
     assert "A" in console.export_text()
+
 
 def test_b():
     console = Console(record=True, width=80)

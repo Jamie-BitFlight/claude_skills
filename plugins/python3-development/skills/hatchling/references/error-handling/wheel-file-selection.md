@@ -224,7 +224,7 @@ class CustomBuildHook(BuildHookInterface):
         generated_file.write_text(f'__version__ = "{version}"')
 
         # Add as artifact
-        build_data['artifacts'] = ['src/mypackage/version.py']
+        build_data["artifacts"] = ["src/mypackage/version.py"]
 ```
 
 **Solution 2: Force-include with build hook**
@@ -286,30 +286,17 @@ import sys
 import tomllib
 from pathlib import Path
 
+
 def validate_wheel_config():
     with open("pyproject.toml", "rb") as f:
         config = tomllib.load(f)
 
-    wheel_config = (
-        config.get("tool", {})
-        .get("hatch", {})
-        .get("build", {})
-        .get("targets", {})
-        .get("wheel", {})
-    )
+    wheel_config = config.get("tool", {}).get("hatch", {}).get("build", {}).get("targets", {}).get("wheel", {})
 
     # Check if any selection option is defined
-    selection_options = [
-        "packages",
-        "include",
-        "only-include",
-        "force-include",
-        "bypass-selection"
-    ]
+    selection_options = ["packages", "include", "only-include", "force-include", "bypass-selection"]
 
-    has_selection = any(
-        wheel_config.get(opt) for opt in selection_options
-    )
+    has_selection = any(wheel_config.get(opt) for opt in selection_options)
 
     if not has_selection:
         print("ERROR: No file selection options defined!")
@@ -317,6 +304,7 @@ def validate_wheel_config():
         sys.exit(1)
 
     print("File selection configuration valid ✓")
+
 
 if __name__ == "__main__":
     validate_wheel_config()

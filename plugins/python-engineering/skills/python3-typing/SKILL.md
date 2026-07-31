@@ -80,10 +80,12 @@ Boundary modules should return typed objects only.
 from typing import TypedDict, NotRequired
 from dataclasses import dataclass
 
+
 class _RawIncoming(TypedDict):
     user_id: int
     email: str
     metadata: NotRequired[dict[str, str]]
+
 
 @dataclass(frozen=True, slots=True)
 class IncomingPayload:
@@ -91,12 +93,9 @@ class IncomingPayload:
     email: str
     metadata: dict[str, str]
 
+
 def parse_incoming(data: _RawIncoming) -> IncomingPayload:
-    return IncomingPayload(
-        user_id=data["user_id"],
-        email=data["email"],
-        metadata=data.get("metadata", {}),
-    )
+    return IncomingPayload(user_id=data["user_id"], email=data["email"], metadata=data.get("metadata", {}))
 ```
 
 ### Example: Pydantic boundary
@@ -104,11 +103,13 @@ def parse_incoming(data: _RawIncoming) -> IncomingPayload:
 ```python
 from pydantic import BaseModel, TypeAdapter
 
+
 class IncomingPayload(BaseModel):
     user_id: int
     email: str
     metadata: dict[str, str] = {}
     model_config = {"strict": True}
+
 
 def parse_incoming(data: dict[str, object]) -> IncomingPayload:
     return IncomingPayload.model_validate(data)

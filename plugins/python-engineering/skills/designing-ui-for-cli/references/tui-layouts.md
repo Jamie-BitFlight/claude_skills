@@ -11,11 +11,13 @@ Stack widgets vertically:
 from textual.app import App, ComposeResult
 from textual.widgets import Label
 
+
 class VerticalApp(App):
     def compose(self) -> ComposeResult:
         yield Label("Top")
         yield Label("Middle")
         yield Label("Bottom")
+
 
 # Or explicit CSS
 CSS = """
@@ -31,11 +33,13 @@ Arrange widgets side-by-side:
 ```python
 from textual.containers import Horizontal
 
+
 def compose(self) -> ComposeResult:
     with Horizontal():
         yield Label("Left")
         yield Label("Center")
         yield Label("Right")
+
 
 # Or via CSS
 CSS = """
@@ -69,7 +73,7 @@ class GridApp(App):
 
     def compose(self) -> ComposeResult:
         for i in range(6):
-            yield Label(f"Cell {i+1}", classes="cell")
+            yield Label(f"Cell {i + 1}", classes="cell")
 ```
 
 Advanced grid with spanning:
@@ -96,11 +100,13 @@ Dock widgets to edges:
 ```python
 from textual.widgets import Header, Footer
 
+
 class DockedApp(App):
     def compose(self) -> ComposeResult:
         yield Header()  # Docked to top
         yield Label("Content")  # Takes remaining space
         yield Footer()  # Docked to bottom
+
 
 # Custom docking
 CSS = """
@@ -266,6 +272,7 @@ Handle overflow with scrolling:
 ```python
 from textual.containers import ScrollableContainer
 
+
 class ScrollableApp(App):
     CSS = """
     #content {
@@ -277,7 +284,7 @@ class ScrollableApp(App):
     def compose(self) -> ComposeResult:
         with ScrollableContainer(id="content"):
             for i in range(100):
-                yield Label(f"Line {i+1}")
+                yield Label(f"Line {i + 1}")
 ```
 
 ### Tabbed Interface
@@ -285,6 +292,7 @@ class ScrollableApp(App):
 Tab-based navigation:
 ```python
 from textual.widgets import TabbedContent, TabPane
+
 
 class TabbedApp(App):
     def compose(self) -> ComposeResult:
@@ -442,6 +450,7 @@ Centered modal dialog:
 ```python
 from textual.screen import ModalScreen
 from textual.containers import Container
+
 
 class Modal(ModalScreen[bool]):
     CSS = """

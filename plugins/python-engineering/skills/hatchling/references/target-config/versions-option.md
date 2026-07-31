@@ -106,13 +106,14 @@ Hooks receive the version being built:
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class OptimizationHook(BuildHookInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def initialize(self, version: str, build_data: dict) -> None:
         if version == "optimized":
             # Add C extension sources
-            build_data['artifacts'].append('src/**/*.c')
+            build_data["artifacts"].append("src/**/*.c")
         elif version == "standard":
             # Pure Python only
             pass
@@ -339,7 +340,7 @@ def initialize(self, version: str, build_data: dict) -> None:
     if version == "standard":
         pass  # No changes
     elif version == "optimized":
-        build_data['artifacts'].append('*.so')  # Add compiled objects
+        build_data["artifacts"].append("*.so")  # Add compiled objects
     # Otherwise versions produce same output
 ```
 

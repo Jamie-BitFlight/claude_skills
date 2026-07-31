@@ -38,10 +38,12 @@ from fastmcp.server.apps import AppConfig, ResourceCSP
 
 mcp = FastMCP("My App Server")
 
+
 # The tool does the computation
 @mcp.tool(app=AppConfig(resource_uri="ui://my-app/view.html"))
 def generate_chart(data: list[float]) -> str:
     return json.dumps({"values": data})
+
 
 # The resource provides the UI
 @mcp.resource("ui://my-app/view.html")
@@ -57,6 +59,7 @@ PATTERN: Import from `fastmcp.server.apps`. On tools, set `resource_uri` to poin
 
 ```python
 from fastmcp.server.apps import AppConfig
+
 
 @mcp.tool(app=AppConfig(resource_uri="ui://my-app/view.html"))
 def my_tool() -> str:
@@ -80,12 +83,7 @@ The `visibility` field controls where a tool appears in the host:
 - `["model", "app"]` — both
 
 ```python
-@mcp.tool(
-    app=AppConfig(
-        resource_uri="ui://my-app/view.html",
-        visibility=["app"],
-    )
-)
+@mcp.tool(app=AppConfig(resource_uri="ui://my-app/view.html", visibility=["app"]))
 def refresh_data() -> str:
     """Only callable from the app UI, not by the LLM."""
     return fetch_latest()
@@ -146,6 +144,7 @@ PATTERN: Declare external resources needed by your app using `ResourceCSP`:
 ```python
 from fastmcp.server.apps import AppConfig, ResourceCSP
 
+
 @mcp.resource(
     "ui://my-app/view.html",
     app=AppConfig(
@@ -173,15 +172,8 @@ PATTERN: Request browser capabilities (camera, clipboard) via `ResourcePermissio
 ```python
 from fastmcp.server.apps import AppConfig, ResourcePermissions
 
-@mcp.resource(
-    "ui://my-app/view.html",
-    app=AppConfig(
-        permissions=ResourcePermissions(
-            camera={},
-            clipboard_write={},
-        )
-    ),
-)
+
+@mcp.resource("ui://my-app/view.html", app=AppConfig(permissions=ResourcePermissions(camera={}, clipboard_write={})))
 def my_view() -> str:
     return "<html>...</html>"
 ```
@@ -197,6 +189,7 @@ PATTERN: Check at runtime whether the host supports the Apps extension before re
 ```python
 from fastmcp import Context
 from fastmcp.server.apps import AppConfig, UI_EXTENSION_ID
+
 
 @mcp.tool(app=AppConfig(resource_uri="ui://my-app/view.html"))
 async def my_tool(ctx: Context) -> str:
@@ -227,6 +220,7 @@ mcp = FastMCP("QR Code Server")
 
 VIEW_URI = "ui://qr-server/view.html"
 
+
 @mcp.tool(app=AppConfig(resource_uri=VIEW_URI))
 def generate_qr(text: str = "https://gofastmcp.com") -> ToolResult:
     """Generate a QR code from text."""
@@ -239,14 +233,10 @@ def generate_qr(text: str = "https://gofastmcp.com") -> ToolResult:
     img.save(buffer, format="PNG")
     b64 = base64.b64encode(buffer.getvalue()).decode()
 
-    return ToolResult(
-        content=[types.ImageContent(type="image", data=b64, mimeType="image/png")]
-    )
+    return ToolResult(content=[types.ImageContent(type="image", data=b64, mimeType="image/png")])
 
-@mcp.resource(
-    VIEW_URI,
-    app=AppConfig(csp=ResourceCSP(resource_domains=["https://unpkg.com"])),
-)
+
+@mcp.resource(VIEW_URI, app=AppConfig(csp=ResourceCSP(resource_domains=["https://unpkg.com"])))
 def view() -> str:
     """Interactive QR code viewer."""
     return """\
@@ -296,15 +286,18 @@ from fastmcp import FastMCP, FastMCPApp
 
 app = FastMCPApp("Contacts")
 
+
 @app.tool()
 def save_contact(name: str, email: str) -> list[dict]:
     db.append({"name": name, "email": email})
     return list(db)
 
+
 @app.ui()
 def contacts_app() -> PrefabApp:
     """Open the contacts app."""
     ...
+
 
 mcp = FastMCP("My Server")
 mcp.mount(app)
@@ -360,6 +353,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("Dashboard")
 
+
 @mcp.tool(app=True)
 def revenue_chart(year: int) -> PrefabApp:
     """Show annual revenue as an interactive bar chart."""
@@ -372,11 +366,7 @@ def revenue_chart(year: int) -> PrefabApp:
 
     with Column(gap=4, css_class="p-6") as view:
         Heading(f"{year} Revenue")
-        BarChart(
-            data=data,
-            series=[ChartSeries(data_key="revenue", label="Revenue")],
-            x_axis="quarter",
-        )
+        BarChart(data=data, series=[ChartSeries(data_key="revenue", label="Revenue")], x_axis="quarter")
 
     return PrefabApp(view=view)
 ```
@@ -392,6 +382,7 @@ from prefab_ui.components import Column, Heading, Badge
 from fastmcp import FastMCP
 
 mcp = FastMCP("Status")
+
 
 @mcp.tool(app=True)
 def status_badge() -> Column:
@@ -411,6 +402,7 @@ from prefab_ui.app import PrefabApp
 from fastmcp import FastMCP
 
 mcp = FastMCP("Demo")
+
 
 @mcp.tool(app=True)
 def toggle_demo() -> PrefabApp:
@@ -433,6 +425,7 @@ from fastmcp.tools import ToolResult
 
 mcp = FastMCP("Sales")
 
+
 @mcp.tool(app=True)
 def sales_overview(year: int) -> ToolResult:
     """Show sales data visually and summarize for the model."""
@@ -444,8 +437,7 @@ def sales_overview(year: int) -> ToolResult:
         BarChart(data=data, series=[ChartSeries(data_key="revenue")])
 
     return ToolResult(
-        content=f"Total revenue for {year}: ${total:,} across {len(data)} quarters",
-        structured_content=view,
+        content=f"Total revenue for {year}: ${total:,} across {len(data)} quarters", structured_content=view
     )
 ```
 
@@ -476,13 +468,13 @@ Prefab tools and custom HTML tools coexist in the same server. Prefab tools shar
 ```python
 from fastmcp.server.apps import AppConfig
 
+
 @mcp.tool(app=True)
-def team_directory() -> PrefabApp:
-    ...
+def team_directory() -> PrefabApp: ...
+
 
 @mcp.tool(app=AppConfig(resource_uri="ui://my-app/map.html"))
-def map_view() -> str:
-    ...
+def map_view() -> str: ...
 ```
 
 

@@ -347,7 +347,7 @@ flowchart TD
 | P3_CODEBASE_OUT | `@dh:codebase-analyzer` | focus areas (patterns, architecture, testing, conventions) | `plan/codebase/{FOCUS}.md` per focus, `artifact_register(type='codebase-analysis')` | always → P3_ARCHITECT |
 | P3_ARCHITECT | language manifest agent (e.g. `@python3-development:python-cli-design-spec`) | feature context + optional codebase analysis | `plan/architect-{slug}.md`, `artifact_register(type='architect')` | terminal (continues to Phase 4) |
 
-**Agent selection for architecture**: The skill does NOT hardcode `@python3-development:python-cli-design-spec`. It resolves the `design-spec` role from the language manifest at runtime based on project detection markers (`pyproject.toml` → Python, `package.json` → TypeScript, `Cargo.toml` → Rust, none → general-purpose fallback).
+**Agent selection for architecture**: The skill does NOT hardcode `@python3-development:python-cli-design-spec`. It resolves the `design-spec` role from the language manifest at runtime based on project detection markers (`pyproject.toml` → Python, `package.json` → TypeScript, `Cargo.toml` → Rust, none → dh:task-worker fallback).
 
 **Artifact registration**: Each phase calls `artifact_register` after writing its file, with `item_id`, `artifact_type`, `path` (state-relative), and `agent` fields.
 

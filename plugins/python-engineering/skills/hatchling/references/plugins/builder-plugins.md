@@ -19,7 +19,7 @@ Each builder must define a string identifier:
 
 ```python
 class SpecialBuilder(BuilderInterface):
-    PLUGIN_NAME = 'special'
+    PLUGIN_NAME = "special"
 ```
 
 Users select builders via configuration:
@@ -46,9 +46,8 @@ def get_version_api(self) -> dict[str, callable]:
 
     Returns: Absolute path to artifact
     """
-    return {
-        '1.0.0': self.build_wheel_for_version,
-    }
+    return {"1.0.0": self.build_wheel_for_version}
+
 
 def build_wheel_for_version(self, build_dir: str, build_data: dict) -> str:
     # Build implementation
@@ -66,7 +65,7 @@ def get_default_versions(self) -> list[str]:
     Returns list of versions to build by default.
     If not overridden, defaults to all available versions.
     """
-    return ['1.0.0']
+    return ["1.0.0"]
 ```
 
 #### clean()
@@ -79,6 +78,7 @@ def clean(self, build_dir: str, build_data: dict) -> None:
     Clean up temporary or intermediate build artifacts.
     """
     import shutil
+
     shutil.rmtree(build_dir, ignore_errors=True)
 ```
 
@@ -92,10 +92,7 @@ def get_default_build_data(self) -> dict[str, any]:
     Returns mapping of data that can be modified by build hooks.
     Common keys: artifacts, force_include
     """
-    return {
-        'artifacts': [],
-        'force_include': {},
-    }
+    return {"artifacts": [], "force_include": {}}
 ```
 
 ## Configuration Access
@@ -177,7 +174,7 @@ def initialize(self, version: str, build_data: dict):
     - force_include: Dict[str, str] - Forced inclusion mappings
     - build_hooks: Immutable sequence of hook names
     """
-    build_data['artifacts'].append('extra_pattern')
+    build_data["artifacts"].append("extra_pattern")
 ```
 
 ## Official Builders
@@ -229,13 +226,12 @@ Implement `BuilderInterface` for specialized formats:
 ```python
 from hatchling.builders.plugin.interface import BuilderInterface
 
+
 class LambdaBuilder(BuilderInterface):
-    PLUGIN_NAME = 'aws-lambda'
+    PLUGIN_NAME = "aws-lambda"
 
     def get_version_api(self) -> dict[str, callable]:
-        return {
-            'default': self.build_lambda,
-        }
+        return {"default": self.build_lambda}
 
     def build_lambda(self, build_dir: str, build_data: dict) -> str:
         # Create AWS Lambda zip package
@@ -256,33 +252,32 @@ import os
 from pathlib import Path
 from hatchling.builders.plugin.interface import BuilderInterface
 
+
 class ZipBuilder(BuilderInterface):
-    PLUGIN_NAME = 'zip'
+    PLUGIN_NAME = "zip"
 
     def get_version_api(self) -> dict[str, callable]:
-        return {'default': self.build_zip}
+        return {"default": self.build_zip}
 
     def get_default_versions(self) -> list[str]:
-        return ['default']
+        return ["default"]
 
     def get_default_build_data(self) -> dict:
-        return {'artifacts': [], 'force_include': {}}
+        return {"artifacts": [], "force_include": {}}
 
     def clean(self, build_dir: str, build_data: dict) -> None:
         import shutil
+
         shutil.rmtree(build_dir, ignore_errors=True)
 
     def build_zip(self, build_dir: str, build_data: dict) -> str:
         import zipfile
 
-        zip_path = os.path.join(build_dir, 'archive.zip')
+        zip_path = os.path.join(build_dir, "archive.zip")
 
-        with zipfile.ZipFile(zip_path, 'w') as zf:
+        with zipfile.ZipFile(zip_path, "w") as zf:
             for included_file in self.recurse_included_files():
-                zf.write(
-                    included_file.path,
-                    arcname=included_file.distribution_path,
-                )
+                zf.write(included_file.path, arcname=included_file.distribution_path)
 
         return zip_path
 ```

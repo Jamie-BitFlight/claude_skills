@@ -19,7 +19,7 @@ Each hook must define a string identifier:
 
 ```python
 class CustomBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 ```
 
 Users select hooks via configuration:
@@ -52,10 +52,10 @@ def initialize(self, version: str, build_data: dict) -> None:
         build_data: Mutable dictionary of build configuration
     """
     # Example: Add extra artifacts to include
-    build_data['artifacts'].append('generated_file.txt')
+    build_data["artifacts"].append("generated_file.txt")
 
     # Example: Force include files
-    build_data['force_include']['/path/to/file'] = 'dest/file'
+    build_data["force_include"]["/path/to/file"] = "dest/file"
 ```
 
 ### finalize(version, build_data, artifact_path)
@@ -65,12 +65,7 @@ def initialize(self, version: str, build_data: dict) -> None:
 **Purpose**: Process built artifacts or perform post-build actions.
 
 ```python
-def finalize(
-    self,
-    version: str,
-    build_data: dict,
-    artifact_path: str,
-) -> None:
+def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
     """
     This occurs immediately after each build.
 
@@ -84,10 +79,11 @@ def finalize(
     """
     # Example: Sign or notarize the artifact
     import subprocess
-    subprocess.run(['gpg', '--sign', artifact_path])
+
+    subprocess.run(["gpg", "--sign", artifact_path])
 
     # Example: Upload build metadata
-    with open(artifact_path + '.sha256', 'w') as f:
+    with open(artifact_path + ".sha256", "w") as f:
         f.write(compute_hash(artifact_path))
 ```
 
@@ -105,7 +101,8 @@ def clean(self) -> None:
     This is useful for removing temporary files or caches from prior builds.
     """
     import shutil
-    build_cache = os.path.join(self.root, '.build_cache')
+
+    build_cache = os.path.join(self.root, ".build_cache")
     if os.path.exists(build_cache):
         shutil.rmtree(build_cache)
 ```
@@ -118,9 +115,9 @@ Build data is a dictionary containing configuration that can be modified by hook
 
 ```python
 {
-    'artifacts': [],           # Extra artifact patterns (append-only)
-    'force_include': {},       # Mapping: source_path -> dist_path
-    'build_hooks': (...),      # Immutable: configured hook names
+    "artifacts": [],  # Extra artifact patterns (append-only)
+    "force_include": {},  # Mapping: source_path -> dist_path
+    "build_hooks": (...),  # Immutable: configured hook names
 }
 ```
 
@@ -131,17 +128,18 @@ Only `initialize()` should modify build_data; `finalize()` receives read-only da
 ```python
 def initialize(self, version: str, build_data: dict) -> None:
     # SAFE: Modifying in initialize
-    build_data['artifacts'].append('*.pyc')
+    build_data["artifacts"].append("*.pyc")
 
     # SAFE: Adding to force_include
-    build_data['force_include']['/src/generated'] = 'generated/'
+    build_data["force_include"]["/src/generated"] = "generated/"
 
     # NOT SAFE: Modifying immutable build_hooks
     # build_data['build_hooks'] = [...]  # Will fail
 
+
 def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
     # OK to READ build_data
-    if 'metadata_hook' in build_data.get('hooks', []):
+    if "metadata_hook" in build_data.get("hooks", []):
         pass
     # But modifications won't be used - builder already executed
 ```
@@ -154,7 +152,7 @@ String identifier for user selection:
 
 ```python
 class VersionBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'version'
+    PLUGIN_NAME = "version"
 ```
 
 ### root (Property)
@@ -238,7 +236,7 @@ Hooks can declare dependencies required during build:
 
 ```python
 class CMakeBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'cmake'
+    PLUGIN_NAME = "cmake"
 
     @staticmethod
     def dependencies() -> list[str]:
@@ -246,7 +244,7 @@ class CMakeBuildHook(BuildHookInterface):
         Returns list of package names required for building.
         These are added to build-system.requires automatically.
         """
-        return ['cmake>=3.15', 'ninja']
+        return ["cmake>=3.15", "ninja"]
 ```
 
 ## Conditional Execution
@@ -292,8 +290,9 @@ Implement in `hatch_build.py`:
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomHook(BuildHookInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def initialize(self, version, build_data):
         # Custom logic
@@ -322,40 +321,35 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 import os
 import subprocess
 
+
 class ProtobufBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'protobuf'
+    PLUGIN_NAME = "protobuf"
 
     @staticmethod
     def dependencies():
-        return ['protobuf>=3.20']
+        return ["protobuf>=3.20"]
 
     def initialize(self, version: str, build_data: dict) -> None:
         """Compile .proto files to Python."""
-        proto_dir = os.path.join(self.root, self.config.get('proto_dir', 'proto'))
+        proto_dir = os.path.join(self.root, self.config.get("proto_dir", "proto"))
 
         if not os.path.exists(proto_dir):
             return
 
         # Compile protobuf files
         for filename in os.listdir(proto_dir):
-            if filename.endswith('.proto'):
+            if filename.endswith(".proto"):
                 proto_path = os.path.join(proto_dir, filename)
-                output_dir = os.path.join(self.root, 'src')
+                output_dir = os.path.join(self.root, "src")
 
-                subprocess.run([
-                    'protoc',
-                    '--python_out', output_dir,
-                    proto_path,
-                ], check=True)
+                subprocess.run(["protoc", "--python_out", output_dir, proto_path], check=True)
 
         # Ensure generated files are included
-        build_data['force_include'][
-            os.path.join(output_dir, 'src')
-        ] = 'mypackage/'
+        build_data["force_include"][os.path.join(output_dir, "src")] = "mypackage/"
 
     def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
         """Log build completion."""
-        self.app.verbose(f'Built artifact: {artifact_path}')
+        self.app.verbose(f"Built artifact: {artifact_path}")
 ```
 
 ## Configuration Examples

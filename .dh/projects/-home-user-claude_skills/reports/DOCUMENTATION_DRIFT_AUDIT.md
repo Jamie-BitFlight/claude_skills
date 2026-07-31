@@ -93,7 +93,7 @@ loop = asyncio.get_running_loop()
 
 **Implementation** (server.py, line 272):
 ```python
-lifespan=_beads_lifespan,
+lifespan = (_beads_lifespan,)
 ```
 in the FastMCP constructor call (line 264-273). ✓
 

@@ -216,6 +216,7 @@ path = "build_hooks.py"
 import subprocess
 from pathlib import Path
 
+
 def build():
     # Generate files
     subprocess.run(["make", "build"])

@@ -367,6 +367,7 @@ Better:
 ```python
 # Use deterministic data based on source
 import hashlib
+
 token = hashlib.sha256(source_file).hexdigest()
 ```
 

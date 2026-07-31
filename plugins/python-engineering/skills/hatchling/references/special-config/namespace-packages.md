@@ -30,7 +30,7 @@ Using `pkgutil-style` or `setuptools-style` with `__init__.py`:
 
 ```python
 # mycompany/__init__.py
-__path__ = __import__('pkgutil').extend_path(__path__, __name__)
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
 ```
 
 ## Configuration
@@ -125,7 +125,7 @@ only-include = ["mycompany/utils"]
 After installing both:
 
 ```python
-import mycompany.auth   # From mycompany-auth
+import mycompany.auth  # From mycompany-auth
 import mycompany.utils  # From mycompany-utils
 ```
 
@@ -277,11 +277,7 @@ dependencies = [
 # setup.py
 from setuptools import setup, find_namespace_packages
 
-setup(
-    name="mycompany-subpackage",
-    packages=find_namespace_packages(where="src"),
-    package_dir={"": "src"},
-)
+setup(name="mycompany-subpackage", packages=find_namespace_packages(where="src"), package_dir={"": "src"})
 ```
 
 **New (Hatchling):**
@@ -357,11 +353,13 @@ Help users validate namespace packages with this test:
 ```python
 # test_namespace.py
 import mycompany
-assert hasattr(mycompany, '__path__')  # It's a namespace
-assert not hasattr(mycompany, '__file__')  # No __init__.py
+
+assert hasattr(mycompany, "__path__")  # It's a namespace
+assert not hasattr(mycompany, "__file__")  # No __init__.py
 
 import mycompany.subpackage
-assert hasattr(mycompany.subpackage, '__file__')  # Regular package
+
+assert hasattr(mycompany.subpackage, "__file__")  # Regular package
 ```
 
 ## Best Practices

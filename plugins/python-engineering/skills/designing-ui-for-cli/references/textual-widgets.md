@@ -44,6 +44,7 @@ from textual.widgets import Button
 yield Button("Click Me", id="my-button")
 yield Button("Disabled", disabled=True)
 
+
 # Handle click
 def on_button_pressed(self, event: Button.Pressed) -> None:
     button_id = event.button.id
@@ -59,8 +60,10 @@ from textual.widgets import Input
 
 yield Input(placeholder="Enter text...", id="name-input")
 
+
 def on_input_changed(self, event: Input.Changed) -> None:
     self.text_value = event.value
+
 
 def on_input_submitted(self, event: Input.Submitted) -> None:
     # User pressed Enter
@@ -97,6 +100,7 @@ from textual.widgets import Switch
 
 yield Switch(value=True)  # Initially on
 
+
 def on_switch_changed(self, event: Switch.Changed) -> None:
     is_on = event.value
     self.toggle_feature(is_on)
@@ -122,6 +126,7 @@ table.add_row("Bob", 25, "UK")
 
 # Add row with custom label
 from rich.text import Text
+
 label = Text("1", style="bold cyan")
 table.add_row("Charlie", 35, "Canada", label=label)
 
@@ -131,10 +136,12 @@ table.cursor_type = "row"  # "cell", "row", "column", or "none"
 table.show_header = True
 table.show_row_labels = True
 
+
 # Handle selection
 def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
     row_key = event.row_key
     row_data = table.get_row(row_key)
+
 
 def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
     value = event.value
@@ -199,6 +206,7 @@ Standard app chrome:
 ```python
 from textual.widgets import Header, Footer
 
+
 def compose(self) -> ComposeResult:
     yield Header()
     # ... content ...
@@ -214,6 +222,7 @@ Create reusable components:
 ```python
 from textual.widget import Widget
 from textual.widgets import Label, Button
+
 
 class Card(Widget):
     """A card widget with title and content."""
@@ -244,6 +253,7 @@ For simple custom widgets that just render text:
 
 ```python
 from textual.widget import Widget
+
 
 class FizzBuzz(Widget):
     def render(self) -> str:

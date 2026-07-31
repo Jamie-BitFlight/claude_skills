@@ -19,6 +19,7 @@ yield Label("Important!", classes="highlight")
 # With markup
 yield Label("[bold]Bold[/] and [italic]italic[/]")
 
+
 # Dynamic label with reactive
 class DynamicLabel(Widget):
     message = reactive("Initial")
@@ -60,6 +61,7 @@ yield Button("Error", variant="error")
 # Disabled button
 yield Button("Disabled", disabled=True)
 
+
 # Handle click
 def on_button_pressed(self, event: Button.Pressed) -> None:
     if event.button.id == "action":
@@ -84,13 +86,15 @@ yield Input(placeholder="Password", password=True, id="pass")
 yield Input(
     placeholder="Email",
     validators=[Email()],  # Built-in validators
-    id="email"
+    id="email",
 )
+
 
 # Handle submission
 def on_input_submitted(self, event: Input.Submitted) -> None:
     value = event.value
     self.log(f"Submitted: {value}")
+
 
 # Handle changes
 def on_input_changed(self, event: Input.Changed) -> None:
@@ -111,8 +115,9 @@ yield TextArea(
     text="Initial content\nLine 2",
     language="python",  # Syntax highlighting
     theme="monokai",
-    id="code"
+    id="code",
 )
+
 
 # Handle changes
 def on_text_area_changed(self, event: TextArea.Changed) -> None:
@@ -126,12 +131,9 @@ Dropdown selection:
 from textual.widgets import Select
 
 # Basic select
-options = [
-    ("Option A", "a"),
-    ("Option B", "b"),
-    ("Option C", "c"),
-]
+options = [("Option A", "a"), ("Option B", "b"), ("Option C", "c")]
 yield Select(options=options, prompt="Choose...", id="choice")
+
 
 # Handle selection
 def on_select_changed(self, event: Select.Changed) -> None:
@@ -146,6 +148,7 @@ Boolean input:
 from textual.widgets import Checkbox
 
 yield Checkbox("Enable feature", id="feature")
+
 
 # Handle changes
 def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
@@ -164,6 +167,7 @@ with RadioSet(id="size"):
     yield RadioButton("Medium", value=True)  # Default
     yield RadioButton("Large")
 
+
 # Handle selection
 def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
     selected = event.pressed.label
@@ -177,6 +181,7 @@ Toggle switch:
 from textual.widgets import Switch
 
 yield Switch(value=True, id="notifications")
+
 
 # Handle toggle
 def on_switch_changed(self, event: Switch.Changed) -> None:
@@ -204,11 +209,13 @@ table.add_row("Bob", 25, "LA")
 # Cursor control
 table.cursor_type = "row"  # or "cell", "column", "none"
 
+
 # Handle selection
 def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
     row_key = event.row_key
     row_data = event.row
     self.log(f"Selected: {row_data}")
+
 
 # Update cells
 table.update_cell(row_key, "Age", 31)
@@ -237,10 +244,12 @@ folder.add_leaf("file2.txt")
 subfolder = folder.add("Subfolder")
 subfolder.add_leaf("nested.txt")
 
+
 # Handle selection
 def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
     node = event.node
     self.log(f"Selected: {node.label}")
+
 
 # Expand/collapse
 def on_tree_node_expanded(self, event: Tree.NodeExpanded) -> None:
@@ -261,6 +270,7 @@ list_view = ListView(id="menu")
 list_view.append(ListItem(Label("Item 1")))
 list_view.append(ListItem(Label("Item 2")))
 list_view.append(ListItem(Label("Item 3")))
+
 
 # Handle selection
 def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -325,6 +335,7 @@ Standard app chrome:
 ```python
 from textual.widgets import Header, Footer
 
+
 def compose(self) -> ComposeResult:
     yield Header(show_clock=True)
     # ... content ...
@@ -345,6 +356,7 @@ with TabbedContent(id="tabs"):
     with TabPane("Tab 3", id="tab3"):
         yield Label("Content 3")
 
+
 # Handle tab changes
 def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
     tab_id = event.pane.id
@@ -362,6 +374,7 @@ with ContentSwitcher(initial="view1", id="switcher"):
     yield Label("View 2", id="view2")
     yield Label("View 3", id="view3")
 
+
 # Switch views
 def switch_view(self, view_id: str) -> None:
     switcher = self.query_one(ContentSwitcher)
@@ -375,11 +388,8 @@ Selectable list of options:
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 
-option_list = OptionList(
-    Option("Option 1", id="opt1"),
-    Option("Option 2", id="opt2"),
-    Option("Option 3", id="opt3"),
-)
+option_list = OptionList(Option("Option 1", id="opt1"), Option("Option 2", id="opt2"), Option("Option 3", id="opt3"))
+
 
 # Handle selection
 def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
@@ -459,6 +469,7 @@ Create composite widgets:
 from textual.widget import Widget
 from textual.containers import Horizontal, Vertical
 
+
 class UserCard(Widget):
     """Display user information."""
 
@@ -492,6 +503,7 @@ class UserCard(Widget):
         color: $text-muted;
     }
     """
+
 
 # Use the widget
 yield UserCard("Alice Smith", "alice@example.com", "Admin")

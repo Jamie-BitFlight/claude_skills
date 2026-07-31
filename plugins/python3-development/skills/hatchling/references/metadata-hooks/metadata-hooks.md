@@ -37,12 +37,11 @@ Implementation file (`hatch_build.py`):
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         metadata["version"] = "1.0.0"
-        metadata["classifiers"] = [
-            "Development Status :: 5 - Production/Stable",
-        ]
+        metadata["classifiers"] = ["Development Status :: 5 - Production/Stable"]
 ```
 
 The custom hook executes during build processes and receives a mutable metadata dictionary that can be modified in-place.
@@ -53,6 +52,7 @@ All metadata hooks implement `MetadataHookInterface`:
 
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
+
 
 class MyMetadataHook(MetadataHookInterface):
     def update(self, metadata):
@@ -81,6 +81,7 @@ Extract version from a Python source file using regex:
 
 ```python
 import re
+
 
 class VersionHook(MetadataHookInterface):
     def update(self, metadata):
@@ -116,6 +117,7 @@ Load metadata from a JSON configuration file:
 
 ```python
 import json
+
 
 class JSONHook(MetadataHookInterface):
     def update(self, metadata):

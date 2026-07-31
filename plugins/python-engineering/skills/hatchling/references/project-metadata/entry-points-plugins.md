@@ -27,7 +27,6 @@ another = "my_package.plugins:AnotherPlugin"
 Other packages can discover plugins through entry points:
 
 ```python
-
 from importlib.metadata import entry_points
 
 # Get all plugins in a namespace
@@ -36,7 +35,6 @@ plugins = entry_points(group="my-app-plugins")
 for plugin in plugins:
     plugin_class = plugin.load()
     print(f"{plugin.name}: {plugin_class}")
-
 ```
 
 ## Practical Examples
@@ -109,8 +107,8 @@ theme = "my_package.themes.blue"
 Typical plugin system implementation:
 
 ```python
-
 from importlib.metadata import entry_points
+
 
 def load_plugins(group_name):
     plugins = {}
@@ -122,11 +120,11 @@ def load_plugins(group_name):
             print(f"Failed to load {entry_point.name}: {e}")
     return plugins
 
+
 # Usage
 middleware = load_plugins("my-app.middleware")
 for name, plugin in middleware.items():
     print(f"Loaded: {name}")
-
 ```
 
 ## Multiple Namespaces

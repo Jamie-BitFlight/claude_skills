@@ -37,11 +37,13 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
 def main(name: str, city: str = ""):
     typer.echo(f"Hello {name}")
     if city:
         typer.echo(f"Let's have a coffee in {city}")
+
 
 if __name__ == "__main__":
     app()
@@ -53,6 +55,7 @@ from typer.testing import CliRunner
 from app.main import app
 
 runner = CliRunner()
+
 
 def test_app():
     result = runner.invoke(app, ["Camila", "--city", "Berlin"])
@@ -123,8 +126,10 @@ If a script uses `typer.run()` directly without an explicit app, create one in t
 # main.py (no explicit app)
 import typer
 
+
 def main(name: str = "World"):
     typer.echo(f"Hello {name}")
+
 
 if __name__ == "__main__":
     typer.run(main)
@@ -137,6 +142,7 @@ from typer.testing import CliRunner
 from app.main import main
 
 runner = CliRunner()
+
 
 def test_main():
     app = typer.Typer()

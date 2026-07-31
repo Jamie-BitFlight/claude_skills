@@ -30,7 +30,7 @@ Or with explicit pagination:
 def get_content(offset: int = 0, limit: int | None = None) -> str:
     if limit is None:
         return content[offset:]
-    return content[offset:offset + limit]
+    return content[offset : offset + limit]
 ```
 
 ---

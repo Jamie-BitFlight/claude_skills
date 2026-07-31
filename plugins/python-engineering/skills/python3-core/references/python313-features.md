@@ -9,20 +9,23 @@ Narrows BOTH the if-branch and the else-branch. Replaces `TypeGuard` for most us
 ```python
 from typing import TypeIs
 
+
 def is_str(val: object) -> TypeIs[str]:
     return isinstance(val, str)
 
+
 def process(val: str | int) -> None:
     if is_str(val):
-        print(val.upper())   # narrowed to str
+        print(val.upper())  # narrowed to str
     else:
-        print(val * 2)       # narrowed to int (TypeIs narrows both branches)
+        print(val * 2)  # narrowed to int (TypeIs narrows both branches)
 ```
 
 Pre-3.13 equivalent (`TypeGuard` — else-branch NOT narrowed):
 
 ```python
 from typing import TypeGuard
+
 
 def is_str(val: object) -> TypeGuard[str]:
     return isinstance(val, str)
@@ -35,9 +38,10 @@ Type checkers prevent mutation of `ReadOnly` fields.
 ```python
 from typing import ReadOnly, TypedDict
 
+
 class Config(TypedDict):
-    name: str              # mutable
-    version: ReadOnly[str] # immutable — assignment is a type error
+    name: str  # mutable
+    version: ReadOnly[str]  # immutable — assignment is a type error
 ```
 
 ### `@deprecated` decorator — Type-level deprecation warnings (PEP 702)
@@ -46,6 +50,7 @@ Type checkers emit warnings at every call site.
 
 ```python
 from warnings import deprecated
+
 
 @deprecated("Use new_function() instead")
 def old_function() -> None: ...
@@ -56,12 +61,13 @@ def old_function() -> None: ...
 Default type when a generic parameter is not specified.
 
 ```python
-class Queue[T=str]:
+class Queue[T = str]:
     def push(self, item: T) -> None: ...
 
-q = Queue()        # T defaults to str
-q.push("hello")    # ok
-q.push(42)         # type error
+
+q = Queue()  # T defaults to str
+q.push("hello")  # ok
+q.push(42)  # type error
 ```
 
 ## Stdlib Additions
@@ -74,9 +80,11 @@ Works with NamedTuples, dataclasses, and objects with `__replace__`.
 import copy
 from typing import NamedTuple
 
+
 class Point(NamedTuple):
     x: int
     y: int
+
 
 p = Point(1, 2)
 p2 = copy.replace(p, y=10)  # Point(x=1, y=10)
@@ -86,6 +94,7 @@ p2 = copy.replace(p, y=10)  # Point(x=1, y=10)
 
 ```python
 import glob
+
 pattern = glob.translate("*.py")  # returns regex string
 ```
 

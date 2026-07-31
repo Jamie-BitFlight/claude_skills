@@ -41,6 +41,7 @@ A comprehensive reference for writing modern Python 3.11+ code with best practic
 ```python
 from typing import List, Dict, Optional, Union, Tuple, Set
 
+
 def process_items(items: List[str]) -> Dict[str, int]:
     result: Optional[str] = None
     values: Union[int, str] = 0
@@ -62,7 +63,7 @@ def process_items(items: list[str]) -> dict[str, int]:
 
 ```python
 def has_command(cmd: str) -> bool:
-    result = subprocess.run(['which', cmd], capture_output=True)
+    result = subprocess.run(["which", cmd], capture_output=True)
     return result.returncode == 0
 ```
 
@@ -107,7 +108,8 @@ if match := re.search(pattern, text):
 ```python
 from unittest.mock import Mock, patch
 
-@patch('module.function')
+
+@patch("module.function")
 def test_something(mock_func):
     mock_func.return_value = 42
 ```
@@ -117,8 +119,9 @@ def test_something(mock_func):
 ```python
 from pytest_mock import MockerFixture
 
+
 def test_something(mocker: MockerFixture) -> None:
-    mock_func = mocker.patch('module.function', return_value=42)
+    mock_func = mocker.patch("module.function", return_value=42)
 ```
 
 ---
@@ -138,10 +141,14 @@ def test_something(mocker: MockerFixture) -> None:
 ```python
 # Modern
 match status_code:
-    case 200: return "OK"
-    case 404: return "Not Found"
-    case 500: return "Server Error"
-    case _: return "Unknown"
+    case 200:
+        return "OK"
+    case 404:
+        return "Not Found"
+    case 500:
+        return "Server Error"
+    case _:
+        return "Unknown"
 
 # Legacy (avoid)
 if status_code == 200:
@@ -199,6 +206,7 @@ lookup: dict[str, list[tuple[str, int]]]
 # Abstract types
 from collections.abc import Iterable, Sequence, Mapping
 
+
 def process(items: Iterable[str]) -> Sequence[int]:
     data: Mapping[str, int] = {}
     return []
@@ -211,8 +219,10 @@ value: int | str
 result: dict[str, int] | None
 data: int | float | str | None
 
+
 def get_config(path: str | None = None) -> dict[str, str] | None:
     pass
+
 
 # Type aliases
 JsonValue = str | int | float | bool | None | dict[str, "JsonValue"] | list["JsonValue"]
@@ -231,6 +241,7 @@ def process_batch(items: list[Any]) -> None:
     if errors:
         raise ExceptionGroup("Processing failed", errors)
 
+
 # Handling
 try:
     process_batch(items)
@@ -248,9 +259,11 @@ except* RuntimeError as eg:
 import tomllib
 from pathlib import Path
 
+
 def load_config(path: Path) -> dict[str, Any]:
-    with path.open('rb') as f:
+    with path.open("rb") as f:
         return tomllib.load(f)
+
 
 config = load_config(Path("pyproject.toml"))
 ```
@@ -260,11 +273,13 @@ config = load_config(Path("pyproject.toml"))
 ```python
 from enum import StrEnum
 
+
 class Status(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+
 
 def set_status(status: Status) -> None:
     match status:
@@ -278,6 +293,7 @@ def set_status(status: Status) -> None:
 
 ```python
 from typing import Self
+
 
 class Builder:
     def __init__(self) -> None:
@@ -294,6 +310,7 @@ class Builder:
     def build(self) -> int:
         return self.value
 
+
 result = Builder().add(5).multiply(3).build()
 ```
 
@@ -302,11 +319,13 @@ result = Builder().add(5).multiply(3).build()
 ```python
 from typing import TypeVarTuple, Generic
 
-Ts = TypeVarTuple('Ts')
+Ts = TypeVarTuple("Ts")
+
 
 class Tuple(Generic[*Ts]):
     def __init__(self, *items: *Ts) -> None:
         self.items = items
+
 
 t1 = Tuple(1, "hello")  # Tuple[int, str]
 ```
@@ -316,11 +335,13 @@ t1 = Tuple(1, "hello")  # Tuple[int, str]
 ```python
 from typing import TypedDict, Required, NotRequired
 
+
 class User(TypedDict):
     name: Required[str]
     email: Required[str]
     phone: NotRequired[str]
     address: NotRequired[str]
+
 
 user: User = {"name": "Alice", "email": "alice@example.com"}
 ```
@@ -351,19 +372,23 @@ def process_file(path: str) -> None:
 # 3.11 style
 from typing import TypeVar, Generic
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class Container(Generic[T]):
     def __init__(self, value: T) -> None:
         self.value = value
+
 
 # 3.12+ style
 class Container[T]:
     def __init__(self, value: T) -> None:
         self.value = value
 
+
 def first[T](items: list[T]) -> T | None:
     return items[0] if items else None
+
 
 type Point[T] = tuple[T, T]
 ```
@@ -395,11 +420,13 @@ results = [f"{x=}" for x in range(5)]
 ```python
 from typing import TypeVar
 
-T = TypeVar('T', default=str)
+T = TypeVar("T", default=str)
+
 
 class Container[T = str]:
     def __init__(self, value: T) -> None:
         self.value = value
+
 
 Container()  # Container[str] inferred
 Container(42)  # Container[int] inferred
@@ -411,8 +438,10 @@ Container(42)  # Container[int] inferred
 # Run with: python --disable-gil script.py
 import threading
 
+
 def worker(thread_id: int) -> None:
     print(f"Thread {thread_id} running without GIL contention")
+
 
 threads = []
 for i in range(4):
@@ -447,15 +476,19 @@ These modules were removed. Use alternatives:
 ```python
 from typing import Protocol
 
+
 class Drawable(Protocol):
     def draw(self) -> None: ...
+
 
 def render(obj: Drawable) -> None:
     obj.draw()
 
+
 class Circle:
     def draw(self) -> None:
         print("Drawing circle")
+
 
 render(Circle())  # Works without inheritance
 ```
@@ -465,8 +498,10 @@ render(Circle())  # Works without inheritance
 ```python
 from typing import TypeGuard
 
+
 def is_string_list(value: list[object]) -> TypeGuard[list[str]]:
     return all(isinstance(item, str) for item in value)
+
 
 def process_strings(items: list[object]) -> None:
     if is_string_list(items):
@@ -480,10 +515,8 @@ def process_strings(items: list[object]) -> None:
 from typing import Annotated
 from typer import Option
 
-def main(
-    name: Annotated[str, Option(help="User name")],
-    age: Annotated[int, Option(min=0, max=150)],
-) -> None:
+
+def main(name: Annotated[str, Option(help="User name")], age: Annotated[int, Option(min=0, max=150)]) -> None:
     pass
 ```
 
@@ -491,6 +524,7 @@ def main(
 
 ```python
 from typing import Never
+
 
 def raise_error(message: str) -> Never:
     raise RuntimeError(message)
@@ -501,8 +535,10 @@ def raise_error(message: str) -> Never:
 ```python
 from typing import LiteralString
 
+
 def execute_query(query: LiteralString, *args: object) -> list[dict[str, object]]:
     pass
+
 
 execute_query("SELECT * FROM users WHERE id = ?", 123)  # OK
 execute_query(f"SELECT * FROM {user_input}")  # Type error!
@@ -514,14 +550,16 @@ execute_query(f"SELECT * FROM {user_input}")  # Type error!
 from typing import ParamSpec, TypeVar, Callable
 from functools import wraps
 
-P = ParamSpec('P')
-R = TypeVar('R')
+P = ParamSpec("P")
+R = TypeVar("R")
+
 
 def log_call(func: Callable[P, R]) -> Callable[P, R]:
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         print(f"Calling {func.__name__}")
         return func(*args, **kwargs)
+
     return wrapper
 ```
 
@@ -548,11 +586,8 @@ import typer
 from typing import Annotated
 from pathlib import Path
 
-app = typer.Typer(
-    name="myapp",
-    help="My application description",
-    add_completion=False,
-)
+app = typer.Typer(name="myapp", help="My application description", add_completion=False)
+
 
 @app.command()
 def process(
@@ -564,15 +599,15 @@ def process(
     """Process input file and generate output."""
     if verbose:
         typer.echo(f"Processing {input_file}")
-    result_path = output_file or input_file.with_suffix('.out')
+    result_path = output_file or input_file.with_suffix(".out")
     typer.echo(f"Output written to {result_path}")
 
+
 @app.command(rich_help_panel="Configuration")
-def configure(
-    config_file: Annotated[Path, typer.Argument(help="Configuration file")],
-) -> None:
+def configure(config_file: Annotated[Path, typer.Argument(help="Configuration file")]) -> None:
     """Configure application settings."""
     pass
+
 
 if __name__ == "__main__":
     app()
@@ -595,27 +630,21 @@ console.print("[bold green]Success:[/bold green] Operation completed")
 console.print("[bold red]Error:[/bold red] Something went wrong", err=True)
 
 # Panels
-console.print(Panel(
-    "Important information here",
-    title="Notice",
-    border_style="yellow"
-))
+console.print(Panel("Important information here", title="Notice", border_style="yellow"))
 
 # Progress bars
-with Progress(
-    SpinnerColumn(),
-    TextColumn("[progress.description]{task.description}"),
-    console=console,
-) as progress:
+with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
     task = progress.add_task("Processing...", total=100)
     for i in range(100):
         progress.update(task, advance=1)
+
 
 # Table width control (required for production CLIs)
 def _get_table_width(table: Table) -> int:
     temp_console = Console(width=9999)
     measurement = Measurement.get(temp_console, temp_console.options, table)
     return int(measurement.maximum)
+
 
 def display_results(results: list[dict[str, str]]) -> None:
     table = Table(title="Results", box=box.MINIMAL_DOUBLE_HEAD)
@@ -637,11 +666,13 @@ from typing import Generator
 import pytest
 from pytest_mock import MockerFixture
 
+
 @pytest.fixture
 def temp_config(tmp_path: Path) -> Path:
     config_file = tmp_path / "config.json"
     config_file.write_text('{"key": "value"}')
     return config_file
+
 
 @pytest.fixture
 def database_connection() -> Generator[Connection, None, None]:
@@ -649,10 +680,11 @@ def database_connection() -> Generator[Connection, None, None]:
     yield conn
     conn.close()
 
+
 def test_process_file(temp_config: Path, mocker: MockerFixture) -> None:
     """Test file processing with valid configuration."""
     # Arrange
-    mock_api = mocker.patch('module.external_api')
+    mock_api = mocker.patch("module.external_api")
     mock_api.return_value = {"status": "ok"}
 
     # Act
@@ -662,21 +694,20 @@ def test_process_file(temp_config: Path, mocker: MockerFixture) -> None:
     assert result.success
     mock_api.assert_called_once()
 
+
 def test_invalid_config_raises_error() -> None:
     with pytest.raises(ValueError, match="Invalid configuration format"):
         load_config({"invalid": "data"})
 
-@pytest.mark.parametrize("input_value,expected", [
-    ("hello", "HELLO"),
-    ("world", "WORLD"),
-    ("", ""),
-])
+
+@pytest.mark.parametrize("input_value,expected", [("hello", "HELLO"), ("world", "WORLD"), ("", "")])
 def test_uppercase(input_value: str, expected: str) -> None:
     assert to_uppercase(input_value) == expected
 
+
 @pytest.mark.asyncio
 async def test_async_operation(mocker: MockerFixture) -> None:
-    mock_fetch = mocker.patch('module.fetch_data', new_callable=mocker.AsyncMock)
+    mock_fetch = mocker.patch("module.fetch_data", new_callable=mocker.AsyncMock)
     mock_fetch.return_value = {"data": "value"}
 
     result = await process_async()
@@ -760,10 +791,12 @@ with lock1, lock2:
 ```python
 # Legacy
 import os
+
 config_path = os.path.join(home_dir, ".config", "app", "config.json")
 
 # Modern
 from pathlib import Path
+
 config_path = Path.home() / ".config" / "app" / "config.json"
 data = config_path.read_text()
 ```

@@ -88,8 +88,8 @@ Apply these patterns during implementation:
 
 ```python
 # Use modern union syntax
-def process(data: str | None) -> dict[str, Any]:
-    ...
+def process(data: str | None) -> dict[str, Any]: ...
+
 
 # Use TypeGuard for narrowing
 def is_valid_user(obj: object) -> TypeGuard[User]:
@@ -101,8 +101,10 @@ def is_valid_user(obj: object) -> TypeGuard[User]:
 ```python
 from typing import Protocol
 
+
 class Serializable(Protocol):
     def to_dict(self) -> dict[str, Any]: ...
+
 
 def save(item: Serializable) -> None:
     data = item.to_dict()
@@ -114,6 +116,7 @@ def save(item: Serializable) -> None:
 ```python
 from dataclasses import dataclass, field
 
+
 @dataclass(slots=True, frozen=True)
 class Config:
     name: str
@@ -124,6 +127,7 @@ class Config:
 
 ```python
 from pydantic import BaseModel, Field
+
 
 class APIResponse(BaseModel):
     status: int = Field(ge=100, le=599)

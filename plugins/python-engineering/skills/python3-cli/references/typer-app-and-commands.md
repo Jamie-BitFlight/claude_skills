@@ -29,8 +29,10 @@ For a single-function script with no explicit app:
 ```python
 import typer
 
+
 def main(name: str):
     typer.echo(f"Hello {name}")
+
 
 if __name__ == "__main__":
     typer.run(main)
@@ -49,10 +51,12 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
 def main(name: str, lastname: str = ""):
     """Say hi to NAME, optionally with a --lastname."""
     typer.echo(f"Hello {name} {lastname}")
+
 
 if __name__ == "__main__":
     app()
@@ -71,13 +75,16 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
 def create(username: str):
     typer.echo(f"Creating user: {username}")
 
+
 @app.command()
 def delete(username: str):
     typer.echo(f"Deleting user: {username}")
+
 
 if __name__ == "__main__":
     app()
@@ -107,6 +114,7 @@ Equivalent to calling `app.command()(func)` programmatically:
 def main(name: str = "World"):
     typer.echo(f"Hello {name}")
 
+
 app.command()(main)
 ```
 
@@ -118,7 +126,7 @@ app.command()(main)
 
 ```python
 app = typer.Typer(
-    no_args_is_help=True,   # Show help when called with no arguments
+    no_args_is_help=True,  # Show help when called with no arguments
     invoke_without_command=True,  # Run callback even when subcommand is given
 )
 ```

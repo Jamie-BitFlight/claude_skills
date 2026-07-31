@@ -71,17 +71,20 @@ from boltons.cacheutils import LRU, cached, cachedmethod
 
 # LRU cache with size limit
 cache = LRU(max_size=256)
-cache['user:123'] = user_data
+cache["user:123"] = user_data
+
 
 # Decorator with custom cache backend
 @cached(cache={})
 def fibonacci(n):
     if n < 2:
         return n
-    return fibonacci(n-1) + fibonacci(n-2)
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
 
 # Threshold counter - only track frequently occurring items
 from boltons.cacheutils import ThresholdCounter
+
 tc = ThresholdCounter(threshold=0.1)
 tc.update([2] * 10)  # Only remembers items > 10% frequency
 ```
@@ -94,13 +97,19 @@ Powerful iteration utilities beyond `itertools`:
 
 ```python
 from boltons.iterutils import (
-    chunked, chunked_iter,    # Split into chunks
-    windowed, windowed_iter,  # Sliding windows
-    unique, unique_iter,      # Deduplicate preserving order
-    one, first, same,         # Reduction utilities
-    remap, get_path,          # Recursive data structure traversal
-    backoff,                  # Exponential backoff with jitter
-    pairwise                  # Overlapping pairs
+    chunked,
+    chunked_iter,  # Split into chunks
+    windowed,
+    windowed_iter,  # Sliding windows
+    unique,
+    unique_iter,  # Deduplicate preserving order
+    one,
+    first,
+    same,  # Reduction utilities
+    remap,
+    get_path,  # Recursive data structure traversal
+    backoff,  # Exponential backoff with jitter
+    pairwise,  # Overlapping pairs
 )
 
 # Chunking for batch processing
@@ -117,11 +126,13 @@ for window in windowed(prices, 7):
 user = one(users)  # Raises if != 1 item
 first_or_none = first(results, default=None)
 
+
 # Recursive data structure traversal
 def visit(path, key, value):
-    if isinstance(value, str) and 'secret' in key.lower():
-        return '***REDACTED***'
+    if isinstance(value, str) and "secret" in key.lower():
+        return "***REDACTED***"
     return value
+
 
 clean_data = remap(user_data, visit=visit)
 
@@ -167,16 +178,16 @@ Atomic writes and safe file handling:
 from boltons.fileutils import atomic_save, mkdir_p, FilePerms
 
 # Atomic file write (write-to-temp, rename)
-with atomic_save('config.json') as f:
+with atomic_save("config.json") as f:
     json.dump(config, f)
 # File only replaced if write succeeds
 
 # Create directory path (like mkdir -p)
-mkdir_p('/path/to/nested/directory')
+mkdir_p("/path/to/nested/directory")
 
 # Readable permission management
 perms = FilePerms(0o755)
-perms.apply('/path/to/script.sh')
+perms.apply("/path/to/script.sh")
 ```
 
 **When to use**: Configuration files, data persistence, safe concurrent writes.
@@ -190,12 +201,12 @@ from boltons.dictutils import OrderedMultiDict, OMD
 
 # Preserve order + allow duplicate keys (like HTTP headers)
 headers = OMD([
-    ('Accept', 'application/json'),
-    ('Accept', 'text/html'),  # Multiple values for same key
-    ('User-Agent', 'MyBot/1.0')
+    ("Accept", "application/json"),
+    ("Accept", "text/html"),  # Multiple values for same key
+    ("User-Agent", "MyBot/1.0"),
 ])
 
-for accept in headers.getlist('Accept'):
+for accept in headers.getlist("Accept"):
     print(accept)  # application/json, text/html
 ```
 
@@ -207,15 +218,15 @@ Common string operations:
 
 ```python
 from boltons.strutils import (
-    slugify,        # URL-safe slugs
-    bytes2human,    # Human-readable byte sizes
+    slugify,  # URL-safe slugs
+    bytes2human,  # Human-readable byte sizes
     find_hashtags,  # Extract #hashtags
-    pluralize,      # Smart pluralization
-    strip_ansi      # Remove ANSI codes
+    pluralize,  # Smart pluralization
+    strip_ansi,  # Remove ANSI codes
 )
 
 slugify("Hello, World!")  # "hello-world"
-bytes2human(1234567)      # "1.18 MB"
+bytes2human(1234567)  # "1.18 MB"
 ```
 
 ### 7. **queueutils** - Priority Queues [@context7]
@@ -270,6 +281,7 @@ This is explicitly supported by the project design [@context7/architecture.rst].
 # Enhanced traceback handling
 from boltons.tbutils import ExceptionInfo, TracebackInfo
 
+
 class ErrorMiddleware:
     def handle_error(self, exc):
         exc_info = ExceptionInfo.from_current()
@@ -294,7 +306,7 @@ except Exception:
 # Type checking utilities
 from boltons.typeutils import make_sentinel
 
-NOT_SET = make_sentinel('NOT_SET')  # Better than None for defaults
+NOT_SET = make_sentinel("NOT_SET")  # Better than None for defaults
 ```
 
 ### Example 4: Batch Processing Pattern
@@ -316,6 +328,7 @@ from boltons.cacheutils import LRU
 
 # Exponential backoff for API retries
 cache = LRU(max_size=1000)
+
 
 def call_api_with_retry(endpoint):
     for wait in backoff(start=0.1, stop=60, count=5):
@@ -457,10 +470,11 @@ Per @github/README.md:
 ```python
 # Use both boltons and more-itertools
 from boltons.iterutils import chunked  # For chunking
-from more_itertools import flatten     # For flattening
-from boltons.cacheutils import LRU     # For caching
+from more_itertools import flatten  # For flattening
+from boltons.cacheutils import LRU  # For caching
 
 cache = LRU(max_size=1000)
+
 
 @cached(cache=cache)
 def process_data(records):

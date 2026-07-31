@@ -139,14 +139,11 @@ Recognized settings to suggest:
 config_settings = {
     # Version override
     "version": "1.2.3",
-
     # Build target options
     "pure-python": "true",
     "py-limited-api": "cp37",
-
     # Hook control
     "hook.enabled": "false",
-
     # Output directory
     "directory": "/custom/output",
 }

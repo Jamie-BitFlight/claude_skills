@@ -230,7 +230,7 @@ source = "vcs"
 
 ```python
 class CustomMetadataHook:
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def __init__(self, root, config):
         self.root = root
@@ -238,7 +238,7 @@ class CustomMetadataHook:
 
     def dependencies(self):
         # Return list of packages needed for this hook
-        return ['requests>=2.0.0', 'ruamel.yaml>=0.18']
+        return ["requests>=2.0.0", "ruamel.yaml>=0.18"]
 
     def update(self, metadata):
         # Metadata is now updated with hook dependencies

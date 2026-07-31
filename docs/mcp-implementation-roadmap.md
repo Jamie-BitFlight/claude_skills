@@ -130,17 +130,15 @@ plugins/plugin-name/
 ### Standard Tool Template
 
 ```python
-@mcp.tool(annotations={
-    "readOnlyHint": True,      # Safe to call anytime
-    "destructiveHint": False,   # No data modification
-    "idempotentHint": True,     # Same result on repeat
-    "openWorldHint": False      # No external API calls
-})
-async def tool_name(
-    param: str,
-    *,
-    context: Context
-) -> dict[str, Any]:
+@mcp.tool(
+    annotations={
+        "readOnlyHint": True,  # Safe to call anytime
+        "destructiveHint": False,  # No data modification
+        "idempotentHint": True,  # Same result on repeat
+        "openWorldHint": False,  # No external API calls
+    }
+)
+async def tool_name(param: str, *, context: Context) -> dict[str, Any]:
     """One-line tool description.
 
     Detailed explanation of what this tool does,
@@ -192,21 +190,19 @@ Follow consistent patterns for discoverability:
 import pytest
 from mcp.server import mcp
 
+
 @pytest.mark.asyncio
 async def test_validate_frontmatter_valid():
     """Test frontmatter validation with valid input."""
-    result = await mcp.tools["validate_frontmatter"](
-        file_path="/path/to/SKILL.md"
-    )
+    result = await mcp.tools["validate_frontmatter"](file_path="/path/to/SKILL.md")
     assert result["status"] == "valid"
     assert "errors" not in result
+
 
 @pytest.mark.asyncio
 async def test_validate_frontmatter_invalid():
     """Test frontmatter validation with invalid input."""
-    result = await mcp.tools["validate_frontmatter"](
-        file_path="/path/to/invalid.md"
-    )
+    result = await mcp.tools["validate_frontmatter"](file_path="/path/to/invalid.md")
     assert result["status"] == "invalid"
     assert len(result["errors"]) > 0
 ```
@@ -218,22 +214,16 @@ async def test_validate_frontmatter_invalid():
 async def test_fix_workflow():
     """Test complete fix workflow: analyze → fix → validate."""
     # Analyze issues
-    analysis = await mcp.tools["analyze_plugin_structure"](
-        plugin_dir="/path/to/plugin"
-    )
+    analysis = await mcp.tools["analyze_plugin_structure"](plugin_dir="/path/to/plugin")
     assert analysis["status"] == "complete"
 
     # Apply fixes for each issue
     for issue in analysis["issues"]:
-        fix_result = await mcp.tools["auto_fix_frontmatter"](
-            file_path=issue["file"]
-        )
+        fix_result = await mcp.tools["auto_fix_frontmatter"](file_path=issue["file"])
         assert fix_result["status"] == "fixed"
 
     # Validate all files pass
-    validation = await mcp.tools["validate_frontmatter"](
-        plugin_dir="/path/to/plugin"
-    )
+    validation = await mcp.tools["validate_frontmatter"](plugin_dir="/path/to/plugin")
     assert validation["status"] == "valid"
 ```
 

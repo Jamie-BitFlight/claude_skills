@@ -33,9 +33,9 @@ Add the extension to your Sphinx `conf.py`:
 ```python
 # conf.py
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.intersphinx',
-    'sphinx_readme',  # Add this
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx_readme",  # Add this
 ]
 ```
 
@@ -47,13 +47,11 @@ Configure source and output files:
 # conf.py
 readme_config = {
     # Source file (relative to docs/ directory)
-    'src_file': 'index.rst',
-
+    "src_file": "index.rst",
     # Output file (relative to project root)
-    'out_file': '../README.rst',
-
+    "out_file": "../README.rst",
     # Optional: sections to include
-    'sections': ['introduction', 'installation', 'usage'],
+    "sections": ["introduction", "installation", "usage"],
 }
 ```
 
@@ -277,24 +275,17 @@ my-project/
 
 ```python
 # Sphinx configuration
-project = 'My Project'
-extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx',
-    'sphinx_readme',
-]
+project = "My Project"
+extensions = ["sphinx.ext.autodoc", "sphinx.ext.napoleon", "sphinx.ext.intersphinx", "sphinx_readme"]
 
 # sphinx-readme configuration
 readme_config = {
-    'src_file': 'readme.rst',  # Dedicated README source
-    'out_file': '../README.rst',
+    "src_file": "readme.rst",  # Dedicated README source
+    "out_file": "../README.rst",
 }
 
 # Intersphinx (for internal references)
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-}
+intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
 ```
 
 ### docs/readme.rst (Dedicated README Source)
@@ -397,8 +388,8 @@ uv run --with docutils rst2html.py README.rst /dev/null
 
 ```python
 readme_config = {
-    'src_file': 'readme.rst',
-    'out_file': '../README.rst',
+    "src_file": "readme.rst",
+    "out_file": "../README.rst",
     # 'sections': ['intro', 'install'],  # Remove to include all
 }
 ```

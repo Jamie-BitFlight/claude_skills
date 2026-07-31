@@ -23,9 +23,11 @@ import typer
 # items.py
 items_app = typer.Typer()
 
+
 @items_app.command()
 def create(item: str):
     typer.echo(f"Creating item: {item}")
+
 
 @items_app.command()
 def delete(item: str):
@@ -75,11 +77,7 @@ The `name` parameter sets the CLI command used to invoke the sub-app. Without `n
 Pass `name` and `help` to `app.add_typer()` to control CLI display:
 
 ```python
-app.add_typer(
-    items_app,
-    name="items",
-    help="Manage items in the system.",
-)
+app.add_typer(items_app, name="items", help="Manage items in the system.")
 ```
 
 Or set `name` and `help` on the `typer.Typer()` constructor:
@@ -105,9 +103,11 @@ sea_app = typer.Typer()
 app.add_typer(land_app, name="land")
 app.add_typer(sea_app, name="sea")
 
+
 @land_app.command("create")
 def land_create(item: str):
     typer.echo(f"Creating land item: {item}")
+
 
 @sea_app.command("create")
 def sea_create(item: str):
@@ -135,13 +135,16 @@ app = typer.Typer()
 users_app = typer.Typer()
 app.add_typer(users_app, name="users")
 
+
 @users_app.command("create")
 def users_create(username: str):
     typer.echo(f"Creating user: {username}")
 
+
 @users_app.command("delete")
 def users_delete(username: str):
     typer.echo(f"Deleting user: {username}")
+
 
 if __name__ == "__main__":
     app()
@@ -160,6 +163,7 @@ from typing import Optional
 app = typer.Typer()
 items_app = typer.Typer()
 app.add_typer(items_app, name="items")
+
 
 @items_app.callback()
 def items_callback(ctx: typer.Context, verbose: bool = False):

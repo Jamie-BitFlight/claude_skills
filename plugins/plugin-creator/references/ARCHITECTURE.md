@@ -60,6 +60,7 @@ class ValidationIssue:
     suggestion: str | None = None  # Suggested fix
     docs_url: str | None = None  # Documentation URL
 
+
 @dataclass(frozen=True)
 class ValidationResult:
     """Result of running validators."""
@@ -187,19 +188,12 @@ def fix(self, path: Path) -> list[str]:
 
     # Fix 1: YAML arrays → CSV strings
     if "tools:" in content and "- " in content:
-        content = re.sub(
-            r"tools:\s*\n(?:\s*-\s*(\w+)\n)+",
-            lambda m: f"tools: {', '.join(m.groups())}",
-            content
-        )
+        content = re.sub(r"tools:\s*\n(?:\s*-\s*(\w+)\n)+", lambda m: f"tools: {', '.join(m.groups())}", content)
         fixes.append("Converted tools YAML array to CSV")
 
     # Fix 2: Quote descriptions with colons
     if "description:" in content and ":" in desc_value:
-        content = content.replace(
-            f"description: {desc_value}",
-            f'description: "{desc_value}"'
-        )
+        content = content.replace(f"description: {desc_value}", f'description: "{desc_value}"')
         fixes.append("Quoted description with colons")
 
     return fixes
@@ -249,6 +243,7 @@ def fix(self, path: Path) -> list[str]:
 def validate(self, path: Path) -> ValidationResult:
     # Import tiktoken only when needed (not at module level)
     import tiktoken
+
     encoding = tiktoken.get_encoding("cl100k_base")
     ...
 ```
@@ -373,19 +368,12 @@ def validate(self, path: Path) -> ValidationResult:
 
 ```python
 app = typer.Typer(
-    name="skilllint",
-    help="Validate Claude Code plugins, skills, agents, and commands",
-    no_args_is_help=True,
+    name="skilllint", help="Validate Claude Code plugins, skills, agents, and commands", no_args_is_help=True
 )
 
+
 @app.command()
-def main(
-    path: Path,
-    check: bool = False,
-    fix: bool = False,
-    verbose: bool = False,
-    no_color: bool = False,
-) -> None:
+def main(path: Path, check: bool = False, fix: bool = False, verbose: bool = False, no_color: bool = False) -> None:
     """Validate plugin components."""
 ```
 
@@ -495,11 +483,7 @@ def get_staged_files() -> list[Path]:
         return []
 
     result = subprocess.run(
-        [git_path, "diff", "--cached", "--name-only"],
-        timeout=10,
-        capture_output=True,
-        text=True,
-        check=False
+        [git_path, "diff", "--cached", "--name-only"], timeout=10, capture_output=True, text=True, check=False
     )
 
     if result.returncode != 0:
@@ -549,20 +533,22 @@ class MyNewValidator:
 
         # Validation logic here
         if condition_fails:
-            issues.append(ValidationIssue(
-                field="field-name",
-                severity="error",
-                message="Description of issue",
-                code="XX001",  # New error code
-                suggestion="How to fix",
-                docs_url=f"{ERROR_CODE_BASE_URL}#xx001"
-            ))
+            issues.append(
+                ValidationIssue(
+                    field="field-name",
+                    severity="error",
+                    message="Description of issue",
+                    code="XX001",  # New error code
+                    suggestion="How to fix",
+                    docs_url=f"{ERROR_CODE_BASE_URL}#xx001",
+                )
+            )
 
         return ValidationResult(
             passed=len([i for i in issues if i.severity == "error"]) == 0,
             errors=[i for i in issues if i.severity == "error"],
             warnings=[i for i in issues if i.severity == "warning"],
-            info=[i for i in issues if i.severity == "info"]
+            info=[i for i in issues if i.severity == "info"],
         )
 
     def can_fix(self) -> bool:
@@ -652,7 +638,7 @@ ValidationIssue(
     message="Human-readable description",
     code=XX001,  # Use constant
     suggestion="How to fix",
-    docs_url=f"{ERROR_CODE_BASE_URL}#xx001"
+    docs_url=f"{ERROR_CODE_BASE_URL}#xx001",
 )
 ```
 
@@ -672,6 +658,7 @@ ValidationIssue(
 def validate(self, path: Path) -> ValidationResult:
     # Import inside method, not at module level
     import tiktoken
+
     ...
 ```
 
@@ -736,12 +723,16 @@ with ThreadPoolExecutor(max_workers=4) as executor:
 ```python
 import pytest
 
-@pytest.mark.parametrize("name,expected_error", [
-    ("valid-name", None),
-    ("Invalid-Name", "SK001"),  # Uppercase
-    ("invalid_name", "SK002"),  # Underscore
-    ("-invalid", "SK003"),  # Leading hyphen
-])
+
+@pytest.mark.parametrize(
+    "name,expected_error",
+    [
+        ("valid-name", None),
+        ("Invalid-Name", "SK001"),  # Uppercase
+        ("invalid_name", "SK002"),  # Underscore
+        ("-invalid", "SK003"),  # Leading hyphen
+    ],
+)
 def test_name_validation(name, expected_error):
     validator = NameFormatValidator()
     result = validator.validate_name(name)
@@ -764,10 +755,12 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
+
 def test_validate_success():
     result = runner.invoke(app, ["plugins/valid-plugin"])
     assert result.exit_code == 0
     assert "PASSED" in result.stdout
+
 
 def test_validate_failure():
     result = runner.invoke(app, ["plugins/invalid-plugin"])
@@ -783,6 +776,7 @@ def test_validate_failure():
 
 ```python
 from hypothesis import given, strategies as st
+
 
 @given(st.text())
 def test_token_count_deterministic(text):

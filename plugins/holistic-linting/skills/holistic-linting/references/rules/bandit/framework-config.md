@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
 # Or explicitly
 import logging
+
 app.logger.setLevel(logging.INFO if app.debug else logging.WARNING)
 ```
 
@@ -94,6 +95,7 @@ with tarfile.open(user_tar) as tar:
 import tarfile
 import os
 
+
 def safe_extract_tar(tar_path, extract_path):
     """Extract tar safely, validating all member paths."""
     extract_path = os.path.abspath(extract_path)
@@ -101,17 +103,14 @@ def safe_extract_tar(tar_path, extract_path):
     with tarfile.open(tar_path) as tar:
         for member in tar.getmembers():
             # Check for path traversal
-            member_path = os.path.abspath(
-                os.path.join(extract_path, member.name)
-            )
+            member_path = os.path.abspath(os.path.join(extract_path, member.name))
 
             if not member_path.startswith(extract_path):
-                raise ValueError(
-                    f"Attempted directory traversal: {member.name}"
-                )
+                raise ValueError(f"Attempted directory traversal: {member.name}")
 
             # Extract safely
             tar.extract(member, path=extract_path)
+
 
 # Safe extraction
 safe_extract_tar("uploaded.tar.gz", "./temp/")
@@ -206,14 +205,12 @@ env = Environment(autoescape=True)
 # RIGHT - Selective autoescape by extension
 env = Environment(
     loader=FileSystemLoader("templates"),
-    autoescape=select_autoescape(
-        enabled_extensions=("html", "xml"),
-        default_for_string=True,
-    )
+    autoescape=select_autoescape(enabled_extensions=("html", "xml"), default_for_string=True),
 )
 
 # RIGHT - For Flask (autoescape on by default)
 from flask import Flask
+
 app = Flask(__name__)
 # Autoescape is enabled by default for .html, .xml, .xhtml
 ```
@@ -311,6 +308,7 @@ safe_content = mark_safe(escaped)
 
 # RIGHT - For markdown/rich text, use safe libraries
 from markdownx import markdownify
+
 rendered = markdownify(user_content)  # Safe markdown rendering
 safe_content = mark_safe(rendered)
 ```
@@ -350,6 +348,7 @@ html = Markup(escape(user_input))
 
 # RIGHT - Use Jinja2 which auto-escapes
 from jinja2 import Template
+
 template = Template("{{ content }}")
 html = template.render(content=user_input)
 ```

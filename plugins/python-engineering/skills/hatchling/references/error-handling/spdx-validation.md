@@ -172,6 +172,7 @@ Hatchling regularly updates SPDX license data:
 from packaging.licenses import NormalizedLicenseExpression
 from packaging.licenses import InvalidLicenseExpression
 
+
 def validate_license(expression: str) -> bool:
     """Validate SPDX license expression."""
     try:
@@ -182,6 +183,7 @@ def validate_license(expression: str) -> bool:
     except InvalidLicenseExpression as e:
         print(f"Invalid expression: {e}")
         return False
+
 
 # Examples
 validate_license("MIT")  # Valid
@@ -197,6 +199,7 @@ validate_license("Unknown-License")  # Invalid
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 import re
 
+
 class LicenseValidationHook(BuildHookInterface):
     def initialize(self, version, build_data):
         """Validate license configuration."""
@@ -209,9 +212,7 @@ class LicenseValidationHook(BuildHookInterface):
             # Validate LicenseRef format if custom
             if license_expr.startswith("LicenseRef-"):
                 if not self._validate_custom_license(license_expr):
-                    raise ValueError(
-                        f"Invalid custom license ID: {license_expr}"
-                    )
+                    raise ValueError(f"Invalid custom license ID: {license_expr}")
 
     def _validate_custom_license(self, license_id: str) -> bool:
         """Validate custom LicenseRef identifier."""
@@ -326,10 +327,7 @@ license-files = ["LICENSE"]  # File doesn't exist
 **setuptools (setup.py):**
 
 ```python
-setup(
-    license='MIT',
-    license_files=['LICENSE'],
-)
+setup(license="MIT", license_files=["LICENSE"])
 ```
 
 **Hatchling (pyproject.toml):**

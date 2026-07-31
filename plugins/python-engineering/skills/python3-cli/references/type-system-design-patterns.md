@@ -105,6 +105,7 @@ from config) but the domain requires distinguishing the identifier from a bare `
 # Interface pattern — not implementation
 RuleId = NewType("RuleId", str)
 
+
 def get_rule(rule_id: RuleId) -> Rule: ...
 ```
 

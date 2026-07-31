@@ -34,9 +34,9 @@ Or mark each test individually:
 ```python
 import pytest
 
+
 @pytest.mark.asyncio
-async def test_my_app() -> None:
-    ...
+async def test_my_app() -> None: ...
 ```
 
 Dependencies: `pytest`, `pytest-asyncio`.
@@ -79,11 +79,11 @@ async with app.run_test(size=(100, 50)) as pilot:
 ## Simulating Key Presses
 
 ```python
-await pilot.press("r")                          # single key
-await pilot.press("h", "e", "l", "l", "o")     # multiple keys in sequence
-await pilot.press("enter")                      # named key
-await pilot.press("ctrl+c")                     # modifier + key
-await pilot.press("shift+tab")                  # shift modifier
+await pilot.press("r")  # single key
+await pilot.press("h", "e", "l", "l", "o")  # multiple keys in sequence
+await pilot.press("enter")  # named key
+await pilot.press("ctrl+c")  # modifier + key
+await pilot.press("shift+tab")  # shift modifier
 ```
 
 - Each string in `press()` is one keypress event.
@@ -97,18 +97,18 @@ await pilot.press("shift+tab")                  # shift modifier
 ```python
 # Click a widget by CSS selector
 await pilot.click("#my-button")
-await pilot.click(Button)                  # by type
+await pilot.click(Button)  # by type
 
 # Click screen at absolute coordinates
-await pilot.click()                        # (0, 0)
-await pilot.click(offset=(10, 5))          # absolute (10, 5)
+await pilot.click()  # (0, 0)
+await pilot.click(offset=(10, 5))  # absolute (10, 5)
 
 # Click relative to a widget
 await pilot.click(Button, offset=(0, -1))  # 1 row above the button
 
 # Double and triple clicks
-await pilot.click(Button, times=2)         # double click
-await pilot.click(Button, times=3)         # triple click
+await pilot.click(Button, times=2)  # double click
+await pilot.click(Button, times=3)  # triple click
 
 # Modifier keys
 await pilot.click("#slider", control=True)
@@ -177,9 +177,11 @@ Only run `--snapshot-update` after visually confirming the output looks correct.
 def test_after_input(snap_compare):
     assert snap_compare("calculator.py", press=["3", ".", "1", "4"])
 
+
 # Custom terminal size
 def test_large_terminal(snap_compare):
     assert snap_compare("calculator.py", terminal_size=(120, 50))
+
 
 # Run arbitrary pilot code before snapshot
 def test_hovered_button(snap_compare):
@@ -273,9 +275,9 @@ flowchart TD
 worker = self.run_worker(self.fetch_data())
 
 # Check later
-print(worker.state)   # WorkerState enum
+print(worker.state)  # WorkerState enum
 print(worker.result)  # return value (None until SUCCESS)
-print(worker.error)   # exception (None unless ERROR)
+print(worker.error)  # exception (None unless ERROR)
 ```
 
 ### Cancelling a worker
@@ -297,8 +299,7 @@ Raises `asyncio.CancelledError` inside the coroutine, causing it to exit.
 
 ```python
 @work(exit_on_error=False)  # don't crash app on worker exception
-async def risky_operation(self) -> None:
-    ...
+async def risky_operation(self) -> None: ...
 ```
 
 - Default behavior: unhandled exception in a worker exits the app and prints the traceback.

@@ -323,7 +323,7 @@ unzip -p dist/*.whl '*/METADATA' | grep "^Name:"
 ```python
 # setup.py (old)
 setup(
-    name="My-Package",  # Sometimes inconsistent normalization
+    name="My-Package"  # Sometimes inconsistent normalization
 )
 ```
 

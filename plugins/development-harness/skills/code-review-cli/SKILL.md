@@ -24,6 +24,7 @@ def main():
         print(f"Error: {e}", file=sys.stderr)
     # implicit exit 0
 
+
 # RIGHT: non-zero on error
 def main():
     try:
@@ -87,6 +88,7 @@ def delete_records(pattern: str):
         r.delete()
     print(f"Deleted {len(records)} records")
 
+
 # RIGHT: dry-run support
 @app.command()
 def delete_records(pattern: str, dry_run: bool = typer.Option(False, "--dry-run")):
@@ -100,11 +102,13 @@ def delete_records(pattern: str, dry_run: bool = typer.Option(False, "--dry-run"
         r.delete()
     print(f"Deleted {len(records)} records")
 
+
 # WRONG: ANSI always on
 print(f"\033[32mSuccess\033[0m")
 
 # RIGHT: conditional color
 import sys
+
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 success = "\033[32mSuccess\033[0m" if USE_COLOR else "Success"
 print(success)

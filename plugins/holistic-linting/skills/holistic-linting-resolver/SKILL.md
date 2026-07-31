@@ -268,6 +268,7 @@ All incidentally modified files must also produce zero errors before resolution 
    def get_data() -> Response:
        return {"key": "value"}  # mypy error: Incompatible return value type
 
+
    # After: Correct annotation to match actual return
    def get_data() -> dict[str, str]:
        return {"key": "value"}
@@ -279,6 +280,7 @@ All incidentally modified files must also produce zero errors before resolution 
    # Before: Function should return Response but returns dict
    def get_data() -> Response:
        return {"key": "value"}  # mypy error: Incompatible return value type
+
 
    # After: Fix implementation to return correct type
    def get_data() -> Response:
@@ -292,6 +294,7 @@ All incidentally modified files must also produce zero errors before resolution 
    def process(value: str | None) -> str:
        return value.upper()  # mypy error: Item "None" has no attribute "upper"
 
+
    # After: Add type guard
    def process(value: str | None) -> str:
        if value is None:
@@ -304,8 +307,10 @@ All incidentally modified files must also produce zero errors before resolution 
    ```python
    from typing import TypeGuard
 
+
    def is_valid_response(data: dict[str, Any]) -> TypeGuard[dict[str, str]]:
        return all(isinstance(v, str) for v in data.values())
+
 
    def process(data: dict[str, Any]) -> dict[str, str]:
        if not is_valid_response(data):
@@ -428,6 +433,7 @@ All incidentally modified files must also produce zero errors before resolution 
    def process(value: str | None) -> str:
        return value.upper()  # reportOptionalMemberAccess
 
+
    # After:
    def process(value: str | None) -> str:
        if value is None:
@@ -441,6 +447,7 @@ All incidentally modified files must also produce zero errors before resolution 
    # Before:
    def fetch_data():  # reportUnknownVariableType on callers
        return {"key": "value"}
+
 
    # After:
    def fetch_data() -> dict[str, str]:
@@ -472,9 +479,11 @@ All incidentally modified files must also produce zero errors before resolution 
    # After (if you've validated data structure):
    from typing import TypedDict
 
+
    class UserData(TypedDict):
        name: str
        age: int
+
 
    data = cast(UserData, get_data())
    name: str = data["name"]  # pyright knows this is str

@@ -88,8 +88,8 @@ table.add_column("Notes")
 
 for task in tasks:
     table.add_row(
-        escape(task["title"]),   # user-supplied — must escape
-        escape(task["notes"]),   # user-supplied — must escape
+        escape(task["title"]),  # user-supplied — must escape
+        escape(task["notes"]),  # user-supplied — must escape
     )
 ```
 
@@ -172,6 +172,7 @@ borders. The standard pattern for status lines, key-value pairs, and label-with-
 ```python
 from rich.table import Table
 
+
 def render_status_line(label: str, value: str, value_style: str = "bold") -> None:
     """Render a label-value pair: label on left, value on right."""
     grid = Table.grid(expand=True)
@@ -179,6 +180,7 @@ def render_status_line(label: str, value: str, value_style: str = "bold") -> Non
     grid.add_column(justify="right")
     grid.add_row(label, f"[{value_style}]{value}[/]")
     console.print(grid)
+
 
 render_status_line("Tasks completed", "12 of 50", value_style="bold green")
 render_status_line("Last synced", "2 minutes ago", value_style="dim")
@@ -199,12 +201,10 @@ Best when completed and total are integers and the user cares about counts, not 
 ```python
 from rich.progress import Progress, BarColumn, TextColumn, MofNCompleteColumn
 
+
 def process_files(items: list, description: str = "Processing") -> None:
     with Progress(
-        TextColumn("[bold blue]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        transient=True,
+        TextColumn("[bold blue]{task.description}"), BarColumn(), MofNCompleteColumn(), transient=True
     ) as progress:
         task = progress.add_task(description, total=len(items))
         for item in items:
@@ -314,7 +314,7 @@ from rich.box import ROUNDED
 table = Table(
     box=ROUNDED,
     row_styles=["dim", ""],  # alternating dim/normal rows
-    show_lines=False,         # no per-row borders needed with zebra
+    show_lines=False,  # no per-row borders needed with zebra
 )
 ```
 
@@ -363,8 +363,8 @@ A bare `except:` catches `KeyboardInterrupt` and `SystemExit`, preventing clean 
 Font names are case-sensitive on case-sensitive filesystems. `banner3-D` requires capital `D`:
 
 ```python
-pyfiglet.figlet_format("Hello", font="banner3-D")   # correct
-pyfiglet.figlet_format("Hello", font="banner3-d")   # raises FontNotFound
+pyfiglet.figlet_format("Hello", font="banner3-D")  # correct
+pyfiglet.figlet_format("Hello", font="banner3-d")  # raises FontNotFound
 ```
 
 Use `pyfiglet.FigletFont.getFonts()` to get the authoritative list of bundled font names.
@@ -441,9 +441,9 @@ The `colors` parameter uses `"FOREGROUND:BACKGROUND"` format:
 ```python
 import pyfiglet
 
-pyfiglet.print_figlet("Hello", font="slant", colors="CYAN:")        # cyan foreground
-pyfiglet.print_figlet("Error", font="doom",  colors="RED:BLACK")    # red on black
-pyfiglet.print_figlet("Hello", font="slant", colors="255;128;0:")   # RGB orange foreground
+pyfiglet.print_figlet("Hello", font="slant", colors="CYAN:")  # cyan foreground
+pyfiglet.print_figlet("Error", font="doom", colors="RED:BLACK")  # red on black
+pyfiglet.print_figlet("Hello", font="slant", colors="255;128;0:")  # RGB orange foreground
 ```
 
 Named colour values (case-insensitive after normalisation):
@@ -479,6 +479,7 @@ and the terminal appears frozen.
 ```python
 import asyncio
 
+
 async def on_mount(self) -> None:
     await asyncio.sleep(2.0)  # yields control to event loop
 ```
@@ -487,6 +488,7 @@ async def on_mount(self) -> None:
 
 ```python
 from textual.worker import work
+
 
 @work
 async def animate_welcome(self) -> None:
@@ -501,6 +503,7 @@ async def animate_welcome(self) -> None:
 
 ```python
 from textual.worker import work
+
 
 @work(thread=True)
 def heavy_sync_work(self) -> None:

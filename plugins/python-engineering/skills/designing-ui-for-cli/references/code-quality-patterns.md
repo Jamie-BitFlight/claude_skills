@@ -72,8 +72,10 @@ API_BASE_URL = "https://api.example.com"
 class UserAccount:
     pass
 
+
 class EmailValidator:
     pass
+
 
 class DatabaseConnection:
     pass
@@ -89,7 +91,7 @@ Each function should do one thing well.
 # ❌ Function doing too much
 def process_user_data(user_data):
     # Validates input
-    if not user_data.get('email'):
+    if not user_data.get("email"):
         raise ValueError("Email required")
 
     # Connects to database
@@ -100,28 +102,32 @@ def process_user_data(user_data):
     cursor.execute("INSERT INTO users...")
 
     # Sends email
-    send_email(user_data['email'])
+    send_email(user_data["email"])
 
     # Returns result
     return {"status": "success"}
 
+
 # ✅ Separated concerns
 def validate_user_data(user_data):
-    if not user_data.get('email'):
+    if not user_data.get("email"):
         raise ValueError("Email required")
+
 
 def save_user_to_database(user_data, connection):
     cursor = connection.cursor()
     cursor.execute("INSERT INTO users...", user_data)
 
+
 def notify_user_created(email):
     send_email(email, subject="Welcome!")
+
 
 def process_user_data(user_data):
     validate_user_data(user_data)
     conn = get_database_connection()
     save_user_to_database(user_data, conn)
-    notify_user_created(user_data['email'])
+    notify_user_created(user_data["email"])
     return {"status": "success"}
 ```
 
@@ -135,18 +141,22 @@ def process_order():
     # 150 lines of logic...
     pass
 
+
 # ✅ Split into smaller functions
 def validate_order(order):
     # 20 lines
     pass
 
+
 def calculate_pricing(order):
     # 15 lines
     pass
 
+
 def charge_payment(order):
     # 25 lines
     pass
+
 
 def process_order(order):
     validate_order(order)
@@ -163,10 +173,11 @@ def process_order(order):
 def create_user(name, email, password, age, city, country, phone, address):
     pass
 
+
 # ✅ Use a dict/dataclass
 def create_user(user_data):
-    name = user_data['name']
-    email = user_data['email']
+    name = user_data["name"]
+    email = user_data["email"]
     # ...
 ```
 
@@ -182,6 +193,7 @@ def divide(a, b):
     except:
         return None
 
+
 # ✅ Explicit error handling
 def divide(a, b):
     if b == 0:
@@ -196,10 +208,7 @@ def divide(a, b):
 raise ValueError("Invalid input")
 
 # ✅ Helpful
-raise ValueError(
-    f"Expected 'email' field to be a valid email address, "
-    f"but got: {user_input}"
-)
+raise ValueError(f"Expected 'email' field to be a valid email address, but got: {user_input}")
 ```
 
 ### Don't Catch Everything
@@ -243,6 +252,7 @@ counter += 1
 # ✅ Explains "why"
 # Retry 3 times because API occasionally returns 503 under load
 max_retries = 3
+
 
 # ✅ Documents complex logic
 def calculate_discount(price, user_tier):
@@ -327,13 +337,16 @@ from typing import Optional
 MAX_LOGIN_ATTEMPTS = 3
 DEFAULT_SESSION_TIMEOUT = 3600
 
+
 # 4. Classes
 class UserSession:
     pass
 
+
 # 5. Functions
 def authenticate_user():
     pass
+
 
 # 6. Main execution
 if __name__ == "__main__":
@@ -347,19 +360,12 @@ if __name__ == "__main__":
 ```python
 # ❌ Hardcoded config
 def connect_to_database():
-    conn = psycopg2.connect(
-        host="localhost",
-        port=5432,
-        database="mydb"
-    )
+    conn = psycopg2.connect(host="localhost", port=5432, database="mydb")
+
 
 # ✅ Externalized config
 def connect_to_database(config):
-    conn = psycopg2.connect(
-        host=config.DB_HOST,
-        port=config.DB_PORT,
-        database=config.DB_NAME
-    )
+    conn = psycopg2.connect(host=config.DB_HOST, port=config.DB_PORT, database=config.DB_NAME)
 ```
 
 ### Early Returns
@@ -377,6 +383,7 @@ def process_payment(amount, user):
             return "No payment method"
     else:
         return "Invalid amount"
+
 
 # ✅ Early returns
 def process_payment(amount, user):
@@ -403,12 +410,14 @@ def save_user():
     conn.commit()
     conn.close()
 
+
 def save_order():
     conn = psycopg2.connect(host=DB_HOST, port=DB_PORT)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO orders...")
     conn.commit()
     conn.close()
+
 
 # ✅ Extracted common logic
 def execute_query(query, params):
@@ -417,8 +426,10 @@ def execute_query(query, params):
         cursor.execute(query, params)
         conn.commit()
 
+
 def save_user(user_data):
     execute_query("INSERT INTO users...", user_data)
+
 
 def save_order(order_data):
     execute_query("INSERT INTO orders...", order_data)
@@ -431,17 +442,19 @@ def save_order(order_data):
 ```python
 # ❌ Hard to test (mixes I/O with logic)
 def process_file():
-    with open('data.json') as f:
+    with open("data.json") as f:
         data = json.load(f)
-    result = data['value'] * 2
+    result = data["value"] * 2
     print(result)
+
 
 # ✅ Testable (pure function)
 def calculate_result(data):
-    return data['value'] * 2
+    return data["value"] * 2
+
 
 def process_file():
-    data = load_json_file('data.json')
+    data = load_json_file("data.json")
     result = calculate_result(data)
     print(result)
 ```

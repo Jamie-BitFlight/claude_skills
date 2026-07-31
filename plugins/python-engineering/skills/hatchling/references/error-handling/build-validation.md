@@ -47,6 +47,7 @@ File "hatchling/builders/wheel.py", line 405, in build_standard
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class ValidationBuildHook(BuildHookInterface):
     """Custom build validation hook."""
 
@@ -59,6 +60,7 @@ class ValidationBuildHook(BuildHookInterface):
     def _validate_version(self, version):
         """Validate version format."""
         from packaging.version import Version, InvalidVersion
+
         try:
             Version(version)
         except InvalidVersion:
@@ -100,7 +102,7 @@ class ArtifactValidationHook(BuildHookInterface):
                 raise FileNotFoundError(f"Artifact missing: {artifact}")
 
         # Add to build data
-        build_data['artifacts'] = artifacts
+        build_data["artifacts"] = artifacts
 
     def _generate_artifacts(self):
         """Generate build artifacts."""
@@ -135,9 +137,7 @@ def validate_force_include(force_include):
     for source, _ in force_include.items():
         source_path = Path(source)
         if not source_path.exists():
-            raise FileNotFoundError(
-                f"Force-included path does not exist: {source}"
-            )
+            raise FileNotFoundError(f"Force-included path does not exist: {source}")
 ```
 
 ### Artifact Validation
@@ -168,6 +168,7 @@ def validate_artifacts(artifacts):
 ```python
 from hatchling.metadata.core import ProjectMetadata
 
+
 class MetadataValidator:
     """Validate project metadata."""
 
@@ -183,7 +184,7 @@ class MetadataValidator:
 
     def _validate_required_fields(self):
         """Ensure required fields present."""
-        required = ['name', 'version']
+        required = ["name", "version"]
         for field in required:
             if not getattr(self.metadata.core, field, None):
                 raise ValueError(f"Required field missing: {field}")
@@ -222,12 +223,12 @@ path = "src/package/__about__.py"
 def validate_dynamic_metadata(metadata):
     """Validate dynamically generated metadata."""
     # Check version was resolved
-    if 'version' in metadata.config.get('dynamic', []):
+    if "version" in metadata.config.get("dynamic", []):
         if not metadata.version:
             raise ValueError("Dynamic version not resolved")
 
     # Check dependencies were resolved
-    if 'dependencies' in metadata.config.get('dynamic', []):
+    if "dependencies" in metadata.config.get("dynamic", []):
         if metadata.dependencies is None:
             raise ValueError("Dynamic dependencies not resolved")
 ```
@@ -238,6 +239,7 @@ def validate_dynamic_metadata(metadata):
 
 ```python
 from packaging.requirements import Requirement, InvalidRequirement
+
 
 def validate_dependencies(dependencies):
     """Validate dependency specifications."""
@@ -266,7 +268,7 @@ def validate_markers(requirement):
     if requirement.marker:
         try:
             # Evaluate marker syntax
-            requirement.marker.evaluate({'extra': ''})
+            requirement.marker.evaluate({"extra": ""})
         except Exception as e:
             raise ValueError(f"Invalid marker: {requirement.marker} - {e}")
 ```
@@ -279,29 +281,30 @@ def validate_markers(requirement):
 import zipfile
 from pathlib import Path
 
+
 def validate_wheel(wheel_path):
     """Validate wheel file contents."""
-    with zipfile.ZipFile(wheel_path, 'r') as zf:
+    with zipfile.ZipFile(wheel_path, "r") as zf:
         # Check for required files
         names = zf.namelist()
 
         # Must have dist-info
-        dist_info = [n for n in names if '.dist-info/' in n]
+        dist_info = [n for n in names if ".dist-info/" in n]
         if not dist_info:
             raise ValueError("No .dist-info directory in wheel")
 
         # Check METADATA file
-        metadata_files = [n for n in dist_info if n.endswith('/METADATA')]
+        metadata_files = [n for n in dist_info if n.endswith("/METADATA")]
         if not metadata_files:
             raise ValueError("No METADATA file in wheel")
 
         # Validate RECORD file
-        record_files = [n for n in dist_info if n.endswith('/RECORD')]
+        record_files = [n for n in dist_info if n.endswith("/RECORD")]
         if not record_files:
             raise ValueError("No RECORD file in wheel")
 
         # Check for Python files
-        py_files = [n for n in names if n.endswith('.py')]
+        py_files = [n for n in names if n.endswith(".py")]
         if not py_files and not bypass_selection:
             raise ValueError("No Python files in wheel")
 ```
@@ -311,23 +314,24 @@ def validate_wheel(wheel_path):
 ```python
 import tarfile
 
+
 def validate_sdist(sdist_path):
     """Validate source distribution contents."""
-    with tarfile.open(sdist_path, 'r:gz') as tf:
+    with tarfile.open(sdist_path, "r:gz") as tf:
         names = tf.getnames()
 
         # Must have PKG-INFO
-        pkg_info = [n for n in names if n.endswith('/PKG-INFO')]
+        pkg_info = [n for n in names if n.endswith("/PKG-INFO")]
         if not pkg_info:
             raise ValueError("No PKG-INFO in sdist")
 
         # Must have pyproject.toml
-        pyproject = [n for n in names if n.endswith('/pyproject.toml')]
+        pyproject = [n for n in names if n.endswith("/pyproject.toml")]
         if not pyproject:
             raise ValueError("No pyproject.toml in sdist")
 
         # Check for source files
-        py_files = [n for n in names if n.endswith('.py')]
+        py_files = [n for n in names if n.endswith(".py")]
         if not py_files:
             raise ValueError("No Python source files in sdist")
 ```
@@ -401,6 +405,7 @@ import subprocess
 from pathlib import Path
 import tomllib
 
+
 def validate_build():
     """Run comprehensive build validation."""
     errors = []
@@ -426,7 +431,7 @@ def validate_build():
         wheel_config.get("include"),
         wheel_config.get("only-include"),
         wheel_config.get("force-include"),
-        wheel_config.get("bypass-selection")
+        wheel_config.get("bypass-selection"),
     ])
 
     if not has_selection:
@@ -447,6 +452,7 @@ def validate_build():
 
     print("Build validation passed ✓")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(validate_build())

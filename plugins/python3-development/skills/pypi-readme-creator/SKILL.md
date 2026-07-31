@@ -319,14 +319,12 @@ uv add --group docs sphinx-readme
 **Configuration in conf.py**
 
 ```python
-extensions = [
-    'sphinx_readme',
-]
+extensions = ["sphinx_readme"]
 
 # Optional configuration
 readme_config = {
-    'src_file': 'index.rst',  # Source file in docs/
-    'out_file': '../README.rst',  # Output to project root
+    "src_file": "index.rst",  # Source file in docs/
+    "out_file": "../README.rst",  # Output to project root
 }
 ```
 

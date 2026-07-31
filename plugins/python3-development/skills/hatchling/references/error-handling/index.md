@@ -151,6 +151,7 @@ import sys
 from pathlib import Path
 import tomllib
 
+
 def validate_all():
     """Run all validations."""
     errors = []
@@ -165,14 +166,9 @@ def validate_all():
         errors.append("Missing project.name")
 
     # Check build config
-    wheel = (config.get("tool", {})
-             .get("hatch", {})
-             .get("build", {})
-             .get("targets", {})
-             .get("wheel", {}))
+    wheel = config.get("tool", {}).get("hatch", {}).get("build", {}).get("targets", {}).get("wheel", {})
 
-    if not any([wheel.get(k) for k in
-                ["packages", "include", "only-include", "bypass-selection"]]):
+    if not any([wheel.get(k) for k in ["packages", "include", "only-include", "bypass-selection"]]):
         errors.append("No file selection configured")
 
     # Check paths exist
@@ -187,6 +183,7 @@ def validate_all():
         sys.exit(1)
 
     print("✓ All validations passed")
+
 
 if __name__ == "__main__":
     validate_all()

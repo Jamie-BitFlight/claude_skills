@@ -67,6 +67,7 @@ Before building compiled modules, consider:
 
 # Use NumPy (compiled in C):
 import numpy as np
+
 result = np.array([expensive_calc(x) for x in arr])
 ```
 
@@ -95,7 +96,7 @@ requires = ["hatchling", "Cython"]
 ```python
 # Instead of writing custom C code:
 import polars  # Rust-based, compiled, fast
-import pandas   # NumPy-based, compiled, fast
+import pandas  # NumPy-based, compiled, fast
 ```
 
 **Advantages**: Leverage existing optimized code, no build complexity

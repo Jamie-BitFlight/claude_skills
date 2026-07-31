@@ -30,4 +30,4 @@ Explicit mapping from abstract roles to agent archetypes used by the development
 
 ## Fallback
 
-When a role is not declared in the manifest, the harness dispatches `dh:task-worker` for that role with no specialist profile loaded. `task-worker` executes the task directly using full dh tool permissions (SAM MCP, backlog MCP). `general-purpose` is never dispatched from any dh skill — it lacks the SAM and backlog MCP access required to execute the SAM lifecycle.
+When a role is not declared in the manifest, the harness dispatches `dh:task-worker` for that role with no specialist profile loaded. `task-worker` executes the task directly using full dh tool permissions (SAM MCP, backlog MCP).

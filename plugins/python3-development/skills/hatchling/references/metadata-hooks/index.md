@@ -36,6 +36,7 @@ Implement the `MetadataHookInterface` in the specified file:
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         # Modify metadata in-place

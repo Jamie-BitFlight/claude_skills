@@ -107,6 +107,7 @@ Example @ <https://eclipse.dev/paho/files/paho.mqtt.python/html/client.html>:
 ```python
 import paho.mqtt.client as mqtt
 
+
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code.is_failure:
         print(f"Failed to connect: {reason_code}")
@@ -115,9 +116,11 @@ def on_connect(client, userdata, flags, reason_code, properties):
         # Subscribe in on_connect ensures subscriptions persist across reconnections
         client.subscribe("sensors/#")
 
+
 def on_disconnect(client, userdata, flags, reason_code, properties):
     if reason_code != 0:
         print(f"Unexpected disconnect: {reason_code}")
+
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
@@ -164,11 +167,13 @@ The model must cite these verified examples from GitHub search @ 2025-10-21:
 # Pattern extracted from Home Assistant ecosystem
 import paho.mqtt.client as mqtt
 
+
 def on_message(client, userdata, message):
     topic = message.topic  # e.g., "homeassistant/switch/living_room/state"
     payload = message.payload.decode()  # e.g., "ON" or "OFF"
     # Process device state changes
     handle_device_update(topic, payload)
+
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_message = on_message
@@ -190,10 +195,7 @@ client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
 # AWS IoT requires TLS with client certificates
 client.tls_set(
-    ca_certs="root-CA.crt",
-    certfile="device-cert.pem",
-    keyfile="device-private.key",
-    tls_version=ssl.PROTOCOL_TLSv1_2
+    ca_certs="root-CA.crt", certfile="device-cert.pem", keyfile="device-private.key", tls_version=ssl.PROTOCOL_TLSv1_2
 )
 
 # AWS IoT endpoint
@@ -230,8 +232,10 @@ Example with Mosquitto @ <http://www.steves-internet-guide.com/into-mqtt-python-
 ```python
 import paho.mqtt.client as mqtt
 
+
 def on_message(client, userdata, message):
     print(f"Received: {message.payload.decode()} on {message.topic}")
+
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="python_client")
 client.on_message = on_message
@@ -253,7 +257,7 @@ import paho.mqtt.client as mqtt
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport="websockets")
 
 # Configure WebSocket path and headers
-client.ws_set_options(path="/mqtt", headers={'User-Agent': 'Paho-Python'})
+client.ws_set_options(path="/mqtt", headers={"User-Agent": "Paho-Python"})
 
 # Connect to broker's WebSocket port
 client.connect("mqtt.example.com", 8080, 60)
@@ -270,12 +274,7 @@ import ssl
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
 # Server certificate validation
-client.tls_set(
-    ca_certs="ca.crt",
-    certfile="client.crt",
-    keyfile="client.key",
-    tls_version=ssl.PROTOCOL_TLSv1_2
-)
+client.tls_set(ca_certs="ca.crt", certfile="client.crt", keyfile="client.key", tls_version=ssl.PROTOCOL_TLSv1_2)
 
 # For testing only: disable certificate verification (insecure!)
 # client.tls_insecure_set(True)
@@ -293,18 +292,13 @@ Example from official docs @ <https://github.com/eclipse-paho/paho.mqtt.python/b
 import paho.mqtt.publish as publish
 
 # One-shot publish (connect, publish, disconnect)
-publish.single(
-    "home/temperature",
-    payload="22.5",
-    hostname="mqtt.eclipseprojects.io",
-    port=1883
-)
+publish.single("home/temperature", payload="22.5", hostname="mqtt.eclipseprojects.io", port=1883)
 
 # Multiple messages at once
 msgs = [
-    {'topic': "sensor/temp", 'payload': "22.5"},
-    {'topic': "sensor/humidity", 'payload': "65"},
-    ('sensor/pressure', '1013', 0, False)  # Alternative tuple format
+    {"topic": "sensor/temp", "payload": "22.5"},
+    {"topic": "sensor/humidity", "payload": "65"},
+    ("sensor/pressure", "1013", 0, False),  # Alternative tuple format
 ]
 publish.multiple(msgs, hostname="mqtt.eclipseprojects.io")
 ```
@@ -320,6 +314,7 @@ import paho.mqtt.subscribe as subscribe
 msg = subscribe.simple("home/temperature", hostname="mqtt.eclipseprojects.io")
 print(f"{msg.topic}: {msg.payload.decode()}")
 
+
 # Callback-based subscription
 def on_message_handler(client, userdata, message):
     print(f"{message.topic}: {message.payload.decode()}")
@@ -327,12 +322,8 @@ def on_message_handler(client, userdata, message):
     if userdata["count"] >= 10:
         client.disconnect()  # Stop after 10 messages
 
-subscribe.callback(
-    on_message_handler,
-    "sensors/#",
-    hostname="mqtt.eclipseprojects.io",
-    userdata={"count": 0}
-)
+
+subscribe.callback(on_message_handler, "sensors/#", hostname="mqtt.eclipseprojects.io", userdata={"count": 0})
 ```
 
 ### Production-Grade Client
@@ -343,6 +334,7 @@ Example combining best practices @ <https://cedalo.com/blog/configuring-paho-mqt
 import paho.mqtt.client as mqtt
 import time
 
+
 def on_connect(client, userdata, flags, reason_code, properties):
     if reason_code.is_failure:
         print(f"Connection failed: {reason_code}")
@@ -352,9 +344,11 @@ def on_connect(client, userdata, flags, reason_code, properties):
     # Subscribe in on_connect ensures subscriptions persist after reconnection
     client.subscribe("sensors/#", qos=1)
 
+
 def on_disconnect(client, userdata, flags, reason_code, properties):
     if reason_code != 0:
         print(f"Unexpected disconnect. Reconnecting... (code: {reason_code})")
+
 
 def on_message(client, userdata, message):
     print(f"Topic: {message.topic}")
@@ -362,14 +356,16 @@ def on_message(client, userdata, message):
     print(f"QoS: {message.qos}")
     print(f"Retain: {message.retain}")
 
+
 def on_publish(client, userdata, mid, reason_code, properties):
     print(f"Message {mid} published")
+
 
 # Create client with VERSION2 callbacks (recommended)
 client = mqtt.Client(
     mqtt.CallbackAPIVersion.VERSION2,
     client_id="sensor_monitor",
-    clean_session=False  # Persistent session
+    clean_session=False,  # Persistent session
 )
 
 # Set callbacks
@@ -572,12 +568,14 @@ The model must verify that paho-mqtt does NOT have native asyncio support:
 import asyncio
 from aiomqtt import Client  # Third-party wrapper
 
+
 async def main():
     async with Client("mqtt.eclipseprojects.io") as client:
         async with client.messages() as messages:
             await client.subscribe("sensors/#")
             async for message in messages:
                 print(message.payload.decode())
+
 
 asyncio.run(main())
 ```
@@ -608,15 +606,18 @@ The model must recommend this pattern @ <https://eclipse.dev/paho/files/paho.mqt
 ```python
 import paho.mqtt.client as mqtt
 
+
 def on_connect(client, userdata, flags, reason_code, properties):
     # ALWAYS subscribe in on_connect callback
     # This ensures subscriptions are renewed after reconnection
     client.subscribe("sensors/#", qos=1)
 
+
 def on_disconnect(client, userdata, flags, reason_code, properties):
     if reason_code != 0:
         print(f"Unexpected disconnect: {reason_code}")
         # loop_forever() and loop_start() will automatically reconnect
+
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_connect = on_connect
@@ -643,10 +644,12 @@ logging.basicConfig(level=logging.DEBUG)
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.enable_logger()  # Uses standard logging module
 
+
 # Or use custom on_log callback
 def on_log(client, userdata, level, buf):
     if level == mqtt.MQTT_LOG_ERR:
         print(f"ERROR: {buf}")
+
 
 client.on_log = on_log
 ```
@@ -662,11 +665,13 @@ import sys
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
+
 def signal_handler(sig, frame):
     print("Shutting down gracefully...")
     client.disconnect()  # Triggers clean disconnect
     client.loop_stop()
     sys.exit(0)
+
 
 signal.signal(signal.SIGINT, signal_handler)
 

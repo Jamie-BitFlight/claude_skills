@@ -107,6 +107,7 @@ print(response.choices[0].message.content)
 from litellm import acompletion
 import asyncio
 
+
 async def generate_message():
     response = await acompletion(
         model="llamafile/gemma-3-3b",
@@ -117,6 +118,7 @@ async def generate_message():
     )
     return response.choices[0].message.content
 
+
 result = asyncio.run(generate_message())
 print(result)
 ```
@@ -126,6 +128,7 @@ print(result)
 ```python
 from litellm import acompletion
 import asyncio
+
 
 async def stream_response():
     response = await acompletion(
@@ -140,6 +143,7 @@ async def stream_response():
             print(chunk.choices[0].delta.content, end="", flush=True)
     print()
 
+
 asyncio.run(stream_response())
 ```
 
@@ -151,10 +155,7 @@ import os
 
 os.environ["LLAMAFILE_API_BASE"] = "http://localhost:8080/v1"
 
-response = embedding(
-    model="llamafile/sentence-transformers/all-MiniLM-L6-v2",
-    input=["Hello world"],
-)
+response = embedding(model="llamafile/sentence-transformers/all-MiniLM-L6-v2", input=["Hello world"])
 
 print(response)
 ```
@@ -167,13 +168,13 @@ All exceptions can be imported directly from `litellm`:
 
 ```python
 from litellm import (
-    BadRequestError,           # 400 errors
-    AuthenticationError,       # 401 errors
-    NotFoundError,             # 404 errors
-    Timeout,                   # 408 errors (alias: openai.APITimeoutError)
-    RateLimitError,            # 429 errors
-    APIConnectionError,        # 500 errors / connection issues (default)
-    ServiceUnavailableError,   # 503 errors
+    BadRequestError,  # 400 errors
+    AuthenticationError,  # 401 errors
+    NotFoundError,  # 404 errors
+    Timeout,  # 408 errors (alias: openai.APITimeoutError)
+    RateLimitError,  # 429 errors
+    APIConnectionError,  # 500 errors / connection issues (default)
+    ServiceUnavailableError,  # 503 errors
 )
 ```
 
@@ -254,7 +255,7 @@ try:
         api_base="http://localhost:8080/v1",
     )
 except Exception as e:
-    if hasattr(e, 'status_code'):
+    if hasattr(e, "status_code"):
         should_retry = litellm._should_retry(e.status_code)
         print(f"Should retry: {should_retry}")
 ```
@@ -268,8 +269,8 @@ response = completion(
     model="llamafile/gemma-3-3b",
     messages=[{"role": "user", "content": "Hello"}],
     api_base="http://localhost:8080/v1",
-    num_retries=3,      # Retry 3 times on failure
-    timeout=30.0,       # 30 second timeout
+    num_retries=3,  # Retry 3 times on failure
+    timeout=30.0,  # 30 second timeout
 )
 ```
 
@@ -293,14 +294,12 @@ model_list:
 import litellm
 from litellm import APIConnectionError
 
+
 def verify_llamafile_connection(api_base: str = "http://localhost:8080/v1") -> bool:
     """Check if llamafile server is running."""
     try:
         litellm.completion(
-            model="llamafile/test",
-            messages=[{"role": "user", "content": "test"}],
-            api_base=api_base,
-            max_tokens=1,
+            model="llamafile/test", messages=[{"role": "user", "content": "test"}], api_base=api_base, max_tokens=1
         )
         return True
     except APIConnectionError:
@@ -313,6 +312,7 @@ def verify_llamafile_connection(api_base: str = "http://localhost:8080/v1") -> b
 import litellm
 from litellm import acompletion, APIConnectionError
 import asyncio
+
 
 class AIService:
     """LiteLLM wrapper with llamafile routing."""

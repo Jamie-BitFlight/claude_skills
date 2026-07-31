@@ -1,61 +1,134 @@
 [project]
 name = "claude_skills"
+version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "fastmcp[tasks]>=3.0.2",
+    "fastmcp[tasks]>=3.2.4",
     "idna>=3.15",
     "marko>=2.2.2",
-    "pygithub>=2.8.1",
-    "skill-seekers>=3.0.0",
+    "pygithub>=2.9.0",
+    "skill-seekers>=3.9.0",
 ]
-version = "0.1.0"
 
 [dependency-groups]
 dev = [
-    "anthropic>=0.80.0",
-    "basedpyright>=1.33.0",
-    "cairosvg>=2.7.0",
+    "anthropic>=0.89.0",
+    "basedpyright>=1.39.9",
+    "cairosvg>=2.9.0",
     "claude-code-sdk>=0.0.25",
     "defusedxml>=0.7.1",
-    "duckdb>=1.4.4",
-    "fastmcp[tasks]>=3.1.1",
+    "duckdb>=1.5.5",
+    "fastmcp[tasks]>=3.2.4",
     "gitpython>=3.1.50",
     "hatch-vcs>=0.5.0",
-    "holoviews>=1.22.1",
+    "holoviews>=1.23.1",
     "httpx>=0.28.1",
     "hvplot>=0.12.2",
-    "hypothesis>=6.0.0",
-    "markdown-it-py>=3.0.0",
+    "hypothesis>=6.164.0",
+    "markdown-it-py>=4.0.0",
     "marko>=2.2.2",
-    "matplotlib>=3.10.8",
-    "mcp[cli]>=1.26.0",
-    "pandas>=3.0.0",
-    "panel>=1.8.10",
-    "pm4py>=2.7.0",
+    "matplotlib>=3.11.1",
+    "mcp[cli]>=1.27.0",
+    "pandas>=3.0.5",
+    "panel>=1.9.3",
+    "pm4py>=2.7.23.3",
     "prefixspan>=0.5.2",
-    "prek>=0.2.19",
-    "pydantic>=2.12.3",
-    "pygithub>=2.1.1",
-    "pypfmt>=0.1.0",
-    "pyright>=1.1.404",
-    "pytest-asyncio>=1.1.0",
-    "pytest-cov>=6.2.1",
-    "pytest-mock>=3.12",
-    "pytest-xdist>=3.5.0",
-    "pytest>=8.4.1",
-    "python-dotenv>=1.1.1",
-    "python-frontmatter>=1.1.0",
-    "python-gitlab>=8.0.0",
-    "rich>=14.2.0",
-    "ruamel.yaml>=0.18.0",
-    "ruff>=0.16.0",
-    "scikit-learn>=1.0",
+    "prek>=0.4.11",
+    "pydantic>=2.12.5",
+    "pygithub>=2.9.0",
+    "pypfmt>=1.1.11",
+    "pyright>=1.1.411",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
+    "pytest-xdist>=3.8.0",
+    "pytest>=9.1.1",
+    "python-dotenv>=1.2.2",
+    "python-frontmatter>=1.3.0",
+    "python-gitlab>=8.5.0",
+    "rich>=14.3.3",
+    "ruamel-yaml>=0.19.1",
+    "ruff>=0.16.1",
+    "scikit-learn>=1.9.0",
     "tiktoken>=0.12.0",
-    "tomlkit>=0.13.0",
+    "tomlkit>=0.15.1",
     "tornado>=6.5.7",
-    "ty>=0.0.25",
-    "typer>=0.21.0",
+    "ty>=0.0.65",
+    "typer>=0.27.0",
 ]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=scripts",
+    "--cov=plugins",
+    "--strict-config",
+    "--strict-markers",
+    "--tb=short",
+    "--import-mode=importlib",
+    "-n",
+    "auto",
+    "--dist",
+    "loadgroup",
+    "-m",
+    "not e2e and not cross_backend",
+]
+asyncio_mode = "auto"
+markers = [
+    "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
+    "demos: marks tests as demonstration tests",
+    "e2e: marks tests as end-to-end tests",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: marks tests as unit tests",
+]
+pythonpath = [
+    ".",
+    "./.claude/skills/create-merge-request-changelog/scripts",
+    "./.claude/skills/gh/scripts",
+    "./.claude/skills/research-curator/scripts",
+    "./plugins/development-harness",
+    "./plugins/development-harness/scripts",
+    "./plugins/development-harness/skills/implementation-manager/scripts",
+    "./plugins/fastmcp-creator/skills/fastmcp-creator/scripts",
+    "./plugins/gitlab-skill/skills/gitlab-skill/scripts",
+    "./plugins/holistic-linting/skills/holistic-linting/scripts",
+    "./plugins/plugin-creator/scripts",
+    "./plugins/plugin-creator/skills/skill-creator/scripts",
+    "./plugins/python3-development/scripts",
+    "./plugins/python3-development/skills/mkdocs/scripts",
+    "./plugins/python3-development/skills/uv/scripts",
+    "./plugins/summarizer/scripts",
+    "./plugins/frustration-analyzer/tests",
+    "./examples/solid-review-ab",
+]
+testpaths = [
+    "plugins/agentskill-kaizen/tests",
+    "plugins/development-harness/tests",
+    "plugins/development-harness/tests_sam",
+    "plugins/development-harness/sam_schema/tests",
+    "plugins/development-harness/backlog_core/tests",
+    "plugins/frustration-analyzer/tests",
+    "plugins/plugin-creator/tests",
+    "plugins/development-harness/skills/implementation-manager/tests",
+    "plugins/summarizer/tests",
+    "tests",
+    "examples/solid-review-ab/tests",
+    "plugins/plugin-creator/skills/ensemble-rule-review/scripts",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.run]
+omit = ["tests/*", "*/tests/*", "**/test_*.py"]
+source = ["**/scripts"]
 
 [tool.ty.environment]
 extra-paths = [
@@ -94,8 +167,8 @@ include = ["plugins/agentskill-kaizen/**"]
 
 [tool.ty.overrides.rules]
 call-non-callable = "warn"             # prefixspan has incomplete type stubs
-unresolved-attribute = "warn"          # lazy import pattern: `import mod; mod.Attr` — ty sees ModuleType, not resolved class
 too-many-positional-arguments = "warn" # hv.extension stubs model __init__(**params) but public API is extension(*backends)
+unresolved-attribute = "warn"          # lazy import pattern: `import mod; mod.Attr` — ty sees ModuleType, not resolved class
 
 [[tool.ty.overrides]]
 include = ["**/test_*.py", "**/conftest.py", "**/tests/**", "tests/**"]
@@ -243,21 +316,28 @@ ignore = [
 preview = true
 unfixable = ["unused-import"]
 
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+force-wrap-aliases = false
+known-local-folder = [
+    "models",
+    "registry_loader",
+    "state_manager",
+    "validators",
+]
+required-imports = ["from __future__ import annotations"]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
 [tool.ruff.lint.per-file-ignores]
 # Anti-pattern examples: intentionally incorrect code demonstrating what NOT to do
 "**/assets/nested-typer-exceptions/*.py" = ["ANN", "DOC"]
-# Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
-# (linting-exceptions.md category 2: what-not-to-do examples / negative test cases).
-# Modifying these to satisfy linters would remove the seeded defects the experiment measures.
-"examples/solid-review-ab/corpus/cases/*.py" = [
-    "ANN", # Intentionally missing annotations on violation-seeding helpers
-    "D",   # Docstrings relaxed — focus is on SOLID violations, not docstyle
-    "DOC", # ditto
-    "N",   # Naming violations intentional in some cases
-    "PLR", # Complexity flags from intentional god-object patterns
-    "C90", # Cyclomatic complexity from intentional dispatch violations
-    "SLF", # Private-access patterns seeded intentionally
-]
 # Lazy imports for optional dependency detection (hatchling may not be installed)
 "**/assets/version.py" = ["import-outside-top-level"]
 # BacklogBackend Protocol must expose all 41 operations from gh_client/github_sync/github_branches
@@ -268,33 +348,21 @@ unfixable = ["unused-import"]
     "too-many-public-methods",
     "undocumented-public-method",
 ]
-# FastMCP @mcp.tool uses get_type_hints() at decoration time to build tool schemas — annotated
-# parameter types (PlanActionConfig, TaskActionConfig, ActiveTaskActionConfig, etc.) must be
-# present in the module's global namespace even with `from __future__ import annotations`.
-# TC001/TC002 would move these to TYPE_CHECKING, making them unavailable at runtime.
-# TC001/TC002 — action model types must be present at runtime for discriminated union dispatch (from __future__ import annotations bypasses this)
-# PLR0911 — match-case action dispatch in sam_plan/sam_task produces one return per case; guard-clause refactoring would obscure intent
-# C901/PLR0912 — discriminated union dispatch with per-arm isinstance type-narrowing guards is intentional; complexity metrics do not apply to inherently branching dispatch patterns
-"**/sam_schema/server.py" = [
-    "too-many-return-statements",
-    "complex-structure",
-    "too-many-branches",
+# BeadsBackend implements the full BacklogBackend Protocol surface — PLR0904 does not apply
+# SLF001 — protocol surface includes _-prefixed methods that are part of the public protocol interface by design
+# DOC201 — single-line docstrings for NotImplementedError stubs; Returns sections add no information
+"**/backlog_core/backends/beads_backend.py" = [
+    "docstring-missing-returns",
+    "private-member-access",
+    "too-many-public-methods",
 ]
 # GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — protocol surface includes _-prefixed methods that delegate to _-prefixed gh_client functions by design
 # JsonValue is used in parse_* function annotations — must be available at runtime for
 # GitHubBackend implements every method of BacklogBackend — PLR0904 does not apply to protocol implementations
 "**/backlog_core/backends/github_backend.py" = [
-    "too-many-public-methods",
     "private-member-access",
-]
-# GitHubTaskProvider implements every method of TaskBackend — PLR0904 does not apply to protocol implementations
-# SLF001 — BacklogBackend Protocol surface includes _-prefixed GraphQL methods by design (same justification as github_backend.py)
-# DOC201 — single-line docstrings for private helpers already state the return value; formal Returns sections add no information
-"**/sam_schema/core/backends/github_task.py" = [
     "too-many-public-methods",
-    "private-member-access",
-    "docstring-missing-returns",
 ]
 # InMemoryBackend implements the full BacklogBackend Protocol surface — PLR0904 and DOC201 do not apply
 # DOC201 — single-line docstrings already state the return value; formal Returns sections add no information
@@ -305,16 +373,8 @@ unfixable = ["unused-import"]
 # SQLiteBackend implements the full BacklogBackend Protocol surface — PLR0904 does not apply
 # SLF001 — protocol surface includes _-prefixed methods that are part of the public protocol interface by design
 "**/backlog_core/backends/sqlite_backend.py" = [
-    "too-many-public-methods",
     "private-member-access",
-]
-# BeadsBackend implements the full BacklogBackend Protocol surface — PLR0904 does not apply
-# SLF001 — protocol surface includes _-prefixed methods that are part of the public protocol interface by design
-# DOC201 — single-line docstrings for NotImplementedError stubs; Returns sections add no information
-"**/backlog_core/backends/beads_backend.py" = [
     "too-many-public-methods",
-    "private-member-access",
-    "docstring-missing-returns",
 ]
 # operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
@@ -322,21 +382,37 @@ unfixable = ["unused-import"]
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
 # SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
 # underscore prefix marks it as a background-task entry point, not a user-facing tool
-"**/backlog_core/server.py" = ["unused-async", "private-member-access"]
+"**/backlog_core/server.py" = ["private-member-access", "unused-async"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["start-process-with-partial-path"]
 "**/kage-bunshin/scripts/spawn.py" = ["start-process-with-partial-path"]
+# GitHubTaskProvider implements every method of TaskBackend — PLR0904 does not apply to protocol implementations
+# SLF001 — BacklogBackend Protocol surface includes _-prefixed GraphQL methods by design (same justification as github_backend.py)
+# DOC201 — single-line docstrings for private helpers already state the return value; formal Returns sections add no information
+"**/sam_schema/core/backends/github_task.py" = [
+    "docstring-missing-returns",
+    "private-member-access",
+    "too-many-public-methods",
+]
+# FastMCP @mcp.tool uses get_type_hints() at decoration time to build tool schemas — annotated
+# parameter types (PlanActionConfig, TaskActionConfig, ActiveTaskActionConfig, etc.) must be
+# present in the module's global namespace even with `from __future__ import annotations`.
+# TC001/TC002 would move these to TYPE_CHECKING, making them unavailable at runtime.
+# TC001/TC002 — action model types must be present at runtime for discriminated union dispatch (from __future__ import annotations bypasses this)
+# PLR0911 — match-case action dispatch in sam_plan/sam_task produces one return per case; guard-clause refactoring would obscure intent
+# C901/PLR0912 — discriminated union dispatch with per-arm isinstance type-narrowing guards is intentional; complexity metrics do not apply to inherently branching dispatch patterns
+"**/sam_schema/server.py" = [
+    "complex-structure",
+    "too-many-branches",
+    "too-many-return-statements",
+]
 "**/skill-creator/**/*.py" = [
     "ANN",
     "ANN",
-    "blind-except",
-    "complex-structure",
-    "complex-structure",
     "D",
     "D",
     "DOC",
     "DOC",
-    "unused-import",
     "FURB",
     "PLR",
     "PLR",
@@ -347,13 +423,16 @@ unfixable = ["unused-import"]
     "T",
     "T",
     "TRY",
+    "blind-except",
+    "complex-structure",
+    "complex-structure",
+    "unused-import",
 ]
 # Test files that live in scripts/ directories (not tests/)
 "**/test_*.py" = [
     "ANN",           # Type annotations optional for test fixtures/methods
     "D",             # Docstring requirements relaxed for tests
     "DOC",           # Docstring content requirements relaxed
-    "line-too-long", # Line length relaxed for test data
     "EXE",           # Shebang executable check skipped for PEP723 test files
     "N",             # camelCase in test names acceptable when testing API fields
     "PLC",           # Local imports acceptable in test helpers
@@ -361,25 +440,34 @@ unfixable = ["unused-import"]
     "S",             # Security checks not needed in tests (S101 assert is expected)
     "SLF",           # Private name imports acceptable for testing internals
     "T",             # print() statements are intentional for CI output visibility
+    "line-too-long", # Line length relaxed for test data
 ]
 "**/tests*/**" = [
     "ANN",                                    # Type annotations optional for test fixtures/methods
-    "blocking-path-method-in-async-function", # Blocking pathlib I/O in async test methods is acceptable at test scale
     "D",                                      # Docstring requirements relaxed for tests
     "DOC",                                    # Docstring content requirements relaxed
-    "line-too-long",                          # Line length relaxed for test data
     "EXE",                                    # Shebang executable check skipped for PEP723 test files
     "N",                                      # camelCase in test names acceptable when testing API fields
     "PLC",                                    # Local imports acceptable in test helpers
     "PLR",                                    # Testing private methods is valid test pattern
-    "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
     "S",                                      # Security checks not needed in tests
     "SLF",                                    # Private name imports acceptable for testing internals
     "T",                                      # print() statements are intentional for CI output visibility
+    "blocking-path-method-in-async-function", # Blocking pathlib I/O in async test methods is acceptable at test scale
+    "line-too-long",                          # Line length relaxed for test data
+    "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
 ]
-# Executable bit is set at runtime via uv run (PEP 723 shebang)
-"plugins/development-harness/scripts/verify_migration_fidelity.py" = [
-    "shebang-not-executable",
+# Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
+# (linting-exceptions.md category 2: what-not-to-do examples / negative test cases).
+# Modifying these to satisfy linters would remove the seeded defects the experiment measures.
+"examples/solid-review-ab/corpus/cases/*.py" = [
+    "ANN", # Intentionally missing annotations on violation-seeding helpers
+    "C90", # Cyclomatic complexity from intentional dispatch violations
+    "D",   # Docstrings relaxed — focus is on SOLID violations, not docstyle
+    "DOC", # ditto
+    "N",   # Naming violations intentional in some cases
+    "PLR", # Complexity flags from intentional god-object patterns
+    "SLF", # Private-access patterns seeded intentionally
 ]
 # live_validation_step: S105 false-positive (enum value "PASS" ≠ password),
 # S602 shell=True intentional (command run verbatim as manifest declares),
@@ -388,6 +476,10 @@ unfixable = ["unused-import"]
     "hardcoded-password-string",
     "subprocess-popen-with-shell-equals-true",
     "too-many-return-statements",
+]
+# Executable bit is set at runtime via uv run (PEP 723 shebang)
+"plugins/development-harness/scripts/verify_migration_fidelity.py" = [
+    "shebang-not-executable",
 ]
 # Hyphenated package directory name is required by MCP convention
 "plugins/scientific-method/mcp/experiment-registry/__init__.py" = [
@@ -403,27 +495,8 @@ max-line-length = 120
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.lint.mccabe]
-max-complexity = 12
-
-[tool.ruff.lint.flake8-quotes]
-docstring-quotes = "double"
-
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "requests".msg = "Use httpx instead. httpx has built-in type annotations and is the project standard."
-
-[tool.ruff.lint.isort]
-combine-as-imports = true
-force-single-line = false
-force-wrap-aliases = false
-known-local-folder = [
-    "models",
-    "registry_loader",
-    "state_manager",
-    "validators",
-]
-required-imports = ["from __future__ import annotations"]
-split-on-trailing-comma = false
 
 [tool.mypy]
 # Project uses ty (basedpyright) for type checking. Exclude all to avoid mypy extension errors.
@@ -432,76 +505,3 @@ exclude = [".*"]
 [tool.basedpyright]
 # Disabled: project uses ty for type checking. Config kept so IDE uses project settings, not defaults.
 typeCheckingMode = "off"
-
-[tool.pytest.ini_options]
-addopts = [
-    "--cov=scripts",
-    "--cov=plugins",
-    "--strict-config",
-    "--strict-markers",
-    "--tb=short",
-    "--import-mode=importlib",
-    "-n",
-    "auto",
-    "--dist",
-    "loadgroup",
-    "-m",
-    "not e2e and not cross_backend",
-]
-asyncio_mode = "auto"
-markers = [
-    "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
-    "demos: marks tests as demonstration tests",
-    "e2e: marks tests as end-to-end tests",
-    "integration: marks tests as integration tests",
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "unit: marks tests as unit tests",
-]
-pythonpath = [
-    ".",
-    "./.claude/skills/create-merge-request-changelog/scripts",
-    "./.claude/skills/gh/scripts",
-    "./.claude/skills/research-curator/scripts",
-    "./plugins/development-harness",
-    "./plugins/development-harness/scripts",
-    "./plugins/development-harness/skills/implementation-manager/scripts",
-    "./plugins/fastmcp-creator/skills/fastmcp-creator/scripts",
-    "./plugins/gitlab-skill/skills/gitlab-skill/scripts",
-    "./plugins/holistic-linting/skills/holistic-linting/scripts",
-    "./plugins/plugin-creator/scripts",
-    "./plugins/plugin-creator/skills/skill-creator/scripts",
-    "./plugins/python3-development/scripts",
-    "./plugins/python3-development/skills/mkdocs/scripts",
-    "./plugins/python3-development/skills/uv/scripts",
-    "./plugins/summarizer/scripts",
-    "./plugins/frustration-analyzer/tests",
-    "./examples/solid-review-ab",
-]
-testpaths = [
-    "plugins/agentskill-kaizen/tests",
-    "plugins/development-harness/tests",
-    "plugins/development-harness/tests_sam",
-    "plugins/development-harness/sam_schema/tests",
-    "plugins/development-harness/backlog_core/tests",
-    "plugins/frustration-analyzer/tests",
-    "plugins/plugin-creator/tests",
-    "plugins/development-harness/skills/implementation-manager/tests",
-    "plugins/summarizer/tests",
-    "tests",
-    "examples/solid-review-ab/tests",
-    "plugins/plugin-creator/skills/ensemble-rule-review/scripts",
-]
-
-[tool.coverage.run]
-omit = ["tests/*", "*/tests/*", "**/test_*.py"]
-source = ["**/scripts"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if __name__ == .__main__.:",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if TYPE_CHECKING:",
-]

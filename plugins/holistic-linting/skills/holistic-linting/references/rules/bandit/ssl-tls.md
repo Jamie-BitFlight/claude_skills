@@ -21,9 +21,11 @@ response = requests.get("https://api.example.com", verify="")  # Also bad
 
 # VULNERABLE - Requests library default without proper setup
 import urllib3
+
 urllib3.disable_warnings()  # Disables SSL warnings
 
 import requests
+
 requests.get("https://api.example.com")  # If warnings were disabled
 ```
 
@@ -55,10 +57,7 @@ response = requests.get("https://api.example.com")
 response = requests.get("https://api.example.com", verify=True)
 
 # Custom certificate bundle
-response = requests.get(
-    "https://api.example.com",
-    verify="/path/to/ca-bundle.crt"
-)
+response = requests.get("https://api.example.com", verify="/path/to/ca-bundle.crt")
 ```
 
 **For Development with Self-Signed Certificates**:
@@ -68,14 +67,17 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.ssl_ import create_urllib3_context
 
+
 class SSLAdapter(HTTPAdapter):
     """Adapter for self-signed cert development (dev only)."""
+
     def init_poolmanager(self, *args, **kwargs):
         context = create_urllib3_context()
         context.check_hostname = False
         context.verify_mode = "CERT_NONE"
-        kwargs['ssl_context'] = context
+        kwargs["ssl_context"] = context
         return super().init_poolmanager(*args, **kwargs)
+
 
 # Use only in development
 session = requests.Session()
@@ -107,12 +109,14 @@ context.minimum_version = ssl.TLSVersion.TLSv1  # Too old!
 
 # VULNERABLE - In Paramiko
 import paramiko
+
 client = paramiko.SSHClient()
-client.get_transport().security_options.key_types = ['ssh-rsa']
+client.get_transport().security_options.key_types = ["ssh-rsa"]
 # Should also enforce minimum TLS 1.2+
 
 # VULNERABLE - In urllib3
 import urllib3
+
 http = urllib3.PoolManager(
     ssl_version=ssl.PROTOCOL_TLSv1  # Wrong!
 )
@@ -159,6 +163,7 @@ CSRF_COOKIE_SECURE = True
 
 # Flask with SSL
 from flask_talisman import Talisman
+
 app = Flask(__name__)
 Talisman(app, force_https=True)
 ```
@@ -196,12 +201,14 @@ import ssl
 context = ssl.create_default_context()
 
 # Explicitly set strong ciphers only
-context.set_ciphers(":".join([
-    "ECDHE-ECDSA-AES128-GCM-SHA256",
-    "ECDHE-RSA-AES128-GCM-SHA256",
-    "ECDHE-ECDSA-AES256-GCM-SHA384",
-    "ECDHE-RSA-AES256-GCM-SHA384",
-]))
+context.set_ciphers(
+    ":".join([
+        "ECDHE-ECDSA-AES128-GCM-SHA256",
+        "ECDHE-RSA-AES128-GCM-SHA256",
+        "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "ECDHE-RSA-AES256-GCM-SHA384",
+    ])
+)
 
 # Disable problematic protocol versions
 context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1

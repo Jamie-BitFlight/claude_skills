@@ -18,12 +18,14 @@ PATTERN: Subclass `Middleware` from `fastmcp.server.middleware` and override the
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
+
 class LoggingMiddleware(Middleware):
     async def on_message(self, context: MiddlewareContext, call_next):
         print(f"→ {context.method}")
         result = await call_next(context)
         print(f"← {context.method}")
         return result
+
 
 mcp = FastMCP("MyServer")
 mcp.add_middleware(LoggingMiddleware())
@@ -70,9 +72,9 @@ from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 
 mcp = FastMCP("MyServer")
-mcp.add_middleware(ErrorHandlingMiddleware())   # 1st in, last out — catches all errors
-mcp.add_middleware(RateLimitingMiddleware())    # 2nd
-mcp.add_middleware(LoggingMiddleware())         # 3rd in, first out — sees post-processed request
+mcp.add_middleware(ErrorHandlingMiddleware())  # 1st in, last out — catches all errors
+mcp.add_middleware(RateLimitingMiddleware())  # 2nd
+mcp.add_middleware(LoggingMiddleware())  # 3rd in, first out — sees post-processed request
 ```
 
 RULE: Place error handling first so it catches exceptions from all subsequent middleware. Place logging last (innermost) so it records execution after other middleware has processed the request.
@@ -84,6 +86,7 @@ PATTERN: Initialize middleware with configuration via `__init__`:
 ```python
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
+
 class ConfigurableMiddleware(Middleware):
     def __init__(self, api_key: str, rate_limit: int = 100):
         self.api_key = api_key
@@ -91,6 +94,7 @@ class ConfigurableMiddleware(Middleware):
 
     async def on_request(self, context: MiddlewareContext, call_next):
         return await call_next(context)
+
 
 mcp.add_middleware(ConfigurableMiddleware(api_key="secret", rate_limit=50))
 ```
@@ -102,6 +106,7 @@ PATTERN: Raise the appropriate exception to stop processing and return an error 
 ```python
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.exceptions import ToolError
+
 
 class AuthMiddleware(Middleware):
     async def on_call_tool(self, context: MiddlewareContext, call_next):
@@ -125,12 +130,14 @@ PATTERN: Mutate `context.message.arguments` before `call_next()` to transform th
 ```python
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
+
 class InputSanitizer(Middleware):
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         if context.message.name == "search":
             query = context.message.arguments.get("query", "")
             context.message.arguments["query"] = query.strip().lower()
         return await call_next(context)
+
 
 class ResponseEnricher(Middleware):
     async def on_call_tool(self, context: MiddlewareContext, call_next):
@@ -149,6 +156,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.dependencies import get_http_headers
 from fastmcp import FastMCP, Context
 
+
 class UserMiddleware(Middleware):
     async def on_request(self, context: MiddlewareContext, call_next):
         headers = get_http_headers() or {}
@@ -157,8 +165,10 @@ class UserMiddleware(Middleware):
             context.fastmcp_context.set_state("user_id", user_id)
         return await call_next(context)
 
+
 mcp = FastMCP("MyServer")
 mcp.add_middleware(UserMiddleware())
+
 
 @mcp.tool
 def get_user_data(ctx: Context) -> str:
@@ -173,6 +183,7 @@ PATTERN: Look up the component through the server context to access its tags dur
 ```python
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.exceptions import ToolError
+
 
 class TagBasedAuth(Middleware):
     async def on_call_tool(self, context: MiddlewareContext, call_next):
@@ -192,6 +203,7 @@ PATTERN: Filter list operations to hide tools from clients — also block execut
 ```python
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.exceptions import ToolError
+
 
 class PrivateToolFilter(Middleware):
     async def on_list_tools(self, context: MiddlewareContext, call_next):
@@ -216,6 +228,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.dependencies import get_http_headers
 from fastmcp.exceptions import ToolError
 
+
 class ApiKeyAuth(Middleware):
     def __init__(self, valid_keys: set[str], protected_tools: set[str]):
         self.valid_keys = valid_keys
@@ -231,15 +244,15 @@ class ApiKeyAuth(Middleware):
             raise ToolError(f"Invalid API key for protected tool: {tool_name}")
         return await call_next(context)
 
+
 mcp = FastMCP("Secure Server")
-mcp.add_middleware(ApiKeyAuth(
-    valid_keys={"key-1", "key-2"},
-    protected_tools={"delete_user", "admin_panel"},
-))
+mcp.add_middleware(ApiKeyAuth(valid_keys={"key-1", "key-2"}, protected_tools={"delete_user", "admin_panel"}))
+
 
 @mcp.tool
 def delete_user(user_id: str) -> str:
     return f"Deleted user {user_id}"
+
 
 @mcp.tool
 def get_user(user_id: str) -> str:
@@ -270,6 +283,7 @@ PATTERN: Override `__call__` directly to bypass the hook dispatch system and han
 ```python
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 
+
 class RawMiddleware(Middleware):
     async def __call__(self, context: MiddlewareContext, call_next):
         print(f"Processing: {context.method}")
@@ -291,6 +305,7 @@ async def on_request(self, context: MiddlewareContext, call_next):
     else:
         # Session not yet established (e.g., during initialization)
         from fastmcp.server.dependencies import get_http_headers
+
         headers = get_http_headers()
     return await call_next(context)
 ```
@@ -309,10 +324,7 @@ from fastmcp.server.middleware.logging import LoggingMiddleware, StructuredLoggi
 `StructuredLoggingMiddleware` — JSON-formatted logs for Datadog, Splunk, etc.
 
 ```python
-mcp.add_middleware(LoggingMiddleware(
-    include_payloads=True,
-    max_payload_length=1000,
-))
+mcp.add_middleware(LoggingMiddleware(include_payloads=True, max_payload_length=1000))
 ```
 
 | Parameter | Default | Description |
@@ -336,25 +348,16 @@ mcp.add_middleware(TimingMiddleware())
 #### Rate Limiting
 
 ```python
-from fastmcp.server.middleware.rate_limiting import (
-    RateLimitingMiddleware,
-    SlidingWindowRateLimitingMiddleware,
-)
+from fastmcp.server.middleware.rate_limiting import RateLimitingMiddleware, SlidingWindowRateLimitingMiddleware
 ```
 
 `RateLimitingMiddleware` — token bucket algorithm (allows controlled bursts).
 `SlidingWindowRateLimitingMiddleware` — precise time-window limiting without burst allowance.
 
 ```python
-mcp.add_middleware(RateLimitingMiddleware(
-    max_requests_per_second=10.0,
-    burst_capacity=20,
-))
+mcp.add_middleware(RateLimitingMiddleware(max_requests_per_second=10.0, burst_capacity=20))
 
-mcp.add_middleware(SlidingWindowRateLimitingMiddleware(
-    max_requests=100,
-    window_minutes=1,
-))
+mcp.add_middleware(SlidingWindowRateLimitingMiddleware(max_requests=100, window_minutes=1))
 ```
 
 #### Error Handling
@@ -366,16 +369,11 @@ from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware, Re
 `ErrorHandlingMiddleware` — centralized error logging and transformation. `RetryMiddleware` — exponential backoff retry for transient failures.
 
 ```python
-mcp.add_middleware(ErrorHandlingMiddleware(
-    include_traceback=True,
-    transform_errors=True,
-    error_callback=my_error_callback,
-))
+mcp.add_middleware(
+    ErrorHandlingMiddleware(include_traceback=True, transform_errors=True, error_callback=my_error_callback)
+)
 
-mcp.add_middleware(RetryMiddleware(
-    max_retries=3,
-    retry_exceptions=(ConnectionError, TimeoutError),
-))
+mcp.add_middleware(RetryMiddleware(max_retries=3, retry_exceptions=(ConnectionError, TimeoutError)))
 ```
 
 #### Caching
@@ -394,11 +392,13 @@ from fastmcp.server.middleware.caching import (
     ReadResourceSettings,
 )
 
-mcp.add_middleware(ResponseCachingMiddleware(
-    list_tools_settings=ListToolsSettings(ttl=30),
-    call_tool_settings=CallToolSettings(included_tools=["expensive_tool"]),
-    read_resource_settings=ReadResourceSettings(enabled=False),
-))
+mcp.add_middleware(
+    ResponseCachingMiddleware(
+        list_tools_settings=ListToolsSettings(ttl=30),
+        call_tool_settings=CallToolSettings(included_tools=["expensive_tool"]),
+        read_resource_settings=ReadResourceSettings(enabled=False),
+    )
+)
 ```
 
 CONSTRAINT: Cache keys are based on operation name and arguments only — they do not include user or session identity. Tools that return user-specific data derived from auth context must either disable caching or include identity in their arguments.
@@ -412,10 +412,12 @@ from fastmcp.server.middleware.response_limiting import ResponseLimitingMiddlewa
 Enforces byte size limits on tool outputs. Truncated responses receive a plain `TextContent` block with a suffix.
 
 ```python
-mcp.add_middleware(ResponseLimitingMiddleware(
-    max_size=500_000,
-    tools=["search", "fetch_data"],  # None = all tools
-))
+mcp.add_middleware(
+    ResponseLimitingMiddleware(
+        max_size=500_000,
+        tools=["search", "fetch_data"],  # None = all tools
+    )
+)
 ```
 
 | Parameter | Default | Description |

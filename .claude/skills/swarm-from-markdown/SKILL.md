@@ -89,7 +89,7 @@ from marko.block import List, ListItem, Paragraph
 from marko.inline import RawText
 
 md = Markdown(extensions=["gfm"])
-doc = md.parse(markdown_text)      # parse() returns AST — do NOT call md() which returns HTML
+doc = md.parse(markdown_text)  # parse() returns AST — do NOT call md() which returns HTML
 
 results = []
 for node in doc.children:
@@ -101,13 +101,9 @@ for node in doc.children:
         for child in item.children:
             if not isinstance(child, Paragraph) or not hasattr(child, "checked"):
                 continue
-            if child.checked is not False:   # True=checked, None=non-checkbox — both skip
+            if child.checked is not False:  # True=checked, None=non-checkbox — both skip
                 continue
-            text_parts = [
-                c.children.strip()
-                for c in child.children
-                if isinstance(c, RawText)
-            ]
+            text_parts = [c.children.strip() for c in child.children if isinstance(c, RawText)]
             text = " ".join(text_parts).strip()
             if text:
                 results.append(text)

@@ -95,9 +95,11 @@ if status == HTTP_TOO_MANY_REQUESTS:
 
 # WRONG: os.path
 import os
+
 path = os.path.join(base, "config.toml")
 
 # RIGHT: pathlib
 from pathlib import Path
+
 path = Path(base) / "config.toml"
 ```

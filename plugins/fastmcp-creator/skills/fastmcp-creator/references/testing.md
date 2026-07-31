@@ -16,10 +16,12 @@ from fastmcp.client import Client
 
 mcp = FastMCP("TestServer")
 
+
 @mcp.tool
 def greet(name: str) -> str:
     """Greet someone."""
     return f"Hello, {name}!"
+
 
 async def test_greet_tool():
     async with Client(mcp) as client:
@@ -59,6 +61,7 @@ import pytest
 from fastmcp import FastMCP
 from fastmcp.client import Client
 
+
 @pytest.fixture
 def weather_server():
     server = FastMCP("WeatherServer")
@@ -71,6 +74,7 @@ def weather_server():
 
     return server
 
+
 async def test_temperature_tool(weather_server):
     async with Client(weather_server) as client:
         result = await client.call_tool("get_temperature", {"city": "LA"})
@@ -82,10 +86,12 @@ Using the fixture-level client pattern (from `testing.mdx`):
 ```python
 from fastmcp.client.transports import FastMCPTransport
 
+
 @pytest.fixture
 async def main_mcp_client():
     async with Client(transport=mcp) as mcp_client:
         yield mcp_client
+
 
 async def test_list_tools(main_mcp_client: Client[FastMCPTransport]):
     tools = await main_mcp_client.list_tools()
@@ -102,30 +108,36 @@ from fastmcp.client import Client
 
 mcp = FastMCP("TestServer")
 
+
 @mcp.tool
 def add(x: int, y: int) -> int:
     """Add two numbers."""
     return x + y
+
 
 @mcp.resource("config://app")
 def app_config() -> dict:
     """Application configuration."""
     return {"version": "1.0", "debug": False}
 
+
 @mcp.prompt
 def review(code: str) -> str:
     """Review code."""
     return f"Please review:\n\n{code}"
+
 
 async def test_tool_call():
     async with Client(mcp) as client:
         result = await client.call_tool("add", {"x": 3, "y": 4})
         assert result.data == 7
 
+
 async def test_resource_read():
     async with Client(mcp) as client:
         result = await client.read_resource("config://app")
         assert result[0].text is not None
+
 
 async def test_prompt_get():
     async with Client(mcp) as client:
@@ -146,25 +158,20 @@ from fastmcp.client import Client
 
 mcp = FastMCP("MathServer")
 
+
 @mcp.tool
 def add(x: int, y: int) -> int:
     """Add two numbers."""
     return x + y
+
 
 @pytest.fixture
 async def mcp_client():
     async with Client(mcp) as client:
         yield client
 
-@pytest.mark.parametrize(
-    "x, y, expected",
-    [
-        (1, 2, 3),
-        (2, 3, 5),
-        (0, 0, 0),
-        (-1, 1, 0),
-    ],
-)
+
+@pytest.mark.parametrize("x, y, expected", [(1, 2, 3), (2, 3, 5), (0, 0, 0), (-1, 1, 0)])
 async def test_add(x: int, y: int, expected: int, mcp_client):
     result = await mcp_client.call_tool("add", {"x": x, "y": y})
     assert result.data == expected
@@ -182,10 +189,12 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("TestServer")
 
+
 @mcp.tool
 def calculate(amount: float, rate: float = 0.1) -> dict:
     """Calculate tax."""
     return {"amount": amount, "tax": amount * rate}
+
 
 async def test_tool_schema():
     tools = mcp.list_tools()
@@ -211,11 +220,14 @@ from fastmcp.client import Client
 
 mcp = FastMCP("TestServer")
 
+
 @mcp.tool
 def status() -> dict:
     """Return server status."""
     import datetime
+
     return {"status": "ok", "checked_at": datetime.datetime.now().isoformat()}
+
 
 async def test_status_tool():
     async with Client(mcp) as client:
@@ -238,14 +250,12 @@ from unittest.mock import AsyncMock
 from fastmcp import FastMCP
 from fastmcp.client import Client
 
+
 async def test_database_tool():
     server = FastMCP("DataServer")
 
     mock_db = AsyncMock()
-    mock_db.fetch_users.return_value = [
-        {"id": 1, "name": "Alice"},
-        {"id": 2, "name": "Bob"},
-    ]
+    mock_db.fetch_users.return_value = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}]
 
     @server.tool
     async def list_users() -> list:
@@ -268,6 +278,7 @@ RULE: Mock at the boundary — mock external services (databases, HTTP APIs), no
 import pytest
 from fastmcp import FastMCP
 from fastmcp.client import Client
+
 
 async def test_tool_raises_on_invalid_input():
     server = FastMCP("test-server")
@@ -296,6 +307,7 @@ from fastmcp import FastMCP, Client
 from fastmcp.client.transports import StreamableHttpTransport
 from fastmcp.utilities.tests import run_server_async
 
+
 def create_test_server() -> FastMCP:
     server = FastMCP("TestServer")
 
@@ -305,16 +317,16 @@ def create_test_server() -> FastMCP:
 
     return server
 
+
 @pytest.fixture
 async def http_server() -> str:
     server = create_test_server()
     async with run_server_async(server) as url:
         yield url
 
+
 async def test_http_transport(http_server: str):
-    async with Client(
-        transport=StreamableHttpTransport(http_server)
-    ) as client:
+    async with Client(transport=StreamableHttpTransport(http_server)) as client:
         result = await client.ping()
         assert result is True
         greeting = await client.call_tool("greet", {"name": "World"})
@@ -327,6 +339,7 @@ For subprocess isolation (e.g., STDIO transport testing), use `run_server_in_pro
 
 ```python
 from fastmcp.utilities.tests import run_server_in_process
+
 
 @pytest.fixture
 async def http_server():
@@ -344,18 +357,17 @@ RULE: Each test verifies exactly one behavior. When it fails, the name tells you
 
 ```python
 # Correct — name describes the specific behavior
-async def test_tool_returns_error_on_missing_parameter():
-    ...
+async def test_tool_returns_error_on_missing_parameter(): ...
 
-async def test_resource_returns_json_content():
-    ...
+
+async def test_resource_returns_json_content(): ...
+
 
 # Wrong — too vague, failure gives no signal
-async def test_server():
-    ...
+async def test_server(): ...
 
-async def test_tool():
-    ...
+
+async def test_tool(): ...
 ```
 
 ---

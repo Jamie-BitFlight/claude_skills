@@ -133,6 +133,7 @@ Use for applications targeting only Linux/Unix systems or requiring no dependenc
 
 ```python
 """XDG Base Directory compliant path management using stdlib only."""
+
 from pathlib import Path
 import os
 
@@ -143,10 +144,10 @@ def get_config_home() -> Path:
     Returns user-specific configuration directory.
     Falls back to $HOME/.config if XDG_CONFIG_HOME unset or relative.
     """
-    xdg = os.environ.get('XDG_CONFIG_HOME')
+    xdg = os.environ.get("XDG_CONFIG_HOME")
     if xdg and Path(xdg).is_absolute():
         return Path(xdg)
-    return Path.home() / '.config'
+    return Path.home() / ".config"
 
 
 def get_data_home() -> Path:
@@ -155,10 +156,10 @@ def get_data_home() -> Path:
     Returns user-specific data directory.
     Falls back to $HOME/.local/share if XDG_DATA_HOME unset or relative.
     """
-    xdg = os.environ.get('XDG_DATA_HOME')
+    xdg = os.environ.get("XDG_DATA_HOME")
     if xdg and Path(xdg).is_absolute():
         return Path(xdg)
-    return Path.home() / '.local' / 'share'
+    return Path.home() / ".local" / "share"
 
 
 def get_state_home() -> Path:
@@ -167,10 +168,10 @@ def get_state_home() -> Path:
     Returns user-specific state directory.
     Falls back to $HOME/.local/state if XDG_STATE_HOME unset or relative.
     """
-    xdg = os.environ.get('XDG_STATE_HOME')
+    xdg = os.environ.get("XDG_STATE_HOME")
     if xdg and Path(xdg).is_absolute():
         return Path(xdg)
-    return Path.home() / '.local' / 'state'
+    return Path.home() / ".local" / "state"
 
 
 def get_cache_home() -> Path:
@@ -179,10 +180,10 @@ def get_cache_home() -> Path:
     Returns user-specific cache directory.
     Falls back to $HOME/.cache if XDG_CACHE_HOME unset or relative.
     """
-    xdg = os.environ.get('XDG_CACHE_HOME')
+    xdg = os.environ.get("XDG_CACHE_HOME")
     if xdg and Path(xdg).is_absolute():
         return Path(xdg)
-    return Path.home() / '.cache'
+    return Path.home() / ".cache"
 
 
 def get_runtime_dir() -> Path | None:
@@ -191,7 +192,7 @@ def get_runtime_dir() -> Path | None:
     Returns user-specific runtime directory, or None if not set.
     This variable has no default - it must be set by the system.
     """
-    xdg = os.environ.get('XDG_RUNTIME_DIR')
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
     if xdg and Path(xdg).is_absolute():
         return Path(xdg)
     return None
@@ -203,12 +204,12 @@ def get_config_dirs() -> list[Path]:
     Returns preference-ordered list of system configuration directories.
     Falls back to [Path('/etc/xdg')] if XDG_CONFIG_DIRS unset.
     """
-    xdg = os.environ.get('XDG_CONFIG_DIRS')
+    xdg = os.environ.get("XDG_CONFIG_DIRS")
     if xdg:
-        paths = [Path(p) for p in xdg.split(':') if p and Path(p).is_absolute()]
+        paths = [Path(p) for p in xdg.split(":") if p and Path(p).is_absolute()]
         if paths:
             return paths
-    return [Path('/etc/xdg')]
+    return [Path("/etc/xdg")]
 
 
 def get_data_dirs() -> list[Path]:
@@ -217,12 +218,12 @@ def get_data_dirs() -> list[Path]:
     Returns preference-ordered list of system data directories.
     Falls back to [Path('/usr/local/share'), Path('/usr/share')] if unset.
     """
-    xdg = os.environ.get('XDG_DATA_DIRS')
+    xdg = os.environ.get("XDG_DATA_DIRS")
     if xdg:
-        paths = [Path(p) for p in xdg.split(':') if p and Path(p).is_absolute()]
+        paths = [Path(p) for p in xdg.split(":") if p and Path(p).is_absolute()]
         if paths:
             return paths
-    return [Path('/usr/local/share'), Path('/usr/share')]
+    return [Path("/usr/local/share"), Path("/usr/share")]
 ```
 
 ### Application-Specific Path Module
@@ -231,42 +232,43 @@ Create a dedicated paths module for your application:
 
 ```python
 """Path management for myapp following XDG specification."""
+
 from pathlib import Path
 import os
 
-APP_NAME = 'myapp'
+APP_NAME = "myapp"
 
 
 def get_config_dir() -> Path:
     """Get myapp config directory."""
-    xdg = os.environ.get('XDG_CONFIG_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.config'
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".config"
     return base / APP_NAME
 
 
 def get_config_file() -> Path:
     """Get myapp config file path."""
-    return get_config_dir() / 'config.toml'
+    return get_config_dir() / "config.toml"
 
 
 def get_data_dir() -> Path:
     """Get myapp data directory."""
-    xdg = os.environ.get('XDG_DATA_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.local' / 'share'
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".local" / "share"
     return base / APP_NAME
 
 
 def get_cache_dir() -> Path:
     """Get myapp cache directory."""
-    xdg = os.environ.get('XDG_CACHE_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.cache'
+    xdg = os.environ.get("XDG_CACHE_HOME")
+    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".cache"
     return base / APP_NAME
 
 
 def get_state_dir() -> Path:
     """Get myapp state directory."""
-    xdg = os.environ.get('XDG_STATE_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.local' / 'state'
+    xdg = os.environ.get("XDG_STATE_HOME")
+    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".local" / "state"
     return base / APP_NAME
 
 
@@ -282,11 +284,12 @@ For applications targeting Linux, macOS, and Windows, use the `platformdirs` lib
 
 ```python
 """Cross-platform path management using platformdirs."""
+
 from platformdirs import user_config_dir, user_data_dir, user_cache_dir, user_state_dir
 from pathlib import Path
 
-APP_NAME = 'myapp'
-APP_AUTHOR = 'myapp'  # Used on Windows
+APP_NAME = "myapp"
+APP_AUTHOR = "myapp"  # Used on Windows
 
 # Get platform-appropriate directories
 # Linux: Uses XDG specification
@@ -330,7 +333,7 @@ config_dir = Path(user_config_dir(APP_NAME, APP_AUTHOR, ensure_exists=True))
 
 ```python
 # ❌ WRONG
-config_file = Path.home() / '.myapp' / 'config.toml'
+config_file = Path.home() / ".myapp" / "config.toml"
 ```
 
 **Solution**: Use `~/.config/appname/`
@@ -338,11 +341,12 @@ config_file = Path.home() / '.myapp' / 'config.toml'
 ```python
 # ✅ CORRECT
 def get_config_dir() -> Path:
-    xdg = os.environ.get('XDG_CONFIG_HOME')
-    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.config'
-    return base / 'myapp'
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".config"
+    return base / "myapp"
 
-config_file = get_config_dir() / 'config.toml'
+
+config_file = get_config_dir() / "config.toml"
 ```
 
 ### 2. Ignoring Environment Variables
@@ -351,16 +355,16 @@ config_file = get_config_dir() / 'config.toml'
 
 ```python
 # ❌ WRONG
-config_dir = Path.home() / '.config' / 'myapp'
+config_dir = Path.home() / ".config" / "myapp"
 ```
 
 **Solution**: Always check environment variables first.
 
 ```python
 # ✅ CORRECT
-xdg = os.environ.get('XDG_CONFIG_HOME')
-base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / '.config'
-config_dir = base / 'myapp'
+xdg = os.environ.get("XDG_CONFIG_HOME")
+base = Path(xdg) if xdg and Path(xdg).is_absolute() else Path.home() / ".config"
+config_dir = base / "myapp"
 ```
 
 ### 3. Accepting Relative Paths
@@ -369,7 +373,7 @@ config_dir = base / 'myapp'
 
 ```python
 # ❌ WRONG
-xdg = os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))
+xdg = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
 return Path(xdg)  # Accepts relative paths
 ```
 
@@ -377,10 +381,10 @@ return Path(xdg)  # Accepts relative paths
 
 ```python
 # ✅ CORRECT
-xdg = os.environ.get('XDG_CONFIG_HOME')
+xdg = os.environ.get("XDG_CONFIG_HOME")
 if xdg and Path(xdg).is_absolute():
     return Path(xdg)
-return Path.home() / '.config'  # Default for unset or relative
+return Path.home() / ".config"  # Default for unset or relative
 ```
 
 ### 4. Missing Directory Creation
@@ -389,7 +393,7 @@ return Path.home() / '.config'  # Default for unset or relative
 
 ```python
 # ❌ WRONG
-config_file = get_config_dir() / 'config.toml'
+config_file = get_config_dir() / "config.toml"
 config_file.write_text(data)  # Fails if directory doesn't exist
 ```
 
@@ -397,7 +401,7 @@ config_file.write_text(data)  # Fails if directory doesn't exist
 
 ```python
 # ✅ CORRECT
-config_file = get_config_dir() / 'config.toml'
+config_file = get_config_dir() / "config.toml"
 config_file.parent.mkdir(parents=True, exist_ok=True)
 config_file.write_text(data)
 ```
@@ -408,14 +412,14 @@ config_file.write_text(data)
 
 ```python
 # ❌ WRONG
-cache_file = get_config_dir() / 'download_cache.json'
+cache_file = get_config_dir() / "download_cache.json"
 ```
 
 **Solution**: Use `$XDG_CACHE_HOME` for regenerable data.
 
 ```python
 # ✅ CORRECT
-cache_file = get_cache_dir() / 'download_cache.json'
+cache_file = get_cache_dir() / "download_cache.json"
 ```
 
 ### 6. Large Files in Runtime Directory
@@ -424,14 +428,14 @@ cache_file = get_cache_dir() / 'download_cache.json'
 
 ```python
 # ❌ WRONG
-large_file = get_runtime_dir() / 'model.gguf'  # May be 1GB+
+large_file = get_runtime_dir() / "model.gguf"  # May be 1GB+
 ```
 
 **Solution**: Use `$XDG_DATA_HOME` for large persistent files.
 
 ```python
 # ✅ CORRECT
-large_file = get_data_dir() / 'models' / 'model.gguf'
+large_file = get_data_dir() / "models" / "model.gguf"
 ```
 
 ### 7. Not Handling Unset `XDG_RUNTIME_DIR`
@@ -441,7 +445,7 @@ large_file = get_data_dir() / 'models' / 'model.gguf'
 ```python
 # ❌ WRONG
 runtime_dir = get_runtime_dir()
-socket_path = runtime_dir / 'socket'  # Fails if None
+socket_path = runtime_dir / "socket"  # Fails if None
 ```
 
 **Solution**: Check for None before using.
@@ -451,7 +455,7 @@ socket_path = runtime_dir / 'socket'  # Fails if None
 runtime_dir = get_runtime_dir()
 if runtime_dir is None:
     raise RuntimeError("XDG_RUNTIME_DIR not set by system")
-socket_path = runtime_dir / 'socket'
+socket_path = runtime_dir / "socket"
 ```
 
 ## Testing XDG Compliance
@@ -487,6 +491,7 @@ ls -la ~/.local/state/myapp/
 
 ```python
 """Test XDG compliance."""
+
 import os
 import tempfile
 from pathlib import Path
@@ -496,52 +501,52 @@ import pytest
 def test_xdg_config_home_override(monkeypatch):
     """XDG_CONFIG_HOME environment variable is respected."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setenv('XDG_CONFIG_HOME', tmpdir)
+        monkeypatch.setenv("XDG_CONFIG_HOME", tmpdir)
         config_dir = get_config_dir()
-        assert config_dir == Path(tmpdir) / 'myapp'
+        assert config_dir == Path(tmpdir) / "myapp"
 
 
 def test_xdg_config_home_default(monkeypatch):
     """Default used when XDG_CONFIG_HOME unset."""
-    monkeypatch.delenv('XDG_CONFIG_HOME', raising=False)
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     config_dir = get_config_dir()
-    assert config_dir == Path.home() / '.config' / 'myapp'
+    assert config_dir == Path.home() / ".config" / "myapp"
 
 
 def test_relative_path_ignored(monkeypatch):
     """Relative paths in XDG variables are ignored per specification."""
-    monkeypatch.setenv('XDG_CONFIG_HOME', 'relative/path')
+    monkeypatch.setenv("XDG_CONFIG_HOME", "relative/path")
     config_dir = get_config_dir()
     # Should fall back to default, not use relative path
-    assert config_dir == Path.home() / '.config' / 'myapp'
+    assert config_dir == Path.home() / ".config" / "myapp"
 
 
 def test_empty_string_uses_default(monkeypatch):
     """Empty string in XDG variable uses default."""
-    monkeypatch.setenv('XDG_CONFIG_HOME', '')
+    monkeypatch.setenv("XDG_CONFIG_HOME", "")
     config_dir = get_config_dir()
-    assert config_dir == Path.home() / '.config' / 'myapp'
+    assert config_dir == Path.home() / ".config" / "myapp"
 
 
 def test_runtime_dir_none_when_unset(monkeypatch):
     """XDG_RUNTIME_DIR returns None when unset (no default)."""
-    monkeypatch.delenv('XDG_RUNTIME_DIR', raising=False)
+    monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
     runtime_dir = get_runtime_dir()
     assert runtime_dir is None
 
 
 def test_config_dirs_search_path(monkeypatch):
     """XDG_CONFIG_DIRS parsed as colon-separated search path."""
-    monkeypatch.setenv('XDG_CONFIG_DIRS', '/etc/xdg:/opt/config')
+    monkeypatch.setenv("XDG_CONFIG_DIRS", "/etc/xdg:/opt/config")
     dirs = get_config_dirs()
-    assert dirs == [Path('/etc/xdg'), Path('/opt/config')]
+    assert dirs == [Path("/etc/xdg"), Path("/opt/config")]
 
 
 def test_data_dirs_ignores_relative_paths(monkeypatch):
     """XDG_DATA_DIRS filters out relative paths."""
-    monkeypatch.setenv('XDG_DATA_DIRS', '/usr/share:relative/path:/opt/data')
+    monkeypatch.setenv("XDG_DATA_DIRS", "/usr/share:relative/path:/opt/data")
     dirs = get_data_dirs()
-    assert dirs == [Path('/usr/share'), Path('/opt/data')]
+    assert dirs == [Path("/usr/share"), Path("/opt/data")]
 ```
 
 ## Example Directory Structure

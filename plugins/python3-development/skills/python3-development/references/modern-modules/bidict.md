@@ -45,7 +45,7 @@ bidict eliminates the need to manually maintain two separate dictionaries when y
 
 ```python
 # DON'T DO THIS - The naive approach
-mapping = {'H': 'hydrogen', 'hydrogen': 'H'}
+mapping = {"H": "hydrogen", "hydrogen": "H"}
 ```
 
 **Problems with this approach:**
@@ -62,9 +62,9 @@ mapping = {'H': 'hydrogen', 'hydrogen': 'H'}
 from bidict import bidict
 
 # The correct approach
-element_by_symbol = bidict({'H': 'hydrogen'})
-element_by_symbol['H']                    # 'hydrogen'
-element_by_symbol.inverse['hydrogen']     # 'H'
+element_by_symbol = bidict({"H": "hydrogen"})
+element_by_symbol["H"]  # 'hydrogen'
+element_by_symbol.inverse["hydrogen"]  # 'H'
 ```
 
 bidict maintains two separate internal dictionaries and keeps them automatically synchronized, providing:
@@ -166,19 +166,19 @@ No runtime dependencies outside Python's standard library.
 from bidict import bidict
 
 # Create from dict, keyword arguments, or items
-element_by_symbol = bidict({'H': 'hydrogen', 'He': 'helium'})
-element_by_symbol = bidict(H='hydrogen', He='helium')
-element_by_symbol = bidict([('H', 'hydrogen'), ('He', 'helium')])
+element_by_symbol = bidict({"H": "hydrogen", "He": "helium"})
+element_by_symbol = bidict(H="hydrogen", He="helium")
+element_by_symbol = bidict([("H", "hydrogen"), ("He", "helium")])
 
 # Forward lookup (key → value)
-element_by_symbol['H']  # 'hydrogen'
+element_by_symbol["H"]  # 'hydrogen'
 
 # Inverse lookup (value → key)
-element_by_symbol.inverse['hydrogen']  # 'H'
+element_by_symbol.inverse["hydrogen"]  # 'H'
 
 # Inverse is a full bidict, kept in sync
-element_by_symbol.inverse['helium'] = 'He'
-element_by_symbol['He']  # 'helium'
+element_by_symbol.inverse["helium"] = "He"
+element_by_symbol["He"]  # 'helium'
 ```
 
 Source: @[docs/intro.rst, docs/basic-usage.rst]
@@ -188,16 +188,16 @@ Source: @[docs/intro.rst, docs/basic-usage.rst]
 ```python
 from bidict import bidict, ValueDuplicationError
 
-b = bidict({'one': 1})
+b = bidict({"one": 1})
 
 # This raises an error - value 1 already exists
 try:
-    b['two'] = 1
+    b["two"] = 1
 except ValueDuplicationError:
     print("Value 1 is already mapped to 'one'")
 
 # Explicitly allow overwriting with forceput()
-b.forceput('two', 1)
+b.forceput("two", 1)
 # Result: bidict({'two': 1}) - 'one' was removed
 ```
 
@@ -208,19 +208,19 @@ Source: @[docs/basic-usage.rst: "Values Must Be Unique"]
 ```python
 from bidict import bidict
 
-b = bidict(H='hydrogen', He='helium')
+b = bidict(H="hydrogen", He="helium")
 
 # All standard dict methods work
-'H' in b                          # True
-b.get('Li', 'not found')          # 'not found'
-b.pop('He')                       # 'helium'
-b.update({'Li': 'lithium'})       # Add items
-len(b)                            # 2
+"H" in b  # True
+b.get("Li", "not found")  # 'not found'
+b.pop("He")  # 'helium'
+b.update({"Li": "lithium"})  # Add items
+len(b)  # 2
 
 # Iteration yields only keys (not keys+values like naive approach)
-list(b.keys())                    # ['H', 'Li']
-list(b.values())                  # ['hydrogen', 'lithium']
-list(b.items())                   # [('H', 'hydrogen'), ('Li', 'lithium')]
+list(b.keys())  # ['H', 'Li']
+list(b.values())  # ['hydrogen', 'lithium']
+list(b.items())  # [('H', 'hydrogen'), ('Li', 'lithium')]
 ```
 
 Source: @[docs/basic-usage.rst: "Interop"]
@@ -233,10 +233,10 @@ Source: @[docs/basic-usage.rst: "Interop"]
 from bidict import frozenbidict, OrderedBidict
 
 # Immutable bidict (hashable, can be dict key or set member)
-immutable = frozenbidict({'H': 'hydrogen'})
+immutable = frozenbidict({"H": "hydrogen"})
 
 # Ordered bidict (maintains insertion order, like dict in Python 3.7+)
-ordered = OrderedBidict({'H': 'hydrogen', 'He': 'helium'})
+ordered = OrderedBidict({"H": "hydrogen", "He": "helium"})
 ```
 
 Source: @[docs/other-bidict-types.rst]
@@ -246,14 +246,14 @@ Source: @[docs/other-bidict-types.rst]
 ```python
 from bidict import bidict, OnDup, RAISE, DROP_OLD
 
-b = bidict({1: 'one'})
+b = bidict({1: "one"})
 
 # Strict mode - raise on any key or value duplication
-b.put(2, 'two', on_dup=OnDup(key=RAISE, val=RAISE))
+b.put(2, "two", on_dup=OnDup(key=RAISE, val=RAISE))
 
 # Custom policies for different duplication scenarios
 on_dup = OnDup(key=DROP_OLD, val=RAISE)
-b.putall([(1, 'uno'), (2, 'dos')], on_dup=on_dup)
+b.putall([(1, "uno"), (2, "dos")], on_dup=on_dup)
 ```
 
 Source: @[docs/basic-usage.rst: "Key and Value Duplication"]
@@ -263,11 +263,11 @@ Source: @[docs/basic-usage.rst: "Key and Value Duplication"]
 ```python
 from bidict import bidict
 
-b = bidict({1: 'one', 2: 'two'})
+b = bidict({1: "one", 2: "two"})
 
 # If an update fails, the bidict is unchanged
 try:
-    b.putall({3: 'three', 1: 'uno'})  # 1 is duplicate key
+    b.putall({3: "three", 1: "uno"})  # 1 is duplicate key
 except KeyDuplicationError:
     pass
 
@@ -287,17 +287,13 @@ Based on analysis of the bidict repository and documentation:
 from bidict import bidict
 
 # Chemical elements
-element_by_symbol = bidict({
-    'H': 'hydrogen',
-    'He': 'helium',
-    'Li': 'lithium'
-})
+element_by_symbol = bidict({"H": "hydrogen", "He": "helium", "Li": "lithium"})
 
 # Look up element by symbol
-element_by_symbol['H']  # 'hydrogen'
+element_by_symbol["H"]  # 'hydrogen'
 
 # Look up symbol by element name
-element_by_symbol.inverse['lithium']  # 'Li'
+element_by_symbol.inverse["lithium"]  # 'Li'
 ```
 
 ### Pattern 2: ID-to-Object Mappings
@@ -306,16 +302,13 @@ element_by_symbol.inverse['lithium']  # 'Li'
 from bidict import bidict
 
 # User session management
-session_by_user_id = bidict({
-    1001: 'session_abc123',
-    1002: 'session_def456'
-})
+session_by_user_id = bidict({1001: "session_abc123", 1002: "session_def456"})
 
 # Find session by user ID
 session_by_user_id[1001]  # 'session_abc123'
 
 # Find user ID by session
-session_by_user_id.inverse['session_abc123']  # 1001
+session_by_user_id.inverse["session_abc123"]  # 1001
 ```
 
 ### Pattern 3: Internationalization/Translation
@@ -324,17 +317,13 @@ session_by_user_id.inverse['session_abc123']  # 1001
 from bidict import bidict
 
 # Language code mappings
-lang_code = bidict({
-    'en': 'English',
-    'es': 'Español',
-    'fr': 'Français'
-})
+lang_code = bidict({"en": "English", "es": "Español", "fr": "Français"})
 
 # Look up language name from code
-lang_code['es']  # 'Español'
+lang_code["es"]  # 'Español'
 
 # Look up code from language name
-lang_code.inverse['Français']  # 'fr'
+lang_code.inverse["Français"]  # 'fr'
 ```
 
 ### Pattern 4: File Path-to-Identifier Mappings
@@ -343,16 +332,13 @@ lang_code.inverse['Français']  # 'fr'
 from bidict import bidict
 
 # File tracking system
-file_by_id = bidict({
-    'f001': '/path/to/document.pdf',
-    'f002': '/path/to/image.png'
-})
+file_by_id = bidict({"f001": "/path/to/document.pdf", "f002": "/path/to/image.png"})
 
 # Get path from ID
-file_by_id['f001']  # '/path/to/document.pdf'
+file_by_id["f001"]  # '/path/to/document.pdf'
 
 # Get ID from path
-file_by_id.inverse['/path/to/image.png']  # 'f002'
+file_by_id.inverse["/path/to/image.png"]  # 'f002'
 ```
 
 ## Integration Patterns
@@ -363,13 +349,15 @@ file_by_id.inverse['/path/to/image.png']  # 'f002'
 from typing import Mapping
 from bidict import bidict
 
+
 def process_mapping(data: Mapping[str, int]) -> None:
     # bidict is a full Mapping implementation
     for key, value in data.items():
         print(f"{key}: {value}")
 
+
 # Works seamlessly
-process_mapping(bidict({'a': 1, 'b': 2}))
+process_mapping(bidict({"a": 1, "b": 2}))
 ```
 
 ### With collections.abc
@@ -383,8 +371,10 @@ bidict implements:
 from collections.abc import MutableMapping
 from bidict import bidict
 
+
 def validate_mapping(m: MutableMapping) -> bool:
     return isinstance(m, MutableMapping)
+
 
 validate_mapping(bidict())  # True
 ```
@@ -395,11 +385,11 @@ validate_mapping(bidict())  # True
 from bidict import bidict
 
 # bidict compares equal to dicts with same items
-bidict(a=1, b=2) == {'a': 1, 'b': 2}  # True
+bidict(a=1, b=2) == {"a": 1, "b": 2}  # True
 
 # Can convert freely between dict and bidict
-dict(bidict(a=1))    # {'a': 1}
-bidict(dict(a=1))    # bidict({'a': 1})
+dict(bidict(a=1))  # {'a': 1}
+bidict(dict(a=1))  # bidict({'a': 1})
 ```
 
 Source: @[docs/basic-usage.rst: "Interop"]
@@ -438,9 +428,9 @@ Source: @[docs/basic-usage.rst: "Values Must Be Hashable", "Values Must Be Uniqu
 # BAD: Multiple keys mapping to same value
 # This won't work with bidict - use dict instead
 category_to_items = {
-    'fruit': 'apple',
-    'vegetable': 'carrot',
-    'fruit': 'banana'  # Duplicate value for different key
+    "fruit": "apple",
+    "vegetable": "carrot",
+    "fruit": "banana",  # Duplicate value for different key
 }
 ```
 
@@ -450,14 +440,14 @@ category_to_items = {
 # BAD: Lists as values
 # This raises TypeError with bidict
 groups = bidict({
-    'admins': ['alice', 'bob'],    # TypeError: unhashable type: 'list'
-    'users': ['charlie', 'david']
+    "admins": ["alice", "bob"],  # TypeError: unhashable type: 'list'
+    "users": ["charlie", "david"],
 })
 
 # Use regular dict or use frozenset/tuple as values
 groups = bidict({
-    'admins': frozenset(['alice', 'bob']),  # OK
-    'users': frozenset(['charlie', 'david'])
+    "admins": frozenset(["alice", "bob"]),  # OK
+    "users": frozenset(["charlie", "david"]),
 })
 ```
 
@@ -465,7 +455,7 @@ groups = bidict({
 
 ```python
 # If you only need inverse lookup occasionally, manual approach may be simpler
-forward = {'key1': 'value1', 'key2': 'value2'}
+forward = {"key1": "value1", "key2": "value2"}
 
 # Occasionally create inverse when needed
 inverse = {v: k for k, v in forward.items()}
@@ -516,31 +506,33 @@ Source: @[README.rst: "Features", "Enterprise Support"]
 
 ```python
 # Before: Manual synchronization
-forward = {'H': 'hydrogen'}
-inverse = {'hydrogen': 'H'}
+forward = {"H": "hydrogen"}
+inverse = {"hydrogen": "H"}
 
 # When updating
-forward['H'] = 'hydrogène'
-del inverse['hydrogen']  # Manual cleanup
-inverse['hydrogène'] = 'H'
+forward["H"] = "hydrogène"
+del inverse["hydrogen"]  # Manual cleanup
+inverse["hydrogène"] = "H"
 
 # After: Automatic synchronization
 from bidict import bidict
-mapping = bidict({'H': 'hydrogen'})
-mapping['H'] = 'hydrogène'  # inverse automatically updated
+
+mapping = bidict({"H": "hydrogen"})
+mapping["H"] = "hydrogène"  # inverse automatically updated
 ```
 
 ### From Naive Single Dict
 
 ```python
 # Before: Mixed keys and values
-mixed = {'H': 'hydrogen', 'hydrogen': 'H'}
+mixed = {"H": "hydrogen", "hydrogen": "H"}
 len(mixed)  # 2 (wrong - should be 1 association)
 list(mixed.keys())  # ['H', 'hydrogen'] (values mixed in)
 
 # After: Clean separation
 from bidict import bidict
-b = bidict({'H': 'hydrogen'})
+
+b = bidict({"H": "hydrogen"})
 len(b)  # 1 (correct)
 list(b.keys())  # ['H'] (only keys)
 list(b.values())  # ['hydrogen'] (only values)

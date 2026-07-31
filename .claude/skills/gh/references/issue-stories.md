@@ -126,11 +126,7 @@ repo = gh.get_repo("Jamie-BitFlight/claude_skills")
 issue = repo.create_issue(
     title="fix: correct task_output variable in log_functions.sh",
     body="## Story\n\nAs a developer...",
-    labels=[
-        repo.get_label("priority:p1"),
-        repo.get_label("type:bug"),
-        repo.get_label("status:needs-grooming"),
-    ],
+    labels=[repo.get_label("priority:p1"), repo.get_label("type:bug"), repo.get_label("status:needs-grooming")],
     milestone=repo.get_milestone(1),
 )
 print(f"Created #{issue.number}: {issue.html_url}")

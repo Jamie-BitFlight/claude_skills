@@ -50,9 +50,11 @@ Use behavioral naming that describes what is being tested:
 ```python
 # Pattern: test_{function}_{scenario}_{expected_result}
 
+
 def test_validate_email_with_invalid_format_raises_validation_error():
     """Validate that malformed emails are rejected."""
     ...
+
 
 def test_process_payment_when_insufficient_funds_returns_declined():
     """Payment processing declines when balance is insufficient."""
@@ -104,6 +106,7 @@ def test_user_registration_creates_account():
 ```python
 from hypothesis import given, strategies as st
 
+
 @given(st.lists(st.integers()))
 def test_sort_maintains_length(data):
     """Sorting preserves all elements."""
@@ -145,6 +148,7 @@ Use factories for complex test objects:
 ```python
 import factory
 from datetime import datetime, UTC
+
 
 class UserFactory(factory.Factory):
     class Meta:

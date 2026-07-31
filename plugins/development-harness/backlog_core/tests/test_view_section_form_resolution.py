@@ -237,9 +237,10 @@ class TestSectionsDictFilterIsCaseInsensitive:
 
         sections = filtered.get("sections")
         assert isinstance(sections, dict), "filtered response 'sections' must be a dict."
-        assert "RT-ICA" in sections, (
+        section_keys: list[str] = [key for key in sections if isinstance(key, str)]
+        assert "RT-ICA" in section_keys, (
             "a lowercase 'rt-ica' request must keep the case-differing 'RT-ICA' structured key — "
-            f"the dict filter must be case-insensitive like the body filter; got keys {sorted(sections)}. Codex P2."
+            f"the dict filter must be case-insensitive like the body filter; got keys {sorted(section_keys)}. Codex P2."
         )
         assert "rt-ica body" in str(filtered.get("body", "")), (
             "the body arm narrows case-insensitively; the narrowed RT-ICA slice must be present."
@@ -263,9 +264,10 @@ class TestSectionsDictFilterIsCaseInsensitive:
 
         sections = filtered.get("sections")
         assert isinstance(sections, dict), "filtered response 'sections' must be a dict."
-        assert "rt-ica" in sections, (
+        section_keys: list[str] = [key for key in sections if isinstance(key, str)]
+        assert "rt-ica" in section_keys, (
             "an uppercase 'RT-ICA' request must keep the lowercase 'rt-ica' structured key; "
-            f"got keys {sorted(sections)}. Codex P2."
+            f"got keys {sorted(section_keys)}. Codex P2."
         )
         assert "lower header body" in str(filtered.get("body", "")), (
             "the case-insensitive body arm must narrow to the matching lowercase header slice."

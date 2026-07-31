@@ -145,10 +145,7 @@ Default columns:
 from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
 
 progress = Progress(
-    TextColumn("[progress.description]{task.description}"),
-    BarColumn(),
-    TaskProgressColumn(),
-    TimeRemainingColumn(),
+    TextColumn("[progress.description]{task.description}"), BarColumn(), TaskProgressColumn(), TimeRemainingColumn()
 )
 ```
 
@@ -157,11 +154,7 @@ Extend defaults with additional columns:
 ```python
 from rich.progress import Progress, SpinnerColumn, TimeElapsedColumn
 
-progress = Progress(
-    SpinnerColumn(),
-    *Progress.get_default_columns(),
-    TimeElapsedColumn(),
-)
+progress = Progress(SpinnerColumn(), *Progress.get_default_columns(), TimeElapsedColumn())
 ```
 
 Available column classes:

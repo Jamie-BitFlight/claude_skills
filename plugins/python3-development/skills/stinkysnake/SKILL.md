@@ -367,8 +367,10 @@ APIResponse: TypeAlias = dict[str, JSONValue]
 # src/protocols.py
 from typing import Protocol
 
+
 class Handler(Protocol):
     def handle(self, data: bytes) -> None: ...
+
 
 class Serializable(Protocol):
     def to_dict(self) -> dict[str, Any]: ...
@@ -379,6 +381,7 @@ class Serializable(Protocol):
 ```python
 # src/schemas.py
 from typing import TypedDict, NotRequired
+
 
 class UserData(TypedDict):
     name: str
@@ -391,6 +394,7 @@ class UserData(TypedDict):
 ```python
 # src/models.py
 from dataclasses import dataclass
+
 
 @dataclass
 class User:

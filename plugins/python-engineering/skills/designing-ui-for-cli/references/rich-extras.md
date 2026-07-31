@@ -34,10 +34,10 @@ from rich.syntax import Syntax
 
 console = Console()
 
-code = '''
+code = """
 def hello():
     print("Hello, World!")
-'''
+"""
 
 syntax = Syntax(code, "python", theme="monokai", line_numbers=True)
 console.print(syntax)

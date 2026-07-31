@@ -12,11 +12,13 @@ This skill helps you build sophisticated Text User Interfaces (TUIs) using Textu
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Label
 
+
 class MyApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Label("Hello, Textual!")
         yield Footer()
+
 
 if __name__ == "__main__":
     app = MyApp()

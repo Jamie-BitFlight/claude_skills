@@ -577,11 +577,12 @@ import typer
 
 app = typer.Typer()
 
+
 @app.command()
-def hello(name: str = "World",
-          greeting: str = typer.Option("Hello", help="Greeting to use")):
+def hello(name: str = "World", greeting: str = typer.Option("Hello", help="Greeting to use")):
     """Say hello to someone."""
     typer.echo(f"{greeting}, {name}!")
+
 
 @app.command()
 def goodbye(name: str = "World", formal: bool = False):

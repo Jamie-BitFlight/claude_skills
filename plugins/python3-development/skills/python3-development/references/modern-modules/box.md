@@ -26,16 +26,7 @@ Without python-box, working with nested dictionaries requires verbose bracket no
 
 ```python
 # Standard dict - verbose and error-prone
-config = {
-    "database": {
-        "host": "localhost",
-        "port": 5432,
-        "credentials": {
-            "username": "admin",
-            "password": "secret"
-        }
-    }
-}
+config = {"database": {"host": "localhost", "port": 5432, "credentials": {"username": "admin", "password": "secret"}}}
 
 # Accessing nested values - clunky syntax
 db_host = config["database"]["host"]
@@ -54,14 +45,7 @@ With python-box, you get clean dot notation and safe defaults:
 from box import Box
 
 config = Box({
-    "database": {
-        "host": "localhost",
-        "port": 5432,
-        "credentials": {
-            "username": "admin",
-            "password": "secret"
-        }
-    }
+    "database": {"host": "localhost", "port": 5432, "credentials": {"username": "admin", "password": "secret"}}
 })
 
 # Clean dot notation access
@@ -70,6 +54,7 @@ db_user = config.database.credentials.username
 
 # Safe access with defaults (using DefaultBox)
 from box import DefaultBox
+
 config = DefaultBox(config, default_box=True)
 timeout = config.database.timeout or 30  # No KeyError
 ```
@@ -123,12 +108,7 @@ pip install python-box[all]~=7.0 --force
 from box import Box
 
 # Create from dict
-movie_box = Box({
-    "Robin Hood: Men in Tights": {
-        "imdb_stars": 6.7,
-        "length": 104
-    }
-})
+movie_box = Box({"Robin Hood: Men in Tights": {"imdb_stars": 6.7, "length": 104}})
 
 # Automatic key conversion for dot notation
 # Spaces become underscores, special chars removed
@@ -138,8 +118,7 @@ movie_box.Robin_Hood_Men_in_Tights.imdb_stars  # 6.7
 movie_box["Robin Hood: Men in Tights"]["length"]  # 104
 
 # Both are equivalent
-assert movie_box.Robin_Hood_Men_in_Tights.imdb_stars == \
-       movie_box["Robin Hood: Men in Tights"]["imdb_stars"]
+assert movie_box.Robin_Hood_Men_in_Tights.imdb_stars == movie_box["Robin Hood: Men in Tights"]["imdb_stars"]
 ```
 
 ### 2. Configuration Management with ConfigBox
@@ -150,22 +129,8 @@ import os
 
 # Load environment-specific configuration
 config_data = {
-    "development": {
-        "database": {
-            "host": "localhost",
-            "port": 5432,
-            "pool_size": 5
-        },
-        "debug": True
-    },
-    "production": {
-        "database": {
-            "host": "prod-db.server.com",
-            "port": 5432,
-            "pool_size": 20
-        },
-        "debug": False
-    }
+    "development": {"database": {"host": "localhost", "port": 5432, "pool_size": 5}, "debug": True},
+    "production": {"database": {"host": "prod-db.server.com", "port": 5432, "pool_size": 20}, "debug": False},
 }
 
 # Select environment
@@ -199,6 +164,7 @@ config.to_yaml(filename="output.yaml")
 
 # To dict (for standard JSON serialization)
 import json
+
 json.dumps(config.to_dict())
 ```
 
@@ -250,20 +216,20 @@ from box import Box, BoxList
 
 # CamelKillerBox - converts camelCase to snake_case
 from box import Box
+
 config = Box({"apiEndpoint": "https://api.example.com"}, camel_killer_box=True)
 config.api_endpoint  # Works!
 
 # BoxList - list of Box objects
 from box import BoxList
-users = BoxList([
-    {"name": "Alice", "age": 30},
-    {"name": "Bob", "age": 25}
-])
+
+users = BoxList([{"name": "Alice", "age": 30}, {"name": "Bob", "age": 25}])
 users[0].name  # "Alice"
-users[1].age   # 25
+users[1].age  # 25
 
 # Box with dots in keys
 from box import Box
+
 config = Box({"api.version": "v2"}, box_dots=True)
 config["api.version"]  # Access with dots in key
 ```
@@ -277,10 +243,12 @@ config["api.version"]  # Access with dots in key
 from box import ConfigBox
 from pathlib import Path
 
+
 def load_config(env: str = "development") -> ConfigBox:
     """Load environment-specific configuration."""
     config_path = Path(__file__).parent / f"{env}.yaml"
     return ConfigBox.from_yaml(filename=config_path)
+
 
 # usage
 config = load_config(os.getenv("ENVIRONMENT", "development"))
@@ -313,19 +281,21 @@ import argparse
 from box import Box
 
 parser = argparse.ArgumentParser()
-parser.add_argument('floats', metavar='N', type=float, nargs='+')
+parser.add_argument("floats", metavar="N", type=float, nargs="+")
 parser.add_argument("-v", "--verbosity", action="count", default=0)
 
 # Parse into Box instead of Namespace
-args = parser.parse_args(['1', '2', '3', '-vv'], namespace=Box())
+args = parser.parse_args(["1", "2", "3", "-vv"], namespace=Box())
 
 # Can now use as dict or object
-print(args.floats)      # [1.0, 2.0, 3.0]
-print(args.verbosity)   # 2
+print(args.floats)  # [1.0, 2.0, 3.0]
+print(args.verbosity)  # 2
+
 
 # Easy to pass as kwargs
 def process(**kwargs):
     print(kwargs)
+
 
 process(**args.to_dict())
 ```
@@ -372,7 +342,7 @@ db_conn = connect(
     host=config.database.host,
     port=config.database.port,
     user=config.database.credentials.username,
-    password=config.database.credentials.password
+    password=config.database.credentials.password,
 )
 ```
 
@@ -611,6 +581,7 @@ mutable_config.debug = False  # Works
 ```python
 from box import Box
 
+
 # Problem: Creating Box in tight loops
 def process_items(items):
     results = []
@@ -618,6 +589,7 @@ def process_items(items):
         item_box = Box(item)  # Overhead per iteration!
         results.append(item_box.process())
     return results
+
 
 # Solution: Convert once, or avoid Box in hot path
 def process_items_better(items):

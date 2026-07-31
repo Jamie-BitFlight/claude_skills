@@ -69,6 +69,7 @@ expression = "get_version()"
 def get_version():
     """Calculate version based on current date."""
     from datetime import datetime
+
     now = datetime.now()
     return f"{now.year}.{now.month}.{now.day}"
 ```
@@ -90,6 +91,7 @@ import os
 import subprocess
 from pathlib import Path
 
+
 def determine_version():
     """Determine version from multiple sources."""
 
@@ -100,10 +102,7 @@ def determine_version():
     # 2. Try to get from git tag
     try:
         result = subprocess.run(
-            ["git", "describe", "--tags", "--exact-match"],
-            capture_output=True,
-            text=True,
-            check=True
+            ["git", "describe", "--tags", "--exact-match"], capture_output=True, text=True, check=True
         )
         return result.stdout.strip().lstrip("v")
     except subprocess.CalledProcessError:
@@ -127,16 +126,20 @@ Include build metadata in your version:
 import os
 import subprocess
 
+
 def get_git_revision():
     """Get current git revision."""
     try:
-        revision = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL
-        ).decode("utf-8").strip()
+        revision = (
+            subprocess
+            .check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+            .decode("utf-8")
+            .strip()
+        )
         return revision
     except:
         return "unknown"
+
 
 def get_version():
     """Get version with build metadata."""
@@ -148,6 +151,7 @@ def get_version():
     # Add git revision for dev builds
     revision = get_git_revision()
     return f"{base_version}+git.{revision}"
+
 
 __version__ = get_version()
 ```
@@ -188,9 +192,9 @@ The code source populates certain global variables when executing your version c
 
 ```python
 # These are available in your version file
-print(__name__)     # "__main__" during version resolution
-print(__file__)     # Absolute path to the version file
-print(__cached__)   # None
+print(__name__)  # "__main__" during version resolution
+print(__file__)  # Absolute path to the version file
+print(__cached__)  # None
 ```
 
 Example using globals:
@@ -219,15 +223,18 @@ from pathlib import Path
 
 VERSION_FILE = Path(__file__).parent / "VERSION.json"
 
+
 def get_version():
     """Read version from JSON file."""
     with open(VERSION_FILE) as f:
         return json.load(f)["version"]
 
+
 def set_version(new_version):
     """Write version to JSON file."""
     with open(VERSION_FILE, "w") as f:
         json.dump({"version": new_version}, f, indent=2)
+
 
 __version__ = get_version()
 ```
@@ -251,6 +258,7 @@ The code source imports and executes Python code, which can be slow:
 import numpy as np
 import pandas as pd
 
+
 def get_version():
     # Complex computation
     return calculate_version_somehow()
@@ -271,15 +279,13 @@ Implement caching for expensive operations:
 import functools
 import subprocess
 
+
 @functools.lru_cache(maxsize=1)
 def get_git_version():
     """Cache git version to avoid repeated subprocess calls."""
-    result = subprocess.run(
-        ["git", "describe", "--tags"],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["git", "describe", "--tags"], capture_output=True, text=True)
     return result.stdout.strip()
+
 
 __version__ = get_git_version()
 ```
@@ -294,6 +300,7 @@ Handle missing optional dependencies gracefully:
 # version.py
 try:
     import git  # Optional dependency
+
     repo = git.Repo(".")
     __version__ = repo.git.describe("--tags")
 except ImportError:
@@ -309,11 +316,13 @@ Provide fallbacks for missing files:
 ```python
 from pathlib import Path
 
+
 def get_version():
     version_file = Path("VERSION")
     if version_file.exists():
         return version_file.read_text().strip()
     return "0.0.0+dev"
+
 
 __version__ = get_version()
 ```
@@ -326,9 +335,11 @@ __version__ = get_version()
 # version.py
 from datetime import datetime
 
+
 def get_version():
     now = datetime.now()
     return f"{now.year}.{now.month}.{now.day}"
+
 
 __version__ = get_version()
 ```
@@ -339,11 +350,13 @@ __version__ = get_version()
 # version.py
 import os
 
+
 def get_version():
     base = "1.2.3"
     if build_number := os.environ.get("BUILD_NUMBER"):
         return f"{base}+build.{build_number}"
     return base
+
 
 __version__ = get_version()
 ```
@@ -355,17 +368,19 @@ __version__ = get_version()
 import os
 from pathlib import Path
 
+
 def get_version():
     # Priority order: env var > file > default
     sources = [
         lambda: os.environ.get("VERSION"),
         lambda: Path("VERSION").read_text().strip() if Path("VERSION").exists() else None,
-        lambda: "0.0.0+dev"
+        lambda: "0.0.0+dev",
     ]
 
     for source in sources:
         if version := source():
             return version
+
 
 __version__ = get_version()
 ```
@@ -378,6 +393,7 @@ __version__ = get_version()
 # version.py
 import os
 
+
 def get_version():
     # Different version for different CI systems
     if os.environ.get("GITHUB_ACTIONS"):
@@ -389,6 +405,7 @@ def get_version():
     else:
         return "1.2.3+dev"
 
+
 __version__ = get_version()
 ```
 
@@ -398,10 +415,12 @@ __version__ = get_version()
 # version.py
 import importlib.resources as resources
 
+
 def get_version():
     # Read version from package resource
     version_bytes = resources.read_text("my_package.data", "VERSION")
     return version_bytes.strip()
+
 
 __version__ = get_version()
 ```
@@ -432,6 +451,7 @@ __version__ = get_version()
 
 # Debug version file
 import sys
+
 print("Python path:", sys.path)
 print("Searching in:", search_paths)
 ```
@@ -451,6 +471,7 @@ Error: NameError: name '__version__' is not defined
 ```python
 # Problem: hatch version patch doesn't update
 # Solution: Implement set_version function
+
 
 def set_version(new_version):
     """This function is required for version updates."""

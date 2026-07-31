@@ -251,10 +251,12 @@ fi
 In Python scripts you can now check for it:
 
 ```python
-token = os.environ.get("CI_PUBLISH_TOKEN") or \
-        os.environ.get("GITLAB_TOKEN") or \
-        os.environ.get("GL_TOKEN") or \
-        os.environ.get("CI_JOB_TOKEN")
+token = (
+    os.environ.get("CI_PUBLISH_TOKEN")
+    or os.environ.get("GITLAB_TOKEN")
+    or os.environ.get("GL_TOKEN")
+    or os.environ.get("CI_JOB_TOKEN")
+)
 ```
 
 ## Token Details

@@ -109,6 +109,9 @@ async def _run_single_sync(state: SyncState, full_refresh: bool = False) -> None
     await asyncio.to_thread(
         operations.refresh_local_cache_from_github, full_refresh=full_refresh, progress_callback=callback
     )
+    # The progress callback marshals mutations via loop.call_soon_threadsafe.
+    # Yield once so those callbacks run before we mark the sync complete.
+    await asyncio.sleep(0)
     now = datetime.now(UTC)
     state.status = SyncStatus.IDLE
     state.completed_at = now

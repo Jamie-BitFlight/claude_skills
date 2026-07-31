@@ -54,25 +54,33 @@ Functions that previously used `typer.echo()` for status/progress messages must 
 # In models.py — ALL models use Pydantic BaseModel
 from pydantic import BaseModel, Field
 
+
 class Entry(BaseModel):
     """Timestamped addressable content entry within a section."""
-    id: str                        # ISO timestamp used as primary key
+
+    id: str  # ISO timestamp used as primary key
     content: str
     struck: bool = False
     struck_at: str = ""
     struck_reason: str = ""
 
+
 class Section(BaseModel):
     """A section containing a list of timestamped entries."""
+
     entries: list[Entry] = Field(default_factory=list)
+
 
 class GroomedData(BaseModel):
     """Structured groomed section with a date and named subsections."""
+
     date: str = ""
     subsections: dict[str, str] = Field(default_factory=dict)
 
+
 class BacklogItem(BaseModel):
     """Parsed backlog item — replaces untyped dict."""
+
     title: str = ""
     description: str = ""
     source: str = "Not specified"
@@ -88,10 +96,12 @@ class BacklogItem(BaseModel):
     last_synced: str = ""
     sections: dict[str, Section | GroomedData] = Field(default_factory=dict)
 
+
 # Notes:
 # - `file_path` and `skip` are excluded from YAML serialisation (yaml_io.save_item).
 # - `sections` holds Entry-bearing sections ("fact_check", "rt_ica", "issue_classification")
 #   plus a "groomed" key (GroomedData). Populated by github_sync.parse_issue_body.
+
 
 class Output(BaseModel):
     messages: list[str] = Field(default_factory=list)
@@ -101,6 +111,7 @@ class Output(BaseModel):
     def info(self, msg: str) -> None: ...
     def warn(self, msg: str) -> None: ...
     def error(self, msg: str) -> None: ...
+
 
 # Also: IssueStatus, PullRequestRef, ViewItemResult, IssueLocalFields
 ```

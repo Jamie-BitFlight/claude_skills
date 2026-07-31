@@ -215,7 +215,7 @@ The artifact manifest is a structured registry for generated artifacts. It provi
 
 ### Storage
 
-The manifest is stored in the GitHub Issue body between HTML comment delimiters:
+In the default GitHub artifact deployment, the manifest is stored in the GitHub Issue body between HTML comment delimiters:
 
 ```html
 <!-- ARTIFACT_MANIFEST_START -->
@@ -245,15 +245,15 @@ Each entry records the artifact `type`, filesystem `path`, `status` (current, su
 
 ### Source of Truth
 
-GitHub is the source of truth for the manifest. Local plan files under `~/.dh/projects/{slug}/plan/` are the content cache — they hold the artifact content itself, but the manifest in the issue body is the authoritative registry of what artifacts exist, their types, and their status.
+The active artifact provider is the source of truth for the manifest. In the default GitHub artifact deployment, local plan files under `~/.dh/projects/{slug}/plan/` are the content cache and the manifest in the issue body is the authoritative registry of what artifacts exist, their types, and their status. Other providers use their configured native manifest store.
 
 ### Producer Registration
 
-Producer agents register artifacts via the `artifact_register` MCP tool after writing a plan artifact to disk. Registration adds an entry to the manifest in the GitHub Issue body. This ensures that every generated artifact is discoverable without filesystem scanning.
+Producer agents register artifacts via the `artifact_register` MCP tool after writing a plan artifact to disk. Registration adds an entry to the manifest in the active artifact provider (the GitHub Issue body in the default deployment). This ensures that every generated artifact is discoverable without filesystem scanning.
 
 ### Consumer Discovery
 
-Consumer agents discover artifacts via the `artifact_list` MCP tool, which reads the manifest from the GitHub Issue body and returns the list of registered artifacts. For content access, consumers use `artifact_read`, which retrieves the artifact content by path.
+Consumer agents discover artifacts via the `artifact_list` MCP tool, which reads the manifest from the active artifact provider and returns the list of registered artifacts. For content access, consumers use `artifact_read`, which retrieves the artifact content by path.
 
 ### Worktree-Isolated Agents
 

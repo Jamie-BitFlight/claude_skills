@@ -145,7 +145,9 @@ Trace the data flow:
 
 ```python
 import logging
+
 logger = logging.getLogger(__name__)
+
 
 def investigate(data: InputType) -> OutputType:
     logger.debug(f"INPUT: {data!r}, type={type(data)}")
@@ -290,6 +292,7 @@ def buggy(items=[]):  # WRONG: mutable default
     items.append(1)
     return items
 
+
 # Fix
 def fixed(items: list | None = None) -> list:
     if items is None:
@@ -305,6 +308,7 @@ def fixed(items: list | None = None) -> list:
 async def fetch_data():
     return await api_call()
 
+
 # WRONG: Missing await
 result = fetch_data()  # Returns coroutine, not result
 
@@ -319,6 +323,7 @@ result = await fetch_data()
 # Fix: Use local imports for circular dependencies
 def function_that_needs_other_module():
     from .other_module import OtherClass  # Local import
+
     return OtherClass()
 ```
 

@@ -19,6 +19,7 @@ def read_file(path):
     except Exception as e:
         raise ConfigError(f"Failed to read: {e}") from e
 
+
 # Layer 2
 def load_config(path):
     try:
@@ -28,6 +29,7 @@ def load_config(path):
         raise ConfigError(f"Config load failed: {e}") from e
     except Exception as e:
         raise ConfigError(f"Unexpected error: {e}") from e
+
 
 # Layer 3... Layer 4... Layer 5... Layer 6... Layer 7...
 # Each layer wraps the exception again
@@ -48,6 +50,7 @@ Create a custom exception class that handles user-friendly output:
 ```python
 # From: nested-typer-exception-explosion_corrected_typer_echo.py
 import typer
+
 
 class AppExit(typer.Exit):
     """Custom exception for graceful application exits."""
@@ -80,8 +83,7 @@ def load_json_file(file_path: Path) -> dict:
     except json.JSONDecodeError as e:
         # Only catch where we can add meaningful context
         raise AppExit(
-            code=1,
-            message=f"Invalid JSON in {file_path} at line {e.lineno}, column {e.colno}: {e.msg}"
+            code=1, message=f"Invalid JSON in {file_path} at line {e.lineno}, column {e.colno}: {e.msg}"
         ) from e
 ```
 
@@ -106,15 +108,11 @@ import typer
 normal_console = Console()
 err_console = Console(stderr=True)
 
+
 class AppExitRich(typer.Exit):
     """Custom exception using Rich console for consistent formatting."""
 
-    def __init__(
-        self,
-        code: int | None = None,
-        message: str | None = None,
-        console: Console = normal_console
-    ):
+    def __init__(self, code: int | None = None, message: str | None = None, console: Console = normal_console):
         self.code = code
         self.message = message
         if message is not None:
@@ -135,11 +133,7 @@ def validate_config(data: dict) -> dict:
     if not data:
         raise AppExitRich(code=1, message="Config cannot be empty", console=err_console)
     if not isinstance(data, dict):
-        raise AppExitRich(
-            code=1,
-            message=f"Config must be a JSON object, got {type(data)}",
-            console=err_console
-        )
+        raise AppExitRich(code=1, message=f"Config must be a JSON object, got {type(data)}", console=err_console)
     return data
 ```
 
@@ -161,6 +155,7 @@ import typer
 
 app = typer.Typer()
 
+
 class AppExit(typer.Exit):
     """Custom exception for graceful exits with user-friendly messages."""
 
@@ -172,6 +167,7 @@ class AppExit(typer.Exit):
                 typer.echo(message, err=True)
         super().__init__(code=code)
 
+
 # Helper functions - let exceptions bubble naturally
 def read_file_contents(file_path: Path) -> str:
     """Read file contents.
@@ -182,6 +178,7 @@ def read_file_contents(file_path: Path) -> str:
     """
     return file_path.read_text(encoding="utf-8")
 
+
 def parse_json_string(content: str) -> dict:
     """Parse JSON string.
 
@@ -189,6 +186,7 @@ def parse_json_string(content: str) -> dict:
         json.JSONDecodeError: If JSON is invalid
     """
     return json.loads(content)
+
 
 # Only catch where we add meaningful context
 def load_json_file(file_path: Path) -> dict:
@@ -202,9 +200,9 @@ def load_json_file(file_path: Path) -> dict:
         return parse_json_string(contents)
     except json.JSONDecodeError as e:
         raise AppExit(
-            code=1,
-            message=f"Invalid JSON in {file_path} at line {e.lineno}, column {e.colno}: {e.msg}"
+            code=1, message=f"Invalid JSON in {file_path} at line {e.lineno}, column {e.colno}: {e.msg}"
         ) from e
+
 
 def validate_config(data: dict, source: str) -> dict:
     """Validate config structure.
@@ -218,6 +216,7 @@ def validate_config(data: dict, source: str) -> dict:
         raise AppExit(code=1, message=f"Config must be a JSON object, got {type(data)}")
     return data
 
+
 def load_config(file_path: Path) -> dict:
     """Load and validate configuration.
 
@@ -230,11 +229,13 @@ def load_config(file_path: Path) -> dict:
         raise AppExit(code=1, message=f"Failed to load config from {file_path}")
     return validate_config(data, str(file_path))
 
+
 @app.command()
 def main(config_file: Annotated[Path, typer.Argument()]) -> None:
     """Load and process configuration file."""
     config = load_config(config_file)
     typer.echo(f"Config loaded successfully: {config}")
+
 
 if __name__ == "__main__":
     app()

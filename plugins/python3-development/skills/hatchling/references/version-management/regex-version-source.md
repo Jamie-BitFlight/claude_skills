@@ -43,11 +43,11 @@ When `pattern` is not specified or set to `true`, Hatchling uses a default patte
 ```python
 # Default pattern matches these formats:
 __version__ = "1.2.3"
-__version__ = '1.2.3'
+__version__ = "1.2.3"
 VERSION = "1.2.3"
-VERSION = '1.2.3'
+VERSION = "1.2.3"
 version = "1.2.3"
-version = '1.2.3'
+version = "1.2.3"
 __version__: str = "1.2.3"  # Type hints supported
 VERSION: Final[str] = "1.2.3"  # Final annotations supported
 ```
@@ -228,13 +228,13 @@ The regex source preserves:
 # Before update
 """Package metadata."""
 
-__version__ = '1.2.3'  # Current version
+__version__ = "1.2.3"  # Current version
 __author__ = "Name"
 
 # After `hatch version 2.0.0`
 """Package metadata."""
 
-__version__ = '2.0.0'  # Current version
+__version__ = "2.0.0"  # Current version
 __author__ = "Name"
 ```
 

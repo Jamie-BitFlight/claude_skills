@@ -15,7 +15,7 @@ With this plugin installed, Claude will:
 - Break features into stages with explicit artifacts before writing a single line of code
 - Route work to specialist agents based on your project language
 - Run quality gates automatically after implementation completes
-- Manage a GitHub-backed backlog and escalate to you only when constraints genuinely require human judgment
+- Manage a configured-provider backlog (GitHub is the default deployment) and escalate to you only when constraints genuinely require human judgment
 - Execute milestone-scale work with true parallel orchestration using isolated git worktrees
 
 ## Quick Start
@@ -69,7 +69,7 @@ What happens:
 5. A plan validator checks the task file for completeness and feasibility
 6. A context-gathering agent writes a context manifest so subsequent agents have full situational awareness
 
-All outputs land in `~/.dh/projects/{your-project}/plan/` as named files. The GitHub issue body records an artifact manifest so worktree-isolated agents can discover them.
+All outputs land in `~/.dh/projects/{your-project}/plan/` as named files. The active artifact provider records an artifact manifest so worktree-isolated agents can discover them; the default deployment uses a GitHub issue body for that manifest.
 
 **RT-ICA Gate**: Before planning begins, Claude runs a Reverse Thinking Information Completeness Assessment. If any required information is genuinely missing (not just derivable), planning blocks and you are asked to provide it. This prevents plans built on assumptions.
 
@@ -91,7 +91,7 @@ What happens:
 
 #### `/dh:complete-implementation`
 
-Runs quality gates after all tasks are complete. Takes either a plan file path or a GitHub issue number.
+Runs quality gates after all tasks are complete. Takes either a plan file path or a provider item reference (a GitHub issue number in the default deployment).
 
 ```text
 /dh:complete-implementation plan/Pa1b2c3d4-jwt-authentication.yaml
@@ -112,13 +112,13 @@ Runs quality gates after all tasks are complete. Takes either a plan file path o
 
 **Proportional path** (for issues without a linked plan) — 3 phases: code review, test verification, acceptance criteria check.
 
-On completion, applies `status:verified` to the GitHub issue.
+On completion, applies `status:verified` to the selected backend item.
 
 ---
 
 ### Backlog Management
 
-The selected backlog backend is the source of truth; the default deployment uses GitHub Issues. The plugin exposes workflow commands and a full MCP server for managing your backlog with AI assistance.
+The selected backlog backend is the source of truth; the default deployment uses GitHub Issues. The plugin exposes workflow commands and structured MCP operations for managing workflow state with AI assistance. In a Beads workspace, use `bd` directly for Beads-native issue, status, dependency, readiness, notes, and metadata operations.
 
 #### `/dh:work-backlog-item`
 
@@ -158,11 +158,11 @@ Workflow modes:
 | `resolve {title}` | Mark done with an evidence trail |
 | `progress` | Show current item progress |
 | `resume` | Resume interrupted work |
-| `setup-github` | Initialize labels, project, and milestone in the repo |
+| `setup-github` | Initialize labels, project, and milestone for a GitHub-backed repo |
 
 #### `/dh:create-backlog-item`
 
-Creates a new backlog item and corresponding GitHub issue.
+Creates a new backlog item in the selected backend (a GitHub issue in the default deployment).
 
 ```text
 /dh:create-backlog-item "Add rate limiting to the auth endpoints"
@@ -180,7 +180,7 @@ Grooms a backlog item: fact-checks claims, maps required resources, identifies g
 
 #### `/dh:backlog`
 
-Reference overview for all backlog operations and MCP tools.
+Reference overview for selected structured backlog operations and MCP tools; provider-native operations remain on the configured backend.
 
 ---
 
@@ -188,7 +188,7 @@ Reference overview for all backlog operations and MCP tools.
 
 #### `/dh:groom-milestone`
 
-Analyzes all issues in a GitHub milestone and produces a wave-based dispatch plan. Issues that touch overlapping files are placed in separate waves so wave items are always independent of each other.
+Analyzes items in a GitHub milestone when the selected backend is GitHub and produces a wave-based dispatch plan. Items that touch overlapping files are placed in separate waves so wave items are always independent of each other.
 
 ```text
 /dh:groom-milestone 3
@@ -347,7 +347,7 @@ flowchart TD
     Detect -->|pyproject.toml| Python[Python plugin]
     Detect -->|package.json| TypeScript[TypeScript plugin]
     Detect -->|Cargo.toml| Rust[Rust plugin]
-    Detect -->|None found| Fallback[General-purpose agents]
+    Detect -->|None found| Fallback[dh:task-worker]
     Python --> Manifest[Read language manifest]
     TypeScript --> Manifest
     Rust --> Manifest
@@ -364,26 +364,26 @@ Install the `python3-development` plugin alongside this one for full Python spec
 
 The plugin ships three MCP servers that activate automatically after installation.
 
-### `plugin:dh:backlog` — Backlog and GitHub Integration
+### `plugin:dh:backlog` — Structured Backlog Workflow
 
-The primary runtime interface. Exposes tools for all backlog operations, artifact management, dispatch orchestration, and GitHub integration.
+The structured workflow transport. Exposes selected provider-neutral backlog operations, artifact management, and dispatch orchestration; provider-native capabilities remain on the selected backend.
 
 **Core backlog tools** (available as `mcp__plugin_dh_backlog__<name>`):
 
 | Tool | Purpose |
 |------|---------|
-| `backlog_add` | Create a new item and GitHub Issue |
+| `backlog_add` | Create a new item in the selected backend |
 | `backlog_list` | List open items with filters |
 | `backlog_view` | View one item in full detail |
-| `backlog_sync` | Push local items to GitHub |
+| `backlog_sync` | Synchronize local items with the selected backend |
 | `backlog_close` | Dismiss an item with a reason |
 | `backlog_resolve` | Mark an item done with evidence |
 | `backlog_update` | Set status, attach plan, update content |
 | `backlog_groom` | Write or update the groomed section |
 | `backlog_normalize` | Rewrite files to canonical format |
-| `backlog_pull` | Pull GitHub issue body into local files |
-| `backlog_list_comments` | List comments on a GitHub issue |
-| `backlog_read_comment` | Read a specific comment body |
+| `backlog_pull` | Pull the selected backend item into local files |
+| `backlog_list_comments` | List comments on a backend item |
+| `backlog_read_comment` | Read a specific backend comment body |
 
 The server also exposes `artifact_*` tools for plan artifact management and `dispatch_*` tools for milestone wave orchestration. See `/dh:backlog` for the full reference.
 
@@ -454,8 +454,7 @@ The harness ships 27 specialist agents invoked automatically during pipeline sta
 
 **Execution:**
 
-- `task-worker` — Universal SAM task executor — claims, executes, and reports all implementation tasks
-- `generic-stage-agent` — General-purpose agent for pipeline stages without a specialist
+- `task-worker` — Universal dispatch and SAM task executor; claims, executes, and reports all tasks while loading specialist profiles from each task's `agent:` field
 
 ---
 
@@ -471,7 +470,7 @@ plan/
   T0-baseline-{slug}.yaml         Pre-implementation baseline
   TN-verification-{slug}.yaml     Post-implementation verification
   QG{NNN}-qg-{slug}.yaml          Quality gate plan
-backlog/                          Local cache of GitHub Issues
+backlog/                          Local cache of selected-backend items
 context/
   active-task-{session-id}.json   Ephemeral task tracking (deleted after task)
 kage-bunshin/
@@ -527,7 +526,7 @@ Claude queries ready tasks. If tasks T1 (implement middleware) and T2 (write tes
 /dh:complete-implementation plan/Pa1b2c3d4-rate-limiting.yaml
 ```
 
-Code review, feature verification, integration check, documentation drift audit, documentation update, context refinement — all run in sequence. The GitHub issue receives `status:verified` when all gates pass.
+Code review, feature verification, integration check, documentation drift audit, documentation update, context refinement — all run in sequence. The selected backend item receives `status:verified` when all gates pass.
 
 ---
 
@@ -580,8 +579,8 @@ The **`.cursor-plugin/plugin.json`** manifest is for Cursor (see [Plugins refere
 ## Requirements
 
 - Claude Code v2.0+
-- GitHub repository (required for backlog and milestone features)
-- `GITHUB_TOKEN` in your environment (for MCP tool access to Issues)
+- A configured backlog provider; a GitHub repository is required only for GitHub-backed backlog and milestone features
+- Credentials required by the selected provider (for example, `GITHUB_TOKEN` for GitHub Issues)
 - Python 3.11+ (for the MCP server backends — installed automatically via `uv`)
 - `uv` package manager (for running Python components)
 
@@ -592,7 +591,7 @@ The **`.cursor-plugin/plugin.json`** manifest is for Cursor (see [Plugins refere
 **Use it when:**
 
 - Starting a feature that benefits from structured planning before implementation
-- Managing a GitHub Issues backlog and want AI-assisted grooming and prioritization
+- Managing a configured-provider backlog (including the default GitHub Issues deployment) and wanting AI-assisted grooming and prioritization
 - Running a milestone with multiple parallel work streams
 - You want quality gates (code review, verification, documentation, context) enforced after implementation
 - Working across a multi-language codebase where consistent process matters

@@ -74,6 +74,7 @@ If you need to include content referenced via symlink:
 import os
 import shutil
 
+
 class SymlinkResolutionHook:
     def initialize(self, version, build_data):
         # Resolve symlinks before building
@@ -127,12 +128,12 @@ For more complex scenarios, manipulate `build_data['force_include']` in a build 
 class DynamicIncludeHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Dynamically add files based on build conditions
-        if os.path.exists('dist/wheels'):
-            build_data['force_include']['dist/wheels'] = 'mypackage/wheels'
+        if os.path.exists("dist/wheels"):
+            build_data["force_include"]["dist/wheels"] = "mypackage/wheels"
 
         # Include optional assets
-        if os.getenv('INCLUDE_DOCS'):
-            build_data['force_include']['docs/_build/html'] = 'mypackage/docs'
+        if os.getenv("INCLUDE_DOCS"):
+            build_data["force_include"]["docs/_build/html"] = "mypackage/docs"
 ```
 
 ## Best Practices

@@ -155,6 +155,7 @@ This will generate a minimal `setup.py` file:
 ```python
 # Generated setup.py
 from setuptools import setup
+
 setup()
 ```
 

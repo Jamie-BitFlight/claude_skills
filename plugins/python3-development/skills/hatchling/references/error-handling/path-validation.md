@@ -44,10 +44,7 @@ force-include = [
    # Check before build
    import pathlib
 
-   force_includes = [
-       "src/generated/schema.py",
-       "docs/api.html"
-   ]
+   force_includes = ["src/generated/schema.py", "docs/api.html"]
 
    for path in force_includes:
        if not pathlib.Path(path).exists():
@@ -183,6 +180,7 @@ import sys
 from pathlib import Path
 import tomllib
 
+
 def validate_paths():
     """Check all configured paths exist."""
     with open("pyproject.toml", "rb") as f:
@@ -214,6 +212,7 @@ def validate_paths():
 
     print("All paths valid ✓")
 
+
 if __name__ == "__main__":
     validate_paths()
 ```
@@ -244,30 +243,23 @@ import os
 from pathlib import Path
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class PathValidationHook(BuildHookInterface):
     def initialize(self, version, build_data):
         """Validate paths before build starts."""
-        required_paths = [
-            "src",
-            "LICENSE",
-            "README.md",
-        ]
+        required_paths = ["src", "LICENSE", "README.md"]
 
         for path_str in required_paths:
             path = Path(path_str)
             if not path.exists():
-                raise FileNotFoundError(
-                    f"Required path missing: {path_str}"
-                )
+                raise FileNotFoundError(f"Required path missing: {path_str}")
 
         # Validate no broken symlinks
         for root, dirs, files in os.walk("src"):
             for name in files + dirs:
                 path = Path(root) / name
                 if path.is_symlink() and not path.exists():
-                    raise FileNotFoundError(
-                        f"Broken symlink: {path}"
-                    )
+                    raise FileNotFoundError(f"Broken symlink: {path}")
 ```
 
 ## Common Path Validation Errors and Solutions

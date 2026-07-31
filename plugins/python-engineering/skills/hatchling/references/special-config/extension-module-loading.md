@@ -106,13 +106,14 @@ import sysconfig
 from pathlib import Path
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         """Initialize the build hook."""
         # Set up extension modules
         if self.target_name == "wheel":
             self._build_extensions()
-            build_data['infer_tag'] = True  # Auto-detect platform tag
+            build_data["infer_tag"] = True  # Auto-detect platform tag
 
     def _build_extensions(self):
         """Build C extensions."""
@@ -120,13 +121,7 @@ class CustomBuildHook(BuildHookInterface):
         from setuptools import Extension
         from Cython.Build import cythonize
 
-        extensions = [
-            Extension(
-                "mypackage.fast_module",
-                ["src/mypackage/fast_module.pyx"],
-                include_dirs=["."],
-            )
-        ]
+        extensions = [Extension("mypackage.fast_module", ["src/mypackage/fast_module.pyx"], include_dirs=["."])]
 
         # Compile extensions
         ext_modules = cythonize(extensions)
@@ -182,8 +177,8 @@ When building extensions, set `infer_tag` to automatically detect the platform:
 ```python
 # In build hook
 def initialize(self, version, build_data):
-    build_data['infer_tag'] = True
-    build_data['pure_python'] = False
+    build_data["infer_tag"] = True
+    build_data["pure_python"] = False
 ```
 
 ### Manual Tag Configuration
@@ -191,9 +186,9 @@ def initialize(self, version, build_data):
 ```python
 # In build hook
 def initialize(self, version, build_data):
-    build_data['tag'] = f"cp{sys.version_info[0]}{sys.version_info[1]}"
-    build_data['abi_tag'] = 'none'
-    build_data['platform_tag'] = sysconfig.get_platform().replace('-', '_')
+    build_data["tag"] = f"cp{sys.version_info[0]}{sys.version_info[1]}"
+    build_data["abi_tag"] = "none"
+    build_data["platform_tag"] = sysconfig.get_platform().replace("-", "_")
 ```
 
 ## Version Source for Extensions
@@ -213,6 +208,7 @@ With extension module version:
 # src/mypackage/__init__.py
 try:
     from . import _version  # Compiled module
+
     __version__ = _version.VERSION
 except ImportError:
     __version__ = "unknown"
@@ -271,6 +267,7 @@ require-runtime-dependencies = true
 # hatch_build.py
 import platform
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         arch = platform.machine()
@@ -286,10 +283,11 @@ class CustomBuildHook(BuildHookInterface):
 # Use environment variables for build configuration
 import os
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Respect ARCHFLAGS on macOS
-        archflags = os.environ.get('ARCHFLAGS', '')
+        archflags = os.environ.get("ARCHFLAGS", "")
         if archflags:
             # Configure build for specified architectures
             pass
@@ -330,12 +328,15 @@ When helping users test their extensions, reference this pattern:
 import pytest
 import mypackage.extension_module
 
+
 def test_extension_loads():
     # Verify extension module loads
-    assert hasattr(mypackage.extension_module, 'fast_function')
+    assert hasattr(mypackage.extension_module, "fast_function")
+
 
 def test_extension_performance():
     import time
+
     # Test that extension is actually faster
     result = mypackage.extension_module.fast_function(1000000)
     assert result is not None
@@ -349,6 +350,7 @@ def test_extension_performance():
 # hatch_build.py
 import numpy as np
 from setuptools import Extension
+
 
 class NumpyBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
@@ -401,8 +403,8 @@ bypass-selection = false
 # In build hook
 def initialize(self, version, build_data):
     # Force correct platform tag
-    build_data['pure_python'] = False
-    build_data['infer_tag'] = True
+    build_data["pure_python"] = False
+    build_data["infer_tag"] = True
 ```
 
 ### Build Failures
@@ -471,6 +473,7 @@ import sys
 from pathlib import Path
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CythonBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         if self.target_name != "wheel":
@@ -479,29 +482,17 @@ class CythonBuildHook(BuildHookInterface):
         from Cython.Build import cythonize
         from setuptools import Extension
 
-        extensions = [
-            Extension(
-                "fast_math._accelerated",
-                ["src/fast_math/_accelerated.pyx"],
-                language="c",
-            )
-        ]
+        extensions = [Extension("fast_math._accelerated", ["src/fast_math/_accelerated.pyx"], language="c")]
 
         # Compile Cython modules
-        ext_modules = cythonize(
-            extensions,
-            compiler_directives={
-                'language_level': "3",
-                'embedsignature': True,
-            }
-        )
+        ext_modules = cythonize(extensions, compiler_directives={"language_level": "3", "embedsignature": True})
 
         # Build extensions (simplified)
         self._compile_extensions(ext_modules)
 
         # Set wheel tags
-        build_data['infer_tag'] = True
-        build_data['pure_python'] = False
+        build_data["infer_tag"] = True
+        build_data["pure_python"] = False
 
     def _compile_extensions(self, extensions):
         """Compile the extensions."""
@@ -516,12 +507,14 @@ class CythonBuildHook(BuildHookInterface):
 
 try:
     from ._accelerated import fast_multiply, fast_power
+
     HAS_ACCELERATION = True
 except ImportError:
     from .pure import fast_multiply, fast_power
+
     HAS_ACCELERATION = False
 
-__all__ = ['fast_multiply', 'fast_power', 'HAS_ACCELERATION']
+__all__ = ["fast_multiply", "fast_power", "HAS_ACCELERATION"]
 ```
 
 ## References

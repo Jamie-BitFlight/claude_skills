@@ -20,6 +20,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("MyServer")
 
+
 @mcp.tool(task=True)
 async def slow_computation(duration: int) -> str:
     """A long-running operation."""
@@ -47,6 +48,7 @@ from fastmcp import FastMCP
 from fastmcp.dependencies import Progress
 
 mcp = FastMCP("MyServer")
+
 
 @mcp.tool(task=True)
 async def process_files(files: list[str], progress: Progress = Progress()) -> str:
@@ -106,11 +108,10 @@ from fastmcp.dependencies import Progress, CurrentDocket, CurrentWorker
 
 mcp = FastMCP("MyServer")
 
+
 @mcp.tool(task=True)
 async def my_task(
-    progress: Progress = Progress(),
-    docket: Docket = CurrentDocket(),
-    worker: Worker = CurrentWorker(),
+    progress: Progress = Progress(), docket: Docket = CurrentDocket(), worker: Worker = CurrentWorker()
 ) -> str:
     # Schedule additional background work
     await docket.add(another_task, arg1, arg2)
@@ -130,17 +131,16 @@ from dataclasses import dataclass
 
 mcp = FastMCP("Elicitation Server")
 
+
 @dataclass
 class UserInfo:
     name: str
     age: int
 
+
 @mcp.tool
 async def collect_user_info(ctx: Context) -> str:
-    result = await ctx.elicit(
-        message="Please provide your information",
-        response_type=UserInfo
-    )
+    result = await ctx.elicit(message="Please provide your information", response_type=UserInfo)
 
     if result.action == "accept":
         user = result.data
@@ -162,11 +162,8 @@ Elicitation result actions:
 PATTERN: Use typed result classes for pattern matching: [2]
 
 ```python
-from fastmcp.server.elicitation import (
-    AcceptedElicitation,
-    DeclinedElicitation,
-    CancelledElicitation,
-)
+from fastmcp.server.elicitation import AcceptedElicitation, DeclinedElicitation, CancelledElicitation
+
 
 @mcp.tool
 async def pattern_example(ctx: Context) -> str:
@@ -196,10 +193,7 @@ async def plan_meeting(ctx: Context) -> str:
     if duration_result.action != "accept":
         return "Meeting planning cancelled"
 
-    priority_result = await ctx.elicit(
-        "Is this urgent?",
-        response_type=["yes", "no"]
-    )
+    priority_result = await ctx.elicit("Is this urgent?", response_type=["yes", "no"])
     if priority_result.action != "accept":
         return "Meeting planning cancelled"
 
@@ -222,15 +216,9 @@ PATTERN: Constrained choices using list of strings, `Literal`, or Python enum:
 ```python
 from typing import Literal
 
-result = await ctx.elicit(
-    "What priority level?",
-    response_type=["low", "medium", "high"],
-)
+result = await ctx.elicit("What priority level?", response_type=["low", "medium", "high"])
 
-result = await ctx.elicit(
-    "What priority level?",
-    response_type=Literal["low", "medium", "high"]
-)
+result = await ctx.elicit("What priority level?", response_type=Literal["low", "medium", "high"])
 ```
 
 PATTERN: Multi-select — wrap choices in an additional list level (available in v2.14.0+):
@@ -238,7 +226,7 @@ PATTERN: Multi-select — wrap choices in an additional list level (available in
 ```python
 result = await ctx.elicit(
     "Choose tags",
-    response_type=[["bug", "feature", "documentation"]]  # List of a list
+    response_type=[["bug", "feature", "documentation"]],  # List of a list
 )
 ```
 
@@ -250,8 +238,8 @@ result = await ctx.elicit(
     response_type={
         "low": {"title": "Low Priority"},
         "medium": {"title": "Medium Priority"},
-        "high": {"title": "High Priority"}
-    }
+        "high": {"title": "High Priority"},
+    },
 )
 ```
 
@@ -261,6 +249,7 @@ PATTERN: Structured responses via dataclass or Pydantic model:
 from dataclasses import dataclass
 from typing import Literal
 
+
 @dataclass
 class TaskDetails:
     title: str
@@ -268,10 +257,8 @@ class TaskDetails:
     priority: Literal["low", "medium", "high"]
     due_date: str
 
-result = await ctx.elicit(
-    "Please provide task details",
-    response_type=TaskDetails
-)
+
+result = await ctx.elicit("Please provide task details", response_type=TaskDetails)
 ```
 
 CONSTRAINT: MCP spec only supports shallow objects with scalar (`string`, `number`, `boolean`) or enum properties. Nested objects are not supported.
@@ -282,15 +269,18 @@ PATTERN: Default values for elicitation fields — pre-populate form fields (ava
 from pydantic import BaseModel, Field
 from enum import Enum
 
+
 class Priority(Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
 
+
 class TaskDetails(BaseModel):
     title: str = Field(description="Task title")
     description: str = Field(default="", description="Task description")
     priority: Priority = Field(default=Priority.MEDIUM, description="Task priority")
+
 
 result = await ctx.elicit("Please provide task details", response_type=TaskDetails)
 ```
@@ -333,10 +323,7 @@ PATTERN: Use `GoogleGenAISamplingHandler` for server-initiated LLM calls via the
 from fastmcp import Client
 from fastmcp.client.sampling.handlers.google_genai import GoogleGenAISamplingHandler
 
-client = Client(
-    "my_mcp_server.py",
-    sampling_handler=GoogleGenAISamplingHandler(default_model="gemini-2.0-flash"),
-)
+client = Client("my_mcp_server.py", sampling_handler=GoogleGenAISamplingHandler(default_model="gemini-2.0-flash"))
 ```
 
 CONSTRAINT: Requires the `gemini` optional extra:
@@ -375,6 +362,7 @@ from fastmcp.server.context import Context
 
 mcp = FastMCP("Demo")
 
+
 @mcp.tool
 async def my_tool(query: str, ctx: Context) -> str:
     await ctx.info(f"Processing: {query}")
@@ -388,6 +376,7 @@ PATTERN: Use `CurrentContext()` as an explicit default to make the injection vis
 ```python
 from fastmcp.dependencies import CurrentContext
 from fastmcp.server.context import Context
+
 
 @mcp.tool
 async def my_tool(query: str, ctx: Context = CurrentContext()) -> str:
@@ -406,6 +395,7 @@ Provides logging, progress reporting, resource access, and other request-scoped 
 ```python
 from fastmcp.server.context import Context
 
+
 @mcp.tool
 async def process_data(data: str, ctx: Context) -> str:
     await ctx.info(f"Processing: {data}")
@@ -416,6 +406,7 @@ PATTERN: Use `get_context()` from helper functions or middleware that cannot dec
 
 ```python
 from fastmcp.server.dependencies import get_context
+
 
 async def log_something(message: str):
     ctx = get_context()
@@ -428,6 +419,7 @@ Access the `FastMCP` server instance for introspection or server-level configura
 
 ```python
 from fastmcp.dependencies import CurrentFastMCP
+
 
 @mcp.tool
 async def server_info(server: FastMCP = CurrentFastMCP()) -> str:
@@ -444,6 +436,7 @@ Access the Starlette `Request` when running over HTTP transports (SSE or Streama
 from fastmcp.dependencies import CurrentRequest
 from starlette.requests import Request
 
+
 @mcp.tool
 async def client_info(request: Request = CurrentRequest()) -> dict:
     return {
@@ -458,6 +451,7 @@ Access HTTP headers with graceful fallback — returns an empty dict when no HTT
 
 ```python
 from fastmcp.dependencies import CurrentHeaders
+
 
 @mcp.tool
 async def get_auth_type(headers: dict = CurrentHeaders()) -> str:
@@ -475,6 +469,7 @@ Access the authenticated user's token when the server uses authentication. Raise
 from fastmcp.dependencies import CurrentAccessToken
 from fastmcp.server.auth import AccessToken
 
+
 @mcp.tool
 async def get_user_id(token: AccessToken = CurrentAccessToken()) -> str:
     return token.claims.get("sub", "unknown")
@@ -486,6 +481,7 @@ PATTERN: Use `get_access_token()` (function form) for optional auth — returns 
 
 ```python
 from fastmcp.server.dependencies import get_access_token
+
 
 @mcp.tool
 async def get_user_info() -> dict:
@@ -501,6 +497,7 @@ Extract one specific claim from the token without needing the full `AccessToken`
 
 ```python
 from fastmcp.server.dependencies import TokenClaim
+
 
 @mcp.tool
 async def add_expense(
@@ -527,13 +524,9 @@ CONSTRAINT: Requires `pip install 'fastmcp[tasks]'`. Only available inside task-
 ```python
 from fastmcp.dependencies import CurrentDocket, CurrentWorker, Progress
 
+
 @mcp.tool(task=True)
-async def long_running_task(
-    data: str,
-    docket=CurrentDocket(),
-    worker=CurrentWorker(),
-    progress=Progress(),
-) -> str:
+async def long_running_task(data: str, docket=CurrentDocket(), worker=CurrentWorker(), progress=Progress()) -> str:
     await progress.set_total(100)
     for i in range(100):
         await progress.increment()
@@ -552,18 +545,17 @@ PATTERN: Wrap any callable with `Depends()` to inject its return value. Works wi
 ```python
 from fastmcp.dependencies import Depends
 
+
 def get_config() -> dict:
     return {"api_url": "https://api.example.com", "timeout": 30}
+
 
 async def get_user_id() -> int:
     return 42
 
+
 @mcp.tool
-async def fetch_data(
-    query: str,
-    config: dict = Depends(get_config),
-    user_id: int = Depends(get_user_id),
-) -> str:
+async def fetch_data(query: str, config: dict = Depends(get_config), user_id: int = Depends(get_user_id)) -> str:
     return f"User {user_id} fetching '{query}' from {config['api_url']}"
 ```
 
@@ -575,18 +567,17 @@ PATTERN: Dependencies are cached per request. If multiple parameters declare the
 def get_db_connection():
     print("Connecting to database...")  # Printed only once per request
 
+
 def get_user_repo(db=Depends(get_db_connection)):
     return {"db": db, "type": "user"}
+
 
 def get_order_repo(db=Depends(get_db_connection)):
     return {"db": db, "type": "order"}
 
+
 @mcp.tool
-async def process_order(
-    order_id: str,
-    users=Depends(get_user_repo),
-    orders=Depends(get_order_repo),
-) -> str:
+async def process_order(order_id: str, users=Depends(get_user_repo), orders=Depends(get_order_repo)) -> str:
     # Both repos share the same db connection
     return f"Processed order {order_id}"
 ```
@@ -599,6 +590,7 @@ PATTERN: Use an async context manager for dependencies that need teardown — da
 from contextlib import asynccontextmanager
 from fastmcp.dependencies import Depends
 
+
 @asynccontextmanager
 async def get_database():
     db = await connect_to_database()
@@ -606,6 +598,7 @@ async def get_database():
         yield db
     finally:
         await db.close()
+
 
 @mcp.tool
 async def query_users(sql: str, db=Depends(get_database)) -> list:
@@ -620,8 +613,10 @@ PATTERN: Dependencies can depend on other dependencies. FastMCP resolves them in
 def get_base_url() -> str:
     return "https://api.example.com"
 
+
 def get_api_client(base_url: str = Depends(get_base_url)) -> dict:
     return {"base_url": base_url, "version": "v1"}
+
 
 @mcp.tool
 async def call_api(endpoint: str, client: dict = Depends(get_api_client)) -> str:

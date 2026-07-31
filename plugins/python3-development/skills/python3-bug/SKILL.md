@@ -124,6 +124,7 @@ Questions to answer:
 # Minimal reproduction case
 # Goal: Smallest code that demonstrates the bug
 
+
 def test_reproduction():
     """Minimal reproduction of the bug."""
     # Setup
@@ -207,6 +208,7 @@ Follow the data flow:
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def investigate_function(data: InputType) -> OutputType:
     logger.debug(f"INPUT: data={data!r}, type={type(data)}")
@@ -414,6 +416,7 @@ def buggy(items=[]):  # WRONG: mutable default
     items.append(1)
     return items
 
+
 # Fix
 def fixed(items: list | None = None) -> list:
     if items is None:
@@ -428,6 +431,7 @@ def fixed(items: list | None = None) -> list:
 # Bug: Coroutine never executed
 async def fetch_data():
     return await api_call()
+
 
 # WRONG: Missing await
 result = fetch_data()  # Returns coroutine, not result
@@ -445,6 +449,7 @@ result = await fetch_data()
 # Fix: Use local imports for circular dependencies
 def function_that_needs_other_module():
     from .other_module import OtherClass  # Local import
+
     return OtherClass()
 ```
 

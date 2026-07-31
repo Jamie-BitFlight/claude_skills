@@ -628,9 +628,7 @@ Support theme switching:
 # Use the built-in action_toggle_dark() action instead.
 # SOURCE: https://textual.textualize.io/api/app/ — action_toggle_dark (accessed 2026-05-07)
 class MyApp(App):
-    BINDINGS = [
-        ("d", "toggle_dark", "Toggle theme"),
-    ]
+    BINDINGS = [("d", "toggle_dark", "Toggle theme")]
 
     CSS = """
     /* Dark theme (default) */

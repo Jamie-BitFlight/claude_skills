@@ -264,12 +264,7 @@ Handle extensions in dev mode:
 # setup.py compatibility
 from setuptools import setup, Extension
 
-ext_modules = [
-    Extension(
-        "mypackage._speedups",
-        sources=["src/speedups.c"],
-    )
-]
+ext_modules = [Extension("mypackage._speedups", sources=["src/speedups.c"])]
 
 # Build command
 # python setup.py build_ext --inplace
@@ -342,6 +337,7 @@ When code changes don't appear:
 # Force reload in Python
 import importlib
 import mypackage
+
 importlib.reload(mypackage)
 
 # Or restart interpreter
@@ -421,6 +417,7 @@ Never use dev mode in production:
 # test_dev_mode.py
 import sys
 from pathlib import Path
+
 
 def test_dev_mode_active():
     """Verify package is in dev mode."""

@@ -89,9 +89,9 @@ import os
 load_dotenv()
 
 # Access environment variables
-database_url = os.getenv('DATABASE_URL')
-api_key = os.getenv('API_KEY')
-debug = os.getenv('DEBUG', 'False') == 'True'
+database_url = os.getenv("DATABASE_URL")
+api_key = os.getenv("API_KEY")
+debug = os.getenv("DEBUG", "False") == "True"
 ```
 
 Corresponding `.env` file:
@@ -114,11 +114,11 @@ import os
 config = {
     **dotenv_values(".env.shared"),  # load shared development variables
     **dotenv_values(".env.secret"),  # load sensitive variables
-    **os.environ,                    # override with environment variables
+    **os.environ,  # override with environment variables
 }
 
 # Access with priority: os.environ > .env.secret > .env.shared
-database_url = config['DATABASE_URL']
+database_url = config["DATABASE_URL"]
 ```
 
 ### Multi-Environment Loading
@@ -130,8 +130,8 @@ from dotenv import load_dotenv, find_dotenv
 import os
 
 # Determine environment
-env = os.getenv('ENVIRONMENT', 'development')
-dotenv_path = f'.env.{env}'
+env = os.getenv("ENVIRONMENT", "development")
+dotenv_path = f".env.{env}"
 
 # Load environment-specific file
 load_dotenv(dotenv_path=dotenv_path)
@@ -209,12 +209,13 @@ import os
 import sys
 from dotenv import load_dotenv
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Load .env before Django imports settings
     load_dotenv()
 
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myproject.settings')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "myproject.settings")
     from django.core.management import execute_from_command_line
+
     execute_from_command_line(sys.argv)
 ```
 
@@ -225,16 +226,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+SECRET_KEY = os.getenv("SECRET_KEY")
+DEBUG = os.getenv("DEBUG", "False") == "True"
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
 ```
@@ -251,16 +252,18 @@ import os
 
 load_dotenv()
 
+
 def create_app():
     app = Flask(__name__)
 
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-    app.config['DATABASE_URI'] = os.getenv('DATABASE_URL')
-    app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'False') == 'True'
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+    app.config["DATABASE_URI"] = os.getenv("DATABASE_URL")
+    app.config["DEBUG"] = os.getenv("FLASK_DEBUG", "False") == "True"
 
     return app
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = create_app()
     app.run()
 ```
@@ -276,14 +279,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Settings(BaseSettings):
     database_url: str
     api_key: str
     debug: bool = False
 
     class Config:
-        env_file = '.env'
-        env_file_encoding = 'utf-8'
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
 
 settings = Settings()
 ```
@@ -294,6 +299,7 @@ from fastapi import FastAPI
 from config import settings
 
 app = FastAPI(debug=settings.debug)
+
 
 @app.get("/")
 def read_root():
@@ -328,7 +334,7 @@ import os
 load_dotenv(override=False)
 
 # This respects container-injected variables
-database_url = os.getenv('DATABASE_URL')
+database_url = os.getenv("DATABASE_URL")
 ```
 
 ```yaml
@@ -388,7 +394,7 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-api_key = os.getenv('API_KEY')
+api_key = os.getenv("API_KEY")
 ```
 
 ## When to Use python-dotenv
@@ -587,8 +593,9 @@ The model must recommend the following verified patterns:
 
    ```python
    # Load once at startup, not in modules
-   if __name__ == '__main__':
+   if __name__ == "__main__":
        from dotenv import load_dotenv
+
        load_dotenv()
        main()
    ```
@@ -608,7 +615,7 @@ The model must recommend the following verified patterns:
 
    load_dotenv()
 
-   required_vars = ['DATABASE_URL', 'API_KEY', 'SECRET_KEY']
+   required_vars = ["DATABASE_URL", "API_KEY", "SECRET_KEY"]
    missing = [var for var in required_vars if not os.getenv(var)]
 
    if missing:
@@ -618,9 +625,9 @@ The model must recommend the following verified patterns:
 6. **Use type conversion explicitly**
    ```python
    # python-dotenv returns strings only
-   DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
-   PORT = int(os.getenv('PORT', '8000'))
-   TIMEOUT = float(os.getenv('TIMEOUT', '30.0'))
+   DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+   PORT = int(os.getenv("PORT", "8000"))
+   TIMEOUT = float(os.getenv("TIMEOUT", "30.0"))
    ```
 
 ## Common Pitfalls

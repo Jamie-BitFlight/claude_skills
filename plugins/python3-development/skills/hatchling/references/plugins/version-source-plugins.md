@@ -19,7 +19,7 @@ Each version source must define a string identifier:
 
 ```python
 class GitVersionSource(VersionSourceInterface):
-    PLUGIN_NAME = 'git'
+    PLUGIN_NAME = "git"
 ```
 
 Users select version sources via configuration:
@@ -48,10 +48,10 @@ def get_version_data(self) -> dict:
               May contain other keys for custom data.
     """
     return {
-        'version': '1.2.3',
+        "version": "1.2.3",
         # Additional metadata
-        'commit': 'abc123def456',
-        'dirty': False,
+        "commit": "abc123def456",
+        "dirty": False,
     }
 ```
 
@@ -72,8 +72,8 @@ def set_version(self, desired_version: str, original_data: dict) -> None:
         original_data: Return value from get_version_data()
     """
     # Example: Write version to file
-    version_file = os.path.join(self.root, 'src/__version__.py')
-    with open(version_file, 'w') as f:
+    version_file = os.path.join(self.root, "src/__version__.py")
+    with open(version_file, "w") as f:
         f.write(f"__version__ = '{desired_version}'\n")
 ```
 
@@ -159,7 +159,7 @@ The pattern must contain exactly one capture group or a named `version` group:
 __version__ = "1.2.3"  # Matches: captures "1.2.3"
 
 # Named group pattern
-pattern = '__version__\s*=\s*["\'](?P<version>[^"\']+)["\']'
+pattern = "__version__\s*=\s*[\"'](?P<version>[^\"']+)[\"']"
 ```
 
 ### env
@@ -297,40 +297,41 @@ from hatchling.version.source.plugin.interface import VersionSourceInterface
 import os
 import json
 
+
 class ManifestVersionSource(VersionSourceInterface):
     """Extract version from a manifest.json file."""
 
-    PLUGIN_NAME = 'manifest'
+    PLUGIN_NAME = "manifest"
 
     def get_version_data(self) -> dict:
-        manifest_path = os.path.join(self.root, 'manifest.json')
+        manifest_path = os.path.join(self.root, "manifest.json")
 
         if not os.path.exists(manifest_path):
-            raise FileNotFoundError(f'Manifest not found: {manifest_path}')
+            raise FileNotFoundError(f"Manifest not found: {manifest_path}")
 
         with open(manifest_path) as f:
             manifest = json.load(f)
 
-        version = manifest.get('version')
+        version = manifest.get("version")
         if not version:
-            raise ValueError('No version field in manifest.json')
+            raise ValueError("No version field in manifest.json")
 
         return {
-            'version': version,
-            'build_number': manifest.get('build_number'),
-            'release_date': manifest.get('release_date'),
+            "version": version,
+            "build_number": manifest.get("build_number"),
+            "release_date": manifest.get("release_date"),
         }
 
     def set_version(self, desired_version: str, original_data: dict) -> None:
-        manifest_path = os.path.join(self.root, 'manifest.json')
+        manifest_path = os.path.join(self.root, "manifest.json")
 
         with open(manifest_path) as f:
             manifest = json.load(f)
 
-        manifest['version'] = desired_version
-        manifest['build_number'] = int(manifest.get('build_number', 0)) + 1
+        manifest["version"] = desired_version
+        manifest["build_number"] = int(manifest.get("build_number", 0)) + 1
 
-        with open(manifest_path, 'w') as f:
+        with open(manifest_path, "w") as f:
             json.dump(manifest, f, indent=2)
 ```
 
@@ -436,6 +437,7 @@ Versions from sources should follow [PEP 440](https://peps.python.org/pep-0440/)
 ```python
 from packaging.version import Version
 
+
 def get_version_data(self) -> dict:
     version_str = self._retrieve_version()
 
@@ -443,9 +445,9 @@ def get_version_data(self) -> dict:
     try:
         Version(version_str)
     except Exception as exc:
-        raise ValueError(f'Invalid version format: {version_str}') from exc
+        raise ValueError(f"Invalid version format: {version_str}") from exc
 
-    return {'version': version_str}
+    return {"version": version_str}
 ```
 
 ## See Also

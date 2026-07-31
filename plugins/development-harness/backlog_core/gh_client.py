@@ -899,9 +899,10 @@ def _fetch_issue_comments_graphql(
         page_info: dict[str, object] = comments_data.get("pageInfo") or {}
         if not page_info.get("hasNextPage"):
             break
-        cursor = page_info.get("endCursor")
-        if not cursor:
+        raw_cursor = page_info.get("endCursor")
+        if not isinstance(raw_cursor, str):
             break
+        cursor = raw_cursor
     return comments
 
 

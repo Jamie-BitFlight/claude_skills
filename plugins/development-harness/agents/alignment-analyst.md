@@ -29,7 +29,7 @@ Read `plugins/development-harness/CLAUDE.md`. Extract:
 
 - The plugin's stated purpose (e.g. "Language-agnostic development process harness that orchestrates feature development through a structured 7-stage pipeline")
 - The Design Principles section (e.g. "The harness owns the process; language plugins own the specialists", "Every stage produces an MCP-registered artifact", "Human escalation follows ARL constraint analysis, not arbitrary checkpoints")
-- The Dispatch Pattern rules (e.g. "`dh:task-worker` is the universal dispatch agent — no exceptions", "`general-purpose` must never be dispatched")
+- The Dispatch Pattern rules (e.g. "`dh:task-worker` is the universal dispatch agent — no exceptions", with specialist profiles loaded internally)
 - Any explicit "Do NOT use when" guidance
 - The Composition Model section
 
@@ -107,7 +107,7 @@ Compare the proposed change against the mission sources loaded in Phase 1.
 For each alignment concern found, assign a category:
 
 - **contradicts-mission** — the proposed change directly opposes the plugin's stated purpose or core identity (e.g. making the harness language-specific, removing the 7-stage pipeline, bypassing ARL-derived touchpoints)
-- **violates-design-principle** — the proposed change breaks a named design principle from CLAUDE.md (e.g. routing directly to `general-purpose` instead of `dh:task-worker`, storing artifacts via filesystem path instead of MCP artifact registry, adding arbitrary human checkpoints not derived from ARL)
+- **violates-design-principle** — the proposed change breaks a named design principle from CLAUDE.md (e.g. bypassing `dh:task-worker` specialist-profile routing, storing artifacts via filesystem path instead of MCP artifact registry, adding arbitrary human checkpoints not derived from ARL)
 - **reverses-merged-direction** — the proposed change undoes something a merged PR explicitly established. Cite the PR number. *When backend=beads, use `reverses-committed-direction` instead and cite commit SHAs from Phase 1c git history.*
 - **expands-scope-beyond-mission** — the proposed change pulls the harness into territory the mission explicitly excludes (e.g. language-specific logic in a harness that explicitly owns only the process)
 

@@ -41,6 +41,7 @@ Drop-in replacement for `print`:
 
 ```python
 from rich import print
+
 print("[italic red]Hello[/italic red] World!", locals())
 ```
 
@@ -52,6 +53,7 @@ print("[italic red]Hello[/italic red] World!", locals())
 
 ```python
 from rich.console import Console
+
 console = Console()
 ```
 
@@ -198,6 +200,7 @@ Alternative for unit tests:
 
 ```python
 from io import StringIO
+
 console = Console(file=StringIO())
 console.print("[bold red]Hello[/] World")
 str_output = console.file.getvalue()
@@ -234,9 +237,9 @@ print("Visit my [link=https://www.willmcgugan.com]blog[/link]!")
 ### Emoji codes
 
 ```python
-print(":warning:")          # ⚠️
+print(":warning:")  # ⚠️
 print(":red_heart-emoji:")  # full-color variant
-print(":red_heart-text:")   # monochrome variant
+print(":red_heart-text:")  # monochrome variant
 ```
 
 Run `python -m rich.emoji` to list all emoji codes.
@@ -247,7 +250,8 @@ Run `python -m rich.emoji` to list all emoji codes.
 from rich.markup import escape
 
 # Backslash escapes a bracket
-print(r"foo\[bar]")   # prints: foo[bar]
+print(r"foo\[bar]")  # prints: foo[bar]
+
 
 # Escape user-supplied strings to prevent injection
 def greet(name):
@@ -362,11 +366,7 @@ Rich caches parsed style definitions — first call has a small parsing cost, su
 from rich.console import Console
 from rich.theme import Theme
 
-custom_theme = Theme({
-    "info": "dim cyan",
-    "warning": "magenta",
-    "danger": "bold red"
-})
+custom_theme = Theme({"info": "dim cyan", "warning": "magenta", "danger": "bold red"})
 console = Console(theme=custom_theme)
 console.print("This is information", style="info")
 console.print("[warning]The pod bay doors are locked[/warning]")
@@ -435,5 +435,6 @@ console.save_svg("output.svg")
 
 # Custom SVG theme
 from rich.terminal_theme import MONOKAI
+
 console.save_svg("output.svg", theme=MONOKAI)
 ```

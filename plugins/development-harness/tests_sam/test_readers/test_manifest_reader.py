@@ -553,12 +553,12 @@ def test_extract_bold_fields_agent_is_populated() -> None:
     """Verify **Agent**: value is extracted from prose into the agent field.
 
     Tests: _extract_bold_fields via _build_task_dict — agent field.
-    How: Load fixture with **Agent**: general-purpose in T1 prose.
+    How: Load fixture with **Agent**: python3-development:python-cli-architect in T2 prose.
     Why: agent was always None before the fix; this is the primary regression guard.
     """
     _, task_dicts, _ = read_manifest_plan(_BOLD_FIXTURE)
-    t1 = next(t for t in task_dicts if t.get("task") == "T1")
-    assert t1.get("agent") == "general-purpose"
+    t2 = next(t for t in task_dicts if t.get("task") == "T2")
+    assert t2.get("agent") == "python3-development:python-cli-architect"
 
 
 def test_extract_bold_fields_priority_is_int() -> None:
@@ -730,7 +730,7 @@ def test_extract_bold_fields_frontmatter_fields_take_precedence_over_prose(tmp_p
         "## T1: First task\n"
         "\n"
         "**Status**: NOT STARTED\n"
-        "**Agent**: general-purpose\n"
+        "**Agent**: python3-development:python-cli-architect\n"
         "**Priority**: 1\n"
         "\n"
         "Narrative content here.\n"
@@ -742,7 +742,7 @@ def test_extract_bold_fields_frontmatter_fields_take_precedence_over_prose(tmp_p
     # Frontmatter says complete; prose says NOT STARTED — frontmatter wins
     assert t1.get("status") == "complete"
     # But agent from prose fills the gap (not in frontmatter)
-    assert t1.get("agent") == "general-purpose"
+    assert t1.get("agent") == "python3-development:python-cli-architect"
 
 
 def test_extract_bold_fields_prose_without_bold_fields_no_structured_fields_added(tmp_path: pathlib.Path) -> None:

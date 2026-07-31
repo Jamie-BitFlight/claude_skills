@@ -22,12 +22,13 @@ from __future__ import annotations
 import os
 import socket
 from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from socket import AddressFamily, SocketKind
+from typing import TYPE_CHECKING, Literal
 
 import pytest
 
 if TYPE_CHECKING:
-    from socket import _Address, _RetAddress
+    from socket import _Address
 
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost", "localhost.localdomain", ""})
 
@@ -42,7 +43,7 @@ _state = {"allowed": False}
 
 # Single module-level MonkeyPatch installs the guard at session start and
 # undoes it at session end, restoring the real socket functions reliably and
-# without ``# type: ignore`` suppressions.
+# without inline type-suppression comments.
 _network_patch = pytest.MonkeyPatch()
 
 import tiktoken as _tk
@@ -63,10 +64,19 @@ except OSError:
         special_tokens={},
     )
 
-    def _mock_get_encoding(name: str, **kwargs: object) -> _tk.Encoding:
+    def _mock_get_encoding(encoding_name: str) -> _tk.Encoding:
+        """Return the byte-level mock encoder used when real BPE tables are unavailable.
+
+        Args:
+            encoding_name: Name of the requested tiktoken encoding (unused; the mock
+                always returns the same byte-level encoder regardless of name).
+
+        Returns:
+            The pre-built byte-level mock ``Encoding``.
+        """
         return _mock_enc
 
-    _tk.get_encoding = _mock_get_encoding
+    _network_patch.setattr(_tk, "get_encoding", _mock_get_encoding)
 
 
 def _is_local(address: _Address) -> bool:
@@ -123,7 +133,10 @@ def _guarded_connect_ex(self: socket.socket, address: _Address) -> int:
 
 def _guarded_getaddrinfo(
     host: str | bytes | None, port: str | bytes | int | None, *args: int, **kwargs: int
-) -> list[tuple[socket.AddressFamily, socket.SocketKind, int, str, _RetAddress]]:
+) -> list[
+    tuple[Literal[AddressFamily.AF_INET], SocketKind, int, str, tuple[str, int]]
+    | tuple[Literal[AddressFamily.AF_INET6], SocketKind, int, str, tuple[str, int, int, int] | tuple[int, bytes]]
+]:
     """Block DNS resolution of non-loopback hosts.
 
     Args:

@@ -170,15 +170,16 @@ Help users write reproducible hooks:
 import os
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Use SOURCE_DATE_EPOCH if available
-        timestamp = int(os.environ.get('SOURCE_DATE_EPOCH', '0'))
+        timestamp = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
 
         # Generate files with consistent content
-        with open('generated.py', 'w') as f:
-            f.write(f'# Generated at timestamp {timestamp}\n')
-            f.write(f'BUILD_TIME = {timestamp}\n')
+        with open("generated.py", "w") as f:
+            f.write(f"# Generated at timestamp {timestamp}\n")
+            f.write(f"BUILD_TIME = {timestamp}\n")
 
         # Avoid random data
         # BAD: BUILD_ID = str(uuid.uuid4())
@@ -196,12 +197,14 @@ Help users identify and fix:
 ```python
 # Avoid
 import uuid
+
 BUILD_ID = str(uuid.uuid4())
 
 # Use instead
 BUILD_ID = "stable-build-id"
 # Or derive from source
 import hashlib
+
 BUILD_ID = hashlib.sha256(source_code.encode()).hexdigest()[:8]
 ```
 
@@ -210,12 +213,14 @@ BUILD_ID = hashlib.sha256(source_code.encode()).hexdigest()[:8]
 ```python
 # Avoid
 from datetime import datetime
+
 BUILD_TIME = datetime.now()
 
 # Use instead
 import os
 from datetime import datetime
-timestamp = int(os.environ.get('SOURCE_DATE_EPOCH', '0'))
+
+timestamp = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
 BUILD_TIME = datetime.fromtimestamp(timestamp)
 ```
 
@@ -223,10 +228,10 @@ BUILD_TIME = datetime.fromtimestamp(timestamp)
 
 ```python
 # Avoid
-files = set(Path('.').glob('*.py'))
+files = set(Path(".").glob("*.py"))
 
 # Use instead
-files = sorted(Path('.').glob('*.py'))
+files = sorted(Path(".").glob("*.py"))
 ```
 
 ## Testing Reproducibility
@@ -243,26 +248,27 @@ import tempfile
 import os
 from pathlib import Path
 
+
 def test_reproducible_build():
     """Test that builds are reproducible."""
-    os.environ['SOURCE_DATE_EPOCH'] = '1704067200'
+    os.environ["SOURCE_DATE_EPOCH"] = "1704067200"
 
     # Build twice
-    subprocess.run(['hatch', 'build'], check=True)
+    subprocess.run(["hatch", "build"], check=True)
 
-    wheels = list(Path('dist').glob('*.whl'))
+    wheels = list(Path("dist").glob("*.whl"))
     assert len(wheels) == 1
 
     # Calculate checksum
-    with open(wheels[0], 'rb') as f:
+    with open(wheels[0], "rb") as f:
         hash1 = hashlib.sha256(f.read()).hexdigest()
 
     # Clean and rebuild
-    subprocess.run(['rm', '-rf', 'dist'], check=True)
-    subprocess.run(['hatch', 'build'], check=True)
+    subprocess.run(["rm", "-rf", "dist"], check=True)
+    subprocess.run(["hatch", "build"], check=True)
 
-    wheels = list(Path('dist').glob('*.whl'))
-    with open(wheels[0], 'rb') as f:
+    wheels = list(Path("dist").glob("*.whl"))
+    with open(wheels[0], "rb") as f:
         hash2 = hashlib.sha256(f.read()).hexdigest()
 
     assert hash1 == hash2, "Builds are not reproducible!"
@@ -279,11 +285,7 @@ For consistent version timestamps:
 from datetime import datetime
 import os
 
-VERSION_DATES = {
-    "1.0.0": "2024-01-01",
-    "1.1.0": "2024-02-15",
-    "1.2.0": "2024-03-30",
-}
+VERSION_DATES = {"1.0.0": "2024-01-01", "1.1.0": "2024-02-15", "1.2.0": "2024-03-30"}
 
 version = "1.2.0"  # Get from project
 if version in VERSION_DATES:

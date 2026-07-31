@@ -26,7 +26,7 @@ methodology is in `docs/workflow-trace-methodology.md`.
 ## Agent roles
 
 Extraction agents are pending redesign (see the PRD at [../../docs/plans/prd-workflow-extractor.md](../../docs/plans/prd-workflow-extractor.md)).
-Do not use `general-purpose` for any extraction role.
+Route every extraction role through `dh:task-worker`; use the ensemble pattern and load specialist profiles through the worker when needed.
 Do not write worker output directly to a layer JSON without corroboration.
 
 ## Existing layer data (collected 2026-06-08)

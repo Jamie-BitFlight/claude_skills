@@ -41,6 +41,7 @@ Scope: $ARGUMENTS
 def process(data):
     return data.get("value")
 
+
 # Good - complete types
 def process(data: dict[str, int]) -> int | None:
     return data.get("value")
@@ -176,6 +177,7 @@ if result := expensive_call():
 # Bad - raw dict passed into typed core
 def handle_request(payload: dict) -> None:
     user = create_user(payload["name"], payload["email"])
+
 
 # Good - validated at boundary
 def handle_request(payload: dict) -> None:

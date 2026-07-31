@@ -14,6 +14,7 @@ All version source plugins must inherit from `VersionSourceInterface`:
 ```python
 from hatchling.version.source.plugin.interface import VersionSourceInterface
 
+
 class CustomVersionSource(VersionSourceInterface):
     """Custom version source implementation."""
 
@@ -106,7 +107,7 @@ def get_version_data(self) -> dict:
         "version": "1.2.3",
         "source_file": str(self.root / "VERSION"),
         "raw_version": "v1.2.3",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 ```
 
@@ -119,21 +120,15 @@ def get_version_data(self) -> dict:
     version_file = self.root / self.config["path"]
 
     if not version_file.exists():
-        raise FileNotFoundError(
-            f"Version file not found: {version_file}"
-        )
+        raise FileNotFoundError(f"Version file not found: {version_file}")
 
     try:
         version = version_file.read_text().strip()
     except Exception as e:
-        raise RuntimeError(
-            f"Failed to read version from {version_file}: {e}"
-        )
+        raise RuntimeError(f"Failed to read version from {version_file}: {e}")
 
     if not version:
-        raise ValueError(
-            f"Version file {version_file} is empty"
-        )
+        raise ValueError(f"Version file {version_file} is empty")
 
     return {"version": version}
 ```
@@ -156,9 +151,7 @@ If not implemented, raise `NotImplementedError`:
 ```python
 def set_version(self, version: str, version_data: dict) -> None:
     """Version setting not supported."""
-    raise NotImplementedError(
-        f"The {self.PLUGIN_NAME} source does not support setting versions"
-    )
+    raise NotImplementedError(f"The {self.PLUGIN_NAME} source does not support setting versions")
 ```
 
 ## Complete Example: File Version Source
@@ -167,6 +160,7 @@ def set_version(self, version: str, version_data: dict) -> None:
 # my_package/hatch_plugins.py
 from pathlib import Path
 from hatchling.version.source.plugin.interface import VersionSourceInterface
+
 
 class FileVersionSource(VersionSourceInterface):
     """Read version from a plain text file."""
@@ -182,9 +176,7 @@ class FileVersionSource(VersionSourceInterface):
         # Read file
         version_file = self.root / filename
         if not version_file.exists():
-            raise FileNotFoundError(
-                f"Version file '{filename}' not found at {version_file}"
-            )
+            raise FileNotFoundError(f"Version file '{filename}' not found at {version_file}")
 
         # Parse version
         content = version_file.read_text().strip()
@@ -192,13 +184,9 @@ class FileVersionSource(VersionSourceInterface):
 
         # Strip optional prefix
         if strip_prefix and version.startswith(strip_prefix):
-            version = version[len(strip_prefix):]
+            version = version[len(strip_prefix) :]
 
-        return {
-            "version": version,
-            "raw_content": content,
-            "source_file": str(version_file)
-        }
+        return {"version": version, "raw_content": content, "source_file": str(version_file)}
 
     def set_version(self, version: str, version_data: dict) -> None:
         """Write version to file."""
@@ -231,6 +219,7 @@ import subprocess
 from pathlib import Path
 from hatchling.version.source.plugin.interface import VersionSourceInterface
 
+
 class GitTagVersionSource(VersionSourceInterface):
     """Derive version from git tags."""
 
@@ -249,22 +238,16 @@ class GitTagVersionSource(VersionSourceInterface):
                 cwd=self.root,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             raw_version = result.stdout.strip()
 
         except subprocess.CalledProcessError:
             if strict:
-                raise RuntimeError(
-                    "No git tags found matching pattern: " + tag_pattern
-                )
+                raise RuntimeError("No git tags found matching pattern: " + tag_pattern)
             # Fallback to commit hash
             result = subprocess.run(
-                ["git", "rev-parse", "--short", "HEAD"],
-                cwd=self.root,
-                capture_output=True,
-                text=True,
-                check=True
+                ["git", "rev-parse", "--short", "HEAD"], cwd=self.root, capture_output=True, text=True, check=True
             )
             commit = result.stdout.strip()
             raw_version = f"0.0.0+g{commit}"
@@ -272,11 +255,7 @@ class GitTagVersionSource(VersionSourceInterface):
         # Clean version
         version = self._clean_version(raw_version)
 
-        return {
-            "version": version,
-            "raw_version": raw_version,
-            "source": "git"
-        }
+        return {"version": version, "raw_version": raw_version, "source": "git"}
 
     def _clean_version(self, raw: str) -> str:
         """Clean git version to PEP 440 format."""
@@ -301,22 +280,13 @@ class GitTagVersionSource(VersionSourceInterface):
         tag_name = f"{tag_prefix}{version}"
 
         # Check if tag exists
-        result = subprocess.run(
-            ["git", "tag", "-l", tag_name],
-            cwd=self.root,
-            capture_output=True,
-            text=True
-        )
+        result = subprocess.run(["git", "tag", "-l", tag_name], cwd=self.root, capture_output=True, text=True)
 
         if result.stdout.strip():
             raise ValueError(f"Tag {tag_name} already exists")
 
         # Create tag
-        subprocess.run(
-            ["git", "tag", tag_name],
-            cwd=self.root,
-            check=True
-        )
+        subprocess.run(["git", "tag", tag_name], cwd=self.root, check=True)
 
         print(f"Created git tag: {tag_name}")
 ```
@@ -379,10 +349,12 @@ import pytest
 from pathlib import Path
 from my_package.hatch_plugins import FileVersionSource
 
+
 class MockConfig:
     def __init__(self, root, config):
         self.root = Path(root)
         self.config = config
+
 
 def test_file_version_source(tmp_path):
     # Create version file
@@ -392,10 +364,7 @@ def test_file_version_source(tmp_path):
     # Create source
     source = FileVersionSource.__new__(FileVersionSource)
     source.root = tmp_path
-    source.config = {
-        "filename": "VERSION.txt",
-        "strip_prefix": "v"
-    }
+    source.config = {"filename": "VERSION.txt", "strip_prefix": "v"}
 
     # Test get_version_data
     data = source.get_version_data()
@@ -433,11 +402,7 @@ build-backend = "hatchling.build"
 
     # Test with hatch
     monkeypatch.chdir(tmp_path)
-    result = subprocess.run(
-        ["hatch", "version"],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(["hatch", "version"], capture_output=True, text=True)
     assert result.stdout.strip() == "1.2.3"
 ```
 
@@ -450,9 +415,7 @@ Provide clear error messages immediately:
 ```python
 def get_version_data(self):
     if "required_config" not in self.config:
-        raise ValueError(
-            f"{self.PLUGIN_NAME} source requires 'required_config' in configuration"
-        )
+        raise ValueError(f"{self.PLUGIN_NAME} source requires 'required_config' in configuration")
 ```
 
 ### 2. Document Configuration
@@ -461,6 +424,7 @@ Use docstrings and type hints:
 
 ```python
 from typing import Dict, Any
+
 
 class CustomSource(VersionSourceInterface):
     """
@@ -483,15 +447,14 @@ Ensure versions are PEP 440 compliant:
 ```python
 from packaging.version import Version, InvalidVersion
 
+
 def get_version_data(self):
     version_str = self._read_version()
 
     try:
         Version(version_str)  # Validate
     except InvalidVersion:
-        raise ValueError(
-            f"Invalid PEP 440 version: {version_str}"
-        )
+        raise ValueError(f"Invalid PEP 440 version: {version_str}")
 
     return {"version": version_str}
 ```

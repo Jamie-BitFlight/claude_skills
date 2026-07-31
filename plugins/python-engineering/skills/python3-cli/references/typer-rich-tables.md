@@ -35,23 +35,13 @@ def _get_table_width(table: Table) -> int:
 ## Table Creation and Print
 
 ```python
-table = Table(
-    title=":electric_plug: Device Status",
-    box=box.MINIMAL_DOUBLE_HEAD,
-    title_style="bold blue",
-)
+table = Table(title=":electric_plug: Device Status", box=box.MINIMAL_DOUBLE_HEAD, title_style="bold blue")
 table.add_column("Device", style="cyan", no_wrap=True)
 table.add_column("Status", justify="center", no_wrap=True)
 
 table.width = _get_table_width(table)  # natural width, no cap
 
-console.print(
-    table,
-    crop=False,
-    overflow="ignore",
-    no_wrap=True,
-    soft_wrap=True,
-)
+console.print(table, crop=False, overflow="ignore", no_wrap=True, soft_wrap=True)
 ```
 
 **Prohibited**: `table.width = min(_get_table_width(table), SOME_CAP)`. A cap defeats the measurement. If you believe a cap is required, re-read "The Goal: Zero Data Loss" above — the answer is that the consumer handles width, not the producer.

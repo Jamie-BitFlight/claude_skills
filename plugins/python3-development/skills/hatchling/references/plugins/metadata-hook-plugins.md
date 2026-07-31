@@ -19,7 +19,7 @@ Each metadata hook must define a string identifier:
 
 ```python
 class DynamicDescriptionHook(MetadataHookInterface):
-    PLUGIN_NAME = 'dynamic-description'
+    PLUGIN_NAME = "dynamic-description"
 ```
 
 Users select metadata hooks via configuration:
@@ -54,20 +54,17 @@ def update(self, metadata: dict) -> None:
         metadata: Mutable dictionary of project metadata
     """
     # Example: Set version from file
-    with open(os.path.join(self.root, 'VERSION')) as f:
-        metadata['version'] = f.read().strip()
+    with open(os.path.join(self.root, "VERSION")) as f:
+        metadata["version"] = f.read().strip()
 
     # Example: Set description from README
-    readme_path = os.path.join(self.root, 'README.md')
+    readme_path = os.path.join(self.root, "README.md")
     if os.path.exists(readme_path):
         with open(readme_path) as f:
-            metadata['description'] = f.read()
+            metadata["description"] = f.read()
 
     # Example: Add dynamic classifiers
-    metadata['classifiers'].extend([
-        'Environment :: Console',
-        'Topic :: Software Development',
-    ])
+    metadata["classifiers"].extend(["Environment :: Console", "Topic :: Software Development"])
 ```
 
 ### get_known_classifiers()
@@ -85,10 +82,7 @@ def get_known_classifiers(self) -> list[str]:
     Returns:
         list[str]: List of valid classifier strings
     """
-    return [
-        'Topic :: Documentation',
-        'Topic :: System :: Shells',
-    ]
+    return ["Topic :: Documentation", "Topic :: System :: Shells"]
 ```
 
 ## Configuration & Properties
@@ -141,8 +135,9 @@ Implement in `hatch_build.py`:
 ```python
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class CustomMetadataHook(MetadataHookInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def update(self, metadata):
         # Custom logic here
@@ -307,39 +302,40 @@ from hatchling.metadata.plugin.interface import MetadataHookInterface
 import os
 import json
 
+
 class JSONMetadataHook(MetadataHookInterface):
     """Load metadata from JSON configuration file."""
 
-    PLUGIN_NAME = 'json-config'
+    PLUGIN_NAME = "json-config"
 
     def update(self, metadata: dict) -> None:
-        config_file = os.path.join(self.root, self.config.get('file', 'metadata.json'))
+        config_file = os.path.join(self.root, self.config.get("file", "metadata.json"))
 
         if not os.path.exists(config_file):
-            raise FileNotFoundError(f'Metadata config not found: {config_file}')
+            raise FileNotFoundError(f"Metadata config not found: {config_file}")
 
         with open(config_file) as f:
             config = json.load(f)
 
         # Update version
-        if 'version' in config:
-            metadata['version'] = config['version']
+        if "version" in config:
+            metadata["version"] = config["version"]
 
         # Update description
-        if 'description' in config:
-            metadata['description'] = config['description']
+        if "description" in config:
+            metadata["description"] = config["description"]
 
         # Update classifiers
-        if 'classifiers' in config:
-            metadata['classifiers'].extend(config['classifiers'])
+        if "classifiers" in config:
+            metadata["classifiers"].extend(config["classifiers"])
 
         # Update urls
-        if 'urls' in config:
-            metadata.setdefault('urls', {}).update(config['urls'])
+        if "urls" in config:
+            metadata.setdefault("urls", {}).update(config["urls"])
 
     def get_known_classifiers(self) -> list[str]:
         """Return any custom classifiers from config."""
-        return self.config.get('known_classifiers', [])
+        return self.config.get("known_classifiers", [])
 ```
 
 ## Configuration Examples
@@ -385,20 +381,17 @@ environment = "production"  # Custom config for hook
 
 ```python
 class VersionMetadataHook(MetadataHookInterface):
-    PLUGIN_NAME = 'version'
+    PLUGIN_NAME = "version"
 
     def update(self, metadata: dict) -> None:
         # Read version from __init__.py
-        init_file = os.path.join(
-            self.root,
-            self.config.get('path', 'src/mypackage/__init__.py'),
-        )
+        init_file = os.path.join(self.root, self.config.get("path", "src/mypackage/__init__.py"))
         with open(init_file) as f:
             for line in f:
-                if line.startswith('__version__'):
+                if line.startswith("__version__"):
                     # Extract: __version__ = "1.0.0"
-                    version = line.split('=')[1].strip().strip('"\'')
-                    metadata['version'] = version
+                    version = line.split("=")[1].strip().strip("\"'")
+                    metadata["version"] = version
                     break
 ```
 
@@ -406,21 +399,21 @@ class VersionMetadataHook(MetadataHookInterface):
 
 ```python
 class PlatformClassifiersHook(MetadataHookInterface):
-    PLUGIN_NAME = 'platform-classifiers'
+    PLUGIN_NAME = "platform-classifiers"
 
     def update(self, metadata: dict) -> None:
         import sys
 
-        classifiers = ['Environment :: Console']
+        classifiers = ["Environment :: Console"]
 
-        if sys.platform == 'win32':
-            classifiers.append('Operating System :: Microsoft :: Windows')
-        elif sys.platform == 'darwin':
-            classifiers.append('Operating System :: MacOS')
+        if sys.platform == "win32":
+            classifiers.append("Operating System :: Microsoft :: Windows")
+        elif sys.platform == "darwin":
+            classifiers.append("Operating System :: MacOS")
         else:
-            classifiers.append('Operating System :: POSIX :: Linux')
+            classifiers.append("Operating System :: POSIX :: Linux")
 
-        metadata['classifiers'].extend(classifiers)
+        metadata["classifiers"].extend(classifiers)
 ```
 
 ### Combined with Version Source
@@ -456,17 +449,17 @@ Metadata hooks should validate classifier values:
 
 ```python
 def update(self, metadata: dict) -> None:
-    classifiers = metadata.get('classifiers', [])
+    classifiers = metadata.get("classifiers", [])
 
     # Ensure classifiers are valid strings
     if not all(isinstance(c, str) for c in classifiers):
-        raise ValueError('Classifiers must be strings')
+        raise ValueError("Classifiers must be strings")
 
     # Check for duplicates
     if len(classifiers) != len(set(classifiers)):
-        raise ValueError('Duplicate classifiers found')
+        raise ValueError("Duplicate classifiers found")
 
-    metadata['classifiers'] = classifiers
+    metadata["classifiers"] = classifiers
 ```
 
 ## See Also

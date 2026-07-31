@@ -109,12 +109,13 @@ Create build artifacts dynamically (e.g., generated code, compiled resources):
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict) -> None:
         # Generate files before build starts
         self.generate_code()
         # Add generated artifacts to build
-        build_data['artifacts'].append('generated/*.py')
+        build_data["artifacts"].append("generated/*.py")
 ```
 
 ### Managing Version Information

@@ -100,9 +100,9 @@ For each `bucket_NNN/` directory found under `./daily-releases/<date>/buckets/`:
 
 ```python
 Agent(
-  subagent_type="general-purpose",
-  model="claude-haiku-4-5-20251001",
-  prompt="""
+    subagent_type="general-purpose",
+    model="claude-haiku-4-5-20251001",
+    prompt="""
 Read: ./daily-releases/<date>/buckets/bucket_NNN/content.txt
 
 Apply the Per-Bucket Analysis Prompt from:
@@ -112,7 +112,7 @@ Write the structured JSON output to:
   ./daily-releases/<date>/summaries/bucket_NNN.json
 
 Report "bucket_NNN.json written" when done.
-"""
+""",
 )
 ```
 
@@ -133,9 +133,9 @@ lines_deleted). No synthesis agent needed.
 
 ```python
 Agent(
-  subagent_type="general-purpose",
-  model="claude-haiku-4-5-20251001",
-  prompt="""
+    subagent_type="general-purpose",
+    model="claude-haiku-4-5-20251001",
+    prompt="""
 Apply the Day Synthesis Prompt from:
   .claude/skills/daily-releases/references/synthesis_prompt.md
 
@@ -149,7 +149,7 @@ Also read ./daily-releases/<date>/dataset/files.json for statistics counts.
 Write the merged analysis JSON to: ./daily-releases/<date>/analysis.json
 
 Report "analysis.json written" when done.
-"""
+""",
 )
 ```
 

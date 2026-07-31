@@ -20,8 +20,9 @@ import os
 import socket
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeGuard
+from typing import TYPE_CHECKING, TypeGuard, TypeVar
 
 import holoviews as hv
 import hvplot.pandas  # ruff: ignore[unused-import]
@@ -30,12 +31,107 @@ import panel as pn
 import tornado.web
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from panel.io.server import StoppableThread
 
 
 logger = logging.getLogger(__name__)
+
+
+_AccessorT = TypeVar("_AccessorT", bound=Callable[..., object])
+
+
+def _is_get_port(value: object) -> TypeGuard[Callable[[], int | None]]:
+    """Narrow ``value`` to the ``get_port`` accessor contract.
+
+    ``callable()`` can only verify that ``value`` is invocable, not that its
+    parameter and return types match ``Callable[[], int | None]`` — Python
+    has no runtime mechanism to check a callable's signature. The narrowed
+    type is therefore a declared boundary contract, not a runtime-enforced
+    one; callers that pass a mistyped callable are only caught by ``ty``.
+
+    Args:
+        value: Object to test.
+
+    Returns:
+        ``True`` when ``value`` is callable.
+    """
+    return callable(value)
+
+
+def _is_get_start_time(value: object) -> TypeGuard[Callable[[], float | None]]:
+    """Narrow ``value`` to the ``get_start_time`` accessor contract.
+
+    See :func:`_is_get_port` for the runtime-verification caveat shared by
+    all four accessor guards in this module.
+
+    Args:
+        value: Object to test.
+
+    Returns:
+        ``True`` when ``value`` is callable.
+    """
+    return callable(value)
+
+
+def _is_get_csv_path(value: object) -> TypeGuard[Callable[[], Path | None]]:
+    """Narrow ``value`` to the ``get_csv_path`` accessor contract.
+
+    See :func:`_is_get_port` for the runtime-verification caveat shared by
+    all four accessor guards in this module.
+
+    Args:
+        value: Object to test.
+
+    Returns:
+        ``True`` when ``value`` is callable.
+    """
+    return callable(value)
+
+
+def _is_get_csv_rows(value: object) -> TypeGuard[Callable[[], int | None]]:
+    """Narrow ``value`` to the ``get_csv_rows`` accessor contract.
+
+    See :func:`_is_get_port` for the runtime-verification caveat shared by
+    all four accessor guards in this module.
+
+    Args:
+        value: Object to test.
+
+    Returns:
+        ``True`` when ``value`` is callable.
+    """
+    return callable(value)
+
+
+def _extract_accessor(
+    kwargs: dict[str, object], key: str, guard: Callable[[object], TypeGuard[_AccessorT]]
+) -> _AccessorT:
+    """Pull one named accessor callable out of ``initialize()`` kwargs.
+
+    Centralises the lookup/validate/raise sequence shared by all four
+    ``HealthHandler`` state accessors while keeping each accessor's exact
+    callable signature intact — the caller-supplied ``guard`` determines the
+    narrowed return type, so ``ty`` still catches a wrong-signature accessor
+    at the assignment site in :meth:`HealthHandler.initialize`.
+
+    Args:
+        kwargs: The raw keyword arguments passed to ``initialize()``.
+        key: The kwarg name to extract.
+        guard: A ``TypeGuard`` predicate narrowing to the accessor's exact
+            callable signature.
+
+    Returns:
+        The accessor narrowed to its declared callable signature.
+
+    Raises:
+        TypeError: If the value stored under ``key`` is not callable.
+    """
+    value = kwargs[key]
+    if not guard(value):
+        msg = f"{key} must be callable"
+        raise TypeError(msg)
+    return value
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -550,33 +646,33 @@ class HealthHandler(tornado.web.RequestHandler):
     than stale copies captured at thread-start time.
     """
 
-    _body: bytes
+    _body: str | bytes
     _get_port: Callable[[], int | None]
     _get_start_time: Callable[[], float | None]
     _get_csv_path: Callable[[], Path | None]
     _get_csv_rows: Callable[[], int | None]
 
-    def initialize(
-        self,
-        get_port: Callable[[], int | None],
-        get_start_time: Callable[[], float | None],
-        get_csv_path: Callable[[], Path | None],
-        get_csv_rows: Callable[[], int | None],
-    ) -> None:
+    def initialize(self, *args: object, **kwargs: object) -> None:
         """Store accessor lambdas for module-level dashboard state.
 
-        Args:
-            get_port: Returns the current dashboard port or ``None``.
-            get_start_time: Returns the monotonic start time or ``None``.
-            get_csv_path: Returns the CSV path or ``None``.
-            get_csv_rows: Returns the cached CSV row count or ``None``.
-        """
-        self._get_port = get_port
-        self._get_start_time = get_start_time
-        self._get_csv_path = get_csv_path
-        self._get_csv_rows = get_csv_rows
+        Each accessor is validated and narrowed to its exact callable
+        signature via :func:`_extract_accessor`, so a wrong-signature
+        accessor is caught by ``ty`` at the assignment below rather than
+        silently passing through as ``Callable[..., Any]``.
 
-    def get(self) -> None:
+        Args:
+            *args: Positional arguments passed by Tornado (unused).
+            **kwargs: Keyword arguments containing dashboard state accessors.
+
+        Raises:
+            TypeError: If any of the four required accessors is not callable.
+        """
+        self._get_port = _extract_accessor(kwargs, "get_port", _is_get_port)
+        self._get_start_time = _extract_accessor(kwargs, "get_start_time", _is_get_start_time)
+        self._get_csv_path = _extract_accessor(kwargs, "get_csv_path", _is_get_csv_path)
+        self._get_csv_rows = _extract_accessor(kwargs, "get_csv_rows", _is_get_csv_rows)
+
+    def get(self, *args: object, **kwargs: object) -> None:
         """Handle ``GET /health`` — return JSON with dashboard status.
 
         Always returns HTTP 200 when the handler is reachable.  The

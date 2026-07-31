@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from enum import IntEnum, StrEnum
 from io import TextIOWrapper
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, TypedDict
+from typing import TYPE_CHECKING, Annotated, TypedDict, cast
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -977,15 +977,20 @@ def fetch_tasks_from_beads(parent_issue_number: str, feature_slug: str, cache_pa
         try:
             task_status = _parse_yaml_status(str(raw.get("status", "not-started")))
             raw_priority = raw.get("priority", 2)
-            task_priority = TaskPriority(int(raw_priority)) if raw_priority is not None else TaskPriority.MEDIUM
+            task_priority = TaskPriority(raw_priority) if isinstance(raw_priority, int) else TaskPriority.MEDIUM
             issue_id = str(raw.get("id", ""))
-            metadata: dict[str, object] = raw.get("metadata", {}) or {}  # type: ignore[assignment]
+            metadata_value = raw.get("metadata", {})
+            metadata: dict[str, object] = (
+                cast("dict[str, object]", metadata_value) if isinstance(metadata_value, dict) else {}
+            )
+            dependencies_value = raw.get("dependencies", [])
+            dependencies = [str(d) for d in dependencies_value] if isinstance(dependencies_value, list) else []
             tasks.append(
                 Task(
                     id=issue_id,
                     name=str(raw.get("title", issue_id)),
                     status=task_status,
-                    dependencies=[str(d) for d in raw.get("dependencies", []) or []],
+                    dependencies=dependencies,
                     agent=str(metadata.get("dh.agent")) if metadata.get("dh.agent") else None,
                     priority=task_priority,
                     complexity="Medium",

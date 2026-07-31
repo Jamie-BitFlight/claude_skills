@@ -35,16 +35,19 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("MyServer")
 
+
 # All of these store components in the server's LocalProvider
 @mcp.tool
 def greet(name: str) -> str:
     """Greet someone by name."""
     return f"Hello, {name}!"
 
+
 @mcp.resource("data://config")
 def get_config() -> str:
     """Return configuration data."""
     return '{"version": "1.0"}'
+
 
 @mcp.prompt
 def analyze(topic: str) -> str:
@@ -61,9 +64,11 @@ from fastmcp.server.providers import LocalProvider
 
 shared_tools = LocalProvider()
 
+
 @shared_tools.tool
 def greet(name: str) -> str:
     return f"Hello, {name}!"
+
 
 server1 = FastMCP("Server1", providers=[shared_tools])
 server2 = FastMCP("Server2", providers=[shared_tools])
@@ -80,10 +85,12 @@ from fastmcp import FastMCP
 
 weather_server = FastMCP("Weather")
 
+
 @weather_server.tool
 def get_forecast(city: str) -> str:
     """Get weather forecast for a city."""
     return f"Sunny in {city}"
+
 
 main = FastMCP("MainApp")
 main.mount(weather_server)
@@ -99,13 +106,16 @@ RULE: Use `namespace=` to avoid naming conflicts when mounting multiple servers.
 weather = FastMCP("Weather")
 calendar = FastMCP("Calendar")
 
+
 @weather.tool
 def get_data() -> str:
     return "Weather data"
 
+
 @calendar.tool
 def get_data() -> str:
     return "Calendar data"
+
 
 main = FastMCP("Main")
 main.mount(weather, namespace="weather")
@@ -155,9 +165,11 @@ from fastmcp.server import create_proxy
 
 server = FastMCP("Orchestrator")
 
+
 @server.tool
 def local_tool() -> str:
     return "Local result"
+
 
 # Add proxied tools from a remote server
 external = create_proxy("http://external-server/mcp")
@@ -174,14 +186,7 @@ mcp.mount(create_proxy("http://api.example.com/mcp"), namespace="api")
 mcp.mount(create_proxy("./my_server.py"), namespace="local")
 
 # npm package via config dict
-github_config = {
-    "mcpServers": {
-        "default": {
-            "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-github"]
-        }
-    }
-}
+github_config = {"mcpServers": {"default": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"]}}}
 mcp.mount(create_proxy(github_config), namespace="github")
 ```
 
@@ -214,11 +219,7 @@ mcp.add_provider(provider)
 PATTERN: Use `FastMCP.from_openapi()` as a shorthand that creates the provider and wraps it in a server in one call.
 
 ```python
-mcp = FastMCP.from_openapi(
-    openapi_spec=spec,
-    client=client,
-    name="My API Server",
-)
+mcp = FastMCP.from_openapi(openapi_spec=spec, client=client, name="My API Server")
 ```
 
 ### Constructor Parameters
@@ -279,9 +280,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 
-mcp = FastMCP("MyServer", providers=[
-    FileSystemProvider(Path(__file__).parent / "mcp")
-])
+mcp = FastMCP("MyServer", providers=[FileSystemProvider(Path(__file__).parent / "mcp")])
 ```
 
 PATTERN: Component files use standalone decorators from their respective modules — not server-bound decorators.
@@ -289,6 +288,7 @@ PATTERN: Component files use standalone decorators from their respective modules
 ```python
 # mcp/tools/greet.py
 from fastmcp.tools import tool
+
 
 @tool
 def greet(name: str) -> str:
@@ -300,6 +300,7 @@ def greet(name: str) -> str:
 # mcp/resources/config.py
 from fastmcp.resources import resource
 
+
 @resource("config://app")
 def get_app_config() -> str:
     """Get application configuration."""
@@ -309,6 +310,7 @@ def get_app_config() -> str:
 ```python
 # mcp/prompts/assistant.py
 from fastmcp.prompts import prompt
+
 
 @prompt
 def code_review(code: str, language: str = "python") -> str:
@@ -349,10 +351,14 @@ mcp = FastMCP("Skills Server")
 mcp.add_provider(ClaudeSkillsProvider())
 
 # Or specify custom root(s)
-mcp.add_provider(SkillsDirectoryProvider(roots=[
-    Path.cwd() / ".claude" / "skills",      # Project-level first
-    Path.home() / ".claude" / "skills",     # User-level fallback
-]))
+mcp.add_provider(
+    SkillsDirectoryProvider(
+        roots=[
+            Path.cwd() / ".claude" / "skills",  # Project-level first
+            Path.home() / ".claude" / "skills",  # User-level fallback
+        ]
+    )
+)
 ```
 
 Each subdirectory containing a `SKILL.md` file becomes a discoverable skill. Clients access skills via:
@@ -374,6 +380,7 @@ from collections.abc import Sequence
 from fastmcp.server.providers import Provider
 from fastmcp.tools import Tool
 
+
 class DatabaseProvider(Provider):
     def __init__(self, db_url: str):
         super().__init__()
@@ -392,6 +399,7 @@ PATTERN: Override `lifespan()` for connection setup and teardown.
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
+
 class DatabaseProvider(Provider):
     @asynccontextmanager
     async def lifespan(self) -> AsyncIterator[None]:
@@ -409,6 +417,7 @@ def add(a: int, b: int) -> int:
     """Add two numbers."""
     return a + b
 
+
 tool = Tool.from_function(add, name="calculator_add", description="Add two integers")
 ```
 
@@ -420,10 +429,7 @@ RULE: Only implement the `_list_*` methods for component types your provider off
 
 ```python
 # At construction time
-mcp = FastMCP(
-    "MyServer",
-    providers=[DatabaseProvider(db_url), ConfigProvider(config_path)],
-)
+mcp = FastMCP("MyServer", providers=[DatabaseProvider(db_url), ConfigProvider(config_path)])
 
 # After construction
 mcp = FastMCP("MyServer")

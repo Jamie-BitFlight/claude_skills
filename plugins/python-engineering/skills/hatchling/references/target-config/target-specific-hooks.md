@@ -177,9 +177,9 @@ Hooks can modify build data to influence target behavior. Standard fields includ
 
 ```python
 build_data = {
-    'artifacts': [],        # List of artifact patterns to include
-    'force_include': {},    # Dict of paths to force include in build
-    'build_hooks': tuple()  # Immutable sequence of configured hook names
+    "artifacts": [],  # List of artifact patterns to include
+    "force_include": {},  # Dict of paths to force include in build
+    "build_hooks": tuple(),  # Immutable sequence of configured hook names
 }
 ```
 
@@ -188,7 +188,7 @@ Always append to `artifacts` rather than replacing:
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     # CORRECT: Append to existing artifacts
-    build_data['artifacts'].append('**/*.so')
+    build_data["artifacts"].append("**/*.so")
 
     # INCORRECT: Don't replace
     # build_data['artifacts'] = ['**/*.so']
@@ -209,16 +209,17 @@ path = "hatch_build.py"
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomHook(BuildHookInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def initialize(self, version: str, build_data: dict) -> None:
         # Generate version file
-        with open('src/mypackage/_version.py', 'w') as f:
+        with open("src/mypackage/_version.py", "w") as f:
             f.write(f'__version__ = "{version}"\n')
 
         # Add generated file as artifact
-        build_data['artifacts'].append('src/mypackage/_version.py')
+        build_data["artifacts"].append("src/mypackage/_version.py")
 ```
 
 ### Example 2: Different Hooks for Different Targets

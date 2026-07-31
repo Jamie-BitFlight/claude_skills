@@ -18,10 +18,10 @@ from hatchling.builders.plugin.interface import BuilderInterface
 
 
 class CustomBuilder(BuilderInterface):
-    PLUGIN_NAME = 'custom'
+    PLUGIN_NAME = "custom"
 
     def get_version_api(self):
-        return {'standard': self.build_standard}
+        return {"standard": self.build_standard}
 
     def build_standard(self, directory, **kwargs):
         # Your build logic here
@@ -39,11 +39,7 @@ Returns a dictionary mapping version names to build methods:
 
 ```python
 def get_version_api(self):
-    return {
-        'standard': self.build_standard,
-        'minified': self.build_minified,
-        'debug': self.build_debug,
-    }
+    return {"standard": self.build_standard, "minified": self.build_minified, "debug": self.build_debug}
 ```
 
 #### Build Methods
@@ -104,13 +100,10 @@ from hatchling.builders.plugin.interface import BuilderInterface
 
 
 class JSONBuilder(BuilderInterface):
-    PLUGIN_NAME = 'json'
+    PLUGIN_NAME = "json"
 
     def get_version_api(self):
-        return {
-            'standard': self.build_standard,
-            'pretty': self.build_pretty,
-        }
+        return {"standard": self.build_standard, "pretty": self.build_pretty}
 
     def build_standard(self, directory, **kwargs):
         """Build compact JSON metadata."""
@@ -123,17 +116,17 @@ class JSONBuilder(BuilderInterface):
     def _build_json(self, directory, indent):
         """Common JSON building logic."""
         metadata = {
-            'name': self.metadata.core.name,
-            'version': self.metadata.version,
-            'description': self.metadata.core.description,
-            'dependencies': list(self.metadata.core.dependencies),
-            'files': self.get_included_files(),
+            "name": self.metadata.core.name,
+            "version": self.metadata.version,
+            "description": self.metadata.core.description,
+            "dependencies": list(self.metadata.core.dependencies),
+            "files": self.get_included_files(),
         }
 
         output_file = Path(directory) / f"{self.metadata.core.name}-{self.metadata.version}.json"
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(metadata, f, indent=indent)
 
         return str(output_file)
@@ -172,8 +165,8 @@ Read custom configuration:
 ```python
 def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self.compression = self.target_config.get('compression', 'gzip')
-    self.include_tests = self.target_config.get('include-tests', False)
+    self.compression = self.target_config.get("compression", "gzip")
+    self.include_tests = self.target_config.get("include-tests", False)
 ```
 
 Configuration in `pyproject.toml`:
@@ -191,8 +184,8 @@ Modify build data for other builders:
 ```python
 def initialize(self, version, build_data):
     """Called before building."""
-    build_data['custom_field'] = 'custom_value'
-    build_data['artifacts'].append('*.custom')
+    build_data["custom_field"] = "custom_value"
+    build_data["artifacts"].append("*.custom")
 ```
 
 ## Practical Examples
@@ -201,36 +194,26 @@ def initialize(self, version, build_data):
 
 ```python
 class DocsBuilder(BuilderInterface):
-    PLUGIN_NAME = 'docs'
+    PLUGIN_NAME = "docs"
 
     def get_version_api(self):
-        return {'standard': self.build_docs}
+        return {"standard": self.build_docs}
 
     def build_docs(self, directory, **kwargs):
         import subprocess
         from pathlib import Path
 
         # Build Sphinx documentation
-        docs_dir = self.root / 'docs'
-        output_dir = Path(directory) / 'docs'
+        docs_dir = self.root / "docs"
+        output_dir = Path(directory) / "docs"
 
-        subprocess.run([
-            'sphinx-build',
-            '-b', 'html',
-            str(docs_dir),
-            str(output_dir)
-        ], check=True)
+        subprocess.run(["sphinx-build", "-b", "html", str(docs_dir), str(output_dir)], check=True)
 
         # Create archive
         archive_name = f"{self.metadata.core.name}-docs-{self.metadata.version}.tar.gz"
         archive_path = Path(directory) / archive_name
 
-        subprocess.run([
-            'tar', '-czf',
-            str(archive_path),
-            '-C', str(directory),
-            'docs'
-        ], check=True)
+        subprocess.run(["tar", "-czf", str(archive_path), "-C", str(directory), "docs"], check=True)
 
         return str(archive_path)
 ```
@@ -239,14 +222,10 @@ class DocsBuilder(BuilderInterface):
 
 ```python
 class InstallerBuilder(BuilderInterface):
-    PLUGIN_NAME = 'installer'
+    PLUGIN_NAME = "installer"
 
     def get_version_api(self):
-        return {
-            'windows': self.build_windows,
-            'macos': self.build_macos,
-            'linux': self.build_linux,
-        }
+        return {"windows": self.build_windows, "macos": self.build_macos, "linux": self.build_linux}
 
     def build_windows(self, directory, **kwargs):
         """Build Windows installer using NSIS."""
@@ -301,7 +280,7 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
 class CustomBuildHook(BuildHookInterface):
-    PLUGIN_NAME = 'custom-hook'
+    PLUGIN_NAME = "custom-hook"
 
     def initialize(self, version, build_data):
         """Run before build."""
@@ -321,11 +300,11 @@ class CustomBuildHook(BuildHookInterface):
 ```python
 def build_standard(self, directory, **kwargs):
     # Validate configuration
-    if not self.target_config.get('required-option'):
+    if not self.target_config.get("required-option"):
         raise ValueError("'required-option' must be specified")
 
     # Validate environment
-    if not shutil.which('required-tool'):
+    if not shutil.which("required-tool"):
         raise RuntimeError("'required-tool' not found in PATH")
 
     # Proceed with build
@@ -354,25 +333,15 @@ from my_builder import CustomBuilder
 
 
 def test_builder_configuration(tmp_path):
-    builder = CustomBuilder(
-        root=tmp_path,
-        plugin_name='custom',
-        config={},
-        target_config={'option': 'value'}
-    )
+    builder = CustomBuilder(root=tmp_path, plugin_name="custom", config={}, target_config={"option": "value"})
 
-    assert builder.target_config['option'] == 'value'
+    assert builder.target_config["option"] == "value"
 
 
 def test_build_artifact(tmp_path, mock_project):
-    builder = CustomBuilder(
-        root=mock_project,
-        plugin_name='custom',
-        config={},
-        target_config={}
-    )
+    builder = CustomBuilder(root=mock_project, plugin_name="custom", config={}, target_config={})
 
-    output_dir = tmp_path / 'dist'
+    output_dir = tmp_path / "dist"
     output_dir.mkdir()
 
     artifact = builder.build_standard(str(output_dir))
@@ -391,9 +360,9 @@ def test_integration(tmp_path):
     runner = Runner()
     project_dir = create_test_project(tmp_path)
 
-    result = runner(['build', '-t', 'custom'], cwd=project_dir)
+    result = runner(["build", "-t", "custom"], cwd=project_dir)
     assert result.exit_code == 0
-    assert 'custom' in result.output
+    assert "custom" in result.output
 ```
 
 ## Performance Optimization
@@ -424,7 +393,7 @@ def build_standard(self, directory, **kwargs):
     cache_key = self.get_cache_key()
     cached_artifact = self.get_cached_artifact(cache_key)
 
-    if cached_artifact and not kwargs.get('force'):
+    if cached_artifact and not kwargs.get("force"):
         return cached_artifact
 
     artifact = self._do_build(directory)

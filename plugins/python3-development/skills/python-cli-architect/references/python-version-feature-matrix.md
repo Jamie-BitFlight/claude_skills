@@ -52,6 +52,7 @@ same type as the class.
 ```python
 from typing import Self
 
+
 class Builder:
     def set_name(self, name: str) -> Self:
         self._name = name
@@ -64,6 +65,7 @@ equal to plain strings.
 
 ```python
 from enum import StrEnum
+
 
 class Status(StrEnum):
     PENDING = "pending"
@@ -101,6 +103,7 @@ from typing import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts")
 
+
 def zip_apply(*fns: Unpack[Ts]) -> tuple[Unpack[Ts]]: ...
 ```
 
@@ -109,6 +112,7 @@ requiring that a string argument be a literal or composed only from literals.
 
 ```python
 from typing import LiteralString
+
 
 def execute_query(sql: LiteralString) -> list[dict]: ...
 ```
@@ -119,6 +123,7 @@ enabling exhaustiveness checking in `match`/`if-elif` chains.
 ```python
 from typing import Never
 
+
 def assert_never(value: Never) -> Never:
     raise AssertionError(f"Unexpected value: {value}")
 ```
@@ -128,6 +133,7 @@ required or optional within a `TypedDict` without splitting it into two separate
 
 ```python
 from typing import TypedDict, Required, NotRequired
+
 
 class Config(TypedDict):
     name: Required[str]
@@ -198,6 +204,7 @@ Available via `typing_extensions` for 3.11 floors.
 from typing import override  # stdlib 3.12+
 # from typing_extensions import override  # for 3.11 floor
 
+
 class Child(Parent):
     @override
     def process(self, value: str) -> str: ...
@@ -210,9 +217,11 @@ using a `TypedDict`. Available via `typing_extensions` for 3.11 floors.
 from typing import TypedDict, Unpack  # stdlib 3.12+
 # from typing_extensions import TypedDict, Unpack  # for 3.11 floor
 
+
 class Options(TypedDict):
     timeout: int
     retries: int
+
 
 def connect(**kwargs: Unpack[Options]) -> None: ...
 ```
@@ -255,8 +264,10 @@ Available via `typing_extensions` for 3.11 and 3.12 floors.
 from typing import TypeIs  # stdlib 3.13+
 # from typing_extensions import TypeIs  # for < 3.13 floor
 
+
 def is_string_list(val: list[object]) -> TypeIs[list[str]]:
     return all(isinstance(x, str) for x in val)
+
 
 def process(items: list[object]) -> None:
     if is_string_list(items):
@@ -272,6 +283,7 @@ at the type-checker level. Available via `typing_extensions` for 3.11 and 3.12 f
 from typing import TypedDict, ReadOnly  # stdlib 3.13+
 # from typing_extensions import TypedDict, ReadOnly  # for < 3.13 floor
 
+
 class Config(TypedDict):
     name: ReadOnly[str]
     debug: bool
@@ -285,6 +297,7 @@ for 3.11 and 3.12 floors.
 from typing import deprecated  # stdlib 3.13+
 # from typing_extensions import deprecated  # for < 3.13 floor
 
+
 @deprecated("Use new_function() instead.")
 def old_function() -> None: ...
 ```
@@ -295,6 +308,7 @@ the type parameter is not supplied. Available via `typing_extensions` for 3.11 a
 ```python
 # typing_extensions backport available for < 3.13
 from typing import TypeVar
+
 T = TypeVar("T", default=str)  # typing_extensions form for 3.11/3.12
 ```
 
@@ -366,6 +380,7 @@ The architect must NOT prescribe the following:
 class Pair[T, U]:  # native generic syntax — 3.12+ only
     ...
 
+
 type Callback = Callable[[str], None]  # type statement — 3.12+ only
 ```
 
@@ -385,7 +400,9 @@ from typing_extensions import TypeIs  # with note: until >= 3.13
 # WRONG at any version — deprecated since 3.10
 from typing import Optional, List, Dict, Union, Tuple
 
+
 def process(items: List[str], mapping: Dict[str, int]) -> Optional[str]: ...
+
 
 # CORRECT at any supported version
 def process(items: list[str], mapping: dict[str, int]) -> str | None: ...

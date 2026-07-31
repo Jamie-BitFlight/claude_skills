@@ -21,7 +21,8 @@ class Resource:
     def __init__(self, name: str) -> None:
         self.name = name
 
-r = Resource('x')
+
+r = Resource("x")
 print(r.name)  # OK
 print(r.id)  # Error: "Resource" has no attribute "id" [attr-defined]
 r.id = 5  # Error: "Resource" has no attribute "id" [attr-defined]
@@ -38,6 +39,7 @@ from os import non_existent
 
 ```python
 import untyped_library
+
 x = untyped_library.some_function()
 y = x.undefined_attr  # May produce [attr-defined] error
 ```
@@ -54,14 +56,16 @@ class Resource:
     def set_description(self, desc: str) -> None:
         self.description = desc  # OK - attribute defined in method
 
-r = Resource('test')
-r.set_description('My resource')  # OK
+
+r = Resource("test")
+r.set_description("My resource")  # OK
 ```
 
 #### Using typed attributes with explicit type hints
 
 ```python
 from typing import Optional
+
 
 class Resource:
     name: str
@@ -79,9 +83,10 @@ class Car:
     def __init__(self, make: str) -> None:
         self.make = make
 
-car = Car('Toyota')
+
+car = Car("Toyota")
 print(car.model)  # Error: "Car" has no attribute "model" [attr-defined]
-car.color = 'red'  # Error: "Car" has no attribute "color" [attr-defined]
+car.color = "red"  # Error: "Car" has no attribute "color" [attr-defined]
 
 # Also applies to modules:
 from typing import Any
@@ -89,7 +94,8 @@ from unknown_module import something  # May error if not found
 
 # And wrong attribute names:
 import json
-data = json.loads('{}')
+
+data = json.loads("{}")
 result = data.validate()  # Error if validate doesn't exist on dict
 ```
 
@@ -102,12 +108,14 @@ class Car:
         self.model = model
         self.color = color
 
-car = Car('Toyota', 'Camry', 'red')
+
+car = Car("Toyota", "Camry", "red")
 print(car.model)  # OK
 print(car.color)  # OK
 
 # Or with explicit type annotations:
 from typing import Optional
+
 
 class Car:
     make: str
@@ -119,8 +127,9 @@ class Car:
         self.model = model
         self.color = None
 
-car = Car('Toyota', 'Camry')
-car.color = 'red'  # OK
+
+car = Car("Toyota", "Camry")
+car.color = "red"  # OK
 ```
 
 ### Configuration Options
@@ -131,10 +140,12 @@ This error is enabled by default and cannot be disabled directly. However, you c
 # Suppress for one line
 x = obj.undefined  # type: ignore[attr-defined]
 
+
 # Suppress for a block
 # mypy: disable-error-code="attr-defined"
-class MyClass:
-    ...
+class MyClass: ...
+
+
 # mypy: enable-error-code="attr-defined"
 ```
 
@@ -161,9 +172,11 @@ class Cat:
     def sleep(self) -> None: ...
     def miaow(self) -> None: ...
 
+
 class Dog:
     def sleep(self) -> None: ...
     def follow_me(self) -> None: ...
+
 
 def func(animal: Cat | Dog) -> None:
     # OK: 'sleep' is defined for both Cat and Dog
@@ -179,6 +192,7 @@ class User:
     def greet(self) -> str:
         return "hello"
 
+
 def process(user: User | None) -> str:
     # Error: Item "None" of "User | None" has no attribute "greet" [union-attr]
     return user.greet()
@@ -193,9 +207,11 @@ class Cat:
     def sleep(self) -> None: ...
     def miaow(self) -> None: ...
 
+
 class Dog:
     def sleep(self) -> None: ...
     def follow_me(self) -> None: ...
+
 
 def func(animal: Cat | Dog) -> None:
     animal.sleep()  # OK
@@ -211,6 +227,7 @@ class User:
     def greet(self) -> str:
         return "hello"
 
+
 def process(user: User | None) -> str:
     if user is None:
         return "no user"
@@ -222,15 +239,19 @@ def process(user: User | None) -> str:
 ```python
 from typing import Union
 
+
 class Circle:
     def get_radius(self) -> float: ...
+
 
 class Square:
     def get_side(self) -> float: ...
 
+
 def get_area(shape: Circle | Square) -> float:
     # Error: Item "Square" of "Circle | Square" has no attribute "get_radius" [union-attr]
     return 3.14159 * shape.get_radius() ** 2
+
 
 def greet(person: object | None) -> None:
     # Error: Item "None" of "object | None" has no attribute "say_hello" [union-attr]
@@ -242,44 +263,53 @@ def greet(person: object | None) -> None:
 ```python
 from typing import Union
 
+
 class Circle:
     def __init__(self, radius: float):
         self.radius = radius
+
 
 class Square:
     def __init__(self, side: float):
         self.side = side
 
+
 def get_area(shape: Circle | Square) -> float:
     if isinstance(shape, Circle):
-        return 3.14159 * shape.radius ** 2
+        return 3.14159 * shape.radius**2
     else:
-        return shape.side ** 2
+        return shape.side**2
+
 
 def greet(person: object | None) -> None:
-    if person is not None and hasattr(person, 'say_hello'):
+    if person is not None and hasattr(person, "say_hello"):
         person.say_hello()
+
 
 # Or use common interface:
 from abc import ABC, abstractmethod
 
+
 class Shape(ABC):
     @abstractmethod
     def area(self) -> float: ...
+
 
 class Circle(Shape):
     def __init__(self, radius: float):
         self.radius = radius
 
     def area(self) -> float:
-        return 3.14159 * self.radius ** 2
+        return 3.14159 * self.radius**2
+
 
 class Square(Shape):
     def __init__(self, side: float):
         self.side = side
 
     def area(self) -> float:
-        return self.side ** 2
+        return self.side**2
+
 
 def get_area(shape: Shape) -> float:
     return shape.area()  # OK
@@ -295,6 +325,7 @@ animal.follow_me()  # type: ignore[union-attr]
 
 # Use type assertion to narrow type
 from typing import cast
+
 dog = cast(Dog, animal)
 dog.follow_me()  # OK
 ```
@@ -336,10 +367,13 @@ class Problem:
 ```python
 # module_a.py
 from module_b import process
+
 value = process()  # Error if module_b imports from module_a
 
 # module_b.py
 from module_a import value
+
+
 def process():
     return value * 2
 ```
@@ -364,6 +398,7 @@ def process() -> int:
     x = get_value()  # OK - type is inferred
     return x * 2
 
+
 def get_value() -> int:
     return 42
 ```
@@ -385,6 +420,7 @@ class DataProcessor:
 ```python
 from typing import Dict, Any
 
+
 class DataProcessor:
     cache: Dict[str, Any]
 
@@ -405,5 +441,6 @@ self.x: Any = self.y
 
 # Or use explicit type annotation
 from typing import Optional
+
 self.y: Optional[int] = None
 ```

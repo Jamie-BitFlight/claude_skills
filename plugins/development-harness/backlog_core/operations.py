@@ -4978,9 +4978,11 @@ def get_sam_tasks(
                 if cached.get("parent_issue_number") == parent_issue_number:
                     out.warn(f"  WARNING: GitHub unavailable — returning cached tasks from {cache_file.name}")
                     cached_tasks_raw = cached.get("tasks", [])
-                    cached_tasks: list[dict[str, object]] = (
-                        cached_tasks_raw if isinstance(cached_tasks_raw, list) else []
-                    )
+                    cached_tasks: list[dict[str, object]] = [
+                        {str(k): v for k, v in item.items()}
+                        for item in (cached_tasks_raw if isinstance(cached_tasks_raw, list) else [])
+                        if isinstance(item, dict)
+                    ]
                     count_raw = cached.get("count", len(cached_tasks))
                     return {
                         "tasks": cached_tasks,

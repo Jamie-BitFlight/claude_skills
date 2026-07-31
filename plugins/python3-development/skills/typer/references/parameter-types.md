@@ -38,15 +38,15 @@ import typer
 import enum
 from typing import Annotated
 
+
 class NeuralNetwork(str, enum.Enum):
     simple = "simple"
     conv = "conv"
     lstm = "lstm"
 
+
 @app.command()
-def train(
-    network: Annotated[NeuralNetwork, typer.Option()] = NeuralNetwork.simple,
-):
+def train(network: Annotated[NeuralNetwork, typer.Option()] = NeuralNetwork.simple):
     typer.echo(f"Training neural network of type: {network.value}")
 ```
 
@@ -70,10 +70,9 @@ Use `Literal` for choices without defining a class:
 ```python
 from typing import Annotated, Literal
 
+
 @app.command()
-def train(
-    network: Annotated[Literal["simple", "conv", "lstm"], typer.Option()] = "simple",
-):
+def train(network: Annotated[Literal["simple", "conv", "lstm"], typer.Option()] = "simple"):
     typer.echo(f"Training: {network}")
 ```
 
@@ -93,11 +92,9 @@ Use `typer.Option()` or `typer.Argument()` with `min` and `max` to constrain num
 import typer
 from typing import Annotated
 
+
 @app.command()
-def main(
-    percent: Annotated[float, typer.Option(min=0, max=100)] = 40.0,
-    rank: Annotated[int, typer.Option(min=0)] = 0,
-):
+def main(percent: Annotated[float, typer.Option(min=0, max=100)] = 40.0, rank: Annotated[int, typer.Option(min=0)] = 0):
     typer.echo(f"Percent: {percent}, Rank: {rank}")
 ```
 
@@ -118,15 +115,9 @@ import typer
 from pathlib import Path
 from typing import Annotated
 
+
 @app.command()
-def main(
-    config: Annotated[Path, typer.Option(
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-    )],
-):
+def main(config: Annotated[Path, typer.Option(exists=True, file_okay=True, dir_okay=False, readable=True)]):
     typer.echo(f"Config: {config}")
 ```
 
@@ -138,10 +129,9 @@ For file objects (opened handles), use `typer.FileText` or `typer.FileBinaryRead
 from typing import Annotated
 import typer
 
+
 @app.command()
-def main(
-    config: Annotated[typer.FileText, typer.Option()] = ...,
-):
+def main(config: Annotated[typer.FileText, typer.Option()] = ...):
     text = config.read()
     typer.echo(text)
 ```
@@ -157,10 +147,9 @@ import typer
 from datetime import datetime
 from typing import Annotated
 
+
 @app.command()
-def main(
-    launch: Annotated[datetime, typer.Option()] = datetime(2023, 1, 1),
-):
+def main(launch: Annotated[datetime, typer.Option()] = datetime(2023, 1, 1)):
     typer.echo(f"Launch date: {launch}")
 ```
 
@@ -177,10 +166,9 @@ import typer
 import uuid
 from typing import Annotated
 
+
 @app.command()
-def main(
-    user_id: Annotated[uuid.UUID, typer.Argument()],
-):
+def main(user_id: Annotated[uuid.UUID, typer.Argument()]):
     typer.echo(f"User ID: {user_id}")
 ```
 
@@ -197,6 +185,7 @@ import click
 import typer
 from typing import Annotated
 
+
 class EmailType(click.ParamType):
     name = "email"
 
@@ -205,10 +194,9 @@ class EmailType(click.ParamType):
             self.fail(f"{value!r} is not a valid email address", param, ctx)
         return value
 
+
 @app.command()
-def main(
-    email: Annotated[str, typer.Option(click_type=EmailType())],
-):
+def main(email: Annotated[str, typer.Option(click_type=EmailType())]):
     typer.echo(f"Email: {email}")
 ```
 

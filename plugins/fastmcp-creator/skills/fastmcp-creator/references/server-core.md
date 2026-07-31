@@ -99,6 +99,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(name="CalculatorServer")
 
+
 @mcp.tool
 def add(a: int, b: int) -> int:
     """Adds two integer numbers together."""
@@ -141,6 +142,7 @@ from fastmcp.dependencies import CurrentContext
 
 mcp = FastMCP("PersonalizedServer")
 
+
 @mcp.tool
 async def get_user_tools(ctx: Context = CurrentContext()) -> list[str]:
     """Return the list of tools available to the current user."""
@@ -149,6 +151,7 @@ async def get_user_tools(ctx: Context = CurrentContext()) -> list[str]:
     if user_id.startswith("admin:"):
         return ["search", "delete", "export"]
     return ["search"]
+
 
 @mcp.tool
 async def search(query: str, ctx: Context = CurrentContext()) -> list[dict]:
@@ -169,6 +172,7 @@ async def set_user_preference(key: str, value: str, ctx: Context) -> str:
     """Store a user preference for this session."""
     await ctx.set_state(f"pref:{key}", value)
     return f"Preference '{key}' saved"
+
 
 @mcp.tool
 async def get_user_preference(key: str, ctx: Context) -> str | None:
@@ -201,6 +205,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(name="AsyncServer")
 
+
 @mcp.tool
 async def fetch_data(url: str) -> str:
     """Fetch data from a URL asynchronously."""
@@ -222,10 +227,12 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(name="DataServer")
 
+
 @mcp.resource("data://config")
 def get_config() -> str:
     """Provides application configuration as JSON."""
     import json
+
     return json.dumps({"theme": "dark", "version": "1.2.0"})
 ```
 [3]
@@ -261,13 +268,11 @@ Resources must return `str`, `bytes`, or `ResourceResult`.
 ```python
 from fastmcp.resources import ResourceResult, ResourceContent
 
+
 @mcp.resource("data://users")
 def get_users() -> ResourceResult:
     return ResourceResult(
-        contents=[
-            ResourceContent(content='[{"id": 1}]', mime_type="application/json"),
-        ],
-        meta={"total": 1}
+        contents=[ResourceContent(content='[{"id": 1}]', mime_type="application/json")], meta={"total": 1}
     )
 ```
 [3]
@@ -288,10 +293,12 @@ from fastmcp.prompts import Message
 
 mcp = FastMCP(name="PromptServer")
 
+
 @mcp.prompt
 def ask_about_topic(topic: str) -> str:
     """Generates a user message asking for an explanation."""
     return f"Can you please explain the concept of '{topic}'?"
+
 
 @mcp.prompt
 def generate_code_request(language: str, task: str) -> list[Message]:
@@ -328,6 +335,7 @@ PATTERN: Access MCP context by adding a `ctx: Context` parameter to any tool, re
 from fastmcp import FastMCP, Context
 
 mcp = FastMCP(name="ContextDemo")
+
 
 @mcp.tool
 async def process_file(file_uri: str, ctx: Context) -> str:
@@ -385,15 +393,13 @@ async def read_config(ctx: Context) -> str:
     content_list = await ctx.read_resource("data://config")
     return content_list[0].content
 
+
 @mcp.tool
 async def list_available(ctx: Context) -> dict:
     """List available resources and prompts."""
     resources = await ctx.list_resources()
     prompts = await ctx.list_prompts()
-    return {
-        "resources": [r.uri for r in resources],
-        "prompts": [p.name for p in prompts],
-    }
+    return {"resources": [r.uri for r in resources], "prompts": [p.name for p in prompts]}
 ```
 [3]
 
@@ -408,6 +414,7 @@ async def increment_counter(ctx: Context) -> int:
     count = await ctx.get_state("counter") or 0
     await ctx.set_state("counter", count + 1)
     return count + 1
+
 
 @mcp.tool
 async def get_counter(ctx: Context) -> int:
@@ -430,10 +437,7 @@ CONSTRAINT: State expires after 1 day. Non-JSON-serializable values (e.g., HTTP 
 @mcp.tool
 async def request_info(ctx: Context) -> dict:
     """Return information about the current request."""
-    return {
-        "request_id": ctx.request_id,
-        "client_id": ctx.client_id or "unknown",
-    }
+    return {"request_id": ctx.request_id, "client_id": ctx.client_id or "unknown"}
 ```
 [3]
 
@@ -449,6 +453,7 @@ RULE: Use the `@lifespan` decorator to run setup code once at server start and t
 from fastmcp import FastMCP, Context
 from fastmcp.server.lifespan import lifespan
 
+
 @lifespan
 async def app_lifespan(server):
     # Setup: runs once when server starts
@@ -459,7 +464,9 @@ async def app_lifespan(server):
         # Teardown: runs when server stops
         await db.close()
 
+
 mcp = FastMCP("MyServer", lifespan=app_lifespan)
+
 
 @mcp.tool
 async def query_data(query: str, ctx: Context) -> list:
@@ -477,6 +484,7 @@ async def config_lifespan(server):
     config = load_config()
     yield {"config": config}
 
+
 @lifespan
 async def db_lifespan(server):
     db = await connect_to_database()
@@ -484,6 +492,7 @@ async def db_lifespan(server):
         yield {"db": db}
     finally:
         await db.close()
+
 
 mcp = FastMCP("MyServer", lifespan=config_lifespan | db_lifespan)
 ```
@@ -498,10 +507,12 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(name="MyServer")
 
+
 @mcp.tool
 def greet(name: str) -> str:
     """Greet a user by name."""
     return f"Hello, {name}!"
+
 
 if __name__ == "__main__":
     # STDIO transport (default) — for local integrations
@@ -520,6 +531,7 @@ Supported transports: `"stdio"` (default), `"http"` (Streamable HTTP), `"sse"` (
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> PlainTextResponse:
     return PlainTextResponse("OK")
@@ -537,13 +549,15 @@ PATTERN: Apply `tags` to any component at registration, then filter at the serve
 def public_tool() -> str:
     return "This tool is public"
 
+
 @mcp.tool(tags={"internal", "admin"})
 def admin_tool() -> str:
     return "This tool is for admins only"
 
+
 # Server-level filtering
-mcp = FastMCP(include_tags={"public"})          # Only expose "public" components
-mcp = FastMCP(exclude_tags={"internal"})         # Hide "internal" components
+mcp = FastMCP(include_tags={"public"})  # Only expose "public" components
+mcp = FastMCP(exclude_tags={"internal"})  # Hide "internal" components
 mcp = FastMCP(include_tags={"admin"}, exclude_tags={"deprecated"})
 ```
 [3]
@@ -563,15 +577,18 @@ from fastmcp.server.transforms import VersionFilter
 
 components = LocalProvider()
 
+
 @components.tool(version="1.0")
 def calculate(x: int, y: int) -> int:
     """Add two numbers."""
     return x + y
 
+
 @components.tool(version="2.0")
 def calculate(x: int, y: int, z: int = 0) -> int:
     """Add two or three numbers."""
     return x + y + z
+
 
 # Serve different version ranges to different clients
 api_v1 = FastMCP("API v1", providers=[components])

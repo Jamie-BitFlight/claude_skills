@@ -65,11 +65,14 @@ Use overloads when return type depends on input parameters.
 ```python
 from typing import overload
 
+
 @overload
 def get_config(*, as_dict: bool = False) -> str: ...
 
+
 @overload
 def get_config(*, as_dict: bool) -> dict[str, str]: ...
+
 
 def get_config(*, as_dict: bool = False) -> str | dict[str, str]:
     """Get configuration as string or dict."""
@@ -86,11 +89,14 @@ Define behavioral contracts without inheritance.
 ```python
 from typing import Protocol
 
+
 class Closable(Protocol):
     def close(self) -> None: ...
 
+
 class Flushable(Protocol):
     def flush(self) -> None: ...
+
 
 def cleanup(resource: Closable & Flushable) -> None:
     """Clean up a resource that can be flushed and closed."""
@@ -104,6 +110,7 @@ Use type guards to narrow union types.
 
 ```python
 from typing import Any
+
 
 def process_data(data: str | dict[str, Any]) -> str:
     """Process string or dict data."""
@@ -122,10 +129,12 @@ Define dict schemas with type checking.
 ```python
 from typing import TypedDict, NotRequired
 
+
 class UserConfig(TypedDict):
     name: str
     email: str
     age: NotRequired[int]  # Optional field
+
 
 def validate_config(config: dict[str, Any]) -> UserConfig:
     """Validate and narrow config dict."""
@@ -150,9 +159,11 @@ from collections.abc import Callable, Iterable
 T = TypeVar("T")
 U = TypeVar("U")
 
+
 def map_values(items: Iterable[T], fn: Callable[[T], U]) -> list[U]:
     """Apply function to each item."""
     return [fn(item) for item in items]
+
 
 # Usage with full type inference
 numbers = [1, 2, 3]
@@ -168,10 +179,13 @@ from typing import Literal
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 
+
 def set_log_level(level: LogLevel) -> None:
     """Set logging level to one of the valid values."""
     import logging
+
     logging.basicConfig(level=level)
+
 
 # Type checker catches invalid values
 set_log_level("DEBUG")  # OK
@@ -202,9 +216,11 @@ from typing import NewType
 UserId = NewType("UserId", int)
 ProductId = NewType("ProductId", int)
 
+
 def get_user(user_id: UserId) -> str:
     """Get user by ID."""
     return f"User {user_id}"
+
 
 # Type checker enforces distinction
 uid = UserId(123)
@@ -223,10 +239,12 @@ import json
 from pathlib import Path
 from typing import Any, TypedDict
 
+
 class Config(TypedDict):
     host: str
     port: int
     debug: bool
+
 
 def load_config(path: Path) -> Config:
     """Load and validate config from JSON file."""

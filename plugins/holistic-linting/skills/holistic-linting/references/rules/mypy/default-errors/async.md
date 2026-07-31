@@ -11,8 +11,8 @@
 ### When This Is an Error
 
 ```python
-async def f() -> None:
-    ...
+async def f() -> None: ...
+
 
 def g() -> None:
     # Error: "await" outside coroutine ("async def") [await-not-async]
@@ -22,8 +22,8 @@ def g() -> None:
 ### Examples of Corrected Code
 
 ```python
-async def f() -> None:
-    ...
+async def f() -> None: ...
+
 
 async def g() -> None:
     await f()  # OK - inside async function
@@ -51,8 +51,8 @@ def g() -> None:
 ### When This Is an Error
 
 ```python
-async def f() -> None:
-    ...
+async def f() -> None: ...
+
 
 async def g() -> None:
     f()  # Error: missing await [unused-coroutine]
@@ -62,11 +62,12 @@ async def g() -> None:
 ### Examples of Corrected Code
 
 ```python
-async def f() -> None:
-    ...
+async def f() -> None: ...
+
 
 async def g() -> None:
     await f()  # OK - awaited
+
 
 # Or assign if intentional
 async def h() -> None:
@@ -95,8 +96,8 @@ async def g() -> None:
 ### When This Is an Error
 
 ```python
-async def f() -> None:
-    ...
+async def f() -> None: ...
+
 
 top = await f()  # Error: "await" outside function [top-level-await]
 ```
@@ -134,13 +135,16 @@ disable_error_code = top-level-await
 import asyncio
 from typing import Coroutine
 
+
 async def fetch_data(url: str) -> dict:
     # Simulate async operation
-    return {'data': 'value'}
+    return {"data": "value"}
+
 
 async def process() -> None:
-    result = await fetch_data('https://example.com')
+    result = await fetch_data("https://example.com")
     print(result)
+
 
 # Run the coroutine
 asyncio.run(process())  # OK
@@ -150,13 +154,14 @@ asyncio.run(process())  # OK
 
 ```python
 async def fetch_data(url: str) -> dict:
-    return {'data': 'value'}
+    return {"data": "value"}
+
 
 # Error: missing await
-result = fetch_data('https://example.com')
+result = fetch_data("https://example.com")
 
 # Error: not in async context
-await fetch_data('https://example.com')
+await fetch_data("https://example.com")
 ```
 
 ### Proper type annotations for async functions
@@ -164,9 +169,11 @@ await fetch_data('https://example.com')
 ```python
 from typing import Awaitable, Coroutine
 
+
 # Return type includes automatic Coroutine wrapping
 async def get_value() -> int:
     return 42
+
 
 # If you need to type a variable holding a coroutine
 coro: Coroutine[None, None, int] = get_value()

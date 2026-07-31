@@ -149,6 +149,7 @@ if TYPE_CHECKING:
 
 class Severity(enum.StrEnum):
     """Finding severity levels."""
+
     critical = "critical"
     warning = "warning"
     info = "info"
@@ -156,6 +157,7 @@ class Severity(enum.StrEnum):
 
 class FindingDimension(enum.StrEnum):
     """The 10 analysis dimensions from transcript-analysis skill."""
+
     tool_misuse = "tool_misuse"
     repeated_errors = "repeated_errors"
     user_frustration = "user_frustration"
@@ -170,6 +172,7 @@ class FindingDimension(enum.StrEnum):
 
 class FixStatus(enum.StrEnum):
     """Fix lifecycle states."""
+
     proposed = "proposed"
     applied = "applied"
     verified = "verified"
@@ -179,6 +182,7 @@ class FixStatus(enum.StrEnum):
 
 class TransitionOutcome(enum.StrEnum):
     """State transition outcomes."""
+
     success = "success"
     intervention = "intervention"
     error = "error"
@@ -188,6 +192,7 @@ class TransitionOutcome(enum.StrEnum):
 @dataclass(slots=True)
 class FindingFilter:
     """Filter criteria for findings queries."""
+
     dimension: FindingDimension | None = None
     severity: Severity | None = None
     project_name: str | None = None
@@ -199,6 +204,7 @@ class FindingFilter:
 @dataclass(slots=True)
 class SessionFilter:
     """Filter criteria for session queries."""
+
     project_name: str | None = None
     session_id: str | None = None
     has_interventions: bool | None = None
@@ -219,9 +225,7 @@ class KaizenDB:
     def findings(self, filters: FindingFilter | None = None) -> pd.DataFrame: ...
     def finding_evidence(self, finding_id: str) -> pd.DataFrame: ...
     def interventions(self, session_id: str | None = None) -> pd.DataFrame: ...
-    def state_transitions(
-        self, session_id: str | None = None, finding_id: str | None = None
-    ) -> pd.DataFrame: ...
+    def state_transitions(self, session_id: str | None = None, finding_id: str | None = None) -> pd.DataFrame: ...
     def fixes(self, status: FixStatus | None = None) -> pd.DataFrame: ...
     def fix_measurements(self, fix_id: str) -> pd.DataFrame: ...
     def sessions(self, filters: SessionFilter | None = None) -> pd.DataFrame: ...
@@ -234,6 +238,7 @@ class KaizenDB:
 
 ```python
 # mcp/dashboard.py -- View builder signatures
+
 
 def _build_findings_tab(db: KaizenDB) -> pn.Column: ...
 def _build_flow_tab(db: KaizenDB) -> pn.Column: ...

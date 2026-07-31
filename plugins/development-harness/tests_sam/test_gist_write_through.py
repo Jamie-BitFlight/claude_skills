@@ -83,19 +83,39 @@ class _InMemoryArtifactStore:
         self._store.clear()
 
 
-def _make_fake_client(store: _InMemoryArtifactStore) -> ArtifactRegistryClient:
-    """Return an ArtifactRegistryClient backed by the given in-memory store.
+class _FakeArtifactRegistryClient(ArtifactRegistryClient):
+    """ArtifactRegistryClient that delegates reads/writes to an in-memory store.
 
-    Monkey-patches the four public methods so the client exercises its own
-    interface contract while delegating to the deterministic store.
+    Using a subclass instead of monkey-patching bound methods keeps the
+    interface contract visible to the type checker (same signatures as the
+    parent) and avoids method-assign diagnostics.
     """
-    client = ArtifactRegistryClient.__new__(ArtifactRegistryClient)
-    # Directly bind the in-memory store methods to the client interface.
-    client.store = store.store  # type: ignore[method-assign]
-    client.read = store.read  # type: ignore[method-assign]
-    client.store_index = store.store_index  # type: ignore[method-assign]
-    client.read_index = store.read_index  # type: ignore[method-assign]
-    return client
+
+    def __init__(self, store: _InMemoryArtifactStore) -> None:
+        """Initialise with an in-memory store."""
+        super().__init__()
+        self._store = store
+
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+        """Delegate to the in-memory store."""
+        self._store.store(issue, content, artifact_type=artifact_type)
+
+    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+        """Delegate to the in-memory store."""
+        return self._store.read(issue, artifact_type)
+
+    def store_index(self, sentinel_issue: int, content: str) -> None:
+        """Delegate to the in-memory store."""
+        self._store.store_index(sentinel_issue, content)
+
+    def read_index(self, sentinel_issue: int) -> str | None:
+        """Delegate to the in-memory store."""
+        return self._store.read_index(sentinel_issue)
+
+
+def _make_fake_client(store: _InMemoryArtifactStore) -> ArtifactRegistryClient:
+    """Return an ArtifactRegistryClient backed by the given in-memory store."""
+    return _FakeArtifactRegistryClient(store)
 
 
 def _make_fake_plan_index(client: ArtifactRegistryClient, sentinel_issue: int = 42) -> PlanIdIndex:

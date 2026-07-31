@@ -275,15 +275,10 @@ import sys
 
 # Define validation rules as (regex pattern, message) tuples
 VALIDATION_RULES = [
-    (
-        r"\bgrep\b(?!.*\|)",
-        "Use 'rg' (ripgrep) instead of 'grep' for better performance",
-    ),
-    (
-        r"\bfind\s+\S+\s+-name\b",
-        "Use 'rg --files -g pattern' instead of 'find -name'",
-    ),
+    (r"\bgrep\b(?!.*\|)", "Use 'rg' (ripgrep) instead of 'grep' for better performance"),
+    (r"\bfind\s+\S+\s+-name\b", "Use 'rg --files -g pattern' instead of 'find -name'"),
 ]
+
 
 def validate_command(command: str) -> list[str]:
     issues = []
@@ -291,6 +286,7 @@ def validate_command(command: str) -> list[str]:
         if re.search(pattern, command):
             issues.append(message)
     return issues
+
 
 try:
     input_data = json.load(sys.stdin)
@@ -332,16 +328,14 @@ except json.JSONDecodeError as e:
 prompt = input_data.get("prompt", "")
 
 # Check for sensitive patterns
-sensitive_patterns = [
-    (r"(?i)\b(password|secret|key|token)\s*[:=]", "Prompt contains potential secrets"),
-]
+sensitive_patterns = [(r"(?i)\b(password|secret|key|token)\s*[:=]", "Prompt contains potential secrets")]
 
 for pattern, message in sensitive_patterns:
     if re.search(pattern, prompt):
         # Use JSON output to block with a specific reason
         output = {
             "decision": "block",
-            "reason": f"Security policy violation: {message}. Please rephrase without sensitive information."
+            "reason": f"Security policy violation: {message}. Please rephrase without sensitive information.",
         }
         print(json.dumps(output))
         sys.exit(0)
@@ -400,12 +394,7 @@ evaluation_context = (
     f"\nUser prompt: {original_prompt}"
 )
 
-output = {
-    "hookSpecificOutput": {
-        "hookEventName": "UserPromptSubmit",
-        "additionalContext": evaluation_context,
-    }
-}
+output = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": evaluation_context}}
 print(json.dumps(output))
 sys.exit(0)
 ```
@@ -460,9 +449,9 @@ if tool_name == "Read":
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "allow",
-                "permissionDecisionReason": "Documentation file auto-approved"
+                "permissionDecisionReason": "Documentation file auto-approved",
             },
-            "suppressOutput": True
+            "suppressOutput": True,
         }
         print(json.dumps(output))
         sys.exit(0)

@@ -13,6 +13,7 @@ related: [custom-build-hooks.md, build-data.md, hook-dependencies.md]
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class MyBuildHook(BuildHookInterface):
     PLUGIN_NAME = "my-hook"  # For third-party hooks only
 
@@ -62,7 +63,7 @@ The root of the project tree (project directory path).
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     # Generate file in project root
     generated_file = os.path.join(self.root, "generated.py")
-    with open(generated_file, 'w') as f:
+    with open(generated_file, "w") as f:
         f.write("# Generated file\n")
 ```
 
@@ -80,8 +81,8 @@ verbose = true
 
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
-    output_dir = self.config.get('output-dir', 'dist')
-    verbose = self.config.get('verbose', False)
+    output_dir = self.config.get("output-dir", "dist")
+    verbose = self.config.get("verbose", False)
     if verbose:
         print(f"Output directory: {output_dir}")
 ```
@@ -93,7 +94,7 @@ An instance of `BuilderConfig` containing the builder configuration. Use this to
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     # Access builder-specific configuration
-    targets = self.build_config.get('targets', {})
+    targets = self.build_config.get("targets", {})
 ```
 
 ### `directory: str`
@@ -103,7 +104,7 @@ The build directory where artifacts are created.
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     # Create directory for build artifacts
-    artifact_dir = os.path.join(self.directory, 'artifacts')
+    artifact_dir = os.path.join(self.directory, "artifacts")
     os.makedirs(artifact_dir, exist_ok=True)
 ```
 
@@ -113,10 +114,10 @@ The plugin name of the build target (e.g., `wheel`, `sdist`, `custom`).
 
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
-    if self.target_name == 'wheel':
+    if self.target_name == "wheel":
         # Wheel-specific logic
         print("Building wheel")
-    elif self.target_name == 'sdist':
+    elif self.target_name == "sdist":
         # Sdist-specific logic
         print("Building source distribution")
 ```
@@ -139,8 +140,8 @@ Project metadata from `pyproject.toml`. Undocumented property, use with caution.
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     # Access project metadata
-    name = self.metadata.config.get('name', 'unknown')
-    version_config = self.metadata.config.get('version', '')
+    name = self.metadata.config.get("name", "unknown")
+    version_config = self.metadata.config.get("version", "")
 ```
 
 ## Methods
@@ -179,7 +180,7 @@ Used to remove artifacts created by the hook in previous builds.
 ```python
 def clean(self, versions: list[str]) -> None:
     """Remove previously generated files"""
-    generated_dir = os.path.join(self.root, 'generated')
+    generated_dir = os.path.join(self.root, "generated")
     if os.path.exists(generated_dir):
         shutil.rmtree(generated_dir)
 ```
@@ -200,10 +201,10 @@ def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     self.generate_source_code(version)
 
     # Add generated files to artifacts
-    build_data['artifacts'].append('generated/**/*.py')
+    build_data["artifacts"].append("generated/**/*.py")
 
     # Add forced inclusions
-    build_data['force_include']['generated'] = 'generated'
+    build_data["force_include"]["generated"] = "generated"
 ```
 
 **Parameters**:
@@ -253,20 +254,20 @@ Build data is a mutable dictionary that hooks can modify to influence build beha
 
 ```python
 {
-    'artifacts': [         # Extra artifacts to include
-        '*.so',
-        '*.dll',
-        'generated/**/*.py'
+    "artifacts": [  # Extra artifacts to include
+        "*.so",
+        "*.dll",
+        "generated/**/*.py",
     ],
-    'force_include': {     # Forced file inclusions
-        '/path/to/lib.so': 'lib/lib.so',
-        'docs': 'docs'
+    "force_include": {  # Forced file inclusions
+        "/path/to/lib.so": "lib/lib.so",
+        "docs": "docs",
     },
-    'build_hooks': (       # Immutable tuple of hook names in execution order
-        'hook1',
-        'hook2',
-        'hook3'
-    )
+    "build_hooks": (  # Immutable tuple of hook names in execution order
+        "hook1",
+        "hook2",
+        "hook3",
+    ),
 }
 ```
 
@@ -275,18 +276,18 @@ Build data is a mutable dictionary that hooks can modify to influence build beha
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     # Add artifacts (files to include in build)
-    if 'artifacts' not in build_data:
-        build_data['artifacts'] = []
-    build_data['artifacts'].append('generated/*.py')
+    if "artifacts" not in build_data:
+        build_data["artifacts"] = []
+    build_data["artifacts"].append("generated/*.py")
 
     # Add forced inclusions (map source to destination)
-    if 'force_include' not in build_data:
-        build_data['force_include'] = {}
-    build_data['force_include']['/absolute/path/to/lib.so'] = 'mylib/lib.so'
+    if "force_include" not in build_data:
+        build_data["force_include"] = {}
+    build_data["force_include"]["/absolute/path/to/lib.so"] = "mylib/lib.so"
 
     # Read hook execution order
-    hooks = build_data['build_hooks']  # Immutable tuple
-    if 'previous-hook' in hooks:
+    hooks = build_data["build_hooks"]  # Immutable tuple
+    if "previous-hook" in hooks:
         # Can depend on earlier hooks' modifications
         pass
 ```
@@ -297,10 +298,10 @@ Hooks can adjust behavior based on the build target:
 
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
-    if self.target_name == 'wheel':
+    if self.target_name == "wheel":
         # Wheel-specific setup
         self.compile_extensions()
-    elif self.target_name == 'sdist':
+    elif self.target_name == "sdist":
         # Sdist-specific setup
         self.include_source_templates()
 ```
@@ -320,12 +321,12 @@ include-patterns = ["*.py", "*.so"]
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict[str, Any]) -> None:
         # Access hook-specific configuration
-        output_dir = self.config.get('output-dir', 'dist')
-        patterns = self.config.get('include-patterns', [])
+        output_dir = self.config.get("output-dir", "dist")
+        patterns = self.config.get("include-patterns", [])
 
         # Use configuration
         for pattern in patterns:
-            build_data['artifacts'].append(pattern)
+            build_data["artifacts"].append(pattern)
 ```
 
 ## Raising Exceptions
@@ -335,9 +336,7 @@ Hooks can raise exceptions to signal errors:
 ```python
 def initialize(self, version: str, build_data: dict[str, Any]) -> None:
     if not self.validate_environment():
-        raise RuntimeError(
-            f"Missing required tool: {self.required_tool}"
-        )
+        raise RuntimeError(f"Missing required tool: {self.required_tool}")
 ```
 
 The build will fail if the hook raises an exception.
@@ -346,6 +345,7 @@ The build will fail if the hook raises an exception.
 
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
 
 class CustomBuildHook(BuildHookInterface):
     def dependencies(self) -> list[str]:
@@ -356,19 +356,19 @@ class CustomBuildHook(BuildHookInterface):
         from jinja2 import Template
 
         # Generate files
-        template_path = os.path.join(self.root, 'templates', 'version.j2')
-        output_path = os.path.join(self.root, 'src', 'version.py')
+        template_path = os.path.join(self.root, "templates", "version.j2")
+        output_path = os.path.join(self.root, "src", "version.py")
 
         with open(template_path) as f:
             template = Template(f.read())
 
         output = template.render(version=version)
 
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             f.write(output)
 
         # Include in build
-        build_data['artifacts'].append('src/version.py')
+        build_data["artifacts"].append("src/version.py")
 
     def finalize(self, version: str, build_data: dict[str, Any], artifact_path: str) -> None:
         print(f"Built {artifact_path} successfully")

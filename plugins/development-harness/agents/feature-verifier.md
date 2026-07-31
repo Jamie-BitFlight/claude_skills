@@ -455,8 +455,10 @@ Grep(pattern="return None|return \\{\\}|return \\[\\]|pass$", path="{file}")
 def create_runner():
     pass
 
+
 def configure_host():
     return None
+
 
 def get_config():
     return {}
@@ -471,6 +473,7 @@ from core import create_runner
 
 # Function called but result ignored:
 create_runner(host)  # No variable assignment, no use
+
 
 # Handler only logs:
 def on_complete(result):

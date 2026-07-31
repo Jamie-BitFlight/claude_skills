@@ -225,9 +225,9 @@ def test_parse_multiple_entries():
 
 def test_parse_struck_entry():
     body = (
-        '<div><sub>2026-03-10T08:00:00Z</sub>\n'
-        '<details><summary>struck: 2026-03-11T09:00:00Z — outdated info</summary>\n\n'
-        'Old content.\n</details>\n</div>'
+        "<div><sub>2026-03-10T08:00:00Z</sub>\n"
+        "<details><summary>struck: 2026-03-11T09:00:00Z — outdated info</summary>\n\n"
+        "Old content.\n</details>\n</div>"
     )
     entries = parse_entries(body)
     assert len(entries) == 1
@@ -303,9 +303,9 @@ def test_parse_show_negative_int():
 def test_parse_show_struck():
     body = (
         "<div><sub>2026-03-10T08:00:00Z</sub>\n\nActive.\n</div>\n\n"
-        '<div><sub>2026-03-10T09:00:00Z</sub>\n'
-        '<details><summary>struck: 2026-03-11T09:00:00Z — wrong</summary>\n\n'
-        'Struck content.\n</details>\n</div>'
+        "<div><sub>2026-03-10T09:00:00Z</sub>\n"
+        "<details><summary>struck: 2026-03-11T09:00:00Z — wrong</summary>\n\n"
+        "Struck content.\n</details>\n</div>"
     )
     entries = parse_entries(body, show="struck")
     assert len(entries) == 1
@@ -314,8 +314,7 @@ def test_parse_show_struck():
 
 def test_parse_since_filter():
     body = (
-        "<div><sub>2026-03-08T08:00:00Z</sub>\n\nOld.\n</div>\n\n"
-        "<div><sub>2026-03-10T14:00:00Z</sub>\n\nNew.\n</div>"
+        "<div><sub>2026-03-08T08:00:00Z</sub>\n\nOld.\n</div>\n\n<div><sub>2026-03-10T14:00:00Z</sub>\n\nNew.\n</div>"
     )
     entries = parse_entries(body, since="2026-03-10")
     assert len(entries) == 1
@@ -351,14 +350,8 @@ Add to `backlog_core/entry_blocks.py`:
 # will break parsing. Content with literal ``</div>`` should be escaped
 # (e.g., ``&lt;/div&gt;``) before wrapping. The ``wrap_entry()`` function
 # does NOT perform this escaping automatically — callers are responsible.
-ENTRY_RE = re.compile(
-    r"<div><sub>([^<]+)</sub>\s*(.*?)</div>",
-    re.DOTALL,
-)
-STRUCK_RE = re.compile(
-    r'<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summary>\s*(.*?)</details>',
-    re.DOTALL,
-)
+ENTRY_RE = re.compile(r"<div><sub>([^<]+)</sub>\s*(.*?)</div>", re.DOTALL)
+STRUCK_RE = re.compile(r"<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summary>\s*(.*?)</details>", re.DOTALL)
 
 
 def _parse_match_to_entry(m: re.Match[str]) -> Entry:
@@ -417,10 +410,7 @@ def _apply_show_filter(raw_entries: list[Entry], show: str | int | None) -> list
 
 
 def parse_entries(
-    section_body: str,
-    show: str | int | None = "all",
-    since: str | None = None,
-    added_date: str = "0000-00-00",
+    section_body: str, show: str | int | None = "all", since: str | None = None, added_date: str = "0000-00-00"
 ) -> list[Entry]:
     """Parse entry blocks from a section body.
 
@@ -444,11 +434,7 @@ def parse_entries(
         content = section_body.strip()
         if not content:
             return []
-        return [Entry(
-            id=f"{added_date}T00:00:00Z",
-            content=content,
-            raw=section_body,
-        )]
+        return [Entry(id=f"{added_date}T00:00:00Z", content=content, raw=section_body)]
 
     raw_entries = [_parse_match_to_entry(m) for m in matches]
     _deduplicate_timestamps(raw_entries)
@@ -456,10 +442,7 @@ def parse_entries(
     # Apply since filter — strip dedup suffix before comparison so
     # "2026-03-10T08:00:00Z-1" compares as "2026-03-10T08:00:00Z"
     if since:
-        raw_entries = [
-            e for e in raw_entries
-            if (e.id.split("Z")[0] + "Z" if "Z" in e.id else e.id) >= since
-        ]
+        raw_entries = [e for e in raw_entries if (e.id.split("Z")[0] + "Z" if "Z" in e.id else e.id) >= since]
 
     return _apply_show_filter(raw_entries, show)
 ```
@@ -552,9 +535,7 @@ def strike_entry(entry_raw: str, reason: str) -> str:
         content = struck_match.group(3).strip()
 
     return (
-        f"<div><sub>{ts}</sub>\n"
-        f"<details><summary>struck: {now} — {reason}</summary>\n\n"
-        f"{content}\n</details>\n</div>"
+        f"<div><sub>{ts}</sub>\n<details><summary>struck: {now} — {reason}</summary>\n\n{content}\n</details>\n</div>"
     )
 ```
 
@@ -586,11 +567,7 @@ from backlog_core.entry_blocks import rewrite_section
 
 
 def test_rewrite_append_to_empty():
-    result = rewrite_section(
-        existing_body="",
-        new_content="First entry.",
-        added_date="2026-01-01",
-    )
+    result = rewrite_section(existing_body="", new_content="First entry.", added_date="2026-01-01")
     entries = parse_entries(result)
     assert len(entries) == 1
     assert entries[0].content == "First entry."
@@ -598,11 +575,7 @@ def test_rewrite_append_to_empty():
 
 def test_rewrite_append_to_existing():
     existing = "<div><sub>2026-03-10T08:00:00Z</sub>\n\nFirst.\n</div>"
-    result = rewrite_section(
-        existing_body=existing,
-        new_content="Second entry.",
-        added_date="2026-01-01",
-    )
+    result = rewrite_section(existing_body=existing, new_content="Second entry.", added_date="2026-01-01")
     entries = parse_entries(result)
     assert len(entries) == 2
     assert entries[1].content == "Second entry."
@@ -610,9 +583,7 @@ def test_rewrite_append_to_existing():
 
 def test_rewrite_append_to_legacy():
     result = rewrite_section(
-        existing_body="Legacy plain text content.",
-        new_content="New entry.",
-        added_date="2026-01-15",
+        existing_body="Legacy plain text content.", new_content="New entry.", added_date="2026-01-15"
     )
     entries = parse_entries(result)
     assert len(entries) == 2
@@ -623,14 +594,10 @@ def test_rewrite_append_to_legacy():
 
 def test_rewrite_overwrite_by_entry_id():
     existing = (
-        "<div><sub>2026-03-10T08:00:00Z</sub>\n\nOld.\n</div>\n\n"
-        "<div><sub>2026-03-10T14:00:00Z</sub>\n\nKeep.\n</div>"
+        "<div><sub>2026-03-10T08:00:00Z</sub>\n\nOld.\n</div>\n\n<div><sub>2026-03-10T14:00:00Z</sub>\n\nKeep.\n</div>"
     )
     result = rewrite_section(
-        existing_body=existing,
-        new_content="Replaced.",
-        entry_id="2026-03-10T08:00:00Z",
-        added_date="2026-01-01",
+        existing_body=existing, new_content="Replaced.", entry_id="2026-03-10T08:00:00Z", added_date="2026-01-01"
     )
     entries = parse_entries(result)
     assert len(entries) == 2
@@ -945,17 +912,10 @@ def test_groom_item_appends_entry_block(tmp_backlog):
     # Create an item first, then groom it
     out = Output()
     operations.add_item(
-        title="Test Entry Groom",
-        priority="P1",
-        description="Test item",
-        output=out,
-        create_issue=False,
+        title="Test Entry Groom", priority="P1", description="Test item", output=out, create_issue=False
     )
     result = operations.groom_item(
-        selector="Test Entry Groom",
-        section="Decision",
-        content="First decision made.",
-        output=out,
+        selector="Test Entry Groom", section="Decision", content="First decision made.", output=out
     )
     assert "error" not in result
     # Read the file and verify entry block exists
@@ -1040,11 +1000,7 @@ def test_strike_entry_operation(tmp_backlog):
     entry_id = entries[-1].id  # Last entry is the one we just groomed
 
     result = operations.strike_entry(
-        selector="Strike Test",
-        entry_id=entry_id,
-        section="Decision",
-        reason="based on training data",
-        output=out,
+        selector="Strike Test", entry_id=entry_id, section="Decision", reason="based on training data", output=out
     )
     assert "error" not in result
     item = operations.view_item(selector="Strike Test", output=out)
@@ -1175,6 +1131,7 @@ git commit -m "feat(backlog): entry-aware merge and diff output in pull_items"
 def test_backlog_groom_no_groomed_content_param():
     """backlog_groom should not accept groomed_content parameter."""
     import inspect
+
     sig = inspect.signature(backlog_groom)
     assert "groomed_content" not in sig.parameters
 
@@ -1182,6 +1139,7 @@ def test_backlog_groom_no_groomed_content_param():
 def test_backlog_groom_has_entry_id_param():
     """backlog_groom should accept entry_id parameter."""
     import inspect
+
     sig = inspect.signature(backlog_groom)
     assert "entry_id" in sig.parameters
 
@@ -1189,6 +1147,7 @@ def test_backlog_groom_has_entry_id_param():
 def test_backlog_strike_entry_tool_exists():
     """backlog_strike_entry should be a registered MCP tool."""
     from backlog_core.server import backlog_strike_entry
+
     assert callable(backlog_strike_entry)
 
 
@@ -1200,6 +1159,7 @@ def test_backlog_view_show_string_int_conversion():
     # fall through to the ValueError branch in _apply_show_filter().
     import inspect
     from backlog_core.server import backlog_view
+
     sig = inspect.signature(backlog_view)
     # show param should exist and accept str | None (MCP layer)
     assert "show" in sig.parameters
@@ -1233,7 +1193,12 @@ async def backlog_strike_entry(
     selector: Annotated[str, Field(description="Item selector: title substring, #N, bare number, or GitHub issue URL")],
     entry_id: Annotated[str, Field(description="Entry ID (ISO timestamp from <sub> tag) to strike")],
     reason: Annotated[str, Field(description="Why this entry is being struck through")],
-    section: Annotated[str | None, Field(description="Optional section name to scope the strike — prevents ambiguity when duplicate timestamps exist across sections")] = None,
+    section: Annotated[
+        str | None,
+        Field(
+            description="Optional section name to scope the strike — prevents ambiguity when duplicate timestamps exist across sections"
+        ),
+    ] = None,
 ) -> dict:
     """Strike through an entry in a backlog item section. The entry content is preserved
     in a collapsed <details> block with the reason, but marked as struck and excluded
@@ -1246,12 +1211,7 @@ async def backlog_strike_entry(
     out = Output()
     try:
         result = await asyncio.to_thread(
-            operations.strike_entry,
-            selector=selector,
-            entry_id=entry_id,
-            reason=reason,
-            section=section,
-            output=out,
+            operations.strike_entry, selector=selector, entry_id=entry_id, reason=reason, section=section, output=out
         )
         return {**result, **out.to_dict()}
     except BacklogError as e:
@@ -1359,6 +1319,7 @@ NOTE: This test depends on the ``sections`` dict structure returned by
 
 If Task 9 defines a different structure, these assertions must be updated.
 """
+
 from __future__ import annotations
 
 from backlog_core import operations
@@ -1388,7 +1349,7 @@ def test_full_entry_lifecycle(tmp_backlog):
     # Strike first entry
     first_id = decision["entries"][0]["id"]
     operations.strike_entry(
-        selector="Lifecycle Test", entry_id=first_id, section="Decision", reason="superseded", output=out,
+        selector="Lifecycle Test", entry_id=first_id, section="Decision", reason="superseded", output=out
     )
 
     # View again — should show 1 active, 1 struck

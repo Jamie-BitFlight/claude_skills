@@ -22,10 +22,10 @@ existing_release = gh_release_exists(gh_repo, tag)
 ```python
 if tag_exists(git_repo, tag) and keep_existing_tag:
     old_commit = old_tag_ref.commit.hexsha
-    if old_commit != head_ref:          # commit changed
+    if old_commit != head_ref:  # commit changed
         if existing_release:
             release = gh_repo.get_release(tag)
-            release.delete_release()    # line 178 — deletes the release
+            release.delete_release()  # line 178 — deletes the release
             deleted_release_in_rename = True
         # rename tag to -r2, delete original, push both
 ```

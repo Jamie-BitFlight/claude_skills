@@ -56,12 +56,7 @@ from fastmcp.exceptions import ToolError
 
 mcp = FastMCP("your-plugin", mask_error_details=False)
 
-_READONLY_ANNOTATIONS = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
-}
+_READONLY_ANNOTATIONS = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
 
 _DESTRUCTIVE_ANNOTATIONS = {
     "readOnlyHint": False,
@@ -84,11 +79,7 @@ Example: Wrap an existing script function
 
 ```python
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def validate_something(
-    file_path: str,
-    *,
-    context: Context,
-) -> dict[str, Any]:
+async def validate_something(file_path: str, *, context: Context) -> dict[str, Any]:
     """Validate a file against rules.
 
     Args:
@@ -109,10 +100,7 @@ async def validate_something(
     result = await asyncio.to_thread(validate_file, file_path)
 
     if result.errors:
-        return {
-            "status": "invalid",
-            "errors": [str(e) for e in result.errors]
-        }
+        return {"status": "invalid", "errors": [str(e) for e in result.errors]}
 
     return {"status": "valid"}
 ```
@@ -179,20 +167,18 @@ Create `tests/test_mcp.py`:
 import pytest
 from mcp.server import mcp
 
+
 @pytest.mark.asyncio
 async def test_validate_something_valid():
     """Test validation with valid file."""
-    result = await mcp.tools["validate_something"](
-        file_path="tests/fixtures/valid.md"
-    )
+    result = await mcp.tools["validate_something"](file_path="tests/fixtures/valid.md")
     assert result["status"] == "valid"
+
 
 @pytest.mark.asyncio
 async def test_validate_something_invalid():
     """Test validation with invalid file."""
-    result = await mcp.tools["validate_something"](
-        file_path="tests/fixtures/invalid.md"
-    )
+    result = await mcp.tools["validate_something"](file_path="tests/fixtures/invalid.md")
     assert result["status"] == "invalid"
     assert len(result["errors"]) > 0
 ```
@@ -267,13 +253,9 @@ async def run_my_tool(
 ```python
 import pathlib
 
+
 @mcp.tool(annotations=_DESTRUCTIVE_ANNOTATIONS)
-async def modify_file(
-    file_path: str,
-    new_content: str,
-    *,
-    context: Context,
-) -> dict[str, Any]:
+async def modify_file(file_path: str, new_content: str, *, context: Context) -> dict[str, Any]:
     """Safely modify a file."""
     path = pathlib.Path(file_path)
 
@@ -304,11 +286,7 @@ async def modify_file(
 
 ```python
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def analyze_directory(
-    directory: str,
-    *,
-    context: Context,
-) -> dict[str, Any]:
+async def analyze_directory(directory: str, *, context: Context) -> dict[str, Any]:
     """Analyze all files in directory."""
     path = pathlib.Path(directory)
     files = list(path.rglob("*.py"))
@@ -323,21 +301,14 @@ async def analyze_directory(
 
     await context.info("Analysis complete")
 
-    return {
-        "total_files": len(files),
-        "results": results,
-    }
+    return {"total_files": len(files), "results": results}
 ```
 
 ### Pattern 4: Error Handling
 
 ```python
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def risky_operation(
-    param: str,
-    *,
-    context: Context,
-) -> dict[str, Any]:
+async def risky_operation(param: str, *, context: Context) -> dict[str, Any]:
     """Operation that might fail."""
     try:
         await context.info("Starting risky operation...")
@@ -346,8 +317,7 @@ async def risky_operation(
 
         if not result.success:
             raise ToolError(
-                f"Operation failed: {result.error}. "
-                f"Try adjusting the {result.problematic_field} parameter."
+                f"Operation failed: {result.error}. Try adjusting the {result.problematic_field} parameter."
             )
 
         return {"status": "success", "data": result.data}

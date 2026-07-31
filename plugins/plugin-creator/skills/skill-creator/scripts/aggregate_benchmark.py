@@ -46,6 +46,8 @@ MIN_CONFIGS_FOR_DELTA = 2
 DEFAULT_RUNS_PER_CONFIGURATION = 3
 MIN_CONFIGS_FOR_LABEL = 1
 
+ConfigStats = dict[str, dict[str, float | int]]
+
 
 def calculate_stats(values: list[float]) -> dict:
     """Calculate mean, stddev, min, max for a list of values.
@@ -239,7 +241,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
     return results
 
 
-def aggregate_results(results: dict) -> dict:
+def aggregate_results(results: dict) -> dict[str, ConfigStats | dict[str, str]]:
     """Aggregate run results into summary statistics.
 
     Args:
@@ -249,14 +251,14 @@ def aggregate_results(results: dict) -> dict:
         Dict with per-config stats and a ``"delta"`` key comparing the first
         two configs.
     """
-    run_summary = {}
+    config_stats: dict[str, ConfigStats] = {}
     configs = list(results.keys())
 
     for config in configs:
         runs = results.get(config, [])
 
         if not runs:
-            run_summary[config] = {
+            config_stats[config] = {
                 "pass_rate": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
                 "time_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
                 "tokens": {"mean": 0, "stddev": 0, "min": 0, "max": 0},
@@ -267,7 +269,7 @@ def aggregate_results(results: dict) -> dict:
         times = [r["time_seconds"] for r in runs]
         tokens = [r.get("tokens", 0) for r in runs]
 
-        run_summary[config] = {
+        config_stats[config] = {
             "pass_rate": calculate_stats(pass_rates),
             "time_seconds": calculate_stats(times),
             "tokens": calculate_stats(tokens),
@@ -275,16 +277,17 @@ def aggregate_results(results: dict) -> dict:
 
     # Calculate delta between the first two configs (if two exist)
     if len(configs) >= MIN_CONFIGS_FOR_DELTA:
-        primary = run_summary.get(configs[0], {})
-        baseline = run_summary.get(configs[1], {})
+        primary = config_stats.get(configs[0], {})
+        baseline = config_stats.get(configs[1], {})
     else:
-        primary = run_summary.get(configs[0], {}) if configs else {}
+        primary = config_stats.get(configs[0], {}) if configs else {}
         baseline = {}
 
     delta_pass_rate = primary.get("pass_rate", {}).get("mean", 0) - baseline.get("pass_rate", {}).get("mean", 0)
     delta_time = primary.get("time_seconds", {}).get("mean", 0) - baseline.get("time_seconds", {}).get("mean", 0)
     delta_tokens = primary.get("tokens", {}).get("mean", 0) - baseline.get("tokens", {}).get("mean", 0)
 
+    run_summary: dict[str, ConfigStats | dict[str, str]] = dict(config_stats)
     run_summary["delta"] = {
         "pass_rate": f"{delta_pass_rate:+.2f}",
         "time_seconds": f"{delta_time:+.1f}",

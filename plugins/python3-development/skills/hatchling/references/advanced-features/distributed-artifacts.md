@@ -119,8 +119,8 @@ Accessing artifact list in build hooks:
 class ArtifactInspectionHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # See what will be included
-        wheel_files = build_data['artifacts']['wheel']
-        sdist_files = build_data['artifacts']['sdist']
+        wheel_files = build_data["artifacts"]["wheel"]
+        sdist_files = build_data["artifacts"]["sdist"]
 
         print(f"Wheel will include: {wheel_files}")
         print(f"Sdist will include: {sdist_files}")
@@ -175,14 +175,15 @@ Build different wheels for different platforms:
 ```python
 import platform
 
+
 class PlatformSpecificBuildsHook(BuildHookInterface):
     def initialize(self, version, build_data):
         plat = platform.system()
 
-        if plat == 'Windows':
-            build_data['force_include']['dist/windows'] = 'mypackage/windows'
-        elif plat == 'Darwin':
-            build_data['force_include']['dist/macos'] = 'mypackage/macos'
+        if plat == "Windows":
+            build_data["force_include"]["dist/windows"] = "mypackage/windows"
+        elif plat == "Darwin":
+            build_data["force_include"]["dist/macos"] = "mypackage/macos"
 ```
 
 ### Universal Wheels

@@ -214,10 +214,12 @@ Adding `beads` as a recognised backend name requires:
 ```python
 _VALID_BACKENDS: tuple[str, ...] = ("beads", "github", "memory", "sqlite")  # add "beads"
 
+
 def create_backend(name: str | None = None) -> BacklogBackend:
     ...
     if resolved == "beads":
         from backlog_core.backends.beads_backend import BeadsBackend  # noqa: PLC0415
+
         return cast("BacklogBackend", BeadsBackend())
     ...
 ```
@@ -397,17 +399,19 @@ chose beads. The check is: `any(p.is_dir() for p in walk_up(cwd, ".beads"))`.
 ```python
 # In backlog_core/backend_protocol.py:create_backend()
 
+
 def create_backend(name: str | None = None) -> BacklogBackend:
     resolved = (
         name
         or os.environ.get("BACKLOG_BACKEND")
         or _load_backend_toml_name()
-        or _auto_detect_beads()   # NEW: returns "beads" if .beads/ found, else None
+        or _auto_detect_beads()  # NEW: returns "beads" if .beads/ found, else None
         or "github"
     )
 
     if resolved == "beads":
         from backlog_core.backends.beads_backend import BeadsBackend
+
         return cast("BacklogBackend", BeadsBackend())
 
     if resolved == "github":
@@ -458,29 +462,20 @@ import subprocess
 import json
 from pathlib import Path
 
+
 class BeadsBackend:
     """BacklogBackend implementation that delegates to the bd CLI."""
 
     def _bd(self, *args: str, input_data: str | None = None) -> dict:
         """Run a bd subcommand and return parsed JSON output."""
         cmd = ["bd", "--json", *args]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            input=input_data,
-            check=True,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, input=input_data, check=True)
         return json.loads(result.stdout)
 
     def create_issue_for_item(self, repo, item, dry_run=False, output=None):
         if dry_run:
             return None
-        result = self._bd(
-            "create",
-            "--title", item.title,
-            "--description", item.description or "",
-        )
+        result = self._bd("create", "--title", item.title, "--description", item.description or "")
         return result.get("id")
 
     def close_github_issue(self, issue_ref, reason, *, reference="", comment="", repo="", output=None):

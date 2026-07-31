@@ -49,6 +49,7 @@ All build hooks inherit from `BuildHookInterface`:
 ```python
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     PLUGIN_NAME = "my-hook"
 
@@ -83,17 +84,13 @@ Build hooks communicate with the builder via `build_data`:
 ```python
 def initialize(self, version, build_data):
     # Declare artifacts to create
-    build_data['artifacts'] = {
-        'src/package/generated.py': 'generated.py'
-    }
+    build_data["artifacts"] = {"src/package/generated.py": "generated.py"}
 
     # Force include files
-    build_data['force_include'] = {
-        'data/resource.dat': 'package/data/resource.dat'
-    }
+    build_data["force_include"] = {"data/resource.dat": "package/data/resource.dat"}
 
     # Infer platform tag for wheels
-    build_data['infer_tag'] = True
+    build_data["infer_tag"] = True
 ```
 
 ## Hook Types
@@ -115,15 +112,14 @@ path = "hatch_build.py"
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class CustomBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Generate files
-        with open('src/package/__version__.py', 'w') as f:
+        with open("src/package/__version__.py", "w") as f:
             f.write(f'__version__ = "{version}"\n')
 
-        build_data['force_include'] = {
-            'src/package/__version__.py': 'package/__version__.py'
-        }
+        build_data["force_include"] = {"src/package/__version__.py": "package/__version__.py"}
 ```
 
 ### 2. Third-Party Hooks
@@ -161,6 +157,7 @@ experimental = true
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class VersionBuildHook(BuildHookInterface):
     PLUGIN_NAME = "version"
 
@@ -170,9 +167,7 @@ class VersionBuildHook(BuildHookInterface):
         version_file.write_text(f'__version__ = "{version}"\n')
 
         # Include in wheel
-        build_data['force_include'] = {
-            str(version_file): "package/_version.py"
-        }
+        build_data["force_include"] = {str(version_file): "package/_version.py"}
 ```
 
 **Configuration:**
@@ -214,16 +209,17 @@ cmake.build-type = "Release"
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 from pathlib import Path
 
+
 class DataFilesBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Copy data files into package
         data_dir = self.root / "data"
-        build_data['force_include'] = {}
+        build_data["force_include"] = {}
 
         for data_file in data_dir.glob("**/*"):
             if data_file.is_file():
                 rel_path = data_file.relative_to(self.root)
-                build_data['force_include'][str(rel_path)] = f"package/data/{data_file.name}"
+                build_data["force_include"][str(rel_path)] = f"package/data/{data_file.name}"
 ```
 
 **Configuration:**
@@ -243,10 +239,11 @@ path = "hatch_build.py"
 # hatch_build.py
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
+
 class PlatformTagBuildHook(BuildHookInterface):
     def initialize(self, version, build_data):
         # Mark wheel as platform-specific
-        build_data['infer_tag'] = True
+        build_data["infer_tag"] = True
 ```
 
 ## Lifecycle and Execution
@@ -358,6 +355,7 @@ class VersionBuildHook(BuildHookInterface):
     based on the build version, making it available
     to the package at runtime.
     """
+
     PLUGIN_NAME = "generate-version"
 ```
 
@@ -379,7 +377,7 @@ Only modify data structures hook is designed to modify:
 ```python
 def initialize(self, version, build_data):
     # Correct: Modify expected fields
-    build_data['force_include'] = {...}
+    build_data["force_include"] = {...}
 
     # Wrong: Don't add arbitrary keys
     # build_data['custom_key'] = value
@@ -393,11 +391,11 @@ Always use absolute paths via `self.root`:
 
 ```python
 # Wrong: Relative to working directory
-open('src/file.py', 'w')
+open("src/file.py", "w")
 
 # Correct: Relative to project root
-version_file = self.root / 'src' / 'file.py'
-version_file.write_text('...')
+version_file = self.root / "src" / "file.py"
+version_file.write_text("...")
 ```
 
 ### Gotcha 2: Force Include Not Auto-Detected
@@ -407,13 +405,11 @@ Files created by hooks must be explicitly included:
 ```python
 def initialize(self, version, build_data):
     # Create file
-    output_file = self.root / 'src' / 'generated.py'
-    output_file.write_text('# generated')
+    output_file = self.root / "src" / "generated.py"
+    output_file.write_text("# generated")
 
     # Must force include
-    build_data['force_include'] = {
-        str(output_file): 'package/generated.py'
-    }
+    build_data["force_include"] = {str(output_file): "package/generated.py"}
 ```
 
 ### Gotcha 3: Hook Runs for Every Version

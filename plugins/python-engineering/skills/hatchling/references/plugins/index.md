@@ -88,13 +88,15 @@ All Hatchling plugins follow this pattern:
 from hatchling.plugin import hookimpl
 from .plugin import MyPlugin
 
+
 @hookimpl
 def hatch_register_builder():
     return MyPlugin
 
+
 # plugin.py - Plugin implementation
 class MyPlugin(BuilderInterface):
-    PLUGIN_NAME = 'my-plugin'  # User-facing identifier
+    PLUGIN_NAME = "my-plugin"  # User-facing identifier
     # ... implement required methods
 ```
 

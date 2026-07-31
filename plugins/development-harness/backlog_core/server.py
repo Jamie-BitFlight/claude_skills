@@ -194,11 +194,9 @@ _DEFAULT_ITEM_FIELDS: frozenset[str] = frozenset(_AVAILABLE_FIELDS) - {"body"}
 # item_depth value that includes the full body in each returned item.
 _ITEM_DEPTH_FULL = 3
 
-# Beads integration removed — was auto-installing @beads/bd via npm during the
-# FastMCP lifespan hook, blocking MCP initialization for 20+ seconds when the
-# download hung.  Beads local storage for task tracking is a future feature;
-# re-add as an opt-in integration (e.g. DH_ENABLE_BEADS=1) when actual tool
-# calls depend on it.
+# Beads-native issue and task operations use the configured backend's direct
+# bd runner; DH MCP operations remain responsible for provider-neutral workflow
+# state and artifacts.
 
 
 def _apply_fields_projection(
@@ -4290,7 +4288,7 @@ async def dispatch_conflicts(
     conflict_groups = await asyncio.to_thread(operations.analyze_impact_radius_conflicts, items)
     return {
         "milestone_number": milestone_number,
-        "conflict_groups": [dataclasses.asdict(cg) for cg in conflict_groups],
+        "conflict_groups": [cg.model_dump() for cg in conflict_groups],
         "count": len(conflict_groups),
     }
 

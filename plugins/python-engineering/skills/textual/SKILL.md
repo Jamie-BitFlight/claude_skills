@@ -106,11 +106,13 @@ Load when the user asks about writing tests, simulating input, snapshot comparis
 from textual.app import App, ComposeResult
 from textual.widgets import Label
 
+
 class MyApp(App):
     CSS = "Screen { align: center middle; }"
 
     def compose(self) -> ComposeResult:
         yield Label("Hello!")
+
 
 if __name__ == "__main__":
     MyApp().run()
@@ -120,6 +122,7 @@ if __name__ == "__main__":
 # Reactive + watch
 from textual.reactive import reactive
 from textual.widget import Widget
+
 
 class Counter(Widget):
     count = reactive(0)
@@ -135,6 +138,7 @@ class Counter(Widget):
 # Worker for background HTTP
 from textual import work
 import httpx
+
 
 class MyApp(App):
     @work(exclusive=True)

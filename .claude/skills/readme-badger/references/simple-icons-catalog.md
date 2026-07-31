@@ -145,6 +145,7 @@ base64 -w 0 icon.svg
 
 ```python
 import base64
+
 with open("icon.svg", "rb") as f:
     encoded = base64.b64encode(f.read()).decode()
 print(f"logo=data:image/svg+xml;base64,{encoded}")

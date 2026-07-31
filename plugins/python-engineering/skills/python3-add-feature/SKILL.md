@@ -164,11 +164,7 @@ Define the public API before implementation:
 
 ```python
 # Define function signatures and docstrings
-def new_feature(
-    input_data: InputType,
-    *,
-    option: str = "default",
-) -> ResultType:
+def new_feature(input_data: InputType, *, option: str = "default") -> ResultType:
     """Process input data with new feature capability.
 
     Args:
@@ -193,6 +189,7 @@ def new_feature(
 ```python
 import pytest
 from pytest_mock import MockerFixture
+
 
 class TestNewFeature:
     """Tests for new_feature functionality."""
@@ -259,9 +256,7 @@ __all__ = [
 
 ```python
 @app.command()
-def feature_command(
-    input_file: Annotated[Path, typer.Argument(help="Input file")],
-) -> None:
+def feature_command(input_file: Annotated[Path, typer.Argument(help="Input file")]) -> None:
     """Run new feature on input file."""
     result = new_feature(load_data(input_file))
     console.print(f"Result: {result}")

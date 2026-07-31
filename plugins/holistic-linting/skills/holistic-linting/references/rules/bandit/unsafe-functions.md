@@ -35,6 +35,7 @@ def calculate(x, y):
     assert y > 0, "y must be positive"
     return x / y
 
+
 # OK - For documenting assumptions (code review)
 def process_data(data):
     assert data is not None  # Programmer assumption, not security check
@@ -51,6 +52,7 @@ def authenticate(username, password):
     assert username != ""
     assert is_valid_password(password)
 
+
 # RIGHT - Explicit validation that can't be disabled
 def authenticate(username, password):
     if not username:
@@ -59,6 +61,7 @@ def authenticate(username, password):
         raise ValueError("Invalid password")
 
     login(username, password)
+
 
 # RIGHT - For type checking
 def process(data: str) -> None:
@@ -102,6 +105,7 @@ result = exec(f"x = {user_formula}")
 import ast
 import operator
 
+
 def evaluate_math(expression):
     """Safely evaluate math expressions."""
     # Parse and validate it's only numbers and operators
@@ -112,12 +116,12 @@ def evaluate_math(expression):
 
     # Verify it only contains safe operations
     for node in ast.walk(tree):
-        if not isinstance(node, (ast.Expression, ast.BinOp, ast.Num,
-                                ast.Add, ast.Sub, ast.Mult, ast.Div)):
+        if not isinstance(node, (ast.Expression, ast.BinOp, ast.Num, ast.Add, ast.Sub, ast.Mult, ast.Div)):
             raise ValueError("Operation not allowed")
 
     # Evaluate safely
     return eval(compile(tree, "<string>", "eval"))
+
 
 result = evaluate_math("1 + 2 * 3")
 ```
@@ -171,6 +175,7 @@ result = eval("1 + 2 * 3")
 
 # RIGHT - Use safer alternatives
 import operator
+
 result = operator.add(1, operator.mul(2, 3))
 ```
 
@@ -217,6 +222,7 @@ content = response.read()
 from urllib.request import urlopen
 from urllib.parse import urlparse
 
+
 def safe_url_open(url_string):
     """Open URL but only allow http/https."""
     parsed = urlparse(url_string)
@@ -225,6 +231,7 @@ def safe_url_open(url_string):
         raise ValueError(f"Scheme {parsed.scheme} not allowed")
 
     return urlopen(url_string)
+
 
 # Safe - only http/https allowed
 response = safe_url_open("https://example.com")
@@ -290,6 +297,7 @@ secure_random = int.from_bytes(os.urandom(32), "big")
 
 # RIGHT - For secure choice from list
 import random as random_module  # OK for non-crypto
+
 choice = secrets.choice(["option1", "option2", "option3"])
 ```
 

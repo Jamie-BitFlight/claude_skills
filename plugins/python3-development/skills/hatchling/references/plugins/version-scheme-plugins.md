@@ -19,7 +19,7 @@ Each version scheme must define a string identifier:
 
 ```python
 class SemanticVersionScheme(VersionSchemeInterface):
-    PLUGIN_NAME = 'semver'
+    PLUGIN_NAME = "semver"
 ```
 
 Users select version schemes via configuration:
@@ -60,12 +60,10 @@ def update(self, desired_version: str, original_version: str, version_data: dict
         desired = Version(desired_version)
         original = Version(original_version)
     except Exception as exc:
-        raise ValueError(f'Invalid version format: {desired_version}') from exc
+        raise ValueError(f"Invalid version format: {desired_version}") from exc
 
     if desired <= original:
-        raise ValueError(
-            f'Version {desired_version} is not higher than current {original_version}'
-        )
+        raise ValueError(f"Version {desired_version} is not higher than current {original_version}")
 
     return str(desired)
 ```
@@ -169,10 +167,11 @@ Features:
 from hatchling.version.scheme.plugin.interface import VersionSchemeInterface
 from datetime import datetime
 
+
 class DateVersionScheme(VersionSchemeInterface):
     """Calendar versioning (YYYY.MM.DD[.MICRO])"""
 
-    PLUGIN_NAME = 'calver'
+    PLUGIN_NAME = "calver"
 
     def update(self, desired_version: str, original_version: str, version_data: dict) -> str:
         """
@@ -184,12 +183,10 @@ class DateVersionScheme(VersionSchemeInterface):
         """
         from datetime import datetime
 
-        parts = desired_version.split('.')
+        parts = desired_version.split(".")
 
         if len(parts) < 3 or len(parts) > 4:
-            raise ValueError(
-                f'Calendar version must be YYYY.MM.DD[.MICRO], got {desired_version}'
-            )
+            raise ValueError(f"Calendar version must be YYYY.MM.DD[.MICRO], got {desired_version}")
 
         try:
             year = int(parts[0])
@@ -202,38 +199,29 @@ class DateVersionScheme(VersionSchemeInterface):
             if len(parts) == 4:
                 micro = int(parts[3])
                 if micro < 0:
-                    raise ValueError('Micro version must be non-negative')
+                    raise ValueError("Micro version must be non-negative")
 
         except ValueError as exc:
-            raise ValueError(f'Invalid calendar version: {desired_version}') from exc
+            raise ValueError(f"Invalid calendar version: {desired_version}") from exc
 
         # Validate version progression
         try:
             desired_date = datetime(year, month, day)
-            original_parts = original_version.split('.')
-            original_date = datetime(
-                int(original_parts[0]),
-                int(original_parts[1]),
-                int(original_parts[2]),
-            )
+            original_parts = original_version.split(".")
+            original_date = datetime(int(original_parts[0]), int(original_parts[1]), int(original_parts[2]))
 
             if desired_date < original_date:
-                raise ValueError(
-                    f'Version {desired_version} is earlier than {original_version}'
-                )
+                raise ValueError(f"Version {desired_version} is earlier than {original_version}")
             elif desired_date == original_date:
                 # Same date: require micro version increment
                 original_micro = int(original_parts[3]) if len(original_parts) == 4 else 0
                 desired_micro = int(parts[3]) if len(parts) == 4 else 0
 
                 if desired_micro <= original_micro:
-                    raise ValueError(
-                        f'Micro version must increase for same date '
-                        f'({desired_micro} > {original_micro})'
-                    )
+                    raise ValueError(f"Micro version must increase for same date ({desired_micro} > {original_micro})")
 
         except (ValueError, IndexError) as exc:
-            raise ValueError(f'Invalid version comparison: {exc}') from exc
+            raise ValueError(f"Invalid version comparison: {exc}") from exc
 
         return desired_version
 ```
@@ -306,15 +294,10 @@ Version schemes should raise descriptive exceptions:
 ```python
 def update(self, desired_version: str, original_version: str, version_data: dict) -> str:
     if not self._is_valid(desired_version):
-        raise ValueError(
-            f'Invalid version format. Expected: {self._format_description}, '
-            f'got: {desired_version}'
-        )
+        raise ValueError(f"Invalid version format. Expected: {self._format_description}, got: {desired_version}")
 
     if not self._is_higher(desired_version, original_version):
-        raise ValueError(
-            f'Version {desired_version} must be higher than {original_version}'
-        )
+        raise ValueError(f"Version {desired_version} must be higher than {original_version}")
 
     return self._normalize(desired_version)
 ```

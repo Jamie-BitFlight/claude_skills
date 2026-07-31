@@ -55,6 +55,7 @@ warn_redundant_casts = True
 ```python
 from typing_extensions import Self
 
+
 class MyClass:
     # Error: Redundant Self annotation [redundant-self]
     def method(self: Self) -> Self:
@@ -66,13 +67,15 @@ class MyClass:
 ```python
 from typing_extensions import Self
 
+
 class MyClass:
     def method(self) -> Self:
         return self
 
+
 # Or explicit if really needed
 class MyClass:
-    def method(self: 'MyClass') -> 'MyClass':
+    def method(self: "MyClass") -> "MyClass":
         return self
 ```
 
@@ -182,6 +185,7 @@ warn_unused_ignores = True
 async def fetch() -> str:
     return "data"
 
+
 async def process() -> None:
     # Error: "await" expected (coroutine "fetch" is not awaited) [unused-awaitable]
     result = fetch()
@@ -192,6 +196,7 @@ async def process() -> None:
 ```python
 async def fetch() -> str:
     return "data"
+
 
 async def process() -> None:
     result = await fetch()  # OK

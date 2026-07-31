@@ -136,12 +136,7 @@ import subprocess
 import sys
 
 try:
-    result = subprocess.run(
-        ["ruff", "check", "--select", "E,W", "."],
-        capture_output=True,
-        text=True,
-        timeout=3,
-    )
+    result = subprocess.run(["ruff", "check", "--select", "E,W", "."], capture_output=True, text=True, timeout=3)
 except subprocess.TimeoutExpired:
     sys.stderr.write("Lint check timed out\n")
     sys.exit(1)
@@ -164,6 +159,7 @@ Use for `PreToolUse` when you need to block a tool call based on its input. Exit
 ```python
 #!/usr/bin/env python3
 """PreToolUse hook — block dangerous shell patterns."""
+
 import json
 import sys
 
@@ -191,6 +187,7 @@ Use for `PreToolUse` when you want fine-grained control — allow, deny, or ask.
 ```python
 #!/usr/bin/env python3
 """PreToolUse hook — deny write operations to production config."""
+
 import json
 import sys
 
@@ -213,12 +210,7 @@ if "production" in file_path:
     sys.stdout.write(json.dumps(output))
     sys.exit(0)
 
-output = {
-    "hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "allow",
-    }
-}
+output = {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow"}}
 sys.stdout.write(json.dumps(output))
 sys.exit(0)
 ```
@@ -240,6 +232,7 @@ Use for `SessionStart` to inject dynamic context into Claude's session. Return J
 ```python
 #!/usr/bin/env python3
 """SessionStart hook — inject current git branch and open issues count."""
+
 import json
 import subprocess
 import sys
@@ -252,12 +245,7 @@ except json.JSONDecodeError:
 context_parts = []
 
 try:
-    branch = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        capture_output=True,
-        text=True,
-        timeout=3,
-    )
+    branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, timeout=3)
     if branch.returncode == 0:
         context_parts.append(f"Current git branch: {branch.stdout.strip()}")
 except subprocess.TimeoutExpired:
@@ -265,10 +253,7 @@ except subprocess.TimeoutExpired:
 
 context = "\n".join(context_parts)
 
-output = {
-    "hookEventName": "SessionStart",
-    "additionalContext": context,
-}
+output = {"hookEventName": "SessionStart", "additionalContext": context}
 sys.stdout.write(json.dumps(output))
 sys.exit(0)
 ```
@@ -284,6 +269,7 @@ Use for `Stop` to force Claude to continue if a quality gate fails. Exit 2 with 
 ```python
 #!/usr/bin/env python3
 """Stop hook — require passing tests before Claude finishes."""
+
 import json
 import subprocess
 import sys
@@ -298,21 +284,13 @@ if payload.get("stop_hook_active"):
     sys.exit(0)
 
 try:
-    result = subprocess.run(
-        ["python", "-m", "pytest", "--tb=no", "-q"],
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    result = subprocess.run(["python", "-m", "pytest", "--tb=no", "-q"], capture_output=True, text=True, timeout=30)
 except subprocess.TimeoutExpired:
     sys.stderr.write("Test run timed out — skipping gate\n")
     sys.exit(0)
 
 if result.returncode != 0:
-    sys.stderr.write(
-        "Tests are failing. Fix the failing tests before finishing.\n"
-        + result.stdout[-500:]
-    )
+    sys.stderr.write("Tests are failing. Fix the failing tests before finishing.\n" + result.stdout[-500:])
     sys.exit(2)
 
 sys.exit(0)

@@ -38,27 +38,28 @@ The standard scheme supports all PEP 440 version formats:
 
 ```python
 # Release versions
-"1.2.3"           # Final release
-"2024.12.1"       # Calendar versioning
+"1.2.3"  # Final release
+
+"2024.12.1"  # Calendar versioning
 
 # Pre-releases
-"1.0.0a1"         # Alpha
-"1.0.0b2"         # Beta
-"1.0.0rc3"        # Release candidate
+"1.0.0a1"  # Alpha
+"1.0.0b2"  # Beta
+"1.0.0rc3"  # Release candidate
 
 # Development releases
-"1.0.0.dev0"      # Development release
-"1.0.0.dev5"      # Fifth development release
+"1.0.0.dev0"  # Development release
+"1.0.0.dev5"  # Fifth development release
 
 # Post releases
-"1.0.0.post1"     # Post release
+"1.0.0.post1"  # Post release
 
 # Epochs
-"1!2.0.0"         # Version with epoch
+"1!2.0.0"  # Version with epoch
 
 # Local versions
-"1.0.0+local.1"   # With local version identifier
-"1.0.0+git.abc123" # With git commit
+"1.0.0+local.1"  # With local version identifier
+"1.0.0+git.abc123"  # With git commit
 ```
 
 ### Version Bumping Commands
@@ -126,8 +127,8 @@ class VersionSchemeInterface:
     """Interface for version scheme plugins."""
 
     PLUGIN_NAME: str  # Unique identifier
-    root: Path        # Project root directory
-    config: dict      # Configuration from pyproject.toml
+    root: Path  # Project root directory
+    config: dict  # Configuration from pyproject.toml
 
     def validate_bump(self, version: str, bump: str) -> None:
         """
@@ -245,6 +246,7 @@ While Hatchling only includes the standard scheme by default, you can create cus
 # hatch_plugins.py
 from hatchling.version.scheme.plugin.interface import VersionSchemeInterface
 
+
 class SemanticVersionScheme(VersionSchemeInterface):
     PLUGIN_NAME = "semantic"
 
@@ -346,13 +348,13 @@ from packaging.version import Version
 
 # Comparison order
 versions = [
-    "1.0.dev0",    # Development
-    "1.0a1",       # Alpha
-    "1.0b1",       # Beta
-    "1.0rc1",      # Release candidate
-    "1.0",         # Final
-    "1.0.post1",   # Post-release
-    "1!0.0",       # Epoch 1
+    "1.0.dev0",  # Development
+    "1.0a1",  # Alpha
+    "1.0b1",  # Beta
+    "1.0rc1",  # Release candidate
+    "1.0",  # Final
+    "1.0.post1",  # Post-release
+    "1!0.0",  # Epoch 1
 ]
 
 # Sorted from lowest to highest

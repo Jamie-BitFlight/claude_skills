@@ -63,8 +63,8 @@ MAX_RETRIES = 3
 **Unexplained constants:**
 
 ```python
-TIMEOUT = 47   # Why 47?
-RETRIES = 5    # Why 5?
+TIMEOUT = 47  # Why 47?
+RETRIES = 5  # Why 5?
 ```
 
 If you cannot justify the value, Claude cannot either. Document the rationale or pick a well-known default.

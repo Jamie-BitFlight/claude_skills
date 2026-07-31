@@ -79,10 +79,10 @@ Flask uses blinker as its signal system foundation. Flask provides built-in sign
 ```python
 from flask import template_rendered
 
+
 def log_template_renders(sender, template, context, **extra):
-    sender.logger.info(
-        f"Rendered {template.name} with context {context}"
-    )
+    sender.logger.info(f"Rendered {template.name} with context {context}")
+
 
 template_rendered.connect(log_template_renders, app)
 ```
@@ -98,22 +98,25 @@ from blinker import Namespace
 app_signals = Namespace()
 
 # Define signals
-user_logged_in = app_signals.signal('user-logged-in')
-data_updated = app_signals.signal('data-updated')
+user_logged_in = app_signals.signal("user-logged-in")
+data_updated = app_signals.signal("data-updated")
+
 
 # Multiple handlers can subscribe
 @user_logged_in.connect
 def update_last_login(sender, **kwargs):
-    user_id = kwargs.get('user_id')
+    user_id = kwargs.get("user_id")
     # Update database
+
 
 @user_logged_in.connect
 def send_login_notification(sender, **kwargs):
     # Send email notification
     pass
 
+
 # Emit signal
-user_logged_in.send(app, user_id=123, ip_address='192.168.1.1')
+user_logged_in.send(app, user_id=123, ip_address="192.168.1.1")
 ```
 
 ### Plugin Systems
@@ -122,15 +125,17 @@ user_logged_in.send(app, user_id=123, ip_address='192.168.1.1')
 from blinker import signal
 
 # Core application defines hook points
-plugin_loaded = signal('plugin-loaded')
-before_process = signal('before-process')
-after_process = signal('after-process')
+plugin_loaded = signal("plugin-loaded")
+before_process = signal("before-process")
+after_process = signal("after-process")
+
 
 # Plugins subscribe to hooks
 @before_process.connect
 def plugin_preprocess(sender, data):
     # Plugin modifies data before processing
     return data
+
 
 # Application emits signals at hook points
 results = before_process.send(self, data=input_data)
@@ -151,12 +156,15 @@ import time
 
 request_times = {}
 
+
 def track_request_start(sender, **extra):
     request_times[id(extra)] = time.time()
+
 
 def track_request_end(sender, response, **extra):
     duration = time.time() - request_times.pop(id(extra), time.time())
     sender.logger.info(f"Request took {duration:.2f}s")
+
 
 request_started.connect(track_request_start)
 request_finished.connect(track_request_end)
@@ -170,7 +178,8 @@ request_finished.connect(track_request_end)
 from blinker import Namespace
 
 model_signals = Namespace()
-model_saved = model_signals.signal('model-saved')
+model_saved = model_signals.signal("model-saved")
+
 
 class Model:
     def save(self):
@@ -179,10 +188,12 @@ class Model:
         # Emit signal for observers
         model_saved.send(self, model_type=self.__class__.__name__)
 
+
 # Cache invalidation handler
 @model_saved.connect
 def invalidate_cache(sender, **kwargs):
     cache.delete(f"model:{kwargs['model_type']}")
+
 
 # Audit logging handler
 @model_saved.connect
@@ -197,17 +208,20 @@ def log_change(sender, **kwargs):
 ```python
 from blinker import signal
 
-round_started = signal('round-started')
+round_started = signal("round-started")
+
 
 # General subscriber - receives from all senders
 @round_started.connect
 def each_round(sender):
     print(f"Round {sender}")
 
+
 # Sender-specific subscriber - only for sender=2
 @round_started.connect_via(2)
 def special_round(sender):
     print("This is round two!")
+
 
 for round_num in range(1, 4):
     round_started.send(round_num)
@@ -228,27 +242,34 @@ from blinker import Signal
 
 async_signal = Signal()
 
+
 # Async receiver
 async def async_receiver(sender, **kwargs):
     await asyncio.sleep(1)
     print("Async handler completed")
+
 
 async_signal.connect(async_receiver)
 
 # Send to async receivers
 await async_signal.send_async()
 
+
 # Mix sync and async receivers
 def sync_receiver(sender, **kwargs):
     print("Sync handler")
 
+
 async_signal.connect(sync_receiver)
+
 
 # Provide wrapper for sync handlers in async context
 async def sync_wrapper(func):
     async def inner(*args, **kwargs):
         func(*args, **kwargs)
+
     return inner
+
 
 await async_signal.send_async(_sync_wrapper=sync_wrapper)
 ```
@@ -261,10 +282,11 @@ await async_signal.send_async(_sync_wrapper=sync_wrapper)
 from blinker import signal
 
 # Named signals (shared across modules)
-initialized = signal('initialized')
+initialized = signal("initialized")
 
 # Anonymous signals (class attributes)
 from blinker import Signal
+
 
 class Processor:
     on_ready = Signal()
@@ -273,14 +295,17 @@ class Processor:
     def process(self):
         self.on_ready.send(self)
         # Do work
-        self.on_complete.send(self, status='success')
+        self.on_complete.send(self, status="success")
+
 
 # Connect receivers
 @initialized.connect
 def on_init(sender, **kwargs):
     print(f"Initialized by {sender}")
 
+
 processor = Processor()
+
 
 @processor.on_complete.connect
 def handle_completion(sender, **kwargs):
@@ -292,15 +317,17 @@ def handle_completion(sender, **kwargs):
 ```python
 from blinker import signal
 
+
 # Module A defines and sends
 def user_service():
-    user_created = signal('user-created')
+    user_created = signal("user-created")
     # Create user
-    user_created.send('user_service', user_id=123, username='john')
+    user_created.send("user_service", user_id=123, username="john")
+
 
 # Module B subscribes (no import of Module A needed!)
 def notification_service():
-    user_created = signal('user-created')  # Same signal instance
+    user_created = signal("user-created")  # Same signal instance
 
     @user_created.connect
     def send_welcome_email(sender, **kwargs):
@@ -312,7 +339,8 @@ def notification_service():
 ```python
 from blinker import signal
 
-data_changed = signal('data-changed')
+data_changed = signal("data-changed")
+
 
 def update_data(new_data):
     # Only compute expensive stats if someone is listening
@@ -329,17 +357,19 @@ def update_data(new_data):
 ```python
 from blinker import signal
 
-send_email = signal('send-email')
+send_email = signal("send-email")
+
 
 @send_email.connect
 def actually_send(sender, **kwargs):
     # Send real email
     pass
 
+
 def test_user_registration():
     # Don't send emails during tests
     with send_email.muted():
-        register_user('test@example.com')
+        register_user("test@example.com")
         # send_email signal is ignored in this context
 ```
 
@@ -348,28 +378,27 @@ def test_user_registration():
 ```python
 from blinker import signal
 
-validate_data = signal('validate-data')
+validate_data = signal("validate-data")
+
 
 @validate_data.connect
 def check_email(sender, **kwargs):
-    email = kwargs['email']
-    if '@' not in email:
+    email = kwargs["email"]
+    if "@" not in email:
         return False, "Invalid email"
     return True, None
 
+
 @validate_data.connect
 def check_username(sender, **kwargs):
-    username = kwargs['username']
+    username = kwargs["username"]
     if len(username) < 3:
         return False, "Username too short"
     return True, None
 
+
 # Collect all validation results
-results = validate_data.send(
-    None,
-    email='invalid',
-    username='ab'
-)
+results = validate_data.send(None, email="invalid", username="ab")
 
 for receiver, (valid, error) in results:
     if not valid:
@@ -389,14 +418,17 @@ for receiver, (valid, error) in results:
 ```python
 # Overkill - use simple callback
 from blinker import signal
-sig = signal('done')
+
+sig = signal("done")
 sig.connect(on_done)
 sig.send(self)
+
 
 # Better - direct callback
 def process(callback):
     # do work
     callback()
+
 
 process(on_done)
 ```
@@ -412,19 +444,18 @@ process(on_done)
 ```python
 # Wrong tool - blinker is in-process only
 from blinker import signal
-distributed_event = signal('cross-service-event')
+
+distributed_event = signal("cross-service-event")
 
 # Better - use async message queue
 import asyncio
 from aio_pika import connect, Message
 
+
 async def publish_event():
     connection = await connect("amqp://guest:guest@localhost/")
     channel = await connection.channel()
-    await channel.default_exchange.publish(
-        Message(b"event data"),
-        routing_key="events"
-    )
+    await channel.default_exchange.publish(Message(b"event data"), routing_key="events")
 ```
 
 ### Scenario 3: Complex State Machines
@@ -442,17 +473,14 @@ from blinker import signal
 # Better - use state machine library
 from transitions import Machine
 
+
 class Order:
-    states = ['pending', 'paid', 'shipped', 'delivered']
+    states = ["pending", "paid", "shipped", "delivered"]
 
     def __init__(self):
-        self.machine = Machine(
-            model=self,
-            states=Order.states,
-            initial='pending'
-        )
-        self.machine.add_transition('pay', 'pending', 'paid')
-        self.machine.add_transition('ship', 'paid', 'shipped')
+        self.machine = Machine(model=self, states=Order.states, initial="pending")
+        self.machine.add_transition("pay", "pending", "paid")
+        self.machine.add_transition("ship", "paid", "shipped")
 ```
 
 ### Scenario 4: Request/Response Patterns
@@ -465,15 +493,17 @@ class Order:
 
 ```python
 # Awkward with signals
-result = some_signal.send(self, request='data')
+result = some_signal.send(self, request="data")
 # Hard to know which handler provided what
+
 
 # Better - direct method call or dependency injection
 class ServiceLocator:
     def get_service(self, name):
         return self._services[name]
 
-service = locator.get_service('data_processor')
+
+service = locator.get_service("data_processor")
 result = service.process(data)
 ```
 
@@ -561,7 +591,7 @@ Current version: 1.9.0 Minimum Python: 3.9+
    ```python
    @my_signal.connect
    def handler(sender, **kwargs):  # sender is required!
-       print(kwargs['data'])
+       print(kwargs["data"])
    ```
 
 4. **Cross-process communication:**

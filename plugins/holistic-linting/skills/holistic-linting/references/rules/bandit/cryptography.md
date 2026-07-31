@@ -31,10 +31,11 @@ file_signature = hashlib.sha1(file_content).hexdigest()
 
 # VULNERABLE - In django.contrib.auth (older versions)
 from django.contrib.auth.hashers import MD5PasswordHasher
+
 hasher = MD5PasswordHasher()
 
 # VULNERABLE - Using hashlib.new with weak algorithm
-hash_obj = hashlib.new('md5')
+hash_obj = hashlib.new("md5")
 hash_obj.update(data)
 ```
 
@@ -49,6 +50,7 @@ MD5 and SHA1 are acceptable only for:
 ```python
 # Safe - MD5 for non-security checksum
 import hashlib
+
 file_checksum = hashlib.md5(file_content).hexdigest()  # For deduplication, not security
 
 # Safe - SHA256 for security
@@ -62,19 +64,23 @@ secure_hash = hashlib.sha256(password.encode()).hexdigest()
 ```python
 # WRONG - MD5
 import hashlib
+
 hashed = hashlib.md5(password.encode()).hexdigest()
 
 # RIGHT - Use bcrypt (recommended)
 import bcrypt
+
 hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
 
 # RIGHT - Use argon2 (excellent for passwords)
 from argon2 import PasswordHasher
+
 ph = PasswordHasher()
 hashed = ph.hash(password)
 
 # RIGHT - Use scrypt
 from hashlib import scrypt
+
 hashed = scrypt(password.encode(), salt=os.urandom(32), n=2**14, r=8, p=1)
 ```
 
@@ -91,6 +97,7 @@ hashed = hashlib.sha256(data).hexdigest()
 
 # Or for HMAC-based integrity
 import hmac
+
 signature = hmac.new(secret_key, data, hashlib.sha256).hexdigest()
 ```
 
@@ -133,10 +140,12 @@ cipher = Cipher(algorithms.TripleDES(key), modes.CBC(iv), backend=backend)
 
 # VULNERABLE - Using PyCrypto (deprecated) with weak cipher
 from Crypto.Cipher import DES
+
 cipher = DES.new(key, DES.MODE_CBC, iv)
 
 # VULNERABLE - Blowfish (64-bit block size is too small)
 from Crypto.Cipher import Blowfish
+
 cipher = Blowfish.new(key, Blowfish.MODE_ECB)
 ```
 
@@ -156,6 +165,7 @@ def decrypt_legacy_data(ciphertext, key):
     """Decrypt data encrypted with DES (legacy only)."""
     # Should have immediate migration plan to AES
     from Crypto.Cipher import DES
+
     cipher = DES.new(key, DES.MODE_CBC, iv)
     return cipher.decrypt(ciphertext)
 ```
@@ -169,17 +179,15 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 import os
 
+
 def encrypt_with_aes(plaintext: bytes, key: bytes) -> bytes:
     """Encrypt using AES-256-GCM (authenticated encryption)."""
     iv = os.urandom(12)  # 96-bit IV for GCM
-    cipher = Cipher(
-        algorithms.AES(key),
-        modes.GCM(iv),
-        backend=default_backend()
-    )
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv), backend=default_backend())
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(plaintext) + encryptor.finalize()
     return iv + encryptor.tag + ciphertext  # Prepend IV and auth tag
+
 
 def decrypt_with_aes(ciphertext_bundle: bytes, key: bytes) -> bytes:
     """Decrypt using AES-256-GCM."""
@@ -187,11 +195,7 @@ def decrypt_with_aes(ciphertext_bundle: bytes, key: bytes) -> bytes:
     tag = ciphertext_bundle[12:28]
     ciphertext = ciphertext_bundle[28:]
 
-    cipher = Cipher(
-        algorithms.AES(key),
-        modes.GCM(iv, tag),
-        backend=default_backend()
-    )
+    cipher = Cipher(algorithms.AES(key), modes.GCM(iv, tag), backend=default_backend())
     decryptor = cipher.decryptor()
     return decryptor.update(ciphertext) + decryptor.finalize()
 ```
@@ -247,6 +251,7 @@ ECB is only acceptable for:
 ```python
 # Safe - encrypting exactly one block
 from Crypto.Cipher import AES
+
 plaintext = b"1234567890123456"  # Exactly 16 bytes
 cipher = AES.new(key, AES.MODE_ECB)
 ciphertext = cipher.encrypt(plaintext)
@@ -260,6 +265,7 @@ ciphertext = cipher.encrypt(plaintext)
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import os
 
+
 # Option 1: GCM (Galois/Counter Mode) - RECOMMENDED
 def encrypt_gcm(key: bytes, plaintext: bytes) -> bytes:
     iv = os.urandom(12)
@@ -268,14 +274,17 @@ def encrypt_gcm(key: bytes, plaintext: bytes) -> bytes:
     ciphertext = encryptor.update(plaintext) + encryptor.finalize()
     return iv + encryptor.tag + ciphertext
 
+
 # Option 2: CBC (Cipher Block Chaining)
 def encrypt_cbc(key: bytes, plaintext: bytes) -> bytes:
     from Crypto.Util.Padding import pad
+
     iv = os.urandom(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     padded = pad(plaintext, AES.block_size)
     ciphertext = cipher.encrypt(padded)
     return iv + ciphertext
+
 
 # Option 3: CTR (Counter Mode)
 def encrypt_ctr(key: bytes, plaintext: bytes) -> bytes:

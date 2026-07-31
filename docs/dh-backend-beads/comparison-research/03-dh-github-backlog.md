@@ -861,10 +861,10 @@ worktrees or CI.
 
 ```python
 artifact_type: ArtifactType
-artifact_id: str           # repo-relative path or logical ID
+artifact_id: str  # repo-relative path or logical ID
 status: ArtifactStatus
-created_at: str            # ISO 8601 datetime
-agent: str                 # producing agent name
+created_at: str  # ISO 8601 datetime
+agent: str  # producing agent name
 ```
 
 ### MCP-Native Rule for Agents
@@ -902,12 +902,12 @@ milestone: int
 wave_num: int
 issue: int
 title: str
-status: str           # pending, in-progress, complete, failed, skipped
-pid: int | None       # OS process ID of spawned session
+status: str  # pending, in-progress, complete, failed, skipped
+pid: int | None  # OS process ID of spawned session
 session_id: str | None
-result: str           # JSON result or summary
+result: str  # JSON result or summary
 error: str
-cost: float | None    # USD cost
+cost: float | None  # USD cost
 started_at: str | None
 completed_at: str | None
 ```
@@ -917,7 +917,7 @@ completed_at: str | None
 ```python
 milestone: int
 wave_num: int
-status: str           # pending, in-progress, complete, failed
+status: str  # pending, in-progress, complete, failed
 items: list[DispatchItemRecord]
 started_at: str | None
 completed_at: str | None

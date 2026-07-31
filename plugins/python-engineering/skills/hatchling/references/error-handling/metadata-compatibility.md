@@ -110,13 +110,12 @@ path = "src/package/__about__.py"
 # Custom metadata hook (v1.22.0+)
 from hatchling.metadata.plugin.interface import MetadataHookInterface
 
+
 class CustomMetadataHook(MetadataHookInterface):
     def update(self, metadata):
         """Modify metadata during build."""
         # Works with all metadata versions
-        metadata['description'] = self.process_description(
-            metadata.get('description', '')
-        )
+        metadata["description"] = self.process_description(metadata.get("description", ""))
 
     def dependencies(self):
         """Dynamically define dependencies (v1.22.0+)."""
@@ -139,6 +138,7 @@ build-backend = "hatchling.build"
 # Correct PEP 517 signatures maintained
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     pass
+
 
 def build_editable(wheel_directory, config_settings=None, metadata_directory=None):
     pass
@@ -249,6 +249,7 @@ test_utils = ["coverage"]
 import tomllib
 from pathlib import Path
 
+
 def check_metadata_compatibility():
     """Analyze project for metadata version requirements."""
     with open("pyproject.toml", "rb") as f:
@@ -261,21 +262,13 @@ def check_metadata_compatibility():
     if "license" in project:
         license_val = project["license"]
         if isinstance(license_val, dict):
-            issues.append(
-                "Using dict-style license - consider SPDX expression"
-            )
+            issues.append("Using dict-style license - consider SPDX expression")
 
     # Check for deprecated options
-    metadata_config = (
-        config.get("tool", {})
-        .get("hatch", {})
-        .get("metadata", {})
-    )
+    metadata_config = config.get("tool", {}).get("hatch", {}).get("metadata", {})
 
     if metadata_config.get("allow-ambiguous-features"):
-        issues.append(
-            "allow-ambiguous-features is deprecated"
-        )
+        issues.append("allow-ambiguous-features is deprecated")
 
     return issues
 ```
@@ -314,6 +307,7 @@ unzip -p dist/*.whl '*.dist-info/METADATA' | head -20
 from hatchling.metadata.core import ProjectMetadata
 from pathlib import Path
 
+
 def test_metadata_versions():
     """Generate metadata for different versions."""
     root = Path.cwd()
@@ -331,6 +325,7 @@ def test_metadata_versions():
     print(f"License: {core.license}")
     print(f"License-Expression: {core.license_expression}")
     print(f"License-Files: {core.license_files}")
+
 
 if __name__ == "__main__":
     test_metadata_versions()
@@ -374,24 +369,21 @@ if __name__ == "__main__":
 import subprocess
 import json
 
+
 def debug_metadata():
     """Extract and display effective metadata."""
     # Build wheel
     subprocess.run(["hatch", "build", "-t", "wheel"], check=True)
 
     # Extract metadata
-    result = subprocess.run(
-        ["python", "-m", "zipfile", "-l", "dist/*.whl"],
-        capture_output=True,
-        text=True,
-        shell=True
-    )
+    result = subprocess.run(["python", "-m", "zipfile", "-l", "dist/*.whl"], capture_output=True, text=True, shell=True)
 
     print("Wheel contents:")
     print(result.stdout)
 
     # Get metadata file
     # ... extract and parse METADATA file ...
+
 
 if __name__ == "__main__":
     debug_metadata()

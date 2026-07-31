@@ -108,10 +108,12 @@ from fastmcp import FastMCP
 
 mcp = FastMCP("my-server")
 
+
 @mcp.tool  # RULE: no parentheses — v3 canonical syntax
 def greet(name: str) -> str:
     """Return a greeting."""
     return f"Hello, {name}!"
+
 
 if __name__ == "__main__":
     mcp.run()
@@ -135,6 +137,7 @@ main.mount(weather, namespace="weather")
 from fastmcp import FastMCP
 
 mcp = FastMCP("task-server")
+
 
 @mcp.tool(task=True)  # RULE: task=True, NOT task=TaskConfig(...)
 async def long_running(data: str) -> str:

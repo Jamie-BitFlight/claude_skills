@@ -18,10 +18,11 @@ MyPy expects that the number and names of arguments match the called function. N
 
 ```python
 def greet(name: str) -> None:
-    print('hello', name)
+    print("hello", name)
 
-greet('jack')  # OK
-greet('jill', 'jack')  # Error: Too many arguments for "greet" [call-arg]
+
+greet("jack")  # OK
+greet("jill", "jack")  # Error: Too many arguments for "greet" [call-arg]
 ```
 
 #### Too few arguments
@@ -29,6 +30,7 @@ greet('jill', 'jack')  # Error: Too many arguments for "greet" [call-arg]
 ```python
 def process(x: int, y: int) -> int:
     return x + y
+
 
 result = process(5)  # Error: Missing positional argument "y" for "process" [call-arg]
 ```
@@ -39,6 +41,7 @@ result = process(5)  # Error: Missing positional argument "y" for "process" [cal
 def calculate(value: int) -> int:
     return value * 2
 
+
 result = calculate(value=5, factor=2)  # Error: Unexpected keyword argument "factor" [call-arg]
 ```
 
@@ -48,10 +51,11 @@ result = calculate(value=5, factor=2)  # Error: Unexpected keyword argument "fac
 
 ```python
 def greet(name: str) -> None:
-    print('hello', name)
+    print("hello", name)
 
-greet('jack')  # OK
-greet(name='jill')  # OK
+
+greet("jack")  # OK
+greet(name="jill")  # OK
 ```
 
 #### Default arguments
@@ -59,6 +63,7 @@ greet(name='jill')  # OK
 ```python
 def process(x: int, y: int = 10) -> int:
     return x + y
+
 
 result = process(5)  # OK - y has default value
 result = process(5, 20)  # OK - y provided explicitly
@@ -70,34 +75,35 @@ result = process(5, 20)  # OK - y provided explicitly
 def sum_all(*values: int) -> int:
     return sum(values)
 
+
 total = sum_all(1, 2, 3, 4, 5)  # OK
 ```
 
 ### Examples of Error-Producing Code
 
 ```python
-def register(name: str, email: str) -> None:
-    ...
+def register(name: str, email: str) -> None: ...
+
 
 # Error: Missing positional argument "email"
-register('Alice')
+register("Alice")
 
 # Error: Too many arguments
-register('Bob', 'bob@example.com', 'extra')
+register("Bob", "bob@example.com", "extra")
 
 # Error: Unexpected keyword argument
-register('Charlie', email='charlie@example.com', verified=True)
+register("Charlie", email="charlie@example.com", verified=True)
 ```
 
 ### Examples of Corrected Code
 
 ```python
-def register(name: str, email: str, verified: bool = False) -> None:
-    ...
+def register(name: str, email: str, verified: bool = False) -> None: ...
 
-register('Alice', 'alice@example.com')  # OK
-register('Bob', 'bob@example.com', True)  # OK
-register('Charlie', email='charlie@example.com', verified=True)  # OK
+
+register("Alice", "alice@example.com")  # OK
+register("Bob", "bob@example.com", True)  # OK
+register("Charlie", email="charlie@example.com", verified=True)  # OK
 ```
 
 ### Configuration Options
@@ -105,7 +111,7 @@ register('Charlie', email='charlie@example.com', verified=True)  # OK
 This error is enabled by default. Suppress specific instances:
 
 ```python
-greet('jill', 'jack')  # type: ignore[call-arg]
+greet("jill", "jack")  # type: ignore[call-arg]
 ```
 
 ---
@@ -130,6 +136,7 @@ MyPy checks that argument types in a call match the declared argument types in t
 def first(x: list[int]) -> int:
     return x[0] if x else 0
 
+
 t = (5, 4)
 # Error: Argument 1 to "first" has incompatible type "tuple[int, int]";
 #        expected "list[int]" [arg-type]
@@ -141,6 +148,7 @@ print(first(t))
 ```python
 def process(value: str) -> str:
     return value.upper()
+
 
 # Error: Argument 1 to "process" has incompatible type "int"; expected "str" [arg-type]
 result = process(42)
@@ -154,6 +162,7 @@ result = process(42)
 def first(x: list[int]) -> int:
     return x[0] if x else 0
 
+
 t = [5, 4]
 print(first(t))  # OK
 ```
@@ -164,11 +173,13 @@ print(first(t))  # OK
 class Animal:
     pass
 
+
 class Dog(Animal):
     pass
 
-def process(animal: Animal) -> None:
-    ...
+
+def process(animal: Animal) -> None: ...
+
 
 dog = Dog()
 process(dog)  # OK - Dog is a subclass of Animal
@@ -177,11 +188,11 @@ process(dog)  # OK - Dog is a subclass of Animal
 #### Union types containing the argument type
 
 ```python
-def process(value: int | str) -> None:
-    ...
+def process(value: int | str) -> None: ...
+
 
 process(42)  # OK
-process('text')  # OK
+process("text")  # OK
 ```
 
 ### Examples of Error-Producing Code
@@ -190,8 +201,10 @@ process('text')  # OK
 def divide(x: float, y: float) -> float:
     return x / y
 
+
 # Error: Argument 2 has incompatible type "str"; expected "float" [arg-type]
 result = divide(10, "2")
+
 
 def greet(user: dict) -> str:
     # Error: Argument has incompatible type "list"; expected "dict" [arg-type]
@@ -204,13 +217,16 @@ def greet(user: dict) -> str:
 def divide(x: float, y: float) -> float:
     return x / y
 
+
 result = divide(10.0, 2.0)  # OK
 result = divide(10, 2)  # OK - int is compatible with float
+
 
 def greet(user: dict) -> str:
     return f"Hello {user['name']}"
 
-greet({'name': 'Alice'})  # OK
+
+greet({"name": "Alice"})  # OK
 ```
 
 ### Configuration Options
@@ -242,17 +258,21 @@ When you call an overloaded function, MyPy checks that at least one of the signa
 ```python
 from typing import overload
 
+
 @overload
 def inc_maybe(x: None) -> None: ...
 
+
 @overload
 def inc_maybe(x: int) -> int: ...
+
 
 def inc_maybe(x: int | None) -> int | None:
     if x is None:
         return None
     else:
         return x + 1
+
 
 inc_maybe(None)  # OK
 inc_maybe(5)  # OK
@@ -268,14 +288,18 @@ inc_maybe(1.2)
 ```python
 from typing import overload
 
+
 @overload
 def process(value: int) -> int: ...
+
 
 @overload
 def process(value: str) -> str: ...
 
+
 def process(value):
     return value if isinstance(value, str) else value * 2
+
 
 process(5)  # OK - matches first overload
 process("text")  # OK - matches second overload
@@ -286,17 +310,21 @@ process("text")  # OK - matches second overload
 ```python
 from typing import overload
 
+
 @overload
 def transform(x: list[int]) -> int: ...
+
 
 @overload
 def transform(x: str) -> str: ...
 
+
 def transform(x):
     return sum(x) if isinstance(x, list) else x.upper()
 
+
 # Error: No overload variant matches argument type "dict" [call-overload]
-transform({'key': 'value'})
+transform({"key": "value"})
 ```
 
 ### Examples of Corrected Code
@@ -304,14 +332,18 @@ transform({'key': 'value'})
 ```python
 from typing import overload
 
+
 @overload
 def transform(x: list[int]) -> int: ...
+
 
 @overload
 def transform(x: str) -> str: ...
 
+
 def transform(x):
     return sum(x) if isinstance(x, list) else x.upper()
+
 
 result1 = transform([1, 2, 3])  # OK
 result2 = transform("hello")  # OK
@@ -322,7 +354,7 @@ result2 = transform("hello")  # OK
 This error is enabled by default. Suppress specific instances:
 
 ```python
-transform({'key': 'value'})  # type: ignore[call-overload]
+transform({"key": "value"})  # type: ignore[call-overload]
 ```
 
 ---
@@ -347,6 +379,7 @@ If a function has a non-None return type, MyPy expects that the function always 
 # Error: Missing return statement [return]
 def show(x: int) -> int:
     print(x)
+
 
 # Error: Missing return statement [return]
 def pred1(x: int) -> int:
@@ -382,7 +415,7 @@ def pred2(x: int) -> int:
     if x > 0:
         return x - 1
     else:
-        raise ValueError('not defined for zero')  # OK - raises exception
+        raise ValueError("not defined for zero")  # OK - raises exception
 ```
 
 #### Unreachable code after return
@@ -402,6 +435,7 @@ def max_value(items: list[int]) -> int:
         return max(items)
     # Doesn't return for empty list
 
+
 # Error: Missing return statement
 def validate_age(age: int) -> bool:
     if age >= 18:
@@ -418,11 +452,13 @@ def max_value(items: list[int]) -> int:
         return max(items)
     return 0
 
+
 # Handle all cases
 def validate_age(age: int) -> bool:
     if age >= 18:
         return True
     return False
+
 
 # Or use shorter form
 def validate_age(age: int) -> bool:
@@ -489,8 +525,10 @@ def func(x: int) -> str:
 class Animal:
     pass
 
+
 class Dog(Animal):
     pass
+
 
 def get_pet() -> Animal:
     return Dog()  # OK - Dog is subclass of Animal
@@ -503,6 +541,7 @@ def get_count() -> int:
     # Error: Incompatible return value type (got "str", expected "int") [return-value]
     return "42"
 
+
 def process(data: list) -> dict:
     # Error: Incompatible return value type (got "list", expected "dict") [return-value]
     return data
@@ -514,12 +553,14 @@ def process(data: list) -> dict:
 def get_count() -> int:
     return int("42")  # OK
 
+
 def process(data: list) -> list:
     return data  # OK - type matches
 
+
 # Or convert to dict
 def process_to_dict(data: list) -> dict:
-    return {'items': data}  # OK
+    return {"items": data}  # OK
 ```
 
 ### Configuration Options
@@ -553,8 +594,8 @@ This error code is similar to `[return]` but is emitted specifically for functio
 def process(x: int) -> int:
     pass  # Error: Missing return statement [empty-body]
 
-def calculate() -> str:
-    ...  # Error: Missing return statement [empty-body]
+
+def calculate() -> str: ...  # Error: Missing return statement [empty-body]
 ```
 
 ### When This IS NOT an Error
@@ -564,10 +605,12 @@ def calculate() -> str:
 ```python
 from abc import abstractmethod
 
+
 class Base:
     @abstractmethod
     def foo(self) -> int:
         pass  # OK - abstract method
+
 
 class Derived(Base):
     def foo(self) -> int:
@@ -579,9 +622,11 @@ class Derived(Base):
 ```python
 from typing import Protocol
 
+
 class Compute(Protocol):
     def process(self) -> int:
         pass  # OK - in Protocol
+
 
 class Implementation(Compute):
     def process(self) -> int:
@@ -592,8 +637,8 @@ class Implementation(Compute):
 
 ```python
 # Error: Missing return statement [empty-body]
-def get_data() -> dict:
-    ...
+def get_data() -> dict: ...
+
 
 # Error: Missing return statement [empty-body]
 def validate(value: int) -> bool:
@@ -605,14 +650,17 @@ def validate(value: int) -> bool:
 ```python
 from abc import abstractmethod
 
+
 # For abstract methods
 class Base:
     @abstractmethod
     def get_data(self) -> dict: ...
 
+
 # For actual implementation
 def get_data() -> dict:
     return {}
+
 
 def validate(value: int) -> bool:
     return value > 0
@@ -646,8 +694,8 @@ MyPy reports an error if you call a function with a `None` return type and don't
 #### Using return value from None-returning function
 
 ```python
-def f() -> None:
-    ...
+def f() -> None: ...
+
 
 # Error: "f" does not return a value (it only ever returns None) [func-returns-value]
 if f():
@@ -661,8 +709,8 @@ result = f()  # Error: assigned value of None is usually not needed
 #### Not using the return value
 
 ```python
-def f() -> None:
-    ...
+def f() -> None: ...
+
 
 f()  # OK - we don't do anything with the return value
 ```
@@ -673,6 +721,7 @@ f()  # OK - we don't do anything with the return value
 def f() -> str:
     return "value"
 
+
 if f():  # OK - returns str
     print("not false")
 ```
@@ -682,6 +731,7 @@ if f():  # OK - returns str
 ```python
 def log(message: str) -> None:
     print(message)
+
 
 # Error: does not return a value [func-returns-value]
 status = log("hello")
@@ -697,12 +747,15 @@ if log("error"):
 def log(message: str) -> None:
     print(message)
 
+
 log("hello")  # OK - don't use return value
+
 
 # Or make function return a value
 def log_and_get_length(message: str) -> int:
     print(message)
     return len(message)
+
 
 length = log_and_get_length("hello")  # OK
 ```

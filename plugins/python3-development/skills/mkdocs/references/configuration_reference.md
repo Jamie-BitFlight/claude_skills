@@ -605,13 +605,16 @@ The built-in search plugin accepts these options:
 # scripts/hooks.py
 import logging
 
+
 def on_pre_build(config):
     """Called before the build process starts."""
     logging.info("Starting documentation build...")
 
+
 def on_page_markdown(markdown, page, config, files):
     """Called when markdown is loaded, before conversion to HTML."""
-    return markdown.replace('{{VERSION}}', config['extra']['version'])
+    return markdown.replace("{{VERSION}}", config["extra"]["version"])
+
 
 def on_page_content(html, page, config, files):
     """Called after markdown is converted to HTML."""
