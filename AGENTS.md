@@ -55,6 +55,29 @@ claude --plugin-dir ./plugins/holistic-linting          # Load multiple plugins
 /plugin validate ./plugins/plugin-name                  # Validate plugin structure
 ```
 
+### MCP Server Validation
+
+For a FastMCP server, use the active `fastmcp-creator:fastmcp-client-cli` skill for protocol
+checks and `fastmcp-creator:fastmcp-python-tests` for Python tests when the harness exposes them.
+If either is unavailable, read its corresponding `SKILL.md` under
+`plugins/fastmcp-creator/skills/` before choosing test commands; do not invent an invocation or
+test pattern from memory.
+
+Validate separate concerns separately:
+
+1. **Server protocol and tools**: from outside the plugin directory, use `fastmcp list` to
+   discover tools and `fastmcp call` to invoke one against the configured stdio command. Use a
+   non-sensitive temporary fixture and assert a successful, meaningful response.
+2. **Codex plugin integration**: install the plugin from an isolated local marketplace and
+   invoke a named MCP tool through Codex. Do not count manually opening `SKILL.md` or starting a
+   server process as proof that Codex loaded the plugin.
+3. **Claude plugin integration**: start Claude with the packaged plugin and invoke a named MCP
+   tool. If Claude authentication is unavailable, record this as blocked rather than inferring
+   runtime compatibility from static configuration.
+
+FastMCP client syntax is versioned. Run `fastmcp call --help` before relying on an invocation
+from documentation; for FastMCP 3.4.5, use explicit `--command` and `--target` options together.
+
 ### MCP Server Scripts
 
 ```bash
