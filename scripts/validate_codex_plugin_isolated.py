@@ -41,6 +41,7 @@ class ValidationWorkspace:
     marketplace_source: Path
     marketplace_path: Path
     plugin_dir: Path
+    plugin_id: str
     project_dir: Path
     codex_home: Path
 
@@ -51,7 +52,8 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Build an isolated temp marketplace tree for exactly one Codex plugin, then "
-            "either print or execute the Codex marketplace/install/exec smoke sequence."
+            "either print or execute the Codex marketplace/install/exec smoke sequence. "
+            "Use --package-only to stop after marketplace registration and installation."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -111,6 +113,14 @@ def create_parser() -> argparse.ArgumentParser:
         help="Execute the Codex marketplace/install/exec smoke flow instead of printing commands.",
     )
     parser.add_argument(
+        "--package-only",
+        action="store_true",
+        help=(
+            "With --run, register and install the plugin but skip codex exec/model work. "
+            "Cannot be combined with --copy-auth-from-current-home."
+        ),
+    )
+    parser.add_argument(
         "--copy-auth-from-current-home",
         action="store_true",
         help=(
@@ -148,6 +158,21 @@ def resolve_plugin_dir(plugin_name: str) -> Path:
     return plugin_dir
 
 
+def load_plugin_id(plugin_dir: Path) -> str:
+    """Read and validate the Codex plugin ID from a plugin manifest."""
+
+    manifest_path = plugin_dir / ".codex-plugin" / "plugin.json"
+    if not manifest_path.is_file():
+        raise HarnessError(f"Plugin manifest is missing: {manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise HarnessError(f"Plugin manifest must be a JSON object: {manifest_path}")
+    plugin_id = manifest.get("name")
+    if not isinstance(plugin_id, str) or not plugin_id:
+        raise HarnessError(f"Plugin name is missing in {manifest_path}")
+    return plugin_id
+
+
 def expand_path_prefix(path_prefix: str) -> str:
     """Expand a PATH prefix string without mutating the user's shell environment."""
 
@@ -165,11 +190,12 @@ def create_temp_workspace(plugin_name: str) -> ValidationWorkspace:
     source_plugin_dir = resolve_plugin_dir(plugin_name)
     copied_plugin_dir = plugins_root / plugin_name
     shutil.copytree(source_plugin_dir, copied_plugin_dir)
+    plugin_id = load_plugin_id(copied_plugin_dir)
 
     marketplace_root = root / ".agents" / "plugins"
     marketplace_root.mkdir(parents=True, exist_ok=True)
     marketplace_path = marketplace_root / "marketplace.json"
-    write_marketplace_json(marketplace_path, plugin_name)
+    write_marketplace_json(marketplace_path, plugin_id, plugin_name)
 
     project_dir = root / "project"
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -184,6 +210,7 @@ def create_temp_workspace(plugin_name: str) -> ValidationWorkspace:
         marketplace_source=root,
         marketplace_path=marketplace_path,
         plugin_dir=copied_plugin_dir,
+        plugin_id=plugin_id,
         project_dir=project_dir,
         codex_home=codex_home,
     )
@@ -212,6 +239,7 @@ def create_repo_workspace(plugin_name: str) -> ValidationWorkspace:
     codex_home.mkdir(parents=True, exist_ok=True)
     plugin_dir = resolve_plugin_dir(plugin_name)
     marketplace_path = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
+    plugin_id = load_plugin_id(plugin_dir)
 
     return ValidationWorkspace(
         root=root,
@@ -220,12 +248,13 @@ def create_repo_workspace(plugin_name: str) -> ValidationWorkspace:
         marketplace_source=REPO_ROOT,
         marketplace_path=marketplace_path,
         plugin_dir=plugin_dir,
+        plugin_id=plugin_id,
         project_dir=project_dir,
         codex_home=codex_home,
     )
 
 
-def write_marketplace_json(marketplace_path: Path, plugin_name: str) -> None:
+def write_marketplace_json(marketplace_path: Path, plugin_id: str, plugin_name: str) -> None:
     """Write the smallest marketplace file needed to expose one isolated plugin."""
 
     marketplace = {
@@ -235,7 +264,7 @@ def write_marketplace_json(marketplace_path: Path, plugin_name: str) -> None:
         },
         "plugins": [
             {
-                "name": plugin_name,
+                "name": plugin_id,
                 "source": {
                     "source": "local",
                     "path": f"./plugins/{plugin_name}",
@@ -301,7 +330,6 @@ def copy_auth_from_current_home(workspace: ValidationWorkspace) -> Path:
 
 def build_command_strings(
     workspace: ValidationWorkspace,
-    plugin_name: str,
     prompt: str,
     output_file: Path,
     path_prefix: str,
@@ -317,7 +345,7 @@ def build_command_strings(
         f"{env_prefix} codex plugin marketplace add {shlex.quote(str(workspace.marketplace_source))}"
     )
     install_cmd = (
-        f"{env_prefix} codex plugin add {shlex.quote(f'{plugin_name}@{workspace.marketplace_name}')}"
+        f"{env_prefix} codex plugin add {shlex.quote(f'{workspace.plugin_id}@{workspace.marketplace_name}')}"
     )
     exec_cmd = (
         f"{env_prefix} codex exec --skip-git-repo-check -o {shlex.quote(str(output_file))} "
@@ -368,7 +396,6 @@ def run_command(
 
 def print_plan(
     workspace: ValidationWorkspace,
-    plugin_name: str,
     prompt: str,
     output_file: Path,
     path_prefix: str,
@@ -380,6 +407,7 @@ def print_plan(
     print(f"  distribution:   {workspace.mode}")
     print(f"  temp workspace: {workspace.root}")
     print(f"  plugin source:  {workspace.plugin_dir}")
+    print(f"  plugin id:      {workspace.plugin_id}")
     print(f"  marketplace:    {workspace.marketplace_path}")
     print(f"  source root:    {workspace.marketplace_source}")
     print(f"  marketplace id: {workspace.marketplace_name}")
@@ -391,7 +419,7 @@ def print_plan(
     print("  auth:           not copied in dry-run output")
     print()
     print("Commands to run:")
-    for command in build_command_strings(workspace, plugin_name, prompt, output_file, path_prefix):
+    for command in build_command_strings(workspace, prompt, output_file, path_prefix):
         print(f"  {command}")
 
 
@@ -402,6 +430,15 @@ def cleanup_workspace(workspace: ValidationWorkspace) -> None:
         shutil.rmtree(workspace.root)
 
 
+def validate_args(args: argparse.Namespace) -> None:
+    """Reject combinations that cannot produce a valid isolated run."""
+
+    if args.package_only and not args.run:
+        raise HarnessError("--package-only requires --run")
+    if args.package_only and args.copy_auth_from_current_home:
+        raise HarnessError("--package-only cannot be combined with --copy-auth-from-current-home")
+
+
 def main() -> int:
     """Run the isolated Codex plugin validation harness."""
 
@@ -410,6 +447,7 @@ def main() -> int:
     workspace: ValidationWorkspace | None = None
 
     try:
+        validate_args(args)
         if args.zip_unzip and args.distribution_mode != "copy":
             raise HarnessError("--zip-unzip requires --distribution-mode copy")
 
@@ -424,7 +462,6 @@ def main() -> int:
         if not args.run:
             print_plan(
                 workspace,
-                args.plugin,
                 args.prompt,
                 output_file,
                 args.path_prefix,
@@ -465,12 +502,16 @@ def main() -> int:
                 "codex",
                 "plugin",
                 "add",
-                f"{args.plugin}@{workspace.marketplace_name}",
+                f"{workspace.plugin_id}@{workspace.marketplace_name}",
             ],
             cwd=workspace.project_dir,
             env=env,
             label="install",
         )
+        if args.package_only:
+            print("Package-only validation complete: marketplace registered and plugin installed; codex exec skipped.")
+            return 0
+
         run_command(
             [
                 "codex",
