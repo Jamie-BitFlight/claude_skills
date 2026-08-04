@@ -1,0 +1,216 @@
+# Basic Python Project Configuration
+# Use this template for simple Python projects
+
+[project]
+name = "my-project"
+version = "0.1.0"
+description = "A simple Python project"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+license = {text = "MIT"}
+keywords = ["example", "project"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+# Core dependencies
+dependencies = [
+    "requests>=2.31.0",
+]
+
+# Development dependencies using PEP 735 dependency groups
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.13.3",
+    "pyright>=1.1.406",
+    "mypy>=1.18.2",
+    "pre-commit>=4.3.0",
+]
+
+# Entry points for CLI tools
+[project.scripts]
+my-tool = "my_project.cli:main"
+
+# Project URLs
+[project.urls]
+Homepage = "https://github.com/yourusername/my-project"
+Documentation = "https://my-project.readthedocs.io"
+Repository = "https://github.com/yourusername/my-project.git"
+Issues = "https://github.com/yourusername/my-project/issues"
+
+# Build system
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# uv configuration
+[tool.uv]
+managed = true
+package = true
+default-groups = ["dev"]
+
+# Development server sources (optional)
+[tool.uv.sources]
+# Example: Install from git during development
+# requests = { git = "https://github.com/psf/requests", branch = "main" }
+
+# Ruff configuration
+[tool.ruff]
+target-version = "py311"
+fix = true
+unsafe-fixes = true
+src = ["packages", "scripts", "tests", "typings", ".gitlab", ".github"]
+
+[tool.ruff.format]
+docstring-code-format = true
+quote-style = "double"
+line-ending = "lf"
+skip-magic-trailing-comma = true
+preview = true
+
+[tool.ruff.lint]
+preview = true
+extend-select = [
+    "A",     # see: https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+    "ANN",   # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+    "ASYNC", # see: https://docs.astral.sh/ruff/rules/#flake8-async-async
+    "B",     # see: https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+    "BLE",   # see: https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
+    "C4",    # see: https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
+    "C90",   # see: https://docs.astral.sh/ruff/rules/#mccabe-c90
+    "D",     # see: https://docs.astral.sh/ruff/rules/#pydocstyle-d
+    "DOC",   # see: https://docs.astral.sh/ruff/rules/#pydoclint-doc
+    "E",     # see: https://docs.astral.sh/ruff/rules/#error-e
+    "EXE",   # see: https://docs.astral.sh/ruff/rules/#flake8-executable-exe
+    "F",     # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "FA",    # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-fa
+    "FAST",  # see: https://docs.astral.sh/ruff/rules/#fastapi-fast
+    "FLY",   # see: https://docs.astral.sh/ruff/rules/#flynt-fly
+    "FURB",  # see: https://docs.astral.sh/ruff/rules/#refurb-furb
+    "G201",  # see: https://docs.astral.sh/ruff/rules/logging-exc-info/
+    "G202",  # see: https://docs.astral.sh/ruff/rules/logging-redundant-exc-info/
+    "I",     # see: https://docs.astral.sh/ruff/rules/#isort-i
+    "N",     # see: https://docs.astral.sh/ruff/rules/#flake8-quotes-n
+    "PERF",  # see: https://docs.astral.sh/ruff/rules/#perflint-perf
+    "PGH",   # see: https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
+    "PIE",   # see: https://docs.astral.sh/ruff/rules/#flake8-pie-pie
+    "PL",    # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "PT",    # see: https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+    "PTH",   # see: https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
+    "PYI",   # see: https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
+    "Q",     # see: https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+    "RET",   # see: https://docs.astral.sh/ruff/rules/#flake8-return-ret
+    "RSE",   # see: https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+    "RUF",   # see: https://docs.astral.sh/ruff/rules/#ruff-ruf
+    "S",     # see: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+    "SIM",   # see: https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+    "SLF",   # see: https://docs.astral.sh/ruff/rules/#flake8-self-slf
+    "SLOT",  # see: https://docs.astral.sh/ruff/rules/#flake8-slots-slot
+    "T10",   # see: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
+    "T20",   # see: https://docs.astral.sh/ruff/rules/#flake8-typing-t20
+    "TC",    # see: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
+    "TRY",   # see: https://docs.astral.sh/ruff/rules/#tryceratops-try
+    "UP",    # see: https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "W",     # see: https://docs.astral.sh/ruff/rules/#warning-w
+    "YTT",   # see: https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+]
+ignore = [
+    "DOC501", # Raised exception {id} missing from docstring
+    "DOC502", # Raised exception is not explicitly raised
+    "E501",   # Line too long ({width} > {limit})
+    "EXE003", # Shebang should contain python, pytest, or uv run (doesn't handle global arguments)
+    "S404",   # subprocess possibly insecure - still need to use subprocess though
+    "S603",   # subprocess without shell=True
+    "TRY003", # Long error messages are fine
+]
+unfixable = ["F401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "D", "E501"]
+"typings/**" = ["N", "ANN", "A"]
+".gitlab/scripts/**" = [
+    "T201", # print() statements are intentional for CI output visibility
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+split-on-trailing-comma = false
+force-single-line = false
+force-wrap-aliases = false
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.11"
+strict = true
+extra_checks = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+show_error_codes = true
+pretty = true
+disable_error_code = ["call-arg", "misc"]
+mypy_path = ["packages", "scripts", "."]
+
+[[tool.mypy.overrides]]
+module = ["test.*", "tests.*"]
+disable_error_code = ["attr-defined", "call-arg", "var-annotated"]
+
+# Basedpyright configuration
+[tool.basedpyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+reportMissingImports = false
+reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = "error"
+reportPrivateImportUsage = false
+include = ["packages", "scripts"]
+extraPaths = ["packages", "scripts", "tests"]
+ignore = ["**/typings", "**/tests"]
+venvPath = "."
+venv = ".venv"
+
+# Pytest configuration
+[tool.pytest.ini_options]
+addopts = [
+    "--cov=my_project",
+    "--cov-report=term-missing",
+    "-v",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: tests that take significant time to run",
+    "integration: integration tests",
+]
+
+[tool.coverage.run]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 70
