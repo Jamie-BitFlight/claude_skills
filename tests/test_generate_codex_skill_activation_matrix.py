@@ -23,6 +23,17 @@ def test_checked_in_matrix_matches_declared_plugin_skills() -> None:
         row["status"] in {"NO_ORACLE", "MAPPED", "BLOCKED", "PASSED", "FAILED"}
         for row in rows
     )
+    for row in rows:
+        if row["status"] == "NO_ORACLE":
+            assert row["task_source"] is None
+            assert row["task_text"] is None
+            assert row["expected_outcome"] is None
+            assert row["safety_class"] == "UNCLASSIFIED"
+        if row["status"] == "MAPPED":
+            assert isinstance(row["task_source"], str)
+            assert isinstance(row["task_text"], str)
+            assert isinstance(row["expected_outcome"], str)
+            assert row["safety_class"] != "UNCLASSIFIED"
 
     parsed_rows = [json.loads(line) for line in checked_in.splitlines()]
     targets = [row["target"] for row in parsed_rows]
