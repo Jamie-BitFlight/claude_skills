@@ -4,8 +4,6 @@
       "command": "uv",
       "args": [
         "run",
-        "--python",
-        "3.12",
         "--script",
         "mcp/server.py"
       ],
