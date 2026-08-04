@@ -82,7 +82,7 @@ flowchart TD
     N10B --> N10C
     N10C --> N11D
     N11D --> N11D1[N11D.1: count reconciliation]
-    N11D1 --> N11M[N11M: 244-row activation matrix]
+    N11D1 --> N11M[N11M: 245-row activation matrix]
     N11D1 --> N11R[N11R: materialize uv surface]
     N11R --> N11P[N11P: portable-bundle proof]
     N11M --> N11P
@@ -189,28 +189,28 @@ its workers may substitute a direct `SKILL.md` read for a skill load.
 
 | Partition | Plugin surface | Declared operational skills | Result |
 | --- | --- | ---: | --- |
-| N11D-1 | development-harness | 58 | Lifecycle, backlog, research, review, diagnosis, and orchestration classes mapped. |
+| N11D-1 | development-harness | 59 | 58 pre-rebase skills mapped; `meta-workflow-graph-refresh` still needs task-oracle mapping. |
 | N11D-2 | plugin-creator | 43 | Operational top-level skills mapped; `examples/skills/example-skill` is a fixture, not a declared skill. |
 | N11D-3 | python-engineering | 42 | Routing and tool-executing classes mapped. |
 | N11D-4 | python3-development | 34 | Specialist and chained Python workflow classes mapped. |
 | N11D-5 | agent-orchestration, agentskill-kaizen, brainstorming-skill, fastmcp-creator, frustration-analyzer, holistic-linting, orchestrator-discipline, process-siren, rtfp, scientific-method, verification-gate | 26 | Delegation, MCP, transcript, scientific-method, verification, and process classes mapped. |
 | N11D-6 | bash-development, dasel, perl-development, clang-format, commitlint, conventional-commits, dot-dash, gitlab-skill, litellm, llamafile | 30 | Reference, local-command, and external-service classes mapped. |
-| N11D-7 | summarizer, the-rewrite-room, twelve-factor-app, uv | 10 | Summarization, documentation, architecture, and uv classes mapped; `uv` is a symlinked entry. |
+| N11D-7 | summarizer, the-rewrite-room, twelve-factor-app, uv | 10 | Summarization, documentation, architecture, and uv classes mapped; N11R materializes uv as a regular directory. |
 | N11D-8 | xdg-base-directory | 1 | Mapped: one read-only XDG location-classification task, with no MCP, hook, or agent chain. |
 
 The N11D-5 worker reported 28 skills, but the Git index proves its assigned plugins contain 26.
 The fan-in therefore uses the index-derived count and treats the worker's count as an input error,
 not as a capability claim.
 
-N11D.1 reconciled these two complementary inventories:
+N11D.1 reconciled the current repository inventory after the rebase:
 
-- 244 tracked `SKILL.md` files under `plugins/`; one is the plugin-creator example fixture.
-- 243 regular operational skill files remain after excluding that fixture.
-- `plugins/uv/skills/uv` is an additional declared symlink surface whose target is the existing
-  python3-development `uv` skill. It must be validated independently as `uv:uv`, not collapsed
-  into the target's `python3-development:uv` result.
-- The activation ledger therefore contains 244 declared plugin-surface targets: 243 regular
-  operational skills plus the standalone `uv:uv` surface.
+- 246 tracked `SKILL.md` files under `plugins/`; one is the plugin-creator example fixture.
+- 245 manifest-declared operational skill surfaces remain after excluding that fixture.
+- `development-harness:meta-workflow-graph-refresh` arrived from `origin/main` during the rebase
+  and is an additional pending N11D row.
+- N11R materialized `plugins/uv/skills/uv` as a regular copy. It remains independently validated
+  as `uv:uv`, not collapsed into `python3-development:uv`.
+- The activation ledger therefore contains 245 declared plugin-surface targets.
 
 The `xdg-base-directory:xdg-base-directory` activation task is: state the XDG configuration,
 data, cache, state/history, and runtime-lock locations using the repository's XDG conventions.
@@ -221,7 +221,7 @@ derived from the plugin README; it remains unactivated until N11.
 
 ## N11M Per-Target Activation Matrix
 
-N11 cannot start until a committed matrix contains exactly 244 rows, one for every declared
+N11 cannot start until a committed matrix contains exactly 245 rows, one for every declared
 plugin-surface target. A batch is only scheduling convenience; it cannot replace the retained
 record for any individual target. Every row contains:
 
@@ -307,7 +307,7 @@ transcript rows use approved redacted fixtures; and network, credential, or writ
 blocked until an explicitly safe local mock or test fixture exists. Retain redacted evidence, not
 raw transcripts, authorization files, or sensitive tool output.
 
-N11G audits that every one of the 244 evidence bundles independently contains distribution,
+N11G audits that every one of the 245 evidence bundles independently contains distribution,
 installed-cache provenance, explicit injection, behavior, and safety evidence. N12 is a separate
 hard gate: it requires an authenticated Claude invocation of the packaged plugin and its named
 component. The cross-harness goal cannot be reported complete while N12 is blocked.

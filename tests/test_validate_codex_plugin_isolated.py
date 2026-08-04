@@ -33,7 +33,10 @@ def test_package_only_rejects_incompatible_arguments(
         validator.validate_args(args)
 
 
-def test_package_only_run_skips_exec_stage(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_package_only_run_skips_exec_stage(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Package-only mode registers and installs the plugin without invoking a model."""
     commands: list[list[str]] = []
 
@@ -107,6 +110,10 @@ def test_copy_distribution_preserves_same_name_plugin_behavior() -> None:
         assert workspace.plugin_id == "xdg-base-directory"
         assert entry["name"] == "xdg-base-directory"
         assert entry["source"]["path"] == "./plugins/xdg-base-directory"
-        assert "codex plugin add xdg-base-directory@isolated-codex-plugin-validation" in commands[1]
+        expected_install = (
+            "codex plugin add "
+            "xdg-base-directory@isolated-codex-plugin-validation"
+        )
+        assert expected_install in commands[1]
     finally:
         validator.cleanup_workspace(workspace)
