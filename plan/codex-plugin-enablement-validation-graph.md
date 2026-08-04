@@ -5,20 +5,48 @@
 Produce artifact-backed proof that every Codex plugin can be distributed through a marketplace
 and that declared capabilities work through the intended harness. Preserve Claude compatibility.
 
+## Validation Integrity Ledger
+
+No warning or error is "expected" by default. A validation result is usable only when its
+redacted, reproducible artifact is retained under `plan/` and linked from its node. An exception
+must name the exact tool/version, warning text or identifier, upstream cause, affected scope,
+expiry/review condition, and why it cannot hide a failure. No exception has been recorded for this
+Codex-plugin enablement work.
+
+The following results are recorded as failures or limits, not waived outcomes:
+
+1. A prior slim pytest invocation used `--no-project` and `-o addopts=''` without
+   `pytest-asyncio`. It emitted `PytestConfigWarning: Unknown config option: asyncio_mode`.
+   That run is invalid because it bypassed the repository's `--strict-config` gate.
+2. A full `uv run pytest` attempt selected host Python 3.14 and failed while building `cvxopt`
+   because `umfpack.h` is absent. No tests ran, and the dependency-build deprecation warning is
+   not accepted as clean output. The full project environment remains unverified.
+3. The replacement focused runner passed with no warnings:
+   `uv run --no-project --python 3.12 --with pytest==9.0.3 --with pytest-asyncio==1.3.0 pytest -o addopts='' --strict-config --strict-markers -q tests/test_generate_codex_skill_activation_matrix.py tests/test_validate_codex_plugin_isolated.py tests/test_validate_codex_skill_activation.py`.
+   It reported `13 passed`. This is runner evidence for those stdlib-only validator tests, not a
+   substitute for a full project test environment.
+4. The only retained runtime-evidence artifact is
+   `plan/codex-skill-activation-evidence/xdg-base-directory.json`, for the later non-MCP
+   sentinel. It does not support any N1 through N9 MCP claim. All earlier MCP completion prose
+   below is historical, unverified, and cannot satisfy a gate until replaced by retained evidence.
+5. `--package-only` is an N10 distribution probe: its success means marketplace registration and
+   installation only. It must be labelled `distribution-only` and cannot contribute activation,
+   behavior, safety, or cross-harness completion evidence.
+
 ## Dependency Audit
 
 | Node | Reads prior node output? | Verdict |
 | --- | --- | --- |
-| N0: define MCP validation contract | No | Complete prerequisite for the MCP nodes. |
-| N1: validate frustration-analyzer MCP | No | Complete. |
-| N2: validate plugin-creator MCP | No | Complete. |
-| N3: validate agentskill-kaizen MCP | No | Parallel. |
-| N4: validate development-harness MCP | No | Parallel. |
-| N5: validate process-siren MCP | No | Parallel. |
-| N6: validate python3-development MCP | No | Parallel. |
-| N7: validate scientific-method MCP | No | Parallel. |
-| N8: consolidate MCP results | Yes, reads N1 through N7 | Fan-in. |
-| N9: independently verify selected MCP claims | Yes, reads N8 claims and re-derives from source | Verification. |
+| N0: define MCP validation contract | No | Specification retained; must be amended by the integrity ledger. |
+| N1: validate frustration-analyzer MCP | No | Unverified: no retained protocol or Codex artifact. |
+| N2: validate plugin-creator MCP | No | Unverified: no retained protocol or Codex artifact. |
+| N3: validate agentskill-kaizen MCP | No | Historical claim unverified: rerun required. |
+| N4: validate development-harness MCP | No | Historical claim unverified: rerun required. |
+| N5: validate process-siren MCP | No | Historical claim unverified: rerun required. |
+| N6: validate python3-development MCP | No | Historical claim unverified: rerun required. |
+| N7: validate scientific-method MCP | No | Historical claim unverified: rerun required. |
+| N8: consolidate MCP results | Yes, reads N1 through N7 | Invalidated: it has no retained node artifacts to consolidate. |
+| N9: independently verify selected MCP claims | Yes, reads N8 claims and re-derives from source | Unverified: no fresh-run artifact retained. |
 | N9.1: correct isolated validator plugin-ID resolution | Yes, consumes N9 runtime proof | Targeted retry. |
 | N10a: add package-only validator mode | Yes, consumes N9.1 | Mechanical phase prerequisite. |
 | N10b: validate marketplace/zip distribution for all plugins | Yes, consumes N10a and resolved MCP configuration | Parallel mechanical checks. |
@@ -45,15 +73,15 @@ actions.
 
 ```mermaid
 flowchart TD
-    N0[N0: MCP test contract complete]
-    N1[N1: frustration-analyzer complete]
-    N2[N2: plugin-creator complete]
-    N3[N3: agentskill-kaizen]
-    N4[N4: development-harness]
-    N5[N5: process-siren]
-    N6[N6: python3-development]
-    N7[N7: scientific-method]
-    N8[N8: MCP fan-in and completeness check]
+    N0[N0: MCP test contract, amend]
+    N1[N1: frustration-analyzer, unverified]
+    N2[N2: plugin-creator, unverified]
+    N3[N3: agentskill-kaizen, rerun]
+    N4[N4: development-harness, rerun]
+    N5[N5: process-siren, rerun]
+    N6[N6: python3-development, rerun]
+    N7[N7: scientific-method, rerun]
+    N8[N8: fresh MCP fan-in]
     N9[N9: fresh-context verification]
     N91[N9.1: validator plugin-ID fix]
     N10A[N10a: package-only validator mode]
@@ -114,7 +142,11 @@ Each N3 through N7 node returns exactly these fields:
    smallest concrete failure cause.
 6. No repository changes. Do not expose credentials, session content, or generated auth files.
 
-## Execution State
+## Historical MCP Claims (Not Evidence)
+
+The following is a historical narrative retained for diagnosis only. It is not a completed
+execution state: N1 through N9 require a fresh run that writes one redacted artifact per server
+before any downstream gate may consume the result.
 
 - N3: complete. Both package installs passed; `kaizen-duckdb` failed at the uvx launcher and
   `kaizen-analysis` failed at the host Cargo/libgit2 dependency.
