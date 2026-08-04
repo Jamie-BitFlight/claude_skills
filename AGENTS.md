@@ -379,6 +379,10 @@ Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `bac
   the QG plan it generates internally — passing the QG plan back in produces a spurious second
   `qg-qg-...` plan and re-runs quality gates on an already-complete pass
 
+`plan/` is ignored working context. Use it to design and coordinate in-progress work, but do not
+force-add or commit its contents. Put durable user-facing documentation in `docs/` or `research/`
+only when that is explicitly part of the requested deliverable.
+
 ### Other Tools' Rule Files
 
 Rule files outside `.claude/rules/` that other harnesses read — not a full rule-file index:
@@ -407,7 +411,7 @@ this file) was removed to avoid two files drifting out of sync.
 4. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
 5. **pytest parallelism**: Tests run with `-n auto --dist loadgroup` (xdist). Tests marked with `@pytest.mark.xdist_group` run in same worker.
 6. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
-7. **Markdown lint exclusions**: `plan/` and `.claude/backlog/` are excluded from markdownlint (they may have intentionally relaxed formatting).
+7. **Ignored planning context**: `plan/` and `.claude/backlog/` are ignored working context and excluded from markdownlint. Do not force-add either directory.
 8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 9. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
 10. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism.
