@@ -256,8 +256,15 @@ https://github.com/openai/codex/blob/64bb8094ba3b2c77becea8281a4b070e05e6c758/co
 Because app-server accepts a caller-provided skill path, N11C supplies mandatory provenance for
 every app-server test: after the temporary marketplace install, resolve the input path, require it
 to be below the just-installed plugin cache root for the selected manifest ID/version, and retain
-a SHA-256 digest of the resolved regular file. Shell variables configure the test process only;
-they never establish plugin or skill provenance.
+both the resolved skill digest and the full installed-tree digest. The full installed tree must
+match the copied distribution tree and contain no symbolic links. Shell variables configure the
+test process only; they never establish plugin or skill provenance.
+
+The app-server lane disables Codex's host-owned Apps feature (`codex --disable apps app-server`)
+before the JSONL session begins. With ChatGPT authentication, that feature otherwise materializes
+the `codex_apps` MCP server even for a plugin that declares no MCP configuration. Every remaining
+MCP startup, MCP tool, command-execution, file-change, or approval event is a failure in this
+read-only lane. MCP-bearing plugins use the separate FastMCP CLI lane.
 
 Each activation record must distinguish four independent results:
 
@@ -278,14 +285,18 @@ source-level archive checks only as static evidence, never as an activation pass
 
 ## N11E and N11F Execution Evidence
 
-N11E passed for `xdg-base-directory:xdg-base-directory` through an isolated app-server session.
-The session set the installed marketplace-cache skills root, supplied one cache-sourced `skill`
-input item, and completed the existing-prose, read-only XDG-location task without modifications.
-The first run failed only because the isolated `CODEX_HOME` lacked authentication; a temporary,
-mode-0600 auth copy repaired that environment and was removed after the run. The app-server
-accepts a caller-supplied skill path without independently proving that the file came from a
-plugin, so every future N11 record must retain both the separate marketplace-install result and
-the app-server injection result.
+`xdg-base-directory:xdg-base-directory` is a narrow N11E/N11C sentinel, not a behavior-complete
+plugin claim. A 2026-08-04 isolated app-server run installed the copied plugin, verified an exact
+full-tree SHA-256 match against cache version `1.1.7`, and injected the cache skill
+`1.1.7/skills/xdg-base-directory/SKILL.md` using the explicit app-server `skill` input item. The
+turn completed in about ten seconds with no MCP, command-execution, file-change, or approval
+events. Redacted evidence is `plan/codex-skill-activation-evidence/xdg-base-directory.json`.
+
+This sentinel does **not** satisfy N11 behavior: it has no retained, machine-checkable semantic
+oracle. Its evidence proves distribution, installed-cache provenance, explicit injection, and the
+read-only safety profile only. The activation JSONL client uses byte-level newline framing; a
+buffered text reader combined with `select` previously hid already-buffered protocol messages and
+caused a false timeout.
 
 N11F had two intentionally non-equivalent discovery results:
 
