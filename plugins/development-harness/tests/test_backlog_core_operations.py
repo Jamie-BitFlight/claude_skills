@@ -290,6 +290,104 @@ class TestAddItemCreatesLocalFile:
         assert "item_ref" not in result
 
 
+class TestAddItemValidatesPriorityAndType:
+    """add_item() rejects invalid priority/type at the ingress boundary.
+
+    Regression coverage for the bug where add_item() passed priority/type_
+    straight into BacklogItem(...) with no acceptance check — an invalid
+    value like "P3" silently persisted to a real file and backend issue
+    instead of being rejected.
+    """
+
+    def test_add_item_rejects_invalid_priority_raises_validation_error(self, mocker: MockerFixture) -> None:
+        """Verify add_item raises ValidationError for a priority outside the canonical set.
+
+        Tests: add_item ingress validation — invalid priority.
+        How: Call add_item with priority="P3" (not a real priority level).
+        Why: P3 previously passed straight through to BacklogItem with no rejection.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        with pytest.raises(ValidationError, match="Invalid priority"):
+            add_item(title="Bad Priority Item", description="desc", priority="P3")
+
+    def test_add_item_rejects_invalid_priority_creates_no_file_or_issue(self, mocker: MockerFixture) -> None:
+        """Verify a rejected priority leaves no file and never contacts the backend.
+
+        Tests: add_item ingress validation — no side effects on rejection.
+        How: Call add_item with an invalid priority; assert zero files written
+             and try_get_github was never called.
+        Why: Rejecting invalid input after partial side effects (file write,
+             issue creation) would be worse than not validating at all.
+        """
+        mock_try_gh = mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        fake_dir: Path = _bc_models.get_backlog_dir()
+        with pytest.raises(ValidationError):
+            add_item(title="Bad Priority No Side Effects", description="desc", priority="P3")
+
+        assert list(fake_dir.glob("*.yaml")) == []
+        mock_try_gh.assert_not_called()
+
+    def test_add_item_accepts_idea_prefix_case_insensitive(self, mocker: MockerFixture) -> None:
+        """Verify add_item accepts a case-insensitive 'idea*' priority variant.
+
+        Tests: add_item ingress validation — idea* convenience acceptance.
+        How: Call add_item with priority="IDEA"; expect no exception raised.
+        Why: BacklogItemMetadata._validate_priority normalises any case-insensitive
+             idea* value to "Ideas" — the ingress gate must not reject what the
+             model itself accepts and normalises.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        result = add_item(title="Idea Prefix Item", description="desc", priority="IDEA")
+
+        assert result["title"] == "Idea Prefix Item"
+
+    def test_add_item_rejects_invalid_type_raises_validation_error(self, mocker: MockerFixture) -> None:
+        """Verify add_item raises ValidationError for a type outside the canonical set/aliases.
+
+        Tests: add_item ingress validation — invalid type.
+        How: Call add_item with type_="Enhancement" (not a recognized type or alias).
+        Why: Unrecognized types previously passed straight through with no rejection.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        with pytest.raises(ValidationError, match="Invalid type"):
+            add_item(title="Bad Type Item", description="desc", priority="P1", type_="Enhancement")
+
+    def test_add_item_rejects_invalid_type_creates_no_file_or_issue(self, mocker: MockerFixture) -> None:
+        """Verify a rejected type leaves no file and never contacts the backend.
+
+        Tests: add_item ingress validation — no side effects on rejection.
+        How: Call add_item with an invalid type; assert zero files written
+             and try_get_github was never called.
+        Why: Same no-partial-side-effect guarantee as the priority rejection path.
+        """
+        mock_try_gh = mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        fake_dir: Path = _bc_models.get_backlog_dir()
+        with pytest.raises(ValidationError):
+            add_item(title="Bad Type No Side Effects", description="desc", priority="P1", type_="Enhancement")
+
+        assert list(fake_dir.glob("*.yaml")) == []
+        mock_try_gh.assert_not_called()
+
+    def test_add_item_accepts_known_type_alias(self, mocker: MockerFixture) -> None:
+        """Verify add_item accepts a known type alias (Documentation -> Docs).
+
+        Tests: add_item ingress validation — type alias acceptance.
+        How: Call add_item with type_="Documentation"; expect no exception raised.
+        Why: BacklogItemMetadata._validate_item_type normalises "documentation" to
+             "Docs" — the ingress gate must not reject a value the model accepts.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        result = add_item(title="Alias Type Item", description="desc", priority="P1", type_="Documentation")
+
+        assert result["title"] == "Alias Type Item"
+
+
 class TestAddItemBeadsBackend:
     """add_item dispatches to create_beads_issue_for_item for string-ID backends."""
 
@@ -376,7 +474,7 @@ class TestAddItemBeadsBackend:
         set_config(BacklogConfig(backend=beads_backend))
 
         try:
-            result = add_item(title="Beads Unavailable Item", description="desc", priority="P3")
+            result = add_item(title="Beads Unavailable Item", description="desc", priority="P2")
         finally:
             reset_config()
 

@@ -687,6 +687,19 @@ _PRIORITY_ALIASES: dict[str, str] = {}  # populated below via case-insensitive i
 _TYPE_ALIASES: dict[str, str] = {"documentation": "Docs"}
 _ADDED_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+# Public ingress-validation constants for add_item() (backlog_core/operations.py).
+# Derived from the canonical sets above so both stay in sync automatically.
+#
+# VALID_NEW_ITEM_PRIORITIES excludes "completed": that value is populated
+# internally when an item transitions to a completed state, never something
+# a caller creating a NEW item should be able to request directly. The
+# permissive _validate_priority field validator above is unaffected — it
+# still accepts "completed" and any unrecognized value verbatim when reading
+# existing files.
+VALID_NEW_ITEM_PRIORITIES: tuple[str, ...] = tuple(sorted(_VALID_PRIORITIES - {"completed"}))
+VALID_ITEM_TYPES: tuple[str, ...] = tuple(sorted(_VALID_TYPES))
+ITEM_TYPE_ALIASES: dict[str, str] = dict(_TYPE_ALIASES)
+
 
 class MilestoneInfo(BaseModel):
     """Structured milestone reference embedded in backlog metadata.

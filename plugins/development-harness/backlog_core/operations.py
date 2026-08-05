@@ -32,9 +32,12 @@ from .backend_types import GitHubExtras, IssueCommentNode, IssueNode, MilestoneF
 from .entry_blocks import ENTRY_RE, _render_entry_raw, generate_diff, parse_entries, strike_entry as strike_entry_block
 from .models import (
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
+    ITEM_TYPE_ALIASES,
     MIN_FRONTMATTER_PARTS,
     SECTION_HEADING_ALIAS,
     VALID_CLOSE_REASONS,
+    VALID_ITEM_TYPES,
+    VALID_NEW_ITEM_PRIORITIES,
     ArtifactEntry,
     ArtifactType,
     BackendUnavailableError,
@@ -1745,6 +1748,44 @@ def _pull_item(
 # ---------------------------------------------------------------------------
 
 
+def _validate_add_item_priority(priority: str) -> None:
+    """Raise ValidationError if priority is not an accepted value for a new item.
+
+    Accepts the canonical set (``VALID_NEW_ITEM_PRIORITIES``) plus any
+    case-insensitive ``idea*`` variant, matching the convenience normalisation
+    ``BacklogItemMetadata._validate_priority`` applies when the value is later
+    written into the item's YAML frontmatter.
+
+    Args:
+        priority: Raw priority value supplied by the caller.
+
+    Raises:
+        ValidationError: If priority is not a recognized value.
+    """
+    if priority in VALID_NEW_ITEM_PRIORITIES or priority.lower().startswith("idea"):
+        return
+    msg = f"Invalid priority: {priority!r}. Valid priorities: {', '.join(VALID_NEW_ITEM_PRIORITIES)} (or an 'Idea*' variant)."
+    raise ValidationError(msg)
+
+
+def _validate_add_item_type(type_: str) -> None:
+    """Raise ValidationError if type_ is not a recognized item type or alias.
+
+    Args:
+        type_: Raw item type value supplied by the caller.
+
+    Raises:
+        ValidationError: If type_ is not a recognized value or alias.
+    """
+    if type_ in VALID_ITEM_TYPES or type_.lower() in ITEM_TYPE_ALIASES:
+        return
+    msg = (
+        f"Invalid type: {type_!r}. Valid types: {', '.join(VALID_ITEM_TYPES)} "
+        f"(aliases: {', '.join(ITEM_TYPE_ALIASES)})."
+    )
+    raise ValidationError(msg)
+
+
 def _check_for_duplicates(title: str, force: bool) -> None:
     """Raise DuplicateItemError if a fuzzy duplicate exists and force is False.
 
@@ -1909,7 +1950,14 @@ def add_item(
 
     Returns:
         Dict with title, priority, filepath, and optionally item_ref.
+
+    Raises:
+        ValidationError: If priority or type_ is not a recognized value. No
+            file is written and no backend issue is created when raised.
     """
+    _validate_add_item_priority(priority)
+    _validate_add_item_type(type_)
+
     out = output or Output()
 
     _check_for_duplicates(title, force)
