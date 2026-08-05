@@ -50,7 +50,9 @@ import typer
 
 from sam_schema import artifacts, backlog, cli_active_task, dispatch, sam_plan
 
-app = typer.Typer(name="sam", help="Provider-neutral development harness CLI.", no_args_is_help=True)
+app = typer.Typer(
+    name="sam", help="Provider-neutral development harness CLI.", no_args_is_help=True, rich_markup_mode=None
+)
 
 app.add_typer(sam_plan.app, name="plan")
 app.add_typer(backlog.app, name="backlog")

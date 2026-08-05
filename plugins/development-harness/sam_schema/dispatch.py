@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sam_schema.cli_output import emit_result, err
 
-app = typer.Typer(help="Dispatch workflow operations.", no_args_is_help=True)
+app = typer.Typer(help="Dispatch workflow operations.", no_args_is_help=True, rich_markup_mode=None)
 
 
 class _PlanWaveItemInput(BaseModel):

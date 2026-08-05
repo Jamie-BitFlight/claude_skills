@@ -31,7 +31,7 @@ __all__ = ["DEFAULT_SESSION_ID", "app"]
 #: same session-scoped context.
 DEFAULT_SESSION_ID = "_default"
 
-app = typer.Typer(help="Session-scoped active task context.", no_args_is_help=True)
+app = typer.Typer(help="Session-scoped active task context.", no_args_is_help=True, rich_markup_mode=None)
 
 _SESSION_OPTION = typer.Option("--session-id", help="Session identifier (default: '_default')")
 

@@ -57,7 +57,7 @@ except ImportError:
 if TYPE_CHECKING:
     from dh_core.protocols import TaskBackend
 
-app = typer.Typer(name="plan", help="SAM plan and task operations.", no_args_is_help=True)
+app = typer.Typer(name="plan", help="SAM plan and task operations.", no_args_is_help=True, rich_markup_mode=None)
 
 
 def _plan_dir(value: Path | None) -> Path:

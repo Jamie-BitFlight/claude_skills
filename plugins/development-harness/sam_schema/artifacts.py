@@ -10,7 +10,7 @@ from dh_core import operations
 
 from sam_schema.cli_output import emit_result, err
 
-app = typer.Typer(help="Artifact manifest operations.", no_args_is_help=True)
+app = typer.Typer(help="Artifact manifest operations.", no_args_is_help=True, rich_markup_mode=None)
 
 
 @app.command("register")

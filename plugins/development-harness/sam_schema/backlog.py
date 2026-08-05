@@ -12,7 +12,7 @@ from backlog_core.models import BacklogError, Output
 
 from sam_schema import cli_output
 
-app = typer.Typer(name="backlog", help="Backlog item operations.", no_args_is_help=True)
+app = typer.Typer(name="backlog", help="Backlog item operations.", no_args_is_help=True, rich_markup_mode=None)
 
 
 def _emit(result: object, output: Output) -> None:
