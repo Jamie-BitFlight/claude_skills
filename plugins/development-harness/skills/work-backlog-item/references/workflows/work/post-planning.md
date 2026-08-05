@@ -25,10 +25,10 @@ Do not stop for user input at any point.
 ```text
 Backlog item "{title}" is now planned.
 
-- Plan: accessible via `sam_plan(action='read', plan="{slug}")` MCP tool
+- Plan: accessible via `uv run plugins/development-harness/sam_schema/cli.py plan read --address "{slug}"`
 - To execute:      /implement-feature {slug}
 - To check status: /implementation-manager status . {slug}
 - To close when done: /work-backlog-item close {title}
 ```
 
-**Do NOT close the GitHub Issue directly.** Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` in task-level commit messages or PR bodies — issue closure is handled exclusively by `/dh:complete-implementation` as its terminal step (via `backlog_resolve` after all quality gates pass). Do not call `mcp__plugin_dh_backlog__backlog_resolve` during implementation work — it is only correct as the final step in `/dh:complete-implementation`. Use `/work-backlog-item close` only for dismissals (duplicate, out_of_scope, etc.). Use `/work-backlog-item resolve` only when `/dh:complete-implementation` was interrupted before the resolve step and manual resolution is required.
+**Do NOT close the GitHub Issue directly.** Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` in task-level commit messages or PR bodies — issue closure is handled exclusively by `/dh:complete-implementation` as its terminal step (via `backlog_resolve` after all quality gates pass). Do not call `backlog resolve` (via MCP's `backlog_resolve` tool or the CLI's `backlog resolve` command) during implementation work — it is only correct as the final step in `/dh:complete-implementation`. Use `/work-backlog-item close` only for dismissals (duplicate, out_of_scope, etc.). Use `/work-backlog-item resolve` only when `/dh:complete-implementation` was interrupted before the resolve step and manual resolution is required.

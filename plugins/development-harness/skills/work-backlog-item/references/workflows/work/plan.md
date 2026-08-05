@@ -40,20 +40,20 @@ Compute slug: lowercase item title, replace spaces with hyphens.
 slug = item_title.lower().replace(" ", "-")
 ```
 
-Call `mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "{slug}"})`.
+Call: `uv run plugins/development-harness/sam_schema/cli.py plan list --search "{slug}"`.
 
 **Branch:**
 
 ```mermaid
 flowchart TD
-    Search["Call sam_plan action=list search={slug}"] --> Q{Result list length?}
+    Search["CLI: plan list --search {slug}"] --> Q{Result list length?}
     Q -->|">= 1 plans returned"| Found["Use first plan's ID<br>(P{id} format)"]
-    Q -->|"0 plans — search miss"| Retry["Call sam_plan action=list<br>(no search param)<br>Get all plans sorted by update time"]
+    Q -->|"0 plans — search miss"| Retry["CLI: plan list<br>(no --search param)<br>Get all plans sorted by update time"]
     Retry --> Scan["Scan plans newest-first<br>Match title field against slug"]
     Scan --> Q2{Match found?}
     Q2 -->|"Yes"| Found
     Q2 -->|"No — still not found"| Warn["Log warning: Plan not found for {title}<br>Skip backlog_update<br>Proceed to Step 4.4"]
-    Found --> Update["Call mcp__plugin_dh_backlog__backlog_update<br>selector={title} plan=P{id}"]
+    Found --> Update["CLI: backlog update<br>--selector={title} --plan=P{id}"]
     Update --> RecordIssue["If item has Issue: #N,<br>record it in plan file header comment"]
     RecordIssue --> Done([Step 4.3 complete])
     Warn --> Done

@@ -2,9 +2,9 @@
 
 **Trigger:** <mode/> matches `#[0-9]+`, is a bare number, or is a GitHub issue URL (`https://github.com/.../issues/N`).
 
-Fetch the issue using the `mcp__plugin_dh_backlog__backlog_view` tool (accepts URLs, `#N`, and bare numbers):
+Fetch the issue using the CLI's `backlog view` command (accepts URLs, `#N`, and bare numbers):
 
-Call the `mcp__plugin_dh_backlog__backlog_view` tool with `selector="<mode/>"`.
+Call: `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "<mode/>"`.
 
 If the tool returns a dict with an `error` key, report and stop.
 If `state` is `closed`, run the **Completed Issue Discovery** procedure below and stop.
@@ -21,7 +21,7 @@ From the JSON response build the working item:
 | `milestone` | `milestone` |
 | `plan` | `plan` field, or search `body` for `**Plan**:` line |
 
-The `backlog_view` MCP tool operates in two modes depending on GitHub reachability (architect spec §5.2, ADR-002):
+The `backlog view` command (CLI or MCP `backlog_view`) operates in two modes depending on GitHub reachability (architect spec §5.2, ADR-002):
 
 - **Connected**: sections and `sections_index` are derived from the live GitHub issue body (takes priority over local cache)
 - **Offline**: sections and `sections_index` are derived from local YAML cache; the response `warnings` field contains `"backend unreachable"` indicating potentially stale data
@@ -65,8 +65,7 @@ When an issue is found to be already closed (`state: closed`), gather evidence b
    Closing local backlog item with evidence.
    ```
 
-   Call the `mcp__plugin_dh_backlog__backlog_resolve` tool with `selector="{title}"` and
-   `summary="Completed via PR #{pr} / commit {sha}"`.
+   Call: `uv run plugins/development-harness/sam_schema/cli.py backlog resolve --selector "{title}" --summary "Completed via PR #{pr} / commit {sha}"`.
 
    If no commits or PRs reference the issue:
 

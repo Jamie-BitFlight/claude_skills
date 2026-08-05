@@ -20,7 +20,7 @@ Load [github-sync.md](./github-sync.md#step-23-create-linked-issue).
 
 Load [github-sync.md](./github-sync.md#step-24-set-in-progress).
 
-**Two-part step:** (a) Always run `mcp__plugin_dh_backlog__backlog_update` with `status="in-progress"` for the current item. (b) Run `milestone start` only on explicit user intent to start the whole milestone — it bulk-transitions all open milestone issues, not just the current one.
+**Two-part step:** (a) Always run `uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}" --status "in-progress"` for the current item. (b) Run `milestone start` only on explicit user intent to start the whole milestone — it bulk-transitions all open milestone issues, not just the current one.
 
 ## Step 2.5: Discovery Gate
 
@@ -32,15 +32,15 @@ flowchart TD
     HasIssue -->|"No"| SkipGate["Skip discovery gate<br>Proceed to Step 3.1"]
     HasIssue -->|"Yes — issue #{N}"| TypeCheck{"Labels include<br>'type:fix' or 'type:bug'?"}
     TypeCheck -->|"Yes — fix/bug type"| SkipGate
-    TypeCheck -->|"No — feature/refactor/other"| CheckArtifact["artifact_list(<br>item_id={N},<br>artifact_type='feature-context')"]
+    TypeCheck -->|"No — feature/refactor/other"| CheckArtifact["CLI: artifact list<br>--item-id={N}<br>--artifact-type=feature-context"]
     CheckArtifact --> HasDiscovery{"count > 0?"}
     HasDiscovery -->|"Yes"| Proceed["Discovery exists<br>Proceed to Step 3.1"]
     HasDiscovery -->|"No"| InvokeDiscovery["Invoke: Skill(skill='dh:discovery')"]
-    InvokeDiscovery --> VerifyDiscovery["Call artifact_list(<br>item_id={N},<br>artifact_type='feature-context')"]
+    InvokeDiscovery --> VerifyDiscovery["CLI: artifact list<br>--item-id={N}<br>--artifact-type=feature-context"]
     VerifyDiscovery --> DiscoveryConfirmed{"count > 0?"}
     DiscoveryConfirmed -->|"Yes — artifact registered"| Continue
     DiscoveryConfirmed -->|"No — retry once"| RetryDiscovery["Re-invoke: Skill(skill='dh:discovery')<br>(max 1 retry)"]
-    RetryDiscovery --> VerifyRetry["Call artifact_list(<br>item_id={N},<br>artifact_type='feature-context')"]
+    RetryDiscovery --> VerifyRetry["CLI: artifact list<br>--item-id={N}<br>--artifact-type=feature-context"]
     VerifyRetry --> RetryConfirmed{"count > 0?"}
     RetryConfirmed -->|"Yes"| Continue
     RetryConfirmed -->|"No — still 0 after retry"| DiscoveryFail(["STOP — report to user:<br>dh:discovery completed but no feature-context<br>artifact was registered for issue #{N}.<br>Re-run /dh:discovery manually and retry."])
@@ -50,10 +50,10 @@ flowchart TD
 
 The discovery skill gathers WHO/WHAT/WHEN/WHY requirements and registers the result as a
 `feature-context` artifact. The exit signal is a non-zero count from
-`artifact_list(item_id={N}, artifact_type='feature-context')`.
+`uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {N} --artifact-type feature-context`.
 
 **When <mode/> is `auto`**: After `dh:discovery` returns, do NOT yield to the user. Immediately
-call `artifact_list` to verify the artifact was registered, then proceed to Step 3.1 without
+call `artifact list --item-id {N} --artifact-type feature-context` to verify the artifact was registered, then proceed to Step 3.1 without
 presenting a summary or asking for confirmation. The `dh:discovery` skill skips its user
 confirmation gate when <mode/> is `auto` — no additional acknowledgment is needed.
 
