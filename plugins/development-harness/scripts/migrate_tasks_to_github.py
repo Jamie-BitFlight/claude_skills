@@ -57,9 +57,8 @@ if str(_HARNESS_DIR) not in sys.path:
 import dh_paths
 import typer
 from ruamel.yaml import YAML, YAMLError
+from sam_schema.cli_output import err, output_json
 from sam_schema.task_format import resolve_task_id
-
-from cli_output import err, output_json
 
 if TYPE_CHECKING:
     from backlog_core.backend_types import IssueNode
