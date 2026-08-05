@@ -29,6 +29,7 @@ plugin cache cwd, IDEs). Checked in order by :func:`infer_project_root` when
 
     DH_PROJECT_ROOT=/path/to/repo          # explicit override (any host)
     WORKSPACE_FOLDER_PATHS=["/path"]       # VS Code / Cursor (JSON array)
+    PWD=/path/to/repo                        # Codex MCP, with CODEX_THREAD_ID
     CURSOR_PROJECT_ROOT=/path/to/repo      # when the Cursor host sets it
     CLAUDE_PROJECT_DIR=/path/to/repo       # when the Claude Code host sets it
 
@@ -152,6 +153,20 @@ def _infer_dh_project_root_env() -> Path | None:
     return _git_root_if_directory(Path(raw).expanduser().resolve())
 
 
+def _infer_from_codex_pwd() -> Path | None:
+    """Use Codex's forwarded agent cwd only for a Codex MCP process.
+
+    Returns:
+        Resolved Git root from PWD, or ``None`` outside Codex or without a repo.
+    """
+    if not os.environ.get("CODEX_THREAD_ID"):
+        return None
+    raw = os.environ.get("PWD", "").strip()
+    if not raw:
+        return None
+    return _git_root_if_directory(Path(raw).expanduser().resolve())
+
+
 def _infer_from_ide_env_vars() -> Path | None:
     """Try ``CURSOR_PROJECT_ROOT`` then ``CLAUDE_PROJECT_DIR``.
 
@@ -204,6 +219,7 @@ def infer_project_root(cwd: Path | None = None) -> Path:
        that resolves as a git worktree.
     #. ``CURSOR_PROJECT_ROOT``, then ``CLAUDE_PROJECT_DIR`` — only if the host
        sets them (Cursor before Claude when both are present).
+    #. ``PWD`` — Codex agent cwd, only when ``CODEX_THREAD_ID`` is present.
     #. Walk upward from *cwd* (default ``Path.cwd()``) for a ``.git`` entry,
        then git-resolve from that directory (preserves worktree semantics).
     #. Run git from *cwd* itself.
@@ -222,7 +238,12 @@ def infer_project_root(cwd: Path | None = None) -> Path:
     """
     start = (cwd or Path.cwd()).resolve()
 
-    for resolved in (_infer_dh_project_root_env(), _infer_from_workspace_folder_paths(), _infer_from_ide_env_vars()):
+    for resolved in (
+        _infer_dh_project_root_env(),
+        _infer_from_workspace_folder_paths(),
+        _infer_from_ide_env_vars(),
+        _infer_from_codex_pwd() if cwd is None else None,
+    ):
         if resolved is not None:
             return resolved
 

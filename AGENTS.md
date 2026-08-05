@@ -57,6 +57,11 @@ claude --plugin-dir ./plugins/holistic-linting          # Load multiple plugins
 
 ### MCP Server Validation
 
+Read [Codex MCP Runtime Guide](./docs/codex-mcp-runtime.md) before configuring
+or validating a Codex marketplace MCP. It documents Codex's literal `env`
+behavior, `env_vars` pass-through, the two-root `cwd` plus `PWD` pattern, and
+host prerequisites for FastMCP and project hooks.
+
 For a FastMCP server, use the active `fastmcp-creator:fastmcp-client-cli` skill for protocol
 checks and `fastmcp-creator:fastmcp-python-tests` for Python tests when the harness exposes them.
 If either is unavailable, read its corresponding `SKILL.md` under

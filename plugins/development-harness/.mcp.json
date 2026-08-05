@@ -2,28 +2,19 @@
   "mcpServers": {
     "backlog": {
       "command": "uv",
-      "args": [
-        "run",
-        "--script",
-        "scripts/run_backlog_server.py"
-      ],
-      "cwd": "."
+      "args": ["run", "--script", "scripts/run_backlog_server.py"],
+      "cwd": ".",
+      "env_vars": ["PWD", "CODEX_THREAD_ID"]
     },
     "sam": {
       "command": "uv",
-      "args": [
-        "run",
-        "--script",
-        "scripts/run_sam_server.py"
-      ],
-      "cwd": "."
+      "args": ["run", "--script", "scripts/run_sam_server.py"],
+      "cwd": ".",
+      "env_vars": ["PWD", "CODEX_THREAD_ID"]
     },
     "sequential_thinking": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking@latest"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
     }
   }
 }

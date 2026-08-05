@@ -364,6 +364,34 @@ class TestInferProjectRoot:
 
         assert git_project_root() == repo
 
+    def test_infer_uses_codex_pwd_when_plugin_cwd_is_not_a_repository(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """Codex MCP uses its forwarded agent PWD instead of the plugin cache cwd."""
+        project = tmp_path / "project"
+        plugin_cache = tmp_path / "plugin-cache"
+        project.mkdir()
+        fake_git = project / ".git"
+        fake_git.mkdir()
+        plugin_cache.mkdir()
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setenv("CODEX_THREAD_ID", "codex-test-thread")
+        monkeypatch.setenv("PWD", str(project))
+        monkeypatch.chdir(plugin_cache)
+
+        def _side_effect(args: list[str], **kwargs: object) -> object:
+            cwd = str(kwargs.get("cwd", ""))
+            if str(project) not in cwd:
+                raise subprocess.CalledProcessError(128, "git")
+            return type("CompletedProcess", (), {"stdout": str(fake_git) + "\n", "returncode": 0})()
+
+        mocker.patch("subprocess.run", side_effect=_side_effect)
+
+        assert infer_project_root() == project
+
     def test_infer_workspace_folder_paths_json(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
     ) -> None:
