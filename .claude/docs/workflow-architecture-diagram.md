@@ -137,7 +137,7 @@ flowchart TD
 
 ### 2.1 sam_ready output (ReadyTasksResult)
 
-Output of `mcp__plugin_dh_sam__sam_ready(plan="P{N}")` and `backlog_get_ready_sam_tasks(parent_issue_number)`. CLI fallback: `uv run sam ready P{N} --format json`.
+Output of `mcp__plugin_dh_sam__sam_ready(plan="P{N}")` and `backlog_get_ready_sam_tasks(parent_issue_number)`. CLI fallback: `uv run plugins/development-harness/sam_schema/cli.py plan ready --plan-address P{N}`.
 
 ```json
 {
@@ -159,7 +159,7 @@ Output of `mcp__plugin_dh_sam__sam_ready(plan="P{N}")` and `backlog_get_ready_sa
 
 ### 2.2 TaskAssignment (sam_read P{N}/T{M})
 
-Output of `mcp__plugin_dh_sam__sam_read(plan="P{N}", task="T{M}")`. CLI fallback: `uv run sam read P{N}/T{M} --format json`.
+Output of `mcp__plugin_dh_sam__sam_read(plan="P{N}", task="T{M}")`. CLI fallback: `uv run plugins/development-harness/sam_schema/cli.py plan read --address P{N}/T{M}`.
 
 ```json
 {
@@ -247,7 +247,7 @@ Written by `/start-task` skill. Read by `task_status_hook.py` PostToolUse handle
 
 ### 2.7 sam_claim output
 
-Output of `mcp__plugin_dh_sam__sam_claim(plan="P{N}", task="T{M}")`. CLI fallback: `uv run sam claim P{N}/T{M} --format json`.
+Output of `mcp__plugin_dh_sam__sam_claim(plan="P{N}", task="T{M}")`. CLI fallback: `uv run plugins/development-harness/sam_schema/cli.py plan claim --address P{N}/T{M}`.
 
 ```json
 {
