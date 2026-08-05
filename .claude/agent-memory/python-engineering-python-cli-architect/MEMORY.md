@@ -11,3 +11,4 @@
 - [feedback_sandbox_guard_env_c_pipe_complexity.md](./feedback_sandbox_guard_env_c_pipe_complexity.md) — `env -C <dir> <cmd> | pipe` gets refused as "too complex" even for read-only non-git commands; split into single-redirect calls
 - [project_sam_schema_task_id_pattern_duplication.md](./project_sam_schema_task_id_pattern_duplication.md) — sam_schema Task.id and TaskDefinition.id both hard-coded a narrower regex than TASK_ID_PATTERN; verify parent model before trusting "fix the override" framing
 - [project_sam_console_script_cwd_dependence.md](./project_sam_console_script_cwd_dependence.md) — `uv run sam` only resolves inside plugins/development-harness cwd; subprocess fallbacks must target cli.py by absolute path
+- [project_claude_plugin_root_bang_exec_vs_later_bash.md](./project_claude_plugin_root_bang_exec_vs_later_bash.md) — CLAUDE_PLUGIN_ROOT resolves in SKILL.md bang-exec lines, NOT in prose the agent runs later via Bash — don't conflate the two
