@@ -1,0 +1,890 @@
+{
+  "generated_at": "2026-08-03T03:16:29.392386+00:00",
+  "scope": "repository-tree structure only; no manifest or MCP content was read and no plugin was executed",
+  "source_rankings": "research/claude-code-plugins/2026-08-03-cross-harness-mcp-candidate-rankings-with-direct-seeds.json",
+  "source_rankings_partial": true,
+  "complete": true,
+  "records": [
+    {
+      "repository": "affaan-m/ECC",
+      "rank": 1,
+      "stars": 237100,
+      "forks": 36039,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [
+        ".codex-plugin/plugin.json",
+        "plugins/ecc/.codex-plugin/plugin.json"
+      ],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": [".mcp.json", "mcp-configs/mcp-servers.json"]
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "thedotmack/claude-mem",
+      "rank": 2,
+      "stars": 89348,
+      "forks": 7778,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json", "plugin/.claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json", "plugin/.codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugin",
+          "claude_manifest": "plugin/.claude-plugin/plugin.json",
+          "codex_manifest": "plugin/.codex-plugin/plugin.json",
+          "mcp_config_paths": ["plugin/.mcp.json"]
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "MemPalace/mempalace",
+      "rank": 3,
+      "stars": 57992,
+      "forks": 7454,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "wshobson/agents",
+      "rank": 4,
+      "stars": 38437,
+      "forks": 4113,
+      "tree_truncated": false,
+      "claude_manifest_paths": [
+        "plugins/accessibility-compliance/.claude-plugin/plugin.json",
+        "plugins/agent-orchestration/.claude-plugin/plugin.json",
+        "plugins/agent-teams/.claude-plugin/plugin.json",
+        "plugins/api-scaffolding/.claude-plugin/plugin.json",
+        "plugins/api-testing-observability/.claude-plugin/plugin.json",
+        "plugins/application-performance/.claude-plugin/plugin.json",
+        "plugins/arm-cortex-microcontrollers/.claude-plugin/plugin.json",
+        "plugins/backend-api-security/.claude-plugin/plugin.json",
+        "plugins/backend-development/.claude-plugin/plugin.json",
+        "plugins/before-you-build/.claude-plugin/plugin.json",
+        "plugins/block-no-verify/.claude-plugin/plugin.json",
+        "plugins/blockchain-web3/.claude-plugin/plugin.json",
+        "plugins/brand-landingpage/.claude-plugin/plugin.json",
+        "plugins/business-analytics/.claude-plugin/plugin.json",
+        "plugins/c4-architecture/.claude-plugin/plugin.json",
+        "plugins/cicd-automation/.claude-plugin/plugin.json",
+        "plugins/cloud-infrastructure/.claude-plugin/plugin.json",
+        "plugins/code-documentation/.claude-plugin/plugin.json",
+        "plugins/code-refactoring/.claude-plugin/plugin.json",
+        "plugins/codebase-cleanup/.claude-plugin/plugin.json",
+        "plugins/comprehensive-review/.claude-plugin/plugin.json",
+        "plugins/conductor/.claude-plugin/plugin.json",
+        "plugins/content-marketing/.claude-plugin/plugin.json",
+        "plugins/context-management/.claude-plugin/plugin.json",
+        "plugins/customer-sales-automation/.claude-plugin/plugin.json",
+        "plugins/data-engineering/.claude-plugin/plugin.json",
+        "plugins/data-validation-suite/.claude-plugin/plugin.json",
+        "plugins/database-cloud-optimization/.claude-plugin/plugin.json",
+        "plugins/database-design/.claude-plugin/plugin.json",
+        "plugins/database-migrations/.claude-plugin/plugin.json",
+        "plugins/debugging-toolkit/.claude-plugin/plugin.json",
+        "plugins/dependency-management/.claude-plugin/plugin.json",
+        "plugins/deployment-strategies/.claude-plugin/plugin.json",
+        "plugins/deployment-validation/.claude-plugin/plugin.json",
+        "plugins/developer-essentials/.claude-plugin/plugin.json",
+        "plugins/dgx-spark-ops/.claude-plugin/plugin.json",
+        "plugins/distributed-debugging/.claude-plugin/plugin.json",
+        "plugins/documentation-generation/.claude-plugin/plugin.json",
+        "plugins/documentation-standards/.claude-plugin/plugin.json",
+        "plugins/dotnet-contribution/.claude-plugin/plugin.json",
+        "plugins/error-debugging/.claude-plugin/plugin.json",
+        "plugins/error-diagnostics/.claude-plugin/plugin.json",
+        "plugins/file-conversion/.claude-plugin/plugin.json",
+        "plugins/framework-migration/.claude-plugin/plugin.json",
+        "plugins/frontend-mobile-development/.claude-plugin/plugin.json",
+        "plugins/frontend-mobile-security/.claude-plugin/plugin.json",
+        "plugins/full-stack-orchestration/.claude-plugin/plugin.json",
+        "plugins/functional-programming/.claude-plugin/plugin.json",
+        "plugins/game-development/.claude-plugin/plugin.json",
+        "plugins/git-pr-workflows/.claude-plugin/plugin.json",
+        "plugins/hermes-tweet/.claude-plugin/plugin.json",
+        "plugins/hr-legal-compliance/.claude-plugin/plugin.json",
+        "plugins/incident-response/.claude-plugin/plugin.json",
+        "plugins/javascript-typescript/.claude-plugin/plugin.json",
+        "plugins/julia-development/.claude-plugin/plugin.json",
+        "plugins/jvm-languages/.claude-plugin/plugin.json",
+        "plugins/kubernetes-operations/.claude-plugin/plugin.json",
+        "plugins/llm-application-dev/.claude-plugin/plugin.json",
+        "plugins/llm-finetuning/.claude-plugin/plugin.json",
+        "plugins/machine-learning-ops/.claude-plugin/plugin.json",
+        "plugins/meigen-ai-design/.claude-plugin/plugin.json",
+        "plugins/multi-platform-apps/.claude-plugin/plugin.json",
+        "plugins/observability-monitoring/.claude-plugin/plugin.json",
+        "plugins/operating-kit/.claude-plugin/plugin.json",
+        "plugins/payment-processing/.claude-plugin/plugin.json",
+        "plugins/performance-testing-review/.claude-plugin/plugin.json",
+        "plugins/plugin-eval/.claude-plugin/plugin.json",
+        "plugins/pptx-deck-creation/.claude-plugin/plugin.json",
+        "plugins/protect-mcp/.claude-plugin/plugin.json",
+        "plugins/python-development/.claude-plugin/plugin.json",
+        "plugins/quantitative-trading/.claude-plugin/plugin.json",
+        "plugins/reverse-engineering/.claude-plugin/plugin.json",
+        "plugins/review-agent-governance/.claude-plugin/plugin.json",
+        "plugins/runapi-mcp/.claude-plugin/plugin.json",
+        "plugins/security-compliance/.claude-plugin/plugin.json",
+        "plugins/security-scanning/.claude-plugin/plugin.json",
+        "plugins/seo-analysis-monitoring/.claude-plugin/plugin.json",
+        "plugins/seo-content-creation/.claude-plugin/plugin.json",
+        "plugins/seo-technical-optimization/.claude-plugin/plugin.json",
+        "plugins/shell-scripting/.claude-plugin/plugin.json",
+        "plugins/ship-mate/.claude-plugin/plugin.json",
+        "plugins/signed-audit-trails/.claude-plugin/plugin.json",
+        "plugins/skill-forge-essentials/.claude-plugin/plugin.json",
+        "plugins/social-publishing/.claude-plugin/plugin.json",
+        "plugins/startup-business-analyst/.claude-plugin/plugin.json",
+        "plugins/systems-programming/.claude-plugin/plugin.json",
+        "plugins/tdd-workflows/.claude-plugin/plugin.json",
+        "plugins/team-collaboration/.claude-plugin/plugin.json",
+        "plugins/ui-design/.claude-plugin/plugin.json",
+        "plugins/unit-testing/.claude-plugin/plugin.json",
+        "plugins/web-scripting/.claude-plugin/plugin.json"
+      ],
+      "codex_manifest_paths": [
+        "plugins/accessibility-compliance/.codex-plugin/plugin.json",
+        "plugins/agent-orchestration/.codex-plugin/plugin.json",
+        "plugins/agent-teams/.codex-plugin/plugin.json",
+        "plugins/api-scaffolding/.codex-plugin/plugin.json",
+        "plugins/api-testing-observability/.codex-plugin/plugin.json",
+        "plugins/application-performance/.codex-plugin/plugin.json",
+        "plugins/arm-cortex-microcontrollers/.codex-plugin/plugin.json",
+        "plugins/backend-api-security/.codex-plugin/plugin.json",
+        "plugins/backend-development/.codex-plugin/plugin.json",
+        "plugins/before-you-build/.codex-plugin/plugin.json",
+        "plugins/block-no-verify/.codex-plugin/plugin.json",
+        "plugins/blockchain-web3/.codex-plugin/plugin.json",
+        "plugins/brand-landingpage/.codex-plugin/plugin.json",
+        "plugins/business-analytics/.codex-plugin/plugin.json",
+        "plugins/c4-architecture/.codex-plugin/plugin.json",
+        "plugins/cicd-automation/.codex-plugin/plugin.json",
+        "plugins/cloud-infrastructure/.codex-plugin/plugin.json",
+        "plugins/code-documentation/.codex-plugin/plugin.json",
+        "plugins/code-refactoring/.codex-plugin/plugin.json",
+        "plugins/codebase-cleanup/.codex-plugin/plugin.json",
+        "plugins/comprehensive-review/.codex-plugin/plugin.json",
+        "plugins/conductor/.codex-plugin/plugin.json",
+        "plugins/content-marketing/.codex-plugin/plugin.json",
+        "plugins/context-management/.codex-plugin/plugin.json",
+        "plugins/customer-sales-automation/.codex-plugin/plugin.json",
+        "plugins/data-engineering/.codex-plugin/plugin.json",
+        "plugins/data-validation-suite/.codex-plugin/plugin.json",
+        "plugins/database-cloud-optimization/.codex-plugin/plugin.json",
+        "plugins/database-design/.codex-plugin/plugin.json",
+        "plugins/database-migrations/.codex-plugin/plugin.json",
+        "plugins/debugging-toolkit/.codex-plugin/plugin.json",
+        "plugins/dependency-management/.codex-plugin/plugin.json",
+        "plugins/deployment-strategies/.codex-plugin/plugin.json",
+        "plugins/deployment-validation/.codex-plugin/plugin.json",
+        "plugins/developer-essentials/.codex-plugin/plugin.json",
+        "plugins/dgx-spark-ops/.codex-plugin/plugin.json",
+        "plugins/distributed-debugging/.codex-plugin/plugin.json",
+        "plugins/documentation-generation/.codex-plugin/plugin.json",
+        "plugins/documentation-standards/.codex-plugin/plugin.json",
+        "plugins/dotnet-contribution/.codex-plugin/plugin.json",
+        "plugins/error-debugging/.codex-plugin/plugin.json",
+        "plugins/error-diagnostics/.codex-plugin/plugin.json",
+        "plugins/file-conversion/.codex-plugin/plugin.json",
+        "plugins/framework-migration/.codex-plugin/plugin.json",
+        "plugins/frontend-mobile-development/.codex-plugin/plugin.json",
+        "plugins/frontend-mobile-security/.codex-plugin/plugin.json",
+        "plugins/full-stack-orchestration/.codex-plugin/plugin.json",
+        "plugins/functional-programming/.codex-plugin/plugin.json",
+        "plugins/game-development/.codex-plugin/plugin.json",
+        "plugins/git-pr-workflows/.codex-plugin/plugin.json",
+        "plugins/hermes-tweet/.codex-plugin/plugin.json",
+        "plugins/hr-legal-compliance/.codex-plugin/plugin.json",
+        "plugins/incident-response/.codex-plugin/plugin.json",
+        "plugins/javascript-typescript/.codex-plugin/plugin.json",
+        "plugins/julia-development/.codex-plugin/plugin.json",
+        "plugins/jvm-languages/.codex-plugin/plugin.json",
+        "plugins/kubernetes-operations/.codex-plugin/plugin.json",
+        "plugins/llm-application-dev/.codex-plugin/plugin.json",
+        "plugins/llm-finetuning/.codex-plugin/plugin.json",
+        "plugins/machine-learning-ops/.codex-plugin/plugin.json",
+        "plugins/meigen-ai-design/.codex-plugin/plugin.json",
+        "plugins/multi-platform-apps/.codex-plugin/plugin.json",
+        "plugins/observability-monitoring/.codex-plugin/plugin.json",
+        "plugins/operating-kit/.codex-plugin/plugin.json",
+        "plugins/payment-processing/.codex-plugin/plugin.json",
+        "plugins/performance-testing-review/.codex-plugin/plugin.json",
+        "plugins/plugin-eval/.codex-plugin/plugin.json",
+        "plugins/pptx-deck-creation/.codex-plugin/plugin.json",
+        "plugins/protect-mcp/.codex-plugin/plugin.json",
+        "plugins/python-development/.codex-plugin/plugin.json",
+        "plugins/quantitative-trading/.codex-plugin/plugin.json",
+        "plugins/reverse-engineering/.codex-plugin/plugin.json",
+        "plugins/review-agent-governance/.codex-plugin/plugin.json",
+        "plugins/runapi-mcp/.codex-plugin/plugin.json",
+        "plugins/security-compliance/.codex-plugin/plugin.json",
+        "plugins/security-scanning/.codex-plugin/plugin.json",
+        "plugins/seo-analysis-monitoring/.codex-plugin/plugin.json",
+        "plugins/seo-content-creation/.codex-plugin/plugin.json",
+        "plugins/seo-technical-optimization/.codex-plugin/plugin.json",
+        "plugins/shell-scripting/.codex-plugin/plugin.json",
+        "plugins/ship-mate/.codex-plugin/plugin.json",
+        "plugins/signed-audit-trails/.codex-plugin/plugin.json",
+        "plugins/skill-forge-essentials/.codex-plugin/plugin.json",
+        "plugins/social-publishing/.codex-plugin/plugin.json",
+        "plugins/startup-business-analyst/.codex-plugin/plugin.json",
+        "plugins/systems-programming/.codex-plugin/plugin.json",
+        "plugins/tdd-workflows/.codex-plugin/plugin.json",
+        "plugins/team-collaboration/.codex-plugin/plugin.json",
+        "plugins/ui-design/.codex-plugin/plugin.json",
+        "plugins/unit-testing/.codex-plugin/plugin.json",
+        "plugins/web-scripting/.codex-plugin/plugin.json"
+      ],
+      "aligned_plugins": [
+        {
+          "root": "plugins/accessibility-compliance",
+          "claude_manifest": "plugins/accessibility-compliance/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/accessibility-compliance/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/agent-orchestration",
+          "claude_manifest": "plugins/agent-orchestration/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/agent-orchestration/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/agent-teams",
+          "claude_manifest": "plugins/agent-teams/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/agent-teams/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/api-scaffolding",
+          "claude_manifest": "plugins/api-scaffolding/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/api-scaffolding/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/api-testing-observability",
+          "claude_manifest": "plugins/api-testing-observability/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/api-testing-observability/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/application-performance",
+          "claude_manifest": "plugins/application-performance/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/application-performance/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/arm-cortex-microcontrollers",
+          "claude_manifest": "plugins/arm-cortex-microcontrollers/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/arm-cortex-microcontrollers/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/backend-api-security",
+          "claude_manifest": "plugins/backend-api-security/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/backend-api-security/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/backend-development",
+          "claude_manifest": "plugins/backend-development/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/backend-development/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/before-you-build",
+          "claude_manifest": "plugins/before-you-build/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/before-you-build/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/block-no-verify",
+          "claude_manifest": "plugins/block-no-verify/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/block-no-verify/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/blockchain-web3",
+          "claude_manifest": "plugins/blockchain-web3/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/blockchain-web3/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/brand-landingpage",
+          "claude_manifest": "plugins/brand-landingpage/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/brand-landingpage/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/business-analytics",
+          "claude_manifest": "plugins/business-analytics/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/business-analytics/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/c4-architecture",
+          "claude_manifest": "plugins/c4-architecture/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/c4-architecture/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/cicd-automation",
+          "claude_manifest": "plugins/cicd-automation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/cicd-automation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/cloud-infrastructure",
+          "claude_manifest": "plugins/cloud-infrastructure/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/cloud-infrastructure/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/code-documentation",
+          "claude_manifest": "plugins/code-documentation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/code-documentation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/code-refactoring",
+          "claude_manifest": "plugins/code-refactoring/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/code-refactoring/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/codebase-cleanup",
+          "claude_manifest": "plugins/codebase-cleanup/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/codebase-cleanup/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/comprehensive-review",
+          "claude_manifest": "plugins/comprehensive-review/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/comprehensive-review/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/conductor",
+          "claude_manifest": "plugins/conductor/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/conductor/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/content-marketing",
+          "claude_manifest": "plugins/content-marketing/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/content-marketing/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/context-management",
+          "claude_manifest": "plugins/context-management/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/context-management/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/customer-sales-automation",
+          "claude_manifest": "plugins/customer-sales-automation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/customer-sales-automation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/data-engineering",
+          "claude_manifest": "plugins/data-engineering/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/data-engineering/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/data-validation-suite",
+          "claude_manifest": "plugins/data-validation-suite/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/data-validation-suite/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/database-cloud-optimization",
+          "claude_manifest": "plugins/database-cloud-optimization/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/database-cloud-optimization/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/database-design",
+          "claude_manifest": "plugins/database-design/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/database-design/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/database-migrations",
+          "claude_manifest": "plugins/database-migrations/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/database-migrations/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/debugging-toolkit",
+          "claude_manifest": "plugins/debugging-toolkit/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/debugging-toolkit/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/dependency-management",
+          "claude_manifest": "plugins/dependency-management/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/dependency-management/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/deployment-strategies",
+          "claude_manifest": "plugins/deployment-strategies/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/deployment-strategies/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/deployment-validation",
+          "claude_manifest": "plugins/deployment-validation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/deployment-validation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/developer-essentials",
+          "claude_manifest": "plugins/developer-essentials/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/developer-essentials/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/dgx-spark-ops",
+          "claude_manifest": "plugins/dgx-spark-ops/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/dgx-spark-ops/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/distributed-debugging",
+          "claude_manifest": "plugins/distributed-debugging/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/distributed-debugging/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/documentation-generation",
+          "claude_manifest": "plugins/documentation-generation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/documentation-generation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/documentation-standards",
+          "claude_manifest": "plugins/documentation-standards/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/documentation-standards/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/dotnet-contribution",
+          "claude_manifest": "plugins/dotnet-contribution/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/dotnet-contribution/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/error-debugging",
+          "claude_manifest": "plugins/error-debugging/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/error-debugging/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/error-diagnostics",
+          "claude_manifest": "plugins/error-diagnostics/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/error-diagnostics/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/file-conversion",
+          "claude_manifest": "plugins/file-conversion/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/file-conversion/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/framework-migration",
+          "claude_manifest": "plugins/framework-migration/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/framework-migration/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/frontend-mobile-development",
+          "claude_manifest": "plugins/frontend-mobile-development/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/frontend-mobile-development/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/frontend-mobile-security",
+          "claude_manifest": "plugins/frontend-mobile-security/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/frontend-mobile-security/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/full-stack-orchestration",
+          "claude_manifest": "plugins/full-stack-orchestration/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/full-stack-orchestration/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/functional-programming",
+          "claude_manifest": "plugins/functional-programming/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/functional-programming/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/game-development",
+          "claude_manifest": "plugins/game-development/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/game-development/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/git-pr-workflows",
+          "claude_manifest": "plugins/git-pr-workflows/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/git-pr-workflows/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/hermes-tweet",
+          "claude_manifest": "plugins/hermes-tweet/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/hermes-tweet/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/hr-legal-compliance",
+          "claude_manifest": "plugins/hr-legal-compliance/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/hr-legal-compliance/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/incident-response",
+          "claude_manifest": "plugins/incident-response/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/incident-response/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/javascript-typescript",
+          "claude_manifest": "plugins/javascript-typescript/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/javascript-typescript/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/julia-development",
+          "claude_manifest": "plugins/julia-development/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/julia-development/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/jvm-languages",
+          "claude_manifest": "plugins/jvm-languages/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/jvm-languages/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/kubernetes-operations",
+          "claude_manifest": "plugins/kubernetes-operations/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/kubernetes-operations/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/llm-application-dev",
+          "claude_manifest": "plugins/llm-application-dev/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/llm-application-dev/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/llm-finetuning",
+          "claude_manifest": "plugins/llm-finetuning/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/llm-finetuning/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/machine-learning-ops",
+          "claude_manifest": "plugins/machine-learning-ops/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/machine-learning-ops/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/meigen-ai-design",
+          "claude_manifest": "plugins/meigen-ai-design/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/meigen-ai-design/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/multi-platform-apps",
+          "claude_manifest": "plugins/multi-platform-apps/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/multi-platform-apps/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/observability-monitoring",
+          "claude_manifest": "plugins/observability-monitoring/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/observability-monitoring/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/operating-kit",
+          "claude_manifest": "plugins/operating-kit/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/operating-kit/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/payment-processing",
+          "claude_manifest": "plugins/payment-processing/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/payment-processing/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/performance-testing-review",
+          "claude_manifest": "plugins/performance-testing-review/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/performance-testing-review/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/plugin-eval",
+          "claude_manifest": "plugins/plugin-eval/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/plugin-eval/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/pptx-deck-creation",
+          "claude_manifest": "plugins/pptx-deck-creation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/pptx-deck-creation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/protect-mcp",
+          "claude_manifest": "plugins/protect-mcp/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/protect-mcp/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/python-development",
+          "claude_manifest": "plugins/python-development/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/python-development/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/quantitative-trading",
+          "claude_manifest": "plugins/quantitative-trading/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/quantitative-trading/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/reverse-engineering",
+          "claude_manifest": "plugins/reverse-engineering/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/reverse-engineering/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/review-agent-governance",
+          "claude_manifest": "plugins/review-agent-governance/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/review-agent-governance/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/runapi-mcp",
+          "claude_manifest": "plugins/runapi-mcp/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/runapi-mcp/.codex-plugin/plugin.json",
+          "mcp_config_paths": ["plugins/runapi-mcp/.mcp.json"]
+        },
+        {
+          "root": "plugins/security-compliance",
+          "claude_manifest": "plugins/security-compliance/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/security-compliance/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/security-scanning",
+          "claude_manifest": "plugins/security-scanning/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/security-scanning/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/seo-analysis-monitoring",
+          "claude_manifest": "plugins/seo-analysis-monitoring/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/seo-analysis-monitoring/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/seo-content-creation",
+          "claude_manifest": "plugins/seo-content-creation/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/seo-content-creation/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/seo-technical-optimization",
+          "claude_manifest": "plugins/seo-technical-optimization/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/seo-technical-optimization/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/shell-scripting",
+          "claude_manifest": "plugins/shell-scripting/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/shell-scripting/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/ship-mate",
+          "claude_manifest": "plugins/ship-mate/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/ship-mate/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/signed-audit-trails",
+          "claude_manifest": "plugins/signed-audit-trails/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/signed-audit-trails/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/skill-forge-essentials",
+          "claude_manifest": "plugins/skill-forge-essentials/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/skill-forge-essentials/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/social-publishing",
+          "claude_manifest": "plugins/social-publishing/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/social-publishing/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/startup-business-analyst",
+          "claude_manifest": "plugins/startup-business-analyst/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/startup-business-analyst/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/systems-programming",
+          "claude_manifest": "plugins/systems-programming/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/systems-programming/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/tdd-workflows",
+          "claude_manifest": "plugins/tdd-workflows/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/tdd-workflows/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/team-collaboration",
+          "claude_manifest": "plugins/team-collaboration/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/team-collaboration/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/ui-design",
+          "claude_manifest": "plugins/ui-design/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/ui-design/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/unit-testing",
+          "claude_manifest": "plugins/unit-testing/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/unit-testing/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugins/web-scripting",
+          "claude_manifest": "plugins/web-scripting/.claude-plugin/plugin.json",
+          "codex_manifest": "plugins/web-scripting/.codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "mksglu/context-mode",
+      "rank": 5,
+      "stars": 19569,
+      "forks": 1396,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "yusufkaraaslan/Skill_Seekers",
+      "rank": 6,
+      "stars": 14681,
+      "forks": 1489,
+      "tree_truncated": false,
+      "claude_manifest_paths": ["distribution/claude-plugin/.claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "mrexodia/ida-pro-mcp",
+      "rank": 7,
+      "stars": 11020,
+      "forks": 1302,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "Q00/ouroboros",
+      "rank": 8,
+      "stars": 5253,
+      "forks": 532,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": [".mcp.codex.json", ".mcp.json"]
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "zhongerxin/Cowart",
+      "rank": 9,
+      "stars": 5217,
+      "forks": 405,
+      "tree_truncated": false,
+      "claude_manifest_paths": [],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [],
+      "status": "rejected_no_aligned_bundled_mcp"
+    }
+  ]
+}

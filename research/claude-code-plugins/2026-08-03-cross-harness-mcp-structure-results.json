@@ -1,0 +1,148 @@
+{
+  "generated_at": "2026-08-03T03:13:47.507995+00:00",
+  "scope": "repository-tree structure only; no manifest or MCP content was read and no plugin was executed",
+  "source_rankings": "research/claude-code-plugins/2026-08-03-cross-harness-mcp-candidate-rankings.json",
+  "source_rankings_partial": true,
+  "complete": true,
+  "records": [
+    {
+      "repository": "affaan-m/ECC",
+      "rank": 1,
+      "stars": 237100,
+      "forks": 36039,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [
+        ".codex-plugin/plugin.json",
+        "plugins/ecc/.codex-plugin/plugin.json"
+      ],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": [".mcp.json", "mcp-configs/mcp-servers.json"]
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "thedotmack/claude-mem",
+      "rank": 2,
+      "stars": 89348,
+      "forks": 7778,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json", "plugin/.claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json", "plugin/.codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        },
+        {
+          "root": "plugin",
+          "claude_manifest": "plugin/.claude-plugin/plugin.json",
+          "codex_manifest": "plugin/.codex-plugin/plugin.json",
+          "mcp_config_paths": ["plugin/.mcp.json"]
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "MemPalace/mempalace",
+      "rank": 3,
+      "stars": 57992,
+      "forks": 7454,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "mksglu/context-mode",
+      "rank": 4,
+      "stars": 19569,
+      "forks": 1396,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "yusufkaraaslan/Skill_Seekers",
+      "rank": 5,
+      "stars": 14681,
+      "forks": 1489,
+      "tree_truncated": false,
+      "claude_manifest_paths": ["distribution/claude-plugin/.claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "mrexodia/ida-pro-mcp",
+      "rank": 6,
+      "stars": 11020,
+      "forks": 1302,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": []
+        }
+      ],
+      "status": "rejected_no_aligned_bundled_mcp"
+    },
+    {
+      "repository": "Q00/ouroboros",
+      "rank": 7,
+      "stars": 5253,
+      "forks": 532,
+      "tree_truncated": false,
+      "claude_manifest_paths": [".claude-plugin/plugin.json"],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [
+        {
+          "root": ".",
+          "claude_manifest": ".claude-plugin/plugin.json",
+          "codex_manifest": ".codex-plugin/plugin.json",
+          "mcp_config_paths": [".mcp.codex.json", ".mcp.json"]
+        }
+      ],
+      "status": "accepted_for_semantic_inspection"
+    },
+    {
+      "repository": "zhongerxin/Cowart",
+      "rank": 8,
+      "stars": 5217,
+      "forks": 405,
+      "tree_truncated": false,
+      "claude_manifest_paths": [],
+      "codex_manifest_paths": [".codex-plugin/plugin.json"],
+      "aligned_plugins": [],
+      "status": "rejected_no_aligned_bundled_mcp"
+    }
+  ]
+}
