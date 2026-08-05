@@ -22,6 +22,7 @@ render_card = _module._render_card
 count_tokens = _module._count_tokens
 EncoderCache = _module._EncoderCache
 DEFAULT_BATCH_TOKENS = _module._DEFAULT_BATCH_TOKENS
+TIKTOKEN_ENCODING = _module._TIKTOKEN_ENCODING
 DEFAULT_WIDTH = _module._DEFAULT_WIDTH
 DEFAULT_FONT_SIZE = _module._DEFAULT_FONT_SIZE
 extract_user_messages = _module.extract_user_messages

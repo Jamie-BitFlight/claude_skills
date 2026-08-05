@@ -40,12 +40,18 @@ class NetworkBlocked(RuntimeError):
 
 
 import tiktoken as _tk
+from _server import TIKTOKEN_ENCODING
 
 # tiktoken downloads its BPE encoding from openaipublic.blob.core.windows.net
 # on first use when there's no local cache.  Fresh CI runners have no cache,
 # so the network guard blocks the download.  Try to load the real encoding
 # first; if that fails (no cache + network blocked), fall back to a byte-level
 # mock that can encode any string without the real BPE tables.
+#
+# Must probe/mock TIKTOKEN_ENCODING (server.py's actual encoding), not an
+# unrelated name -- probing a different, already-cached encoding here would
+# silently skip both the real download AND the mock install, leaving the
+# real encoding to hit the network guard during test execution.
 _mock_enc: _tk.Encoding | None = None
 
 
@@ -57,10 +63,10 @@ def _mock_get_encoding(encoding_name: str) -> _tk.Encoding:
 
 
 try:
-    _tk.get_encoding("cl100k_base")
+    _tk.get_encoding(TIKTOKEN_ENCODING)
 except OSError:
     _mock_enc = _tk.Encoding(
-        name="cl100k_base",
+        name=TIKTOKEN_ENCODING,
         pat_str=r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""",
         mergeable_ranks={bytes([i]): i for i in range(256)},
         special_tokens={},
