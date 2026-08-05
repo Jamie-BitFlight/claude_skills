@@ -187,15 +187,16 @@ Wave-based parallel execution state for `/work-milestone`. State is persisted to
 - `dispatch_validate(milestone_number)` — Validate structural integrity of an existing dispatch plan. Returns is_valid, errors, warnings.
 - `dispatch_stale_check(milestone_number)` — Check whether any wave items have stale or dead PIDs and return staleness summary.
 - `dispatch_create_plan(milestone_number, plan, overwrite, validate, issue)` — Validate and persist a dispatch plan atomically. `plan` is a typed DispatchPlan object. Returns `milestone_number`, `wave_count`, `item_count`, `is_valid`, `errors`, `warnings`, and `messages`. Set overwrite=True when re-grooming. Pass issue to auto-register as a `dispatch-plan` artifact.
+- `dispatch_conflicts(milestone_number, repo)` — Analyze Impact Radius conflicts for open issues in a milestone. Returns `conflict_groups` and `count`.
 - `dispatch_wave_start(milestone, wave_num, items)` — Create a wave entry; initialise all items with `status=pending`. Call before spawning processes. Returns error if wave already exists.
 - `dispatch_item_status(milestone, issue, status, result, error, cost)` — Record completion or failure of one item. Looks up item by milestone+issue across all waves. Valid status: `complete`, `failed`, `skipped`.
 - `dispatch_wave_status(milestone, wave_num)` — Query wave progress with per-item detail and elapsed time. Checks stale PIDs (marks dead processes failed) before returning.
 - `dispatch_spawn(milestone, wave_num, ...)` — Background task tool (`task=True`) that calls `dispatch_wave_start` then spawns one `claude -p` kage-bunshin process per wave item. Used by `/work-milestone`.
 
-Each tool above except `dispatch_stale_check` has a full CLI equivalent under `dispatch
-read|validate|create-plan|wave-start|item-status|wave-status|spawn` — see
+Every tool above has a full CLI equivalent under `dispatch
+read|validate|stale-check|create-plan|conflicts|wave-start|item-status|wave-status|spawn` — see
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
-authoritative flag mapping. `dispatch_stale_check` and `dispatch_conflicts` have no CLI leaf.
+authoritative flag mapping.
 
 **Workflow:** `/groom-milestone` calls `dispatch_create_plan` to validate and persist the dispatch plan YAML. `/work-milestone` calls `dispatch_wave_start` per wave, `dispatch_spawn` to launch sessions, and `dispatch_wave_status` to poll progress. Spawned sessions call `dispatch_item_status` on completion.
 

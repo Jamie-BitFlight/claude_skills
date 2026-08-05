@@ -166,6 +166,30 @@ def _group_plan_items(values: list[str]) -> tuple[dict[int, list[WaveItem]], dic
     return grouped, parallel
 
 
+def _reject_undeclared_conflict_groups(grouped: dict[int, list[WaveItem]], groups: list[_ConflictGroupInput]) -> None:
+    """Raise when a wave item references a ``conflict_group`` with no matching declaration.
+
+    A wave item's ``conflict_group`` is a foreign key into
+    ``DispatchPlan.conflict_groups`` — integrity validation reports it as an
+    error, but that check runs only after the plan is already written to
+    disk. Rejecting here keeps an invalid plan from ever reaching the
+    filesystem.
+
+    Raises:
+        ValueError: One or more wave items reference a ``conflict_group`` id
+            with no corresponding ``--conflict-group`` declaration.
+    """
+    declared_ids = {group.group_id for group in groups}
+    referenced_ids = {
+        item.conflict_group for items in grouped.values() for item in items if item.conflict_group is not None
+    }
+    undeclared = sorted(referenced_ids - declared_ids)
+    if undeclared:
+        raise ValueError(
+            f"wave items reference conflict_group id(s) {undeclared} with no matching --conflict-group declaration"
+        )
+
+
 @app.command("read")
 def read(milestone_number: Annotated[int, typer.Option("--milestone-number", min=1)]) -> None:
     """Read a dispatch plan."""
@@ -176,6 +200,24 @@ def read(milestone_number: Annotated[int, typer.Option("--milestone-number", min
 def validate(milestone_number: Annotated[int, typer.Option("--milestone-number", min=1)]) -> None:
     """Validate a dispatch plan's structure."""
     emit_result(operations.dispatch_validate_plan(milestone_number=milestone_number))
+
+
+@app.command("stale-check")
+def stale_check(
+    milestone_number: Annotated[int, typer.Option("--milestone-number", min=1)],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+) -> None:
+    """Check whether a dispatch plan is stale relative to the current milestone."""
+    emit_result(operations.dispatch_stale_check(milestone_number=milestone_number, repo=repo))
+
+
+@app.command("conflicts")
+def conflicts(
+    milestone_number: Annotated[int, typer.Option("--milestone-number", min=1)],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+) -> None:
+    """Analyze Impact Radius conflicts for items in a milestone."""
+    emit_result(operations.dispatch_conflicts(milestone_number=milestone_number, repo=repo))
 
 
 @app.command("create-plan")
@@ -191,6 +233,9 @@ def create_plan(
     post_merge: Annotated[list[str] | None, typer.Option("--post-merge")] = None,
     overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
     validate_after_write: Annotated[bool, typer.Option("--validate/--no-validate")] = True,
+    issue: Annotated[
+        int | None, typer.Option("--issue", help="Backlog issue to register the dispatch-plan artifact against")
+    ] = None,
 ) -> None:
     """Create a dispatch plan from strictly validated named fields."""
     if not integration_branch:
@@ -201,6 +246,7 @@ def create_plan(
     try:
         grouped, parallel = _group_plan_items(wave_item)
         groups = [_parse_conflict_group(value) for value in groups_input]
+        _reject_undeclared_conflict_groups(grouped, groups)
         plan = DispatchPlan(
             milestone=MilestoneHeader(
                 number=milestone_number, title=milestone_title, integration_branch=integration_branch
@@ -220,6 +266,7 @@ def create_plan(
             plan=plan.model_dump(mode="json", by_alias=True),
             overwrite=overwrite,
             validate=validate_after_write,
+            issue=issue,
         )
     )
 

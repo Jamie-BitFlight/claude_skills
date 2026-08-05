@@ -118,6 +118,7 @@ def test_create_plan_forwards_all_supported_dispatch_plan_fields(monkeypatch: py
         },
         overwrite=False,
         validate=True,
+        issue=None,
     )
 
 

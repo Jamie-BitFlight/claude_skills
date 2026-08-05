@@ -1075,6 +1075,20 @@ def _assert_compact_result(result: Any, expected: dict[str, Any]) -> None:
             {"milestone_number": 10},
         ),
         (
+            "stale-check",
+            "dispatch_stale_check",
+            ["--milestone-number", "10", "--repo", "owner/name"],
+            {"milestone_number": 10, "repo": "owner/name"},
+            {"milestone_number": 10, "is_stale": False, "added_issues": [], "removed_issues": []},
+        ),
+        (
+            "conflicts",
+            "dispatch_conflicts",
+            ["--milestone-number", "10", "--repo", "owner/name"],
+            {"milestone_number": 10, "repo": "owner/name"},
+            {"milestone_number": 10, "conflict_groups": [], "count": 0},
+        ),
+        (
             "create-plan",
             "dispatch_create_plan",
             [
@@ -1128,6 +1142,7 @@ def _assert_compact_result(result: Any, expected: dict[str, Any]) -> None:
                 },
                 "overwrite": False,
                 "validate": True,
+                "issue": None,
             },
             {"milestone_number": 10, "wave_count": 2},
         ),
@@ -1218,6 +1233,58 @@ def test_dispatch_cli_forwards_named_options(
     result = _runner.invoke(app, ["dispatch", command, *args])
     _assert_compact_result(result, payload)
     mock_operation.assert_called_once_with(**kwargs)
+
+
+def test_dispatch_create_plan_forwards_issue_option(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``--issue`` must reach ``dispatch_create_plan`` so the plan is registered on the item."""
+    mock_operation = Mock(return_value={"milestone_number": 10, "wave_count": 1})
+    monkeypatch.setattr(dispatch.operations, "dispatch_create_plan", mock_operation)
+    result = _runner.invoke(
+        app,
+        [
+            "dispatch",
+            "create-plan",
+            "--milestone-number",
+            "10",
+            "--milestone-title",
+            "Milestone",
+            "--integration-branch",
+            "main",
+            "--wave-item",
+            "wave=1;issue=101;title=Feature A;priority=P1",
+            "--issue",
+            "55",
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert mock_operation.call_args.kwargs["issue"] == 55
+
+
+def test_dispatch_create_plan_rejects_undeclared_conflict_group(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A ``conflict_group`` referenced by a wave item but never declared via
+    ``--conflict-group`` must be rejected before the plan is written — not
+    silently persisted with ``is_valid: false``.
+    """
+    mock_operation = Mock(return_value={"milestone_number": 10, "wave_count": 1, "is_valid": False})
+    monkeypatch.setattr(dispatch.operations, "dispatch_create_plan", mock_operation)
+    result = _runner.invoke(
+        app,
+        [
+            "dispatch",
+            "create-plan",
+            "--milestone-number",
+            "10",
+            "--milestone-title",
+            "Milestone",
+            "--integration-branch",
+            "main",
+            "--wave-item",
+            "wave=1;issue=101;title=Feature A;priority=P1;conflict_group=9",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "conflict_group id(s) [9]" in result.stderr
+    mock_operation.assert_not_called()
 
 
 @pytest.mark.parametrize(
