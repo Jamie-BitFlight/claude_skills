@@ -459,7 +459,7 @@ Assemble the markdown report (see Output Format below).
 Register one artifact:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact register \
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --item-id {issue_number} \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}" \
@@ -474,7 +474,7 @@ Register each diagram as a separate artifact. Register the parent first, then ea
 
 ```bash
 # Parent
-uv run plugins/development-harness/sam_schema/cli.py artifact register \
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --item-id {issue_number} \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}" \
@@ -483,7 +483,7 @@ uv run plugins/development-harness/sam_schema/cli.py artifact register \
   --agent "code-review-architecture"
 
 # Each child cluster
-uv run plugins/development-harness/sam_schema/cli.py artifact register \
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --item-id {issue_number} \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}-{cluster-name}" \

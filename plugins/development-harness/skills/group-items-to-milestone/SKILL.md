@@ -32,7 +32,7 @@ If milestone not found or closed, report and stop.
 
 ### Step 2: Load Backlog Items
 
-Call `uv run plugins/development-harness/sam_schema/cli.py backlog list` (flags: `--section` for P0/P1/P2/Ideas, `--title` for a title filter — the CLI has no `--search` full-text flag, but these two are fully supported). Parse the returned dict — each entry in `items` has `title`, `priority`, `issue`, `plan`, `status`, `milestone`, `file_path`, `groomed`. Filter items by section (P0, P1, P2, Ideas). Apply any title filter.
+Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list` (flags: `--section` for P0/P1/P2/Ideas, `--title` for a title filter — the CLI has no `--search` full-text flag, but these two are fully supported). Parse the returned dict — each entry in `items` has `title`, `priority`, `issue`, `plan`, `status`, `milestone`, `file_path`, `groomed`. Filter items by section (P0, P1, P2, Ideas). Apply any title filter.
 
 For each item determine status:
 
