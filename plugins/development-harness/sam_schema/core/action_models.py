@@ -19,7 +19,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
-from sam_schema.core.models import _BEADS_ID_PATTERN, STATUS_MAP, Task, TaskStatus
+from sam_schema.core.models import _BEADS_ID_PATTERN, STATUS_MAP, TASK_ID_PATTERN, Task, TaskStatus
 
 # ---------------------------------------------------------------------------
 # Shared base — eliminates 17x repeated model_config boilerplate
@@ -79,8 +79,11 @@ class TaskDefinition(Task):
     ``last_activity``, ``github_issue``) are inherited but default to ``None``;
     callers should omit them when authoring a new task.
 
-    The ID regex, status enum, priority/complexity enums, and dependency
-    validators are all inherited automatically from ``Task``.
+    The status enum, priority/complexity enums, and dependency validators are
+    all inherited automatically from ``Task``. ``id`` is overridden only to add
+    the ``"task"`` alias for MCP callers; its ``pattern`` still sources from the
+    same canonical ``TASK_ID_PATTERN`` used by ``Task.id`` so both models accept
+    identical ID forms.
 
     ``status`` is given a default of ``"not-started"`` at the MCP boundary so
     callers may omit it when submitting a new task.
@@ -88,7 +91,7 @@ class TaskDefinition(Task):
 
     model_config = ConfigDict(populate_by_name=True, use_enum_values=True, extra="forbid")
 
-    id: str = Field(..., pattern=r"^[A-Za-z]?\d+(\.\d+)?$", validation_alias=AliasChoices("task", "id"))
+    id: str = Field(..., pattern=TASK_ID_PATTERN.pattern, validation_alias=AliasChoices("task", "id"))
     status: TaskStatus = Field(default=TaskStatus.NOT_STARTED, description="Task status. Defaults to 'not-started'.")
 
     @field_validator("status", mode="before")

@@ -348,6 +348,18 @@ class TestTaskRequiredFields:
         with pytest.raises(ValidationError):
             Task(id="invalid-id", title="Bad ID", status=TaskStatus.NOT_STARTED)
 
+    @pytest.mark.parametrize("valid_id", ["T10a", "T10a/T10b", "P1/T3", "P1/T10a"])
+    def test_id_accepts_letter_suffix_and_compound_forms(self, valid_id: str) -> None:
+        """Letter-suffixed (T10a) and slash-separated compound (T10a/T10b) IDs are accepted.
+
+        Regression test: Task.id's field pattern previously duplicated a narrower
+        regex than TASK_ID_PATTERN, rejecting these documented-valid ID forms
+        (see AGENTS.md task-ID conventions and TASK_ID_PATTERN's own docstring).
+        """
+        task = Task(id=valid_id, title="T", status=TaskStatus.NOT_STARTED)
+        assert task.id == valid_id
+        assert TASK_ID_PATTERN.match(valid_id)
+
 
 # ---------------------------------------------------------------------------
 # Task model — alias handling

@@ -129,7 +129,7 @@ class Task(BaseModel):
     model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
 
     # Required fields
-    id: str = Field(..., pattern=r"^[A-Za-z]?\d+(\.\d+)?$")
+    id: str = Field(..., pattern=TASK_ID_PATTERN.pattern)
     title: str = Field(..., min_length=1, max_length=200)
     status: TaskStatus
 
@@ -242,7 +242,7 @@ class Task(BaseModel):
             Normalized list of validated task ID strings.
 
         Raises:
-            ValueError: If any item does not match ``^[A-Za-z]?\\d+(\\.\\d+)?$``.
+            ValueError: If any item does not match ``TASK_ID_PATTERN``.
         """
         if v is None:
             return []

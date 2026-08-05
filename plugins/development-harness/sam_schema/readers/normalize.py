@@ -11,7 +11,16 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
-from sam_schema.core.models import STATUS_MAP, AcceptanceCriterion, Plan, ReadResult, SchemaGap, Task, TaskStatus
+from sam_schema.core.models import (
+    STATUS_MAP,
+    TASK_ID_PATTERN,
+    AcceptanceCriterion,
+    Plan,
+    ReadResult,
+    SchemaGap,
+    Task,
+    TaskStatus,
+)
 from sam_schema.readers.detect import FormatType
 
 if TYPE_CHECKING:
@@ -314,7 +323,7 @@ def normalize_plan(plan_meta: dict, task_dicts: list[dict], source_format: Forma
                     task_id=raw_id,
                     field_name="id",
                     gap_type="invalid_value",
-                    expected="Task ID matching pattern ^[A-Za-z]?\\d+(\\.\\d+)?$",
+                    expected=f"Task ID matching pattern {TASK_ID_PATTERN.pattern}",
                     actual=str(exc),
                 )
             )

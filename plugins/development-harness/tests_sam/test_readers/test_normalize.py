@@ -335,10 +335,10 @@ def test_normalize_plan_raises_when_filename_does_not_match_convention() -> None
 
 
 def test_normalize_plan_invalid_task_id_recorded_as_gap_not_abort() -> None:
-    # Task IDs like T10a do not match ^[A-Za-z]?\d+(\.\d+)?$
+    # "invalid-id" does not match TASK_ID_PATTERN (sam_schema.core.models).
     raw_meta = {"feature": "test"}
     task_dicts = [
-        {"task": "T10a", "title": "Invalid ID task", "status": "not-started"},
+        {"task": "invalid-id", "title": "Invalid ID task", "status": "not-started"},
         {"task": "T1", "title": "Valid task", "status": "not-started"},
     ]
     result = normalize_plan(raw_meta, task_dicts, FormatType.YAML_FRONTMATTER, pathlib.Path("/fake"))
@@ -346,16 +346,34 @@ def test_normalize_plan_invalid_task_id_recorded_as_gap_not_abort() -> None:
     assert len(result.plan.tasks) == 1
     assert result.plan.tasks[0].id == "T1"
     # Invalid ID is recorded as a schema gap
-    invalid_gaps = [g for g in result.gaps if g.task_id == "T10a"]
+    invalid_gaps = [g for g in result.gaps if g.task_id == "invalid-id"]
     assert len(invalid_gaps) >= 1
 
 
 def test_normalize_plan_invalid_task_gap_has_invalid_value_gap_type() -> None:
     raw_meta = {"feature": "test"}
-    task_dicts = [{"task": "T10b", "title": "Bad", "status": "not-started"}]
+    task_dicts = [{"task": "invalid-id", "title": "Bad", "status": "not-started"}]
     result = normalize_plan(raw_meta, task_dicts, FormatType.YAML_FRONTMATTER, pathlib.Path("/fake"))
-    gap = next(g for g in result.gaps if g.task_id == "T10b")
+    gap = next(g for g in result.gaps if g.task_id == "invalid-id")
     assert gap.gap_type == "invalid_value"
+
+
+def test_normalize_plan_letter_suffixed_task_id_now_valid_not_gap() -> None:
+    """T10a matches TASK_ID_PATTERN and must normalize as a real task, not a gap.
+
+    Regression test: Task.id's field pattern previously duplicated a narrower
+    regex than TASK_ID_PATTERN, causing this ID form to fail Task construction
+    and get silently recorded as an invalid_value gap instead of a task.
+    """
+    raw_meta = {"feature": "test"}
+    task_dicts = [{"task": "T10a", "title": "Suffixed ID task", "status": "not-started"}]
+    result = normalize_plan(raw_meta, task_dicts, FormatType.YAML_FRONTMATTER, pathlib.Path("/fake"))
+    assert len(result.plan.tasks) == 1
+    assert result.plan.tasks[0].id == "T10a"
+    # Missing-optional-field gaps are expected for a minimal task dict; only an
+    # "invalid_value" gap on the id itself would indicate the regression.
+    invalid_id_gaps = [g for g in result.gaps if g.task_id == "T10a" and g.gap_type == "invalid_value"]
+    assert invalid_id_gaps == []
 
 
 # ---------------------------------------------------------------------------
