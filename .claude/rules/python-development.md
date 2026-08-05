@@ -29,3 +29,9 @@ git ls-files | grep uv.lock
 ```
 
 Must return only the root `uv.lock`. A per-plugin `uv.lock` is never read — the runtime self-resolves via PEP 723 and the linters use the root dev group — so it would only drift from the real dependency set.
+
+---
+
+## ty Type Checker Errors
+
+Fix the code to satisfy the type checker — inline `# ty: ignore` suppressions and per-file-ignores relaxation are prohibited. Load `python-engineering:ty` for suppression syntax, diagnostics, and unresolved-import/environment resolution. Load `python-engineering:python3-typing` for the boundary-validation pattern (`model_validate()` on raw input) instead of passing untyped values to typed constructors.

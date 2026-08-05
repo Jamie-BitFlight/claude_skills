@@ -6,6 +6,10 @@ paths:
 
 # Plugin.json Requirements
 
+## Manifest Location
+
+`plugin.json` is always at `<plugin-root>/.claude-plugin/plugin.json` (or `.cursor-plugin/plugin.json` when developing a Cursor plugin, or both).
+
 ## Required Fields
 
 - `name`: kebab-case, required

@@ -59,6 +59,20 @@ uv run plugins/development-harness/scripts/run_backlog_server.py  # Backlog MCP 
 uv run plugins/development-harness/scripts/run_sam_server.py      # SAM MCP server
 ```
 
+Both servers are built with FastMCP v3. To validate a change against the live source (not the
+installed plugin cache):
+
+```bash
+FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp call \
+  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
+  --target <tool_name> --input-json '{"...": "..."}'
+```
+
+Use `--command "uv run --script <path>"` — invoking `fastmcp list/call <path>` directly conflicts
+with the caller's own asyncio event loop. Suppress banner/log noise with the `FASTMCP_*` env vars
+above rather than redirecting stderr to `/dev/null`, which would also hide real errors. `--json`
+output is wrapped: unwrap with `json.loads(json.loads(stdout)["content"][0]["text"])`.
+
 ## Directory Structure
 
 ```
@@ -134,6 +148,23 @@ description: Description with trigger conditions
 }
 ```
 
+### Agent Frontmatter (plugin-shipped agents)
+
+- Plugin-shipped agents (files under a plugin's `agents/`) forbid `hooks`, `mcpServers`, and
+  `permissionMode` frontmatter fields — Claude Code ignores them or refuses to start the agent. Do
+  not list these as supported fields when authoring plugin agents.
+- `SubagentStop` hooks use `type: "prompt"` for context-aware validation — no `matcher` needed.
+- The plugin-validator hook may silently strip unexpected frontmatter fields (e.g. `name` from
+  skill frontmatter) — a field disappearing after commit is validator auto-fix, not a manual edit.
+
+### Documentation Convention
+
+Plugins commonly ship a `{plugin-name}-meta-docs` skill that dynamically lists the plugin's
+`docs/` directory at load time (e.g. `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' -type f | sort`)
+instead of hardcoding relative paths to another plugin's docs. When a skill needs another plugin's
+documentation, load that plugin's meta-docs skill rather than hardcoding a cross-plugin relative
+path — those break on every directory restructure.
+
 ## Code Conventions
 
 ### Python
@@ -153,6 +184,11 @@ description: Description with trigger conditions
   touching a structured data shape (CLI output, MCP tool payloads, parsed file records), use
   Pydantic `BaseModel` by default. `TypedDict`/`dataclass` remain correct only for genuinely
   stdlib-only, dependency-constrained contexts (see `python-engineering:python3-stdlib-only`).
+- **Default to already-declared dependencies**: before writing a new shared module, check the PEP
+  723 dependency block of the scripts that will import it (`grep dependencies plugins/*/scripts/*.py`)
+  and reuse what's already declared (e.g. `httpx`, `ruamel.yaml`) instead of assuming a stdlib-only
+  design. Stdlib-only is a valid constraint only for a confirmed deployment restriction (airgapped,
+  no pip access) — not a default posture.
 
 ### CLI and script output — agent-only, never human-facing
 
@@ -193,6 +229,37 @@ guess:
 - Cite sources with URLs and access dates
 - File references use `./` relative prefix
 
+**SKILL.md string substitution** happens at load time, including inside fenced code blocks —
+backslash-escaping (`\$1`) does not prevent it:
+
+- `$ARGUMENTS`, `$ARGUMENTS[N]`, `$0`–`$9` — arguments passed at invocation
+- `${CLAUDE_SESSION_ID}` — current session ID
+- `${CLAUDE_SKILL_DIR}` — the skill's own directory (for plugin skills: the skill subdirectory,
+  NOT the plugin root)
+- Literal `$N` is only safe to document inside `references/*.md` files, which are not substituted —
+  a SKILL.md itself cannot explain this syntax without being corrupted by it. Canary-test any new
+  substitution-adjacent pattern (`/example-argument-substitution`) before applying it across
+  multiple files.
+
+Separate from SKILL.md substitution, hook/command scripts receive env vars: `CLAUDE_PROJECT_DIR`
+(project root, all hooks), `CLAUDE_PLUGIN_ROOT` (plugin root, plugin hooks only —
+`CLAUDE_PLUGIN_DIR` does not exist), `CLAUDE_ENV_FILE` (SessionStart hooks only),
+`CLAUDE_CODE_REMOTE`.
+
+**Multi-mode workflow skills**: when a SKILL.md parses `$ARGUMENTS` into a structured `<input>`
+JSON block, its `references/workflows/*.md` files use self-closing XML tags (e.g. `<item_ref/>`)
+as **labels naming a key in that JSON** — not variables passed into the file. Reference them as
+"the value from the `item_ref` key," never "the parser provides `item_ref`."
+
+**Agent `tools:` frontmatter** requires exact, correctly-cased tool names
+(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`) — wildcards (`*`) and short-form MCP
+aliases (`mcp__context-mode__ctx_stats` instead of the full
+`mcp__plugin_context-mode_context-mode__ctx_stats`) silently resolve to zero tools, with no error
+raised.
+
+After editing any SKILL.md, invoke the skill and confirm it still renders correctly with no
+unexpected prompts or extra steps.
+
 ### JavaScript/TypeScript
 
 - Formatted with Biome (`biome.json`)
@@ -215,6 +282,13 @@ Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`
 
 **NEVER use `--no-verify` or flags that bypass git hooks.** If a hook fails, fix the underlying issue.
 
+## Working Tree Safety
+
+The working tree may hold another contributor's uncommitted, legitimate work. Before reverting or
+discarding an unexpected diff (`git checkout`, `git restore`, `git reset --hard`), read the diff
+and confirm it is unintended rather than assuming it is an agent artifact — an unexplained change
+is a reason to investigate and ask, not a reason to revert.
+
 ## Testing Patterns
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`
@@ -223,12 +297,21 @@ Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`
 - **Test discovery**: Multiple test directories configured in `pyproject.toml [tool.pytest.ini_options] testpaths`
 - **Type checker exclusions**: Test files get relaxed rules in `pyproject.toml` per-file overrides
 - **Test file placement**: Tests go in `plugins/{name}/tests/` or root `tests/`
+- **Close criteria**: passing pre-existing tests proves no regression, not correctness — do not
+  mark a fix or issue closed without a test that specifically demonstrates the new/fixed behavior
+- **SAM/backlog MCP error contract**: `sam_schema/server.py` tool handlers let exceptions
+  (`PlanNotFoundError`, `TaskNotFoundError`, etc.) propagate rather than returning
+  `{"error": ...}` dicts — FastMCP converts them to `isError=true` responses. Tests for
+  invalid-input paths must use `pytest.raises(ToolError)` (`fastmcp.exceptions.ToolError`), not
+  `assert result["error"]`.
 
 ## Type Checking
 
 Two type checkers run in CI:
 
-1. **ty** (Astral, primary) — `uv run ty check .`
+1. **ty** (Astral, primary) — `uv run ty check .`. `mypy` is legacy and being migrated away from
+   this repo's own code; plugin-facing *documentation* keeps mypy as a secondary option since
+   external plugin users may still run it.
 2. **basedpyright** (secondary) — run via `pep723-loader`
 
 ### Known ty overrides (in `pyproject.toml [tool.ty]`)
@@ -236,6 +319,19 @@ Two type checkers run in CI:
 - Test files get relaxed rules (`call-non-callable = "warn"`, etc.)
 - `plugins/agentskill-kaizen/**` has `call-non-callable = "warn"` (prefixspan incomplete stubs)
 - Symlinked directories excluded: `plugins/uv/skills/uv`, `plugins/development-harness/skills/implementation-manager`
+
+### Common ty Failure Patterns
+
+- **`unresolved-attribute` on a `ModuleType`**: almost always means the module's directory is
+  missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`. Add it there first —
+  mirroring the matching entry already in `[tool.pytest.ini_options] pythonpath` — and re-run
+  before investigating the importing code itself.
+- **TypedDict nominal typing**: ty treats a `TypedDict` as scoped to its defining module — two
+  structurally identical TypedDicts from different modules are incompatible types to ty. Avoid
+  making an implementation explicitly inherit from a `@runtime_checkable` Protocol when the
+  Protocol's signatures reference TypedDicts duplicated across modules (`isinstance()` checks
+  still work without explicit inheritance); if inheritance is required, have all signatures import
+  the TypedDicts from one canonical module.
 
 ## CI Pipeline (`.github/workflows/code-quality.yml`)
 
@@ -273,6 +369,12 @@ Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `bac
 - `plan/tasks-{id}-{name}.yaml` — Task decompositions
 - `plan/feature-context-{name}.md` — Feature context documents
 - `plan/P{NNN}-{name}.yaml` — Follow-up task files
+- Task YAML `agent:` fields must use plugin-qualified names (e.g. `dh:service-docs-maintainer`) —
+  a bare name (`service-docs-maintainer`) silently degrades to generalist behavior if no plugin
+  matches, or is ambiguous if two plugins ship an agent with that name
+- Invoke `complete-implementation` with the implementation plan path (e.g. `P964-....yaml`), never
+  the QG plan it generates internally — passing the QG plan back in produces a spurious second
+  `qg-qg-...` plan and re-runs quality gates on an already-complete pass
 
 ### Rule Files
 
@@ -306,6 +408,9 @@ this file) was removed to avoid two files drifting out of sync.
 10. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
 11. **Banned API**: `requests` is banned — use `httpx` (enforced by ruff `flake8-tidy-imports`).
 12. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies.
+13. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
+14. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
+15. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.
 
 ## File Locations Quick Reference
 
@@ -347,6 +452,22 @@ gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {path
 `reviewDecision` being empty and `state: COMMENTED` does NOT mean no findings. Codex and other bots post substantive per-line feedback as inline comments, not as blocking review verdicts. Checking only the top-level state misses these entirely.
 
 Address all inline comments before declaring the PR review complete.
+
+## GitHub CLI Conventions
+
+- This checkout's git remote points to a local proxy (`127.0.0.1`), not `github.com` — `gh` cannot
+  auto-detect the repository. Pass `-R <owner/repo>` on every `gh` command. `GITHUB_TOKEN` set in
+  environment handles authentication automatically. The correct `<owner/repo>` for this checkout is
+  written to `.dh/config.yaml` under `gh.repo` by `setup_gh.py`.
+- Prefer extending this repo's existing GitHub tooling — backlog MCP tools
+  (`mcp__plugin_dh_backlog__*`) and PyGithub-based scripts — over adding new `gh` CLI usage; the
+  project has invested in portable Python tooling that needs no separate `gh` auth/installation.
+- When `gh` is the right tool, prefer `gh graphql` (single call) over `gh api` (slower, often
+  multi-step) for new usage — the PR Review Protocol above is an existing exception that already
+  depends on `gh api`.
+- To read a GitHub-hosted file's contents, use
+  `gh api repos/{owner}/{repo}/contents/{path}?ref={branch} --jq '.content' | base64 -d` rather
+  than a URL-fetch tool — it authenticates automatically and returns exact file bytes.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
 ## Beads Issue Tracker
