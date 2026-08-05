@@ -13,8 +13,14 @@ Before planning work, verify the described feature/fix hasn't already been imple
 
 If evidence shows the work is already done:
 
-- Call the `mcp__plugin_dh_backlog__backlog_resolve` tool with `selector="{title}"` and
-  `summary="Already implemented via PR #{pr} / commit {sha}"`.
+- Resolve via the CLI:
+
+  ```bash
+  uv run plugins/development-harness/sam_schema/cli.py backlog resolve \
+    --selector "{title}" \
+    --summary "Already implemented via PR #{pr} / commit {sha}"
+  ```
+
 - Report to the user and stop — no planning needed.
 
 When <mode/> is `auto`: log `[AUTO] Work already implemented — closing #{N} with evidence: {sha/PR}` and stop.

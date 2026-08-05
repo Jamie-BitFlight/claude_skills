@@ -21,7 +21,9 @@ is a separate check at a different stage and is not unified with this one.
 
 ### Extract Impact Radius files
 
-Call `mcp__plugin_dh_backlog__backlog_view(selector="{title}", summary=false)`.
+Call the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{title}"`. Note: the
+CLI's `backlog view` has no `summary` parameter — it always returns full section content, equivalent to MCP's
+`summary=false`.
 
 Extract file paths using this priority order:
 
@@ -112,14 +114,13 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
 
 **FUNCTIONAL_DRIFT:**
 
-1. Write the diff summary as the `staleness context` section via MCP:
+1. Write the diff summary as the `staleness context` section via the CLI:
 
-   ```text
-   mcp__plugin_dh_backlog__backlog_groom(
-     selector="{title}",
-     section="staleness context",
-     content="Staleness detected {today}: functional commits since {groomed_date}.\n\n{diff summary — key changed interfaces, renamed functions, added/removed files}\n\nCommits:\n{list of qualifying commit one-liners}"
-   )
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+     --selector "{title}" \
+     --section "staleness context" \
+     --content "Staleness detected {today}: functional commits since {groomed_date}.\n\n{diff summary — key changed interfaces, renamed functions, added/removed files}\n\nCommits:\n{list of qualifying commit one-liners}"
    ```
 
 2. Invoke re-groom:
@@ -134,12 +135,11 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
 
 **SUPERSEDED:**
 
-```text
-mcp__plugin_dh_backlog__backlog_close(
-  selector="{title}",
-  reason="superseded",
-  comment="Goal already implemented by commits since groom date: {commit sha list}"
-)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog close \
+  --selector "{title}" \
+  --reason "superseded" \
+  --comment "Goal already implemented by commits since groom date: {commit sha list}"
 ```
 
 Stop. Do not proceed to RT-ICA or any planning steps.

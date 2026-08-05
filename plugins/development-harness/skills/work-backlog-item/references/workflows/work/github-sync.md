@@ -28,13 +28,13 @@ After extracting item fields, check for an existing linked issue:
 
 ## Step 2.3: Create Linked Issue
 
-Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"`.
+Call the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}"`.
 
-The tool creates the linked issue automatically when the item lacks one and records the `issue: '#N'` link in the backend. Check the returned dict for an `error` key.
+The tool creates the linked issue automatically when the item lacks one and records the `issue: '#N'` link in the backend. Check the JSON output for an `error` key.
 
 ## Step 2.4: Set In-Progress
 
-Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"` and `status="in-progress"`. Check the returned dict for an `error` key.
+Call the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}" --status "in-progress"`. Check the JSON output for an `error` key.
 
 If the item is in a milestone with other issues, also run `milestone start` to bulk-transition all open milestone issues to in-progress:
 
