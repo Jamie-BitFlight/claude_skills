@@ -73,6 +73,54 @@ def test_append_task_uses_typed_options(plan_dir: Path) -> None:
     assert json.loads(result.stdout) == {"appended": True, "task_id": "T4"}
 
 
+def test_append_task_stdin_carries_fields_absent_from_typed_options(plan_dir: Path) -> None:
+    """append-task --stdin persists skills and body, which the scalar options cannot carry.
+
+    Tests: structured stdin input path restores full-fidelity task authoring.
+    How: Pipe a YAML task mapping with skills/body via --stdin, read the task back.
+    Why: The scalar typed options omit acceptance criteria, verification steps, handoff,
+        body, and skills entirely -- --stdin is the documented (AGENTS.md) large-plan
+        append path and must round-trip those fields.
+    """
+    task_yaml = (
+        "task: T4\n"
+        "title: Rich task\n"
+        "status: not-started\n"
+        "skills:\n"
+        "  - python-engineering:python3-cli\n"
+        "body: |\n"
+        "  ## Objective\n"
+        "  Do the thing.\n"
+    )
+    result = runner.invoke(
+        app, ["plan", "append-task", "--plan-address", "P1", "--plan-dir", str(plan_dir), "--stdin"], input=task_yaml
+    )
+    assert result.exit_code == 0, result.stdout
+    assert json.loads(result.stdout) == {"appended": True, "task_id": "T4"}
+
+    read_result = runner.invoke(app, ["plan", "read", "--address", "P1/T4", "--plan-dir", str(plan_dir)])
+    task = json.loads(read_result.stdout)["task"]
+    assert task["skills"] == ["python-engineering:python3-cli"]
+    assert task["body"] == "## Objective\nDo the thing.\n"
+
+
+def test_append_task_stdin_combined_with_typed_option_is_rejected(plan_dir: Path) -> None:
+    """append-task rejects --stdin combined with a scalar typed task option.
+
+    Tests: mixed structured/scalar input is a clear caller error, not silently merged.
+    How: Pass --stdin together with --task-id, expect a parser-level rejection.
+    Why: Ambiguous precedence between the two input paths must not be resolved silently.
+    """
+    result = runner.invoke(
+        app,
+        ["plan", "append-task", "--plan-address", "P1", "--plan-dir", str(plan_dir), "--stdin", "--task-id", "T4"],
+        input="task: T4\ntitle: x\n",
+    )
+    assert result.exit_code != 0
+    assert result.stdout == ""
+    assert "--stdin" in result.stderr
+
+
 def test_sam_task_create_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPatch) -> None:
     """sam-task-create accepts --repo and forwards it to operations."""
     captured: dict[str, object] = {}
@@ -110,6 +158,47 @@ def test_sam_task_create_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPat
 
     assert result.exit_code == 0, result.stdout
     assert captured["repo"] == "acme/project"
+
+
+def test_sam_task_create_without_skill_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
+    """sam-task-create omitting --skill forwards an empty skills list, not a CLI error.
+
+    Tests: --skill is optional (not required=True at the CLI boundary).
+    How: Invoke sam-task-create with no --skill option, monkeypatch operations.create_sam_task.
+    Why: SamTask.skills defaults to an empty list -- tasks for the direct dh:task-worker
+        fallback intentionally carry no specialist skill and must not be blocked.
+    """
+    captured: dict[str, object] = {}
+
+    def fake_create(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"issue_number": 42, "title": "T1", "url": "", "messages": [], "warnings": [], "errors": []}
+
+    monkeypatch.setattr("sam_schema.sam_plan.operations.create_sam_task", fake_create)
+    result = runner.invoke(
+        app,
+        [
+            "plan",
+            "sam-task-create",
+            "--parent-issue-number",
+            "480",
+            "--task-id",
+            "T1",
+            "--feature",
+            "f",
+            "--task-type",
+            "implementation",
+            "--agent",
+            "a",
+            "--priority",
+            "1",
+            "--description",
+            "d",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert captured["skills"] == []
 
 
 def test_sam_task_status_accepts_and_forwards_repo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -315,6 +404,25 @@ def test_status_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
     assert result.exit_code == 1
 
 
+def test_status_all_skips_structurally_malformed_plan(plan_dir: Path) -> None:
+    """Status --all warns and skips a plan whose top level is not a YAML mapping.
+
+    Tests: warn-and-skip resilience against a TypeError-raising candidate.
+    How: Add a bare-list YAML file (raises TypeError in the reader, not ValueError)
+        alongside the valid fixture plan, then request --all.
+    Why: A single malformed plan must not abort the rest of the listing.
+    """
+    (plan_dir / "P002-bad.yaml").write_text("- just\n- a\n- list\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["plan", "status", "--all", "--plan-dir", str(plan_dir)])
+
+    assert result.exit_code == 0, result.stdout
+    data = json.loads(result.stdout)
+    assert len(data) == 1
+    assert data[0]["feature"] == "auth-system"
+    assert "Warning: skipping" in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # sam ready
 # ---------------------------------------------------------------------------
@@ -408,6 +516,27 @@ def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
     data = json.loads(result.stdout)
     assert data["valid"] is True
     assert data["errors"] == []
+    assert data["warnings"] == []
+
+
+def test_validate_structurally_malformed_plan_reports_invalid_instead_of_crashing(tmp_path: Path) -> None:
+    """Validate on a plan whose top level is not a mapping returns valid:false, not a traceback.
+
+    Tests: TypeError from the reader is converted into the JSON validation contract.
+    How: Write a bare-list YAML file (not a mapping) and validate it.
+    Why: Callers of ``sam plan validate`` parse JSON on stdout -- an uncaught traceback
+        breaks that contract for the exact malformed-plan case validate exists to detect.
+    """
+    d = tmp_path / "plan"
+    d.mkdir()
+    (d / "P001-bad.yaml").write_text("- just\n- a\n- list\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["plan", "validate", "--address", "P1", "--plan-dir", str(d)])
+
+    assert result.exit_code == 1
+    data = json.loads(result.stdout)
+    assert data["valid"] is False
+    assert data["errors"]
     assert data["warnings"] == []
 
 

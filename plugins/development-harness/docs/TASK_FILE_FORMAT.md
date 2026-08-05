@@ -442,7 +442,7 @@ $CLI active-task update --set-fields-json '{"priority": 1}'
 $CLI active-task clear
 ```
 
-For a task-bearing plan, repeat the validated named options shown by `plan create --help` (`--task-id`, `--task-title`, `--task-status`, `--task-agent`, `--task-dependency`, `--task-priority`, and `--task-complexity`). For a large plan, create an empty drafting plan, append one task at a time with `plan append-task --plan-address ...` and the same named task fields, then run `plan finalize --plan-address ...`; serialize appends for the same plan.
+For a task-bearing plan, repeat the validated named options shown by `plan create --help` (`--task-id`, `--task-title`, `--task-status`, `--task-agent`, `--task-dependency`, `--task-priority`, and `--task-complexity`). For a large plan, create an empty drafting plan, append one task at a time with `plan append-task --plan-address ...` and the same named task fields, then run `plan finalize --plan-address ...`; serialize appends for the same plan. `plan append-task --stdin` accepts a full YAML task mapping (using `task:` as the identifier key) on stdin instead of the scalar options — use it when a task needs fields the scalar set omits (`body`, `description`, `acceptance_criteria`, `verification_steps`, `handoff`, `skills`, etc.); `--stdin` cannot be combined with the scalar task options.
 
 The structured MCP composites remain MCP-only transport names (`sam_plan`, `sam_task`, and `sam_active_task`) and are not CLI commands. The CLI exposes their reachable operations under `plan`, `backlog`, `dispatch`, `artifact`, and `active-task`; consult each group's current `--help` before invoking a less common leaf.
 

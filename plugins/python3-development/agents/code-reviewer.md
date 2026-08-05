@@ -111,7 +111,7 @@ For Python files, you must run automated quality checks:
 
 ### Step 7: Create Follow-up Tasks
 
-For each significant issue found (including HIGH/MEDIUM priority issues from the automated analysis), create a follow-up plan file using `sam create --stdin` as
+For each significant issue found (including HIGH/MEDIUM priority issues from the automated analysis), create a follow-up plan file using the DH CLI as
 described in the Task File Format section. Do NOT use the Write tool to create task files.
 </workflow>
 
@@ -191,54 +191,90 @@ perceived impact large enough to warrant its own grooming?
 
 ## Task File Format
 
-### Creating Follow-up Files with `sam create`
+### Creating Follow-up Files with the DH CLI
 
-Use `sam create --stdin` to create follow-up task files. This produces a versioned YAML plan file
-in `~/.dh/projects/{slug}/plan/` with an auto-assigned plan number (`plan/P{NNN}-{slug}.yaml` relative to the dh state root).
+Use the DH CLI's two-step drafting workflow to create follow-up task files: `plan create`
+(plan metadata only, no task) followed by `plan append-task --stdin` (the full task
+definition piped as YAML), then `plan finalize`. This produces a versioned YAML plan file in
+`~/.dh/projects/{slug}/plan/` with an auto-assigned plan number
+(`plan/P{NNN}-{slug}.yaml` relative to the dh state root).
 
 **CRITICAL: Task identifier key is `task:` — NEVER use `id:`.**
 
-The stdin YAML passed to `sam create` MUST use `task:` as the identifier field. Using `id:` is
-wrong and will produce a malformed plan.
+The stdin YAML passed to `plan append-task --stdin` MUST use `task:` as the identifier
+field. Using `id:` is wrong and will produce a malformed plan.
 
 **Correct stdin YAML structure:**
 
 ```yaml
-tasks:
-  - task: T1
-    title: "Brief title of the fix"
-    status: not-started
-    agent: python-cli-architect
-    dependencies: []
-    priority: 2
-    complexity: low
-    skills: []
-    scope: in-scope   # Required. Values: in-scope | out-of-scope
-    body: |
-      ## Objective
-      Describe what needs to be done.
+task: T1
+title: "Brief title of the fix"
+status: not-started
+agent: python-cli-architect
+dependencies: []
+priority: 2
+complexity: low
+skills: []
+body: |
+  ## Scope
+  in-scope
 
-      ## Acceptance Criteria
-      - Criterion 1
+  ## Scope Rationale
+  One sentence explaining why this finding is in-scope.
+
+  ## Objective
+  Describe what needs to be done.
+
+  ## Acceptance Criteria
+  - Criterion 1
 ```
 
-**Command:**
+Scope classification lives in the `body` markdown (`## Scope` and `## Scope Rationale`
+sections per the "Scope Classification" requirements above) — there is no top-level
+`scope:` task field; the schema rejects unknown top-level keys.
 
-Use the SAM MCP tool `mcp__plugin_dh_sam__sam_create` to create follow-up plans:
+**Commands:**
 
-```text
-mcp__plugin_dh_sam__sam_create(
-  slug="{feature-slug}-followup-{issue-number}",
-  goal="{one-sentence goal describing the fix}",
-  tasks_yaml="tasks:\n  - task: T1\n    title: \"{Brief Title}\"\n    status: not-started\n    agent: python-cli-architect\n    dependencies: []\n    priority: 2\n    complexity: low\n    skills: []\n    body: |\n      ## Objective\n      {describe the fix needed}\n"
-)
+```bash
+CLI="uv run plugins/development-harness/sam_schema/cli.py"
+
+# 1. Create an empty drafting plan
+$CLI plan create --slug "{feature-slug}-followup-{issue-number}" \
+  --goal "{one-sentence goal describing the fix}"
+# -> {"plan_id": "Pxxxxxxxx", "task_count": 0, "plan_ref": "Pxxxxxxxx"}
+
+# 2. Append the task via stdin YAML (use the plan_id returned by step 1)
+$CLI plan append-task --plan-address Pxxxxxxxx --stdin <<'EOF'
+task: T1
+title: "Brief title of the fix"
+status: not-started
+agent: python-cli-architect
+dependencies: []
+priority: 2
+complexity: low
+skills: []
+body: |
+  ## Scope
+  in-scope
+
+  ## Scope Rationale
+  One sentence explaining why this finding is in-scope.
+
+  ## Objective
+  Describe what needs to be done.
+
+  ## Acceptance Criteria
+  - Criterion 1
+EOF
+# -> {"appended": true, "task_id": "T1"}
+
+# 3. Finalize -- transitions the plan out of drafting state
+$CLI plan finalize --plan-address Pxxxxxxxx
 ```
 
-**Output:** JSON with the created file path:
-
-```json
-{"path": "plan/P005-{feature-slug}-followup-{issue-number}.yaml", "plan_number": 5, "task_count": 1}
-```
+**Output:** step 1 returns the created plan ID; record it and pass the file path
+(`plan/P{NNN}-{feature-slug}-followup-{issue-number}.yaml`) in your ARTIFACTS `Task files:`
+list.
 
 **To determine the slug:**
 
@@ -246,32 +282,44 @@ mcp__plugin_dh_sam__sam_create(
 2. EXTRACT the feature slug (e.g., `data-validation`)
 3. PASS `{feature-slug}-followup-{issue-number}` as the slug argument
 
-**Example:** If reviewing a `data-validation` plan and finding 2 issues:
+**Example:** If reviewing a `data-validation` plan and finding 2 issues, run the three-command
+sequence above once per issue -- e.g. for issue 1:
 
-```text
-# Issue 1
-mcp__plugin_dh_sam__sam_create(
-  slug="data-validation-followup-1",
-  goal="Add missing unit tests for the data validation module",
-  tasks_yaml="tasks:\n  - task: T1\n    title: \"Add missing unit tests for validator\"\n    status: not-started\n    agent: python-pytest-architect\n    dependencies: []\n    priority: 2\n    complexity: low\n    skills: []\n    body: |\n      ## Objective\n      Add unit tests for all public functions in the data validation module.\n\n      ## Acceptance Criteria\n      - All validator functions have at least one test\n      - Edge cases are covered\n"
-)
+```bash
+CLI="uv run plugins/development-harness/sam_schema/cli.py"
 
-# Issue 2
-mcp__plugin_dh_sam__sam_create(
-  slug="data-validation-followup-2",
-  goal="Fix error handling in data validation edge cases",
-  tasks_yaml="tasks:\n  - task: T1\n    title: \"Fix error handling in edge cases\"\n    status: not-started\n    agent: python-cli-architect\n    dependencies: []\n    priority: 2\n    complexity: medium\n    skills: []\n    body: |\n      ## Objective\n      Fix error handling for malformed input in the data validation module.\n"
-)
+$CLI plan create --slug "data-validation-followup-1" \
+  --goal "Add missing unit tests for the data validation module"
+# -> {"plan_id": "Pxxxxxxxx", ...}
 
-      ## Acceptance Criteria
-      - Malformed input raises a specific, informative exception
-      - No silent failures
+$CLI plan append-task --plan-address Pxxxxxxxx --stdin <<'EOF'
+task: T1
+title: "Add missing unit tests for validator"
+status: not-started
+agent: python-pytest-architect
+dependencies: []
+priority: 2
+complexity: low
+skills: []
+body: |
+  ## Scope
+  in-scope
+
+  ## Scope Rationale
+  Missing tests for functionality introduced by the current task.
+
+  ## Objective
+  Add unit tests for all public functions in the data validation module.
+
+  ## Acceptance Criteria
+  - All validator functions have at least one test
+  - Edge cases are covered
 EOF
+
+$CLI plan finalize --plan-address Pxxxxxxxx
 ```
 
 **Priority values:** 1 (critical) through 5 (low). Complexity: `low`, `medium`, or `high` (lowercase).
-
-**IMPORTANT:** Use the `path` value from the JSON output in your ARTIFACTS `Task files:` list.
 
 ## Output Format (MANDATORY)
 

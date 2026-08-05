@@ -187,6 +187,38 @@ class TestSamUpdateContext:
         assert data["updated"] is True
         assert data["address"] == "1"
 
+    def test_update_mixed_task_and_context_applies_both(self, plan_dir: Path) -> None:
+        """A task-address update combined with --context applies both changes.
+
+        Tests: Plan-level context is not silently dropped by a task-scoped update.
+        How: Update P1/T1's title and --context in one invocation, verify both persisted.
+        Why: ``--task-id T1 --title New --context Shared`` must update the task AND
+            apply the plan-level context in the same operation, not exit successfully
+            while silently discarding the context.
+        """
+        # Arrange / Act
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                "P1/T1",
+                "--title",
+                "New title",
+                "--context",
+                "Shared context text",
+                "--plan-dir",
+                str(plan_dir),
+            ],
+            env={"NO_COLOR": "1"},
+        )
+        # Assert
+        assert result.exit_code == 0, result.stdout
+        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        assert plan_data["context"] == "Shared context text"
+        assert plan_data["tasks"][0]["title"] == "New title"
+
 
 # ---------------------------------------------------------------------------
 # sam plan update -- task-level field updates

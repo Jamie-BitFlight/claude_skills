@@ -6,6 +6,7 @@ import io
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, NoReturn
 
@@ -115,6 +116,27 @@ def _task_options(
         raise AssertionError from exc
 
 
+def _task_from_stdin() -> dict[str, object]:
+    """Read a single task definition as a YAML mapping from stdin.
+
+    Supports the full ``Task`` field set (body, description, acceptance
+    criteria, verification steps, handoff, skills, etc.) that the scalar
+    typed options in :func:`_task_options` do not expose. Callers must
+    validate the returned mapping through ``TaskDefinition.model_validate``.
+
+    Returns:
+        Raw task mapping ready for ``TaskDefinition`` validation.
+    """
+    raw = sys.stdin.read()
+    if not raw.strip():
+        _error("stdin is empty — provide a YAML task mapping via --stdin")
+    parsed = YAML(typ="safe").load(raw)
+    if not isinstance(parsed, dict):
+        _error("stdin must be a single YAML task mapping")
+        raise TypeError(parsed)
+    return parsed
+
+
 @app.command("list")
 def list_plans(
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
@@ -218,7 +240,7 @@ def status(
                 entry = operations.get_plan_status(backend, plan_id_from_path(candidate)).model_dump(mode="json")
                 entry["path"] = str(candidate)
                 results.append(entry)
-            except (PlanNotFoundError, FileNotFoundError, FormatDetectionError, ValueError) as exc:
+            except _PLAN_LOAD_ERRORS as exc:
                 typer.echo(f"Warning: skipping {candidate}: {exc}", err=True)
         _emit(results)
         return
@@ -345,7 +367,7 @@ def update(
         result = operations.update_plan_fields(
             _backend(_plan_dir(plan_dir)),
             plan_ref,
-            context=None if target_task else context,
+            context=context,
             set_fields=values,
             task_id=target_task,
             append_section_name=append_section,
@@ -383,6 +405,9 @@ def validate(
         result = operations.read_plan(_backend(_plan_dir(plan_dir)), plan_ref)
     except (PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
+    except (ValueError, TypeError) as exc:
+        _emit({"valid": False, "errors": [str(exc)], "warnings": []})
+        raise typer.Exit(1) from None
     errors: list[str] = []
     warnings: list[str] = []
     for gap in result.gaps:
@@ -396,25 +421,41 @@ def validate(
 @app.command("append-task")
 def append_task(
     plan_address: Annotated[str, typer.Option("--plan-address")],
-    task_id: Annotated[str, typer.Option("--task-id")],
-    task_title: Annotated[str, typer.Option("--task-title")],
+    task_id: Annotated[str | None, typer.Option("--task-id")] = None,
+    task_title: Annotated[str | None, typer.Option("--task-title")] = None,
     task_status: Annotated[TaskStatus | None, typer.Option("--task-status")] = None,
     task_agent: Annotated[str | None, typer.Option("--task-agent")] = None,
     task_dependencies: Annotated[list[str] | None, typer.Option("--task-dependency")] = None,
     task_priority: Annotated[int | None, typer.Option("--task-priority", min=1, max=5)] = None,
     task_complexity: Annotated[Complexity | None, typer.Option("--task-complexity")] = None,
+    stdin: Annotated[bool, typer.Option("--stdin", help="Read the full task definition as YAML from stdin")] = False,
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
 ) -> None:
-    """Append one typed task to a drafting plan."""
+    """Append one task to a drafting plan, from typed options or a YAML mapping on stdin.
+
+    ``--stdin`` accepts the full ``Task`` field set (body, description,
+    acceptance criteria, verification steps, handoff, skills, etc.) that the
+    scalar typed options do not expose. It cannot be combined with the
+    scalar task options.
+    """
     plan_ref, task_ref = _address(plan_address)
     if task_ref is not None:
         _error("--plan-address must identify a plan, not a task")
+    has_scalar_task_option = any(
+        value is not None
+        for value in (task_id, task_title, task_status, task_agent, task_dependencies, task_priority, task_complexity)
+    )
+    if stdin and has_scalar_task_option:
+        _error("--stdin cannot be combined with typed task options")
     try:
-        task = _task_options(
-            task_id, task_title, task_status, task_agent, task_dependencies, task_priority, task_complexity
-        )
-        if task is None:
-            _error("--task-id and --task-title are required")
+        if stdin:
+            task = TaskDefinition.model_validate(_task_from_stdin())
+        else:
+            task = _task_options(
+                task_id, task_title, task_status, task_agent, task_dependencies, task_priority, task_complexity
+            )
+            if task is None:
+                _error("--task-id and --task-title are required (or use --stdin)")
         config = AppendTaskInput(plan_address=plan_ref, task=task)
         result = operations.append_task(_backend(_plan_dir(plan_dir)), plan_ref, config.task)
     except (ValidationError, ValueError, PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
@@ -704,7 +745,7 @@ def sam_task_create(
         task_type=task_type,
         agent=agent,
         priority=priority,
-        skills=_repeatable(skills, "--skill", required=True),
+        skills=_repeatable(skills, "--skill"),
         dependencies=_repeatable(dependencies, "--dependency"),
         description=description,
         acceptance_criteria=_repeatable(acceptance_criteria, "--acceptance-criterion"),
