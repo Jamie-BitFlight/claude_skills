@@ -13,3 +13,4 @@
 - [project_sam_console_script_cwd_dependence.md](./project_sam_console_script_cwd_dependence.md) — `uv run sam` only resolves inside plugins/development-harness cwd; subprocess fallbacks must target cli.py by absolute path
 - [project_sam_plan_cli_stdin_removal.md](./project_sam_plan_cli_stdin_removal.md) — sam_plan.py: `plan create --stdin` is deliberately removed (tested); restore structured input via `plan append-task --stdin` instead
 - [feedback_sam_task_create_hits_live_github.md](./feedback_sam_task_create_hits_live_github.md) — `sam-task-create` hits the live GitHub API immediately; monkeypatch `operations.create_sam_task` before reproduction-testing it
+- [project_claude_plugin_root_bang_exec_vs_later_bash.md](./project_claude_plugin_root_bang_exec_vs_later_bash.md) — CLAUDE_PLUGIN_ROOT substitutes throughout a SKILL.md's rendered body (verified live); references/*.md files get no substitution at all
