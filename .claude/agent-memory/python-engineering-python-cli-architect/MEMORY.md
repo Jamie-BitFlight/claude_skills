@@ -10,3 +10,4 @@
 - [feedback_worktree_isolated_cwd_must_not_cd.md](./feedback_worktree_isolated_cwd_must_not_cd.md) — worktree-isolated sessions: never `cd` to the shared checkout — only git ops are guarded, non-git mutating commands (uv add/remove) silently pollute it
 - [project_skillmd_bang_exec_plugin_root.md](./project_skillmd_bang_exec_plugin_root.md) — SKILL.md `!`-bang-exec body commands get CLAUDE_PLUGIN_ROOT as a real shell env var (double-quote it, never single-quote)
 - [feedback_sandbox_guard_env_c_pipe_complexity.md](./feedback_sandbox_guard_env_c_pipe_complexity.md) — `env -C <dir> <cmd> | pipe` gets refused as "too complex" even for read-only non-git commands; split into single-redirect calls
+- [project_sam_schema_task_id_pattern_duplication.md](./project_sam_schema_task_id_pattern_duplication.md) — sam_schema Task.id and TaskDefinition.id both hard-coded a narrower regex than TASK_ID_PATTERN; verify parent model before trusting "fix the override" framing
