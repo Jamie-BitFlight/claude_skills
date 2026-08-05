@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
@@ -49,16 +50,19 @@ def add(
 ) -> None:
     """Add a new item to the backlog."""
     output = Output()
-    result = operations.add_item(
-        title=title,
-        description=description,
-        priority=priority,
-        source=source,
-        type_=type_,
-        force=force,
-        repo=repo,
-        output=output,
-    )
+    try:
+        result = operations.add_item(
+            title=title,
+            description=description,
+            priority=priority,
+            source=source,
+            type_=type_,
+            force=force,
+            repo=repo,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc)})
     _emit(result, output)
 
 
@@ -231,16 +235,32 @@ def groom(
 
 
 def _sync_fallback(repo: str, dry_run: bool, output: Output, error: Exception) -> None:
-    """Preserve the legacy optional-core fallback for backlog sync."""
+    """Preserve the legacy optional-core fallback for backlog sync.
+
+    Invokes ``cli.py`` (this module's own root Typer composer) as a
+    self-resolving ``uv run`` script by absolute path rather than the
+    installed ``sam`` console script. ``sam`` is registered in
+    ``[project.scripts]`` inside this plugin's own ``pyproject.toml`` and
+    only resolves via ``uv run sam ...`` when the process's current working
+    directory is that plugin directory (or the package is installed into
+    the active venv) — it fails with "Failed to spawn: sam" from the repo
+    root, which is how this CLI is actually invoked elsewhere in the repo
+    (e.g. ``uv run plugins/development-harness/sam_schema/cli.py ...``).
+    An absolute script path is resolvable regardless of caller cwd.
+    """
     typer.echo(f"Warning: backlog_core sync failed; falling back to CLI. ({error})", err=True)
     uv_exe = shutil.which("uv")
     if uv_exe is None:
         cli_output.err("Backlog sync unavailable (uv not found).")
         return
+    cli_path = Path(__file__).resolve().parent / "cli.py"
+    cmd = [uv_exe, "run", str(cli_path), "backlog", "sync"]
+    if repo:
+        cmd.extend(["--repo", repo])
+    if dry_run:
+        cmd.append("--dry-run")
     try:
-        proc = subprocess.run(
-            [uv_exe, "run", "backlog", "sync"], capture_output=True, text=True, timeout=30, check=False
-        )
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         cli_output.err(f"Backlog sync unavailable: {exc}")
         return

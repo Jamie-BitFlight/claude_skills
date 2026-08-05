@@ -13,7 +13,7 @@ from typing import NoReturn, TypeGuard
 import typer
 from pydantic import BaseModel
 
-__all__ = ["emit_result", "err", "output_json"]
+__all__ = ["emit_result", "err", "exit_with_json_error", "output_json"]
 
 
 def err(msg: str, exit_code: int = 1) -> NoReturn:
@@ -71,14 +71,53 @@ def _is_result_mapping(value: object) -> TypeGuard[dict[str, object]]:
     return isinstance(value, dict)
 
 
+def exit_with_json_error(payload: object, *, exit_code: int = 1) -> NoReturn:
+    """Emit ``payload`` as JSON to stdout, then exit nonzero.
+
+    Unlike :func:`err`, which writes only a stderr string, this keeps the
+    calling agent's JSON parser fed even on failure — a caller reading only
+    stdout still receives a parseable ``{"error": ...}`` payload instead of
+    an empty stream. The process still exits nonzero afterward, so
+    shell-level failure detection (``$?``) is unaffected.
+
+    Args:
+        payload: JSON-serializable error payload — typically a mapping with
+            an ``"error"`` key and any diagnostic context fields the caller
+            wants preserved (e.g. ``milestone_number``).
+        exit_code: Process exit code (1 for user/operation errors).
+
+    Raises:
+        typer.Exit: Always — after the JSON payload has been written.
+    """
+    output_json(payload)
+    raise typer.Exit(exit_code)
+
+
 def emit_result(result: object) -> None:
-    """Emit an operation result, keeping diagnostics off stdout."""
-    if _is_result_mapping(result) and "error" in result:
-        err(str(result["error"]))
+    """Emit an operation result as JSON to stdout, then exit nonzero on error.
+
+    Diagnostic ``messages``/``warnings``/``errors`` lists embedded in a
+    mapping result are echoed to stderr first. The result itself always
+    reaches stdout as JSON afterward — including when it carries a
+    top-level ``"error"`` key — so a calling agent's JSON parser is never
+    handed an empty stdout stream in place of the structured payload the
+    operations layer returned; a nonzero exit still signals failure to
+    shell-level callers.
+
+    Args:
+        result: A Pydantic model, mapping, or JSON-serializable object
+            returned by the operations layer.
+
+    Raises:
+        typer.Exit: When ``result`` is a mapping with an ``"error"`` key —
+            raised after the JSON payload has been written to stdout.
+    """
     if _is_result_mapping(result):
         for key in ("messages", "warnings", "errors"):
             values = result.get(key, [])
             if isinstance(values, list):
                 for value in values:
                     typer.echo(str(value), err=True)
+        if "error" in result:
+            exit_with_json_error(result)
     output_json(result)
