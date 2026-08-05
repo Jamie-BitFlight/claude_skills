@@ -126,6 +126,18 @@ routing.
 - **Active task**: `sam_active_task` (actions: get, set, update, clear) is mirrored by the CLI `active-task` command group (`active-task get`, `active-task set`, `active-task update`, `active-task clear`). Both transports resolve a `ContextBackend` through the same chain (`CONTEXTBACKEND` env var → `context.backend` in `.dh/config.yaml` → default `local`) and delegate to the same `dh_core.operations` functions, so the CLI is backend-agnostic rather than local-only and a task parked by one surface is visible to the other. Caveat: the `memory` backend is per-process, so it is not meaningful across separate CLI invocations — `local` (writes `active-task-{session_id}.json` under `dh_paths.context_dir()`) and `beads` (`bd remember` under `dh.active-task.<session_id>`) are the durable choices; `github` raises `NotImplementedError` pending T02. Added by T-P5-ACTIVE-TASK; parity covered by `tests/test_cli_active_task.py`.
 - **Dispatch**: `dispatch_read` (`dispatch read`), `dispatch_validate` (`dispatch validate`), `dispatch_create_plan` (`dispatch create-plan`), `dispatch_spawn` (`dispatch spawn`), `dispatch_wave_start` (`dispatch wave-start`), `dispatch_wave_status` (`dispatch wave-status`), `dispatch_item_status` (`dispatch item-status`). `dispatch_stale_check` and `dispatch_conflicts` remain MCP-only/provider-specific blockers and have no CLI leaf.
 
+### Partial CLI coverage (narrower than MCP)
+
+Some operations above are shared but the CLI surface is not parameter-complete relative to the
+MCP tool. Listed here so consumers do not assume full parity from the shared-operations mapping:
+
+| MCP tool | CLI command | What the CLI omits |
+|----------|--------------|---------------------|
+| `backlog_list` | `backlog list` | No `--search` flag — full-text search across title, section, topic, type, description, and body has no CLI path. |
+| `backlog_update` | `backlog update` | No `verified`, `entry_id`, `replace_section`, or `reason` params. Struck-entry operations go through `backlog strike`; `status:verified` labeling is MCP-only. |
+| `backlog_view` | `backlog view` | No progressive-disclosure ordinal navigation (`map`, `navigate`, `head`, `skip_tokens`, `sections`, `summary`, `include_content`) — the CLI view is flatter than the MCP view. |
+| `sam_plan` (action=create) | `plan create` | Accepts only one inline task per call, vs MCP's `tasks=[...]` list — use `plan append-task` for each additional task. |
+
 ### MCP-only operations (no CLI equivalent)
 
 Two MCP tools have no CLI command today. The audit's B1 verdict named four (`sam_active_task` plus three bridge tools); on full inventory the bridge tools and the GitHub-metadata tools do have CLI equivalents (listed above), and `sam_active_task` gained one in T-P5-ACTIVE-TASK, so the real gap is two tools.

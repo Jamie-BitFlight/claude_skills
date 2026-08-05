@@ -221,7 +221,7 @@ absent on every non-orphan edge.
 
 | type | meaning |
 |---|---|
-| `calls` | step invokes a tool or MCP call |
+| `calls` | step invokes a tool via MCP or the CLI (`sam_schema/cli.py`) |
 | `dispatches` | orchestrator spawns an agent |
 | `loads` | agent loads a skill or reference file |
 | `reads` | step reads an artifact or section |
@@ -587,7 +587,11 @@ Key rules:
 1. Every step node gets `source_file` + `source_heading` from the fragment it came from
 2. Every edge of type `gap` sets `gap: true` and `verified: false`
 3. Agents are extracted from `agents_dispatched[]` arrays in step nodes (edge type `dispatches`)
-4. MCP tool nodes are extracted from `mcp_calls[]` strings starting with `mcp__`
+4. MCP tool nodes are extracted from `mcp_calls[]` strings starting with `mcp__`. Some workflow
+   reference files document the CLI form (`uv run plugins/development-harness/sam_schema/cli.py
+   <command>`) instead of the MCP call — those `mcp_calls[]` entries do not start with `mcp__`
+   and are not extracted as `mcp_tool` nodes by this rule; a future assembler revision would need
+   a second pattern for CLI-form entries to keep those edges represented.
 5. Artifact nodes are extracted from `reads_artifacts[]` and `writes_artifacts[]` arrays in step nodes
 6. Skills are extracted from agent frontmatter `tools:` field (requires a second pass over agent files)
 7. Reference files are extracted from `enumerate_scope.py`'s scope enumeration (see SCOPE.md above), not from step node fields

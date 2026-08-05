@@ -115,6 +115,12 @@ While a plan is in `state="drafting"`, `sam_plan ready` and `sam_plan status` re
 result models with `state="drafting"` instead of dispatchable task data — this prevents dispatching
 a partial plan. Only `finalize` makes the plan visible to the dispatch loop.
 
+CLI equivalent: `plan create --slug ... --goal ... --issue <github_issue_number>` (omit
+`--task-id`/`--task-title` to start in `state="drafting"`) → `plan append-task --plan-address
+<plan_id> --task-id ... --task-title ...` × N → `plan finalize --plan-address <plan_id>`. See
+[docs/TASK_FILE_FORMAT.md](./docs/TASK_FILE_FORMAT.md) "DH CLI Usage Guide" for the full
+grouped-command reference.
+
 **Gotcha — `append_task` is single-writer only:**
 
 `TaskBackend.append_task` is NOT safe under concurrent writers. Do NOT call `append_task` for
@@ -139,6 +145,10 @@ Plan artifacts are registered in a structured manifest stored by the active arti
 - `artifact_list` — List all artifacts for an issue, optionally filtered by type
 - `artifact_get` — Get metadata for a specific artifact type on an issue
 - `artifact_read` — Read artifact file content from root worktree path (with path safety validation)
+
+Each tool above has a full CLI equivalent under `artifact register|list|get|read` — see
+[docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
+authoritative flag mapping.
 
 **Artifact types and owners:**
 
@@ -181,6 +191,11 @@ Wave-based parallel execution state for `/work-milestone`. State is persisted to
 - `dispatch_item_status(milestone, issue, status, result, error, cost)` — Record completion or failure of one item. Looks up item by milestone+issue across all waves. Valid status: `complete`, `failed`, `skipped`.
 - `dispatch_wave_status(milestone, wave_num)` — Query wave progress with per-item detail and elapsed time. Checks stale PIDs (marks dead processes failed) before returning.
 - `dispatch_spawn(milestone, wave_num, ...)` — Background task tool (`task=True`) that calls `dispatch_wave_start` then spawns one `claude -p` kage-bunshin process per wave item. Used by `/work-milestone`.
+
+Each tool above except `dispatch_stale_check` has a full CLI equivalent under `dispatch
+read|validate|create-plan|wave-start|item-status|wave-status|spawn` — see
+[docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
+authoritative flag mapping. `dispatch_stale_check` and `dispatch_conflicts` have no CLI leaf.
 
 **Workflow:** `/groom-milestone` calls `dispatch_create_plan` to validate and persist the dispatch plan YAML. `/work-milestone` calls `dispatch_wave_start` per wave, `dispatch_spawn` to launch sessions, and `dispatch_wave_status` to poll progress. Spawned sessions call `dispatch_item_status` on completion.
 
@@ -229,7 +244,7 @@ The manifest schema is documented in [./skills/development-harness/references/la
 
 ### Why
 
-`dh:task-worker` carries full dh tool permissions (SAM MCP, backlog MCP). When a task's `agent:` field is set, `task-worker` reads it via SAM MCP and passes it to `profile_load` to load specialist behavior internally. This ensures the SAM lifecycle (claim → execute → sam_state) is always owned by an agent that has the tools to execute it.
+`dh:task-worker` carries full dh tool permissions (SAM MCP, backlog MCP). When a task's `agent:` field is set, `task-worker` reads it via SAM MCP and passes it to `profile_load` to load specialist behavior internally. This ensures the SAM lifecycle (claim → execute → `sam_task(action='state')`) is always owned by an agent that has the tools to execute it.
 
 Dispatching `dh:task-worker` preserves SAM and backlog MCP access so the worker can execute the complete SAM lifecycle and update task state.
 

@@ -218,17 +218,19 @@ State is persisted through the `BacklogBackend` Protocol (`backlog_core/backend_
 The active backend is the source of truth. When local cache and the backend disagree, the
 backend wins.
 
-All state mutations go through MCP tools (`backlog_update`, `backlog_groom`, `backlog_close`,
-`backlog_resolve`). Direct edits to local cache files or backend-native APIs bypass sync
-logic and are prohibited.
+All state mutations go through the shared `backlog_core.operations` layer — reachable via MCP
+tools (`backlog_update`, `backlog_groom`, `backlog_close`, `backlog_resolve`) or their CLI
+equivalents (`backlog update`, `backlog groom`, `backlog close`, `backlog resolve`; see
+[Backend Providers](./backend-providers.md) "CLI vs MCP Capability Surface"). Direct edits to
+local cache files or backend-native APIs bypass sync logic and are prohibited.
 
 ### Persistence Layers
 
 | Layer | Purpose | Access method |
 |---|---|---|
-| Backend | Source of truth for status, priority, sections, comments | MCP tools (`mcp__plugin_dh_backlog__*`) |
-| Local cache | Read-optimized derived copy of backend state | Written only by MCP tools; never edited directly |
-| SAM plans | Task decomposition and execution state | SAM MCP tools (`mcp__plugin_dh_sam__*`) |
+| Backend | Source of truth for status, priority, sections, comments | MCP tools (`mcp__plugin_dh_backlog__*`) or the CLI (`backlog ...`) |
+| Local cache | Read-optimized derived copy of backend state | Written only by MCP tools or the CLI; never edited directly |
+| SAM plans | Task decomposition and execution state | SAM MCP tools (`mcp__plugin_dh_sam__*`) or the CLI (`plan ...`) |
 | Active-task context | Ephemeral session state for task execution | Written by `/dh:start-task`, deleted after completion |
 
 ### Backend Selection
@@ -259,7 +261,10 @@ and configuration.
 ### SAM Plan Files
 
 Created by `add-new-feature` Phase 4 via `sam_create`. Managed by the SAM MCP server.
-Access via `sam_read(plan="P{id}")` and `sam_list(search="{slug}")` — not via filesystem path.
+Access via `sam_task(plan="P{id}", task="T{M}", config={"action":"read"})` (MCP) or
+`plan read --address P{id}` (CLI), and `sam_plan(config={"action":"list","search":"{slug}"})`
+(MCP) or `plan list --search {slug}` (CLI) — not via filesystem path. (`sam_read`/`sam_list` are
+deprecated tool names — see [TASK_FILE_FORMAT.md](./TASK_FILE_FORMAT.md) "Deprecated Tools".)
 
 The plan address is written to the backlog item via
 `backlog_update(selector='{item_ref}', plan='P{id}')`. The `plan` field is a backend

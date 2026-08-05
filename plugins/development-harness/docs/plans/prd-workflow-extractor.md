@@ -86,7 +86,7 @@ Agent files are in `agents/*.md`. Each agent's frontmatter declares `tools:`, `m
 
 ### How MCP tools appear in source
 
-Two forms used interchangeably in prose and Mermaid:
+Three forms appear in prose and Mermaid — two MCP call forms plus the provider-neutral CLI:
 
 **Full form** (matches the actual tool name registered by MCP server):
 ```
@@ -105,11 +105,29 @@ sam_plan(action='create', ...)
 sam_task(action='claim', plan=..., task=...)
 ```
 
-The two forms are semantically identical. Extraction rules must recognise both.
+**CLI form** (`sam_schema/cli.py`, a Typer app — used where a workflow step documents the
+provider-neutral CLI instead of, or alongside, an MCP call; see
+[TASK_FILE_FORMAT.md](../TASK_FILE_FORMAT.md) "DH CLI Usage Guide" and
+[backend-providers.md](../backend-providers.md) "CLI vs MCP Capability Surface" for the full
+mapping):
+```
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "Impact Radius" --content "..."
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address {plan}
+```
+
+The full and short MCP forms are semantically identical; the CLI form is a distinct transport
+that reaches the same `backlog_core.operations`/`sam_schema.core` code paths (no parallel
+implementation) but is not itself an MCP call. Extraction rules must recognise all three —
+a `mcp_calls[]` entry that does not start with `mcp__` may be a CLI invocation rather than the
+short MCP form; see [graph-schema.md](../graph-schema.md) "What the workflow assembler must
+output" rule 4 for the current gap in automated recognition of CLI-form entries. Not every MCP
+tool has a CLI equivalent — see the capability-surface tables cited above before assuming a CLI
+form exists for a given tool.
 
 **Server routing** (from plugin.json):
 - `mcp__plugin_dh_backlog__*` → `scripts/run_backlog_server.py`
 - `mcp__plugin_dh_sam__*` → `scripts/run_sam_server.py`
+- CLI form → `sam_schema/cli.py` (single entry point; not routed per-tool)
 
 ### How reference files are loaded
 
@@ -310,6 +328,7 @@ Before reading any source file, extraction workers must load
 - All agent names (canonical `subagent_type` values)
 - All skill names (canonical invocation names)
 - All MCP tool names (full form and short-form aliases)
+- All CLI subcommand names (`sam_schema/cli.py` groups and leaves)
 - All registered artifact type keys
 - All named backlog item section names
 
@@ -433,7 +452,7 @@ slice differs. The denoising comes from overlapping rule coverage on shared inpu
 | 5 | Agent dispatch per step | `subagent_type="dh:..."`, `TeamCreate(team_name=...)`, named wave members |
 | 6 | File-reference expansion links | Mermaid node: `Load X.md`, `→ groom/swarm.md`; prose: "Read `references/...`" |
 | 7 | Skill invocations | `/dh:skill-name`, `Skill(skill='dh:...')` |
-| 8 | MCP tool calls (full and short form) | `mcp__plugin_dh_backlog__*`, `backlog_groom(...)`, `sam_task(...)`, `artifact_list(...)` |
+| 8 | MCP tool calls (full and short form) and CLI-form invocations | `mcp__plugin_dh_backlog__*`, `backlog_groom(...)`, `sam_task(...)`, `artifact_list(...)`, `uv run plugins/development-harness/sam_schema/cli.py ...` |
 | 9 | Actor topology per dispatch | `orchestrator` (inline), `subagent` (Agent tool), `team-member` (TeamCreate), `hook` (lifecycle event) |
 
 **Output schema per finding (fixed — all workers emit this shape):**

@@ -436,6 +436,10 @@ $CLI plan ready --plan-address Pc7d8e9f0
 $CLI plan status --plan-address Pc7d8e9f0
 $CLI plan validate --address Pc7d8e9f0
 $CLI plan migrate --plan-address tasks-3-integrate-sam-schema.md
+$CLI active-task set --address Pc7d8e9f0/T04
+$CLI active-task get
+$CLI active-task update --set-fields-json '{"priority": 1}'
+$CLI active-task clear
 ```
 
 For a task-bearing plan, repeat the validated named options shown by `plan create --help` (`--task-id`, `--task-title`, `--task-status`, `--task-agent`, `--task-dependency`, `--task-priority`, and `--task-complexity`). For a large plan, create an empty drafting plan, append one task at a time with `plan append-task --plan-address ...` and the same named task fields, then run `plan finalize --plan-address ...`; serialize appends for the same plan.
@@ -547,6 +551,10 @@ artifact_list       -- List all registered artifacts for a plan/issue
 artifact_get        -- Get metadata for a specific artifact by path
 artifact_read       -- Read artifact content by path (used by worktree-isolated agents)
 ```
+
+Each has a full CLI equivalent under `artifact register|list|get|read`; see
+[backend-providers.md](./backend-providers.md) "CLI vs MCP Capability Surface" for the flag
+mapping.
 
 ### Auto-Registration via sam_create
 
