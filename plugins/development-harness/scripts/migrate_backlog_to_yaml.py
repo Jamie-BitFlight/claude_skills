@@ -482,14 +482,6 @@ def _report_payload(backlog_dir: Path, report: MigrationReport, *, dry_run: bool
         "results": report.results,
     }
 
-    if dry_run and not report.error_count:
-        typer.echo("\nWARNING: Dry run complete — no files modified.")
-        typer.echo("Run with --confirm to execute the migration.")
-    elif not dry_run and not report.error_count:
-        typer.echo(f"\nOK: Done — {report.migrated} file(s) converted to YAML.")
-        typer.echo("Run with --cleanup to remove .md.bak files after verifying YAML output.")
-    return None
-
 
 if __name__ == "__main__":
     app()
