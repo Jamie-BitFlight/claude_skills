@@ -18,6 +18,14 @@ You MUST validate that the implemented feature meets its goals and quality gates
 $ARGUMENTS
 </task_file>
 
+<sam_cli>
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
+</sam_cli>
+
+The `references/recursive-follow-up-handling.md` file loaded by this skill is a plain file, not
+substituted — every `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"` invocation it documents
+means the exact command shown in <sam_cli/> above, already resolved for this session.
+
 ---
 
 > [!IMPORTANT]

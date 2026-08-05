@@ -5,6 +5,14 @@ description: Use when structured backlog operations are needed through MCP or th
 
 # Backlog
 
+<sam_cli>
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
+</sam_cli>
+
+The `references/mcp-connection-check.md` file loaded by this skill is a plain file, not
+substituted — every `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"` invocation it documents
+means the exact command shown in <sam_cli/> above, already resolved for this session.
+
 MCP tools are the primary structured interface for provider-neutral backlog operations. They are not a universal proxy for backend-native tools.
 The selected backend provider is authoritative; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache or working state according to that backend.
 For Beads-backed projects, use `bd` directly for issue creation, inspection, status, dependencies, readiness, labels, notes, and metadata. Use MCP or the CLI for structured plans, artifacts, dispatch, validation, and other operations Beads does not provide. Do not edit derived per-item files directly.

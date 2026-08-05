@@ -28,7 +28,7 @@ Record the priority section (P0, P1, P2, Ideas) the item belongs to.
 
 ## Step 1.4: Extract Item Fields
 
-From the matched item's entry in the `backlog list` returned JSON, extract `title`, `plan`, `section` (priority), `issue`, and `groomed`. For detailed fields not in the list response (`description`, `source`, `added`, `research_first`, `suggested_location`), call `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{title}"` (CLI has no `summary` parameter — its output is already the flatter, full-detail equivalent of MCP's `summary=false`) to fetch the full item from the backend.
+From the matched item's entry in the `backlog list` returned JSON, extract `title`, `plan`, `section` (priority), `issue`, and `groomed`. For detailed fields not in the list response (`description`, `source`, `added`, `research_first`, `suggested_location`), call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title}"` (CLI has no `summary` parameter — its output is already the flatter, full-detail equivalent of MCP's `summary=false`) to fetch the full item from the backend.
 
 - `title` — the `title` field from list JSON (required)
 - `plan` — the `plan` field from list JSON (optional)

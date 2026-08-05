@@ -16,6 +16,12 @@ Execute the command in <input/> and parse its stdout as JSON. Treat that JSON as
 
 For every placeholder in the form <key/>, substitute the value of that key from the parsed JSON.
 
+<sam_cli>
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
+</sam_cli>
+
+The `references/workflows/*.md` files loaded by this skill are plain files, not substituted — every `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"` invocation they document means the exact command shown in <sam_cli/> above, already resolved for this session.
+
 > [!IMPORTANT]
 > When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 > A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.

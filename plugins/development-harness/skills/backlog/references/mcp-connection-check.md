@@ -58,10 +58,10 @@ If a server shows as failed in `/mcp` or tool calls return connection errors:
 
 If the configured backend is Beads, use native `bd` first for CRUD, readiness, status, and dependencies; do not route those operations through an adapter. If a structured SAM operation is needed and the SAM server is unavailable, use the validated direct script-path CLI.
 
-From the repository root:
+From any directory (the invoking SKILL.md's `<sam_cli/>` block already resolved `${CLAUDE_PLUGIN_ROOT}` for this session):
 
 ```bash
-CLI="uv run plugins/development-harness/sam_schema/cli.py"
+CLI="uv run ${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
 $CLI plan list
 $CLI plan status --plan-address P{N}
 $CLI plan ready --plan-address P{N}

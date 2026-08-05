@@ -21,7 +21,7 @@ Do not stop for user input after any announcement. Announce then immediately exe
 
 | Normal behaviour | `--auto` substitution |
 |---|---|
-| No title given (<item_ref/> is empty) | Call the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog list` and scan P0 then P1 sections in the JSON output for the first open item. Log `[AUTO] No title — auto-selected: {title}` and proceed. If none found, log `[AUTO] STOP — no open P0/P1 items found` and stop. |
+| No title given (<item_ref/> is empty) | Call the CLI: `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list` and scan P0 then P1 sections in the JSON output for the first open item. Log `[AUTO] No title — auto-selected: {title}` and proceed. If none found, log `[AUTO] STOP — no open P0/P1 items found` and stop. |
 | No title given and no open P0/P1 items found | Log `[AUTO] STOP — no open P0/P1 items found`, stop. Do not attempt to create a new item. |
 | Auto-selected P0/P1 item already has RT-ICA BLOCKED status | Log `[AUTO] STOP — RT-ICA BLOCKED on auto-selected item: {title}. {missing inputs}`, stop. Cannot resolve without human — select a different item manually. |
 | Step 1.2: issue not found | Log `[AUTO] STOP — Issue #N not found`, stop |
