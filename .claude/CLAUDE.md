@@ -138,6 +138,11 @@ flowchart TD
 
 Load `agent-orchestration:agent-orchestration` for the dispatch decision (single `Agent()` vs `TeamCreate`, shared-file-mutation serialization) — see its "Parallel Dispatch — Teams as Standard Mechanism" section.
 
+**Close out idle completed agents.** A teammate that reports `idleReason: "available"` after
+finishing and being merged/reconciled is done — send it a `shutdown_request` rather than leaving
+it resident. An idle agent still holds terminal space and system resources on the user's machine.
+Do not wait for the user to ask for cleanup after every batch.
+
 ## Autonomous Action Boundary
 
 ```mermaid
