@@ -257,7 +257,7 @@ The CLI exposes the provider-neutral `sam backlog` domain group. Its 26 leaves a
 
 `add`, `list`, `view`, `update`, `close`, `resolve`, `link-followup`, `list-followups`, `groom`, `sync`, `pull`, `pull-all`, `normalize`, `strike`, `refresh`, `labels`, `merged-prs`, `milestones`, `soonest-milestone`, `create-milestone`, `issues`, `comment-issue`, `comments`, `read-comment`, `projects`, and `create-project`.
 
-Use them as `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog <leaf>`. This plugin's distribution model ships no installed `sam` console-script binary — the `sam = "sam_schema.cli:app"` entry point in `pyproject.toml` only resolves via `uv run sam` when uv's active project root is `plugins/development-harness` itself, which is never true for a plugin installed into an arbitrary target project. Always invoke the CLI as a `${CLAUDE_PLUGIN_ROOT}`-relative PEP 723 script, never as a bare `sam` command. The CLI does not select a provider; backend selection is resolved from project configuration. The full, authoritative CLI-vs-MCP capability list is in [backend-providers.md](../../docs/backend-providers.md) "CLI vs MCP Capability Surface".
+Use them as `sam backlog <leaf>`. The CLI does not select a provider; backend selection is resolved from project configuration. The full, authoritative CLI-vs-MCP capability list is in [backend-providers.md](../../docs/backend-providers.md) "CLI vs MCP Capability Surface".
 
 ## Environment
 
