@@ -8,6 +8,7 @@ import typer
 from backlog_core.models import ArtifactStatus, ArtifactType
 from dh_core import operations
 
+from sam_schema.cli_inputs import parse_item_id
 from sam_schema.cli_output import emit_result, err
 
 app = typer.Typer(help="Artifact manifest operations.", no_args_is_help=True, rich_markup_mode=None)
@@ -25,7 +26,7 @@ def register(
     """Register or update an artifact."""
     emit_result(
         operations.artifact_register(
-            item_id=item_id,
+            item_id=parse_item_id(item_id),
             artifact_type=artifact_type.value,
             artifact_id=artifact_id,
             status=status.value,
@@ -43,7 +44,7 @@ def list_artifacts(
     """List artifacts registered for an item."""
     emit_result(
         operations.artifact_list(
-            item_id=item_id, artifact_type=artifact_type.value if artifact_type is not None else None
+            item_id=parse_item_id(item_id), artifact_type=artifact_type.value if artifact_type is not None else None
         )
     )
 
@@ -55,7 +56,11 @@ def get(
     artifact_id: Annotated[str | None, typer.Option("--artifact-id")] = None,
 ) -> None:
     """Get artifact metadata."""
-    emit_result(operations.artifact_get(item_id=item_id, artifact_type=artifact_type.value, artifact_id=artifact_id))
+    emit_result(
+        operations.artifact_get(
+            item_id=parse_item_id(item_id), artifact_type=artifact_type.value, artifact_id=artifact_id
+        )
+    )
 
 
 @app.command("read")
@@ -65,7 +70,11 @@ def read(
     artifact_id: Annotated[str | None, typer.Option("--artifact-id")] = None,
 ) -> None:
     """Read artifact content."""
-    emit_result(operations.artifact_read(item_id=item_id, artifact_type=artifact_type.value, artifact_id=artifact_id))
+    emit_result(
+        operations.artifact_read(
+            item_id=parse_item_id(item_id), artifact_type=artifact_type.value, artifact_id=artifact_id
+        )
+    )
 
 
 @app.command("migrate")
@@ -82,7 +91,10 @@ def migrate(
         err("--item-id is required when renaming an artifact")
     emit_result(
         operations.artifact_migrate(
-            item_id=item_id, dry_run=dry_run, old_artifact_id=old_artifact_id, new_artifact_id=new_artifact_id
+            item_id=parse_item_id(item_id) if item_id is not None else None,
+            dry_run=dry_run,
+            old_artifact_id=old_artifact_id,
+            new_artifact_id=new_artifact_id,
         )
     )
 

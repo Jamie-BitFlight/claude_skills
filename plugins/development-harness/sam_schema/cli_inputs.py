@@ -220,6 +220,27 @@ class TaskUpdateInput(_CliInput):
         return self
 
 
+def parse_item_id(value: str) -> int | str:
+    """Coerce a raw ``--item-id`` CLI value to ``int`` when it is digit-only.
+
+    GitHub and GitLab identify backlog items by positive integer issue
+    number; Beads and Linear use opaque string identifiers (``"bd-a3f8"``,
+    a UUID). Typer always delivers option values as ``str``, so a
+    digit-only value must be converted here before it reaches a provider —
+    ``backlog_core.artifact_provider._require_int_item_id`` rejects every
+    ``str`` item ID for the GitHub/GitLab backends, including a numeric
+    one such as ``"42"``.
+
+    Args:
+        value: Raw ``--item-id`` value received from the CLI.
+
+    Returns:
+        ``int`` when *value* consists only of decimal digits, otherwise
+        *value* unchanged.
+    """
+    return int(value) if value.isdigit() else value
+
+
 class PlanUpdateInput(_CliInput):
     """Validated options for a plan or task update."""
 
@@ -251,4 +272,5 @@ __all__ = [
     "PlanUpdateInput",
     "TaskUpdateFields",
     "TaskUpdateInput",
+    "parse_item_id",
 ]

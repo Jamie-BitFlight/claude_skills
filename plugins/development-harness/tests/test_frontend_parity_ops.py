@@ -1241,7 +1241,7 @@ def test_dispatch_cli_forwards_named_options(
                 "# Research",
             ],
             {
-                "item_id": "42",
+                "item_id": 42,
                 "artifact_type": "research",
                 "artifact_id": "plan/research.md",
                 "status": "current",
@@ -1254,28 +1254,28 @@ def test_dispatch_cli_forwards_named_options(
             "list",
             "artifact_list",
             ["--item-id", "42", "--artifact-type", "research"],
-            {"item_id": "42", "artifact_type": "research"},
+            {"item_id": 42, "artifact_type": "research"},
             {"artifacts": [], "count": 0},
         ),
         (
             "get",
             "artifact_get",
             ["--item-id", "42", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
-            {"item_id": "42", "artifact_type": "research", "artifact_id": "plan/research.md"},
+            {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/research.md"},
             {"artifacts": [], "count": 0},
         ),
         (
             "read",
             "artifact_read",
             ["--item-id", "42", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
-            {"item_id": "42", "artifact_type": "research", "artifact_id": "plan/research.md"},
+            {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/research.md"},
             {"artifact_type": "research", "path": "plan/research.md", "content": "# Research", "status": "current"},
         ),
         (
             "migrate",
             "artifact_migrate",
             ["--item-id", "42", "--old-artifact-id", "plan/old.md", "--new-artifact-id", "plan/new.md"],
-            {"item_id": "42", "dry_run": False, "old_artifact_id": "plan/old.md", "new_artifact_id": "plan/new.md"},
+            {"item_id": 42, "dry_run": False, "old_artifact_id": "plan/old.md", "new_artifact_id": "plan/new.md"},
             {"migrated": 1},
         ),
     ],
@@ -1288,6 +1288,87 @@ def test_artifact_cli_forwards_named_options(
     kwargs: dict[str, Any],
     payload: dict[str, Any],
 ) -> None:
+    """A numeric ``--item-id`` is coerced to ``int`` before reaching ``dh_core.operations``.
+
+    GitHub/GitLab artifact providers reject a ``str`` item ID via
+    ``backlog_core.artifact_provider._require_int_item_id`` — including a
+    numeric one such as ``"42"``. ``sam_schema.cli_inputs.parse_item_id``
+    performs the coercion at the CLI boundary so every artifact subcommand
+    reaches the provider with the correct type.
+    """
+    mock_operation = Mock(return_value=payload)
+    monkeypatch.setattr(artifacts.operations, operation, mock_operation)
+    result = _runner.invoke(app, ["artifact", command, *args])
+    _assert_compact_result(result, payload)
+    mock_operation.assert_called_once_with(**kwargs)
+
+
+@pytest.mark.parametrize(
+    ("command", "operation", "args", "kwargs", "payload"),
+    [
+        (
+            "register",
+            "artifact_register",
+            ["--item-id", "bd-a3f8", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
+            {
+                "item_id": "bd-a3f8",
+                "artifact_type": "research",
+                "artifact_id": "plan/research.md",
+                "status": "current",
+                "agent": "",
+                "content": None,
+            },
+            {"registered": True},
+        ),
+        (
+            "list",
+            "artifact_list",
+            ["--item-id", "bd-a3f8", "--artifact-type", "research"],
+            {"item_id": "bd-a3f8", "artifact_type": "research"},
+            {"artifacts": [], "count": 0},
+        ),
+        (
+            "get",
+            "artifact_get",
+            ["--item-id", "bd-a3f8", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
+            {"item_id": "bd-a3f8", "artifact_type": "research", "artifact_id": "plan/research.md"},
+            {"artifacts": [], "count": 0},
+        ),
+        (
+            "read",
+            "artifact_read",
+            ["--item-id", "bd-a3f8", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
+            {"item_id": "bd-a3f8", "artifact_type": "research", "artifact_id": "plan/research.md"},
+            {"artifact_type": "research", "path": "plan/research.md", "content": "# Research", "status": "current"},
+        ),
+        (
+            "migrate",
+            "artifact_migrate",
+            ["--item-id", "bd-a3f8", "--old-artifact-id", "plan/old.md", "--new-artifact-id", "plan/new.md"],
+            {
+                "item_id": "bd-a3f8",
+                "dry_run": False,
+                "old_artifact_id": "plan/old.md",
+                "new_artifact_id": "plan/new.md",
+            },
+            {"migrated": 1},
+        ),
+    ],
+)
+def test_artifact_cli_preserves_nonnumeric_item_id(
+    monkeypatch: pytest.MonkeyPatch,
+    command: str,
+    operation: str,
+    args: list[str],
+    kwargs: dict[str, Any],
+    payload: dict[str, Any],
+) -> None:
+    """A non-digit ``--item-id`` (Beads/Linear-style) is forwarded unchanged as ``str``.
+
+    Only digit-only strings are coerced to ``int`` — opaque string identifiers
+    used by the Beads and Linear backends must reach ``dh_core.operations``
+    exactly as given.
+    """
     mock_operation = Mock(return_value=payload)
     monkeypatch.setattr(artifacts.operations, operation, mock_operation)
     result = _runner.invoke(app, ["artifact", command, *args])
