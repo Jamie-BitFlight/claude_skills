@@ -40,7 +40,6 @@ if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import typer
-from rich.console import Console
 from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
 
 # task_format.py is a sibling module in the same scripts/ directory.
@@ -84,7 +83,6 @@ if TYPE_CHECKING:
 app = typer.Typer(
     name="implementation-manager", help="Query and manage feature implementation task status.", no_args_is_help=True
 )
-console = Console()
 
 
 # =============================================================================
@@ -918,7 +916,7 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
     }
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(cache_payload, indent=2), encoding="utf-8")
+        cache_path.write_text(json.dumps(cache_payload), encoding="utf-8")
     except OSError as exc:
         sys.stderr.write(f"WARNING: Could not write cache file: {exc}\n")
 
@@ -1155,7 +1153,7 @@ def list_features(project_path: ProjectPath) -> None:
 
     output = {"features": [f.to_dict() for f in features], "count": len(features)}
 
-    console.print(json.dumps(output, indent=2))
+    print(json.dumps(output))
 
 
 @app.command(name="status")
@@ -1193,7 +1191,7 @@ def status(
                 "error": f"No task file found for feature: {feature_slug}",
                 "available_features": [f.slug for f in find_task_files(project_path)],
             }
-            console.print(json.dumps(error_output, indent=2))
+            print(json.dumps(error_output))
             raise typer.Exit(1)
         tasks = _load_tasks_via_sam(task_file)
 
@@ -1221,7 +1219,7 @@ def status(
         "tasks": [t.to_dict() for t in tasks],
     }
 
-    console.print(json.dumps(output, indent=2))
+    print(json.dumps(output))
 
 
 @app.command(name="ready-tasks")
@@ -1257,13 +1255,13 @@ def ready_tasks(
             if github and parent_issue is not None:
                 # Both GitHub and local files are unavailable
                 error_output = {"error": "No task data available — GitHub unreachable and no cache found"}
-                console.print(json.dumps(error_output, indent=2))
+                print(json.dumps(error_output))
                 raise typer.Exit(1)
             error_output = {
                 "error": f"No task file found for feature: {feature_slug}",
                 "available_features": [f.slug for f in find_task_files(project_path)],
             }
-            console.print(json.dumps(error_output, indent=2))
+            print(json.dumps(error_output))
             raise typer.Exit(1)
         tasks = _load_tasks_via_sam(task_file)
 
@@ -1275,7 +1273,7 @@ def ready_tasks(
         "count": len(ready),
     }
 
-    console.print(json.dumps(output, indent=2))
+    print(json.dumps(output))
 
 
 @app.command(name="validate")
@@ -1296,14 +1294,14 @@ def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
             "error": f"No task file found for feature: {feature_slug}",
             "available_features": [f.slug for f in find_task_files(project_path)],
         }
-        console.print(json.dumps(error_output, indent=2))
+        print(json.dumps(error_output))
         raise typer.Exit(1)
 
     try:
         tasks = _load_tasks_via_sam(task_file)
     except (FileNotFoundError, FormatDetectionError, ValueError) as exc:
         output = {"valid": False, "errors": [str(exc)], "warnings": [], "task_count": 0}
-        console.print(json.dumps(output, indent=2))
+        print(json.dumps(output))
         raise typer.Exit(1) from exc
 
     errors: list[str] = []
@@ -1332,7 +1330,7 @@ def validate(project_path: ProjectPath, feature_slug: FeatureSlug) -> None:
 
     output = {"valid": len(errors) == 0, "errors": errors, "warnings": warnings, "task_count": len(tasks)}
 
-    console.print(json.dumps(output, indent=2))
+    print(json.dumps(output))
 
     if errors:
         raise typer.Exit(1)

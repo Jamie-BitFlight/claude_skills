@@ -5,14 +5,18 @@ Note: Imports resolve via [tool.pytest.ini_options] pythonpath in pyproject.toml
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from textwrap import dedent
 from typing import NoReturn
 
 import pytest
 from _pytest.outcomes import Skipped
+from typer.testing import CliRunner
 
-from manifest_resolver import resolve_for_project
+from manifest_resolver import app, resolve_for_project
+
+runner = CliRunner()
 
 
 def _skip_test(reason: str) -> NoReturn:
@@ -191,3 +195,70 @@ class TestRealManifestResolution:
         result = resolve_for_project(project_root=project, plugin_dirs=[plugin_dir])
         assert result is not None
         assert result.name == "python3"
+
+
+class TestResolveCommand:
+    """CLI-level tests for the ``resolve`` and ``show`` Typer commands.
+
+    These exercise the ``--plugin-dir`` list-option callback and the JSON
+    output path — both previously untested at the CLI layer (only the
+    underlying ``resolve_for_project`` function had coverage).
+    """
+
+    def test_resolve_no_match_exits_1_with_error_on_stderr(self, tmp_path: Path) -> None:
+        project = tmp_path / "rust-project"
+        project.mkdir()
+        (project / "Cargo.toml").write_text("[package]\nname = 'foo'\n")
+
+        result = runner.invoke(app, ["resolve", str(project)])
+
+        assert result.exit_code == 1
+        assert "No matching manifest found." in result.output
+
+    def test_resolve_success_prints_compact_json(self, tmp_path: Path) -> None:
+        project = _setup_project(tmp_path)
+        plugin_dir = _setup_manifests(tmp_path)
+
+        result = runner.invoke(app, ["resolve", str(project), "--plugin-dir", str(plugin_dir)])
+
+        assert result.exit_code == 0
+        # Compact JSON: no indentation, single line.
+        assert "\n" not in result.output.strip()
+        payload = json.loads(result.output)
+        assert payload["name"] == "python3-cli"
+
+    def test_resolve_rejects_nonexistent_plugin_dir(self, tmp_path: Path) -> None:
+        project = _setup_project(tmp_path)
+        missing = tmp_path / "does-not-exist"
+
+        result = runner.invoke(app, ["resolve", str(project), "--plugin-dir", str(missing)])
+
+        assert result.exit_code != 0
+        assert "does not exist" in result.output
+
+    def test_resolve_accepts_multiple_plugin_dirs(self, tmp_path: Path) -> None:
+        # Two distinct existing plugin dirs — validates the callback handles
+        # the full accumulated list, not just a single item.
+        project = _setup_project(tmp_path)
+        plugin_dir = _setup_manifests(tmp_path)
+        other_dir = tmp_path / "other-plugins"
+        other_dir.mkdir()
+
+        result = runner.invoke(
+            app, ["resolve", str(project), "--plugin-dir", str(plugin_dir), "--plugin-dir", str(other_dir)]
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["name"] == "python3-cli"
+
+    def test_show_prints_compact_json(self, tmp_path: Path) -> None:
+        plugin_dir = _setup_manifests(tmp_path)
+        manifest_path = plugin_dir / "manifests" / "python3" / "language-manifest.yaml"
+
+        result = runner.invoke(app, ["show", str(manifest_path)])
+
+        assert result.exit_code == 0
+        assert "\n" not in result.output.strip()
+        payload = json.loads(result.output)
+        assert payload["name"] == "python3"

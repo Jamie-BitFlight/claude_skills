@@ -65,11 +65,9 @@ from backlog_core.models import get_backlog_dir
 from backlog_core.operations import render_sections_as_body
 from backlog_core.yaml_io import load_item
 from pydantic import ValidationError
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
-from rich.table import Table
 from ruamel.yaml import YAMLError
+
+from cli_output import err, output_json
 
 if TYPE_CHECKING:
     from backlog_core.models import BacklogItem
@@ -85,8 +83,6 @@ app = typer.Typer(
     no_args_is_help=False,
     add_completion=False,
 )
-console = Console()
-err_console = Console(stderr=True)
 
 # ---------------------------------------------------------------------------
 # Classification
@@ -513,8 +509,7 @@ def main(
     code path as backlog_view, and diffs the result against the original body text.
     """
     if not backlog_dir.exists():
-        err_console.print(f"[red]Error:[/red] Directory not found: {backlog_dir}")
-        raise typer.Exit(code=1)
+        err(f"Directory not found: {backlog_dir}")
 
     bak_files = sorted(backlog_dir.glob("*.md.bak"))
     report = VerificationReport(total_bak=len(bak_files))
@@ -522,96 +517,66 @@ def main(
     if limit is not None:
         bak_files = bak_files[:limit]
 
-    console.print(
-        f"\n[bold]:magnifying_glass_tilted_left: Verifying migration fidelity[/bold] — {backlog_dir}\n"
-        f"Files to check: {len(bak_files)} of {report.total_bak} total .md.bak\n"
-    )
+    for bak_path in bak_files:
+        yaml_path = bak_path.with_suffix("").with_suffix(".yaml")
+        if not yaml_path.exists():
+            report.skipped_no_yaml += 1
+            continue
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Verifying...", total=len(bak_files))
+        result = verify_file(bak_path)
+        report.results.append(result)
 
-        for bak_path in bak_files:
-            progress.update(task, description=f"[cyan]{bak_path.name}[/cyan]")
-
-            yaml_path = bak_path.with_suffix("").with_suffix(".yaml")
-            if not yaml_path.exists():
-                report.skipped_no_yaml += 1
-                progress.advance(task)
-                continue
-
-            result = verify_file(bak_path)
-            report.results.append(result)
-
-            if result.error:
-                report.errors += 1
-
-            progress.advance(task)
-
-    _print_summary(report, verbose=verbose)
+        if result.error:
+            report.errors += 1
 
     _write_report(report, _REPORT_PATH, verbose=verbose)
-    console.print(f"\n[dim]Full report written to:[/dim] {_REPORT_PATH}\n")
+
+    output_json(_summary_payload(report, backlog_dir, verbose=verbose))
 
     if report.count(CONTENT_LOSS) > 0 or report.errors > 0:
         raise typer.Exit(code=1)
 
 
-def _print_summary(report: VerificationReport, *, verbose: bool) -> None:
-    """Print the Rich summary to the console.
+def _summary_payload(report: VerificationReport, backlog_dir: Path, *, verbose: bool) -> dict[str, object]:
+    """Build the JSON summary payload for a verification run.
 
     Args:
-        report: VerificationReport to display.
-        verbose: When True, show diffs for MINOR_DIFF items too.
+        report: VerificationReport with all results.
+        backlog_dir: Directory that was scanned.
+        verbose: When True, include full diffs for MINOR_DIFF/CONTENT_LOSS/CONTENT_GAIN items.
+
+    Returns:
+        Dict summarising the run for JSON output.
     """
-    table = Table(title="Migration Fidelity Report", show_header=True, header_style="bold cyan")
-    table.add_column("Classification", style="bold")
-    table.add_column("Count", justify="right")
-
-    match_count = report.count(MATCH)
-    minor_count = report.count(MINOR_DIFF)
-    loss_count = report.count(CONTENT_LOSS)
-    gain_count = report.count(CONTENT_GAIN)
-
-    table.add_row("MATCH", str(match_count), style="green" if match_count else "")
-    table.add_row("MINOR_DIFF", str(minor_count), style="yellow" if minor_count else "")
-    table.add_row("CONTENT_LOSS", str(loss_count), style="red bold" if loss_count else "")
-    table.add_row("CONTENT_GAIN", str(gain_count), style="yellow" if gain_count else "")
-    table.add_row("[dim]Skipped (no .yaml)[/dim]", str(report.skipped_no_yaml))
-    table.add_row("[dim]Errors[/dim]", str(report.errors), style="red" if report.errors else "")
-
-    console.print()
-    console.print(table)
-
-    if report.loss_results:
-        console.print("\n[red bold]:cross_mark: CONTENT_LOSS items:[/red bold]")
-        for res in report.loss_results:
-            lost_preview = " ".join(res.lost_lines)[:200]
-            console.print(f"  [red]:cross_mark:[/red] [cyan]{res.bak_path.name}[/cyan]")
-            console.print(f"     Missing: [dim]{lost_preview}[/dim]")
+    payload: dict[str, object] = {
+        "backlog_dir": backlog_dir,
+        "total_bak": report.total_bak,
+        "processed": report.processed,
+        "skipped_no_yaml": report.skipped_no_yaml,
+        "errors": report.errors,
+        "classification_counts": {
+            MATCH: report.count(MATCH),
+            MINOR_DIFF: report.count(MINOR_DIFF),
+            CONTENT_LOSS: report.count(CONTENT_LOSS),
+            CONTENT_GAIN: report.count(CONTENT_GAIN),
+        },
+        "content_loss_items": [
+            {"file": res.bak_path.name, "missing_preview": " ".join(res.lost_lines)[:200]}
+            for res in report.loss_results
+        ],
+        "verbose_diffs": [],
+        "verification_errors": [{"file": res.bak_path.name, "error": res.error} for res in report.results if res.error],
+        "report_path": _REPORT_PATH,
+    }
 
     if verbose:
-        for res in report.results:
-            if res.classification in {MINOR_DIFF, CONTENT_GAIN, CONTENT_LOSS} and not res.error and res.diff_lines:
-                console.print(
-                    Panel(
-                        "".join(res.diff_lines[:30]),
-                        title=f"[cyan]{res.bak_path.name}[/cyan] — {res.classification}",
-                        expand=False,
-                    )
-                )
+        payload["verbose_diffs"] = [
+            {"file": res.bak_path.name, "classification": res.classification, "diff": "".join(res.diff_lines[:30])}
+            for res in report.results
+            if res.classification in {MINOR_DIFF, CONTENT_GAIN, CONTENT_LOSS} and not res.error and res.diff_lines
+        ]
 
-    error_results = [r for r in report.results if r.error]
-    if error_results:
-        console.print("\n[red bold]:cross_mark: Verification errors:[/red bold]")
-        for res in error_results:
-            console.print(f"  [red]:cross_mark:[/red] [cyan]{res.bak_path.name}[/cyan]")
-            console.print(f"     {res.error}")
+    return payload
 
 
 if __name__ == "__main__":

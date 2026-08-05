@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv --quiet run --active --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["ruamel.yaml", "tomlkit", "typer", "rich"]
+# dependencies = ["ruamel.yaml", "tomlkit", "typer"]
 # ///
 """Manifest resolver CLI -- discover, score, resolve, return manifest.
 
@@ -27,14 +27,13 @@ if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import typer
-from rich.console import Console
 
+from cli_output import err, output_json
 from manifest_discovery import DiscoveredManifest, detect_project_dependencies, discover_manifests, select_best_manifest
 from manifest_merge import resolve_extends_chain
 from manifest_schema import LanguageManifest, ManifestValidationError, load_manifest
 
 app = typer.Typer(help="Language manifest resolver for the development harness.")
-console = Console(stderr=True)
 
 
 def _detect_project_markers(project_root: Path, plugin_dirs: list[Path] | None = None) -> set[str]:
@@ -208,16 +207,26 @@ def _manifest_to_dict(m: LanguageManifest) -> dict[str, Any]:
     return _normalize_for_json(raw)
 
 
-def _validate_plugin_dir(path: Path) -> Path:
-    """Typer callback to validate --plugin-dir exists and is a directory.
+def _validate_plugin_dir(paths: list[Path] | None) -> list[Path] | None:
+    """Typer callback to validate every --plugin-dir exists and is a directory.
+
+    Typer invokes a ``list[Path]``-typed option's callback once with the full
+    accumulated list (or ``None`` when the option was never supplied) — not
+    once per item — so this validates each element rather than a single path.
 
     Returns:
-        The validated path if it exists and is a directory.
+        The validated list of paths (or ``None``) unchanged.
+
+    Raises:
+        typer.BadParameter: If any path does not exist or is not a directory.
     """
-    if not path.is_dir():
-        msg = f"Plugin directory does not exist or is not a directory: {path}"
-        raise typer.BadParameter(msg)
-    return path
+    if not paths:
+        return paths
+    for path in paths:
+        if not path.is_dir():
+            msg = f"Plugin directory does not exist or is not a directory: {path}"
+            raise typer.BadParameter(msg)
+    return paths
 
 
 @app.command()
@@ -233,17 +242,16 @@ def resolve(
         plugin_dir = []
     result = resolve_for_project(project_root, plugin_dir)
     if result is None:
-        console.print("[yellow]No matching manifest found.[/yellow]")
-        raise typer.Exit(1)
+        err("No matching manifest found.")
 
-    print(json.dumps(_manifest_to_dict(result), indent=2))
+    output_json(_manifest_to_dict(result))
 
 
 @app.command()
 def show(manifest_path: Annotated[Path, typer.Argument(help="Path to a manifest YAML file")]) -> None:
     """Load and display a single manifest as JSON (no extends resolution)."""
     m = load_manifest(manifest_path)
-    print(json.dumps(_manifest_to_dict(m), indent=2))
+    output_json(_manifest_to_dict(m))
 
 
 if __name__ == "__main__":

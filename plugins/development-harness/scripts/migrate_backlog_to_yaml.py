@@ -59,10 +59,9 @@ import typer
 from backlog_core.yaml_io import load_item, load_item_text, save_item
 from dh_paths import compute_slug
 from pydantic import ValidationError
-from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
+
+from cli_output import err, output_json
 
 if TYPE_CHECKING:
     from backlog_core.models import BacklogItem
@@ -76,8 +75,6 @@ app = typer.Typer(
     no_args_is_help=False,
     add_completion=False,
 )
-console = Console()
-err_console = Console(stderr=True)
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +103,9 @@ class MigrationReport:
 
     errors: list[tuple[str, str]] = field(default_factory=list)
     """(file_path, error_message) pairs for every file that failed."""
+
+    results: list[dict[str, object]] = field(default_factory=list)
+    """Per-file outcome records: {"file", "status", ...detail fields}."""
 
     @property
     def error_count(self) -> int:
@@ -293,33 +293,38 @@ def run_dry_run(backlog_dir: Path) -> MigrationReport:
 
         if yaml_path.exists():
             report.skipped_already_converted += 1
+            report.results.append({"file": md_path.name, "status": "skipped_yaml_exists"})
             continue
 
         if bak_path.exists():
             report.skipped_bak_exists += 1
+            report.results.append({"file": md_path.name, "status": "skipped_bak_exists"})
             continue
 
         text = md_path.read_text(encoding="utf-8")
         if not _has_frontmatter(text):
             report.skipped_no_frontmatter += 1
+            report.results.append({"file": md_path.name, "status": "skipped_no_frontmatter"})
             continue
 
         try:
             item, ok, detail = migrate_file_dry_run(md_path)
             section_count, section_keys = _dry_run_section_info(item)
-            status = ":white_check_mark:" if ok else ":cross_mark:"
-            rt_label = "pass" if ok else f"FAIL — {detail}"
-            console.print(
-                f"  {status} [cyan]{md_path.name}[/cyan] "
-                f"sections={section_count} keys={section_keys} round-trip={rt_label}"
-            )
+            result: dict[str, object] = {
+                "file": md_path.name,
+                "status": "verified" if ok else "round_trip_mismatch",
+                "sections": section_count,
+                "section_keys": section_keys,
+            }
             if ok:
                 report.migrated += 1
             else:
+                result["detail"] = detail
                 report.errors.append((str(md_path), detail))
+            report.results.append(result)
         except (OSError, ValueError, KeyError, TypeError, AttributeError, YAMLError, ValidationError) as exc:
             report.errors.append((str(md_path), str(exc)))
-            err_console.print(f"  :cross_mark: [red]{md_path.name}[/red] — {exc}")
+            report.results.append({"file": md_path.name, "status": "error", "error": str(exc)})
 
     return report
 
@@ -341,58 +346,50 @@ def run_migration(backlog_dir: Path) -> MigrationReport:
     md_files = sorted(backlog_dir.glob("*.md"))
     report.total_found = len(md_files)
 
-    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
-        task = progress.add_task("Migrating...", total=len(md_files))
+    for md_path in md_files:
+        yaml_path = md_path.with_suffix(".yaml")
+        bak_path = md_path.with_suffix(".md.bak")
 
-        for md_path in md_files:
-            progress.update(task, description=f"[cyan]{md_path.name}[/cyan]")
+        if yaml_path.exists():
+            report.skipped_already_converted += 1
+            report.results.append({"file": md_path.name, "status": "skipped_yaml_exists"})
+            continue
 
-            yaml_path = md_path.with_suffix(".yaml")
-            bak_path = md_path.with_suffix(".md.bak")
+        if bak_path.exists():
+            report.skipped_bak_exists += 1
+            report.results.append({"file": md_path.name, "status": "skipped_bak_exists"})
+            continue
 
-            if yaml_path.exists():
-                report.skipped_already_converted += 1
-                progress.advance(task)
-                continue
+        text = md_path.read_text(encoding="utf-8")
+        if not _has_frontmatter(text):
+            report.skipped_no_frontmatter += 1
+            report.results.append({"file": md_path.name, "status": "skipped_no_frontmatter"})
+            continue
 
-            if bak_path.exists():
-                report.skipped_bak_exists += 1
-                progress.advance(task)
-                continue
-
-            text = md_path.read_text(encoding="utf-8")
-            if not _has_frontmatter(text):
-                report.skipped_no_frontmatter += 1
-                progress.advance(task)
-                continue
-
-            try:
-                migrate_file_live(md_path)
-                report.migrated += 1
-                console.print(f"  :white_check_mark: MIGRATED [cyan]{md_path.name}[/cyan]")
-            except (OSError, ValueError, KeyError, TypeError, AttributeError, YAMLError, ValidationError) as exc:
-                report.errors.append((str(md_path), str(exc)))
-                console.print(f"  :cross_mark: ERROR [red]{md_path.name}[/red]")
-
-            progress.advance(task)
+        try:
+            migrate_file_live(md_path)
+            report.migrated += 1
+            report.results.append({"file": md_path.name, "status": "migrated"})
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, YAMLError, ValidationError) as exc:
+            report.errors.append((str(md_path), str(exc)))
+            report.results.append({"file": md_path.name, "status": "error", "error": str(exc)})
 
     return report
 
 
-def run_cleanup(backlog_dir: Path) -> int:
+def run_cleanup(backlog_dir: Path) -> list[str]:
     """Remove all .md.bak files in backlog_dir.
 
     Args:
         backlog_dir: Directory to clean up.
 
     Returns:
-        Number of .md.bak files removed.
+        Names of the removed .md.bak files.
     """
-    removed = 0
+    removed: list[str] = []
     for bak_path in sorted(backlog_dir.glob("*.md.bak")):
         bak_path.unlink()
-        console.print(f"  :wastebasket: Removed [dim]{bak_path.name}[/dim]")
-        removed += 1
+        removed.append(bak_path.name)
     return removed
 
 
@@ -424,84 +421,74 @@ def main(
     Use --cleanup after verifying .yaml files are correct.
     """
     if not dry_run and not confirm and not cleanup:
-        console.print(
-            "\n[yellow]No action flag provided.[/yellow]\n\n"
-            "  Use [bold]--dry-run[/bold] first to verify parsing and round-trip fidelity.\n"
-            "  Then use [bold]--confirm[/bold] to execute the migration.\n"
-            "  After verifying YAML output, use [bold]--cleanup[/bold] to remove .md.bak files.\n"
-        )
+        output_json({
+            "status": "no_action",
+            "message": (
+                "No action flag provided. Use --dry-run first to verify parsing and round-trip "
+                "fidelity, then --confirm to execute the migration. After verifying YAML output, "
+                "use --cleanup to remove .md.bak files."
+            ),
+        })
         raise typer.Exit(code=0)
 
     if not backlog_dir.exists():
-        err_console.print(f"[red]Error:[/red] Directory not found: {backlog_dir}")
-        raise typer.Exit(code=1)
+        err(f"Directory not found: {backlog_dir}")
 
     if cleanup:
-        console.print(f"\n:wastebasket: [bold]Cleanup:[/bold] removing .md.bak files in {backlog_dir}\n")
         removed = run_cleanup(backlog_dir)
-        console.print(f"\n[green]:white_check_mark: Removed {removed} .md.bak file(s).[/green]")
+        output_json({
+            "backlog_dir": backlog_dir,
+            "status": "cleanup",
+            "removed": removed,
+            "removed_count": len(removed),
+        })
         return
 
     if dry_run:
-        console.print(
-            f"\n:magnifying_glass_tilted_left: [bold]Dry run:[/bold] {backlog_dir}\n"
-            "[yellow]No files will be written or renamed.[/yellow]\n"
-        )
         report = run_dry_run(backlog_dir)
-        _print_report(report, dry_run=True)
+        output_json(_report_payload(backlog_dir, report, dry_run=True))
         if report.error_count:
             raise typer.Exit(code=1)
         return
 
     if confirm:
-        console.print(
-            f"\n:gear: [bold]Migration:[/bold] {backlog_dir}\n"
-            "[green]LIVE — files will be written and originals renamed to .md.bak[/green]\n"
-        )
         report = run_migration(backlog_dir)
-        _print_report(report, dry_run=False)
+        output_json(_report_payload(backlog_dir, report, dry_run=False))
         if report.error_count:
             raise typer.Exit(code=1)
         return
 
 
-def _print_report(report: MigrationReport, *, dry_run: bool) -> None:
-    """Print a Rich summary table for the migration report.
+def _report_payload(backlog_dir: Path, report: MigrationReport, *, dry_run: bool) -> dict[str, object]:
+    """Build the JSON payload summarising a dry-run or live migration report.
 
     Args:
-        report: MigrationReport to display.
-        dry_run: When True, labels the migrated count as verified-ok.
+        backlog_dir: Directory that was scanned.
+        report: MigrationReport with per-file outcomes.
+        dry_run: When True, this is a verify-only run (no files modified).
+
+    Returns:
+        Dict summarising the run for JSON output, including per-file results.
     """
-    migrated_label = "Verified (round-trip ok)" if dry_run else "Successfully migrated"
-
-    table = Table(title="Migration Report", show_header=True, header_style="bold cyan")
-    table.add_column("Metric", style="bold")
-    table.add_column("Count", justify="right")
-
-    table.add_row("Total .md files found", str(report.total_found))
-    table.add_row(migrated_label, str(report.migrated), style="green" if report.migrated else "")
-    table.add_row("Skipped (no frontmatter)", str(report.skipped_no_frontmatter))
-    table.add_row("Skipped (.yaml already exists)", str(report.skipped_already_converted))
-    table.add_row("Skipped (.md.bak already exists)", str(report.skipped_bak_exists))
-    table.add_row("Errors", str(report.error_count), style="red" if report.error_count else "")
-
-    console.print()
-    console.print(table)
-
-    if report.errors:
-        console.print("\n[red bold]:cross_mark: Errors:[/red bold]")
-        for file_path, msg in report.errors:
-            console.print(f"  [red]:cross_mark:[/red] {file_path}")
-            for line in msg.splitlines():
-                console.print(f"     {line}")
-            console.print()
+    return {
+        "backlog_dir": backlog_dir,
+        "dry_run": dry_run,
+        "total_found": report.total_found,
+        "migrated": report.migrated,
+        "skipped_no_frontmatter": report.skipped_no_frontmatter,
+        "skipped_already_converted": report.skipped_already_converted,
+        "skipped_bak_exists": report.skipped_bak_exists,
+        "error_count": report.error_count,
+        "results": report.results,
+    }
 
     if dry_run and not report.error_count:
-        console.print("\n[yellow]:warning:  Dry run complete — no files modified.[/yellow]")
-        console.print("[dim]Run with --confirm to execute the migration.[/dim]")
+        typer.echo("\nWARNING: Dry run complete — no files modified.")
+        typer.echo("Run with --confirm to execute the migration.")
     elif not dry_run and not report.error_count:
-        console.print(f"\n[green]:white_check_mark: Done — {report.migrated} file(s) converted to YAML.[/green]")
-        console.print("[dim]Run with --cleanup to remove .md.bak files after verifying YAML output.[/dim]")
+        typer.echo(f"\nOK: Done — {report.migrated} file(s) converted to YAML.")
+        typer.echo("Run with --cleanup to remove .md.bak files after verifying YAML output.")
+    return None
 
 
 if __name__ == "__main__":

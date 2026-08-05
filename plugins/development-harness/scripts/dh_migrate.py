@@ -7,6 +7,7 @@
 #   "pydantic>=2.12.3",
 #   "pygithub>=2.8.1",
 #   "gitpython>=3.1.0",
+#   "marko>=2.0.0",
 # ]
 # ///
 """dh_migrate — migrate project state from legacy .claude/ layout to ~/.dh/.
@@ -65,17 +66,13 @@ if str(_HARNESS_DIR) not in sys.path:
 
 import dh_paths
 import typer
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 from ruamel.yaml import YAML, YAMLError
+
+from cli_output import err, output_json
 
 app = typer.Typer(
     name="dh_migrate", help="Migrate DH project state from legacy .claude/ layout to ~/.dh/.", no_args_is_help=True
 )
-
-console = Console()
-err_console = Console(stderr=True)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -102,8 +99,7 @@ def _project_root() -> Path:
     try:
         return dh_paths.git_project_root()
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        err_console.print(f":cross_mark: Cannot determine git project root: {exc}")
-        raise typer.Exit(code=1) from exc
+        err(f"Cannot determine git project root: {exc}")
 
 
 def _old_dirs(project_root: Path) -> dict[str, Path]:
@@ -138,55 +134,24 @@ def verify() -> None:
     slug = dh_paths.compute_slug(project_root)
     state = _detect_layout(project_root)
 
-    table = Table(title="DH Layout State", show_header=True, header_style="bold cyan")
-    table.add_column("Check", style="dim")
-    table.add_column("Status")
-    table.add_column("Path")
-
-    # Old layout indicators
-    for label, old_path in _old_dirs(project_root).items():
-        exists = old_path.exists()
-        status = ":cross_mark: [red]present[/red]" if exists else ":white_check_mark: [green]absent[/green]"
-        table.add_row(f"Old: {label}/", status, str(old_path))
-
-    # New layout indicator
+    old_layout = [
+        {"label": label, "path": str(old_path), "present": old_path.exists()}
+        for label, old_path in _old_dirs(project_root).items()
+    ]
     new_backlog = dh_paths.backlog_dir(project_root)
-    new_status = (
-        ":white_check_mark: [green]present[/green]" if state["new_present"] else ":cross_mark: [red]absent[/red]"
-    )
-    table.add_row("New: backlog/", new_status, str(new_backlog))
-
-    console.print(table)
-    console.print(f"\n[dim]Project slug:[/dim] {slug}")
+    new_layout = {"path": str(new_backlog), "present": state["new_present"]}
 
     if state["old_present"] and not state["new_present"]:
-        console.print(
-            Panel(
-                "[yellow]Old layout detected (.claude/backlog/ present).[/yellow]\n"
-                "Run [bold]dh_migrate migrate --dry-run[/bold] to preview changes,\n"
-                "then [bold]dh_migrate migrate[/bold] to apply.",
-                title="Action Required",
-                border_style="yellow",
-            )
-        )
+        status = "action_required"
+    elif state["old_present"] and state["new_present"]:
+        status = "partial_migration"
+    else:
+        status = "migrated"
+
+    output_json({"project_slug": slug, "status": status, "old_layout": old_layout, "new_layout": new_layout})
+
+    if status in {"action_required", "partial_migration"}:
         raise typer.Exit(code=1)
-    if state["old_present"] and state["new_present"]:
-        console.print(
-            Panel(
-                "[yellow]Partial migration detected — both old and new layout present.[/yellow]\n"
-                "Run [bold]dh_migrate migrate[/bold] to complete the migration.",
-                title="Partial Migration",
-                border_style="yellow",
-            )
-        )
-        raise typer.Exit(code=1)
-    console.print(
-        Panel(
-            f"[green]New layout active — backlog under[/green]\n{new_backlog}",
-            title=":white_check_mark: Migrated",
-            border_style="green",
-        )
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -211,19 +176,15 @@ def migrate(
     """
     project_root = _project_root()
     state = _detect_layout(project_root)
-
-    prefix = "[dim][DRY-RUN][/dim] " if dry_run else ""
-
-    console.print(
-        Panel(
-            f"Project root: {project_root}\nState home:   {dh_paths.state_root(project_root)}",
-            title="DH Migration",
-            border_style="blue",
-        )
-    )
+    state_root = dh_paths.state_root(project_root)
 
     if not state["old_present"]:
-        console.print(":white_check_mark: No old layout directories found — nothing to migrate.")
+        output_json({
+            "project_root": project_root,
+            "state_root": state_root,
+            "status": "nothing_to_migrate",
+            "moves": [],
+        })
         return
 
     # Build move plan
@@ -240,62 +201,59 @@ def migrate(
             dest = fn(project_root)
             move_plan.append((src, dest))
 
-    # Display plan
-    plan_table = Table(title="Migration Plan", show_header=True, header_style="bold cyan")
-    plan_table.add_column("Source (old)", style="dim red")
-    plan_table.add_column("Destination (new)", style="dim green")
-    for src, dest in move_plan:
-        plan_table.add_row(str(src), str(dest))
-
-    console.print(plan_table)
-
     if dry_run:
-        console.print("\n:magnifying_glass: Dry-run complete — no files were changed.")
+        moves = [{"source": src, "destination": dest} for src, dest in move_plan]
+        output_json({"project_root": project_root, "state_root": state_root, "status": "dry_run", "moves": moves})
         return
 
     # Execute moves
     errors: list[str] = []
+    executed_moves: list[dict[str, object]] = []
     for src, dest in move_plan:
-        console.print(f"{prefix}Moving [dim]{src}[/dim] → [green]{dest}[/green]")
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
             if dest.exists():
                 # Merge: copy individual items from src into existing dest
-                _merge_dir(src, dest, console)
+                merged_items = _merge_dir(src, dest)
             else:
                 shutil.move(str(src), str(dest))
+                merged_items = []
         except OSError as exc:
-            msg = f"Failed to move {src} → {dest}: {exc}"
-            err_console.print(f":cross_mark: {msg}")
-            errors.append(msg)
+            errors.append(f"Failed to move {src} → {dest}: {exc}")
+        else:
+            executed_moves.append({"source": src, "destination": dest, "merged_items": merged_items})
 
     if errors:
-        err_console.print(Panel("\n".join(errors), title=":cross_mark: Migration Errors", border_style="red"))
+        output_json({
+            "project_root": project_root,
+            "state_root": state_root,
+            "status": "error",
+            "moves": executed_moves,
+            "errors": errors,
+        })
         raise typer.Exit(code=1)
 
     # Remove old empty directories (only if now empty)
-    _remove_empty_old_dirs(project_root, console)
+    removed_dirs, skipped_dirs = _remove_empty_old_dirs(project_root)
 
     # Create .dh/.gitkeep in-repo (Tier 1 marker)
     dh_dir = dh_paths.project_dh_dir(project_root)
     dh_dir.mkdir(parents=True, exist_ok=True)
     gitkeep = dh_dir / ".gitkeep"
-    if not gitkeep.exists():
-        gitkeep.touch()
-        console.print(f":white_check_mark: Created [green]{gitkeep}[/green]")
-    else:
-        console.print(f":white_check_mark: [dim]{gitkeep}[/dim] already present")
+    gitkeep_created = not gitkeep.exists()
+    gitkeep.touch(exist_ok=True)
 
-    console.print(
-        Panel(
-            f"[green]Migration complete.[/green]\nState is now at: {dh_paths.state_root(project_root)}",
-            title=":white_check_mark: Done",
-            border_style="green",
-        )
-    )
-
-    # Artifact manifest update (best-effort; warn on failure)
-    _update_artifact_manifests(project_root, console)
+    output_json({
+        "project_root": project_root,
+        "state_root": state_root,
+        "status": "success",
+        "moves": executed_moves,
+        "removed_empty_dirs": removed_dirs,
+        "skipped_non_empty_dirs": skipped_dirs,
+        "gitkeep_created": gitkeep_created,
+        "gitkeep_path": gitkeep,
+        "artifact_manifest_instructions": _artifact_manifest_instructions(project_root),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -303,25 +261,29 @@ def migrate(
 # ---------------------------------------------------------------------------
 
 
-def _merge_dir(src: Path, dest: Path, out: Console) -> None:
+def _merge_dir(src: Path, dest: Path) -> list[str]:
     """Copy all items from src into dest, then remove src.
 
     Args:
         src: Source directory.
         dest: Destination directory (must already exist).
-        out: Rich Console for progress output.
+
+    Returns:
+        Names of the items merged into *dest*.
     """
+    merged: list[str] = []
     for item in src.iterdir():
         target = dest / item.name
         if item.is_dir():
             shutil.copytree(str(item), str(target), dirs_exist_ok=True)
         else:
             shutil.copy2(str(item), str(target))
-        out.print(f"  [dim]merged[/dim] {item.name}")
+        merged.append(item.name)
     shutil.rmtree(src)
+    return merged
 
 
-def _remove_empty_old_dirs(project_root: Path, out: Console) -> None:
+def _remove_empty_old_dirs(project_root: Path) -> tuple[list[str], list[str]]:
     """Remove legacy directories if they are now empty.
 
     Does NOT remove .claude/ itself — other config files (CLAUDE.md, rules/,
@@ -329,7 +291,9 @@ def _remove_empty_old_dirs(project_root: Path, out: Console) -> None:
 
     Args:
         project_root: Absolute project root path.
-        out: Rich Console for output.
+
+    Returns:
+        Tuple of ``(removed_paths, skipped_non_empty_paths)``.
     """
     # Order matters: remove children before parents
     candidates = [
@@ -338,48 +302,49 @@ def _remove_empty_old_dirs(project_root: Path, out: Console) -> None:
         project_root / ".claude" / "reports",
         project_root / "plan",
     ]
+    removed: list[str] = []
+    skipped: list[str] = []
     for candidate in candidates:
         if candidate.exists() and not any(candidate.iterdir()):
             candidate.rmdir()
-            out.print(f":white_check_mark: Removed empty [dim]{candidate}[/dim]")
+            removed.append(str(candidate))
         elif candidate.exists():
-            out.print(f"[yellow]Skipped removal of {candidate} — not empty after merge.[/yellow]")
+            skipped.append(str(candidate))
+    return removed, skipped
 
 
-def _update_artifact_manifests(project_root: Path, out: Console) -> None:
-    """Log artifact manifest update instructions.
+def _artifact_manifest_instructions(project_root: Path) -> dict[str, object]:
+    """Build artifact manifest update instructions for the calling agent.
 
     Artifact manifests are stored in GitHub Issue bodies and managed by the
     backlog MCP server.  Path updates must be applied via the MCP
-    ``artifact_register`` tool — this CLI script cannot call MCP tools directly.
-
-    This function logs actionable instructions so the operator can complete
-    the manifest update step using the MCP tools after migration.
+    ``artifact_register`` tool — this CLI script cannot call MCP tools directly,
+    so this returns actionable, structured instructions for the caller to act
+    on using the MCP tools after migration.
 
     Args:
         project_root: Absolute project root path.
-        out: Rich Console for output.
-    """
-    old_prefixes = ("plan/", ".claude/backlog/", ".claude/context/", ".claude/reports/")
-    state = dh_paths.state_root(project_root)
 
-    out.print("\n[dim]Artifact manifest update instructions:[/dim]")
-    out.print("[yellow]:warning:  Artifact manifests in GitHub Issue bodies may contain old path prefixes.[/yellow]")
-    out.print(
-        "Run the following via the backlog MCP server for each affected issue:\n"
-        "  [dim]artifact_list(item_id=N)[/dim] — find entries with old prefixes\n"
-        "  [dim]artifact_register(item_id=N, artifact_type=T, artifact_id=<new_relative_path>)[/dim]"
-        " — re-register with new path\n"
-    )
-    out.print("[dim]Old prefixes to look for:[/dim]")
-    for prefix in old_prefixes:
-        out.print(f"  [dim red]{prefix!r}[/dim red]")
-    out.print(f"[dim]New base directory:[/dim] {state}")
-    out.print(
-        "[dim]New relative paths are relative to the state root shown above.[/dim]\n"
-        "Example: [dim]plan/P981-foo.yaml[/dim] → [dim]plan/P981-foo.yaml[/dim] "
-        "(filename unchanged; resolution base changes to state root)."
-    )
+    Returns:
+        Dict describing the required follow-up steps.
+    """
+    return {
+        "warning": "Artifact manifests in GitHub Issue bodies may contain old path prefixes.",
+        "steps": [
+            "artifact_list(item_id=N) — find entries with old prefixes",
+            (
+                "artifact_register(item_id=N, artifact_type=T, artifact_id=<new_relative_path>)"
+                " — re-register with new path"
+            ),
+        ],
+        "old_prefixes": [".claude/backlog/", ".claude/context/", ".claude/reports/", "plan/"],
+        "new_base_directory": dh_paths.state_root(project_root),
+        "note": (
+            "New relative paths are relative to the state root shown above. Filenames are "
+            "unchanged; only the resolution base changes (e.g. plan/P981-foo.yaml stays "
+            "plan/P981-foo.yaml)."
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -886,33 +851,10 @@ def _build_registration_rows(
     return rows
 
 
-def _print_rows_table(title: str, rows: list[tuple[str, str, int | None, str]]) -> None:
-    """Print a Rich table summarising registration rows.
-
-    Args:
-        title: Table title string.
-        rows: List of ``(rel_path, artifact_type, issue_number_or_None, status)`` rows.
-    """
-    status_markup_map: dict[str, str] = {
-        "REGISTERED": ":white_check_mark: [green]REGISTERED[/green]",
-        "SKIPPED": "[dim]SKIPPED[/dim]",
-        "UNMATCHED": "[yellow]UNMATCHED[/yellow]",
-        "FAILED": ":cross_mark: [red]FAILED[/red]",
-        "PENDING": "[dim]PENDING[/dim]",
-    }
-    table = Table(title=title, show_header=True, header_style="bold cyan")
-    table.add_column("File", style="dim")
-    table.add_column("Artifact Type")
-    table.add_column("Issue #", justify="right")
-    table.add_column("Status")
-    for rel, artifact_type, issue_number, status in rows:
-        issue_str = str(issue_number) if issue_number else "[dim]—[/dim]"
-        table.add_row(rel, artifact_type, issue_str, status_markup_map.get(status, status))
-    console.print(table)
-
-
-def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str, issue_number: int) -> str:
-    """Register a single artifact and return the outcome status string.
+def _register_one(
+    provider: GitHubArtifactProvider, rel: str, artifact_type: str, issue_number: int
+) -> tuple[str, str | None]:
+    """Register a single artifact and return its outcome.
 
     Imports model types lazily — only called after GitHub connectivity is confirmed.
 
@@ -923,7 +865,9 @@ def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str
         issue_number: GitHub Issue number.
 
     Returns:
-        One of ``"REGISTERED"``, ``"SKIPPED"``, or ``"FAILED"``.
+        Tuple of ``(status, detail)``: *status* is one of ``"REGISTERED"``,
+        ``"SKIPPED"``, or ``"FAILED"``; *detail* explains SKIPPED/FAILED
+        outcomes, or is ``None`` for REGISTERED.
     """
     from backlog_core.models import (  # ruff: ignore[import-outside-top-level]
         ArtifactEntry,
@@ -936,19 +880,16 @@ def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str
     try:
         art_type_enum = ArtifactType(artifact_type)
     except ValueError:
-        err_console.print(f":cross_mark: Unknown artifact type {artifact_type!r} for {rel}")
-        return "FAILED"
+        return "FAILED", f"Unknown artifact type {artifact_type!r}"
 
     try:
         manifest = provider.get_manifest(issue_number)
     except BacklogError as exc:
-        err_console.print(f":cross_mark: Failed to get manifest for issue #{issue_number}: {exc}")
-        return "FAILED"
+        return "FAILED", f"Failed to get manifest for issue #{issue_number}: {exc}"
 
     existing = next((e for e in manifest.artifacts if e.artifact_id == rel), None)
     if existing is not None and existing.artifact_type == art_type_enum:
-        console.print(f"[dim]  SKIP[/dim]  {rel} (already registered on #{issue_number})")
-        return "SKIPPED"
+        return "SKIPPED", f"already registered on #{issue_number}"
 
     new_entry = ArtifactEntry(
         artifact_type=art_type_enum,
@@ -966,16 +907,14 @@ def _register_one(provider: GitHubArtifactProvider, rel: str, artifact_type: str
     try:
         provider.set_manifest(issue_number, updated_manifest)
     except BacklogError as exc:
-        err_console.print(f":cross_mark: Failed to register {rel} on issue #{issue_number}: {exc}")
-        return "FAILED"
+        return "FAILED", f"Failed to register on issue #{issue_number}: {exc}"
     else:
-        console.print(f":white_check_mark: REGISTERED  {rel}  →  issue #{issue_number}")
-        return "REGISTERED"
+        return "REGISTERED", None
 
 
 def _execute_registrations(
     rows: list[tuple[str, str, int | None, str]], state: Path
-) -> tuple[list[tuple[str, str, int | None, str]], dict[str, int]]:
+) -> tuple[list[dict[str, object]], dict[str, int]]:
     """Execute the registration loop and return final rows and counts.
 
     Args:
@@ -983,31 +922,34 @@ def _execute_registrations(
         state: Absolute path to the DH state root (used to construct the provider).
 
     Returns:
-        Tuple of ``(final_rows, counts)`` where *final_rows* is the updated list and
+        Tuple of ``(final_rows, counts)`` where *final_rows* is a list of
+        ``{"file", "artifact_type", "issue", "status", "detail"}`` dicts and
         *counts* maps status strings to their occurrence count.
     """
     from backlog_core.artifact_provider import GitHubArtifactProvider  # ruff: ignore[import-outside-top-level]
-    from backlog_core.models import discover_repo  # ruff: ignore[import-outside-top-level]
+    from backlog_core.models import RepoDiscoveryError, discover_repo  # ruff: ignore[import-outside-top-level]
 
     try:
         repo_slug = discover_repo()
-    except Exception as exc:
-        err_console.print(f":cross_mark: Cannot discover GitHub repo slug: {exc}")
-        raise typer.Exit(code=1) from exc
+    except RepoDiscoveryError as exc:
+        err(f"Cannot discover GitHub repo slug: {exc}")
 
     provider = GitHubArtifactProvider(repo=repo_slug, root_worktree=state)
 
-    final_rows: list[tuple[str, str, int | None, str]] = []
+    final_rows: list[dict[str, object]] = []
     counts: dict[str, int] = {"REGISTERED": 0, "SKIPPED": 0, "UNMATCHED": 0, "FAILED": 0}
 
     for rel, artifact_type, issue_number, _ in rows:
         if issue_number is None:
-            final_rows.append((rel, artifact_type, None, "UNMATCHED"))
+            final_rows.append({"file": rel, "artifact_type": artifact_type, "issue": None, "status": "UNMATCHED"})
             counts["UNMATCHED"] += 1
             continue
-        result = _register_one(provider, rel, artifact_type, issue_number)
-        final_rows.append((rel, artifact_type, issue_number, result))
-        counts[result] += 1
+        status, detail = _register_one(provider, rel, artifact_type, issue_number)
+        row: dict[str, object] = {"file": rel, "artifact_type": artifact_type, "issue": issue_number, "status": status}
+        if detail is not None:
+            row["detail"] = detail
+        final_rows.append(row)
+        counts[status] += 1
 
     return final_rows, counts
 
@@ -1033,44 +975,33 @@ def register_artifacts(
     state = dh_paths.state_root(project_root)
     plan = dh_paths.plan_dir(project_root)
     backlog = dh_paths.backlog_dir(project_root)
-
-    console.print(
-        Panel(
-            f"Project root:  {project_root}\n"
-            f"Slug:          {resolved_slug}\n"
-            f"Plan dir:      {plan}\n"
-            f"State home:    {state}",
-            title="Register Artifacts",
-            border_style="blue",
-        )
-    )
+    context = {"project_root": project_root, "slug": resolved_slug, "plan_dir": plan, "state_root": state}
 
     if not plan.is_dir():
-        console.print(f":cross_mark: Plan directory does not exist: {plan}")
-        raise typer.Exit(code=1)
+        err(f"Plan directory does not exist: {plan}")
 
     artifact_files = _collect_artifact_files(plan)
     if not artifact_files:
-        console.print(":white_check_mark: No artifact files found in plan directory.")
+        output_json({**context, "status": "no_artifacts", "plan": []})
         return
 
     rows = _build_registration_rows(artifact_files, state, backlog)
-    _print_rows_table("Artifact Registration Plan", rows)
+    plan_rows = [
+        {"file": rel, "artifact_type": artifact_type, "issue": issue_number, "status": status}
+        for rel, artifact_type, issue_number, status in rows
+    ]
 
     if dry_run:
-        console.print("\n:magnifying_glass: Dry-run complete — no manifests were changed.")
+        output_json({**context, "status": "dry_run", "plan": plan_rows})
         return
 
     final_rows, counts = _execute_registrations(rows, state)
-    _print_rows_table("Registration Results", final_rows)
-
-    console.print(
-        f"\n[bold]Summary:[/bold] "
-        f"[green]{counts['REGISTERED']} registered[/green]  "
-        f"[dim]{counts['SKIPPED']} skipped[/dim]  "
-        f"[yellow]{counts['UNMATCHED']} unmatched[/yellow]  "
-        f"[red]{counts['FAILED']} failed[/red]"
-    )
+    output_json({
+        **context,
+        "status": "error" if counts["FAILED"] > 0 else "success",
+        "results": final_rows,
+        "summary": counts,
+    })
 
     if counts["FAILED"] > 0:
         raise typer.Exit(code=1)

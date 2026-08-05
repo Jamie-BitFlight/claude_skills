@@ -1,5 +1,9 @@
 """Tests for migrate_tasks_to_github.py migration script.
 
+migrate_tasks_to_github is invoked exclusively by AI agents via subprocess,
+so its ``migrate`` command emits a single compact JSON object on stdout —
+CLI-level tests parse that JSON and assert on structured fields.
+
 Covers: dry-run safety, idempotency, YAML field writes, task type inference,
 partial failure resilience, and cache file output.
 """
@@ -155,8 +159,12 @@ def test_dry_run_no_writes(tmp_path: Path) -> None:
     cache_file = tmp_path / ".claude" / "context" / "sam-tasks-my-feature.json"
     assert not cache_file.exists()
 
-    # Assert: "Would create:" line in output
-    assert "Would create:" in result.output
+    # Assert: JSON payload reports the task as "would_create"
+    payload = json.loads(result.output)
+    assert payload["dry_run"] is True
+    assert payload["results"] == [
+        {"task_id": "T1", "title": "Implement the feature", "task_type": "implement", "status": "would_create"}
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -189,8 +197,17 @@ def test_skips_already_migrated(tmp_path: Path) -> None:
     # Assert
     assert result.exit_code == 0, result.output
     mock_create.assert_not_called()
-    assert "Skipping T1" in result.output
-    assert "github_issue: 100" in result.output or "100" in result.output
+    payload = json.loads(result.output)
+    assert payload["results"] == [
+        {
+            "task_id": "T1",
+            "title": "Implement the feature",
+            "task_type": "implement",
+            "status": "skipped",
+            "issue": 100,
+            "reason": "already migrated",
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------

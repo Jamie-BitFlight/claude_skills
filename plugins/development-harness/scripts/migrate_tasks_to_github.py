@@ -5,6 +5,7 @@
 #     "typer>=0.21.0",
 #     "ruamel.yaml>=0.18.0",
 #     "PyGithub>=2.1.0",
+#     "pydantic>=2.12.3",
 # ]
 # ///
 r"""Migrate SAM task files to GitHub sub-issues.
@@ -45,11 +46,20 @@ if isinstance(sys.stdout, TextIOWrapper):
 if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+# Bootstrap: make the development-harness package importable from within the
+# PEP 723 isolated environment.  The script lives at:
+#   plugins/development-harness/scripts/migrate_tasks_to_github.py
+# so parents[1] is plugins/development-harness/.
+_HARNESS_DIR = Path(__file__).resolve().parents[1]
+if str(_HARNESS_DIR) not in sys.path:
+    sys.path.insert(0, str(_HARNESS_DIR))
+
 import dh_paths
 import typer
-from rich.console import Console
 from ruamel.yaml import YAML, YAMLError
 from sam_schema.task_format import resolve_task_id
+
+from cli_output import err, output_json
 
 if TYPE_CHECKING:
     from backlog_core.backend_types import IssueNode
@@ -93,8 +103,6 @@ if _BACKLOG_CORE.exists():
 app = typer.Typer(
     name="migrate_tasks_to_github", help="Migrate SAM task files to GitHub sub-issues.", no_args_is_help=True
 )
-console = Console()
-err_console = Console(stderr=True)
 
 
 # ---------------------------------------------------------------------------
@@ -313,16 +321,17 @@ def derive_slug(task_file: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-def topological_sort(tasks: list[TaskRecord]) -> list[TaskRecord]:
+def topological_sort(tasks: list[TaskRecord]) -> tuple[list[TaskRecord], bool]:
     """Sort tasks in dependency-first order using Kahn's algorithm.
 
-    Falls back to file order with a warning when a cycle is detected.
+    Falls back to file order when a cycle is detected.
 
     Args:
         tasks: List of TaskRecord objects to sort.
 
     Returns:
-        Sorted list of TaskRecord objects.
+        Tuple of ``(ordered_tasks, cycle_detected)``. When a cycle is
+        detected, *ordered_tasks* is the original file order.
     """
     id_to_task = {t.task_id: t for t in tasks}
     known_ids = set(id_to_task)
@@ -350,10 +359,9 @@ def topological_sort(tasks: list[TaskRecord]) -> list[TaskRecord]:
         queue.extend(sorted(newly_ready))
 
     if len(sorted_ids) != len(tasks):
-        err_console.print(":warning:  Cycle detected in task dependencies — processing in file order.", style="yellow")
-        return tasks
+        return tasks, True
 
-    return [id_to_task[tid] for tid in sorted_ids]
+    return [id_to_task[tid] for tid in sorted_ids], False
 
 
 # ---------------------------------------------------------------------------
@@ -540,7 +548,7 @@ def _write_cache(
         "tasks": tasks_data,
     }
 
-    cache_path.write_text(json.dumps(cache, indent=2))
+    cache_path.write_text(json.dumps(cache))
     return cache_path
 
 
@@ -549,31 +557,30 @@ def _write_cache(
 # ---------------------------------------------------------------------------
 
 
-def _connect_github() -> Repository | None:
+def _connect_github() -> Repository:
     """Connect to GitHub and return a Repository object.
 
     Returns:
-        Repository object, or None if backlog_core is unavailable.
+        Repository object.
 
     Raises:
-        SystemExit: On connection failure.
+        typer.Exit: Always — when backlog_core is unavailable or the
+            connection fails (via :func:`cli_output.err`).
     """
     if create_task_issue is None or get_github is None or SamTask is None:
-        err_console.print(
-            f":cross_mark: backlog_core not found or could not be imported from {_BACKLOG_CORE}", style="red"
-        )
-        raise typer.Exit(code=1)
+        err(f"backlog_core not found or could not be imported from {_BACKLOG_CORE}")
+
+    from backlog_core.models import GitHubUnavailableError  # ruff: ignore[import-outside-top-level]
 
     try:
         return get_github()
-    except Exception as exc:
-        err_console.print(f":cross_mark: GitHub connection failed: {exc}", style="red")
-        raise typer.Exit(code=1) from exc
+    except GitHubUnavailableError as exc:
+        err(f"GitHub connection failed: {exc}")
 
 
 def _migrate_task(
     task: TaskRecord, slug: str, repo: Repository, parent_issue: int, labels: list[str]
-) -> IssueNode | None:
+) -> tuple[IssueNode | None, str | None]:
     """Create a GitHub sub-issue for a single task.
 
     Args:
@@ -584,7 +591,8 @@ def _migrate_task(
         labels: Label names to apply.
 
     Returns:
-        Created Issue object, or None on failure.
+        Tuple of ``(issue, error)``: the created Issue object with *error*
+        ``None`` on success, or ``(None, error_message)`` on failure.
     """
     from backlog_core.models import BacklogError  # ruff: ignore[import-outside-top-level]
 
@@ -603,10 +611,13 @@ def _migrate_task(
         dependencies=task.dependencies,
     )
     try:
-        return create_task_issue(repo, parent_issue, sam, description=task.title, acceptance_criteria=[], labels=labels)
+        issue = create_task_issue(
+            repo, parent_issue, sam, description=task.title, acceptance_criteria=[], labels=labels
+        )
     except (BacklogError, KeyError, ValueError, RuntimeError) as exc:
-        err_console.print(f":warning:  Failed to create issue for {task.task_id}: {exc}", style="yellow")
-        return None
+        return None, str(exc)
+    else:
+        return issue, None
 
 
 # ---------------------------------------------------------------------------
@@ -636,63 +647,76 @@ def migrate(
     on success. Skips tasks that already have a ``github_issue`` field.
     """
     if not task_file.exists():
-        console.print(f":cross_mark: Task file not found: {task_file}", style="red")
-        raise typer.Exit(code=1)
+        err(f"Task file not found: {task_file}")
 
     tasks = parse_task_file(task_file)
     if not tasks:
-        console.print(":cross_mark: No tasks found in task file.", style="red")
-        raise typer.Exit(code=1)
+        err("No tasks found in task file.")
 
     slug = derive_slug(task_file)
     labels: list[str] = label or []
-    ordered = topological_sort(tasks)
+    ordered, cycle_detected = topological_sort(tasks)
+    warnings: list[str] = []
+    if cycle_detected:
+        warnings.append("Cycle detected in task dependencies — processing in file order.")
 
     repo = None if dry_run else _connect_github()
 
-    n_created = 0
-    n_skipped = 0
-    n_failed = 0
+    results: list[dict[str, object]] = []
     created_pairs: list[tuple[TaskRecord, int]] = []
 
     for task in ordered:
         task_type = infer_task_type(task.title)
+        record: dict[str, object] = {"task_id": task.task_id, "title": task.title, "task_type": task_type}
 
         if task.github_issue is not None:
-            console.print(f"Skipping {task.task_id} — already has github_issue: {task.github_issue}")
-            n_skipped += 1
+            results.append({**record, "status": "skipped", "issue": task.github_issue, "reason": "already migrated"})
             continue
 
         if dry_run:
-            # Escape brackets so Rich does not interpret them as markup tags.
-            console.print(f"Would create: \\[{slug}/{task.task_id}] {task_type}: {task.title}")
-            n_created += 1
+            results.append({**record, "status": "would_create"})
             continue
 
-        if repo is None:
-            err_console.print(":cross_mark: Repository unavailable for live migration.", style="red")
-            raise typer.Exit(code=1)
-        issue = _migrate_task(task, slug, repo, parent_issue, labels)
+        assert repo is not None  # ruff: ignore[assert] — repo is None only when dry_run, handled above
+        issue, error = _migrate_task(task, slug, repo, parent_issue, labels)
         if issue is None:
-            n_failed += 1
+            results.append({**record, "status": "failed", "error": error})
             continue
 
         try:
             _write_github_issue_field(task, issue["number"])
-            console.print(f":white_check_mark: Created #{issue['number']} for {task.task_id}: {task.title}")
-            n_created += 1
-            created_pairs.append((task, issue["number"]))
         except (OSError, KeyError, ValueError) as exc:
-            err_console.print(
-                f":warning:  Created #{issue['number']} but could not write github_issue field: {exc}", style="yellow"
-            )
-            n_failed += 1
+            results.append({
+                **record,
+                "status": "failed",
+                "issue": issue["number"],
+                "error": f"Created issue but could not write github_issue field: {exc}",
+            })
+            continue
 
+        results.append({**record, "status": "created", "issue": issue["number"]})
+        created_pairs.append((task, issue["number"]))
+
+    cache_path: Path | None = None
     if not dry_run and created_pairs:
         cache_path = _write_cache(slug, parent_issue, created_pairs)
-        console.print(f"Cache written: {cache_path}")
 
-    console.print(f"{n_created} created, {n_skipped} skipped, {n_failed} failed")
+    summary = {
+        "created": sum(1 for r in results if r["status"] in {"created", "would_create"}),
+        "skipped": sum(1 for r in results if r["status"] == "skipped"),
+        "failed": sum(1 for r in results if r["status"] == "failed"),
+    }
+
+    output_json({
+        "task_file": task_file,
+        "parent_issue": parent_issue,
+        "slug": slug,
+        "dry_run": dry_run,
+        "warnings": warnings,
+        "results": results,
+        "summary": summary,
+        "cache_path": cache_path,
+    })
 
 
 if __name__ == "__main__":

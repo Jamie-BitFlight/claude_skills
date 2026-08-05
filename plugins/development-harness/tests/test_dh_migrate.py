@@ -1,16 +1,21 @@
 """Unit tests for dh_migrate CLI tool.
 
+dh_migrate is invoked exclusively by AI agents via subprocess, so every
+command emits a single compact JSON object on stdout — these tests parse
+that JSON and assert on structured fields, not human-formatted text.
+
 Tests cover:
 - verify command: detects old layout, new layout, partial migration
 - migrate --dry-run: shows plan without modifying files
 - migrate: moves directories, creates .dh/.gitkeep, removes empty old dirs
 - _detect_layout: correct flags for old/new/both/neither
 - _old_dirs: correct path construction
-- Artifact manifest update step: logs instructions (no external calls)
+- _artifact_manifest_instructions: structured follow-up instructions (no external calls)
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -28,7 +33,15 @@ if str(_HARNESS_DIR) not in sys.path:
 from typing import TYPE_CHECKING
 
 import dh_paths
-from scripts.dh_migrate import _OLD_TO_NEW, _detect_layout, _old_dirs, _update_artifact_manifests, app
+from scripts.dh_migrate import (
+    _OLD_TO_NEW,
+    _artifact_manifest_instructions,
+    _detect_layout,
+    _merge_dir,
+    _old_dirs,
+    _remove_empty_old_dirs,
+    app,
+)
 from typer.testing import CliRunner
 
 if TYPE_CHECKING:
@@ -165,8 +178,9 @@ def test_verify_old_layout_exits_1_and_reports_present(old_layout: Path) -> None
         result = runner.invoke(app, ["verify"])
     # Assert
     assert result.exit_code == 1
-    assert "present" in result.output
-    assert "Action Required" in result.output or "Partial" in result.output
+    payload = json.loads(result.output)
+    assert payload["status"] in {"action_required", "partial_migration"}
+    assert any(entry["present"] for entry in payload["old_layout"])
 
 
 def test_verify_new_layout_exits_0(new_layout: Path) -> None:
@@ -176,17 +190,21 @@ def test_verify_new_layout_exits_0(new_layout: Path) -> None:
         result = runner.invoke(app, ["verify"])
     # Assert
     assert result.exit_code == 0
-    assert "Migrated" in result.output or "present" in result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "migrated"
+    assert payload["new_layout"]["present"] is True
 
 
-def test_verify_no_layout_exits_1(fake_project: Path) -> None:
+def test_verify_no_layout_exits_0_status_migrated(fake_project: Path) -> None:
     # Arrange: neither old nor new layout
     with patch.object(dh_paths, "git_project_root", return_value=fake_project):
         # Act
         result = runner.invoke(app, ["verify"])
-    # Assert: exits 1 because old dirs absent but new also absent — action required
-    # (Actual message depends on state logic; either Action Required or Migrated)
-    assert result.exit_code in (0, 1)
+    # Assert: old_present is False so the command reports "migrated" and exits 0,
+    # regardless of whether new_present is also False (fresh/clean project).
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "migrated"
 
 
 def test_verify_shows_project_slug(old_layout: Path) -> None:
@@ -194,8 +212,9 @@ def test_verify_shows_project_slug(old_layout: Path) -> None:
     with patch.object(dh_paths, "git_project_root", return_value=old_layout):
         # Act
         result = runner.invoke(app, ["verify"])
-    # Assert: "Project slug:" label is in output (Rich may truncate the full slug value)
-    assert "Project slug:" in result.output
+    # Assert: project_slug field is present and non-empty
+    payload = json.loads(result.output)
+    assert payload["project_slug"]
 
 
 # ---------------------------------------------------------------------------
@@ -210,8 +229,9 @@ def test_migrate_dry_run_exits_0_and_shows_plan(old_layout: Path) -> None:
         result = runner.invoke(app, ["migrate", "--dry-run"])
     # Assert
     assert result.exit_code == 0
-    assert "Dry-run complete" in result.output
-    assert "Migration Plan" in result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "dry_run"
+    assert payload["moves"]
 
 
 def test_migrate_dry_run_does_not_move_files(old_layout: Path) -> None:
@@ -234,11 +254,12 @@ def test_migrate_dry_run_shows_source_and_destination(old_layout: Path) -> None:
     with patch.object(dh_paths, "git_project_root", return_value=old_layout):
         # Act
         result = runner.invoke(app, ["migrate", "--dry-run"])
-    # Assert: output contains Source and Destination column headers
-    # (Rich may truncate long path values in table cells)
-    assert "Source (old)" in result.output
-    assert "Destination (new)" in result.output
-    assert "Migration Plan" in result.output
+    # Assert: each planned move has source/destination fields
+    payload = json.loads(result.output)
+    assert payload["status"] == "dry_run"
+    for move in payload["moves"]:
+        assert move["source"]
+        assert move["destination"]
 
 
 # ---------------------------------------------------------------------------
@@ -290,15 +311,23 @@ def test_migrate_creates_dh_gitkeep(old_layout: Path) -> None:
     # Assert
     assert result.exit_code == 0
     assert gitkeep.exists()
+    payload = json.loads(result.output)
+    assert payload["status"] == "success"
+    assert payload["gitkeep_created"] is True
 
 
 def test_migrate_removes_empty_old_dirs(old_layout: Path) -> None:
-    # Arrange: old dirs have content that will be moved
+    # Arrange: old dirs have content that will be moved. When the destination
+    # does not pre-exist, shutil.move() relocates the whole source directory —
+    # by the time _remove_empty_old_dirs runs, it no longer exists at all
+    # (neither empty nor non-empty), so it is not one of the paths that
+    # function reports as removed. _merge_dir's own return value is covered
+    # directly by test_merge_dir_returns_merged_items_and_removes_source below.
     with patch.object(dh_paths, "git_project_root", return_value=old_layout):
         # Act
         result = runner.invoke(app, ["migrate"])
 
-    # Assert: old dirs removed after migration (they are now empty)
+    # Assert: old dirs no longer exist after migration
     assert result.exit_code == 0
     old_backlog = old_layout / ".claude" / "backlog"
     old_plan = old_layout / "plan"
@@ -313,7 +342,9 @@ def test_migrate_no_old_dirs_exits_0_with_nothing_to_migrate(fake_project: Path)
         result = runner.invoke(app, ["migrate"])
     # Assert: exits 0, reports nothing to migrate
     assert result.exit_code == 0
-    assert "nothing to migrate" in result.output.lower()
+    payload = json.loads(result.output)
+    assert payload["status"] == "nothing_to_migrate"
+    assert payload["moves"] == []
 
 
 def test_migrate_idempotent_gitkeep_already_present(old_layout: Path) -> None:
@@ -329,56 +360,87 @@ def test_migrate_idempotent_gitkeep_already_present(old_layout: Path) -> None:
     # Assert: exits 0, does not error on existing .gitkeep
     assert result.exit_code == 0
     assert (dh_dir / ".gitkeep").exists()
+    payload = json.loads(result.output)
+    assert payload["gitkeep_created"] is False
 
 
 # ---------------------------------------------------------------------------
-# _update_artifact_manifests
+# _merge_dir
 # ---------------------------------------------------------------------------
 
 
-def test_update_artifact_manifests_logs_instructions(fake_project: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    # Arrange: use a real Console writing to stdout via Rich
-    from rich.console import Console
-
-    out = Console(highlight=False)
-
-    # Act — should not raise, should print instructions
-    _update_artifact_manifests(fake_project, out)
-
-    # No assertion on specific output needed — just verify no exception raised
-    # and the function returns normally (does not raise SystemExit or Exception)
-
-
-def test_update_artifact_manifests_mentions_artifact_register(fake_project: Path) -> None:
-    # Arrange
-    from io import StringIO
-
-    from rich.console import Console
-
-    buffer = StringIO()
-    out = Console(file=buffer, highlight=False)
+def test_merge_dir_returns_merged_items_and_removes_source(tmp_path: Path) -> None:
+    # Arrange: src has two items, dest already exists (the merge case)
+    src = tmp_path / "src"
+    dest = tmp_path / "dest"
+    src.mkdir()
+    dest.mkdir()
+    (src / "a.md").write_text("a")
+    (src / "b.md").write_text("b")
 
     # Act
-    _update_artifact_manifests(fake_project, out)
-    output = buffer.getvalue()
+    merged = _merge_dir(src, dest)
 
-    # Assert: key MCP tool name is mentioned
-    assert "artifact_register" in output
+    # Assert: both item names reported, files copied, source removed
+    assert set(merged) == {"a.md", "b.md"}
+    assert (dest / "a.md").read_text() == "a"
+    assert (dest / "b.md").read_text() == "b"
+    assert not src.exists()
 
 
-def test_update_artifact_manifests_shows_old_prefixes(fake_project: Path) -> None:
-    # Arrange
-    from io import StringIO
+# ---------------------------------------------------------------------------
+# _remove_empty_old_dirs
+# ---------------------------------------------------------------------------
 
-    from rich.console import Console
 
-    buffer = StringIO()
-    out = Console(file=buffer, highlight=False)
+def test_remove_empty_old_dirs_reports_removed_and_skipped(fake_project: Path) -> None:
+    # Arrange: .claude/backlog is empty (removable), .claude/context has content (skipped)
+    empty_dir = fake_project / ".claude" / "backlog"
+    non_empty_dir = fake_project / ".claude" / "context"
+    empty_dir.mkdir(parents=True)
+    non_empty_dir.mkdir(parents=True)
+    (non_empty_dir / "leftover.md").write_text("still here")
 
     # Act
-    _update_artifact_manifests(fake_project, out)
-    output = buffer.getvalue()
+    removed, skipped = _remove_empty_old_dirs(fake_project)
 
-    # Assert: old prefixes are mentioned
-    assert "plan/" in output
-    assert ".claude/backlog/" in output
+    # Assert
+    assert str(empty_dir) in removed
+    assert not empty_dir.exists()
+    assert str(non_empty_dir) in skipped
+    assert non_empty_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# _artifact_manifest_instructions
+# ---------------------------------------------------------------------------
+
+
+def test_artifact_manifest_instructions_returns_dict_without_raising(fake_project: Path) -> None:
+    # Act — should not raise, should return a populated dict
+    result = _artifact_manifest_instructions(fake_project)
+
+    # Assert
+    assert isinstance(result, dict)
+    assert result
+
+
+def test_artifact_manifest_instructions_mentions_artifact_register(fake_project: Path) -> None:
+    # Act
+    result = _artifact_manifest_instructions(fake_project)
+    steps = result["steps"]
+
+    # Assert: key MCP tool name is mentioned in the steps
+    assert isinstance(steps, list)
+    assert any("artifact_register" in str(step) for step in steps)
+
+
+def test_artifact_manifest_instructions_shows_old_prefixes(fake_project: Path) -> None:
+    # Act
+    result = _artifact_manifest_instructions(fake_project)
+    old_prefixes = result["old_prefixes"]
+
+    # Assert: old prefixes are present in structured form
+    assert isinstance(old_prefixes, list)
+    assert "plan/" in old_prefixes
+    assert ".claude/backlog/" in old_prefixes
