@@ -217,8 +217,12 @@ Executes a groomed milestone with full parallel isolation. For each wave:
 
 This is what enables true parallel milestone execution: multiple independent Claude instances, each working on a separate issue in its own worktree, coordinated by the parent orchestrator.
 
+This is illustrative — `/dh:kage-bunshin`'s own SKILL.md resolves the real script path via
+`${CLAUDE_SKILL_DIR}`, a Claude Code substitution that only applies inside a loaded SKILL.md, not
+in this README. Invoke the skill rather than copying `spawn.py`'s path from here:
+
 ```bash
-SPAWN="${CLAUDE_SKILL_DIR}/scripts/spawn.py"
+SPAWN="spawn.py"  # path resolved by /dh:kage-bunshin's own SKILL.md when it runs
 SID=$(uuidgen)
 
 # Spawn a session
