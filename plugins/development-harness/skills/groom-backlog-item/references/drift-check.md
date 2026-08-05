@@ -21,7 +21,7 @@ Spawn a haiku-model agent (`subagent_type="dh:task-worker"`, model=haiku) with t
    - **New callers** — other files now depend on this file that the plan did not account for
    - **File moved/renamed** — file is at a different path
    - **No impact** — commit is unrelated to the plan's goals for this file
-7. Write findings to the backlog item via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{title}" --section "Plan Drift" --content "..."`
+7. Write findings to the backlog item via `backlog groom --selector "{title}" --section "Plan Drift" --content "..."`
 
 **Plan Drift output format when drift is detected:**
 
@@ -69,7 +69,7 @@ Review {specific task IDs} against this change during execution.
 
 Spawn a haiku-model agent (`subagent_type="dh:task-worker"`, model=haiku) with this task:
 
-1. Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title}"` to retrieve the full item
+1. Call `backlog view --selector "{title}"` to retrieve the full item
 2. Extract file paths from the groomed sections:
    - **Impact Radius** section — file paths listed under Code, Documentation, Configuration/CI, Agent Instructions
    - **Files** section — explicit file paths listed by the groomer
@@ -83,7 +83,7 @@ Spawn a haiku-model agent (`subagent_type="dh:task-worker"`, model=haiku) with t
    - **New callers** — other files now depend on this file that the groomed content did not account for
    - **File moved/renamed** — file is at a different path
    - **No impact** — commit is unrelated to the item's scope for this file
-7. Write findings to the backlog item via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{title}" --section "Grooming Drift" --content "..."`
+7. Write findings to the backlog item via `backlog groom --selector "{title}" --section "Grooming Drift" --content "..."`
 
 **Grooming Drift output format when drift is detected:**
 

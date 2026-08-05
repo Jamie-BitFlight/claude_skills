@@ -10,8 +10,9 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
 </sam_cli>
 
 The `references/mcp-connection-check.md` file loaded by this skill is a plain file, not
-substituted — every `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"` invocation it documents
-means the exact command shown in <sam_cli/> above, already resolved for this session.
+substituted — it shows bare SAM CLI subcommands and args only (e.g. `plan list`), never the
+invocation prefix. Prepend the command in <sam_cli/> above to every one of them. `README.md`'s CLI
+equivalents follow the same convention.
 
 MCP tools are the primary structured interface for provider-neutral backlog operations. They are not a universal proxy for backend-native tools.
 The selected backend provider is authoritative; `~/.dh/projects/{slug}/backlog/` per-item files are the local cache or working state according to that backend.

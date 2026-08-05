@@ -16,7 +16,7 @@ If evidence shows the work is already done:
 - Resolve via the CLI:
 
   ```bash
-  uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve \
+  backlog resolve \
     --selector "{title}" \
     --summary "Already implemented via PR #{pr} / commit {sha}"
   ```

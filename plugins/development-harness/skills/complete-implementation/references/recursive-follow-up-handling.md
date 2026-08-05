@@ -37,7 +37,7 @@ flowchart TD
 **Strategy 1 — substring via `title=`**
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --title "{derived_slug}"
+backlog list --title "{derived_slug}"
 ```
 
 Parse the JSON output. For each item, check if the derived slug appears (case-insensitive
@@ -49,7 +49,7 @@ match as the result and skip Strategy 2.
 If Strategy 1 returns zero matches, run:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --topic "{derived_slug}"
+backlog list --topic "{derived_slug}"
 ```
 
 The `topic` parameter performs a case-insensitive substring match against `metadata.topic`.
@@ -106,7 +106,7 @@ Based on Step 2 result, for each follow-up file:
 **Match found** -- attach follow-up as plan to the existing backlog item using the plan ID from the `sam_plan(action='list')` result in Step 1:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{matched_item_title}" --plan "{plan_id}"
+backlog update --selector "{matched_item_title}" --plan "{plan_id}"
 ```
 
 **No match found** -- create a new backlog item, then attach the follow-up as plan:
@@ -118,7 +118,7 @@ Skill(skill: "dh:create-backlog-item", args: "--auto {derived_title}")
 Then attach the follow-up plan using the plan ID from Step 1:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{derived_title}" --plan "{plan_id}"
+backlog update --selector "{derived_title}" --plan "{plan_id}"
 ```
 
 **Error handling**:

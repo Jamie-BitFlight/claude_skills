@@ -239,7 +239,7 @@ flowchart TD
 Write classification:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
+backlog groom \
   --selector "{item_ref}" \
   --section "Issue Classification" \
   --content "**Type**: {type}\n**Rationale**: {explanation}\n**Analysis Method**: {method}\n**Scenario Target**: {scenario} -> {improvement}"

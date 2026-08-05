@@ -7,7 +7,7 @@
 
 ## Step 5.2: Find Item
 
-Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "<item_ref/>"` (accepts URLs, `#N`, bare numbers, and title substrings).
+Call `backlog view --selector "<item_ref/>"` (accepts URLs, `#N`, bare numbers, and title substrings).
 
 - If the returned dict contains an `error` key, report and stop.
 - Extract `title` from the returned dict and use it as the working title.
@@ -33,7 +33,7 @@ If operation is `close`:
 
 3. Optionally ask for additional context: "Any additional comment?" (free text, can be skipped).
 
-4. Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close`:
+4. Call `backlog close`:
 
    - `--selector`: `"{title}"` or `"#{N}"`
    - `--reason`: `"{selected reason}"`
@@ -51,7 +51,7 @@ If operation is `resolve`:
 1. Extract `**Plan**:` field from the matched item. If absent, skip this step entirely — non-SAM items have no verification gate.
 
 2. If `**Plan**:` is present, check the GitHub Issue labels for `status:verified`:
-   - Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title}"` and inspect the `labels` list in the returned dict.
+   - Call `backlog view --selector "{title}"` and inspect the `labels` list in the returned dict.
    - If `status:verified` is present in `labels`, proceed to Step 5.5.
    - If `status:verified` is absent:
      - If `--force` flag was passed, print a warning and proceed to Step 5.5:
@@ -86,7 +86,7 @@ If operation is `resolve`:
 2. Extract the plan address from the plan path (e.g., `plan/Pe9f0a1b2-backlog-lifecycle-process-gaps.yaml` → `Pe9f0a1b2`). Call:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{address}"
+   plan status --plan-address "{address}"
    ```
 
    From the response, read `status_counts`. A plan is complete when `status_counts.not_started == 0` and `status_counts.in_progress == 0` and `status_counts.blocked == 0`.
@@ -104,7 +104,7 @@ If operation is `resolve`:
 
 ## Step 5.6: Resolve path — typed acceptance-criteria verification
 
-4. Extract acceptance criteria from the `backlog_view` response. Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title}"`, then read `response["sections"]["Acceptance Criteria"]`. The field format is a bullet list:
+4. Extract acceptance criteria from the `backlog_view` response. Call `backlog view --selector "{title}"`, then read `response["sections"]["Acceptance Criteria"]`. The field format is a bullet list:
 
    Note: the CLI's `backlog view` has no `summary` toggle (documented gap in the MCP↔CLI mapping,
    verified 2026-08-05) — it always returns the flatter, full-content equivalent of `summary=false`.
@@ -165,7 +165,7 @@ If operation is `resolve`:
 
    - **Open PR found**: The PR body contains `Fixes #N` — the issue will auto-close on merge. Update only the backlog item status (do NOT close the GitHub Issue):
 
-     Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --status "in-progress"`.
+     Call `backlog update --selector "{title}" --status "in-progress"`.
 
      Report:
 
@@ -185,7 +185,7 @@ If operation is `resolve`:
     - `follow_ups` — "Any follow-up tickets created?" (comma-separated refs)
     - `findings` — "Any retrospective learnings?"
 
-11. Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve`:
+11. Call `backlog resolve`:
 
     - `--selector`: `"{title}"` or `"#{N}"`
     - `--summary`: `"{summary}"`
@@ -204,7 +204,7 @@ If operation is `resolve`:
     b. If a milestone is present, call:
 
        ```bash
-       uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list
+       backlog list
        ```
 
        From the returned items, count those whose `milestone` field matches the resolved item's milestone AND whose `status` is NOT `done` or `resolved`. This is the `open_issues` count.

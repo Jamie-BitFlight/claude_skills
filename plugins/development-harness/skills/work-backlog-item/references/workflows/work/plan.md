@@ -40,7 +40,7 @@ Compute slug: lowercase item title, replace spaces with hyphens.
 slug = item_title.lower().replace(" ", "-")
 ```
 
-Call: `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}"`.
+Call: `plan list --search "{slug}"`.
 
 **Branch:**
 

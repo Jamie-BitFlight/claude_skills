@@ -39,7 +39,7 @@ flowchart TD
 ## Writing Classification to Backlog Item
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
+backlog groom \
   --selector "{title}" \
   --section "Issue Classification" \
   --content "**Type**: {classification}
@@ -67,7 +67,7 @@ Skill(skill="find-cause", args="{description of the defect}")
 Write the evidence chain:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
+backlog groom \
   --selector "{title}" \
   --section "Root-Cause Analysis" \
   --content "**Method**: 5-whys
@@ -83,10 +83,10 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
 
 ### recurring-pattern — 6-sigma
 
-Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --status "resolved"` (the CLI's `backlog list` has no `--search` full-text flag, but `--status` used here is fully supported), filter by keywords related to this defect class, count matches, and write the measurement section:
+Call `backlog list --status "resolved"` (the CLI's `backlog list` has no `--search` full-text flag, but `--status` used here is fully supported), filter by keywords related to this defect class, count matches, and write the measurement section:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
+backlog groom \
   --selector "{title}" \
   --section "Root-Cause Analysis" \
   --content "**Method**: 6-sigma

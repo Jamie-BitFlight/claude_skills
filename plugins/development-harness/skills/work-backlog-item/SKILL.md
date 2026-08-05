@@ -20,7 +20,7 @@ For every placeholder in the form <key/>, substitute the value of that key from 
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
 </sam_cli>
 
-The `references/workflows/*.md` files loaded by this skill are plain files, not substituted — every `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"` invocation they document means the exact command shown in <sam_cli/> above, already resolved for this session.
+The `references/workflows/*.md` files loaded by this skill are plain files, not substituted — they show bare SAM CLI subcommands and args only (e.g. `backlog view --selector "..."`), never the invocation prefix. Prepend the command in <sam_cli/> above to every one of them.
 
 > [!IMPORTANT]
 > When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.

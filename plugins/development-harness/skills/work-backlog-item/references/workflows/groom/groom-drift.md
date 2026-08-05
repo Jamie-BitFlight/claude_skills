@@ -35,7 +35,7 @@ flowchart TD
 
 Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 
-1. Read the plan via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan_address}`.
+1. Read the plan via `plan read --address {plan_address}`.
 2. Extract all file paths from the plan (task descriptions, files-to-modify, context manifest).
 3. Get the plan's last commit date: `git log -1 --format=%aI -- {plan_path}`.
 4. For each file, find commits since that date: `git log --oneline --since={date} -- {file}`.
@@ -49,7 +49,7 @@ Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 7. Write findings:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{title}" --section "Plan Drift" --content "{findings}"
+backlog groom --selector "{title}" --section "Plan Drift" --content "{findings}"
 ```
 
 **`{findings}` content format**:
@@ -77,7 +77,7 @@ Classifications: `Scope change`, `Partial fix`, `New callers`, `File moved`, `No
 
 Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 
-1. Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title}"` (the CLI has no `summary` parameter — it always returns full content).
+1. Call `backlog view --selector "{title}"` (the CLI has no `summary` parameter — it always returns full content).
 2. Extract file paths from groomed sections:
    - `sections["Impact Radius"]` — file paths under Code, Documentation, Configuration/CI
    - `sections["Files"]` — explicit file paths
@@ -88,7 +88,7 @@ Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 6. Write findings:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{title}" --section "Grooming Drift" --content "{findings}"
+backlog groom --selector "{title}" --section "Grooming Drift" --content "{findings}"
 ```
 
 **`{findings}` content format**:

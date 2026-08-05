@@ -20,7 +20,7 @@ Load [github-sync.md](./github-sync.md#step-23-create-linked-issue).
 
 Load [github-sync.md](./github-sync.md#step-24-set-in-progress).
 
-**Two-part step:** (a) Always run `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --status "in-progress"` for the current item. (b) Run `milestone start` only on explicit user intent to start the whole milestone — it bulk-transitions all open milestone issues, not just the current one.
+**Two-part step:** (a) Always run `backlog update --selector "{title}" --status "in-progress"` for the current item. (b) Run `milestone start` only on explicit user intent to start the whole milestone — it bulk-transitions all open milestone issues, not just the current one.
 
 ## Step 2.5: Discovery Gate
 
@@ -50,7 +50,7 @@ flowchart TD
 
 The discovery skill gathers WHO/WHAT/WHEN/WHY requirements and registers the result as a
 `feature-context` artifact. The exit signal is a non-zero count from
-`uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {N} --artifact-type feature-context`.
+`artifact list --item-id {N} --artifact-type feature-context`.
 
 **When <mode/> is `auto`**: After `dh:discovery` returns, do NOT yield to the user. Immediately
 call `artifact list --item-id {N} --artifact-type feature-context` to verify the artifact was registered, then proceed to Step 3.1 without

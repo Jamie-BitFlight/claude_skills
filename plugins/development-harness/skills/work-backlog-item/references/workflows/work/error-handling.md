@@ -1,6 +1,6 @@
 # Error Handling Reference
 
-- `#N` / URL / bare number not found: report and list available items — call the CLI: `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list`
+- `#N` / URL / bare number not found: report and list available items — call the CLI: `backlog list`
 - `#N` already closed: run Completed Issue Discovery (search commits/PRs for evidence, close local item with reference, or ask user)
 - `close #N` / `resolve #N` — issue not found: report and stop
 - Item not found: list available items via `backlog_list` with their priority sections

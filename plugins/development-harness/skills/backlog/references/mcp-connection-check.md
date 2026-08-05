@@ -58,13 +58,13 @@ If a server shows as failed in `/mcp` or tool calls return connection errors:
 
 If the configured backend is Beads, use native `bd` first for CRUD, readiness, status, and dependencies; do not route those operations through an adapter. If a structured SAM operation is needed and the SAM server is unavailable, use the validated direct script-path CLI.
 
-From any directory (the invoking SKILL.md's `<sam_cli/>` block already resolved `${CLAUDE_PLUGIN_ROOT}` for this session):
+Using the SAM CLI (the invoking `backlog` skill's `<sam_cli/>` block already resolved the full
+command for this session — prefix each line below with it):
 
 ```bash
-CLI="uv run ${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
-$CLI plan list
-$CLI plan status --plan-address P{N}
-$CLI plan ready --plan-address P{N}
+plan list
+plan status --plan-address P{N}
+plan ready --plan-address P{N}
 ```
 
 Use named options for addresses and task data. Do not use the retired standalone console script, flat commands, positional addresses, or selectable output-format flags. The MCP composites remain MCP-only and should be called through their connected `mcp__plugin_dh_*` tools.

@@ -4,7 +4,7 @@
 
 Fetch the issue using the CLI's `backlog view` command (accepts URLs, `#N`, and bare numbers):
 
-Call: `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "<mode/>"`.
+Call: `backlog view --selector "<mode/>"`.
 
 If the tool returns a dict with an `error` key, report and stop.
 If `state` is `closed`, run the **Completed Issue Discovery** procedure below and stop.
@@ -65,7 +65,7 @@ When an issue is found to be already closed (`state: closed`), gather evidence b
    Closing local backlog item with evidence.
    ```
 
-   Call: `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "{title}" --summary "Completed via PR #{pr} / commit {sha}"`.
+   Call: `backlog resolve --selector "{title}" --summary "Completed via PR #{pr} / commit {sha}"`.
 
    If no commits or PRs reference the issue:
 
