@@ -1,3 +1,10 @@
+---
+paths:
+- '**/*.py'
+- '**/pyproject.toml'
+- '**/uv.lock'
+---
+
 # Python Development Rules
 
 ## Plugin Python — PEP 723 Scripts, No uv Workspace

@@ -15,6 +15,7 @@ This document covers everything an AI agent needs to work effectively in this re
 ### Environment Setup (Required First)
 
 ```bash
+uv self update                             # Keep uv itself current (v0.10.0+ required)
 uv sync                                    # Install all dependencies, create .venv/
 uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # Install git hooks
 ```
@@ -28,6 +29,7 @@ uv run ty check path/to/file.py            # Type check (Astral's ty)
 uv run prek run --files path/to/file.py    # Run ALL pre-commit hooks on specific files
 uv run prek run --all-files                # Run ALL hooks on all files (slow)
 uv run prek run ruff --files <file>        # Run single hook on specific files
+uvx skilllint@latest check <path>          # Validate skill/agent/plugin frontmatter
 ```
 
 ### Testing
@@ -144,6 +146,44 @@ description: Description with trigger conditions
 - **Imports**: isort with `combine-as-imports = true`, `force-single-line = false`
 - **Banned**: `requests` library — use `httpx` instead
 - **Scripts**: PEP 723 inline metadata (`# /// script`) for standalone scripts run via `uv run --script`
+- **Structured data → Pydantic, not dataclass/TypedDict**: this repo's ingestion and output objects
+  are standardizing on Pydantic `BaseModel`, not `@dataclass` or `TypedDict`. The
+  `python-engineering:python3-typing` skill's lane selection auto-detects from what a file already
+  imports — that means an existing `@dataclass` never gets reconsidered on its own. When adding or
+  touching a structured data shape (CLI output, MCP tool payloads, parsed file records), use
+  Pydantic `BaseModel` by default. `TypedDict`/`dataclass` remain correct only for genuinely
+  stdlib-only, dependency-constrained contexts (see `python-engineering:python3-stdlib-only`).
+
+### CLI and script output — agent-only, never human-facing
+
+Every plugin in this repo exists to be consumed by an AI agent harness (Claude Code, Codex,
+OpenCode, GitHub's coding agent) — that is the whole purpose of a Claude Code plugin. No script,
+CLI tool, or MCP server under `plugins/**/scripts/` or `plugins/**/skills/*/scripts/` has a human
+running it interactively at a terminal, ever. Design output accordingly, not as a dual-audience
+guess:
+
+- **Structured/tabular output → JSON, not aligned plain-text tables.** A text table binds each
+  value to its meaning via column *position* (nth value = nth header); JSON binds via an explicit
+  *repeated key* at each value — a more direct, unambiguous token-level association for an LLM
+  parsing the output, with no risk of misparsing when a cell value contains whitespace. Emit
+  compact JSON (`json.dumps(data)` / `model_dump_json()`, no `indent=`) — see
+  `.claude/CLAUDE.md` "Code Quality Standards" for the JSON-output rule.
+- **`logging` is for debug/trace/forensic output only** — never for primary output a calling agent
+  needs to read or parse. Status messages, results, and errors meant to be consumed by the caller
+  go through direct stdout/stderr emission (`typer.echo()`, `print()`, structured JSON), not a
+  logger.
+- **Never add a `--json`/`--format text|json` dual-mode flag "just in case."** There is one
+  consumer. Dual-mode output is the right pattern for genuinely mixed-audience tools (`kubectl`,
+  `gh`, `docker`) — it is not the right pattern here. Before assuming a tool has a human reader,
+  verify by checking actual callers (`grep` for the script name across `plugin.json`, `hooks.json`,
+  `SKILL.md` workflow steps) rather than inferring "interactive use" from docstring language.
+- **Rich (`rich.console.Console`, `Table`, `Panel`, `Progress`)** defaults to a hardcoded 80-column
+  width with no TTY attached (`rich/console.py`: `width = width or 80`), wrapping or truncating
+  output — a correctness bug for an agent-only consumer, not a cosmetic one. Prefer plain
+  `typer.echo()`/JSON over Rich for agent-facing CLI output. If Rich is genuinely needed (e.g. a
+  `--verbose` diagnostic stream), see `python-engineering:python3-cli`'s
+  `references/typer-rich-non-tty-patterns.md` for the measure-and-render pattern that keeps it
+  data-loss-safe; do not use Rich's TTY-oriented defaults unmodified.
 
 ### Markdown (Skills/Commands/Agents)
 
@@ -240,7 +280,9 @@ Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `bac
 |------|---------|
 | `.cursor/rules/backlog-before-work.mdc` | Always create backlog items for multi-step work |
 | `.agent/rules/git-commits.md` | Commit message rules (conventional commits, no --no-verify) |
-| `.github/copilot-instructions.md` | Copilot agent instructions (also serves as repo overview) |
+
+GitHub's coding agent reads `AGENTS.md` directly — `.github/copilot-instructions.md` (a subset of
+this file) was removed to avoid two files drifting out of sync.
 
 ## MCP Configuration
 

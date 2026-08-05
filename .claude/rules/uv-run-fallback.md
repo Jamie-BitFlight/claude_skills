@@ -1,3 +1,10 @@
+---
+paths:
+- '**/scripts/**'
+- '**/*.py'
+- .claude/hooks/**
+---
+
 # uv run — Fallback When uv Is Not Available
 
 ## Standard invocation

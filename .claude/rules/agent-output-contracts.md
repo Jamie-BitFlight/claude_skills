@@ -1,3 +1,8 @@
+---
+paths:
+- '**/agents/**/*.md'
+---
+
 # Agent Output Contracts — Explicit Terminal Output Required
 
 Every agent MUST emit an explicit terminal message as its final response. Silent completion is

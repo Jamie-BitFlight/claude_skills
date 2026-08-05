@@ -1,5 +1,15 @@
 # Project Instructions for AI Agents
 
+<!--
+maintainer note: AGENTS.md (imported below) holds cross-harness content — build/test commands,
+conventions, gotchas, CI, backlog system — read by Claude Code, Codex, OpenCode, and GitHub's
+coding agent alike. CLAUDE.md and .claude/CLAUDE.md hold only Claude-Code-specific instructions:
+slash commands, subagent/Task-tool orchestration, MCP tool names, skill activation triggers —
+mechanisms with no equivalent in other harnesses. Keep new content in the right file.
+-->
+
+@AGENTS.md
+
 This file provides instructions and context for AI coding agents working on this project.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
@@ -51,16 +61,6 @@ bd close <id>         # Complete work
 <!-- END BEADS INTEGRATION -->
 
 
-## Build & Test
-
-```bash
-uv run pytest                       # run test suite
-uv run prek run --files <file>      # lint a specific file
-uvx skilllint@latest check <path>   # validate skill/agent frontmatter
-```
-
-Full session setup (hook installation, uv update) and additional commands are in `.claude/CLAUDE.md`.
-
-## Architecture Overview
-
-Claude Code Marketplace Plugin repository. Each subdirectory under `plugins/` is an independent plugin containing skills, agents, hooks, and/or MCP servers. See `.claude/CLAUDE.md` for full architectural context and conventions.
+Build/test commands, repository layout, and plugin structure are in `AGENTS.md` (imported above).
+Full Claude Code session setup (hook installation, uv update) and orchestration conventions are in
+`.claude/CLAUDE.md`.

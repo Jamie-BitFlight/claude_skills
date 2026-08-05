@@ -1,3 +1,12 @@
+---
+paths:
+- '**/SKILL.md'
+- '**/agents/**/*.md'
+- '**/commands/**/*.md'
+- .claude/rules/**/*.md
+- '**/CLAUDE.md'
+---
+
 # Review and Correction Discipline
 
 Process rules for reviewing and correcting AI-facing instruction files (prompts, `SKILL.md`,
