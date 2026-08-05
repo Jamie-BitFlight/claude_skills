@@ -107,9 +107,14 @@ If the user chooses not to proceed, stop without writing.
 
 Do not use `force=true` unless the user has already confirmed proceeding despite the duplicate.
 
-## Step 4: Write via MCP
+## Step 4: Write via MCP or CLI
 
-Call:
+Two equivalent interfaces exist. MCP is gated (requires reading this scope boundary first, enforced
+via a session `gate_token`); the CLI is not — the CLI path has no `gate_token` parameter and does
+not enforce reading `create/scope.md` first. This is a known, accepted gap for the CLI path, not
+an oversight. Prefer MCP when available; use the CLI for scripting/dispatch contexts.
+
+**MCP:**
 
 ```text
 mcp__plugin_dh_backlog__backlog_add(
@@ -122,16 +127,30 @@ mcp__plugin_dh_backlog__backlog_add(
 )
 ```
 
-Tool parameters:
+`gate_token` is required and is provided by the skill at load time via the `<gate_token>` tag
+injected from the session gate token file.
+
+**CLI:**
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog add \
+  --title "{title}" \
+  --priority "{priority}" \
+  --description "{description}" \
+  --source "{source}" \
+  --type "{type}"
+```
+
+Shared parameters (both interfaces call the same underlying `add_item()`):
 - `title`: required
 - `priority`: required; must be `P0`, `P1`, `P2`, or `Ideas`
 - `description`: required
 - `source`: optional; defaults to `Not specified`
 - `type`: optional; one of `Feature`, `Bug`, `Refactor`, `Docs`, `Chore`
-- `gate_token`: required. The value is provided by the skill at load time via the `<gate_token>` tag injected from the session gate token file.
 - `force`: optional; default false
 
-If the result contains `error` or non-empty `errors`, report the error and stop.
+If the result contains `error` or non-empty `errors` (MCP), or the CLI exits non-zero, report the
+error and stop.
 
 ## Step 5: Use `item_ref` from the response
 

@@ -73,50 +73,53 @@ or issue reference is passed as `item_ref`.
 
    Stop — do not continue to step 3 or create a new backlog item.
 
-3. Find the item via `mcp__plugin_dh_backlog__backlog_view(selector="{title or #N}", summary=false)`. If not found (response contains `error` key), create a minimal item:
+3. Find the item via the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{title or #N}"`. If not found (JSON output contains an `error` key), create a minimal item:
 
-   ```text
-   mcp__plugin_dh_backlog__backlog_add(
-     title="{title}",
-     priority="P2",
-     description="{title}",
-     gate_token="<gate_token>"
-   )
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py backlog add \
+     --title "{title}" \
+     --priority P2 \
+     --description "{title}"
    ```
 
-   `<gate_token>` is the session token injected by the skill at load time from the `<gate_token>` block in SKILL.md. It is not a literal placeholder — the skill resolves it to the actual token value before these instructions are read.
+   Note: the CLI's `backlog add` has no `gate_token` parameter — unlike the MCP `backlog_add` tool,
+   it does not require or enforce reading `create/scope.md` first. This is a known, accepted gap
+   for the CLI path, not an oversight — do not attempt to invent a token for it.
 
    Note: When arriving via the proactive fix gate with no prior backlog item, this creation step
    is the correct path. The gate's complexity classification already confirmed the fix is trivial —
    no grooming or RT-ICA is needed.
 
-   If found, extract description and acceptance criteria from `response["sections"]`.
+   If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`).
 
 4. Extract the item's description and acceptance criteria if available.
 
-5. Create the quick plan using the SAM MCP tool:
+5. Create the quick plan via the CLI:
 
-   ```text
-   mcp__plugin_dh_sam__sam_plan(
-     config={
-       "action": "create",
-       "slug": "quick-{slug}",
-       "goal": "{goal from description or acceptance_criteria}",
-       "tasks": [{"id": "T1", "title": "{description}", "status": "not-started", "agent": "task-worker", "dependencies": [], "priority": 1, "complexity": "low"}]
-     }
-   )
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py plan create \
+     --slug "quick-{slug}" \
+     --goal "{goal from description or acceptance_criteria}" \
+     --task-id T1 \
+     --task-title "{description}" \
+     --task-agent "task-worker" \
+     --task-priority 1 \
+     --task-complexity low
    ```
 
-   `sam_plan(action='create')` handles path resolution internally — do not resolve or pass a file path.
+   `plan create` accepts only one inline task per call (use `plan append-task` for additional
+   tasks) — sufficient here since the quick plan is always single-task. It handles path resolution
+   internally — do not resolve or pass a file path. Read `plan_id` (e.g. `Pe71c7cb8`) from the JSON
+   output — that is the plan reference used in the next two steps, not the `quick-{slug}` string.
 
-6. Call the `mcp__plugin_dh_backlog__backlog_update` tool with `selector="{title}"` and `plan="quick-{slug}"` to record the plan slug.
+6. Call the CLI to record the plan reference: `uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}" --plan "{plan_id from step 5}"`.
 
-7. Report the path returned by `sam_plan(action='create')`:
+7. Report the `plan_id` returned by `plan create`:
 
    ```text
-   Quick plan created: {path returned by sam_plan(action='create')}
+   Quick plan created: {plan_id from step 5}
    Steps: {N} tasks
 
-   To execute: /implement-feature quick-{slug}
+   To execute: /implement-feature {plan_id}
    To close:   /work-backlog-item close {title}
    ```
