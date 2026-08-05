@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-doc-converter
 description: Converts user-facing documentation directories into Claude Code skill directories — SKILL.md with valid frontmatter plus thematically grouped references/*.md files. Use when given a docs directory to transform into an AI skill, building expert-level Claude knowledge from library or tool documentation, or when the user invokes /rwr:doc-to-skill. Reads the user-docs-to-ai-skill SKILL.md and follows it — delegates Phase 1.5 workflow identification to process-siren.
-tools: Read, Grep, Glob, Bash, Task, Write, Edit
+tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage
 model: sonnet
 color: green
 ---

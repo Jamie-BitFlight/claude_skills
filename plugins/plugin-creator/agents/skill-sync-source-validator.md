@@ -2,7 +2,7 @@
 name: skill-sync-source-validator
 description: Validates and pre-fetches SOURCE URLs from a skill-sync change plan before the write agent runs. Fetches docs index (llms.txt/sitemap.xml) to verify NEW citation URLs exist, downgrades fabricated URLs to UNVERIFIABLE, then pre-fetches content for all SOURCE URLs and writes a source-material file for the write agent. Uses a prioritised fallback chain — Ref MCP first, Exa, ctx_fetch_and_index, curl, GitHub repo mining, WebFetch last. Dispatched by skill-sync pipeline after Stage 3 synthesis produces a change plan. Returns updated change plan path, source-material file path, and UNVERIFIABLE downgrade count.
 model: sonnet
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill,  WebFetch, WebSearch, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__context7__resolve-library-id, mcp__context7__get-library-docs, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__github__search_code, mcp__plugin_plugin-creator_sequential_thinking__sequentialthinking, mcp__plugin_episodic-memory_episodic-memory__search, mcp__plugin_episodic-memory_episodic-memory__read
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill,  WebFetch, WebSearch, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__context7__resolve-library-id, mcp__context7__get-library-docs, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__github__search_code, mcp__plugin_plugin-creator_sequential_thinking__sequentialthinking, mcp__plugin_episodic-memory_episodic-memory__search, mcp__plugin_episodic-memory_episodic-memory__read, SendMessage
 ---
 
 # Skill-Sync Source Validator

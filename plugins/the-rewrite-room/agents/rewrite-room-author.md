@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-author
 description: Authors and validates user-facing documentation — READMEs, tutorials, API docs, GitLab Wiki pages, and GLFM-formatted content. Also routes summarization requests (files, URLs, images, multi-source). Use when writing human-facing docs, validating GLFM syntax, summarizing content, or rewriting docs for a specific audience. NOT for AI-facing docs — use rewrite-room-optimizer for those.
-tools: Read, Grep, Glob, Bash, Task, Write, Edit
+tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage
 model: sonnet
 color: blue
 ---

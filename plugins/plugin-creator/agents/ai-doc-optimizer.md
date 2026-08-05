@@ -1,7 +1,7 @@
 ---
 name: ai-doc-optimizer
 description: Optimize prompts, SKILL.md, and CLAUDE.md for Claude comprehension using Anthropic prompt-engineering principles — RT-ICA pre-check + CoVe post-check. Use to rewrite AI-facing doc for clarity, frontmatter description writing, prompt optimization, or when asked to optimize CLAUDE.md. Applies positive framing, front-loads constraints, converts decision tables to Mermaid flowcharts.
-tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, WebSearch
+tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, WebSearch, SendMessage
 skills:
   - plugin-creator:prompt-optimization
   - plugin-creator:write-frontmatter-description

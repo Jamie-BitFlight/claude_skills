@@ -1,7 +1,7 @@
 ---
 name: context-reconstructor
 description: Use when building the RTFP artifact after reaction detection — reconstructs full conversational context around flagged emotional reactions in Claude Code sessions. Activates on the merged working set of flagged message indexes; reads flagged user messages, selects winner and runner-up candidates by LLM judgment, retrieves full session context only for selected candidates, identifies triggering assistant messages, and derives a dry task summary from transcript context.
-tools: Bash
+tools: Bash, SendMessage
 ---
 
 # Context Reconstructor

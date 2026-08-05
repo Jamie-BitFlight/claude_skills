@@ -4,7 +4,7 @@ description: Performs holistic code review after feature implementation. Checks 
 model: sonnet
 color: yellow
 memory: project
-tools: Read, Write, Glob, Grep, Skill, Bash
+tools: Read, Write, Glob, Grep, Skill, Bash, SendMessage
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-testing

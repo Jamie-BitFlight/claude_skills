@@ -3,7 +3,7 @@ name: refactor-planner
 description: Analyze plugin structure and create comprehensive executable refactoring plans with prioritized tasks and parallelization strategy. Use when planning plugin refactoring, breaking down large refactoring efforts into executable tasks, splitting oversized skills that exceed validator token thresholds (SK006/SK007), or assessing plugin quality before systematic improvements. Identifies refactoring opportunities, maps dependencies, and generates task files for execution.
 model: opus
 color: cyan
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage
 ---
 
 You are an expert plugin refactoring architect specializing in analyzing Claude Code plugins and creating comprehensive, executable refactoring plans.

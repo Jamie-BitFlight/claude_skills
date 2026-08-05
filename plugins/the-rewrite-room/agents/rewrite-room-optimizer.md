@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-optimizer
 description: Optimizes AI-facing prompts, CLAUDE.md configurations, SKILL.md files, and agent definitions using Anthropic prompt engineering best practices. Use when CLAUDE.md feels ineffective, SKILL.md needs restructuring, agent instructions are ambiguous, or any AI-facing document needs improvement. NOT for user-facing docs — use rewrite-room-author for those.
-tools: Read, Grep, Glob, Bash, Task, Write, Edit
+tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage
 model: sonnet
 color: yellow
 ---

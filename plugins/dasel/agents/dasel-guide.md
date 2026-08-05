@@ -1,7 +1,7 @@
 ---
 name: dasel-guide
 description: Teaches dasel v3 selector syntax, functions, and query patterns — answers how-do-I questions about dasel, helps construct selectors, explains v3 syntax differences from v2; includes enterprise XML domain patterns for InstallAnywhere .iap_xml, Spring bean XML, Maven POM, Hibernate HBM, and Tomcat web.xml
-tools: Read, Grep, Glob
+tools: Read, Grep, Glob, SendMessage
 model: haiku
 color: yellow
 skills:

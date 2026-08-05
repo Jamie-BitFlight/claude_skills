@@ -2,7 +2,7 @@
 name: focused-reviewer
 description: "Lean haiku worker for the ensemble-rule-review pattern. Reviews ONE input against ONE partial rule slice passed in the prompt, emits findings in the fixed (group, location) schema to an absolute output path, then stops. Deliberately minimal — few tools, no skills, no creativity — so many run cheaply in parallel and the reducer denoises by corroboration. Spawn one per rotating rule group. Trigger: dispatched by ensemble-rule-review orchestrator or any fan-out review needing a rigid checklist worker. For web/API review targets, the spawner adds the specific MCP tool to the invocation; do not grant all tools."
 model: haiku
-tools: Read, Grep, Glob, Bash, Write
+tools: Read, Grep, Glob, Bash, Write, SendMessage
 user-invocable: false
 color: cyan
 ---

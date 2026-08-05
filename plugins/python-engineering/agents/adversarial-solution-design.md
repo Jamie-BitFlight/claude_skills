@@ -3,7 +3,7 @@ name: adversarial-solution-design
 description: "Pre-implementation challenge agent. Receives a task + codebase paths, reads existing code, questions task goals, identifies 2-3 alternative approaches with trade-offs, checks skill availability via specialist-skill-routing, and designs a behavioral validation plan proving the change works by actually running the script/app/CLI — not just mocked unit tests. Mandates TDD (REQUIRED) when tests/ has content covering affected code; recommends TDD (RECOMMENDED) when the project is a CLI app, web package, or library; marks optional for standalone scripts with no existing suite. Returns: refined task brief + validation plan + TDD recommendation (REQUIRED|RECOMMENDED|OPTIONAL|NOT_APPLICABLE). Use before any python-cli-architect delegation. Triggers: pre-implementation review, solution design, approach challenge, TDD enforcement, behavioral validation plan."
 model: opus
 color: orange
-tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch
+tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch, SendMessage
 memory: project
 skills:
   - python-engineering:python3-core

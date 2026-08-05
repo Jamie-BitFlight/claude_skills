@@ -4,7 +4,7 @@ description: Creates, reviews, or modernizes Python 3.11+ pytest test suites. Ex
 color: pink
 model: sonnet
 memory: project
-tools: Read, Write, Glob, Grep, Skill, Bash
+tools: Read, Write, Glob, Grep, Skill, Bash, SendMessage
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-testing

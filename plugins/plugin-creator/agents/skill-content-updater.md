@@ -4,7 +4,7 @@ description: Update skill content, sync skill upstream drift, fetch SOURCE URLs 
 model: inherit
 skills:
   - plugin-creator:audit-skill-completeness
-tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch
+tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, SendMessage
 ---
 
 # Skill Content Updater

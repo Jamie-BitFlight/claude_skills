@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-auditor
 description: Audits documentation accuracy against code, syncs docs after code changes, and tracks doc freshness. Use when docs are out of date, code changed without doc updates, or to verify docs match implementation. Delegates to specialist agents — does not implement changes directly.
-tools: Read, Grep, Glob, Bash, Task
+tools: Read, Grep, Glob, Bash, Task, SendMessage
 model: sonnet
 color: orange
 ---

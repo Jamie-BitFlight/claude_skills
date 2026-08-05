@@ -1,7 +1,7 @@
 ---
 name: data-explorer
 description: Fast read-only exploration agent for querying structured data files using dasel v3 — discovers structure, lists keys, samples arrays, extracts values across JSON, YAML, TOML, XML, CSV, HCL, INI; includes enterprise XML domain patterns for InstallAnywhere .iap_xml, Spring bean XML, Maven POM, Hibernate HBM, and Tomcat web.xml files
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, SendMessage
 model: haiku
 color: green
 skills:

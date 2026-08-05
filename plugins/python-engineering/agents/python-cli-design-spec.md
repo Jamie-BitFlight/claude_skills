@@ -4,7 +4,7 @@ description: Produces architecture specifications for Python CLI applications â€
 model: sonnet
 color: blue
 memory: project
-tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch
+tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch, SendMessage
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-cli

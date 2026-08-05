@@ -1,7 +1,7 @@
 ---
 name: python-cli-design-spec
 description: Use when designing a Python CLI tool's architecture before implementation — command interfaces, technology stack selection, data models, and contracts. Activates on architecture planning requests for new CLI tools or major feature additions. Produces WHAT to build (interfaces, schemas, contracts); python-cli-architect handles the HOW (implementation).
-tools: Read, Write, Edit, Glob, Grep, TodoWrite, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_python3-development_sequential_thinking__sequentialthinking
+tools: Read, Write, Edit, Glob, Grep, TodoWrite, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_python3-development_sequential_thinking__sequentialthinking, SendMessage
 skills:
   - python3-development:python-cli-architect
 ---

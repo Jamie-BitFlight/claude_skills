@@ -1,7 +1,7 @@
 ---
 name: grader
 description: Evaluate expectations against an execution transcript and outputs. Use when grading skill eval results against assertions.
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage
 ---
 
 # Grader Agent
