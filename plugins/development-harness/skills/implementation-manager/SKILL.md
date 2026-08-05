@@ -10,7 +10,7 @@ disable-model-invocation: false
 ## Current Task Context
 
 **Available features (if in project with plan/ directory):**
-!`uv run plugins/development-harness/sam_schema/cli.py plan list 2>/dev/null || echo '{"features": [], "count": 0, "message": "Not in a project with task files"}'`
+!`uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list 2>/dev/null || echo '{"features": [], "count": 0, "message": "Not in a project with task files"}'`
 
 **Active task context (if any):**
 !`python3 -c "from dh_paths import context_dir; import os; cdir = context_dir(os.environ.get('CLAUDE_CODE_SESSION_ID', '')); files = list(cdir.glob('active-task-*.json')) if cdir.exists() else []; print(files[0].read_text() if files else 'No active task')" 2>/dev/null || echo "No active task"`
