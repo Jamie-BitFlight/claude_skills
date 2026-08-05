@@ -21,9 +21,13 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:discovery', args='#42'
 
 1. Load item context before doing anything else:
 
-```text
-mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#N"
 ```
+
+Note: the CLI's `backlog view` has no `summary`/`include_content` parameter (the MCP tool's
+progressive-disclosure compact-vs-full split) — it always returns the flat, full item content,
+which is the CLI equivalent of the MCP call's `summary=false` above.
 
 2. Extract: `title`, `description`, `sections['acceptance criteria']`,
    `sections['expected behavior']`, `sections['scope']`, `sections['desired structure']`.

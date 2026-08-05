@@ -38,11 +38,14 @@ flowchart TD
 
 ## Writing Classification to Backlog Item
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector="{title}", section="Issue Classification", content="**Type**: {classification}
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+  --selector "{title}" \
+  --section "Issue Classification" \
+  --content "**Type**: {classification}
 **Rationale**: {1-2 sentence explanation}
 **Analysis Method**: {method}
-**Scenario Target**: {what scenario exposed this} -> {what should improve}")
+**Scenario Target**: {what scenario exposed this} -> {what should improve}"
 ```
 
 `scenario-target` captures the specific scenario that exposed the problem and what should improve after the fix.
@@ -63,8 +66,11 @@ Skill(skill="find-cause", args="{description of the defect}")
 
 Write the evidence chain:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector="{title}", section="Root-Cause Analysis", content="**Method**: 5-whys
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+  --selector "{title}" \
+  --section "Root-Cause Analysis" \
+  --content "**Method**: 5-whys
 **Classification**: defect
 
 #### Evidence Chain
@@ -72,15 +78,18 @@ mcp__plugin_dh_backlog__backlog_groom(selector="{title}", section="Root-Cause An
 {evidence chain from /find-cause}
 
 **Root Cause**: {single actionable statement}
-**Scenario Target**: {what scenario exposed this} -> {what should improve}")
+**Scenario Target**: {what scenario exposed this} -> {what should improve}"
 ```
 
 ### recurring-pattern — 6-sigma
 
-Call `mcp__plugin_dh_backlog__backlog_list(status="resolved")`, filter by keywords related to this defect class, count matches, and write the measurement section:
+Call `uv run plugins/development-harness/sam_schema/cli.py backlog list --status "resolved"` (the CLI's `backlog list` has no `--search` full-text flag, but `--status` used here is fully supported), filter by keywords related to this defect class, count matches, and write the measurement section:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector="{title}", section="Root-Cause Analysis", content="**Method**: 6-sigma
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+  --selector "{title}" \
+  --section "Root-Cause Analysis" \
+  --content "**Method**: 6-sigma
 **Classification**: recurring-pattern
 
 #### Measurement
@@ -97,7 +106,7 @@ mcp__plugin_dh_backlog__backlog_groom(selector="{title}", section="Root-Cause An
 #### Improvement
 
 - **Proposed guardrail**: {specific instruction, gate, or check to add}
-- **Verification**: {how to confirm the guardrail works}")
+- **Verification**: {how to confirm the guardrail works}"
 ```
 
 **Note**: If the human has already identified the recurrence pattern, skip the search and use the human's assessment.

@@ -27,8 +27,8 @@ Use the configured provider's native interface for native state. In a Beads work
 
 List all features with task files in the project's `plan/` directory:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "list"})
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan list
 ```
 
 **Output:**
@@ -49,8 +49,8 @@ mcp__plugin_dh_sam__sam_plan(config={"action": "list"})
 
 Get detailed status for a specific feature:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="P1")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address P1
 ```
 
 **Output:**
@@ -82,8 +82,8 @@ mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="P1")
 
 List tasks ready for execution (dependencies satisfied):
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="P1")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan ready --plan-address P1
 ```
 
 **Output:**
@@ -106,16 +106,16 @@ mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="P1")
 
 Read full plan data including task fields and context:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P1")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan read --address P1
 ```
 
 #### claim
 
 Claim a task in-progress (prevents duplicate dispatch):
 
-```text
-mcp__plugin_dh_sam__sam_task(plan="P1", task="T01", config={"action": "claim"})
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan claim --address P1/T01
 ```
 
 Returns `{"claimed": false, "error": "..."}` if task is already claimed or not found.
@@ -127,6 +127,12 @@ Update plan-level fields (e.g., context manifest):
 ```text
 mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "Context Manifest content"}, plan="P1")
 ```
+
+Note: the CLI equivalent is `plan update --plan-address P1 [...]`, but the specific flag for
+setting the plan-level `context` field is not enumerated in the current CLI-parity mapping
+(2026-08-05, backlog item #2793) — verify the exact flag via
+`uv run plugins/development-harness/sam_schema/cli.py plan update --help` before converting
+this call site to CLI form.
 
 ## Task File Format
 
@@ -246,7 +252,7 @@ export CLAUDE_SKILLS_DISABLED_HOOKS="task-status:post-tool-use,task-status:subag
 
 The `/dh:execution` orchestrator uses this skill to:
 
-1. Query task file status via `mcp__plugin_dh_sam__sam_plan`
-2. Find ready tasks via `mcp__plugin_dh_sam__sam_plan`
+1. Query task file status via `uv run plugins/development-harness/sam_schema/cli.py plan status`
+2. Find ready tasks via `uv run plugins/development-harness/sam_schema/cli.py plan ready`
 3. Launch appropriate agents based on task's `agent` field
 4. Update timestamps via hook scripts when tasks start/complete
