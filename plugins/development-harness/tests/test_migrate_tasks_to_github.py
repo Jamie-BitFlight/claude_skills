@@ -11,7 +11,6 @@ partial failure resilience, and cache file output.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -19,15 +18,19 @@ import pytest
 
 # ---------------------------------------------------------------------------
 # Import the script under test.
-# The script adds its own sys.path entries at import time; we replicate
-# the module-level import here.
+# `plugins/development-harness/scripts` is on sys.path via the root
+# pyproject.toml [tool.pytest.ini_options] pythonpath list — no manual
+# sys.path manipulation is needed here.
 # ---------------------------------------------------------------------------
-
-_SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "plugins" / "python3-development" / "scripts"
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
-
-from migrate_tasks_to_github import _write_cache, _write_github_issue_field, infer_task_type, parse_task_file
+from migrate_tasks_to_github import (
+    SamTask as MigrateSamTask,
+    _write_cache,
+    _write_github_issue_field,
+    create_task_issue,
+    get_github,
+    infer_task_type,
+    parse_task_file,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -126,6 +129,43 @@ def _make_mock_issue(number: int) -> dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
+# Test: backlog_core bootstrap imports resolve to real objects
+# ---------------------------------------------------------------------------
+
+
+def test_backlog_core_symbols_resolve_when_available() -> None:
+    """create_task_issue/get_github/SamTask are non-None in this environment.
+
+    ``backlog_core`` is a sibling package of ``migrate_tasks_to_github.py``
+    under ``plugins/development-harness/`` — the script's own ``_HARNESS_DIR``
+    sys.path bootstrap guarantees it is importable, so these names must be the
+    real ``backlog_core`` objects (never ``None``) rather than the previous
+    "guarded, fell back to ``None``" behavior for a stale, no-longer-existent
+    ``.claude/skills/backlog/backlog_core`` path.
+    """
+    # Assert: bound to real callables/classes, not None sentinels.
+    assert create_task_issue is not None
+    assert callable(create_task_issue)
+    assert get_github is not None
+    assert callable(get_github)
+    assert MigrateSamTask is not None
+
+    # Assert: SamTask is the genuine backlog_core.models.SamTask Pydantic
+    # model — constructible with its required fields, not a stand-in.
+    sam = MigrateSamTask(
+        task_id="T1",
+        feature="my-feature",
+        task_type="implement",
+        status="not-started",
+        agent="",
+        priority=2,
+        skills=[],
+        dependencies=[],
+    )
+    assert sam.task_id == "T1"
+
+
+# ---------------------------------------------------------------------------
 # Test: dry-run produces no writes and no API calls
 # ---------------------------------------------------------------------------
 
@@ -184,7 +224,6 @@ def test_skips_already_migrated(tmp_path: Path) -> None:
     runner = CliRunner()
 
     with (
-        patch("migrate_tasks_to_github._BACKLOG_CORE", Path(tmp_path) / "fake_backlog_core"),
         patch("migrate_tasks_to_github.get_github") as mock_gh,
         patch("migrate_tasks_to_github.create_task_issue") as mock_create,
     ):
@@ -296,11 +335,7 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
             raise RuntimeError(msg)
         return success_issue
 
-    fake_bc = tmp_path / "bc"
-    fake_bc.mkdir()
-
     with (
-        patch("migrate_tasks_to_github._BACKLOG_CORE", fake_bc),
         patch("migrate_tasks_to_github.SamTask") as mock_sam_cls,
         patch("migrate_tasks_to_github.get_github") as mock_gh,
         patch("migrate_tasks_to_github.create_task_issue", side_effect=_side_effect),

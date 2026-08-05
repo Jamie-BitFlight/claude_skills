@@ -56,6 +56,8 @@ if str(_HARNESS_DIR) not in sys.path:
 
 import dh_paths
 import typer
+from backlog_core.gh_client import create_task_issue, get_github
+from backlog_core.models import BacklogError, GitHubUnavailableError, SamTask
 from ruamel.yaml import YAML, YAMLError
 from sam_schema.cli_output import err, output_json
 from sam_schema.task_format import resolve_task_id
@@ -65,35 +67,12 @@ if TYPE_CHECKING:
     from github.Repository import Repository
 
 # ---------------------------------------------------------------------------
-# backlog_core path setup — conditional import guard
+# backlog_core is a sibling package of this script under
+# plugins/development-harness/ — the _HARNESS_DIR bootstrap above already
+# guarantees it is importable, so create_task_issue/get_github/SamTask are
+# imported unconditionally at module level (also allowing unit tests to
+# patch them via patch("migrate_tasks_to_github.create_task_issue")).
 # ---------------------------------------------------------------------------
-
-# _SCRIPT_DIR = scripts/  parents[0] = python3-development/
-# parents[1] = plugins/   parents[2] = project root (claude_skills/)
-_SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parents[2]
-_BACKLOG_CORE = _PROJECT_ROOT / ".claude" / "skills" / "backlog" / "backlog_core"
-
-if _BACKLOG_CORE.exists():
-    sys.path.insert(0, str(_BACKLOG_CORE.parent))
-
-# ---------------------------------------------------------------------------
-# Conditional module-level imports from backlog_core.
-# Imported at module level so unit tests can patch them via:
-#   patch("migrate_tasks_to_github.create_task_issue")
-# The guards keep the script runnable without backlog_core present.
-# ---------------------------------------------------------------------------
-
-create_task_issue = None
-get_github = None
-SamTask = None
-
-if _BACKLOG_CORE.exists():
-    try:
-        from backlog_core.gh_client import create_task_issue, get_github
-        from backlog_core.models import SamTask
-    except ImportError:
-        pass
 
 # ---------------------------------------------------------------------------
 # CLI app
@@ -563,14 +542,8 @@ def _connect_github() -> Repository:
         Repository object.
 
     Raises:
-        typer.Exit: Always — when backlog_core is unavailable or the
-            connection fails (via :func:`cli_output.err`).
+        typer.Exit: When the GitHub connection fails (via :func:`cli_output.err`).
     """
-    if create_task_issue is None or get_github is None or SamTask is None:
-        err(f"backlog_core not found or could not be imported from {_BACKLOG_CORE}")
-
-    from backlog_core.models import GitHubUnavailableError  # ruff: ignore[import-outside-top-level]
-
     try:
         return get_github()
     except GitHubUnavailableError as exc:
@@ -593,11 +566,6 @@ def _migrate_task(
         Tuple of ``(issue, error)``: the created Issue object with *error*
         ``None`` on success, or ``(None, error_message)`` on failure.
     """
-    from backlog_core.models import BacklogError  # ruff: ignore[import-outside-top-level]
-
-    assert SamTask is not None  # ruff: ignore[assert] — guarded by _connect_github caller
-    assert create_task_issue is not None  # ruff: ignore[assert] — guarded by _connect_github caller
-
     task_type = infer_task_type(task.title)
     sam = SamTask(
         task_id=task.task_id,
