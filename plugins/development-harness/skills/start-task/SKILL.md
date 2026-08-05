@@ -33,7 +33,7 @@ $ARGUMENTS
 
 ## If `--complete <task-id>` Provided
 
-1. Run `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state --address P{N}/T{M} --new-status complete` to mark the task complete.
+1. Run `uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status complete` to mark the task complete.
 2. Output: `Task {ID} marked as complete`
 
 ---
@@ -43,7 +43,7 @@ $ARGUMENTS
 1. Read the task assignment via the SAM CLI:
 
    ```bash
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M}
+   uv run plugins/development-harness/sam_schema/cli.py plan read --address P{N}/T{M}
    ```
 
    The response is a `TaskAssignment` model containing:
@@ -59,14 +59,14 @@ $ARGUMENTS
    If the `TaskAssignment` model contains a `parent_issue_number` or the plan has an `issue` field, query the artifact manifest to discover available plan artifacts:
 
    ```bash
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id N
+   uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id N
    ```
 
    If the response contains artifacts (non-empty `artifacts` list), use `artifact_read` to fetch the architect spec and feature context content:
 
    ```bash
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id N --artifact-type architect
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id N --artifact-type feature-context
+   uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id N --artifact-type architect
+   uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id N --artifact-type feature-context
    ```
 
    Use the returned content as context for implementation instead of reading filesystem paths directly. This is especially important for worktree-isolated agents that cannot access uncommitted plan files from the root worktree.
@@ -91,7 +91,7 @@ $ARGUMENTS
    mark a task in-progress. Do NOT edit status or started fields directly with the Edit tool.
 
    ```bash
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan claim --address P{N}/T{M}
+   uv run plugins/development-harness/sam_schema/cli.py plan claim --address P{N}/T{M}
    ```
 
    If the response contains `"claimed": false`:
@@ -109,7 +109,7 @@ $ARGUMENTS
 4. Register the active-task context via the SAM CLI (required for hook-driven updates):
 
    ```bash
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" active-task set \
+   uv run plugins/development-harness/sam_schema/cli.py active-task set \
      --address P{N}/T{M} \
      --parent-issue N \
      --session-id "${CLAUDE_CODE_SESSION_ID}"

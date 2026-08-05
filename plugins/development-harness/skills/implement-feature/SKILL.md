@@ -25,7 +25,7 @@ Rules:
 - Otherwise, treat it as a feature slug (or partial slug) and resolve plan address via `sam_plan`:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "<feature_input/>"
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address "<feature_input/>"
 ```
 
 ---
@@ -35,7 +35,7 @@ uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-add
 1. Query status:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address P{N}
 ```
 
 After receiving the status response, extract and store the autonomy mode:
@@ -51,7 +51,7 @@ so no gate fires and the loop behaves identically to the previous behavior.
 If parent story identifier is known and structured SAM readiness is required (`str | int` — GitHub integer ID such as `42` or beads string ID such as `"bd-a3f8"`), use the adapter tool:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan sam-ready-tasks --parent-issue-number N
+uv run plugins/development-harness/sam_schema/cli.py plan sam-ready-tasks --parent-issue-number N
 ```
 
 Output shape: `{"feature": "...", "ready_tasks": [...], "count": N}`. Falls back to local cache if
@@ -60,13 +60,13 @@ GitHub unavailable.
 If parent issue number is unknown, use the SAM CLI:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P{N}
+uv run plugins/development-harness/sam_schema/cli.py plan ready --plan-address P{N}
 ```
 
 > **Call `sam_plan(action='ready')` (or `backlog_get_ready_sam_tasks`) ONCE per batch.** Store the returned
 > task list. Loop over the stored list — do NOT call `sam_plan(action='ready')` again within the loop.
 > After all tasks in the current batch are dispatched and completed, use
-> `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}` to check whether more tasks remain.
+> `uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address P{N}` to check whether more tasks remain.
 > Only call `sam_plan(action='ready')` again when the previous batch is fully dispatched and you need the
 > next batch of ready tasks.
 
@@ -134,7 +134,7 @@ flowchart TD
     Spawn["Task is session health summary<br>subagent_type='agentskill-kaizen:transcript-analyst'<br>Context: agent name or teammate ID to check,<br>JSONL dir ~/.claude/projects/{project-slug}/*.jsonl<br>Report: last turn timestamp, last tool call,<br>verdict of crashed / idle / active"]
     Spawn --> Verdict{Analyst verdict}
     Verdict -->|"Crashed — session ended abruptly<br>after sam_task(action=claim) with no further turns"| Confirm
-    Confirm["Confirm task state via<br>uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan}/{task}<br>Verify task is still CLAIMED"] --> Respawn
+    Confirm["Confirm task state via<br>uv run plugins/development-harness/sam_schema/cli.py plan read --address {plan}/{task}<br>Verify task is still CLAIMED"] --> Respawn
     Respawn["Re-spawn agent with same task file path and task ID<br>SubagentStop hook updates status on completion"]
     Verdict -->|"Idle — no tool calls for 5+ min<br>agent appears stuck mid-task"| TeamCheck{Agent is a teammate<br>in an active team?}
     TeamCheck -->|Yes| SendMsg["SendMessage to teammate<br>'Are you blocked? What is your current status?'<br>Wait 2 minutes for response"]
@@ -167,7 +167,7 @@ Concerns accumulate across all task agents. They feed into the validation stage 
 4a. If a parent issue number is known (`str | int` — GitHub integer ID or beads string ID), attempt contract verification against the architect spec:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id N --artifact-type architect
+uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id N --artifact-type architect
 ```
 
 If `artifact_read` returns content (architect spec exists), resolve the files modified by the just-completed task:
@@ -269,11 +269,11 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 3. Await explicit user confirmation before proceeding.
    - If confirmed: dispatch the next task from the stored batch (or query the next batch if the batch is exhausted).
    - If declined or cancelled: stop the Progress Loop. Report the current plan state via
-     `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}` and exit.
+     `uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address P{N}` and exit.
 
 Skip this gate when `autonomy_mode` is `"full_auto"` or `"checkpoint"`.
 
-5. After all tasks in the current batch complete, call `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}` to
+5. After all tasks in the current batch complete, call `uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address P{N}` to
    check plan progress. If tasks remain, return to step 2 to fetch the next batch of ready
    tasks. Do NOT call `sam_plan(action='ready')` again until the previous batch is fully dispatched.
 

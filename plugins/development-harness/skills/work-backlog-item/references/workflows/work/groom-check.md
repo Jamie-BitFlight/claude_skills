@@ -21,7 +21,7 @@ is a separate check at a different stage and is not unified with this one.
 
 ### Extract Impact Radius files
 
-Call the CLI: `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title}"`. Note: the
+Call the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{title}"`. Note: the
 CLI's `backlog view` has no `summary` parameter — it always returns full section content, equivalent to MCP's
 `summary=false`.
 
@@ -117,7 +117,7 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
 1. Write the diff summary as the `staleness context` section via the CLI:
 
    ```bash
-   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
+   uv run plugins/development-harness/sam_schema/cli.py backlog groom \
      --selector "{title}" \
      --section "staleness context" \
      --content "Staleness detected {today}: functional commits since {groomed_date}.\n\n{diff summary — key changed interfaces, renamed functions, added/removed files}\n\nCommits:\n{list of qualifying commit one-liners}"
@@ -136,7 +136,7 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
 **SUPERSEDED:**
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close \
+uv run plugins/development-harness/sam_schema/cli.py backlog close \
   --selector "{title}" \
   --reason "superseded" \
   --comment "Goal already implemented by commits since groom date: {commit sha list}"

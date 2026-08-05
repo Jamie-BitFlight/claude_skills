@@ -39,7 +39,7 @@ mcp__plugin_dh_backlog__artifact_register(
 **CLI equivalent** (scripting/dispatch contexts):
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
+uv run plugins/development-harness/sam_schema/cli.py artifact register \
   --item-id <int> \
   --artifact-type <str> \
   --artifact-id <str> \

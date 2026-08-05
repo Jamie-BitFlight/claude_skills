@@ -22,7 +22,7 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:discovery', args='#42'
 1. Load item context before doing anything else:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#N"
 ```
 
 Note: the CLI's `backlog view` has no `summary`/`include_content` parameter (the MCP tool's

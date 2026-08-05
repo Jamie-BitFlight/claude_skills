@@ -57,7 +57,7 @@ Entered when input is `#N`, bare `N`, GitHub URL, or beads ID (e.g. `bd-a3f8`). 
 **Step 1 -- Fetch issue data**:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue_number}"
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#{issue_number}"
 ```
 
 If the response contains an `error` key:
@@ -207,7 +207,7 @@ flowchart TD
 After the dispatch loop exits, verify all 5 phases reached terminal status:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{PQG}"
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address "{PQG}"
 ```
 
 All 5 tasks must have `status == 'complete'`, with one exception: T5 (Documentation Update) may have `status == 'skipped'` when T4 found no drift. Any other task with `status == 'skipped'` is an unauthorized skip — treat as a failure. This skip whitelist matches the full SAM path's Completion Verification Gate.
@@ -353,7 +353,7 @@ If signal found — confirm all four fidelity items from the reference before pr
 When the parent story issue number is known (from the plan's `issue` field or the backlog item), query the artifact manifest to discover all plan artifacts for this feature:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id N
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id N
 ```
 
 If the response contains artifacts, pass the manifest to quality gate agents (Phases T0-T6) so they can access plan artifacts via `artifact_read` instead of filesystem paths. This is critical for worktree-isolated agents.
@@ -379,7 +379,7 @@ Extract `{slug}` from the task file path (`plan/P{id}-{slug}.yaml` — strip the
 ### Step 1: Check for existing QG plan
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "qg-{slug}"
+uv run plugins/development-harness/sam_schema/cli.py plan list --search "qg-{slug}"
 ```
 
 The following diagram is the authoritative procedure for Quality Gate Plan Creation Step 1 check for existing QG plan. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
@@ -475,7 +475,7 @@ Repeat until `sam_plan(action='ready')` returns a `ReadyTasksResult` with an emp
 **1. Get next ready task:**
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{QG}"
+uv run plugins/development-harness/sam_schema/cli.py plan ready --plan-address "{QG}"
 ```
 
 If the result is empty, exit the loop and proceed to Completion Verification Gate.
@@ -524,7 +524,7 @@ flowchart TD
 After the SAM dispatch loop exits, verify all phases reached terminal status before allowing label application.
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{QG}"
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address "{QG}"
 ```
 
 The following diagram is the authoritative procedure for Completion Verification Gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
@@ -605,7 +605,7 @@ After all phases complete, route any follow-up task files created by Phase 1 (co
 Retrieve the review report registered by `@dh:code-reviewer` during Phase 1:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue_number} --artifact-type "codebase-analysis"
+uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id {issue_number} --artifact-type "codebase-analysis"
 ```
 
 **If `artifact_read` returns an error**, discover before falling through to SAM search:
@@ -627,7 +627,7 @@ Check the `verdict` field in the report:
 If `artifact_list` also finds no match, fall back to the SAM MCP search:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}-followup"
+uv run plugins/development-harness/sam_schema/cli.py plan list --search "{slug}-followup"
 ```
 
 Where `{slug}` is extracted from the parent task file path (`plan/P{id}-{slug}.yaml` — strip `P{id}-` prefix and `.yaml` suffix).
@@ -659,7 +659,7 @@ After all phases and follow-up routing complete, apply the `status:verified` Git
 Derive the search slug from the task file path (same algorithm as Recursive Follow-up Handling). Search the backlog:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --title "{slug}"
+uv run plugins/development-harness/sam_schema/cli.py backlog list --title "{slug}"
 ```
 
 If zero items match, skip this section — there is no issue to label.
@@ -703,7 +703,7 @@ git status
 **Issue number in commit message**: Before committing, check the backlog item for the current feature slug:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --title "{slug}"
+uv run plugins/development-harness/sam_schema/cli.py backlog list --title "{slug}"
 ```
 
 Check the `issue` field on the matching item. If present, append `Fixes #NNN` to the commit message body (NNN = GitHub integer issue number; omit for beads IDs). If no issue number is found, omit it.
@@ -735,7 +735,7 @@ SendMessage(to="{name}", message={"type": "shutdown_request"})
 **SAM path (plan-linked)**: Use `selector="#{issue_number}"` from the Apply status:verified Label step. Skip this step if no backlog item was matched in that step.
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "<selector>" --summary "Implementation complete — AC verified PASS"
+uv run plugins/development-harness/sam_schema/cli.py backlog resolve --selector "<selector>" --summary "Implementation complete — AC verified PASS"
 ```
 
 On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.

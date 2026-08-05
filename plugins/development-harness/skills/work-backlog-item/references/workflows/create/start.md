@@ -133,7 +133,7 @@ injected from the session gate token file.
 **CLI:**
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog add \
+uv run plugins/development-harness/sam_schema/cli.py backlog add \
   --title "{title}" \
   --priority "{priority}" \
   --description "{description}" \

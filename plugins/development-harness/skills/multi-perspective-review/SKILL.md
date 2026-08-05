@@ -76,7 +76,7 @@ blindly — this causes ephemeral plan accumulation and slug-collision duplicate
 Call:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "review-{slug}"
+uv run plugins/development-harness/sam_schema/cli.py plan list --search "review-{slug}"
 ```
 
 Inspect the returned `plans` array. If any plan has `feature` equal to `review-{slug}`:
@@ -106,7 +106,7 @@ elsewhere in this repo (see `quick/start.md`); verify against `--help` before fi
 mapping table's flag list for these two actions is not fully enumerated.
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan create \
+uv run plugins/development-harness/sam_schema/cli.py plan create \
   --slug "review-{slug}" \
   --goal "Multi-perspective review for {slug}" \
   --issue <issue_number_or_omit_if_absent> \
@@ -125,7 +125,7 @@ Return structured verdict per verdict-schema.md."
 Store the returned plan address as `{PA}`, then append T2, T3, and T4:
 
 ```bash
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan append-task \
+uv run plugins/development-harness/sam_schema/cli.py plan append-task \
   --plan-address {PA} \
   --task-id T2 \
   --task-title "Performance Review" \
@@ -138,7 +138,7 @@ Changed files:
 Review each file through the performance perspective lens.
 Return structured verdict per verdict-schema.md."
 
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan append-task \
+uv run plugins/development-harness/sam_schema/cli.py plan append-task \
   --plan-address {PA} \
   --task-id T3 \
   --task-title "Quality Review" \
@@ -151,7 +151,7 @@ Changed files:
 Review each file through the quality perspective lens.
 Return structured verdict per verdict-schema.md."
 
-uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan append-task \
+uv run plugins/development-harness/sam_schema/cli.py plan append-task \
   --plan-address {PA} \
   --task-id T4 \
   --task-title "Accessibility Review" \
