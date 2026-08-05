@@ -14,23 +14,26 @@ Runs after `intake.md` completes with PROCEED.
 
 1. Check for existing discovery artifact:
 
-```text
-mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue_number} --artifact-type feature-context
 ```
 
 2. If `count > 0`: load the artifact and pass it to swarm agents as prior context.
 
-```text
-mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type='feature-context')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id {issue_number} --artifact-type feature-context
 ```
 
 → **CONTINUE** to RT-ICA snapshot.
 
 3. If `count == 0`: check whether the item already has rich groomed sections.
 
-```text
-mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
 ```
+
+Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
+(simpler/flatter than MCP's progressive-disclosure view).
 
 Inspect `response["sections"]`. If **all three** of the following are non-empty:
 - `acceptance criteria`
@@ -39,15 +42,17 @@ Inspect `response["sections"]`. If **all three** of the following are non-empty:
 
 → **Synthesize** a feature-context artifact directly from those sections instead of invoking discovery:
 
-```text
-mcp__plugin_dh_backlog__artifact_register(
-    item_id={issue_number},
-    artifact_type='feature-context',
-    path='plan/feature-context-{slug}.md',
-    agent='discovery',
-    content='# ARTIFACT:DISCOVERY\n\n## Feature\n{item title}\n\n## Problem Statement\n{item description}\n\n## Goals\n{acceptance criteria section content}\n\n## Expected Behavior\n{expected behavior section content}\n\n## Desired Structure\n{desired structure / scope section content}\n\n## Open Questions\n- None (synthesized from groomed backlog item)'
-)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact register \
+  --item-id {issue_number} \
+  --artifact-type feature-context \
+  --artifact-id "plan/feature-context-{slug}.md" \
+  --agent discovery \
+  --content "# ARTIFACT:DISCOVERY\n\n## Feature\n{item title}\n\n## Problem Statement\n{item description}\n\n## Goals\n{acceptance criteria section content}\n\n## Expected Behavior\n{expected behavior section content}\n\n## Desired Structure\n{desired structure / scope section content}\n\n## Open Questions\n- None (synthesized from groomed backlog item)"
 ```
+
+Note: the CLI's `--artifact-id` corresponds to MCP's `path` parameter — both hold the artifact's
+logical identifier (see development-harness AGENTS.md's Artifact Manifest System section).
 
 → Load the just-registered artifact via `artifact_read`, **CONTINUE** to RT-ICA snapshot.
 Discovery is pure overhead for well-groomed items — skip it when these sections exist.
@@ -60,8 +65,8 @@ Skill(skill='dh:discovery', args='{item_ref}')
 
 5. Verify artifact was registered:
 
-```text
-mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue_number} --artifact-type feature-context
 ```
 
 - `count > 0` → load artifact via `artifact_read`, **CONTINUE**.
@@ -69,7 +74,10 @@ mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='fea
 
 ```text
 Skill(skill='dh:discovery', args='{item_ref}')
-mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')
+```
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue_number} --artifact-type feature-context
 ```
 
 - `count > 0` after retry → load artifact, **CONTINUE**.
@@ -119,8 +127,8 @@ MISSING count: {N}
 
 **Write**:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{snapshot}')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{snapshot}"
 ```
 
 ## Scope Sizing

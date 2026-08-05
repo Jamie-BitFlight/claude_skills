@@ -238,9 +238,11 @@ flowchart TD
 
 Write classification:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='Issue Classification',
-  content='**Type**: {type}\n**Rationale**: {explanation}\n**Analysis Method**: {method}\n**Scenario Target**: {scenario} -> {improvement}')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+  --selector "{item_ref}" \
+  --section "Issue Classification" \
+  --content "**Type**: {type}\n**Rationale**: {explanation}\n**Analysis Method**: {method}\n**Scenario Target**: {scenario} -> {improvement}"
 ```
 
 #### Root-Cause Analysis — only for `defect` or `recurring-pattern`

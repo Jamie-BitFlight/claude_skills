@@ -15,9 +15,12 @@ Runs after the grooming swarm completes. The orchestrator (not a subagent) execu
 
 1. Read all sections now written to the item via MCP:
 
-```text
-mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
 ```
+
+Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
+(simpler/flatter than MCP's progressive-disclosure view).
 
 Extract: Impact Radius, Fact-Check, Issue Classification, Research (if Wave 0 ran), groomed subsections.
 
@@ -63,8 +66,8 @@ Decision: {APPROVED|BLOCKED}
    `{rt_ica_final_content}` — it will be included in the batch write at the end of this workflow
    to ensure atomic persistence with `mark_groomed=True`:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{final report}')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{final report}"
 ```
 
    Retain `{rt_ica_final_content}` in scope for the Write Groomed Content step.
@@ -193,9 +196,11 @@ the solution (should|will|must) (use|implement|call)
 
 Scope violations do NOT block the write. Log violations as notes:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='Grooming Notes',
-  content='Scope violation: {pattern} in {section}')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+  --selector "{item_ref}" \
+  --section "Grooming Notes" \
+  --content "Scope violation: {pattern} in {section}"
 ```
 
 5. When validation passes (all required sections present, scope check logged) → proceed to write.
@@ -231,17 +236,24 @@ mcp__plugin_dh_backlog__backlog_groom(
 )
 ```
 
+Note: no CLI equivalent for the batch `sections=`/`mark_groomed=True` write — `backlog groom`'s
+CLI form accepts only a single `--section`/`--content` pair and has no `--mark-groomed` flag (not
+in the verified mapping table's flag list). This call is left as MCP.
+
 After the batch write, verify the RT-ICA section was persisted:
 
-```text
-mcp__plugin_dh_backlog__backlog_view(selector='{item_ref}', summary=false)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
 ```
+
+Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
+(simpler/flatter than MCP's progressive-disclosure view).
 
 Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-DD` and
 `Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt_ica_final_content}"
 ```
 
 `mark_groomed=True` performs these transitions via the active backend:
@@ -257,13 +269,16 @@ if response.get("mark_groomed_skipped"):
     mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
 
+Note: no CLI equivalent for `mark_groomed=True` — not in `backlog groom`'s verified CLI flag
+list. This call is left as MCP.
+
 **Alternative: incremental section updates**
 
 When sections become available during the swarm (not at the end), write each immediately:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='Fact-Check', content='{fact-check}')
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt-ica}')
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "Fact-Check" --content "{fact-check}"
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt-ica}"
 # ... each section as it completes ...
 ```
 
@@ -274,11 +289,17 @@ it with the final report from the RT-ICA Final Pass step above:
 mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True)
 ```
 
+Note: no CLI equivalent for `replace_section=True` — not in `backlog groom`'s verified CLI flag
+list. This call is left as MCP.
+
 Then call the final status transition:
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
+
+Note: no CLI equivalent for `mark_groomed=True` — not in `backlog groom`'s verified CLI flag
+list. This call is left as MCP.
 
 #### Handoff
 
