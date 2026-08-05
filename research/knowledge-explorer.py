@@ -7,6 +7,7 @@
 #     "python-frontmatter>=1.1.0",
 #     "PyGithub>=2.1.1",
 #     "python-dotenv>=1.0.0",
+#     "click>=8.4.2",
 # ]
 # ///
 """Knowledge base explorer for research/ directory.
@@ -41,10 +42,12 @@ if isinstance(sys.stdout, TextIOWrapper):
 if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+import click
 import frontmatter
 import typer
 from frontmatter.default_handlers import YAMLHandler
 from github import Auth, Github, GithubException
+from github.ContentFile import ContentFile
 from rich.console import Console
 from rich.measure import Measurement
 from rich.panel import Panel
@@ -387,7 +390,7 @@ def fetch_github_metadata(repo_slug: str) -> GitHubMetadata:
         latest_tag = None
 
     root_contents = repo.get_contents("")
-    items = list(root_contents) if isinstance(root_contents, list) else [root_contents]
+    items = [root_contents] if isinstance(root_contents, ContentFile) else root_contents
     has_docs_dir = False
     docs_dirname: str | None = None
     for item in items:
@@ -400,7 +403,7 @@ def fetch_github_metadata(repo_slug: str) -> GitHubMetadata:
     if has_docs_dir and docs_dirname:
         try:
             docs_contents = repo.get_contents(docs_dirname)
-            docs_items = list(docs_contents) if isinstance(docs_contents, list) else [docs_contents]
+            docs_items = [docs_contents] if isinstance(docs_contents, ContentFile) else docs_contents
             docs_files = [item.path for item in docs_items]
         except GithubException:
             docs_files = []
@@ -2135,7 +2138,7 @@ def update_append(topic: Annotated[str, typer.Argument(help="kebab-case topic sl
 
         # Open editor
         template = "<!-- Replace this with your update content -->"
-        update_content = typer.edit(template) or ""
+        update_content = click.edit(template) or ""
         if not update_content.strip() or update_content.strip() == template.strip():
             console.print("[yellow]No update content provided. Aborted.[/yellow]")
             raise typer.Exit(code=0)

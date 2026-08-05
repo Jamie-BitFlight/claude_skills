@@ -16,6 +16,7 @@ dev = [
     "basedpyright>=1.39.9",
     "cairosvg>=2.9.0",
     "claude-code-sdk>=0.0.25",
+    "click>=8.3.2",
     "defusedxml>=0.7.1",
     "duckdb>=1.5.5",
     "fastmcp[tasks]>=3.2.4",
