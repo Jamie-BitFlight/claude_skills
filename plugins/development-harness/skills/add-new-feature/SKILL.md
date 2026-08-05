@@ -159,8 +159,8 @@ Register your deliverable and return:
 
 After the agent completes, verify the artifact was registered:
 
-```text
-mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type="feature-context")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue} --artifact-type feature-context
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -219,8 +219,8 @@ Register each document and return:
 
 After the agent completes, verify the artifact was registered:
 
-```text
-mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type="codebase-analysis")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue} --artifact-type codebase-analysis
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -253,7 +253,7 @@ flowchart TD
     FB --> Delegate
 ```
 
-Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec.
+Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec. No CLI equivalent exists for `profile_load` as of 2026-08-05 (backlog item #2793) — this call remains MCP-only.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
@@ -409,8 +409,8 @@ Register your deliverable and return:
 
 After the agent completes, verify the artifact was registered:
 
-```text
-mcp__plugin_dh_backlog__artifact_list(item_id={issue}, artifact_type="architect")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue} --artifact-type architect
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -469,19 +469,21 @@ outside it. The `swarm-task-planner` never reads this file, so it cannot perform
 self-report such as "linked to issue #N" is not evidence the link exists. Confirm the link by
 reading state, not by trusting a report:
 
-```text
+```bash
 # 1. Read current state — plan_address is null until the link is written
-mcp__plugin_dh_backlog__backlog_view(selector="#{issue}", summary=True)
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#{issue}"
 
 # 2. If plan_address is null, write the link
-mcp__plugin_dh_backlog__backlog_update(
-    selector="{title}",
-    plan="P{id}"
-)
+uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}" --plan "P{id}"
 
 # 3. Re-read and confirm plan_address is non-null before proceeding to Phase 5
-mcp__plugin_dh_backlog__backlog_view(selector="#{issue}", summary=True)
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#{issue}"
 ```
+
+Note: the CLI's `backlog view` has no `--summary` flag — its JSON output is always the flatter,
+full-detail shape and surfaces the plan reference as `plan`, not `plan_address` (that name is
+produced only by the MCP summary-mode response — see below). Check `plan` instead when reading
+CLI output.
 
 Note: `sam_plan(action='create', issue={issue})` already auto-registers the `task-plan`
 artifact. Do NOT call `artifact_register` for the `task-plan` type — it is redundant and

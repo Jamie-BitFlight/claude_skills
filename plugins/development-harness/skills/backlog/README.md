@@ -174,6 +174,8 @@ An item is **fully groomed** only when all required sections (Fact-Check, RT-ICA
 
 ## MCP Tool Reference
 
+Each tool below also has a CLI equivalent via `uv run plugins/development-harness/sam_schema/cli.py`, shown after the MCP call. Where CLI support is partial or absent for a parameter, a note says so explicitly — do not guess a flag that isn't shown.
+
 All tools return a dict. Check for the `"error"` key before consuming result fields. Every response includes `messages` and `warnings` lists (may be empty).
 
 ```text
@@ -200,6 +202,18 @@ mcp__plugin_dh_backlog__backlog_add(
 # Returns: {filepath, filename, title, priority, issue_num?, messages, warnings}
 ```
 
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog add \
+  --title "Fix duplicate detection before creating new items" \
+  --priority P1 \
+  --description "New items can be created without checking for near-duplicates." \
+  --source "Session observation" \
+  --type Bug
+# add --force to skip the fuzzy duplicate check
+```
+
 ### `backlog_list` — List open items
 
 ```python
@@ -215,6 +229,23 @@ mcp__plugin_dh_backlog__backlog_list(
 # Every response item always includes state (open/closed) and status (workflow status)
 # Returns: {items: [{title, priority, issue, plan, type, topic}], backend: {...}, messages, warnings}
 ```
+
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog list \
+  --refresh \
+  --label "priority:p1" \
+  --section P1 \
+  --status "needs-grooming" \
+  --title "duplicate" \
+  --type Bug \
+  --topic "matching"
+```
+
+Note: the CLI's `backlog list` has no `--search` flag — full-text search across title, section,
+topic, type, description, and body has no CLI path as of 2026-08-05 (backlog item #2793). Use the
+MCP `backlog_list(search=...)` tool for full-text search.
 
 The `backend` dict is always present in the response, regardless of the `from_github` parameter.
 It reports the GitHub API availability status checked on every `backlog_list` call.
@@ -296,12 +327,25 @@ mcp__plugin_dh_backlog__backlog_view(
 # Returns: {title, priority, issue, plan, file_path, body, groomed, messages, warnings}
 ```
 
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#142" --offset 0 --limit 0
+```
+
 ### `backlog_sync` — Sync to GitHub
 
 ```python
 mcp__plugin_dh_backlog__backlog_sync(dry_run=False)
 # Returns: {created, pushed, messages, warnings}
 # Progress: emits ctx.info() at start/end; ctx.warning() for each warning
+```
+
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog sync
+# add --dry-run to preview without pushing changes
 ```
 
 ### `backlog_close` — Dismiss an item
@@ -318,6 +362,17 @@ mcp__plugin_dh_backlog__backlog_close(
     force=False,  # close even if open PRs reference the issue
 )
 # Returns: {title, reason, closed, messages, warnings}
+```
+
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog close \
+  --selector "Fix duplicate detection" \
+  --reason duplicate \
+  --reference "#139" \
+  --comment "Covered by #139."
+# add --cleanup / --force as needed
 ```
 
 ### `backlog_resolve` — Mark an item done
@@ -337,6 +392,19 @@ mcp__plugin_dh_backlog__backlog_resolve(
 # Returns: {title, summary, resolved, messages, warnings}
 ```
 
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog resolve \
+  --selector "#142" \
+  --summary "Added fuzzy title matching before item creation." \
+  --plan "plan/tasks-7-duplicate-detection.md" \
+  --method "Levenshtein distance check in add_item()" \
+  --notes "Edge case: exact-match titles with different casing needed normalization." \
+  --follow-ups "#155" \
+  --findings "Fuzzy threshold of 0.85 works well for backlog titles."
+```
+
 ### `backlog_update` — Update an item
 
 ```python
@@ -353,6 +421,23 @@ mcp__plugin_dh_backlog__backlog_update(
 )
 # Returns: {title, changes, messages, warnings}
 ```
+
+CLI equivalent (excludes `verified` and `groomed_content` — see note below):
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog update \
+  --selector "#142" \
+  --plan "plan/tasks-7-slug.md" \
+  --status "in-progress" \
+  --section "Priority" \
+  --content "P1 — blocks item creation." \
+  --title "New title" \
+  --description "New description."
+```
+
+Note: the CLI's `backlog update` has no equivalent for `verified` (apply the `status:verified`
+label) or `groomed_content` (full-section replacement) as of 2026-08-05 (backlog item #2793) —
+those remain MCP-only.
 
 The `verified=True` parameter applies the `status:verified` label to the linked GitHub Issue and
 removes `status:in-progress` if present. It is called automatically by `/dh:complete-implementation`
@@ -373,12 +458,28 @@ mcp__plugin_dh_backlog__backlog_groom(
 # Progress: emits ctx.info() at start/end; ctx.warning() for each warning
 ```
 
+CLI equivalent (incremental section update only — see note below):
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "#142" --section "Dependencies" --content "None."
+```
+
+Note: full-section replacement (`groomed_content=...`, rewriting the entire groomed block at once)
+has no CLI equivalent as of 2026-08-05 (backlog item #2793) — use the MCP
+`backlog_groom(groomed_content=...)` form for that.
+
 ### `backlog_normalize` — Normalize all files
 
 ```python
 mcp__plugin_dh_backlog__backlog_normalize(dry_run=True)  # preview first
 # Returns: {updated, messages, warnings}
 # Progress: emits ctx.info() at start/end; ctx.warning() for each warning
+```
+
+CLI equivalent:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog normalize --dry-run  # preview first
 ```
 
 ### `backlog_pull` — Pull from GitHub
@@ -397,6 +498,16 @@ mcp__plugin_dh_backlog__backlog_pull(
 # Returns: {pulled, messages, warnings}
 # Progress: emits ctx.info() at start/end; ctx.warning() for each warning
 ```
+
+CLI equivalent (single-item pull only):
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog pull --selector "#142"
+```
+
+Note: the CLI's `backlog pull` requires `--selector` — there is no CLI equivalent for the bulk
+"pull all items" form (`dry_run`/`force`, no selector) as of 2026-08-05 (backlog item #2793). Use
+the MCP `backlog_pull()` tool with no `selector` for a bulk pull.
 
 ## GitHub Integration
 

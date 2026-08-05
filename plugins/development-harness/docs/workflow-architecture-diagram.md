@@ -246,7 +246,7 @@ Relevant fields for the pipeline:
 
 ### 2.6 Active-task context file (~/.dh/projects/{slug}/context/active-task-{CLAUDE_CODE_SESSION_ID}.json)
 
-Written by `/start-task` skill via `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})`.
+Written by `/start-task` skill via `uv run plugins/development-harness/sam_schema/cli.py active-task set --address "P{N}/T{M}"` (CLI) or `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})` (MCP) — both write the same session-scoped context.
 Read by `task_status_hook.py` PostToolUse handler.
 
 ```json
@@ -260,9 +260,9 @@ Read by `task_status_hook.py` PostToolUse handler.
 `parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
 
 > **Migration note**: Direct filesystem writes of `active-task-{session_id}.json` via inline
-> Python or Bash are deprecated. Use `sam_active_task(action="set")` instead. The hook
-> still reads from the filesystem path as a compatibility bridge — this path is not
-> migrated to MCP in this iteration.
+> Python or Bash are deprecated. Use `active-task set --address "P{N}/T{M}"` (CLI) or
+> `sam_active_task(action="set")` (MCP) instead. The hook still reads from the filesystem
+> path as a compatibility bridge — this path is not migrated to MCP in this iteration.
 
 ### 2.7 sam_task claim output
 
