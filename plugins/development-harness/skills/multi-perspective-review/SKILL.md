@@ -75,8 +75,8 @@ blindly — this causes ephemeral plan accumulation and slug-collision duplicate
 
 Call:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "review-{slug}"})
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan list --search "review-{slug}"
 ```
 
 Inspect the returned `plans` array. If any plan has `feature` equal to `review-{slug}`:
@@ -95,63 +95,77 @@ Changed files:
 {each file on its own line}
 ```
 
-Call `sam_plan(action='create')` with the four review tasks. All four tasks have
-`dependencies: []` — they are independent and run in parallel.
+Create the plan via the CLI with the first review task (T1) inline, then append the remaining
+three tasks. All four tasks have `dependencies: []` — they are independent and run in parallel.
 
-```text
-mcp__plugin_dh_sam__sam_plan(
-  config={
-    "action": "create",
-    "slug": "review-{slug}",
-    "goal": "Multi-perspective review for {slug}",
-    "issue": <issue_number_or_omit_if_absent>,
-    "tasks": [
-      {
-        "id": "T1",
-        "title": "Security Review",
-        "agent": "reviewer-security",
-        "status": "not-started",
-        "dependencies": [],
-        "priority": 1,
-        "complexity": "medium",
-        "body": "## Security Review\nChanged files:\n{newline-separated changed_files list}\nReview each file through the security perspective lens.\nReturn structured verdict per verdict-schema.md."
-      },
-      {
-        "id": "T2",
-        "title": "Performance Review",
-        "agent": "reviewer-performance",
-        "status": "not-started",
-        "dependencies": [],
-        "priority": 1,
-        "complexity": "medium",
-        "body": "## Performance Review\nChanged files:\n{newline-separated changed_files list}\nReview each file through the performance perspective lens.\nReturn structured verdict per verdict-schema.md."
-      },
-      {
-        "id": "T3",
-        "title": "Quality Review",
-        "agent": "reviewer-quality",
-        "status": "not-started",
-        "dependencies": [],
-        "priority": 1,
-        "complexity": "medium",
-        "body": "## Quality Review\nChanged files:\n{newline-separated changed_files list}\nReview each file through the quality perspective lens.\nReturn structured verdict per verdict-schema.md."
-      },
-      {
-        "id": "T4",
-        "title": "Accessibility Review",
-        "agent": "reviewer-accessibility",
-        "status": "not-started",
-        "dependencies": [],
-        "priority": 1,
-        "complexity": "low",
-        "body": "## Accessibility Review\nChanged files:\n{newline-separated changed_files list}\nApply SKIP detection rule from verdict-schema.md first.\nIf SKIP applies, emit SKIP verdict immediately.\nOtherwise, review for ARIA attributes, color-only signals, keyboard parity.\nReturn structured verdict per verdict-schema.md."
-      }
-    ]
-  }
-)
+Note: the CLI's `plan create` accepts only one inline task per call (mapping table, verified
+2026-08-05) — unlike MCP's `tasks=[...]` list, the remaining tasks are added via `plan append-task`
+below. The `--task-body`/`--task-agent`/`--task-priority`/`--task-complexity` flags follow the
+`--task-{field}` naming convention already established for `plan create`/`plan append-task` calls
+elsewhere in this repo (see `quick/start.md`); verify against `--help` before first use since the
+mapping table's flag list for these two actions is not fully enumerated.
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan create \
+  --slug "review-{slug}" \
+  --goal "Multi-perspective review for {slug}" \
+  --issue <issue_number_or_omit_if_absent> \
+  --task-id T1 \
+  --task-title "Security Review" \
+  --task-agent "reviewer-security" \
+  --task-priority 1 \
+  --task-complexity medium \
+  --task-body "## Security Review
+Changed files:
+{newline-separated changed_files list}
+Review each file through the security perspective lens.
+Return structured verdict per verdict-schema.md."
 ```
 
-Store the returned plan address as `{PA}`.
+Store the returned plan address as `{PA}`, then append T2, T3, and T4:
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan append-task \
+  --plan-address {PA} \
+  --task-id T2 \
+  --task-title "Performance Review" \
+  --task-agent "reviewer-performance" \
+  --task-priority 1 \
+  --task-complexity medium \
+  --task-body "## Performance Review
+Changed files:
+{newline-separated changed_files list}
+Review each file through the performance perspective lens.
+Return structured verdict per verdict-schema.md."
+
+uv run plugins/development-harness/sam_schema/cli.py plan append-task \
+  --plan-address {PA} \
+  --task-id T3 \
+  --task-title "Quality Review" \
+  --task-agent "reviewer-quality" \
+  --task-priority 1 \
+  --task-complexity medium \
+  --task-body "## Quality Review
+Changed files:
+{newline-separated changed_files list}
+Review each file through the quality perspective lens.
+Return structured verdict per verdict-schema.md."
+
+uv run plugins/development-harness/sam_schema/cli.py plan append-task \
+  --plan-address {PA} \
+  --task-id T4 \
+  --task-title "Accessibility Review" \
+  --task-agent "reviewer-accessibility" \
+  --task-priority 1 \
+  --task-complexity low \
+  --task-body "## Accessibility Review
+Changed files:
+{newline-separated changed_files list}
+Apply SKIP detection rule from verdict-schema.md first.
+If SKIP applies, emit SKIP verdict immediately.
+Otherwise, review for ARIA attributes, color-only signals, keyboard parity.
+Return structured verdict per verdict-schema.md."
+```
 
 ---
 

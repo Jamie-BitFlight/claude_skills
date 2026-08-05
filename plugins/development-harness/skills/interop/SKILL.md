@@ -97,6 +97,10 @@ flowchart TD
     WriteRef --> UseExisting
 ```
 
+Note: the CLI's `backlog add` command has no `--plan` flag in the MCP↔CLI mapping (verified
+2026-08-05) — the `plan = $ARGUMENTS` parameter used here has no confirmed CLI equivalent. Use the
+MCP tool for this call until the gap is resolved.
+
 When writing the backlog item reference into the plan file, use the Edit tool to insert:
 
 ```markdown
@@ -133,10 +137,10 @@ Wait for `/work-backlog-item` to complete. The plan address it produces is requi
 
 After `/work-backlog-item` completes, identify the plan address it produced. The plan address is included in the `/work-backlog-item` output (e.g., `Pc7d8e9f0` or `tasks-N-slug`).
 
-If the plan address is not stated in the output, use `sam_list` via MCP to find the plan whose slug matches the backlog item title:
+If the plan address is not stated in the output, use `sam_list` via MCP (or `plan list` via CLI) to find the plan whose slug matches the backlog item title:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "list"})
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan list
 ```
 
 If no matching plan exists, abort:

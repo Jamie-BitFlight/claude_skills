@@ -33,17 +33,17 @@ $ARGUMENTS
 
 ## If `--complete <task-id>` Provided
 
-1. Run `mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "state", "status": "complete"})` to mark the task complete.
+1. Run `uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status complete` to mark the task complete.
 2. Output: `Task {ID} marked as complete`
 
 ---
 
 ## Starting a Task
 
-1. Read the task assignment via the SAM MCP tool:
+1. Read the task assignment via the SAM CLI:
 
-   ```text
-   mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "read"})
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py plan read --address P{N}/T{M}
    ```
 
    The response is a `TaskAssignment` model containing:
@@ -58,15 +58,15 @@ $ARGUMENTS
 
    If the `TaskAssignment` model contains a `parent_issue_number` or the plan has an `issue` field, query the artifact manifest to discover available plan artifacts:
 
-   ```text
-   mcp__plugin_dh_backlog__artifact_list(item_id=N)
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id N
    ```
 
    If the response contains artifacts (non-empty `artifacts` list), use `artifact_read` to fetch the architect spec and feature context content:
 
-   ```text
-   mcp__plugin_dh_backlog__artifact_read(item_id=N, artifact_type="architect")
-   mcp__plugin_dh_backlog__artifact_read(item_id=N, artifact_type="feature-context")
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id N --artifact-type architect
+   uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id N --artifact-type feature-context
    ```
 
    Use the returned content as context for implementation instead of reading filesystem paths directly. This is especially important for worktree-isolated agents that cannot access uncommitted plan files from the root worktree.
@@ -87,11 +87,11 @@ $ARGUMENTS
 
 3. Claim the task (prevents duplicate dispatch):
 
-   Use `sam_task(action='claim')` MCP tool. This is the ONLY permitted way to mark a task in-progress.
-   Do NOT edit status or started fields directly with the Edit tool.
+   Use `sam_task(action='claim')` (MCP) or `plan claim` (CLI). This is the ONLY permitted way to
+   mark a task in-progress. Do NOT edit status or started fields directly with the Edit tool.
 
-   ```text
-   mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "claim"})
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py plan claim --address P{N}/T{M}
    ```
 
    If the response contains `"claimed": false`:
@@ -106,18 +106,18 @@ $ARGUMENTS
    - The task is claimed. `status: in-progress` and `started:` are written on disk.
    - Proceed to step 4 (write context file) and step 5 (implement).
 
-4. Register the active-task context via the SAM MCP tool (required for hook-driven updates):
+4. Register the active-task context via the SAM CLI (required for hook-driven updates):
 
-   ```text
-   mcp__plugin_dh_sam__sam_active_task(
-       config={"action": "set", "plan": "P{N}", "task": "T{M}", "parent_issue_number": N},
-       session_id="${CLAUDE_CODE_SESSION_ID}"
-   )
+   ```bash
+   uv run plugins/development-harness/sam_schema/cli.py active-task set \
+     --address P{N}/T{M} \
+     --parent-issue N \
+     --session-id "${CLAUDE_CODE_SESSION_ID}"
    ```
 
-   Omit `parent_issue_number` from the config if the story issue number is not known. The hook
-   treats absence as `None` and skips backend sync. `parent_issue_number` accepts `str | int`
-   — GitHub integer IDs (e.g., `42`) and beads string IDs (e.g., `"bd-a3f8"`) are both valid.
+   Omit `--parent-issue` if the story issue number is not known. The hook treats absence as `None`
+   and skips backend sync. `--parent-issue` accepts `str | int` — GitHub integer IDs (e.g., `42`)
+   and beads string IDs (e.g., `"bd-a3f8"`) are both valid.
 
 If `parent_issue_number` is known (`str | int`), the `sam_task(action='claim')` step already
 writes `in-progress` status via the backend-agnostic SAM router. The `task_status_hook.py`

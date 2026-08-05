@@ -65,17 +65,20 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:rt-ica', args='#42')`)
 
 1. Load item context before doing anything else:
 
-```text
-mcp__plugin_dh_backlog__backlog_view(selector="#N", summary=false)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#N"
 ```
+
+Note: the CLI's `backlog view` has no `summary` toggle (documented gap in the MCP↔CLI mapping,
+verified 2026-08-05) — it always returns the flatter, full-content equivalent of `summary=false`.
 
 2. Extract: `title`, `description`, `sections['acceptance criteria']`,
    `sections['expected behavior']`, `sections['impact radius']`, and any other populated sections.
 3. Use the loaded content as the goal input for the RT-ICA procedure below.
 4. After completing the assessment, write the RT-ICA result back to the item:
 
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector="#N", section="RT-ICA", content="{RT-ICA SUMMARY block}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "#N" --section "RT-ICA" --content "{RT-ICA SUMMARY block}"
 ```
 
 Without a `#N` arg, the skill expects the goal/input to be provided inline in the invocation
