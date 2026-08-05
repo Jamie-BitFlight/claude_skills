@@ -15,13 +15,13 @@ Runs after `intake.md` completes with PROCEED.
 1. Check for existing discovery artifact:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue_number} --artifact-type feature-context
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue_number} --artifact-type feature-context
 ```
 
 2. If `count > 0`: load the artifact and pass it to swarm agents as prior context.
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id {issue_number} --artifact-type feature-context
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue_number} --artifact-type feature-context
 ```
 
 → **CONTINUE** to RT-ICA snapshot.
@@ -29,7 +29,7 @@ uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id {is
 3. If `count == 0`: check whether the item already has rich groomed sections.
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
 ```
 
 Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
@@ -43,7 +43,7 @@ Inspect `response["sections"]`. If **all three** of the following are non-empty:
 → **Synthesize** a feature-context artifact directly from those sections instead of invoking discovery:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact register \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --item-id {issue_number} \
   --artifact-type feature-context \
   --artifact-id "plan/feature-context-{slug}.md" \
@@ -66,7 +66,7 @@ Skill(skill='dh:discovery', args='{item_ref}')
 5. Verify artifact was registered:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue_number} --artifact-type feature-context
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue_number} --artifact-type feature-context
 ```
 
 - `count > 0` → load artifact via `artifact_read`, **CONTINUE**.
@@ -77,7 +77,7 @@ Skill(skill='dh:discovery', args='{item_ref}')
 ```
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue_number} --artifact-type feature-context
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue_number} --artifact-type feature-context
 ```
 
 - `count > 0` after retry → load artifact, **CONTINUE**.
@@ -128,7 +128,7 @@ MISSING count: {N}
 **Write**:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{snapshot}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{snapshot}"
 ```
 
 ## Scope Sizing

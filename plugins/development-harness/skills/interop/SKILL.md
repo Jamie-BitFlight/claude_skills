@@ -140,7 +140,7 @@ After `/work-backlog-item` completes, identify the plan address it produced. The
 If the plan address is not stated in the output, use `sam_list` via MCP (or `plan list` via CLI) to find the plan whose slug matches the backlog item title:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py plan list
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list
 ```
 
 If no matching plan exists, abort:

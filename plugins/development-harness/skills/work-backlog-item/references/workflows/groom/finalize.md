@@ -16,7 +16,7 @@ Runs after the grooming swarm completes. The orchestrator (not a subagent) execu
 1. Read all sections now written to the item via MCP:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
 ```
 
 Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
@@ -67,7 +67,7 @@ Decision: {APPROVED|BLOCKED}
    to ensure atomic persistence with `mark_groomed=True`:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{final report}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{final report}"
 ```
 
    Retain `{rt_ica_final_content}` in scope for the Write Groomed Content step.
@@ -197,7 +197,7 @@ the solution (should|will|must) (use|implement|call)
 Scope violations do NOT block the write. Log violations as notes:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom \
   --selector "{item_ref}" \
   --section "Grooming Notes" \
   --content "Scope violation: {pattern} in {section}"
@@ -243,7 +243,7 @@ in the verified mapping table's flag list). This call is left as MCP.
 After the batch write, verify the RT-ICA section was persisted:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
 ```
 
 Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
@@ -253,7 +253,7 @@ Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-
 `Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt_ica_final_content}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt_ica_final_content}"
 ```
 
 `mark_groomed=True` performs these transitions via the active backend:
@@ -277,8 +277,8 @@ list. This call is left as MCP.
 When sections become available during the swarm (not at the end), write each immediately:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "Fact-Check" --content "{fact-check}"
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt-ica}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{item_ref}" --section "Fact-Check" --content "{fact-check}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt-ica}"
 # ... each section as it completes ...
 ```
 

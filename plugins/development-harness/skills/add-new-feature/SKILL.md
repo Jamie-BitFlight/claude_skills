@@ -160,7 +160,7 @@ Register your deliverable and return:
 After the agent completes, verify the artifact was registered:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue} --artifact-type feature-context
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue} --artifact-type feature-context
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -220,7 +220,7 @@ Register each document and return:
 After the agent completes, verify the artifact was registered:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue} --artifact-type codebase-analysis
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue} --artifact-type codebase-analysis
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -410,7 +410,7 @@ Register your deliverable and return:
 After the agent completes, verify the artifact was registered:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id {issue} --artifact-type architect
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue} --artifact-type architect
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -471,13 +471,13 @@ reading state, not by trusting a report:
 
 ```bash
 # 1. Read current state — plan_address is null until the link is written
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#{issue}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue}"
 
 # 2. If plan_address is null, write the link
-uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}" --plan "P{id}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --plan "P{id}"
 
 # 3. Re-read and confirm plan_address is non-null before proceeding to Phase 5
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#{issue}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue}"
 ```
 
 Note: the CLI's `backlog view` has no `--summary` flag — its JSON output is always the flatter,

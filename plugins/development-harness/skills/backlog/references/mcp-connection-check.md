@@ -61,7 +61,7 @@ If the configured backend is Beads, use native `bd` first for CRUD, readiness, s
 From the repository root:
 
 ```bash
-CLI="uv run plugins/development-harness/sam_schema/cli.py"
+CLI="uv run --script ${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
 $CLI plan list
 $CLI plan status --plan-address P{N}
 $CLI plan ready --plan-address P{N}

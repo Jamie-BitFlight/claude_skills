@@ -25,7 +25,7 @@ Do not stop for user input at any point.
 ```text
 Backlog item "{title}" is now planned.
 
-- Plan: accessible via `uv run plugins/development-harness/sam_schema/cli.py plan read --address "{slug}"`
+- Plan: accessible via `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address "{slug}"`
 - To execute:      /implement-feature {slug}
 - To check status: /implementation-manager status . {slug}
 - To close when done: /work-backlog-item close {title}

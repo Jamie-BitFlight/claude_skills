@@ -73,10 +73,10 @@ or issue reference is passed as `item_ref`.
 
    Stop — do not continue to step 3 or create a new backlog item.
 
-3. Find the item via the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{title or #N}"`. If not found (JSON output contains an `error` key), create a minimal item:
+3. Find the item via the CLI: `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title or #N}"`. If not found (JSON output contains an `error` key), create a minimal item:
 
    ```bash
-   uv run plugins/development-harness/sam_schema/cli.py backlog add \
+   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog add \
      --title "{title}" \
      --priority P2 \
      --description "{title}"
@@ -97,7 +97,7 @@ or issue reference is passed as `item_ref`.
 5. Create the quick plan via the CLI:
 
    ```bash
-   uv run plugins/development-harness/sam_schema/cli.py plan create \
+   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan create \
      --slug "quick-{slug}" \
      --goal "{goal from description or acceptance_criteria}" \
      --task-id T1 \
@@ -112,7 +112,7 @@ or issue reference is passed as `item_ref`.
    internally — do not resolve or pass a file path. Read `plan_id` (e.g. `Pe71c7cb8`) from the JSON
    output — that is the plan reference used in the next two steps, not the `quick-{slug}` string.
 
-6. Call the CLI to record the plan reference: `uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{title}" --plan "{plan_id from step 5}"`.
+6. Call the CLI to record the plan reference: `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --plan "{plan_id from step 5}"`.
 
 7. Report the `plan_id` returned by `plan create`:
 

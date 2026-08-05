@@ -4,7 +4,7 @@ Validate the item identified by <item_ref/> is eligible for grooming, and extrac
 
 ## Load Item
 
-Verify <item_ref/> exists via `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"`
+Verify <item_ref/> exists via `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"`
 (the CLI has no `summary` parameter — it always returns full content). If error, report and stop.
 
 To extract the integer for tools that require `issue_number` (int):
@@ -21,19 +21,19 @@ git log --oneline --all -50 --grep='{title keywords}'
 ```
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog merged-prs --search "{title keywords}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog merged-prs --search "{title keywords}"
 ```
 
 If commits or merged PRs reference this item:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog resolve --selector "{item_ref}" --summary "Completed via PR #{pr} / commit {sha}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "{item_ref}" --summary "Completed via PR #{pr} / commit {sha}"
 ```
 
 If the active backend supports comments, also record evidence:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog comment-issue --issue-number {issue_number} --body "Completed via {evidence}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog comment-issue --issue-number {issue_number} --body "Completed via {evidence}"
 ```
 
 Result: **SKIP**.
@@ -66,7 +66,7 @@ If condition not met: continue.
 Check the item's state:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
 ```
 
 Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
@@ -80,7 +80,7 @@ git log --oneline --all -20 --grep='{item_ref}'
 ```
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog merged-prs --search "{item_ref}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog merged-prs --search "{item_ref}"
 ```
 
 - Evidence found: `backlog_resolve(selector='{item_ref}', summary='...')` → **SKIP**.
@@ -96,7 +96,7 @@ If `groomed` absent, empty, or not today → **PROCEED**.
 ## Extract Item Details
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{item_ref}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
 ```
 
 Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content

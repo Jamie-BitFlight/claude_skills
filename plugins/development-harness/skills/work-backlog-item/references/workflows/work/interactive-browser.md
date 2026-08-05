@@ -5,7 +5,7 @@
 For MCP tool errors encountered at any step, load [error-handling.md](./error-handling.md) for error
 classification and handling instructions.
 
-1. Call the CLI: `uv run plugins/development-harness/sam_schema/cli.py backlog list`.
+1. Call the CLI: `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list`.
 
    Note: the CLI's `backlog list` has no `--search` flag (unlike the MCP `backlog_list` tool) —
    full-text search across title/section/topic/type/description/body has no CLI path. Not needed
@@ -13,7 +13,7 @@ classification and handling instructions.
 
    Parse the returned JSON. Each entry in `items` has `section`, `title`, `issue`, `plan`, `status`, `milestone`, `file_path` (index format), `groomed` (true if item has groomed content).
 
-2. **Groomed** = item has `groomed: true` in `backlog list` output. For full groomed content, call `uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "{title or #N}"` (CLI has no `summary` parameter — its output is already the flatter, full-detail equivalent of MCP's `summary=false`) — the response `sections` dict contains groomed field values (e.g., `response["sections"]["Acceptance Criteria"]`). If groomed sections are present, use them.
+2. **Groomed** = item has `groomed: true` in `backlog list` output. For full groomed content, call `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{title or #N}"` (CLI has no `summary` parameter — its output is already the flatter, full-detail equivalent of MCP's `summary=false`) — the response `sections` dict contains groomed field values (e.g., `response["sections"]["Acceptance Criteria"]`). If groomed sections are present, use them.
 
 3. Present a numbered list. Use these status indicators in user-visible output only:
 

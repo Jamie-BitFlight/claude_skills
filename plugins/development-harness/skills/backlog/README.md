@@ -174,7 +174,7 @@ An item is **fully groomed** only when all required sections (Fact-Check, RT-ICA
 
 ## MCP Tool Reference
 
-Each tool below also has a CLI equivalent via `uv run plugins/development-harness/sam_schema/cli.py`, shown after the MCP call. Where CLI support is partial or absent for a parameter, a note says so explicitly — do not guess a flag that isn't shown.
+Each tool below also has a CLI equivalent via `uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"`, shown after the MCP call. Where CLI support is partial or absent for a parameter, a note says so explicitly — do not guess a flag that isn't shown.
 
 All tools return a dict. Check for the `"error"` key before consuming result fields. Every response includes `messages` and `warnings` lists (may be empty).
 
@@ -205,7 +205,7 @@ mcp__plugin_dh_backlog__backlog_add(
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog add \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog add \
   --title "Fix duplicate detection before creating new items" \
   --priority P1 \
   --description "New items can be created without checking for near-duplicates." \
@@ -233,7 +233,7 @@ mcp__plugin_dh_backlog__backlog_list(
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog list \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list \
   --refresh \
   --label "priority:p1" \
   --section P1 \
@@ -330,7 +330,7 @@ mcp__plugin_dh_backlog__backlog_view(
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#142" --offset 0 --limit 0
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#142" --offset 0 --limit 0
 ```
 
 ### `backlog_sync` — Sync to GitHub
@@ -344,7 +344,7 @@ mcp__plugin_dh_backlog__backlog_sync(dry_run=False)
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog sync
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog sync
 # add --dry-run to preview without pushing changes
 ```
 
@@ -367,7 +367,7 @@ mcp__plugin_dh_backlog__backlog_close(
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog close \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close \
   --selector "Fix duplicate detection" \
   --reason duplicate \
   --reference "#139" \
@@ -395,7 +395,7 @@ mcp__plugin_dh_backlog__backlog_resolve(
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog resolve \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve \
   --selector "#142" \
   --summary "Added fuzzy title matching before item creation." \
   --plan "plan/tasks-7-duplicate-detection.md" \
@@ -425,7 +425,7 @@ mcp__plugin_dh_backlog__backlog_update(
 CLI equivalent (excludes `verified` and `groomed_content` — see note below):
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog update \
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update \
   --selector "#142" \
   --plan "plan/tasks-7-slug.md" \
   --status "in-progress" \
@@ -461,7 +461,7 @@ mcp__plugin_dh_backlog__backlog_groom(
 CLI equivalent (incremental section update only — see note below):
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "#142" --section "Dependencies" --content "None."
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "#142" --section "Dependencies" --content "None."
 ```
 
 Note: full-section replacement (`groomed_content=...`, rewriting the entire groomed block at once)
@@ -479,7 +479,7 @@ mcp__plugin_dh_backlog__backlog_normalize(dry_run=True)  # preview first
 CLI equivalent:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog normalize --dry-run  # preview first
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog normalize --dry-run  # preview first
 ```
 
 ### `backlog_pull` — Pull from GitHub
@@ -502,7 +502,7 @@ mcp__plugin_dh_backlog__backlog_pull(
 CLI equivalent (single-item pull only):
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog pull --selector "#142"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog pull --selector "#142"
 ```
 
 Note: the CLI's `backlog pull` requires `--selector` — there is no CLI equivalent for the bulk

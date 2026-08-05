@@ -66,7 +66,7 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:rt-ica', args='#42')`)
 1. Load item context before doing anything else:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#N"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
 ```
 
 Note: the CLI's `backlog view` has no `summary` toggle (documented gap in the MCP↔CLI mapping,
@@ -78,7 +78,7 @@ verified 2026-08-05) — it always returns the flatter, full-content equivalent 
 4. After completing the assessment, write the RT-ICA result back to the item:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "#N" --section "RT-ICA" --content "{RT-ICA SUMMARY block}"
+uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "#N" --section "RT-ICA" --content "{RT-ICA SUMMARY block}"
 ```
 
 Without a `#N` arg, the skill expects the goal/input to be provided inline in the invocation

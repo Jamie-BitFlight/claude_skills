@@ -48,7 +48,7 @@ A gate returned BLOCKED or a validation failed after maximum retries. The workfl
 1. Set item status to blocked:
 
    ```bash
-   uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "<item_ref/>" --status blocked
+   uv run --script "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "<item_ref/>" --status blocked
    ```
 
 2. Report to the user with full context:
