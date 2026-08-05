@@ -5,9 +5,10 @@ description: Register a plan artifact via the MCP backlog server. Use when you p
 
 # Create Artifact (MCP-native storage)
 
-Register your deliverable using `mcp__plugin_dh_backlog__artifact_register`. This is the ONLY
-correct storage path for plan artifacts. Do NOT use `Write` to disk and do NOT return content
-inline.
+Register your deliverable using the `artifact_register` operation — MCP tool
+`mcp__plugin_dh_backlog__artifact_register`, or the CLI `artifact register` subcommand for
+scripting/dispatch contexts. This is the ONLY correct storage path for plan artifacts. Do NOT use
+`Write` to disk and do NOT return content inline.
 
 ## Why disk writes and inline returns are wrong
 
@@ -22,6 +23,8 @@ worktree or environment — can retrieve it via `artifact_read`.
 
 ## Correct invocation (verified against `backlog_core/server.py:2385`)
 
+**MCP:**
+
 ```python
 mcp__plugin_dh_backlog__artifact_register(
     item_id=<int>,                # GitHub issue number — REQUIRED
@@ -32,6 +35,21 @@ mcp__plugin_dh_backlog__artifact_register(
     content=<str | None>,         # Full artifact content — include this to store in GitHub
 )
 ```
+
+**CLI equivalent** (scripting/dispatch contexts):
+
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact register \
+  --item-id <int> \
+  --artifact-type <str> \
+  --artifact-id <str> \
+  --status "current" \
+  --agent <str> \
+  --content <str>
+```
+
+`--status` and `--agent` are optional (same defaults as the MCP form). The 6 examples below use
+the MCP form; substitute the same values into the CLI flags above for a scripting/dispatch context.
 
 **Return value**: dict with keys `registered` (bool), `artifact_count` (int), `action`
 ("added" or "updated"), `content_stored` (bool), `messages`, `warnings`. Check `action`

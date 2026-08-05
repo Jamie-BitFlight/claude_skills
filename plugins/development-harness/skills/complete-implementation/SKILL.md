@@ -56,8 +56,8 @@ Entered when input is `#N`, bare `N`, GitHub URL, or beads ID (e.g. `bd-a3f8`). 
 
 **Step 1 -- Fetch issue data**:
 
-```text
-mcp__plugin_dh_backlog__backlog_view(selector="#{issue_number}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog view --selector "#{issue_number}"
 ```
 
 If the response contains an `error` key:
@@ -167,6 +167,11 @@ mcp__plugin_dh_sam__sam_plan(
 )
 ```
 
+Note — `sam_plan(action='create')` has no full CLI equivalent for this call: the CLI's `plan create`
+accepts only one inline task per call (vs MCP's `tasks=[...]` list), and this call's per-task
+`dependencies`/`body` fields have no CLI flag confirmed in the verified mapping — converting would
+require guessing flag names. Left as MCP pending flag verification (backlog item #2793, 2026-08-05).
+
 The `pqg-` prefix (proportional quality gate) distinguishes from the `qg-` prefix used by full SAM gates. Store the returned plan ID as `{PQG}` for use throughout the dispatch loop.
 
 **Step 4 -- SAM dispatch loop**:
@@ -201,8 +206,8 @@ flowchart TD
 
 After the dispatch loop exits, verify all 5 phases reached terminal status:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="{PQG}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address "{PQG}"
 ```
 
 All 5 tasks must have `status == 'complete'`, with one exception: T5 (Documentation Update) may have `status == 'skipped'` when T4 found no drift. Any other task with `status == 'skipped'` is an unauthorized skip — treat as a failure. This skip whitelist matches the full SAM path's Completion Verification Gate.
@@ -246,6 +251,9 @@ On verification success:
 ```text
 mcp__plugin_dh_backlog__backlog_update(selector="#{issue_number}", verified=True)
 ```
+
+Note — no CLI equivalent exists for `verified=True` as of 2026-08-05 (backlog item #2793): the
+CLI's `backlog update` has no `--verified` flag. This call must stay MCP.
 
 **Beads backend**: No `dh:state:verified` label — skip this call, continue.
 
@@ -344,8 +352,8 @@ If signal found — confirm all four fidelity items from the reference before pr
 
 When the parent story issue number is known (from the plan's `issue` field or the backlog item), query the artifact manifest to discover all plan artifacts for this feature:
 
-```text
-mcp__plugin_dh_backlog__artifact_list(item_id=N)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact list --item-id N
 ```
 
 If the response contains artifacts, pass the manifest to quality gate agents (Phases T0-T6) so they can access plan artifacts via `artifact_read` instead of filesystem paths. This is critical for worktree-isolated agents.
@@ -370,8 +378,8 @@ Extract `{slug}` from the task file path (`plan/P{id}-{slug}.yaml` — strip the
 
 ### Step 1: Check for existing QG plan
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "qg-{slug}"})
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan list --search "qg-{slug}"
 ```
 
 The following diagram is the authoritative procedure for Quality Gate Plan Creation Step 1 check for existing QG plan. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
@@ -411,6 +419,11 @@ mcp__plugin_dh_sam__sam_plan(
 )
 ```
 
+Note — `sam_plan(action='create')` has no full CLI equivalent for this call: the CLI's `plan create`
+accepts only one inline task per call (vs MCP's `tasks=[...]` list), and this call's per-task
+`dependencies`/`body` fields have no CLI flag confirmed in the verified mapping — converting would
+require guessing flag names. Left as MCP pending flag verification (backlog item #2793, 2026-08-05).
+
 The response contains the QG plan ID (e.g., `Pdd73f3bd`). Store it as `{QG}` for use throughout the dispatch loop.
 
 ### Step 3: Reset BLOCKED tasks (on re-run)
@@ -421,6 +434,12 @@ If the QG plan already exists and has BLOCKED tasks, reset each to NOT_STARTED b
 For each task where status == "blocked":
     mcp__plugin_dh_sam__sam_state(plan="{QG}", task="{task_id}", status="not-started")
 ```
+
+Note — `sam_state` is not a registered MCP tool (only `sam_plan`, `sam_task`, and `sam_active_task`
+are registered per `sam_schema/server.py`, verified 2026-08-05). This call site references a stale
+or incorrect tool name and needs correction as a separate fix (likely
+`sam_task(config={"action": "state", ...})`) — left unchanged here rather than silently aliased
+(backlog item #2793).
 
 This allows re-running `complete-implementation` to resume from the blocked phase without re-executing completed phases.
 
@@ -455,8 +474,8 @@ Repeat until `sam_plan(action='ready')` returns a `ReadyTasksResult` with an emp
 
 **1. Get next ready task:**
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="{QG}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan ready --plan-address "{QG}"
 ```
 
 If the result is empty, exit the loop and proceed to Completion Verification Gate.
@@ -504,8 +523,8 @@ flowchart TD
 
 After the SAM dispatch loop exits, verify all phases reached terminal status before allowing label application.
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "status"}, plan="{QG}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address "{QG}"
 ```
 
 The following diagram is the authoritative procedure for Completion Verification Gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
@@ -585,8 +604,8 @@ After all phases complete, route any follow-up task files created by Phase 1 (co
 
 Retrieve the review report registered by `@dh:code-reviewer` during Phase 1:
 
-```text
-mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="codebase-analysis")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact read --item-id {issue_number} --artifact-type "codebase-analysis"
 ```
 
 **If `artifact_read` returns an error**, discover before falling through to SAM search:
@@ -607,8 +626,8 @@ Check the `verdict` field in the report:
 
 If `artifact_list` also finds no match, fall back to the SAM MCP search:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "{slug}-followup"})
+```bash
+uv run plugins/development-harness/sam_schema/cli.py plan list --search "{slug}-followup"
 ```
 
 Where `{slug}` is extracted from the parent task file path (`plan/P{id}-{slug}.yaml` — strip `P{id}-` prefix and `.yaml` suffix).
@@ -639,21 +658,24 @@ After all phases and follow-up routing complete, apply the `status:verified` Git
 
 Derive the search slug from the task file path (same algorithm as Recursive Follow-up Handling). Search the backlog:
 
-```text
-mcp__plugin_dh_backlog__backlog_list(title="{slug}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog list --title "{slug}"
 ```
 
 If zero items match, skip this section — there is no issue to label.
 
 ### Step 2: Apply the label
 
-Extract `issue_number` from the matched item returned by `backlog_list` in Step 1 (read from the item's `issue` field, e.g. `"#2437"` → `issue_number = 2437`).
+Extract `issue_number` from the matched item returned by `backlog list` in Step 1 (read from the item's `issue` field, e.g. `"#2437"` → `issue_number = 2437`).
 
 Call:
 
 ```text
 mcp__plugin_dh_backlog__backlog_update(selector="#{issue_number}", verified=True)
 ```
+
+Note — no CLI equivalent exists for `verified=True` as of 2026-08-05 (backlog item #2793): the
+CLI's `backlog update` has no `--verified` flag. This call must stay MCP.
 
 **Error handling**: If the call returns an `error` key, output:
 
@@ -680,8 +702,8 @@ git status
 
 **Issue number in commit message**: Before committing, check the backlog item for the current feature slug:
 
-```text
-mcp__plugin_dh_backlog__backlog_list(title="{slug}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog list --title "{slug}"
 ```
 
 Check the `issue` field on the matching item. If present, append `Fixes #NNN` to the commit message body (NNN = GitHub integer issue number; omit for beads IDs). If no issue number is found, omit it.
@@ -712,8 +734,8 @@ SendMessage(to="{name}", message={"type": "shutdown_request"})
 
 **SAM path (plan-linked)**: Use `selector="#{issue_number}"` from the Apply status:verified Label step. Skip this step if no backlog item was matched in that step.
 
-```text
-mcp__plugin_dh_backlog__backlog_resolve(selector="<selector>", summary="Implementation complete — AC verified PASS")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog resolve --selector "<selector>" --summary "Implementation complete — AC verified PASS"
 ```
 
 On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.

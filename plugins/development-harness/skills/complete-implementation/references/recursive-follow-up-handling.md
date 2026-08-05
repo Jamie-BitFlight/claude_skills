@@ -36,8 +36,8 @@ flowchart TD
 
 **Strategy 1 — substring via `title=`**
 
-```text
-mcp__plugin_dh_backlog__backlog_list(title="{derived_slug}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog list --title "{derived_slug}"
 ```
 
 Parse the JSON output. For each item, check if the derived slug appears (case-insensitive
@@ -48,8 +48,8 @@ match as the result and skip Strategy 2.
 
 If Strategy 1 returns zero matches, run:
 
-```text
-mcp__plugin_dh_backlog__backlog_list(topic="{derived_slug}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog list --topic "{derived_slug}"
 ```
 
 The `topic` parameter performs a case-insensitive substring match against `metadata.topic`.
@@ -60,7 +60,7 @@ If Strategy 2 returns one or more items, use the first match.
 
 If both strategies return zero results, treat as "no match found" and proceed to Step 4.
 
-**Error handling**: If either `mcp__plugin_dh_backlog__backlog_list` call fails, log the error, skip
+**Error handling**: If either `backlog list` call above fails, log the error, skip
 that strategy, and continue to the next strategy (or to Step 4 as "no match found" if all
 strategies fail). If the follow-up plan's `feature` field does not match the expected
 `{slug}-followup-{k}` pattern, log a warning and use the full `feature` value (with hyphens replaced by spaces) as the derived slug.
@@ -105,8 +105,8 @@ Based on Step 2 result, for each follow-up file:
 
 **Match found** -- attach follow-up as plan to the existing backlog item using the plan ID from the `sam_plan(action='list')` result in Step 1:
 
-```text
-mcp__plugin_dh_backlog__backlog_update(selector="{matched_item_title}", plan="{plan_id}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{matched_item_title}" --plan "{plan_id}"
 ```
 
 **No match found** -- create a new backlog item, then attach the follow-up as plan:
@@ -117,14 +117,14 @@ Skill(skill: "dh:create-backlog-item", args: "--auto {derived_title}")
 
 Then attach the follow-up plan using the plan ID from Step 1:
 
-```text
-mcp__plugin_dh_backlog__backlog_update(selector="{derived_title}", plan="{plan_id}")
+```bash
+uv run plugins/development-harness/sam_schema/cli.py backlog update --selector "{derived_title}" --plan "{plan_id}"
 ```
 
 **Error handling**:
 
-- If `mcp__plugin_dh_backlog__backlog_update` fails after creation (title mismatch between what `dh:create-backlog-item` produced and what `update` searched for): re-invoke `mcp__plugin_dh_backlog__backlog_list()`, find the most recently added item, and retry `mcp__plugin_dh_backlog__backlog_update` with its exact title. If the retry also fails, log the error and continue to the next follow-up file.
-- If `dh:create-backlog-item --auto` logs `[AUTO] STOP -- duplicate detected`: treat this as "match found" -- run `mcp__plugin_dh_backlog__backlog_update` on the duplicate's title to attach the plan.
+- If the `backlog update` call fails after creation (title mismatch between what `dh:create-backlog-item` produced and what `update` searched for): re-invoke `backlog list`, find the most recently added item, and retry `backlog update` with its exact title. If the retry also fails, log the error and continue to the next follow-up file.
+- If `dh:create-backlog-item --auto` logs `[AUTO] STOP -- duplicate detected`: treat this as "match found" -- run `backlog update` on the duplicate's title to attach the plan.
 
 ### Step 5: Recursion Gate
 

@@ -458,41 +458,38 @@ Assemble the markdown report (see Output Format below).
 
 Register one artifact:
 
-```text
-mcp__plugin_dh_backlog__artifact_register(
-  item_id={issue_number},
-  type="codebase-analysis",
-  artifact_id="architecture-graph-{slug}",
-  content={report_markdown},
-  status="complete",
-  agent="code-review-architecture"
-)
+```bash
+uv run plugins/development-harness/sam_schema/cli.py artifact register \
+  --item-id {issue_number} \
+  --artifact-type "codebase-analysis" \
+  --artifact-id "architecture-graph-{slug}" \
+  --content "{report_markdown}" \
+  --status "complete" \
+  --agent "code-review-architecture"
 ```
 
 **When the graph WAS partitioned (parent + child diagrams):**
 
 Register each diagram as a separate artifact. Register the parent first, then each child in the order they appear in the parent diagram:
 
-```text
-%% Parent
-mcp__plugin_dh_backlog__artifact_register(
-  item_id={issue_number},
-  type="codebase-analysis",
-  artifact_id="architecture-graph-{slug}",
-  content={parent_report_markdown},
-  status="complete",
-  agent="code-review-architecture"
-)
+```bash
+# Parent
+uv run plugins/development-harness/sam_schema/cli.py artifact register \
+  --item-id {issue_number} \
+  --artifact-type "codebase-analysis" \
+  --artifact-id "architecture-graph-{slug}" \
+  --content "{parent_report_markdown}" \
+  --status "complete" \
+  --agent "code-review-architecture"
 
-%% Each child cluster
-mcp__plugin_dh_backlog__artifact_register(
-  item_id={issue_number},
-  type="codebase-analysis",
-  artifact_id="architecture-graph-{slug}-{cluster-name}",
-  content={child_report_markdown},
-  status="complete",
-  agent="code-review-architecture"
-)
+# Each child cluster
+uv run plugins/development-harness/sam_schema/cli.py artifact register \
+  --item-id {issue_number} \
+  --artifact-type "codebase-analysis" \
+  --artifact-id "architecture-graph-{slug}-{cluster-name}" \
+  --content "{child_report_markdown}" \
+  --status "complete" \
+  --agent "code-review-architecture"
 ```
 
 If `item_id` is not available, output all reports inline (parent first, then children) and note that artifact registration was skipped.
