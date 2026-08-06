@@ -58,6 +58,7 @@ import dh_paths
 import typer
 from backlog_core.gh_client import create_task_issue, get_github
 from backlog_core.models import BacklogError, GitHubUnavailableError, SamTask
+from github import GithubException
 from ruamel.yaml import YAML, YAMLError
 from sam_schema.cli_output import err, output_json
 from sam_schema.task_format import resolve_task_id
@@ -546,7 +547,7 @@ def _connect_github() -> Repository:
     """
     try:
         return get_github()
-    except GitHubUnavailableError as exc:
+    except (GitHubUnavailableError, GithubException) as exc:
         err(f"GitHub connection failed: {exc}")
 
 

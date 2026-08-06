@@ -315,6 +315,11 @@ def update(
     plan_ref, task_ref = _address(plan_address)
     target_task = task_id or (f"T{task_ref}" if task_ref and task_ref.isdigit() else task_ref)
     if target_task:
+        plan_fields = (feature, version, description, state_value, goal, issue, autonomy)
+        if any(v is not None for v in plan_fields):
+            _error(
+                "plan-level fields (--feature, --goal, --description, etc.) must not be combined with task-targeted updates (--task-id, or plan address with task ref)"
+            )
         try:
             has_task_fields = any(
                 value is not None for value in (title, task_status, agent, priority, complexity, dependency, skill)
