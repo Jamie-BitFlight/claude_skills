@@ -111,8 +111,8 @@ provider-neutral CLI instead of, or alongside, an MCP call; see
 [backend-providers.md](../backend-providers.md) "CLI vs MCP Capability Surface" for the full
 mapping):
 ```
-uv run plugins/development-harness/sam_schema/cli.py backlog groom --selector "{item_ref}" --section "Impact Radius" --content "..."
-uv run plugins/development-harness/sam_schema/cli.py plan status --plan-address {plan}
+ backlog groom --selector "{item_ref}" --section "Impact Radius" --content "..."
+ plan status --plan-address {plan}
 ```
 
 The full and short MCP forms are semantically identical; the CLI form is a distinct transport
@@ -452,7 +452,7 @@ slice differs. The denoising comes from overlapping rule coverage on shared inpu
 | 5 | Agent dispatch per step | `subagent_type="dh:..."`, `TeamCreate(team_name=...)`, named wave members |
 | 6 | File-reference expansion links | Mermaid node: `Load X.md`, `→ groom/swarm.md`; prose: "Read `references/...`" |
 | 7 | Skill invocations | `/dh:skill-name`, `Skill(skill='dh:...')` |
-| 8 | MCP tool calls (full and short form) and CLI-form invocations | `mcp__plugin_dh_backlog__*`, `backlog_groom(...)`, `sam_task(...)`, `artifact_list(...)`, `uv run plugins/development-harness/sam_schema/cli.py ...` |
+| 8 | MCP tool calls (full and short form) and CLI-form invocations | `mcp__plugin_dh_backlog__*`, `backlog_groom(...)`, `sam_task(...)`, `artifact_list(...)` |
 | 9 | Actor topology per dispatch | `orchestrator` (inline), `subagent` (Agent tool), `team-member` (TeamCreate), `hook` (lifecycle event) |
 
 **Output schema per finding (fixed — all workers emit this shape):**

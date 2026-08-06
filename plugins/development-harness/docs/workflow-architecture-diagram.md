@@ -246,7 +246,7 @@ Relevant fields for the pipeline:
 
 ### 2.6 Active-task context file (~/.dh/projects/{slug}/context/active-task-{CLAUDE_CODE_SESSION_ID}.json)
 
-Written by `/start-task` skill via `uv run plugins/development-harness/sam_schema/cli.py active-task set --address "P{N}/T{M}"` (CLI) or `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})` (MCP) — both write the same session-scoped context.
+Written by `/start-task` skill via `active-task set --address "P{N}/T{M}"` (CLI) or `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})` (MCP) — both write the same session-scoped context.
 Read by `task_status_hook.py` PostToolUse handler.
 
 ```json
@@ -307,14 +307,14 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 flowchart TD
     Created([Task created]) -->|"swarm-task-planner via `plan create`"| NS[not-started]
     NS -->|"start-task skill via sam_task claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
-    IP -->|"task_status_hook.py SubagentStop<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status complete"| CO[complete]
-    IP -->|"agent or human operator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status blocked"| BL[blocked]
-    IP -->|"agent or orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status failed"| FA[failed]
-    NS -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status deferred"| DE[deferred]
-    NS -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status skipped"| SK[skipped]
-    NS -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status failed"| FA
-    IP -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status deferred"| DE
-    IP -->|"orchestrator<br>via uv run plugins/development-harness/sam_schema/cli.py plan state --address P{N}/T{M} --new-status skipped"| SK
+    IP -->|"task_status_hook.py SubagentStop<br>via plan state --address P{N}/T{M} --new-status complete"| CO[complete]
+    IP -->|"agent or human operator<br>via plan state --address P{N}/T{M} --new-status blocked"| BL[blocked]
+    IP -->|"agent or orchestrator<br>via plan state --address P{N}/T{M} --new-status failed"| FA[failed]
+    NS -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status deferred"| DE[deferred]
+    NS -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status skipped"| SK[skipped]
+    NS -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status failed"| FA
+    IP -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status deferred"| DE
+    IP -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status skipped"| SK
     FA -->|"auto-cascade<br>mark downstream tasks skipped"| SK
 ```
 

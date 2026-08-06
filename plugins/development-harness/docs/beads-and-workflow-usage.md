@@ -39,18 +39,18 @@ bd ready --parent "$epic_id" --json
 Then use the structured workflow surface for the parts Beads does not provide:
 
 ```bash
-uv run plugins/development-harness/sam_schema/cli.py plan create \
+plan create \
   --slug parser-fix \
   --goal "Improve parser" \
   --context "Beads epic: $epic_id"
 
-uv run plugins/development-harness/sam_schema/cli.py artifact register \
+ artifact register \
   --item-id "$task_a" \
   --artifact-type research \
   --artifact-id findings-20260730 \
   --content "$(<findings.md)"
 
-uv run plugins/development-harness/sam_schema/cli.py plan validate \
+ plan validate \
   --address parser-fix
 ```
 

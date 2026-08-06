@@ -588,8 +588,7 @@ Key rules:
 2. Every edge of type `gap` sets `gap: true` and `verified: false`
 3. Agents are extracted from `agents_dispatched[]` arrays in step nodes (edge type `dispatches`)
 4. MCP tool nodes are extracted from `mcp_calls[]` strings starting with `mcp__`. Some workflow
-   reference files document the CLI form (`uv run plugins/development-harness/sam_schema/cli.py
-   <command>`) instead of the MCP call — those `mcp_calls[]` entries do not start with `mcp__`
+   reference files document the CLI form (e.g. ``plan <command>``, ``backlog <command>``) instead of the MCP call — those `mcp_calls[]` entries do not start with `mcp__`
    and are not extracted as `mcp_tool` nodes by this rule; a future assembler revision would need
    a second pattern for CLI-form entries to keep those edges represented.
 5. Artifact nodes are extracted from `reads_artifacts[]` and `writes_artifacts[]` arrays in step nodes
