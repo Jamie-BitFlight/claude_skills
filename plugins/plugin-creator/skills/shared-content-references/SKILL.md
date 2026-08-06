@@ -1,6 +1,6 @@
 ---
 name: shared-content-references
-description: Store instructional prose once and reference it from multiple skills or agents instead of duplicating it. Use when the same steps, rules, or reference material appear in two or more SKILL.md or agent files in one plugin, when a refactor or audit reports duplicate content across skills, when deciding whether a shared doc belongs in the plugin-root docs directory or a single skill's references directory, or when tempted to use a symlink or a ../ path to share a file between components. Covers the plugin-root shared-doc pattern, the index-skill pattern, the annotation format that tells a reader what a doc contains and when to read it, and why symlinks and relative traversal fail after plugin caching.
+description: Store instructional prose once and reference it from multiple skills or agents instead of duplicating it. Use when the same steps, rules, or reference material appear in two or more SKILL.md or agent files in one plugin, when deciding whether a shared doc belongs in the plugin-root docs directory or a single skill's references directory, or when tempted to use a symlink or a ../ path to share a file between components.
 user-invocable: true
 ---
 

@@ -75,6 +75,7 @@ Routing by concern (use when editing files in `plugins/`, `.claude/`, `AGENTS.md
 - Audit quality (read-only, no writes, score against completeness categories) → `subagent_type="plugin-creator:skill-auditor"`
 - Sync content against upstream docs (add NEW/fix STALE from live sources) → `subagent_type="plugin-creator:skill-content-updater"`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
+- Resolve prose duplicated across 2+ skills or agent files (shared reference material, not one skill's own bloat) → `Skill(skill="plugin-creator:shared-content-references")`
 
 Dispatches:
 

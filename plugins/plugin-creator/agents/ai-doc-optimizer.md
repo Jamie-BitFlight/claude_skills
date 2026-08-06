@@ -174,6 +174,8 @@ When removing or replacing content that belongs in another skill, do NOT add a f
 
 The sentence names the skill to load and states why — the topic or capability it covers. Never reference files inside another skill's directory (e.g., `../other-skill/references/file.md` won't resolve at runtime). Never use backtick paths as cross-skill references.
 
+When the content is prose duplicated across two or more skills or agent files — not just misplaced relative to one target skill — activate the `/plugin-creator:shared-content-references` skill for the placement mechanics: plugin-root `docs/` vs. a skill's `references/`, and the annotation format the activation sentence should follow.
+
 ## Constraints
 
 - Preserve original intent while improving execution

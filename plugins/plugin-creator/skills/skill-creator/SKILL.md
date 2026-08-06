@@ -585,6 +585,7 @@ Load [schemas.md](./references/schemas.md) for evals.json and grading.json forma
 | `@plugin-creator:grader` | Assertion grading — evaluates eval outputs against expectations |
 | `@plugin-creator:comparator` | Blind A/B comparison — evaluates two skill versions without knowing which is which |
 | `@plugin-creator:analyzer` | Post-hoc analysis — explains why the winning version won and generates improvement suggestions |
+| `/plugin-creator:shared-content-references` | Cross-skill prose duplication — placement decision (plugin-root `docs/` vs. a skill's `references/`) when the same steps or rules are needed by 2+ skills or agents |
 | `references/` | `references/schemas.md` (JSON schemas), `references/evaluation-and-optimization.md` (Steps 7-10), `references/claude-code-skills-official.md` (spec), `references/workflows.md` (patterns), [`references/authoring-checklist.md`](./references/authoring-checklist.md) (pre-publish checklist) |
 | `eval-viewer/` | `viewer.html` (interactive eval viewer), `generate_review.py` (HTML generator) |
 | `assets/` | `eval_review.html` (trigger eval review template) |

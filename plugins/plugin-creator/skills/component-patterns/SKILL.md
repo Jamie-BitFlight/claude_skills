@@ -157,6 +157,8 @@ plugin/
 
 Access shared resources via `${CLAUDE_PLUGIN_ROOT}/lib/` in scripts.
 
+`lib/` covers shared *code*. For shared *prose* — the same steps, rules, or reference material needed by 2+ skills or agents — activate the `/plugin-creator:shared-content-references` skill instead.
+
 ### Layered Architecture
 
 Separate concerns into layers for large plugins (100+ files):
