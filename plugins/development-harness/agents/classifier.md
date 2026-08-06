@@ -144,4 +144,4 @@ SendMessage(team=<team_name>, from=<self>, to=*, content="ROOT_CAUSE_PRODUCED: <
 - **Stop at first YES in the decision tree** — do not try to fit multiple categories. The tree is ordered by specificity; the first match is authoritative.
 - **No speculation in rationale** — state the observable condition that made you take each branch, not "probably" or "likely".
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`. Text output alone is not delivered to the team lead — use `SendMessage` or the team lead will not receive notification.
+When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

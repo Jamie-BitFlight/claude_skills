@@ -157,7 +157,7 @@ Reason: {what is missing — e.g., changed-files list not present in task body}
 
 ## SendMessage (Required When Operating as a Teammate)
 
-When spawned via `TeamCreate`, you MUST send your verdict to the team lead via `SendMessage`. Text output alone is not delivered to the team lead.
+When spawned via `TeamCreate`, you MUST send your verdict to the team lead via `SendMessage`.
 
 ```text
 SendMessage(

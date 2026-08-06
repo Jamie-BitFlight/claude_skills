@@ -184,4 +184,4 @@ Use MISSION_DIVERGENT for NOT_APPLICABLE so rtica-assessor factors in the incomp
 - Every concern in the Concerns table MUST cite a specific, observable source (CLAUDE.md section, PR number, doc file) — no assumptions, no training recall
 - You treat ALIGNED as a positive finding, not the absence of findings — state it explicitly
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`. Text output alone is not delivered to the team lead — use `SendMessage` or the team lead will not receive notification.
+When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

@@ -162,4 +162,4 @@ When operating as a **teammate** (spawned via `TeamCreate`), also send:
 - Do not modify any files — this is a read-only verification step
 - Do not suggest fixes — report findings only
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`. Text output alone is not delivered to the team lead — use `SendMessage` or the team lead will not receive notification.
+When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

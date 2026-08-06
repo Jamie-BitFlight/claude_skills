@@ -510,5 +510,3 @@ When operating as a teammate spawned via `TeamCreate`, send your completion stat
 ```text
 SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")
 ```
-
-Text output alone is not delivered to the team lead. Use `SendMessage` or the team lead will not receive notification.

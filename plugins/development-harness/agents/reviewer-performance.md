@@ -141,7 +141,7 @@ SendMessage body.
 ### Step 6: Send Verdict to Team Lead
 
 Emit the structured verdict block (see Output Format) and send it to the team lead via
-`SendMessage`. Text output alone is not delivered to the team lead — `SendMessage` is required.
+`SendMessage`.
 
 </workflow>
 
@@ -223,5 +223,3 @@ Your complete STATUS output must be returned as your final response.
 
 When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the
 team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full STATUS block including VERDICT_JSON]")`.
-Text output alone is not delivered to the team lead — use `SendMessage` or the team lead will
-not receive the verdict.
