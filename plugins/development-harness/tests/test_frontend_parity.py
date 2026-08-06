@@ -36,6 +36,9 @@ _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
+_CLI_PATH = _plugin_root / "sam_schema" / "cli.py"
+_REPO_ROOT = _plugin_root.parent.parent  # claude_skills repo root (for DH_PROJECT_ROOT in subprocess tests)
+
 
 def _get_project_slug() -> str:
     """Derive the project slug the CLI will compute from the git root."""
@@ -46,10 +49,10 @@ def _get_project_slug() -> str:
 
 
 def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = None) -> dict[str, Any]:
-    """Run `uv run sam <args>` and return parsed JSON output.
+    """Run ``uv run <cli.py> <args>`` and return parsed JSON output.
 
     Args:
-        args: CLI arguments after `sam` (e.g. ["plan", "list", "--limit", "1"]).
+        args: CLI arguments after the script path (e.g. ``["plan", "list", "--limit", "1"]``).
         timeout: Maximum seconds to wait for the subprocess.
         env: Optional environment variable overrides merged onto os.environ.
 
@@ -65,13 +68,7 @@ def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = 
     if env:
         run_env.update(env)
     result = subprocess.run(
-        ["uv", "run", "sam", *args],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        cwd=_plugin_root,
-        env=run_env,
-        check=False,
+        ["uv", "run", str(_CLI_PATH), *args], capture_output=True, text=True, timeout=timeout, env=run_env, check=False
     )
     if result.returncode != 0:
         raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:500]}")
@@ -124,3 +121,23 @@ class TestParityInfrastructure:
         from dh_core.protocols import TaskBackend
 
         assert TaskBackend is not None
+
+
+class TestCLIForeignCWD:
+    """Regression: the plugin folder is never the CWD in real use."""
+
+    @pytest.mark.parametrize(("extra_env", "label"), [({}, "clean"), ({"PYTHONPATH": "/tmp"}, "contaminated")])
+    def test_cli_runs_from_a_foreign_cwd(self, tmp_path: Path, extra_env: dict[str, str], label: str) -> None:
+        state_home = tmp_path / label / "dh_state"
+        plan_dir = state_home / "projects" / _get_project_slug() / "plan"
+        plan_dir.mkdir(parents=True, exist_ok=True)
+        result = subprocess.run(
+            ["uv", "run", str(_CLI_PATH), "plan", "list", "--limit", "1"],
+            capture_output=True,
+            text=True,
+            cwd=tmp_path,
+            env={**os.environ, **extra_env, "DH_STATE_HOME": str(state_home), "DH_PROJECT_ROOT": str(_REPO_ROOT)},
+            check=False,
+        )
+        assert result.returncode == 0, f"label={label} {result.stderr[:500]}"
+        json.loads(result.stdout)
