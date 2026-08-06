@@ -5,7 +5,7 @@ identical structured output. This is the primary validation gate for
 the unified backend extraction.
 
 Strategy:
-  - CLI path: subprocess ``uv run <cli.py> <group> <command>`` (JSON is the default)
+  - CLI path: subprocess ``uv run <cli.py> <group> <command>`` (compact JSON stdout)
   - MCP path: call the internal server function directly with a test backend
   - Both paths should delegate to the same dh_core.operations function.
   - Once delegation is in place, parity is structural — both call the same
