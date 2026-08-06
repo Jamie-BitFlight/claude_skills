@@ -236,15 +236,24 @@ backslash-escaping (`\$1`) does not prevent it:
 - `${CLAUDE_SESSION_ID}` — current session ID
 - `${CLAUDE_SKILL_DIR}` — the skill's own directory (for plugin skills: the skill subdirectory,
   NOT the plugin root)
+- `${CLAUDE_PLUGIN_ROOT}` — the plugin's root directory. Applies only when the loaded `SKILL.md`
+  belongs to a plugin (not a project-level `.claude/skills/` skill). Substitutes throughout the
+  entire rendered body — plain prose and markdown link targets, not only `` !`bash` `` injection
+  lines — before the model sees the text. Absent from `code.claude.com/docs/en/skills.md`'s own
+  substitution table (a documentation gap on Anthropic's side, not evidence against the behavior).
+  Verified live via `dh-meta-docs` and `implementation-manager`, and canary-tested against a
+  no-variable control line (2026-08-06) — see
+  `.claude/agent-memory/python-engineering-python-cli-architect/project_claude_plugin_root_bang_exec_vs_later_bash.md`.
 - Literal `$N` is only safe to document inside `references/*.md` files, which are not substituted —
-  a SKILL.md itself cannot explain this syntax without being corrupted by it. Canary-test any new
-  substitution-adjacent pattern (`/example-argument-substitution`) before applying it across
-  multiple files.
+  a SKILL.md itself cannot explain this syntax without being corrupted by it. `${CLAUDE_PLUGIN_ROOT}`
+  and `${CLAUDE_SKILL_DIR}` are likewise NOT substituted inside `references/*.md` files — only the
+  `SKILL.md` body itself. Canary-test any new substitution-adjacent pattern
+  (`/example-argument-substitution`) before applying it across multiple files.
 
-Separate from SKILL.md substitution, hook/command scripts receive env vars: `CLAUDE_PROJECT_DIR`
-(project root, all hooks), `CLAUDE_PLUGIN_ROOT` (plugin root, plugin hooks only —
-`CLAUDE_PLUGIN_DIR` does not exist), `CLAUDE_ENV_FILE` (SessionStart hooks only),
-`CLAUDE_CODE_REMOTE`.
+Hook/command scripts additionally receive these as real process env vars (a separate mechanism from
+the load-time text substitution above): `CLAUDE_PROJECT_DIR` (project root, all hooks),
+`CLAUDE_PLUGIN_ROOT` (plugin root, plugin hooks only — `CLAUDE_PLUGIN_DIR` does not exist),
+`CLAUDE_ENV_FILE` (SessionStart hooks only), `CLAUDE_CODE_REMOTE`.
 
 **Multi-mode workflow skills**: when a SKILL.md parses `$ARGUMENTS` into a structured `<input>`
 JSON block, its `references/workflows/*.md` files use self-closing XML tags (e.g. `<item_ref/>`)
