@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Annotated, Literal
 
@@ -58,6 +59,15 @@ class _WaveStartItemInput(BaseModel):
     title: str | None = Field(default=None, min_length=1)
 
 
+def _split_fields(value: str) -> list[str]:
+    r"""Split key=value fields on ``;``, preserving escaped ``\\;`` in values.
+
+    Returns:
+        Field strings with escape sequences resolved.
+    """
+    return [p.replace("\\;", ";") for p in re.split(r"(?<!\\) ;", value)]
+
+
 def _parse_plan_item(value: str) -> _PlanWaveItemInput:
     """Parse ``key=value`` item fields and validate every field strictly.
 
@@ -65,7 +75,7 @@ def _parse_plan_item(value: str) -> _PlanWaveItemInput:
         A validated plan wave-item input model.
     """
     fields: dict[str, object] = {}
-    for part in value.split(";"):
+    for part in _split_fields(value):
         key, separator, raw = part.partition("=")
         if not separator or not key or not raw:
             raise ValueError("items use key=value fields separated by ';'")
@@ -96,7 +106,7 @@ def _parse_wave_start_item(value: str) -> _WaveStartItemInput:
         A validated wave-start item input model.
     """
     fields: dict[str, object] = {}
-    for part in value.split(";"):
+    for part in _split_fields(value):
         key, separator, raw = part.partition("=")
         if not separator or not key or not raw:
             raise ValueError("items use key=value fields separated by ';'")
@@ -118,7 +128,7 @@ def _parse_conflict_group(value: str) -> _ConflictGroupInput:
         A validated conflict-group input model.
     """
     fields: dict[str, object] = {}
-    for part in value.split(";"):
+    for part in _split_fields(value):
         key, separator, raw = part.partition("=")
         if not separator or not key or not raw:
             if key == "items" and separator:
