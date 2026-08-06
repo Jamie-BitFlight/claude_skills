@@ -223,7 +223,7 @@ Run the fidelity checklist (see Quality Checklist) against the Step 1 inventory.
 
 When replacing content inside a file:
 
-Once per file — before inserting the first diagram, check whether the file already contains the execution callout block below. If it does not, insert it once near the top of the file (after any frontmatter and before the first section heading that contains diagrams):
+Once per file — before inserting the first diagram, check whether this instruction already exists in the document, or in its owning `SKILL.md` if this is a `references/*.md` file. Insert the block below only if it is genuinely missing from both; keep it DRY. Place it once near the top of the file (after any frontmatter and before the first section heading that contains diagrams):
 
 ```markdown
 > [!IMPORTANT]
@@ -232,7 +232,7 @@ Once per file — before inserting the first diagram, check whether the file alr
 > When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
 ```
 
-Do not insert this block again if it is already present in the file.
+Do not insert this block again if it is already present in the file or in its owning SKILL.md.
 
 Above each diagram — immediately before every mermaid fence, add a one-sentence procedure label:
 
