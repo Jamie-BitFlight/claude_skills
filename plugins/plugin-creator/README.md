@@ -395,7 +395,7 @@ Claude will assess whether the skill needs splitting (multiple independent domai
 | `agents: Invalid input` | Used directory string instead of array | Change `"agents": "./agents/"` to `["./agents/file.md"]` |
 | Description shows as `>-` | YAML multiline indicator | `skilllint --fix` collapses to single line |
 | Hook not firing | Script not executable | `chmod +x scripts/my-hook.mjs` (or `.cjs`/`.py`) |
-| Path errors after install | Used `../` traversal | Use `${CLAUDE_PLUGIN_ROOT}` or symlinks |
+| Path errors after install | Used `../` traversal | Use `${CLAUDE_PLUGIN_ROOT}`, or the `/plugin-creator:shared-content-references` skill for prose shared across skills (not symlinks — they degrade on Windows checkouts) |
 | Agents disappear after adding one | Declared partial list in `plugin.json` | Remove the `agents` key — auto-discovery registers everything in `agents/` |
 
 ## Agents

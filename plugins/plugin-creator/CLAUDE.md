@@ -308,7 +308,7 @@ Claude Code copies plugins to a cache directory — not used in-place.
 - Plugins CANNOT reference files outside their directory (`../shared-utils` will fail after installation)
 
 **Solutions for external dependencies:**
-- Use symlinks within plugin directory (followed during copy): `ln -s /path/to/shared-utils ./shared-utils`
+- Sharing instructional prose across this plugin's own skills or agents: activate the `/plugin-creator:shared-content-references` skill — plugin-root `docs/` or an index skill, not a symlink (symlinks degrade to plain files on a Windows checkout; see `AGENTS.md` §Gotchas item 3)
 - Restructure marketplace: set `source` to the parent directory containing all required files
 
 **SOURCE:** Lines 350-398 of claude-plugins-reference-2026/SKILL.md

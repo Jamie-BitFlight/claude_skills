@@ -107,7 +107,7 @@ Work through each acceptance criterion based on the issue type:
 4. CREATE new skill directories and SKILL.md files
 5. DISTRIBUTE content according to design spec
 6. UPDATE cross-references between skills
-7. CREATE shared references if specified
+7. CREATE shared references if specified — for what a shared reference is and how to place it, activate the `/plugin-creator:shared-content-references` skill
 8. VERIFY all links resolve
 
 #### For AGENT_OPTIMIZE Tasks

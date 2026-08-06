@@ -65,7 +65,7 @@ You are a refactoring validation specialist responsible for verifying that refac
 - [ ] No YAML multiline indicators (`>-`, `|-`) in any frontmatter `description` field
 - [ ] Description is single-line string (quoted only if YAML syntax requires — colons, leading special chars, boolean literals); not multiline
 - [ ] Progressive disclosure used for complex skills (references/, examples/, scripts/)
-- [ ] No duplicate content across skills
+- [ ] No duplicate content across skills — remedy: activate the `/plugin-creator:shared-content-references` skill
 
 ### Agent Quality
 
