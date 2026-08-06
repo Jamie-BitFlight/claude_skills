@@ -56,23 +56,26 @@ Execute this optimization surgically, making multiple passes. Use subagents to g
 - [ ] **Pass 0: Preparation**
   - [ ] Get the current word count and file size of the target file.
   - [ ] Take a backup of the file (either by committing it to git or creating a `*.bak` copy).
-- [ ] **Pass 1: Mission & Structure**
+- [ ] **Pass 1: Writing-for-Agents Lever Audit**
+  - [ ] Dispatch a subagent to read the target file and [references/writing-for-agents-levers.md](./references/writing-for-agents-levers.md), then report where each of the 5 levers applies: description branches that are true synonyms vs. genuinely distinct triggers, sentences that fail the no-op test, whether the model-invoked/user-invoked choice matches how the skill is actually reached, prohibitions missing their positive pairing, and restated phrases that could collapse into a leading word.
+  - [ ] Carry the findings into Pass 2 (structural decisions) and Pass 5 (reference/dedup decisions) below — this pass reports, it does not rewrite.
+- [ ] **Pass 2: Mission & Structure**
   - [ ] Identify the core mission/purpose of the file.
   - [ ] Ensure the mission statement is explicitly anchored at the top.
   - [ ] Convert any long walls of prose into decision tables, lookup structures, or checklists.
-- [ ] **Pass 2: Discoverable Data Extraction**
+- [ ] **Pass 3: Discoverable Data Extraction**
   - [ ] Scan for hardcoded versions, schema fields, or CLI flags.
   - [ ] Verify that this data is actually discoverable via terminal commands (e.g., `--help`) or specific URLs.
   - [ ] Replace the hardcoded data with routing logic: "When you need X, look in Y" or "[ ] Run `--help` before using."
-- [ ] **Pass 3: Explained Knowledge & Constraints Audit**
+- [ ] **Pass 4: Explained Knowledge & Constraints Audit**
   - [ ] Identify step-by-step tutorials for standard AI capabilities. Cut them and replace with references to authoritative sources.
   - [ ] Identify constraints and rules. Dispatch a subagent (or research yourself) to verify if they are based on a spec or if they are just AI-invented "slop" (like arbitrary string truncation).
   - [ ] Remove unverified or dangerous constraints.
-- [ ] **Pass 4: Reference Extraction & Deduplication**
+- [ ] **Pass 5: Reference Extraction & Deduplication**
   - [ ] Move heavy guidelines, large examples, or deep context into `references/` files.
   - [ ] Check if the remaining content duplicates instructions found in other agents, skills, or rules.
   - [ ] Consolidate duplicated content into a single source of truth and use links/references elsewhere.
-- [ ] **Pass 5: Validation & Review**
+- [ ] **Pass 6: Validation & Review**
   - [ ] Have a subagent or yourself follow the newly optimized instructions step-by-step to ensure they still work and achieve the product goal without the removed bloat.
   - [ ] Compare the new file size and word count against the original.
   - [ ] Read the diff to identify if anything was hard-deleted that might have been overzealous.

@@ -298,7 +298,7 @@ flowchart TD
     S3["Step 3 — Determine skill location<br>and distribution strategy"] --> S4
     S4["Step 4 — Initialize the skill<br>(run init_skill.py — MANDATORY)"] --> S5
     S5["Step 5 — Edit the skill<br>(implement resources and write SKILL.md)"] --> S5R
-    S5R["After Step 5 — Quality review<br>delegate to ai-doc-optimizer"] --> S6Q
+    S5R["After Step 5 — Lever audit, then quality review<br>delegate to ai-doc-optimizer"] --> S6Q
     S6Q{"Distributing via plugin<br>marketplace?"}
     S6Q -->|"Yes — plugin distribution"| S6["Step 6 — Package the skill<br>(validate then package)"]
     S6Q -->|"No — project or user level<br>already in final location"| S7
@@ -525,6 +525,10 @@ Here `mcp:` is an OpenCode-only extension — Claude Code ignores it. Use this p
 Write instructions for using the skill and its bundled resources.
 
 For advanced body features (string substitutions, dynamic context injection, extended thinking), activate the `/plugin-creator:claude-skills-overview-2026` skill.
+
+### After Step 5: Lever Audit
+
+First optimization pass: dispatch a subagent to run `/plugin-creator:optimize` Pass 1 against the draft skill directory.
 
 ### After Step 5: Quality Review
 
