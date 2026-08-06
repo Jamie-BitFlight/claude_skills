@@ -89,7 +89,7 @@ def active_task_set(
     except AddressingError as exc:
         err(str(exc))
     if not task_id:
-        err(f"Address '{address}' must include a task ID (e.g. P1/T3).")
+        err(f"Address '{address}' must include a task ID (e.g. --address P<plan>/T<task>).")
     # Typer hands every option through as str, but ActiveTaskContext accepts
     # int (GitHub issue number) or a beads-ID str. Coerce digit-only input to
     # int so `--parent-issue 42` behaves the same as the MCP tool, which is
@@ -122,7 +122,7 @@ def active_task_update(
     ctx_backend = _context_backend()
     active = ctx_backend.get_active_task(resolved_session)
     if active is None:
-        err("No active task set for this session. Run 'active-task set P1/T3' first.")
+        err("No active task set for this session. Run 'active-task set --address P<plan>/T<task>' first.")
     parsed_fields: dict[str, object] | None = None
     if set_fields is not None:
         try:
