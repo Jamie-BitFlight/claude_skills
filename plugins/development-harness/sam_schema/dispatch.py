@@ -18,6 +18,7 @@ from dispatch_schema import (
     Wave,
     WaveItem,
 )
+from dispatch_schema.core.validator import validate_plan_integrity
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from sam_schema.cli_output import emit_result, err
@@ -65,7 +66,7 @@ def _split_fields(value: str) -> list[str]:
     Returns:
         Field strings with escape sequences resolved.
     """
-    return [p.replace("\\;", ";") for p in re.split(r"(?<!\\) ;", value)]
+    return [p.replace("\\;", ";") for p in re.split(r"(?<!\\);", value)]
 
 
 def _parse_plan_item(value: str) -> _PlanWaveItemInput:
@@ -250,7 +251,6 @@ def create_plan(
     """Create a dispatch plan from strictly validated named fields."""
     if not integration_branch:
         err("Invalid dispatch plan input: integration branch must not be empty")
-    del validate_after_write  # pre-validated by Pydantic; integrity checks are caller's responsibility
     groups_input = conflict_group or []
     pre_merge_input = pre_merge or []
     post_merge_input = post_merge or []
@@ -271,12 +271,16 @@ def create_plan(
         )
     except (ValidationError, ValueError) as exc:
         err(f"Invalid dispatch plan input: {exc}")
+    if validate_after_write:
+        integrity = validate_plan_integrity(plan)
+        if integrity.errors:
+            err(f"Dispatch plan integrity errors: {'; '.join(integrity.errors)}")
     emit_result(
         operations.dispatch_create_plan(
             milestone_number=milestone_number,
             plan=plan.model_dump(mode="json", by_alias=True),
             overwrite=overwrite,
-            validate=False,  # pre-validated above; defer integrity checks to caller
+            validate=validate_after_write,
             issue=issue,
         )
     )

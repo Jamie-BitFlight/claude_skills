@@ -15,14 +15,11 @@ fallback) instead of the documented JSON contract.
 from __future__ import annotations
 
 import json
-import subprocess
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from backlog_core.models import BacklogError
 from typer.testing import CliRunner
 
-from sam_schema import backlog as backlog_module
 from sam_schema.cli import app
 
 if TYPE_CHECKING:
@@ -82,58 +79,33 @@ class TestBacklogAddErrorContract:
 class TestBacklogSyncFallback:
     """The ``backlog sync`` fallback invokes a command that actually exists."""
 
-    def test_fallback_invokes_this_cli_by_absolute_path_not_a_bare_command(self, mocker: MockerFixture) -> None:
-        """The fallback subprocess targets ``cli.py`` by absolute path.
+    def test_fallback_emits_error_json_not_subprocess(self, mocker: MockerFixture) -> None:
+        """The fallback emits structured error JSON directly, no subprocess.
 
-        Tests: The literal PR review regression -- the fallback previously
-        ran ``uv run backlog sync`` (no such console script exists anywhere
-        in this package) and, even after retargeting it at ``uv run sam
-        backlog sync``, that only resolves when the caller's cwd happens to
-        be ``plugins/development-harness`` -- the installed ``sam`` console
-        script is not registered in the root project's environment, and this
-        CLI is documented and invoked elsewhere in the repo as ``uv run
-        plugins/development-harness/sam_schema/cli.py ...`` from the repo
-        root. An absolute script path sidesteps both failure modes.
-        How: Force ``operations.sync_items`` to raise, mock ``shutil.which``
-        and ``subprocess.run``, then inspect the constructed command.
-        Why: A fallback that cannot itself run is not a fallback.
+        After removing the recursive self-invocation, the fallback emits
+        ``{\"error\": ..., \"synced\": False, \"fallback\": False}`` rather than
+        spawning a child process.
         """
         mocker.patch("sam_schema.backlog.operations.sync_items", side_effect=BacklogError("GITHUB_TOKEN not set"))
-        mocker.patch("shutil.which", return_value="/usr/bin/uv")
-        run_mock = mocker.patch(
-            "subprocess.run", return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-        )
+
+        result = runner.invoke(app, ["backlog", "sync", "--repo", "owner/name"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["synced"] is False
+        assert payload["fallback"] is False
+        assert "GITHUB_TOKEN not set" in payload["error"]
+
+    def test_fallback_sync_error_written_to_stderr(self, mocker: MockerFixture) -> None:
+        """A failing sync prints a warning to stderr and emits error JSON to stdout.
+
+        Tests: End-to-end fallback path after removing recursive subprocess.
+        """
+        mocker.patch("sam_schema.backlog.operations.sync_items", side_effect=BacklogError("GITHUB_TOKEN not set"))
 
         result = runner.invoke(app, ["backlog", "sync", "--repo", "owner/name", "--dry-run"], env=_CLI_ENV)
 
         assert result.exit_code == 0, result.stderr
-        run_mock.assert_called_once()
-        (cmd,), _kwargs = run_mock.call_args
-        assert cmd[0] == "/usr/bin/uv"
-        assert cmd[1] == "run"
-
-        cli_path = Path(cmd[2])
-        assert cli_path.is_absolute()
-        assert cli_path == Path(backlog_module.__file__).resolve().parent / "cli.py"
-
-        assert cmd[3:] == ["backlog", "sync", "--repo", "owner/name", "--dry-run"]
-
-    def test_fallback_success_emits_synced_result(self, mocker: MockerFixture) -> None:
-        """A successful fallback subprocess still reports a synced result.
-
-        Tests: End-to-end fallback success path.
-        How: Same mocking as above, but assert the JSON payload returned
-        to the caller.
-        Why: Confirms the command-shape fix does not change the emitted
-        result contract for a successful fallback.
-        """
-        mocker.patch("sam_schema.backlog.operations.sync_items", side_effect=BacklogError("GITHUB_TOKEN not set"))
-        mocker.patch("shutil.which", return_value="/usr/bin/uv")
-        mocker.patch(
-            "subprocess.run", return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-        )
-
-        result = runner.invoke(app, ["backlog", "sync"], env=_CLI_ENV)
-
-        assert result.exit_code == 0, result.stderr
-        assert json.loads(result.stdout) == {"synced": True, "dry_run": False, "fallback": True}
+        payload = json.loads(result.stdout)
+        assert payload["synced"] is False
+        assert "dry_run" not in payload
