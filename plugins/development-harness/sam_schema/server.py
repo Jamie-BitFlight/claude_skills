@@ -131,7 +131,7 @@ mcp: FastMCP = FastMCP(
 
 
 def run_server() -> None:
-    """Entry point for ``sam-mcp`` console script."""
+    """Run the SAM MCP server."""
     mcp.run()
 
 

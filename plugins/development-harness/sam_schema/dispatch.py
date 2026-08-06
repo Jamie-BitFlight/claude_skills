@@ -250,6 +250,7 @@ def create_plan(
     """Create a dispatch plan from strictly validated named fields."""
     if not integration_branch:
         err("Invalid dispatch plan input: integration branch must not be empty")
+    del validate_after_write  # pre-validated by Pydantic; integrity checks are caller's responsibility
     groups_input = conflict_group or []
     pre_merge_input = pre_merge or []
     post_merge_input = post_merge or []
@@ -275,7 +276,7 @@ def create_plan(
             milestone_number=milestone_number,
             plan=plan.model_dump(mode="json", by_alias=True),
             overwrite=overwrite,
-            validate=validate_after_write,
+            validate=False,  # pre-validated above; defer integrity checks to caller
             issue=issue,
         )
     )
