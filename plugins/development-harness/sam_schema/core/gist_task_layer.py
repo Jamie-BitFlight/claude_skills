@@ -463,7 +463,12 @@ class GistTaskLayer:
         # If a file already exists for this plan_id (possibly with a different slug),
         # prefer the existing path to avoid creating a duplicate.
         try:
-            existing = list(self._local.plan_dir.glob(f"{plan_id}.*")) + list(self._local.plan_dir.glob(f"{plan_id}-*"))
+            existing = [
+                p
+                for p in list(self._local.plan_dir.glob(f"{plan_id}.*"))
+                + list(self._local.plan_dir.glob(f"{plan_id}-*"))
+                if p.suffix in {".yaml", ".md"} or p.is_dir()
+            ]
             for existing_path in existing:
                 cache_path = existing_path
                 break

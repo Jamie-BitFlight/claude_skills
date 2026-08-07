@@ -173,7 +173,9 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
     UID_PREFIX_RE = re.compile(r"^P[0-9a-f]{8}$", re.IGNORECASE)
     if UID_PREFIX_RE.match(address):
         for entry in plan_dir.iterdir():
-            if entry.name.startswith(f"{address}-") and (entry.suffix in {".yaml", ".md"} or entry.is_dir()):
+            if entry.name.lower().startswith(f"{address.lower()}-") and (
+                entry.suffix in {".yaml", ".md"} or entry.is_dir()
+            ):
                 return entry
         raise AddressingError(address, plan_dir)
 
