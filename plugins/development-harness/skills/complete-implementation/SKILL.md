@@ -286,12 +286,11 @@ The issue-only path does not produce follow-up task files. Skip directly to "Fin
 
 ## Resolve Plan Address
 
-Extract the plan address `P{N}` from the task file path:
+The plan address is the full filename stem. Do not extract or truncate — the complete stem IS the identifier.
 
-- `plan/Pb3c4d5e6-integrate-sam-schema.yaml` → plan id `b3c4d5e6` → address `Pb3c4d5e6`
-- Strip `plan/P` prefix, take the hex id, format as `P{id}`
+- `plan/Pb3c4d5e6-integrate-sam-schema.yaml` → plan address `Pb3c4d5e6-integrate-sam-schema`
 
-Use `P{N}` in all `sam` CLI calls below.
+Use the full plan address in all CLI calls below.
 
 ---
 

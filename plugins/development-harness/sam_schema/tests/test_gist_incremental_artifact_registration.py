@@ -208,7 +208,7 @@ def test_incremental_plan_registers_finalized_task_plan_artifact(
     # Force a Gist-only read: delete the local YAML so read_plan cannot serve
     # from a surviving local file -- content must come from the artifact store.
     local_dir: Path = gist_layer.local.plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Act: read the plan back. Must not raise PlanNotFoundError.

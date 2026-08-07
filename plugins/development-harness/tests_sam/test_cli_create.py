@@ -18,7 +18,9 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
-_UUID_PLAN_ID_RE = re.compile(r"^P[0-9a-f]{8}$", re.IGNORECASE)
+_UUID_PLAN_ID_RE = re.compile(
+    r"^P[0-9a-f]{8}(-.+)?$", re.IGNORECASE
+)  # ponytail: full stem now, hex prefix + optional slug
 
 
 # ---------------------------------------------------------------------------

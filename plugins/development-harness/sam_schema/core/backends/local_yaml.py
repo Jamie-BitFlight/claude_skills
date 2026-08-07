@@ -42,11 +42,6 @@ if TYPE_CHECKING:
 
 __all__ = ["LocalYamlTaskProvider"]
 
-# Extract plan_id from a plan file stem.
-# Matches both legacy numeric IDs (e.g. "P912" from "P912-migrate-...")
-# and UUID-derived hex IDs (e.g. "Pa1b2c3d4" from "Pa1b2c3d4-migrate-...").
-_P_STEM_RE = re.compile(r"^(P[0-9a-f]+)-", re.IGNORECASE)
-_TASKS_STEM_RE = re.compile(r"^tasks-(\d+)-")
 _TASK_VALIDATION_RE = re.compile(r"Task at index (\d+) failed validation: (.+)", re.DOTALL)
 
 
@@ -86,22 +81,15 @@ def _resolve_writable_path(plan_path: Path, task_id: str) -> Path:
 
 
 def plan_id_from_path(path: Path) -> str:
-    """Extract the plan_id string (e.g. 'P912') from a plan file path.
+    """Return the plan identifier — the full filename stem, never a prefix.
 
     Args:
         path: Path to the plan file or directory.
 
     Returns:
-        Plan identifier string derived from the file stem.
+        The complete filename stem (e.g. 'P001-backlog-cli-dedup').
     """
-    stem = path.stem
-    m = _P_STEM_RE.match(stem)
-    if m:
-        return m.group(1)
-    m2 = _TASKS_STEM_RE.match(stem)
-    if m2:
-        return f"P{m2.group(1)}"
-    return stem
+    return path.stem
 
 
 def _populate_task_content_fields(data: TaskData, task: Task) -> None:
@@ -397,9 +385,10 @@ class LocalYamlTaskProvider:
             result = self._load_plan(path)
         except FileNotFoundError as exc:
             raise PlanNotFoundError(plan_id) from exc
-        # Prefer the plan_id stored in the record; fall back to filename-derived
-        # value for backwards compatibility with pre-existing files.
-        effective_plan_id = result.plan.plan_id or plan_id_from_path(path)
+        # The path is authoritative — use the filename stem as the canonical plan_id.
+        # A stored plan_id in the payload that disagrees is a copy-paste error;
+        # it will self-heal on the next write.
+        effective_plan_id = plan_id_from_path(path)
         plan_data = _plan_to_plan_data(result.plan, effective_plan_id)
         # Preserve schema gaps from the reader/normalizer pipeline so that
         # operations.read_plan can surface them in ReadResult for `sam validate`.
@@ -431,9 +420,8 @@ class LocalYamlTaskProvider:
                     text = f"{plan.feature} {plan.goal or ''} {plan.description}"
                     if search.lower() not in text.lower():
                         continue
-                # Prefer the plan_id stored in the record; fall back to filename-derived
-                # value for backwards compatibility with pre-existing files.
-                plan_id = plan.plan_id or plan_id_from_path(candidate)
+                # The path is authoritative — use the filename stem as the canonical plan_id.
+                plan_id = plan_id_from_path(candidate)
                 summary: PlanSummary = {
                     "plan_id": plan_id,
                     "feature": plan.feature,

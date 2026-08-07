@@ -145,8 +145,12 @@ class TestTaskBackendConformance:
         plan_b = backend.create_plan("slug-b", "Goal B", tasks, issue=9001)
 
         # Assert — each plan gets a unique UUID plan_id
-        assert re.match(r"^P[0-9a-f]{8}$", plan_a["plan_id"]), f"Expected UUID plan_id, got: {plan_a['plan_id']!r}"
-        assert re.match(r"^P[0-9a-f]{8}$", plan_b["plan_id"]), f"Expected UUID plan_id, got: {plan_b['plan_id']!r}"
+        assert re.match(r"^P[0-9a-f]{8}(-.+)?$", plan_a["plan_id"]), (
+            f"Expected UUID plan_id, got: {plan_a['plan_id']!r}"
+        )
+        assert re.match(r"^P[0-9a-f]{8}(-.+)?$", plan_b["plan_id"]), (
+            f"Expected UUID plan_id, got: {plan_b['plan_id']!r}"
+        )
         assert plan_a["plan_id"] != plan_b["plan_id"], "Two create calls must produce distinct plan IDs"
 
     def test_read_nonexistent_plan_raises(self, backend: TaskBackend) -> None:

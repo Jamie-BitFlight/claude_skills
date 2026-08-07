@@ -253,6 +253,13 @@ class PlanIdIndex:
         for entry in entries:
             if entry.plan_id == plan_id:
                 return entry.issue
+            # Full-stem plan_ids (e.g. "Pa1b2c3d4-auth") include the slug.
+            # The Gist index was keyed by hex prefix before the full-stem fix.
+            # Match when the index entry's plan_id is the hex prefix of the
+            # full stem being looked up (e.g. entry "Pa1b2c3d4" matches lookup
+            # "Pa1b2c3d4-auth").
+            if plan_id.lower().startswith(f"{entry.plan_id.lower()}-"):
+                return entry.issue
         return None
 
     def list_all(self) -> list[PlanIndexEntry]:

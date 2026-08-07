@@ -247,10 +247,10 @@ def test_read_without_local_file(gist_layer: GistTaskLayer, store: _InMemoryArti
 
     # Simulate fresh session: delete every local YAML file for this plan.
     local_dir: Path = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
     # Confirm local file is gone.
-    remaining = list(local_dir.glob(f"{plan_id}-*.yaml"))
+    remaining = list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*"))
     assert not remaining, "Local YAML must be deleted before testing Gist-only read"
 
     # Act: read plan — must hit Gist because local is absent.
@@ -292,7 +292,7 @@ def test_mutation_persists(gist_layer: GistTaskLayer, store: _InMemoryArtifactSt
 
     # Simulate fresh session: remove local YAML so read must go to Gist.
     local_dir: Path = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Assert 1: read from Gist returns mutated status.
@@ -483,7 +483,7 @@ def test_full_content_equality_roundtrip(gist_layer: GistTaskLayer, store: _InMe
 
     # Delete local file to force Gist read.
     local_dir: Path = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     retrieved = gist_layer.read_plan(plan_id)
@@ -751,7 +751,7 @@ def test_update_plan_fields_persists_to_gist(gist_layer: GistTaskLayer, store: _
 
     # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
     local_dir = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Assert: read from Gist returns the mutated goal.
@@ -784,7 +784,7 @@ def test_update_task_fields_persists_to_gist(gist_layer: GistTaskLayer, store: _
 
     # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
     local_dir = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Assert: read from Gist returns the updated task title.
@@ -822,7 +822,7 @@ def test_update_task_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemor
 
     # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
     local_dir = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Assert: read from Gist returns the replacement task's fields.
@@ -929,7 +929,7 @@ def test_append_task_persists_to_gist(gist_layer: GistTaskLayer, store: _InMemor
 
     # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
     local_dir = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Assert: Gist-served plan contains the appended task.
@@ -983,7 +983,7 @@ def test_finalize_plan_persists_to_gist(gist_layer: GistTaskLayer, store: _InMem
 
     # Simulate fresh session: delete local YAML so read_plan must fetch from Gist.
     local_dir = gist_layer._local._plan_dir
-    for yaml_file in local_dir.glob(f"{plan_id}-*.yaml"):
+    for yaml_file in list(local_dir.glob(f"{plan_id}.*")) + list(local_dir.glob(f"{plan_id}-*")):
         yaml_file.unlink()
 
     # Assert: Gist-served plan reflects finalized state and contains both tasks.

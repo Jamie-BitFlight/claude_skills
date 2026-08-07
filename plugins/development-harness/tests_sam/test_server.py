@@ -578,7 +578,7 @@ def test_sam_create_valid_tasks_yaml_returns_path_and_counts(tmp_path: Path) -> 
     task = TaskDefinition(
         id="T01",
         title="First task",
-        status="not-started",
+        status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         priority=Priority.CRITICAL,
         complexity=Complexity.LOW,
@@ -592,7 +592,7 @@ def test_sam_create_valid_tasks_yaml_returns_path_and_counts(tmp_path: Path) -> 
 
     # Assert
     assert result.task_count == 1
-    assert re.match(r"^P[0-9a-f]{8}$", result.plan_id), f"Expected UUID plan_id, got: {result.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", result.plan_id), f"Expected UUID plan_id, got: {result.plan_id!r}"
 
 
 def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
@@ -608,7 +608,7 @@ def test_sam_create_file_is_readable_by_sam_task(tmp_path: Path) -> None:
     task = TaskDefinition(
         id="T01",
         title="Round-trip task",
-        status="not-started",
+        status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         priority=Priority.CRITICAL,
         complexity=Complexity.LOW,
@@ -646,7 +646,7 @@ def test_sam_create_empty_tasks_creates_drafting_plan(tmp_path: Path) -> None:
     # Assert
     import re
 
-    assert re.match(r"^P[0-9a-f]{8}$", result.plan_id), f"Expected UUID plan_id, got: {result.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", result.plan_id), f"Expected UUID plan_id, got: {result.plan_id!r}"
     assert result.task_count == 0
 
 
@@ -663,7 +663,12 @@ def test_sam_create_assigns_unique_plan_ids(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+        id="T01",
+        title="Task",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     # Act
@@ -673,8 +678,8 @@ def test_sam_create_assigns_unique_plan_ids(tmp_path: Path) -> None:
     assert isinstance(r2, CreatePlanResult)
 
     # Assert
-    assert re.match(r"^P[0-9a-f]{8}$", r1.plan_id), f"Expected UUID plan_id, got: {r1.plan_id!r}"
-    assert re.match(r"^P[0-9a-f]{8}$", r2.plan_id), f"Expected UUID plan_id, got: {r2.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", r1.plan_id), f"Expected UUID plan_id, got: {r1.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", r2.plan_id), f"Expected UUID plan_id, got: {r2.plan_id!r}"
     assert r1.plan_id != r2.plan_id, "Each plan must get a unique plan_id"
 
 
@@ -694,7 +699,12 @@ def test_sam_update_context_sets_plan_context(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+        id="T01",
+        title="Task",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     create_result = sam_plan(
@@ -729,7 +739,12 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+        id="T01",
+        title="Task",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     create_result = sam_plan(
@@ -737,7 +752,7 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     )
     assert isinstance(create_result, CreatePlanResult)
     plan_id = create_result.plan_id
-    plan_path = p_dir / f"{plan_id}-append-sec.yaml"
+    plan_path = p_dir / f"{plan_id}.yaml"
 
     # Act
     update_result = sam_task(
@@ -790,7 +805,12 @@ def test_sam_claim_not_started_task_returns_claimed_true(tmp_path: Path) -> None
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+        id="T01",
+        title="Task",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     create_result = sam_plan(
@@ -820,7 +840,12 @@ def test_sam_claim_already_claimed_returns_claimed_false(tmp_path: Path) -> None
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+        id="T01",
+        title="Task",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     create_result = sam_plan(
@@ -855,7 +880,12 @@ def test_sam_claim_missing_task_returns_claimed_false(tmp_path: Path) -> None:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task", status="not-started", agent="a", priority=Priority.CRITICAL, complexity=Complexity.LOW
+        id="T01",
+        title="Task",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.CRITICAL,
+        complexity=Complexity.LOW,
     )
 
     create_result = sam_plan(
@@ -901,7 +931,7 @@ def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
     task = TaskDefinition(
         id="T01",
         title="First task",
-        status="not-started",
+        status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         priority=Priority.CRITICAL,
         complexity=Complexity.LOW,
@@ -912,7 +942,7 @@ def test_sam_create_returns_plan_ref_without_issue(tmp_path: Path) -> None:
     assert isinstance(result, CreatePlanResult)
 
     # Assert
-    assert re.match(r"^P[0-9a-f]{8}$", result.plan_ref), f"Expected UUID plan_ref, got: {result.plan_ref!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", result.plan_ref), f"Expected UUID plan_ref, got: {result.plan_ref!r}"
 
 
 def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
@@ -933,7 +963,7 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
     task = TaskDefinition(
         id="T01",
         title="First task",
-        status="not-started",
+        status=TaskStatus.NOT_STARTED,
         agent="test-agent",
         priority=Priority.CRITICAL,
         complexity=Complexity.LOW,
@@ -951,7 +981,7 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
         assert isinstance(result, CreatePlanResult)
 
     # Assert — plan_ref includes issue number and UUID plan_id
-    assert re.match(r"^#42,P[0-9a-f]{8}$", result.plan_ref), f"Expected '#42,P<hex8>', got: {result.plan_ref!r}"
+    assert re.match(r"^#42,P[0-9a-f]{8}(-.+)?$", result.plan_ref), f"Expected '#42,P<hex8>', got: {result.plan_ref!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -1021,7 +1051,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
         task_def = TaskDefinition(
             id="T1",
             title="First task",
-            status="not-started",
+            status=TaskStatus.NOT_STARTED,
             agent="test-agent",
             dependencies=[],
             priority=Priority.HIGH,
@@ -1066,7 +1096,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
         task_def = TaskDefinition(
             id="T1",
             title="First task",
-            status="not-started",
+            status=TaskStatus.NOT_STARTED,
             agent="test-agent",
             dependencies=[],
             priority=Priority.HIGH,

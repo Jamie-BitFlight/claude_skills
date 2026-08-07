@@ -109,7 +109,7 @@ or issue reference is passed as `item_ref`.
 
    `plan create` accepts only one inline task per call (use `plan append-task` for additional
    tasks) — sufficient here since the quick plan is always single-task. It handles path resolution
-   internally — do not resolve or pass a file path. Read `plan_id` (e.g. `Pe71c7cb8`) from the JSON
+   internally — do not resolve or pass a file path. Read `plan_id` (e.g. `Pe71c7cb8-{slug}`) from the JSON
    output — that is the plan reference used in the next two steps, not the `quick-{slug}` string.
 
 6. Call the CLI to record the plan reference: `backlog update --selector "{title}" --plan "{plan_id from step 5}"`.

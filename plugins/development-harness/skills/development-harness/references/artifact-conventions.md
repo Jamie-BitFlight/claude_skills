@@ -65,7 +65,7 @@ Task plans and task-level state are managed by the SAM MCP server:
 - **Read:** `sam_task(plan, task, config={"action": "read"})` — returns a `TaskAssignment` model with plan-level context and task fields.
 - **Update:** `sam_task(plan, task, config={"action": "update", "append_section": ..., "section_content": ...})` — appends sections to task bodies. Used by S5 Execution, S6 Forensic Review, and S7 Final Verification to store results within the task structure.
 
-Task plan YAML files are stored in `~/.dh/projects/{project-slug}/plan/` by the SAM MCP server. Access is exclusively via MCP tools — never via direct filesystem paths.
+Task plans are stored in `~/.dh/projects/{project-slug}/plan/` by the SAM MCP server. Access is exclusively via MCP tools — never via direct filesystem paths. The storage format is an implementation detail of the backend; do not assume YAML, JSON, or any specific format.
 
 ### Backlog System
 

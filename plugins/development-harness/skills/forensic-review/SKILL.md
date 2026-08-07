@@ -53,7 +53,7 @@ sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
 
 Extract:
 
-- `task_file_path` — the path to the task YAML file (e.g., `plan/P{id}-{slug}.yaml`)
+- `task_file_path` — the plan address (full stem, e.g. `P{id}-{slug}`); resolved by MCP tools, not filesystem paths
 - `item_id` — required for artifact registration; if absent, BLOCK immediately
 - `expected_outputs` — the implementation files produced by Stage 5 (listed in the task's
   "Files Changed" or "Expected Outputs" section)

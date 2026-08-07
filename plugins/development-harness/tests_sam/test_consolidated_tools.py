@@ -425,7 +425,7 @@ async def test_sam_plan_create_returns_plan_number_and_task_count(client: Client
 
     # Assert
     data = result.data
-    assert re.match(r"^P[0-9a-f]{8}$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
     assert data.task_count == 2
 
 

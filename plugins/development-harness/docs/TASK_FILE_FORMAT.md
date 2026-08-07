@@ -63,7 +63,7 @@ single monolithic `create` call:
 
 ```text
 1. sam_plan(action='create', tasks=[])
-   -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2").
+   -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2-{slug}").
 
 2. sam_plan(plan='P{id}', action='append_task', task=<single task dict>) × N
    -- Appends one task at a time. Each call validates the task via Task.model_validate().
