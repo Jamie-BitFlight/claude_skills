@@ -664,7 +664,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, Task as _Task, TaskStatus
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, Task, TaskStatus
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange: create plan via LocalYamlTaskProvider so the file is real YAML
@@ -688,7 +688,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
 
         # Act: update task with a Task model that has non-empty dependencies
         task_data = backend.read_task(plan_id, "T01")
-        updated_task = _Task.model_validate({**task_data, "dependencies": ["T01", "T02"]})
+        updated_task = Task.model_validate({**task_data, "dependencies": ["T01", "T02"]})
         backend.update_task(plan_id, updated_task)
 
         # Assert: read the raw YAML file — dependencies must be a sequence, not a string
