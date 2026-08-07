@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import Mock
 
 import pytest
@@ -82,7 +83,7 @@ def test_create_plan_forwards_all_supported_dispatch_plan_fields(monkeypatch: py
             "--integration-branch",
             "main",
             "--wave-item",
-            "wave=1;issue=101;title=Feature;priority=P1;conflict_group=3;depends_on=7;status=complete;parallel=false",
+            "wave=1;issue=101;title=Feature;priority=P1;conflict_group=3;status=complete;parallel=false",
             "--conflict-group",
             "group_id=3;reason=shared files;items=101,102",
             "--pre-merge",
@@ -108,7 +109,7 @@ def test_create_plan_forwards_all_supported_dispatch_plan_fields(monkeypatch: py
                             "issue": 101,
                             "priority": "P1",
                             "conflict_group": 3,
-                            "depends_on": [7],
+                            "depends_on": [],
                             "status": "complete",
                         }
                     ],
@@ -117,7 +118,6 @@ def test_create_plan_forwards_all_supported_dispatch_plan_fields(monkeypatch: py
             "quality_gates": {"pre_merge": ["uv run ruff check"], "post_merge": ["uv run pytest"]},
         },
         overwrite=False,
-        validate=True,
         issue=None,
     )
 
@@ -129,3 +129,81 @@ def test_conflict_group_rejects_empty_branch_and_missing_items() -> None:
         dispatch._parse_conflict_group("group_id=1;reason=shared;items=101")
     with pytest.raises(ValueError, match="unknown conflict-group field"):
         dispatch._parse_conflict_group("group_id=1;reason=shared;items=101,102;unexpected=x")
+
+
+class TestDependencyValidation:
+    """The ``create-plan`` command validates the dependency graph pre-write."""
+
+    _BASE_ARGS: ClassVar[tuple[str, ...]] = (
+        "create-plan",
+        "--milestone-number",
+        "1",
+        "--milestone-title",
+        "Milestone",
+        "--integration-branch",
+        "main",
+    )
+
+    def test_valid_dep_in_earlier_wave_passes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        operation = Mock(return_value={"created": True})
+        monkeypatch.setattr(dispatch.operations, "dispatch_create_plan", operation)
+
+        result = runner.invoke(
+            dispatch.app,
+            [
+                *self._BASE_ARGS,
+                "--wave-item",
+                "wave=1;issue=7;title=Dep",
+                "--wave-item",
+                "wave=2;issue=101;title=Feature;depends_on=7",
+            ],
+        )
+
+        assert result.exit_code == 0, result.stderr
+
+    def test_missing_dep_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        operation = Mock(return_value={"created": True})
+        monkeypatch.setattr(dispatch.operations, "dispatch_create_plan", operation)
+
+        result = runner.invoke(
+            dispatch.app, [*self._BASE_ARGS, "--wave-item", "wave=1;issue=101;title=Feature;depends_on=7"]
+        )
+
+        assert result.exit_code == 1
+        assert "does not appear in any wave" in result.stderr
+
+    def test_same_wave_dep_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        operation = Mock(return_value={"created": True})
+        monkeypatch.setattr(dispatch.operations, "dispatch_create_plan", operation)
+
+        result = runner.invoke(
+            dispatch.app,
+            [
+                *self._BASE_ARGS,
+                "--wave-item",
+                "wave=1;issue=7;title=Dep",
+                "--wave-item",
+                "wave=1;issue=101;title=Feature;depends_on=7",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "same wave" in result.stderr
+
+    def test_later_wave_dep_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        operation = Mock(return_value={"created": True})
+        monkeypatch.setattr(dispatch.operations, "dispatch_create_plan", operation)
+
+        result = runner.invoke(
+            dispatch.app,
+            [
+                *self._BASE_ARGS,
+                "--wave-item",
+                "wave=1;issue=101;title=Feature;depends_on=7",
+                "--wave-item",
+                "wave=2;issue=7;title=Dep",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "later wave" in result.stderr

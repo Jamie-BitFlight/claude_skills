@@ -243,7 +243,6 @@ def create_plan(
     pre_merge: Annotated[list[str] | None, typer.Option("--pre-merge")] = None,
     post_merge: Annotated[list[str] | None, typer.Option("--post-merge")] = None,
     overwrite: Annotated[bool, typer.Option("--overwrite")] = False,
-    validate_after_write: Annotated[bool, typer.Option("--validate/--no-validate")] = True,
     issue: Annotated[
         int | None, typer.Option("--issue", help="Backlog issue to register the dispatch-plan artifact against")
     ] = None,
@@ -271,16 +270,14 @@ def create_plan(
         )
     except (ValidationError, ValueError) as exc:
         err(f"Invalid dispatch plan input: {exc}")
-    if validate_after_write:
-        integrity = validate_plan_integrity(plan)
-        if integrity.errors:
-            err(f"Dispatch plan integrity errors: {'; '.join(integrity.errors)}")
+    integrity = validate_plan_integrity(plan)
+    if integrity.errors:
+        err(f"Dispatch plan integrity errors: {'; '.join(integrity.errors)}")
     emit_result(
         operations.dispatch_create_plan(
             milestone_number=milestone_number,
             plan=plan.model_dump(mode="json", by_alias=True),
             overwrite=overwrite,
-            validate=validate_after_write,
             issue=issue,
         )
     )

@@ -1141,7 +1141,6 @@ def _assert_compact_result(result: Any, expected: dict[str, Any]) -> None:
                     "quality_gates": {"pre_merge": [], "post_merge": []},
                 },
                 "overwrite": False,
-                "validate": True,
                 "issue": None,
             },
             {"milestone_number": 10, "wave_count": 2},
