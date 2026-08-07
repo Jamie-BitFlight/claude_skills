@@ -258,7 +258,7 @@ class PlanIdIndex:
             # Match when the index entry's plan_id is the hex prefix of the
             # full stem being looked up (e.g. entry "Pa1b2c3d4" matches lookup
             # "Pa1b2c3d4-auth").
-            if plan_id.startswith(f"{entry.plan_id}-"):
+            if plan_id.lower().startswith(f"{entry.plan_id.lower()}-"):
                 return entry.issue
         return None
 
