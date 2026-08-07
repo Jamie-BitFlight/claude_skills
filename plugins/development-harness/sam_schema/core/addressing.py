@@ -155,6 +155,28 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
         msg = f"Plan directory does not exist: {plan_dir}"
         raise FileNotFoundError(msg)
 
+    # Fast-path: direct lookup by full stem (the canonical plan_id).
+    # Full stems like "P001-backlog-cli-dedup" or "Pa1b2c3d4-auth" are
+    # resolved by exact match — no regex, no glob, no ambiguity.
+    for ext in (".yaml", ".md"):
+        candidate = plan_dir / f"{address}{ext}"
+        if candidate.is_file():
+            return candidate
+    candidate = plan_dir / address
+    if candidate.is_dir():
+        return candidate
+
+    # Fast-path: prefix match for hex-prefix addresses (e.g. "Pa1b2c3d4").
+    # Existing plans stored only the hex prefix as plan_id for months.
+    # A hex prefix is P + exactly 8 hex chars, no hyphen — unique by design.
+    # Match against files/directories starting with "{address}-".
+    UID_PREFIX_RE = re.compile(r"^P[0-9a-f]{8}$", re.IGNORECASE)
+    if UID_PREFIX_RE.match(address):
+        for entry in plan_dir.iterdir():
+            if entry.name.startswith(f"{address}-") and (entry.suffix in {".yaml", ".md"} or entry.is_dir()):
+                return entry
+        raise AddressingError(address, plan_dir)
+
     # Only consider .yaml/.md files and directories; exclude sidecars (.sha256 etc.)
     # that share the same P{ID}-{slug} prefix and would cause false collisions.
     all_entries: list[Path] = sorted(

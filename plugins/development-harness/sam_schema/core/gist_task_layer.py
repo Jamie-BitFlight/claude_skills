@@ -458,12 +458,12 @@ class GistTaskLayer:
             )
             return
 
-        cache_path = self._local.plan_dir / f"{plan_id}-{slug}.yaml"
+        cache_path = self._local.plan_dir / f"{plan_id}.yaml"
 
         # If a file already exists for this plan_id (possibly with a different slug),
         # prefer the existing path to avoid creating a duplicate.
         try:
-            existing = self._local.plan_dir.glob(f"{plan_id}-*.yaml")
+            existing = list(self._local.plan_dir.glob(f"{plan_id}.*")) + list(self._local.plan_dir.glob(f"{plan_id}-*"))
             for existing_path in existing:
                 cache_path = existing_path
                 break

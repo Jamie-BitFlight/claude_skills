@@ -172,7 +172,7 @@ The exact text to write (substituting the real plan address):
 **SAM tasks:** {plan-address}
 ```
 
-Where `{plan-address}` is the plan identifier returned in Step 5 (e.g., `Pc7d8e9f0` or `tasks-N-slug`). The address is resolved by MCP tools — do not construct filesystem paths.
+Where `{plan-address}` is the plan identifier returned in Step 5 (e.g., `Pc7d8e9f0-my-feature` or `tasks-N-slug`). The address is resolved by MCP tools — do not construct filesystem paths.
 
 Use the Edit tool to make this change. Do not rewrite the file.
 

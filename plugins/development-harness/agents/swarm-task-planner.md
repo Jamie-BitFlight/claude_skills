@@ -348,7 +348,7 @@ When the plan's `acceptance-criteria-structured` field is non-empty, automatical
 
 ### Condition
 
-Generate bookend tasks when and only when the plan YAML contains a non-empty `acceptance-criteria-structured` list. Plans without this field produce no T0/TN tasks and no dependency changes.
+Generate bookend tasks when and only when the plan contains a non-empty `acceptance-criteria-structured` list. Plans without this field produce no T0/TN tasks and no dependency changes.
 
 ### T0 Task Template
 

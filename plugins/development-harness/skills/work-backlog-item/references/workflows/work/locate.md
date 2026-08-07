@@ -38,10 +38,10 @@ From the matched item's entry in the `backlog list` returned JSON, extract `titl
 - `research_first` — from `backlog_view` response body, `**Research first**:` line (optional)
 - `suggested_location` — from `backlog_view` response body, `**Suggested location**:` line (optional)
 
-If the item already has a `**Plan**:` field, extract the plan address from the YAML filename (e.g., `plan/Pf3a4b5c6-machine-readable-inter-item-dependencies.yaml` → `Pf3a4b5c6`). Invoke immediately:
+If the item already has a `**Plan**:` field, use the plan address as-is (the full filename stem, e.g., `Pf3a4b5c6-machine-readable-inter-item-dependencies`). Do not extract or truncate. Invoke immediately:
 
 ```text
-Skill(skill: "dh:implement-feature", args: "P{id}")
+Skill(skill: "dh:implement-feature", args: "{plan_address}")
 ```
 
 After extracting fields, proceed to `validate.md` (Step 2.1) before continuing.

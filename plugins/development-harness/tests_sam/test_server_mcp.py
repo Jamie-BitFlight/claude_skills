@@ -298,7 +298,7 @@ async def test_mcp_sam_create_creates_plan_file(tmp_path: Path) -> None:
     import re
 
     assert data.task_count == 1
-    assert re.match(r"^P[0-9a-f]{8}$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
+    assert re.match(r"^P[0-9a-f]{8}(-.+)?$", data.plan_id), f"Expected UUID plan_id, got: {data.plan_id!r}"
 
 
 async def test_mcp_sam_create_artifact_write_failure_raises_tool_error(

@@ -83,7 +83,7 @@ If operation is `resolve`:
 
 1. Extract `**Plan**:` field from the matched item. If absent, skip to Step 5.7 (no plan = simple resolve with summary only).
 
-2. Extract the plan address from the plan path (e.g., `plan/Pe9f0a1b2-backlog-lifecycle-process-gaps.yaml` → `Pe9f0a1b2`). Call:
+2. Use the plan address from the matched item (the full filename stem, e.g., `Pe9f0a1b2-backlog-lifecycle-process-gaps`). Do not extract or truncate — the full stem IS the address. Call:
 
    ```bash
    plan status --plan-address "{address}"

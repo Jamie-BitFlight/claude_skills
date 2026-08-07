@@ -664,14 +664,19 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, Task as _Task
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, Task as _Task, TaskStatus
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange: create plan via LocalYamlTaskProvider so the file is real YAML
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
+        id="T01",
+        title="Task One",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.HIGH,
+        complexity=Complexity.LOW,
     )
     backend = LocalYamlTaskProvider(p_dir)
     set_task_config(TaskConfig(backend=backend))
@@ -679,7 +684,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
         result = _sam_plan_create(CreatePlanConfig(slug="roundtrip", goal="Goal", tasks=[minimal_task]), str(p_dir))
         assert isinstance(result, CreatePlanResult), f"sam_create failed: {result}"
         plan_id = result.plan_id
-        plan_path = _Path(p_dir) / f"{plan_id}-roundtrip.yaml"
+        plan_path = _Path(p_dir) / f"{plan_id}.yaml"
 
         # Act: update task with a Task model that has non-empty dependencies
         task_data = backend.read_task(plan_id, "T01")
@@ -755,14 +760,19 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
     """
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, TaskStatus
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange: create a plan with a task that has no parallelize_with entries
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
+        id="T01",
+        title="Task One",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.HIGH,
+        complexity=Complexity.LOW,
     )
     backend = LocalYamlTaskProvider(p_dir)
     set_task_config(TaskConfig(backend=backend))
@@ -809,14 +819,19 @@ def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> 
     from ruamel.yaml import YAML
     from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority
+    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, TaskStatus
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     minimal_task = TaskDefinition(
-        id="T01", title="Task One", status="not-started", agent="a", priority=Priority.HIGH, complexity=Complexity.LOW
+        id="T01",
+        title="Task One",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.HIGH,
+        complexity=Complexity.LOW,
     )
     backend = LocalYamlTaskProvider(p_dir)
     set_task_config(TaskConfig(backend=backend))
@@ -839,7 +854,7 @@ def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> 
         assert "error" not in update_result, f"sam_task update failed: {update_result}"
 
         # Assert: read raw YAML back and verify parallelize-with is a list
-        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}-*.yaml"))
+        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}.*")) + list(_Path(p_dir).glob(f"{plan_id}-*"))
         assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
         yaml = YAML()
         loaded = yaml.load(plan_yaml_files[0])
@@ -977,7 +992,7 @@ def test_sam_plan_update_list_field_no_repr_in_yaml(tmp_path: Path) -> None:
         assert "error" not in update_result, f"sam_plan update failed: {update_result}"
 
         # Assert: raw YAML must not contain the Pydantic class name
-        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}-*.yaml"))
+        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}.*")) + list(_Path(p_dir).glob(f"{plan_id}-*"))
         assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
         raw_content = plan_yaml_files[0].read_text()
         assert "AcceptanceCriterion" not in raw_content, (

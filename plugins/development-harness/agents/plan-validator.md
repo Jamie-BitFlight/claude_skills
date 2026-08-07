@@ -463,7 +463,7 @@ Plans live in the DH state directory outside the repo. Access them via SAM MCP â
 
 ```text
 # Read plan and all its tasks
-sam_plan(config={"action": "read"}, plan="{plan_id}")          # plan_id: P123 or slug
+sam_plan(config={"action": "read"}, plan="{plan_id}")          # plan_id: full stem, e.g. P123-my-feature
 
 # Read a specific task
 sam_task(plan="{plan_id}", task="T1", config={"action": "read"})
