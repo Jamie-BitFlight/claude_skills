@@ -82,7 +82,6 @@ def test_create_plan_forwards_all_supported_dispatch_plan_fields(monkeypatch: py
             "Milestone",
             "--integration-branch",
             "main",
-            "--no-validate",
             "--wave-item",
             "wave=1;issue=101;title=Feature;priority=P1;conflict_group=3;status=complete;parallel=false",
             "--conflict-group",
@@ -119,7 +118,6 @@ def test_create_plan_forwards_all_supported_dispatch_plan_fields(monkeypatch: py
             "quality_gates": {"pre_merge": ["uv run ruff check"], "post_merge": ["uv run pytest"]},
         },
         overwrite=False,
-        validate=False,
         issue=None,
     )
 
