@@ -1,6 +1,33 @@
 ---
-title: "Ghost Desk — Invisible AI Overlay for Windows"
-license: "Proprietary (free during launch, paid tiers available)"
+name: ghost-desk
+research_date: 2026-03-13
+source_url: https://www.ghost-desk.app/
+version_at_research: v1.0
+license: Proprietary (free during launch, paid tiers available)
+freshness_tracking:
+  last_verified: 2026-03-13
+  version_at_verification: v1.0 (launch March 2026)
+  next_review: 2026-06-13
+  confidence_map: "Overview: high, Identity: high, Core Features: high, Architecture: medium, Limitations: high, Pricing: high, References: high"
+---
+
+# Ghost Desk
+
+## Overview
+
+Ghost Desk is a Windows-exclusive AI assistant overlay that remains invisible to screen-sharing, recording, and video conferencing software while providing real-time code analysis, voice transcription, and vision-based screenshot interpretation. Powered by Llama 3.3 70B or GPT-4o depending on tier, it uses Windows OS-level APIs (SetWindowDisplayAffinity) to exclude itself from all screen-capture pipelines, enabling developers to access AI assistance during live interviews, meetings, and screenshares without revealing the tool to viewers. (SOURCE: <https://www.ghost-desk.app/>, accessed 2026-03-13)
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| AI assistance during technical interviews reveals to proctors that candidate is using AI tools | OS-level invisibility via SetWindowDisplayAffinity API hides overlay from all screen-capture pipelines (Zoom, Teams, OBS, etc.) |
+| Need for code reference/help during live coding sessions visible to viewers | Invisible overlay allows real-time access to code analysis, documentation lookup, and problem-solving without visible changes to screen share |
+| Distraction from primary task when using separate AI tool window | Always-on-top floating interface with keyboard-only activation (Ctrl+Shift+Space) integrates assistance without task-switching |
+| Voice transcription and analysis requires separate tools or manual context-switching | Integrated voice input/output and screenshot analysis in single overlay reduces cognitive load |
+
 ---
 
 ## Identity and Metadata
@@ -19,7 +46,7 @@ license: "Proprietary (free during launch, paid tiers available)"
 
 ---
 
-## Core Features
+## Key Features
 
 ### 1. Always-On-Top Floating Interface
 
@@ -102,7 +129,7 @@ All shortcuts are fully customizable in settings.
 
 ---
 
-## Installation and Setup
+## Installation & Usage
 
 **Installation time**: Under 1 minute
 
@@ -145,7 +172,7 @@ Upgrade to OpenAI models for higher quality:
 
 ---
 
-## Architecture and Technical Design
+## Technical Architecture
 
 ### Window Display Affinity Implementation
 
@@ -226,7 +253,7 @@ The architecture processes three input types:
 
 ---
 
-## Use Cases and Relevance to Claude Code Development
+## Relevance to Claude Code Development
 
 Ghost Desk is relevant to agents and developers in the following contexts:
 

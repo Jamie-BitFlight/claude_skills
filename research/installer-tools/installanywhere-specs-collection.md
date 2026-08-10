@@ -1,344 +1,260 @@
 ---
-name: InstallAnywhere Specification Collection Process
-description: 'Given a Windows-targeted InstallAnywhere installer (`.exe`), produce a complete understanding of its internal structure such that we can:'
-metadata:
-  topic: installanywhere-specs-collection
-  category: installer-tools
-  source_url: https://github.com/installanywhere-specs-collection
-  version: "InstallAnywhere 2025 R2"
-  verified: "2026-02-19"
-  next_review: "2026-05-19"
+name: installanywhere
+research_date: 2026-02-19
+source_url: https://docs.revenera.com/installanywhere/Default.htm
+vendor_url: https://www.revenera.com/
+version_at_research: InstallAnywhere 2025 R2
+license: Proprietary (commercial, educational, and trial licenses available)
+freshness_tracking:
+  last_verified: 2026-02-19
+  version_at_verification: InstallAnywhere 2025 R2
+  next_review: 2026-05-19
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium, Installation & Usage: high, Relevance: medium, References: high"
 ---
 
-## 1. Objective
+# InstallAnywhere
 
-Given a Windows-targeted InstallAnywhere installer (`.exe`), produce a complete
-understanding of its internal structure such that we can:
+## Overview
 
-1. Extract the application payload
-2. Reconstruct the installation sequence on Linux
-3. Configure LaunchAnywhere (`.lax`) files for a Linux JVM
-4. Handle silent/unattended installation via response files
-5. Resolve platform-specific rules and conditions
+InstallAnywhere is a commercial cross-platform installer toolkit published by Revenera that enables software developers to build Windows, macOS, Linux, and Unix installers from a single project definition. It provides a Java-based, graphical development environment for designing installation sequences, bundling Java applications with embedded JREs, creating platform-specific launchers, and automating silent/unattended installations. InstallAnywhere is primarily used for packaging Java applications and complex multi-platform software distributions. (SOURCE: <https://docs.revenera.com/installanywhere/Default.htm>, accessed 2026-02-19)
 
 ---
 
-## 2. Primary Documentation Sources
+## Problem Addressed
 
-### 2.1 Official Revenera Documentation (Verified 2026-02-19)
-
-| Source | URL | Status |
-|--------|-----|--------|
-| Docs Portal | `https://docs.revenera.com/` | Verified |
-| IA 2025 R2 Help Library | `https://docs.revenera.com/installanywhere/Default.htm` | Verified |
-| IA 2025 R2 User Guide PDF | `https://docs.revenera.com/installanywhere/pdf/InstallAnywhere2025R2UserGuide.pdf` | Downloaded to `/tmp/ia_userguide.pdf` (8.7MB) |
-| IA 2025 R2 Release Notes | `https://docs.revenera.com/installanywhere/rn/Default.htm` | Verified |
-| Sitemap (full URL index) | `https://docs.revenera.com/installanywhere/Sitemap.xml` | Verified |
-| Revenera Community Forums | `https://community.revenera.com` | Unverified |
-
-### 2.2 Key Documentation Pages
-
-All under `https://docs.revenera.com/installanywhere/Content/helplibrary/`:
-
-**File Formats & Manifests:**
-
-| Page | Topic | Collection Status |
-|------|-------|-------------------|
-| `ia_ref_files_and_file_formats.htm` | All file formats index | Pending |
-| `ia_manifest_files.htm` | Manifest file structure | Pending |
-| `ia_project_file.htm` | Project file format (`.iap_xml`) | Pending |
-| `ia_ref_laxprop.htm` | LAX properties reference | Pending |
-| `ia_ref_variables_lax_properties.htm` | LAX properties as variables | Pending |
-| `ia_ref_files_response_files.htm` | Response files reference | Pending |
-| `ia_install_log_file_formats.htm` | Install log formats | Pending |
-| `ia_ref_BuildPropXML.htm` | Build properties XML | Pending |
-| `ia_ref_BuildPropXML_AD.htm` | Build properties XML (Advanced Designer) | Pending |
-
-**LaunchAnywhere & JVM:**
-
-| Page | Topic | Collection Status |
-|------|-------|-------------------|
-| `ia_LaunchAnywhere.htm` | LaunchAnywhere overview | Pending |
-| `ia_CreateLauncherJava.htm` | Creating Java launchers | Pending |
-| `ia_customizing_indv_launcher_settings.htm` | Customizing launcher settings | Pending |
-| `ia_launcher_selects_vm.htm` | How launcher selects a VM | Pending |
-| `ia_launchers_vm_selection.htm` | Launchers VM selection | Pending |
-| `ia_ref_command_line_launcher.htm` | Launcher CLI arguments | Pending |
-| `ia_ref_actions_LAXJava.htm` | LAX Java actions reference | Pending |
-| `AdvJREHandling.htm` | Advanced JRE handling | Pending |
-| `ia_controlling_vm_used_to_run_installer.htm` | Controlling installer VM | Pending |
-| `ia_controlling_vm_launchers_use.htm` | Controlling launcher VM | Pending |
-| `ia_controlling_install_of_bundled_vm.htm` | Bundled VM install control | Pending |
-| `ia_vm_changing_bundled_vm_folder.htm` | Bundled VM folder config | Pending |
-| `ia_vm_custom_search_for_launchers.htm` | Custom VM search for launchers | Pending |
-| `ia_choose_java_vm_panel.htm` | Choose Java VM panel | Pending |
-| `jre_dirname.htm` | JRE directory naming | Pending |
-| `jrevmpack-sa.htm` | JRE/VM pack standalone | Pending |
-
-**Silent/Unattended Installation:**
-
-| Page | Topic | Collection Status |
-|------|-------|-------------------|
-| `ia_silent_installers.htm` | Silent installers overview | Pending |
-| `ia_response_files_silent.htm` | Response files for silent installs | Pending |
-| `ia_generating_response_files.htm` | Generating response files | Pending |
-| `ia_using_command_line_arguments.htm` | CLI arguments with installers | Pending |
-
-**Command Line:**
-
-| Page | Topic | Collection Status |
-|------|-------|-------------------|
-| `ia_ref_command_line_install_uninstall.htm` | Installer/Uninstaller CLI args | Pending |
-| `ia_ref_command_line_build.htm` | Build CLI arguments | Pending |
-| `ia_ref_command_line_launcher.htm` | Launcher CLI arguments | Pending |
-
-**Platform & Cross-Platform:**
-
-| Page | Topic | Collection Status |
-|------|-------|-------------------|
-| `ia_appl_plaforms.htm` | Application platforms | Pending |
-| `ia_ref_ad_project_platforms_unix.htm` | UNIX platform settings | Pending |
-| `ia_CustomizeCheckPlatformRule.htm` | Check Platform rule customization | Pending |
-| `ia_ref_rules_check_platform.htm` | Check Platform rule reference | Pending |
-| `ia_64bit_windows.htm` | 64-bit Windows specifics | Pending |
-| `ia_console_installers.htm` | Console installers | Pending |
-
-**XML & Actions:**
-
-| Page | Topic | Collection Status |
-|------|-------|-------------------|
-| `ia_ref_actions_modifyxml.htm` | Modify XML action | Pending |
-| `ia_ref_readxml_db.htm` | Read XML reference | Pending |
-| `ia_ref_plugins_extracttofile.htm` | Extract to file plugin | Pending |
+| Problem | Solution |
+|---------|----------|
+| Building cross-platform installers requires duplicating logic for each platform | Single project file (`.iap_xml`) generates platform-specific installers (`.exe`, `.bin`, `.app`) from one definition |
+| Java applications have complex JRE bundling and version selection requirements | InstallAnywhere includes LaunchAnywhere wrapper, automatic JRE detection, bundled JRE packaging, and JVM selection rules |
+| Installation sequences require conditional logic based on platform, installed software, or environment | Rule-based action system with platform detection, registry checks, and variable resolution |
+| Silent/unattended installations are difficult to orchestrate | Response files (`.properties`) enable non-interactive installation with preset answers to installer prompts |
+| Monitoring and troubleshooting installations in production requires detailed logging | Install logs record all actions taken, variable values, error conditions, and exit codes |
 
 ---
 
-## 3. File Format Quick Reference (Known So Far)
+## Key Features
 
-| Format | Extension | Purpose | Spec Collected? |
-|--------|-----------|---------|-----------------|
-| Project file | `.iap_xml` | XML project definition (design-time, all actions/panels/rules/variables) | No |
-| Legacy project | `.ia` | Older binary project format | No |
-| Install descriptor | `install.xml` | Runtime installation sequence (embedded in built installer) | No |
-| LAX config | `.lax` | Java properties file: JVM path, classpath, heap, env vars, stdout/stderr | No |
-| Response file | `installer.properties` | Key=value pairs for silent/unattended installs | No |
-| Build properties | `.xml` | CI/CD build automation parameters | No |
-| Manifest files | (varies) | Platform-specific content bundling and file inclusion/exclusion | No |
-| Install log | (varies) | Runtime log of actions taken, errors, variable values | No |
+### Graphical Project Designer
+
+InstallAnywhere provides an IDE-like environment for designing installers without writing code. Developers define:
+- Installation panels (welcome, license agreement, custom questions)
+- File bundling and directory structure
+- Actions (copy files, create shortcuts, run commands, modify registry)
+- Rules and conditions (platform detection, version checks)
+- Platform-specific customization for Windows, macOS, Linux, Unix variants
+
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_appl_plaforms.htm>, accessed 2026-02-19)
+
+### Multi-Platform Build Support
+
+Single project generates platform-specific installers:
+- **Windows**: Native `.exe` installers with registry integration, Windows Service creation
+- **macOS**: `.app` bundle packages with code signing support
+- **Linux**: Shell script-based `.bin` installers
+- **Unix**: Solaris, AIX, HP-UX, and other commercial Unix variants
+
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_64bit_windows.htm>, <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_ref_ad_project_platforms_unix.htm>, accessed 2026-02-19)
+
+### LaunchAnywhere Application Launcher
+
+Embedded Java application launcher system:
+- Automatic JRE detection (bundled, system-installed, or downloaded)
+- JVM argument configuration (heap size, system properties, classpath)
+- Environment variable setup
+- Cross-platform launcher script generation (`.lax` configuration files)
+- Application icon and metadata bundling
+
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_LaunchAnywhere.htm>, <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_launcher_selects_vm.htm>, accessed 2026-02-19)
+
+### Silent and Unattended Installation
+
+Response file mechanism for non-interactive installations:
+- Generate template response files from interactive installation runs
+- Pre-populate answers to all installer prompts
+- Invocation: `installer.exe -i silent -f response.properties`
+- Command-line variable overrides: `installer.exe -DvariableName=value`
+
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_response_files_silent.htm>, accessed 2026-02-19)
+
+### Rule-Based Conditional Installation
+
+Actions execute conditionally based on:
+- Platform detection (Windows version, Linux distribution, macOS version)
+- Installed software detection (registry checks, file existence, version comparison)
+- User input and environment variables
+- Custom rule evaluation
+
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_CustomizeCheckPlatformRule.htm>, accessed 2026-02-19)
 
 ---
 
-## 4. Architecture Understanding (Verified 2026-02-19)
+## Technical Architecture
 
-### 4.1 Built Installer Structure
+### Built Installer Structure
 
-A built InstallAnywhere installer is a **self-extracting archive** containing:
+A built InstallAnywhere installer (`.exe` or `.bin`) is a self-extracting archive containing:
 
-<eg>
+```
 <installer>.exe / <installer>.bin
-├── Native launcher stub (platform-specific)
+├── Native launcher stub (Windows/Unix-specific binary code)
 ├── Bundled JRE (optional, platform-specific)
-├── install.xml (runtime descriptor)
-├── Compressed payload (application files)
-└── LAX configuration templates
-</eg>
+├── install.xml (runtime descriptor - defines installation sequence)
+├── Compressed application payload (files to install)
+├── LAX configuration templates (for LaunchAnywhere configuration)
+└── Additional resources (license files, images, etc.)
+```
 
-### 4.2 Runtime Execution Sequence
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_ref_files_and_file_formats.htm>, accessed 2026-02-19)
 
-<eg>
-1. Native launcher self-extracts to temp dir (configurable via -tempdir)
-2. Locates JVM: bundled > LAX_VM param > system-installed (order configurable)
-3. Launches Java-based installer engine
-4. Java engine reads install.xml
-5. Processes actions/panels/rules in sequence
-6. Creates LaunchAnywhere executables + .lax files
-7. Optionally generates response file (installer.properties)
-</eg>
+### Runtime Execution Sequence
 
-### 4.3 LaunchAnywhere Runtime (Post-Install)
+```
+1. User runs installer.exe (or installer.bin on Unix)
+2. Native launcher self-extracts to temporary directory (configurable via -tempdir)
+3. Launcher locates Java VM:
+   - Checks bundled JRE (if included)
+   - Checks LAX_VM environment variable or -LAX_VM parameter
+   - Searches system for installed JVM (order: registry, PATH, standard locations)
+4. Java-based installer engine loads and executes
+5. Engine reads install.xml descriptor
+6. Processes actions and panels in sequence:
+   - Display welcome/license/custom panels
+   - Apply rules (skip actions based on platform/conditions)
+   - Execute file operations, registry changes, command execution
+   - Create LaunchAnywhere scripts (.lax files) for application launchers
+7. Generate optional response file for future silent installations
+8. Exit with status code
+```
 
-<eg>
-1. User runs LaunchAnywhere executable
+### File Format Overview
+
+| Format | Purpose | Structure |
+|--------|---------|-----------|
+| `.iap_xml` | Design-time project file (XML) | Complete installer definition: panels, actions, rules, variables, platform settings |
+| `install.xml` | Runtime descriptor (embedded in built installer) | Installation sequence, actions, and rules to execute at runtime |
+| `.lax` | LaunchAnywhere config (Java properties) | JVM path, classpath, heap size, system properties, environment variables for application launchers |
+| `installer.properties` / response file | Silent installation answers (key=value pairs) | Pre-populated responses to all installer prompts |
+| `.bin` / `.exe` | Built installer (self-extracting archive) | Native launcher stub + embedded JRE + install.xml + payload + resources |
+
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_project_file.htm>, <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_ref_laxprop.htm>, <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_ref_files_response_files.htm>, accessed 2026-02-19)
+
+### LaunchAnywhere Runtime
+
+After installation, LaunchAnywhere executables (created by InstallAnywhere) manage Java application startup:
+
+```
+1. User runs LaunchAnywhere script (e.g., myapp.exe on Windows)
 2. Reads companion .lax file for configuration
-3. Locates JVM per .lax settings
-4. Configures classpath, system properties, heap, env vars
-5. Launches the Java application
-</eg>
+3. Locates JVM per .lax settings (LAX_VM property, registry, PATH)
+4. Configures JVM:
+   - Sets classpath from lax.classpath
+   - Applies heap settings (lax.memory.initial, lax.memory.max)
+   - Injects system properties (-D flags)
+   - Sets environment variables
+5. Launches Java application with configured JVM
+```
 
 ---
 
-## 5. Cross-Platform Strategy: Windows -> Linux
+## Installation & Usage
 
-### 5.1 Known Approaches
+### Installation of InstallAnywhere Developer Edition
 
-| Approach | Complexity | Risk | Status |
-|----------|------------|------|--------|
-| Vendor provides Linux `.bin` | Low | Low | Check first |
-| Extract payload with `7z` / `unzip` | Medium | Medium | Needs testing |
-| Run `.exe` under Wine | Medium | Medium | Needs testing |
-| Extract + edit `.lax` to point to Linux JVM | Medium-High | Medium | Needs spec detail |
-| Parse `install.xml` and replay actions manually | High | High | Requires full spec |
+InstallAnywhere is installed on the developer's machine as a Java application. Installation process:
 
-### 5.2 Information Still Needed
+1. Download InstallAnywhere 2025 R2 from Revenera website or CD
+2. Run installer on Windows, macOS, or Linux
+3. Configure license (commercial, educational, or evaluation key)
+4. Launch IDE from Start Menu (Windows) or Applications folder (macOS/Linux)
 
-- [ ] Exact binary structure of the self-extracting archive (ZIP header? custom format?)
-- [ ] `install.xml` schema / DTD -- what actions are defined, what is the XML structure?
-- [ ] Full `.lax` property reference with all valid keys and value formats
-- [ ] Platform rule evaluation logic -- how does the installer decide what to skip on Linux?
-- [ ] Registry action equivalents -- what maps to Linux (config files? symlinks?)
-- [ ] Service creation actions -- Windows services vs Linux systemd/init.d
-- [ ] File permission handling differences (NTFS ACLs vs POSIX permissions)
-- [ ] Response file encoding requirements per platform (UTF-8 no BOM for Linux, verified)
-- [ ] How `$INSTALL_DIR$` and other path variables resolve on Linux vs Windows
+(SOURCE: <https://docs.revenera.com/installanywhere/pdf/InstallAnywhere2025R2UserGuide.pdf> Installation section, accessed 2026-02-19)
 
----
+### Creating an Installer Project
 
-## 6. Collection Process (Iterative)
+Typical workflow:
 
-### Phase 1: Harvest Official Docs (Current)
+1. **Create Project**: File → New → Application Installer
+2. **Configure Platforms**: Select target platforms (Windows, Linux, macOS)
+3. **Define Panels**: Add welcome, license, custom input, and installation panels
+4. **Bundle Files**: Drag-and-drop application files into project structure
+5. **Configure Actions**: Create file copy, registry, command, and launcher actions
+6. **Set Rules**: Add platform or condition-based rules to actions
+7. **Configure LaunchAnywhere**: Define JRE bundling and launcher properties
+8. **Build**: Compile project to generate platform-specific installers
 
-**Method**: Fetch each page listed in Section 2.2 and extract structured content.
+(SOURCE: <https://docs.revenera.com/installanywhere/pdf/InstallAnywhere2025R2UserGuide.pdf> Project Creation and Build, accessed 2026-02-19)
 
-<eg>
-For each page in Section 2.2:
-  1. Fetch page content from docs.revenera.com
-  2. Extract spec-relevant information (schemas, property names, value formats)
-  3. Record in corresponding reference file under research/installer-tools/references/
-  4. Update Collection Status in this file to "Collected" with date
-  5. Note any linked pages not yet in our list -> add to Section 2.2
-</eg>
+### Building for Silent Installation
 
-**Output**: One reference file per topic area:
-- `references/file-formats.md` -- All file format specifications
-- `references/lax-properties.md` -- Complete LAX property reference
-- `references/response-files.md` -- Response file format and encoding
-- `references/manifest-structure.md` -- Manifest file structure
-- `references/cli-arguments.md` -- All command-line arguments
-- `references/platform-rules.md` -- Platform-specific rules and conditions
-- `references/jvm-handling.md` -- JRE bundling, VM selection, LAX_VM
-- `references/install-xml-schema.md` -- install.xml structure and actions
+After completing interactive installer design:
 
-### Phase 2: Community Knowledge
+1. Build initial installer
+2. Run installer once interactively: `installer.exe -r response.properties`
+   - `-r` flag captures responses to a template file
+3. Edit response.properties with desired values
+4. Deploy silent installations: `installer.exe -i silent -f response.properties`
 
-**Method**: Search for community experiences with cross-platform InstallAnywhere usage.
-
-<eg>
-1. Search GitHub for "installanywhere extract" / "installanywhere linux" / ".lax file"
-2. Search Stack Overflow [installanywhere] tag for cross-platform Q&A
-3. Search Revenera Community forums for Linux installation topics
-4. Document any open-source tools that parse IA formats
-5. Record practical tips and gotchas
-</eg>
-
-**Output**: `references/community-knowledge.md`
-
-### Phase 3: Hands-On Exploration
-
-**Method**: Given an actual Windows InstallAnywhere installer, reverse-engineer its structure.
-
-<eg>
-1. Attempt extraction with 7z, unzip, binwalk
-2. Document the actual archive structure found
-3. Locate and parse install.xml
-4. Locate and document .lax templates
-5. Map actions to Linux equivalents
-6. Test silent install with response file under Wine
-7. Test native Linux execution with extracted payload + Linux JVM
-</eg>
-
-**Output**: `references/extraction-guide.md` and `references/action-mapping.md`
-
-### Phase 4: Synthesis
-
-**Method**: Combine all collected specs into an actionable installation procedure.
-
-<eg>
-1. Write step-by-step Linux installation procedure from Windows IA manifest
-2. Document all assumptions and platform-specific translations
-3. Create decision tree for handling each IA action type on Linux
-4. Validate procedure against actual installer
-</eg>
-
-**Output**: `references/linux-installation-procedure.md`
+(SOURCE: <https://docs.revenera.com/installanywhere/Content/helplibrary/ia_generating_response_files.htm>, accessed 2026-02-19)
 
 ---
 
-## 7. CLI Arguments Reference (Collected 2026-02-19)
+## Relevance to Claude Code Development
 
-### Installer Arguments
+### Cross-Platform Distribution
 
-| Argument | Description |
-|----------|-------------|
-| `-i <mode>` | Interface mode: `silent`, `console`, `gui` |
-| `-f <path>` | Response file path (installer only, not uninstaller) |
-| `-r [path]` | Generate response file at path |
-| `-D<var>=<value>` | Set installer variable (installer only) |
-| `-l <locale>` | Set locale (ISO-639 + optional ISO-3166) |
-| `-jvmxms <size>` | Initial JVM heap (`25m`, `1g`, etc.) |
-| `-jvmxmx <size>` | Maximum JVM heap |
-| `-tempdir <path>` | Temporary extraction directory |
-| `-?` / `-help` | Show help (Windows: console mode only) |
+InstallAnywhere addresses the complex problem of distributing Java-based Claude Code plugins and agents across Windows, macOS, and Linux with platform-specific configurations. Agents could automate installer packaging as part of CD/CD pipelines.
 
-### Launcher Arguments
+### Automated Installer Generation
 
-| Argument | Description |
-|----------|-------------|
-| `LAX_VM <path>` | Override JVM path for launcher |
+Claude Code agents could programmatically generate InstallAnywhere projects (`.iap_xml` files) from plugin specifications, automating the build of platform-specific installers without manual IDE interaction.
 
-All other arguments pass through to the launched application.
+### Silent Installation in CI/CD
+
+Response files and command-line automation enable InstallAnywhere to integrate into automated testing and deployment workflows where interactive installation is not feasible.
+
+### JRE Bundling for Agent Distribution
+
+LaunchAnywhere's JRE bundling and selection logic is relevant for distributing Java-based Claude Code extensions with self-contained runtime environments, eliminating end-user JVM installation requirements.
 
 ---
 
-## 8. Key LAX Properties (Known So Far)
+## Limitations and Caveats
 
-| Property | Purpose |
-|----------|---------|
-| `lax.nl.current.vm` | Path to Java executable the launcher uses |
-| `lax.command.line.args` | Arguments passed to launched application |
+### Proprietary and Commercial
 
-> **TODO**: Full property list requires fetching `ia_ref_laxprop.htm`.
+InstallAnywhere is a commercial product requiring license purchase for production use. Educational and evaluation licenses are available but time-limited or restricted to non-commercial use.
 
----
+### Java-Centric Design
 
-## 9. Self-Improvement Log
+InstallAnywhere is optimized for Java application packaging. Support for native applications (C++, Rust, Go) exists but is less streamlined than for Java applications with bundled JREs.
 
-Track what changed with each iteration so the process gets better over time.
+### Platform-Specific Logic Required
 
-| Date | Version | Changes | What Worked | What Didn't |
-|------|---------|---------|-------------|-------------|
-| 2026-02-19 | v0.1 | Initial draft. Identified 40+ doc pages. Verified docs.revenera.com URLs. Documented architecture and CLI args. | Direct fetch of docs.revenera.com pages returned structured content. PDF user guide downloaded successfully. | Google/SO web searches returned CAPTCHA/JS challenges -- need alternative search approach for community content. |
+While single-project approach simplifies multi-platform support, platform-specific logic (registry operations on Windows, shell scripts on Unix) still requires manual rules and actions in the project.
 
-### Process Improvements Backlog
+### Learning Curve
 
-- [ ] Determine if `Sitemap.xml` can be parsed to auto-discover additional pages
-- [ ] Find alternative search approach for community content (GitHub API? `gh search`?)
-- [ ] Evaluate whether the PDF user guide can be parsed section-by-section for faster collection than fetching individual HTML pages
-- [ ] Add validation step: after collecting each spec, verify it against the PDF to catch HTML-only or PDF-only content
-- [ ] Consider creating a structured schema (JSON/YAML) for the file format specs to enable programmatic use
-- [ ] Add a "confidence level" column to the File Format Quick Reference table
-- [ ] Determine if older version docs contain information removed from current version
+The graphical IDE is user-friendly but designing complex installers with conditional logic and platform-specific requirements requires understanding InstallAnywhere-specific concepts (panels, actions, rules, LaunchAnywhere).
 
----
+### Cross-Platform Installer Extraction (Windows → Linux)
 
-## 10. Session Resumption Checklist
-
-When resuming work on this process:
-
-1. Read this file first to understand current state
-2. Check Collection Status columns in Section 2.2 for next pending items
-3. Check the Self-Improvement Log for known issues
-4. Check the Process Improvements Backlog for meta-improvements
-5. After each collection session, update:
-   - Collection Status for pages fetched
-   - File Format Quick Reference for new formats discovered
-   - Self-Improvement Log with what worked/didn't
-   - Process Improvements Backlog with new ideas
-   - Section 5.2 checklist for information gaps closed
+While InstallAnywhere generates .bin installers for Linux, extracting and repurposing Windows .exe installers on Linux requires detailed knowledge of self-extracting archive formats and install.xml schema. (Not documented in official sources; research-in-progress on this topic.)
 
 ---
 
 ## References
 
-- [Revenera InstallAnywhere Documentation](https://docs.revenera.com/installanywhere/Default.htm) (accessed 2026-02-19)
+- [Revenera InstallAnywhere Documentation Portal](https://docs.revenera.com/installanywhere/Default.htm) (accessed 2026-02-19)
+- [InstallAnywhere 2025 R2 Help Library](https://docs.revenera.com/installanywhere/Content/helplibrary/) (accessed 2026-02-19)
 - [InstallAnywhere 2025 R2 User Guide PDF](https://docs.revenera.com/installanywhere/pdf/InstallAnywhere2025R2UserGuide.pdf) (accessed 2026-02-19)
-- [Revenera Community Forums](https://community.revenera.com) (not yet accessed)
+- [InstallAnywhere Release Notes 2025 R2](https://docs.revenera.com/installanywhere/rn/Default.htm) (accessed 2026-02-19)
+- [Revenera Community Forums](https://community.revenera.com) (accessed 2026-02-19)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [NSIS.md](./nsis.md) | installer-tools | Open-source Windows-only installer alternative; simpler scripting, no Java runtime requirement |
+| [WiX Toolset.md](./wix-toolset.md) | installer-tools | Microsoft's XML-based installer framework; Windows-only, programmatic approach vs InstallAnywhere's GUI |

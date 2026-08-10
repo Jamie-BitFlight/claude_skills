@@ -1,25 +1,26 @@
 ---
-title: "Unblocked — Context Engine for AI-Driven Development"
-documentation_url: "https://docs.getunblocked.com/"
-license: "Proprietary"
-next_review: "2026-06-13 (90 days)"
+name: unblocked
+research_date: 2026-03-13
+source_url: https://getunblocked.com/
+documentation_url: https://docs.getunblocked.com/
+version_at_research: current
+license: Proprietary
+freshness_tracking:
+  last_verified: 2026-03-13
+  version_at_verification: current
+  next_review: 2026-06-13
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Relevance: high, References: high"
 ---
 
-## Identity
+# Unblocked
 
-**Name**: Unblocked
-**Full Description**: A context engine and decision-grade information platform designed to augment coding agents with organizational knowledge. Unblocked surfaces code history, architectural decisions, team conventions, and cross-functional context (GitHub, Slack, Confluence, Jira, etc.) so that AI agents generate production-ready, mergeable code on the first attempt without requiring human intervention between iteration cycles.
+## Overview
 
-**Core Value Proposition**: "Coding agents can read code. Unblocked gives them the history, decisions, and conventions behind it so they generate mergeable code without the back-and-forth." (SOURCE: <https://getunblocked.com/>, accessed 2026-03-13)
-
-**Company**: Unblocked Inc. (founded 2020, incorporated December 31, 2020)
-**Funding**: $15M across 2 rounds; latest round $10M seed on January 28, 2022. Investors include Tiger Global Management, Penske Media Corporation, and 19+ others.
-**Employee Count**: 102 (as of February 2025 snapshot)
-**Status**: Active commercial product with 21-day free trial available
+Unblocked is a cloud-based context engine and decision-grade information platform that augments AI coding agents with organizational knowledge by synthesizing code history, architectural decisions, team conventions, and cross-functional context from multiple sources (GitHub, Slack, Confluence, Jira, etc.). It enables coding agents to generate production-ready, mergeable code on the first attempt without requiring human intervention between iteration cycles. The platform uses AI-powered retrieval, deconfliction algorithms, and targeted context compression to surface only decision-relevant information, reducing token waste while improving code generation fidelity. (SOURCE: <https://getunblocked.com/>, accessed 2026-03-13)
 
 ---
 
-## Problem Statement
+## Problem Addressed
 
 AI coding assistants fail to produce mergeable code on the first attempt because they lack organizational context. Without understanding:
 - Architectural patterns and design decisions
@@ -31,7 +32,7 @@ Agents generate code that "break[s] patterns, miss[es] dependencies, and fail[s]
 
 ---
 
-## Architecture
+## Technical Architecture
 
 ### Context Engine
 
@@ -60,7 +61,7 @@ The engine operates through four mechanisms:
 
 ---
 
-## Features
+## Key Features
 
 ### 1. AI Code Review
 
@@ -121,6 +122,32 @@ The Unblocked API is a REST interface for:
 Responses include the answer text and references (source URLs/lines).
 
 (SOURCE: <https://docs.getunblocked.com/api-reference/quickstart>, accessed 2026-03-13)
+
+---
+
+## Installation & Usage
+
+### Getting Started
+
+Unblocked is a cloud-based SaaS platform with no local installation required. Users access it through:
+
+1. **Web Dashboard**: <https://app.getunblocked.com> (login with company account or SSO)
+2. **IDE Extensions**: Install Unblocked extension for VS Code, JetBrains IDEs, or other editors from respective marketplaces
+3. **API Access**: Authenticate with Personal or Team Access Tokens for programmatic queries
+
+### Setup Process
+
+1. Create an Unblocked account on <https://getunblocked.com/>
+2. Start 21-day free trial (no credit card required)
+3. Connect data sources:
+   - GitHub/GitLab/Bitbucket repository access
+   - Confluence/Notion/Google Drive documentation
+   - Jira/Linear/Asana project management
+   - Slack/Microsoft Teams workspace
+4. Configure team permissions and data scopes via Unblocked dashboard
+5. Launch IDE extension or use web dashboard to query organizational context
+
+(SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, <https://docs.getunblocked.com/billing/unblocked-plans>, accessed 2026-03-13)
 
 ---
 

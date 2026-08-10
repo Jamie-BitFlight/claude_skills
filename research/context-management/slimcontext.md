@@ -1,7 +1,23 @@
 ---
-title: "SlimContext"
-license: "MIT"
-next_review: "2026-06-17 (3 months)"
+name: slimcontext
+research_date: 2026-03-17
+source_url: https://github.com/agentailor/slimcontext
+github_repository: https://github.com/agentailor/slimcontext
+version_at_research: v2.1.3
+license: MIT
+freshness_tracking:
+  last_verified: 2026-03-17
+  version_at_verification: v2.1.3
+  next_review: 2026-06-17
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Relevance: high, References: high"
+---
+
+# SlimContext
+
+## Overview
+
+SlimContext is a lightweight, model-agnostic JavaScript library that compresses chat histories in AI assistant applications using configurable trimming or AI-powered summarization strategies. It preserves system instructions and recent conversation context while reducing token usage, enabling LLM applications to operate efficiently within finite context windows. The library uses a "Bring Your Own Model" (BYOM) pattern, integrating seamlessly with any LLM provider without enforcing specific dependencies. (SOURCE: <https://github.com/agentailor/slimcontext> README, accessed 2026-03-17)
+
 ---
 
 ## Problem Addressed
