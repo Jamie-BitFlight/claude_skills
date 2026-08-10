@@ -29,7 +29,12 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def terminate_process_tree(process: subprocess.Popen[object]) -> None:
+def terminate_windows_process_tree(pid: int) -> None:
+    """Terminate a Windows process and all of its descendants."""
+    subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False)
+
+
+def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
     """Terminate the isolated process group, escalating after a short grace period."""
     if os.name == "posix":
         try:
@@ -37,7 +42,8 @@ def terminate_process_tree(process: subprocess.Popen[object]) -> None:
         except ProcessLookupError:
             return
     else:
-        process.terminate()
+        terminate_windows_process_tree(process.pid)
+        return
 
     try:
         process.wait(timeout=TERMINATION_GRACE_SECONDS)
@@ -62,10 +68,7 @@ def run_command(command: list[str], timeout_seconds: float) -> int:
     if not command:
         raise ValueError("A command is required after --")
 
-    process = subprocess.Popen(
-        command,
-        start_new_session=os.name == "posix",
-    )
+    process = subprocess.Popen(command, start_new_session=os.name == "posix")
     try:
         return process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:

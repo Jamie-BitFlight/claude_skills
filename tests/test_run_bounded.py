@@ -7,30 +7,20 @@ import sys
 import time
 from pathlib import Path
 
+import pytest
+from scripts import run_bounded
 
 RUNNER = Path(__file__).parents[1] / "scripts" / "run_bounded.py"
 
 
 def run_runner(*arguments: str) -> subprocess.CompletedProcess[str]:
     """Invoke the standalone runner under the current test interpreter."""
-    return subprocess.run(
-        [sys.executable, str(RUNNER), *arguments],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
+    return subprocess.run([sys.executable, str(RUNNER), *arguments], capture_output=True, check=False, text=True)
 
 
 def test_runner_relays_a_successful_childs_output_and_status() -> None:
     """A completed command retains its stdout and exit status."""
-    result = run_runner(
-        "--timeout-seconds",
-        "1",
-        "--",
-        sys.executable,
-        "-c",
-        "print('bounded-success')",
-    )
+    result = run_runner("--timeout-seconds", "1", "--", sys.executable, "-c", "print('bounded-success')")
 
     assert result.returncode == 0
     assert result.stdout == "bounded-success\n"
@@ -40,14 +30,7 @@ def test_runner_relays_a_successful_childs_output_and_status() -> None:
 def test_runner_times_out_and_returns_the_timeout_status() -> None:
     """A hung command is terminated instead of inheriting an unbounded wait."""
     start = time.monotonic()
-    result = run_runner(
-        "--timeout-seconds",
-        "0.1",
-        "--",
-        sys.executable,
-        "-c",
-        "import time; time.sleep(30)",
-    )
+    result = run_runner("--timeout-seconds", "0.1", "--", sys.executable, "-c", "import time; time.sleep(30)")
     elapsed = time.monotonic() - start
 
     assert result.returncode == 124
@@ -63,15 +46,24 @@ def test_runner_timeout_terminates_a_sleeping_grandchild() -> None:
         "time.sleep(30)"
     )
     start = time.monotonic()
-    result = run_runner(
-        "--timeout-seconds",
-        "0.1",
-        "--",
-        sys.executable,
-        "-c",
-        child_program,
-    )
+    result = run_runner("--timeout-seconds", "0.1", "--", sys.executable, "-c", child_program)
     elapsed = time.monotonic() - start
 
     assert result.returncode == 124
     assert elapsed < 3
+
+
+def test_runner_uses_taskkill_to_terminate_the_windows_process_tree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Windows timeout cleanup terminates descendants as well as the direct child."""
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], *, check: bool) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        assert check is False
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(run_bounded.subprocess, "run", fake_run)
+
+    run_bounded.terminate_windows_process_tree(4242)
+
+    assert commands == [["taskkill", "/PID", "4242", "/T", "/F"]]
