@@ -1,7 +1,22 @@
 ---
-title: "Screenpipe"
+name: screenpipe
+research_date: "2026-05-02"
+source_url: "https://github.com/screenpipe/screenpipe"
+github_repository: "https://github.com/screenpipe/screenpipe"
+version_at_research: "0.3.307"
 license: "MIT OR Apache-2.0"
+freshness_tracking:
+  last_verified: "2026-05-02"
+  version_at_verification: "0.3.307"
+  next_review: "2026-08-02"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: high (code-read) | Installation & Usage: high | Relevance: high | References: high"
 ---
+
+# Screenpipe
+
+## Overview
+
+Screenpipe is an open-source, local-first AI memory application built in Rust that continuously captures your screen and audio with event-driven efficiency, creating a searchable, AI-powered record of everything you do on your computer. It provides full local control, optional end-to-end encrypted sync, and integrates with AI assistants (Claude, Cursor, Cline, Continue) via MCP protocol to give them context of your work without explicit prompts. Latest stable version: 0.3.307 (released 2026-05-02); dual-licensed MIT OR Apache-2.0.
 
 ## Identity & Quick Facts
 
@@ -357,6 +372,84 @@ The HTTP server exposes `search_content` only. Full toolset (export-video, list-
 Scheduled pipes introduce latency between triggering event and agent execution. For real-time use cases (e.g., keystroke logging), direct API access is more responsive.
 
 **Source**: README.md § "Plugin system (Pipes)" (accessed 2026-05-02)
+
+---
+
+## Installation & Usage
+
+### Desktop Installation
+
+**macOS & Windows**:
+
+1. Download the latest build from <https://screenpipe.com/download> or <https://github.com/screenpipe/screenpipe/releases>
+2. Run the installer
+3. Grant accessibility permissions when prompted (required for screen capture)
+
+**Linux**:
+
+Build from source: `cargo build --release` (see README.md § "Building from source")
+
+**Source**: README.md § "Installation" (accessed 2026-05-02)
+
+### MCP Server Integration (For Claude, Cursor, etc.)
+
+**Option 1: Claude Desktop**
+
+```bash
+# Install screenpipe-mcp via npm
+claude mcp add screenpipe -- npx -y screenpipe-mcp
+```
+
+Restart Claude Desktop. The mcp-add command registers screenpipe as an MCP server.
+
+**Option 2: VS Code (Cline/Continue)**
+
+```bash
+# Launch screenpipe-mcp on stdio
+npx -y screenpipe-mcp
+```
+
+Configure Cline or Continue to use stdio transport pointing to this command.
+
+**Option 3: HTTP Server (Remote Access)**
+
+```bash
+# MCP server exposes HTTP endpoint
+# Configure client with bearer token auth
+http://localhost:3030/mcp
+```
+
+**Source**: screenpipe-mcp/README.md § "Installation & Setup" (accessed 2026-05-02), packages/screenpipe-mcp/package.json (accessed 2026-05-02)
+
+### Basic Usage: Screen Search
+
+Once installed:
+
+1. Open Screenpipe desktop app
+2. In the search box, enter a query: "project deadline", "typescript error", "conversation about X"
+3. Results show matching screenshots with extracted text and timestamps
+4. Click any result to view full screenshot and audio timeline
+
+**API Usage Example**:
+
+```bash
+# Query via REST API
+curl -X GET "http://localhost:3030/search?q=code%20review&content_type=ocr&limit=10"
+
+# Response includes screenshots as base64 and transcriptions
+```
+
+**Source**: README.md § "Usage examples" (accessed 2026-05-02)
+
+### Configuration
+
+The app stores settings in:
+- **macOS**: `~/Library/Application Support/Screenpipe/settings.json`
+- **Windows**: `%APPDATA%\Screenpipe\settings.json`
+
+Core settings: capture backends (Whisper, Deepgram, Ollama), storage location, privacy filters, sync preferences.
+
+**Source**: README.md § "Configuration" (accessed 2026-05-02)
 
 ---
 
