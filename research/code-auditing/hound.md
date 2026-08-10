@@ -246,27 +246,43 @@ On a five-project subset of ScaBench:
 
 ---
 
-## Installation
+## Installation & Usage
+
+### Installation
+
+**1. Clone Repository**
 
 ```bash
-# Clone repository
 git clone https://github.com/scabench-org/hound.git
 cd hound
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure API keys
-export OPENAI_API_KEY=your_key_here
-# Optional: Anthropic, Google Vertex AI
-
-# Copy and edit config
-cp hound/config.yaml.example hound/config.yaml
 ```
 
----
+**2. Install Dependencies**
 
-## Configuration Options
+```bash
+pip install -r requirements.txt
+```
+
+**3. Configure API Keys**
+
+Set up environment variables for your LLM provider:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+# Optional: Anthropic, Google Vertex AI
+export ANTHROPIC_API_KEY=your_key_here
+```
+
+**4. Configure Hound**
+
+```bash
+cp hound/config.yaml.example hound/config.yaml
+# Edit hound/config.yaml with your preferred settings
+```
+
+Source: GitHub repository installation guide (accessed 2026-08-10).
+
+### Configuration Options
 
 **Model Configuration**:
 

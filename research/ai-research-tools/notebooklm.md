@@ -216,6 +216,77 @@ NotebookLM responses are grounded in user-uploaded content, reducing hallucinati
 
 ---
 
+## Installation & Usage
+
+### Getting Started
+
+**1. Access NotebookLM**
+
+Visit https://notebooklm.google and sign in with any Google account. No installation is required beyond a standard browser.
+
+**2. Create a Notebook**
+
+Click "New notebook" to create a workspace. Each notebook is an isolated workspace for organizing and analyzing related documents.
+
+**3. Add Sources**
+
+Click "Add" in the Sources panel to upload your first document. Supported formats include:
+- PDFs
+- Google Docs  
+- Google Slides
+- YouTube videos and links
+- Website URLs
+
+With NotebookLM Plus: Up to 300 sources per notebook (vs. 50 on the free tier).
+
+**4. Ask Questions**
+
+Type a question in the chat panel on the right. The chat responds strictly from your uploaded sources, reducing hallucination by grounding responses in your data.
+
+**5. Generate Overviews**
+
+Click the Studio tab to generate structured outputs from your sources in one click:
+- **Audio Overviews**: Podcast-style conversations in four formats (Deep Dive, The Brief, The Critique, The Debate) available in 80+ languages
+- **Video Overviews**: Narrated, animated deep-dive videos (launched May 2025)
+- **Study Guides**: Structured summaries and key concepts
+- **Flashcards**: Auto-generated review cards
+- **Mind Maps**: Visual concept relationships
+- **Infographics**: Visual summaries with diagrams (launched November 2025, powered by Nano Banana Pro image generation)
+
+Source: NotebookLM feature documentation and setup guides (accessed 2026-08-10).
+
+### Platform Availability
+
+| Platform | Access | Requirements |
+|----------|--------|--------------|
+| **Web** | notebooklm.google | Any modern browser |
+| **Android** | Google Play Store | Android 10+ |
+| **iOS** | App Store | iOS 17+ |
+| **iPad** | App Store | iPadOS 17+ |
+
+For desktop users without a dedicated app, create a PWA shortcut: In Chrome/Edge, go to the browser menu, select "Create shortcut" or "Install site as app", and save to your desktop.
+
+Source: NotebookLM platform support documentation (accessed 2026-08-10).
+
+### Pricing & Limits
+
+**Free Standard Plan**
+- 100 notebooks
+- 50 sources per notebook
+- 50 chat queries per day
+- Basic Studio features
+
+**NotebookLM Plus** (via Google One AI Premium)
+- 500 notebooks  
+- 300 sources per notebook
+- 500 daily chat queries
+- All Studio features including Video Overviews and Infographics
+- Available since February 2026 to individual users
+
+Source: NotebookLM pricing documentation (accessed 2026-08-10).
+
+---
+
 ## References
 
 | Source                        | URL                                                                                     | Accessed   |

@@ -204,6 +204,86 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 
 ---
 
+## Installation & Usage
+
+### Getting Started
+
+**1. Access Type.ai**
+
+Visit https://type.ai in your web browser. No installation is required — Type.ai is a web-based SaaS application accessible from any modern browser (Chrome, Firefox, Safari, Edge).
+
+**2. Sign Up or Log In**
+
+Create a free account using email or sign in via Google. The free tier includes limited AI features to explore Type.ai's capabilities.
+
+**3. Create Your First Document**
+
+Click "New Document" to start writing. You can:
+- Start with a blank page
+- Import existing Word documents or PDFs
+- Use writing templates for common formats (essays, blog posts, etc.)
+
+**4. Use Cmd+K for AI Commands**
+
+While writing, press **Cmd+K** (Mac) or **Ctrl+K** (Windows/Linux) to open the AI command palette. Available commands include:
+- **Generate**: Create new text from a prompt or outline
+- **Rewrite**: Rephrase selected text in different styles
+- **Expand/Condense**: Add detail or summarize
+- **Review**: Get AI feedback on selected passages
+- **Tone Shift**: Change from formal to casual or vice versa
+
+**5. Choose AI Model & Speed**
+
+When issuing commands, Type.ai offers:
+- **Speed Mode**: Uses GPT-3.5 for faster responses
+- **Power Mode**: Uses GPT-4o+ for higher quality and more creative outputs
+- Model switching: Toggle between OpenAI GPT models and Anthropic Claude 4.5 Sonnet
+
+**6. Export Your Work**
+
+Finished documents can be exported as:
+- **Word** (.docx)
+- **PDF** (.pdf)
+- **Markdown** (.md)
+
+Source: Type.ai product documentation and setup guides (accessed 2026-08-10).
+
+### Pricing Tiers
+
+**Free Plan**
+- Limited AI requests per month
+- Full editor features
+- Export to Word/PDF
+- No model training on your content
+
+**Premium Plans**
+- **Annual Subscription**: $12/month ($144/year with 48% first-year discount)
+- **Monthly Subscription**: $29/month
+- Unlimited AI requests
+- All Studio features
+- Priority model access
+- Private documents guarantee
+
+Source: Type.ai pricing page (accessed 2026-08-10).
+
+### Key Features When Using Type.ai
+
+1. **Document Context**: AI learns document context throughout your writing session, improving suggestions over time.
+
+2. **Long-Form Support**: Documents support up to 130,000 words — ideal for writing full-length books, dissertations, and screenplays.
+
+3. **Email & Writing Tools**: Free tools accessible without login:
+   - AI Email Writer for professional correspondence
+   - Paragraph Rewriter for polishing prose
+   - Sentence Rewriter for individual edits
+   - Writing Templates for various content types
+
+4. **Dark Mode**: Full dark interface available for extended writing sessions to reduce eye strain.
+
+Source: Type.ai feature documentation (accessed 2026-08-10).
+
+---
+
 ## Competitive Landscape
 
 | Competitor     | Positioning                        | Type.ai Advantage                   |

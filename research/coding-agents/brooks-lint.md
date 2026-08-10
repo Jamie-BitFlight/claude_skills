@@ -11,6 +11,14 @@ status: published
 
 # brooks-lint — AI Code Reviews Grounded in Twelve Classic Engineering Books
 
+## Overview
+
+Brooks-lint is an AI-powered code review tool that analyzes software against principles from twelve foundational engineering books (including works by Frederick Brooks, Steve McConnell, Martin Fowler, and Robert C. Martin). It diagnoses code quality across six "decay risk" dimensions in production code and six in test suites, providing structured findings in the format **Symptom → Source → Consequence → Remedy** with explicit book citations, severity labels, and actionable remedies. Unlike traditional linters that count metrics, brooks-lint identifies deeper architectural and design issues that affect long-term maintainability.
+
+Source: GitHub repository documentation and README.md (accessed 2026-08-10).
+
+---
+
 ## Identity & Key Metadata
 
 **Name**: brooks-lint
