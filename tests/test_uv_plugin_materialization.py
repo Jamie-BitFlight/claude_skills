@@ -16,9 +16,15 @@ def test_uv_plugin_contains_regular_copy_of_shared_skill() -> None:
     assert STANDALONE_SKILL.is_dir()
     assert not STANDALONE_SKILL.is_symlink()
 
-    source_files = sorted(path.relative_to(SOURCE_SKILL) for path in SOURCE_SKILL.rglob("*") if path.is_file())
+    source_files = sorted(
+        path.relative_to(SOURCE_SKILL)
+        for path in SOURCE_SKILL.rglob("*")
+        if path.is_file()
+    )
     standalone_files = sorted(
-        path.relative_to(STANDALONE_SKILL) for path in STANDALONE_SKILL.rglob("*") if path.is_file()
+        path.relative_to(STANDALONE_SKILL)
+        for path in STANDALONE_SKILL.rglob("*")
+        if path.is_file()
     )
 
     assert standalone_files == source_files
