@@ -2,7 +2,7 @@
 title: "Obsidian Skills Repository"
 source_url: "https://github.com/kepano/obsidian-skills"
 license: "MIT License"
-version_at_research: "Latest"
+version_at_research: "From main branch (no formal release versioning)"
 research_date: "2026-03-12"
 next_review: "2026-06-12"
 ---
@@ -37,7 +37,7 @@ Obsidian Skills is a collection of agent tools designed to integrate AI agents w
 - LaTeX math expressions (`$O(n \log n)$` for inline and block formulas)
 - Tables, lists, and other standard markdown features
 
-**Obsidian Bases** — Work with Obsidian's database format (available in Obsidian Sync/Plus):
+**Obsidian Bases** — Work with Obsidian's database format:
 - Create databases with custom fields and types
 - Define views, filters, and formulas for data manipulation
 - Structure relationship fields linking between database records
@@ -93,27 +93,28 @@ Skills are designed to be modular but work together on shared vault state:
 
 ### Installation Methods
 
-**Option 1: Plugin Marketplace**
+**Option 1: NPX Skills Command (Recommended)**
+
+```bash
+npx skills add https://github.com/kepano/obsidian-skills
+```
+
+**Option 2: Plugin Marketplace**
 
 ```bash
 /plugin marketplace add kepano/obsidian-skills
-/plugin install obsidian-markdown@kepano-skills
-```
-
-Then browse and install individual skills via `/plugin` UI.
-
-**Option 2: npm Package Manager**
-
-```bash
-npm install @kepano/obsidian-skills --global
+/plugin install obsidian@obsidian-skills
 ```
 
 **Option 3: Manual GitHub Installation**
 
+Clone the entire repository and follow the instructions in the README for your agent type (Claude Code, Codex, or OpenCode).
+
 ```bash
 git clone https://github.com/kepano/obsidian-skills.git
-cp -r obsidian-skills/skills/* ~/.claude/skills/
 ```
+
+**Important**: Do not copy only the inner `skills/` folder — the full directory structure is required for auto-discovery.
 
 ### Usage Examples
 
@@ -124,7 +125,7 @@ Creating a note with wikilinks, callouts, and embeds:
 ```markdown
 ---
 title: Project Alpha
-date: 2026-01-15
+date: 2024-01-15
 tags:
   - project
   - active
@@ -240,10 +241,6 @@ This 4-step workflow (reload → check errors → verify visually → check cons
 ### Limited to Obsidian Ecosystem
 
 Skills are tightly coupled to Obsidian's specific formats and CLI. Agents cannot use these skills to work with other note-taking platforms, databases, or knowledge management systems outside Obsidian.
-
-### Obsidian Sync/Plus Required for Bases
-
-The Obsidian Bases skill requires Obsidian Sync or Obsidian Plus subscription. Personal vaults without these subscriptions cannot use database functionality.
 
 ### Plugin Development Requires Local Installation
 

@@ -1,10 +1,10 @@
 ---
 title: "Impeccable"
 source_url: "https://github.com/pbakaus/impeccable"
-license: "Apache 2.0"
-version_at_research: "v1.5.1"
-research_date: "2026-03-21"
-next_review: "2026-06-21"
+license: "Apache 2.0 (based on Anthropic's frontend-design skill)"
+version_at_research: "Latest (no formal version tag)"
+research_date: "2026-08-10"
+next_review: "2026-11-10"
 ---
 
 # Impeccable
@@ -55,9 +55,7 @@ The skill provides reference documentation covering foundational design concepts
 
 Mandatory pre-design workflow that ensures adequate project context:
 
-1. Check current instructions for a **Design Context** section
-2. Check `.impeccable.md` in project root for required context
-3. If neither exists, run `/teach-impeccable` skill to gather context interactively
+Run `/impeccable init` once per project to establish design context. This writes configuration files to `.impeccable/` directory.
 
 **Required context** (minimum):
 - Target audience: Who uses this product and in what context?
@@ -142,16 +140,9 @@ cp -r dist/codex/.codex/* ~/.codex/
 2. Use specific commands like `/impeccable audit` with optional targets
 3. Pin frequently-used commands to create shortcuts for faster access
 
-**Available Commands:**
+**Available Commands (23 total):**
 
-```bash
-/audit           # Find design issues
-/normalize       # Fix inconsistencies
-/polish          # Final cleanup
-/distill         # Remove complexity
-/shape           # UX/UI planning
-/critique        # UX design review
-```
+Commands include: `audit`, `polish`, `shape`, `critique`, `craft`, `init`, `document`, `extract`, `bolder`, `quieter`, `distill`, `harden`, `onboard`, `animate`, `colorize`, `typeset`, `layout`, `delight`, `overdrive`, `clarify`, `adapt`, `optimize`, and `live`.
 
 **Codex CLI exception**: Uses `/prompts:audit`, `/prompts:polish` syntax instead of `/audit`, `/polish`.
 
@@ -199,13 +190,14 @@ The website includes "case studies" of before/after design improvements, but no 
 
 ## References
 
-- GitHub Repository: <https://github.com/pbakaus/impeccable> (accessed 2026-03-21)
-- Official Website: <https://impeccable.style> (accessed 2026-03-21)
-- README.md: <https://github.com/pbakaus/impeccable/blob/main/README.md> (accessed 2026-03-21)
-- DEVELOP.md: <https://github.com/pbakaus/impeccable/blob/main/DEVELOP.md> (accessed 2026-03-21)
-- Typography Reference: <https://github.com/pbakaus/impeccable/blob/main/source/skills/frontend-design/reference/typography.md> (accessed 2026-03-21)
-- Color & Contrast Reference: <https://github.com/pbakaus/impeccable/blob/main/source/skills/frontend-design/reference/color-and-contrast.md> (accessed 2026-03-21)
-- License (Apache 2.0): <https://github.com/pbakaus/impeccable/blob/main/LICENSE> (accessed 2026-03-21)
+- GitHub Repository: <https://github.com/pbakaus/impeccable> (accessed 2026-08-10)
+- Official Website: <https://impeccable.style> (accessed 2026-08-10)
+- README.md: <https://github.com/pbakaus/impeccable/blob/main/README.md> (accessed 2026-08-10)
+- DEVELOP.md: <https://github.com/pbakaus/impeccable/blob/main/DEVELOP.md> (accessed 2026-08-10)
+- Typography Reference: <https://github.com/pbakaus/impeccable/blob/main/source/skills/frontend-design/reference/typography.md> (accessed 2026-08-10)
+- Color & Contrast Reference: <https://github.com/pbakaus/impeccable/blob/main/source/skills/frontend-design/reference/color-and-contrast.md> (accessed 2026-08-10)
+- License (Apache 2.0): <https://github.com/pbakaus/impeccable/blob/main/LICENSE> (accessed 2026-08-10)
+- Anthropic Frontend-Design Skill (attribution): Referenced in Impeccable README as foundational inspiration
 
 ---
 
