@@ -27,7 +27,9 @@ The toolkit provides **three surface-level instruments** that measure distinct b
 2. **Behavioral Footprint** — tool-use pattern shifts
 3. **Semantic Drift** — topic embedding distance movement
 
-**Problem Addressed**: Compression fidelity in long-running agents. After a 3-hour Claude Code session with a context compression event, an agent might abandon verification steps, suggest approaches it previously avoided, and use different vocabulary — all silently, without triggering any error or warning. This toolkit surfaces those changes through measurable behavioral signals.
+## Problem Addressed
+
+Compression fidelity in long-running agents. After a 3-hour Claude Code session with a context compression event, an agent might abandon verification steps, suggest approaches it previously avoided, and use different vocabulary — all silently, without triggering any error or warning. This toolkit surfaces those changes through measurable behavioral signals.
 
 **Key Finding** (from author's benchmark): Memory retrieval systems show ~40% fidelity loss after compression, yet the agent reports confidence unchanged. This toolkit detects when that loss occurs.
 

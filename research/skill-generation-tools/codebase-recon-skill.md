@@ -15,7 +15,9 @@ status: published
 
 Codebase Recon is a multi-agent compatible skill that analyzes git history to understand a codebase before reading any code. It reveals project health, risk areas, team structure, and development momentum through structured analysis of seven codebase dimensions. The skill is designed for developers onboarding to new projects, technical leads auditing codebases, and consultants evaluating code repositories.
 
-**Problem Addressed**: When entering an unfamiliar codebase, developers typically dive directly into reading code without understanding project patterns, risk areas, or team dynamics. This skill provides structured reconnaissance before code review, enabling more targeted and informed analysis.
+## Problem Addressed
+
+When entering an unfamiliar codebase, developers typically dive directly into reading code without understanding project patterns, risk areas, or team dynamics. This skill provides structured reconnaissance before code review, enabling more targeted and informed analysis.
 
 **Key Innovation**: Unlike ad-hoc manual git commands, this skill auto-scales analysis parameters based on repository size (small: <500 commits, medium: 500–10k commits, large: >10k commits) and cross-references hotspots with bug magnets to identify high-risk files that warrant immediate attention.
 
