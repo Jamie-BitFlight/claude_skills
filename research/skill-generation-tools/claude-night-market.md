@@ -18,6 +18,84 @@ Claude Night Market is a comprehensive Claude Code plugin marketplace providing 
 
 ---
 
+## Installation & Usage
+
+### Claude Code (Recommended Setup)
+
+**Prerequisites**: Claude Code 2.1.16+ and Python 3.9+ for hooks to function properly.
+
+**Quick Setup** (install all plugins at once):
+
+```bash
+/plugin marketplace add athola/claude-night-market
+npx skills add athola/claude-night-market
+```
+
+**Or install by plugin category**:
+
+```bash
+/plugin install sanctum@claude-night-market    # Git operations & session management
+/plugin install pensive@claude-night-market    # Multi-domain code review
+/plugin install spec-kit@claude-night-market   # Spec-driven development
+/plugin install imbue@claude-night-market      # TDD enforcement
+/plugin install attune@claude-night-market     # Project detection & war-room
+```
+
+After installation, run once:
+
+```bash
+claude --init
+```
+
+**Source**: GitHub README Installation section (accessed 2026-01-31)
+
+### Common Workflow Commands
+
+| Task | Command | Skill |
+|------|---------|-------|
+| Start a feature | `/attune:mission` | attune |
+| Write specifications | `/speckit-specify` | spec-kit |
+| Run code review | `/full-review` | pensive |
+| Prepare PR | `/prepare-pr` | sanctum |
+| Resume session | `/catchup` | sanctum |
+| Clean codebase | `/unbloat` | conserve |
+| Strategic decision | `/attune:war-room` | attune |
+
+**Source**: GitHub README Common Commands (accessed 2026-01-31)
+
+### Targeted Installation (Smaller Footprint)
+
+```bash
+opkg i gh@athola/claude-night-market --plugins sanctum,pensive
+```
+
+**Source**: GitHub README alternate installation methods (accessed 2026-01-31)
+
+### Typical Feature Workflow
+
+1. **Brainstorm** — Explore idea scope and constraints
+2. **Specify** — Write structured specification before code
+3. **Plan** — Create implementation plan from spec
+4. **Implement** — Code with spec-driven guidance  
+5. **Review** — Run unified multi-domain code review
+6. **Merge** — Prepare PR and merge with confidence
+
+**Source**: GitHub README Typical Workflow section (accessed 2026-01-31)
+
+### Multi-Platform Support
+
+**Cursor** (`.mdc` rules format):
+
+```bash
+./scripts/convert.sh --tool cursor
+```
+
+**Codex, GitHub Copilot, Factory Droid, Qwen, OpenCode** — each has platform-specific installation pattern documented in README.
+
+**Source**: GitHub README Platform Compatibility (accessed 2026-01-31)
+
+---
+
 ## Problem Addressed
 
 | Problem                                              | Solution                                                                  |

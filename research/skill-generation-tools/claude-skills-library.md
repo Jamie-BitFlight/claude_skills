@@ -2,6 +2,16 @@
 title: "Claude Skills Library — 205 Production-Ready AI Agent Skills & Plugins"
 ---
 
+## Overview
+
+Claude Skills Library is the most comprehensive open-source library of production-ready AI agent skills, providing 205 modular skill packages across 9 specialization domains (Engineering, Product, Marketing, Project Management, Regulatory & Quality, C-Level Advisory, Business & Growth, Finance, and Research). The library ships 268 Python CLI tools (stdlib-only), 384 reference documents, and 16 agents orchestrated through a multi-platform plugin marketplace compatible with Claude Code, Codex, Cursor, Aider, Windsurf, and 8+ other AI coding tools. Each skill is self-contained with SKILL.md (instructions), scripts/ (Python tools), references/ (knowledge bases), and assets/ (templates).
+
+**Source**: GitHub repository README and metadata (accessed 2026-03-28); version 2.1.2 (released 2026-03-10)
+
+**Current Status**: Actively maintained (last commit 2026-03-28); 7,452 GitHub stars and 900 forks; quality-optimized via Tessl review (18 skills upgraded from 66-83% to 85-100% quality in v2.1.1).
+
+---
+
 ## Problem Addressed
 
 AI coding agents (Claude Code, Codex, Cursor, Aider, Windsurf) ship with general-purpose capabilities but lack domain-specific expertise that engineering teams, product managers, marketers, and executives need to execute specialized work. Each skill in this repository addresses a specific problem: "How does an AI agent guide me through [architectural decision / compliance audit / content strategy / security review]?"

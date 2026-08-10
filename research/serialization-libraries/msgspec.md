@@ -2,10 +2,138 @@
 title: "msgspec — Fast Serialization and Validation Library"
 documentation_url: "https://jcristharif.com/msgspec/"
 license: "BSD-3-Clause (New or Revised)"
-next_review: "2026-06-13 (3 months)"
+version_at_research: "v0.20.0"
+last_verified: "2026-03-13"
+next_review: "2026-06-13"
 ---
 
-## Statistics and Community
+## Overview
+
+`msgspec` is a high-performance serialization and validation library for Python that combines fast JSON, MessagePack, YAML, and TOML encoding/decoding with zero-cost schema validation using standard Python type annotations. The library achieves 6-85x performance improvements over competing libraries like Pydantic, cattrs, and mashumaro while reducing memory footprint to just 0.46 MiB (14.66x smaller than Pydantic 2.5.2).
+
+**Source**: GitHub repository README and official documentation (accessed 2026-03-13)
+
+**Current Status**: Stable production library, v0.20.0 released 2025-11-23 with Python 3.14 and Windows ARM64 support.
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Serialization performance overhead in Python applications | Benchmark-optimized JSON/MessagePack implementations that are 6-85x faster than alternatives |
+| Schema validation requires separate post-processing after deserialization | Single-pass validation during decoding eliminates secondary traversal and object conversion |
+| Serialization libraries have large dependency footprints | Zero required dependencies; optional deps (pyyaml, tomli) for format support only |
+| Struct/dataclass patterns don't provide GC efficiency | `msgspec.Struct` with `gc=False` offers 75x faster garbage collection than standard classes |
+| Type annotation schemas require learning domain-specific languages | Define schemas using familiar Python type annotations—no external schema language needed |
+
+**Source**: README.md and benchmarks documentation (accessed 2026-03-13)
+
+---
+
+## Technical Architecture
+
+### Core Design Patterns
+
+**Single-pass validation during decoding**: Unlike Pydantic and cattrs which validate after deserializing, msgspec validates types while decoding the wire format. This eliminates secondary object traversal and conversion overhead.
+
+**Zero-copy optimizations**: For large messages, msgspec reuses short dictionary keys (caching mechanism) to reduce memory allocations—more effective than similar optimizations in competitors.
+
+**Native C implementation**: Performance-critical paths use C extensions (41.8% of codebase) for maximum speed.
+
+**Source**: Benchmarks documentation — JSON Serialization & Validation section, Large JSON data section (accessed 2026-03-13)
+
+### Key Components
+
+1. **`msgspec.Struct`** — Optimized base class for structured data with automatic `__init__`, `__eq__`, `__repr__`, `__copy__` generation; configuration options for `frozen`, `order`, `gc`, `forbid_unknown_fields`
+2. **`msgspec.json`** — High-performance JSON encoder/decoder
+3. **`msgspec.msgpack`** — MessagePack protocol support
+4. **`msgspec.yaml`** — YAML support (pyyaml backend)
+5. **`msgspec.toml`** — TOML support (tomli/tomli_w)
+6. **`msgspec.inspect`** — Introspection utilities including `is_struct` and `is_struct_type` (v0.20.0+)
+7. **Validation layer** — Type checking during decoding with precise JSONPath-style error paths (e.g., `$.groups[0]`)
+
+**Source**: API documentation and module listing (accessed 2026-03-13)
+
+---
+
+## Installation & Usage
+
+### Installation
+
+**Via pip**:
+
+```bash
+pip install msgspec
+```
+
+**Via conda**:
+
+```bash
+conda install -c conda-forge msgspec
+```
+
+**Requires Python 3.10+**
+
+**Source**: PyPI and official documentation (accessed 2026-03-13)
+
+### Basic Usage — Define, Encode, Decode
+
+```python
+import msgspec
+
+# Define schema using type annotations
+class User(msgspec.Struct):
+    """A user account"""
+    name: str
+    groups: set[str] = set()
+    email: str | None = None
+
+# Encode
+alice = User("alice", groups={"admin", "engineering"})
+msg = msgspec.json.encode(alice)
+# Result: b'{"name":"alice","groups":["admin","engineering"],"email":null}'
+
+# Decode with validation
+decoded = msgspec.json.decode(msg, type=User)
+# Returns: User(name='alice', groups={"admin", "engineering"}, email=None)
+
+# Invalid data raises ValidationError with precise path
+msgspec.json.decode(b'{"name":"bob","groups":[123]}', type=User)
+# Raises: msgspec.ValidationError: Expected `str`, got `int` - at `$.groups[0]`
+```
+
+**Source**: README.md examples (accessed 2026-03-13)
+
+### Alternative Formats
+
+```python
+# MessagePack
+msgspec.msgpack.encode(alice)
+
+# YAML (requires pyyaml)
+msgspec.yaml.encode(alice)
+
+# TOML (requires tomli_w)
+msgspec.toml.encode(alice)
+```
+
+**Source**: API documentation and format module listing (accessed 2026-03-13)
+
+### Struct Configuration
+
+```python
+class Config(msgspec.Struct, frozen=True, order=True, kw_only=True):
+    """An immutable, orderable configuration"""
+    timeout: int
+    retries: int = 3
+```
+
+**Options**: `frozen` (pseudo-immutability), `order` (comparison methods), `kw_only` (keyword-only fields), `omit_defaults` (skip defaults in output), `forbid_unknown_fields`, `gc` (garbage collection tracking)
+
+**Source**: API documentation — Struct configuration (accessed 2026-03-13)
+
+---
 
 **GitHub Stars**: 3,632 (as of 2026-03-13)
 SOURCE: GitHub repository page (<https://github.com/jcrist/msgspec>) accessed 2026-03-13

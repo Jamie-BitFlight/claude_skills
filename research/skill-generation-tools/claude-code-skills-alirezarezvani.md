@@ -6,33 +6,197 @@ resource_type: "GitHub Repository — Skill Package Library"
 repository_url: "https://github.com/alirezarezvani/claude-skills"
 license: "MIT"
 last_updated: "2026-03-10"
+version_at_research: "2.1.1"
 confidence_summary: "high — primary sources read in full; recent maintenance confirmed"
 ---
 
-## Identity & Metadata
+## Overview
 
-**Name:** Claude Code Skills Library (also: claude-code-skills)
-**Author:** Alireza Rezvani
-**Repository URL:** <https://github.com/alirezarezvani/claude-skills>
-**License:** MIT (copyright 2025 Alireza Rezvani)
-**Latest Version:** 2.1.1 (released 2026-03-07)
-**Last Commit:** 2026-03-10 (feat: add seek-and-analyze-video skill #300)
-**GitHub Stars:** 2,500+ (claimed in README as of latest access)
-**Repository Type:** Production-ready open-source skill package library
+Claude Code Skills Library by Alireza Rezvani is a **production-ready library of 170 modular skill packages** for Claude AI and Claude Code. Each skill is a reusable instruction bundle consisting of SKILL.md (workflows + instructions), `scripts/` (Python CLI tools), `references/` (knowledge bases), and `assets/` (templates). The library provides domain-specific expertise across 9 specialization areas (Engineering Core, Engineering Advanced, Product, Marketing, C-Level, Regulatory & QM, Project Management, Business & Growth, Finance) enabling AI agents to perform like specialists in each domain.
 
-**Keywords:** Claude Code, AI skills, modular agents, plugin architecture, skill packages, OpenAI Codex, Gemini CLI
+**Source:** GitHub repository README and CLAUDE.md (accessed 2026-03-10)
+
+**Current Status:** Active development; version 2.1.1 (released 2026-03-07); last commit 2026-03-10 (feat: add seek-and-analyze-video skill #300); 2,500+ GitHub stars claimed in README.
 
 ---
 
-## What It Is
+## Problem Addressed
 
-A comprehensive, **production-ready library of 170 modular skill packages** for Claude AI and Claude Code. Skills are reusable instruction bundles that give AI coding agents domain-specific expertise they don't have out of the box.
+| Problem | Solution |
+|---------|----------|
+| AI agents ship with general-purpose capabilities but lack domain expertise | 170 skill packages that give agents specialized knowledge for engineering, product, marketing, compliance, and executive roles |
+| Replicating expertise across different AI platforms requires multiple implementations | One repository, four platforms (Claude Code, Codex, Gemini CLI, OpenClaw); conversion scripts (`scripts/convert.sh`) output platform-native formats |
+| Skill development imposes dependency management overhead | Zero pip dependencies; all 210+ Python scripts use stdlib only—portable anywhere Python runs |
+| No standard for packaging reusable agent expertise | Standardized SKILL.md frontmatter (YAML metadata), folder structure (scripts/, references/, assets/), and marketplace registry (`.claude-plugin/marketplace.json`) |
+| Large skill libraries lack quality assurance | Tessl optimization pipeline: v2.1.1 upgraded 18 skills from 66-83% to 85-100% quality |
 
-**Source:** "170 production-ready skills and plugins for Claude Code, OpenAI Codex, and OpenClaw — reusable expertise bundles that transform AI coding agents into specialized professionals across engineering, product, marketing, compliance, and more." (README.md, line 3)
+**Source:** README.md lines 3-20, CHANGELOG.md v2.1.1 quality section (accessed 2026-03-10)
 
-**Key Design Principle:** "Skills are modular instruction packages (plugins) that give AI coding agents domain expertise they don't have out of the box. Each skill includes a SKILL.md (instructions + workflows), Python CLI tools, and reference documentation — everything the agent needs to perform like a specialist." (README.md, line 18)
+---
 
-**Confidence:** high — directly quoted from primary documentation
+## Key Features
+
+### 1. Modular Skill Architecture
+
+Each skill is self-contained with:
+- **SKILL.md** — Master documentation with workflows and instructions
+- **scripts/** — Python CLI tools for automation (no external dependencies)
+- **references/** — Expert knowledge bases (templates, checklists, frameworks)
+- **assets/** — User-facing templates ready to customize
+
+**Design intent**: "Skills are products. Each skill deployable as standalone package." Skills can be extracted and used immediately without dependencies on other skills or the main repository.
+
+**Source:** CLAUDE.md and SKILL-AUTHORING-STANDARD.md (accessed 2026-03-10)
+
+### 2. Multi-Platform Skill Format
+
+Works natively across 4 AI platforms without modification via `scripts/convert.sh`:
+- **Claude Code** — native plugin format (`.claude-plugin/marketplace.json` registry)
+- **OpenAI Codex** — agent skill format
+- **Gemini CLI** — skill index format
+- **OpenClaw** — open-source alternative format
+
+**Example**: "Convert all 156 skills to all tools (takes ~15 seconds)" via `./scripts/convert.sh --tool all`
+
+**Source:** README.md lines 105-142, installation scripts (accessed 2026-03-10)
+
+### 3. Domain Coverage: 9 Specialization Areas
+
+| Domain | Skills | Highlights |
+|--------|--------|-----------|
+| Engineering Core | 23 | Architecture, frontend, backend, QA, DevOps, Playwright Pro, Self-Improving Agent |
+| Engineering Advanced | 25 | Agent designer, RAG architect, MCP builder, performance profiler, incident commander |
+| Product | 8 | Product manager, agile PO, UX researcher, landing page generator |
+| Marketing | 42 | 7 pods: Content (8), SEO (5), CRO (6), Channels (6), Growth (4), Intelligence (4), Sales (2) |
+| Project Management | 6 | Senior PM, scrum master, Jira, Confluence, Atlassian admin |
+| Regulatory & QM | 12 | ISO 13485, MDR, FDA, ISO 27001, GDPR, CAPA, clinical evaluation |
+| C-Level Advisory | 28 | C-suite roles (CEO, CTO, COO, CPO, CMO, CFO, CRO, CISO, CHRO), strategic decision support |
+| Business & Growth | 4 | Customer success, sales engineer, revenue ops, contracts |
+| Finance | 1 | Financial analyst (DCF, budgeting, forecasting) |
+
+**Source:** README.md lines 88-102, CLAUDE.md (accessed 2026-03-10)
+
+### 4. Python Tools & Zero Dependencies
+
+All 210+ Python CLI scripts use standard library only—no pip installs required. Tools verified to run with `--help` without errors (CHANGELOG.md v2.1.2: "237 Python scripts verified").
+
+**Examples**:
+- `finance/saas-metrics-coach/scripts/metrics_calculator.py --mrr 80000 --customers 200`
+- `marketing-skill/content-production/scripts/brand_voice_analyzer.py article.txt`
+- `c-level-advisor/cto-advisor/scripts/tech_debt_analyzer.py /path/to/codebase`
+
+**Source:** README.md lines 300-315, CHANGELOG.md v2.1.2 (accessed 2026-03-10)
+
+### 5. Security & Quality
+
+- **Skill Security Auditor** (v2.0.0+) — Scan any skill for vulnerabilities: command injection, code execution, data exfiltration, prompt injection, supply chain risks, privilege escalation
+- **Tessl Quality Optimization** — 18 skills upgraded from 66-83% to 85-100% quality in v2.1.1
+- **No build/test framework** — Intentional design for portability; quality enforced via linting + Tessl review
+
+**Source:** README.md lines 140-151, CHANGELOG.md v2.1.1 (accessed 2026-03-10)
+
+---
+
+## Technical Architecture
+
+### Skill-as-Module Pattern
+
+Each skill is a self-contained directory (one level deep under a domain folder) with zero interdependencies. Folders nest only one level: `domain/skill-name/`, not nested subdirectories.
+
+**Knowledge Hierarchy**: Information flows from `references/` → `SKILL.md` workflows → executed via `scripts/` → applied using `assets/` templates.
+
+**Source:** CLAUDE.md and SKILL-AUTHORING-STANDARD.md (accessed 2026-03-10)
+
+### Marketplace Distribution
+
+`.claude-plugin/marketplace.json` coordinates skill publication across multiple channels:
+- Claude Code marketplace
+- ClawHub registry (with cs- prefix for slug conflicts)
+- Individual tool indexes (.gemini/, .codex/)
+
+**Semantic versioning** with backward compatibility within patch releases.
+
+**Source:** `.claude-plugin/marketplace.json` and README.md lines 62-81 (accessed 2026-03-10)
+
+### Git Workflow
+
+**Branch Strategy**: feature → dev → main (PR only)
+
+**Version Management**: Semantic versioning; v2.1.1 current stable release
+
+**Maintenance Cadence**: Last commit 2026-03-10; active development with feature additions (video analysis skill recently added) and quality optimization ongoing.
+
+**Source:** Git log and CHANGELOG.md (accessed 2026-03-10)
+
+---
+
+## Installation & Usage
+
+### Claude Code (Recommended)
+
+```bash
+# Add marketplace
+/plugin marketplace add alirezarezvani/claude-skills
+
+# Install skill bundles by domain
+/plugin install engineering-skills@claude-code-skills      # 23 core skills
+/plugin install engineering-advanced-skills@claude-code-skills  # 25 POWERFUL-tier
+/plugin install marketing-skills@claude-code-skills        # 42 marketing skills
+/plugin install c-level-skills@claude-code-skills          # 28 C-suite skills
+```
+
+**Or install individual skills**:
+
+```bash
+/plugin install skill-security-auditor@claude-code-skills
+/plugin install senior-architect@claude-code-skills
+```
+
+**Source:** README.md lines 62-81 (accessed 2026-03-10)
+
+### Manual Installation
+
+```bash
+git clone https://github.com/alirezarezvani/claude-skills.git
+cd claude-skills
+
+# Copy skill folder to local Claude Code directory
+cp -r engineering-team/senior-architect ~/.claude/skills/
+```
+
+**Source:** README.md line 100 (accessed 2026-03-10)
+
+### Multi-Platform Conversion
+
+```bash
+# Convert all skills to all tools
+./scripts/convert.sh --tool all
+
+# Install for specific tool
+./scripts/install.sh --tool cursor --target /path/to/project
+```
+
+**Supported tools**: Claude Code, Codex, Cursor, Aider, Windsurf, Kilo Code, OpenCode, Augment, Antigravity
+
+**Source:** README.md lines 123-134 (accessed 2026-03-10)
+
+### Python Tool Usage Example
+
+```bash
+# SaaS metrics analysis
+python3 finance/saas-metrics-coach/scripts/metrics_calculator.py \
+  --mrr 80000 --customers 200 --churned 3 --json
+
+# Tech debt scoring
+python3 c-level-advisor/cto-advisor/scripts/tech_debt_analyzer.py /path/to/codebase
+
+# Skill security audit
+python3 engineering/skill-security-auditor/scripts/skill_security_auditor.py /path/to/skill/
+```
+
+**Source:** README.md lines 300-315 (accessed 2026-03-10)
+
+---
 
 ---
 
