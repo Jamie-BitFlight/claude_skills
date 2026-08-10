@@ -69,7 +69,7 @@ CUA addresses three critical needs in autonomous agent development:
 
 ---
 
-## Installation & Quick Start
+## Installation & Usage
 
 ```bash
 # Cua Sandbox (Python SDK)
@@ -84,7 +84,7 @@ npx cuabot
 
 ---
 
-## Architecture & Design
+## Technical Architecture
 
 CUA follows a modular architecture with clear separation of concerns:
 
@@ -158,23 +158,37 @@ CUA integrates with and builds upon:
 
 ---
 
-## Citation & Documentation
+## Relevance to Claude Code Development
 
-**Official Resources:**
-- Repository: <https://github.com/trycua/cua>
-- Documentation: <https://cua.ai/docs>
-- Community: Discord server for discussions
+### Direct Applications
 
-**For Agents:**
-- Installation via pip recommended for most users
-- Comprehensive API documentation available at official docs site
-- Example code and tutorials available in repository
-- Benchmark integration guides for evaluation workflows
+1. **Multi-OS Agent Execution**: Claude Code agents that need to automate GUI interactions across macOS, Windows, Linux, and Android can leverage CUA's unified sandbox API without OS-specific implementation branches.
+
+2. **Benchmarking Agent Behavior**: CUA's integration with OSWorld, ScreenSpot, and Windows Arena datasets enables standardized evaluation of agent capabilities — valuable for Claude Code plugin developers testing agent-driven workflows.
+
+3. **Non-Disruptive Automation**: The non-accessibility-surface approach enables agents to interact with applications (Chromium, canvas tools) without triggering accessibility APIs, useful for automation that must coexist with user workflows.
+
+### Patterns Worth Adopting
+
+1. **Sandbox Abstraction Layer**: CUA's unified environment interface across Linux, VMs, Android, and bring-your-own-images demonstrates effective abstraction for heterogeneous execution environments — applicable to Claude Code's own execution layer.
+
+2. **Evaluation-First Design**: First-class benchmarking and trajectory export show how agent evaluation can be a core concern, not an afterthought — useful for Claude Code plugin quality assurance.
+
+### Integration Opportunities
+
+1. **Claude Code Agent Sandbox Backend**: Use CUA's sandboxes for safe execution of Claude Code agents that interact with GUI applications.
+
+2. **Cross-Platform Agent Development**: Agents could test behavior across all supported OSes via CUA's unified API before deployment.
 
 ---
 
-**Research Entry Created:** 2026-05-03
-**URL Status:** Verified and accessible
+## References
+
+- [GitHub - trycua/cua](https://github.com/trycua/cua) (accessed 2026-08-10)
+- [CUA Official Documentation](https://cua.ai/docs) (accessed 2026-08-10)
+- [CUA Community Discord](https://discord.gg/cua) (accessed 2026-08-10)
+- [OSWorld Benchmark Dataset](https://www.osworld.dev) (accessed 2026-08-10)
+- [ScreenSpot Evaluation Framework](https://www.screenspot.dev) (accessed 2026-08-10)
 
 ---
 

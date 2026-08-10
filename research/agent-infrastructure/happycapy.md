@@ -2,7 +2,7 @@
 title: "HappyCapy — Agent-Native Computer for Developers"
 ---
 
-## Identity & Overview
+## Overview
 
 HappyCapy is a browser-based agent-native computing platform that transforms any web browser into a complete AI agent workspace. It eliminates the need for local installation, terminal configuration, or technical setup by running Claude Code and autonomous AI agents in a secure cloud sandbox environment, accessible directly from any device with a browser.
 
@@ -12,7 +12,18 @@ HappyCapy is a browser-based agent-native computing platform that transforms any
 
 ---
 
-## Core Architecture & Execution Model
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| AI agents require local setup (terminal, CLI, configuration) — high friction for non-technical users | Browser-based execution eliminates setup; agents run immediately from any device with a browser |
+| Agent development siloed locally on developer's machine — difficult to access remotely | Cloud sandbox runs agents anywhere; accessible from phone, tablet, or remote devices |
+| Agents lack visual interface for monitoring — CLI-only output makes agent behavior opaque | Visual desktop GUI with file manager, terminal, code editor, task panels shows all agent actions in real-time |
+| Running multiple concurrent agents depletes local system resources | Cloud infrastructure scales automatically; support for 10,000+ concurrent agent executions |
+
+---
+
+## Technical Architecture
 
 ### Agent Execution Stack
 
@@ -47,7 +58,7 @@ Key isolation properties:
 
 ---
 
-## Key Features & Mechanisms
+## Key Features
 
 ### 1. Browser-Based Agent Computer
 
@@ -112,6 +123,89 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 **Team Capability**: "Agent teams with GUI" now available in Max tier, currently in research preview. (SOURCE: HappyCapy pricing page)
 
 **Scope**: Enables coordinated multi-agent projects tracking within same workspace.
+
+---
+
+## Installation & Usage
+
+### Getting Started
+
+**Step 1: Access HappyCapy**
+
+HappyCapy is cloud-native and requires no installation:
+
+```
+1. Open any web browser (Chrome, Edge, Safari, Firefox)
+2. Navigate to https://happycapy.ai
+3. Sign up with email or social login (Google, GitHub)
+4. Accept sandbox environment terms
+5. Launch a new workspace
+```
+
+(SOURCE: [HappyCapy Official Site](https://happycapy.ai), accessed 2026-08-10)
+
+**Step 2: Create a Project**
+
+```
+1. Click "New Project"
+2. Name your project (e.g., "Marketing Report Automation")
+3. Select project type: code, skill, or automation
+4. Start describing what you want in natural language
+```
+
+### Basic Usage Examples
+
+**Example 1: Automate a Report**
+
+```
+User prompt: "Create a Python script that downloads CSV sales data from S3, 
+calculates total revenue by region, and generates a PDF report with charts."
+
+Result:
+- Claude Code analyzes the request
+- Generates Python script with boto3, pandas, matplotlib
+- Creates and executes within sandboxed environment
+- Delivers PDF report to your inbox via Capymail
+- You can reply to ask for refinements
+```
+
+**Example 2: Build a Web Skill**
+
+```
+User prompt: "Create a skill that scrapes product reviews from a URL, 
+analyzes sentiment, and categorizes them into positive, neutral, negative."
+
+Result:
+- HappyCapy generates a reusable skill
+- Skill packaged as npm module or Python package
+- Published to SkillsMP marketplace for sharing
+- Other users can install with single click
+```
+
+**Example 3: Multi-Agent Workflow**
+
+```
+User prompt: "Set up automated daily monitoring: fetch error logs from production,
+analyze patterns, create a Slack summary, and email the team."
+
+With Agent Teams (Max tier):
+- Agent 1 fetches logs
+- Agent 2 analyzes patterns (in parallel)
+- Agent 3 formats Slack message (in parallel)
+- Agents coordinate and send outputs
+- Runs on schedule every morning
+```
+
+### Installation Methods
+
+**Cloud (Recommended)**:
+- Access via browser at https://happycapy.ai — no installation needed
+
+**Self-Hosted (for teams)**:
+- Enterprise tier supports private deployment
+- Contact sales@happycapy.ai for self-hosted licensing
+
+(SOURCE: [HappyCapy Pricing Page](https://happycapy.ai/pricing), accessed 2026-08-10)
 
 ---
 
