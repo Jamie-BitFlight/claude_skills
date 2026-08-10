@@ -27,7 +27,7 @@ AutoResearchClaw is a fully autonomous research pipeline that transforms a singl
 | Labor-intensive manual literature review and paper writing | Autonomous research pipeline retrieves genuine papers from OpenAlex, Semantic Scholar, and arXiv with 4-layer citation verification to eliminate fabricated references |
 | Variable hardware availability for experiments | Auto-detects computing resources (GPU/CPU/MPS) and tailors experiment code accordingly; routes complex projects to OpenCode "Beast Mode" |
 | Experiment failures block research progress | Isolated sandboxes with self-healing capabilities allow the system to diagnose failures and attempt repairs before proceeding |
-| Lack of human control in fully autonomous systems | Six intervention modes (full-auto, gate-only, checkpoint, step-by-step, co-pilot, custom) allow researchers to guide decisions at critical junctures while automation handles routine stages |
+| Lack of human control in fully autonomous systems | Six intervention modes (gate-only, checkpoint, co-pilot, step-by-step, express, custom) plus `--auto-approve` baseline allow researchers to guide decisions at critical junctures while automation handles routine stages |
 
 ---
 
@@ -45,7 +45,7 @@ AutoResearchClaw is a fully autonomous research pipeline that transforms a singl
 
 ### Human-AI Collaboration (v0.4.0+)
 
-- **Six Intervention Modes**: Full automation, gate-only approval, checkpoint-based control, step-by-step guidance, co-pilot collaboration, or custom workflows allow researchers to direct critical decisions.
+- **Seven Execution Modes**: Fully autonomous via `--auto-approve` baseline, plus six intervention modes (gate-only, checkpoint, co-pilot, step-by-step, express, custom) allow researchers to direct decisions at varying granularities.
 - **Continuous Learning**: MetaClaw integration (v0.3.0+) enables cross-run learning with reported +18.3% robustness improvement in controlled experiments.
 
 ### Output
@@ -58,7 +58,7 @@ AutoResearchClaw is a fully autonomous research pipeline that transforms a singl
 
 ### 23-Stage Pipeline (8 Phases)
 
-The system orchestrates eight distinct phases across 23 sequential stages (README L277-299):
+The system orchestrates eight distinct phases across 23 sequential stages (README L282-304):
 
 1. **Phase A — Research Scoping** (Stages 1-2): Problem definition, scope boundaries
 2. **Phase B — Literature Discovery** (Stages 3-6): Paper search, source validation, knowledge compilation
@@ -80,7 +80,7 @@ The system orchestrates eight distinct phases across 23 sequential stages (READM
 ### Sandbox Security
 
 - **Docker Hardening** (v0.2.0+): Network-policy-aware sandbox execution prevents unauthorized data exfiltration.
-- **Citation Verification** (README L331): 4-layer citation integrity process — (1) arXiv ID check, (2) CrossRef/DataCite DOI validation, (3) Semantic Scholar title match, (4) LLM relevance scoring — eliminates hallucinated references before integration into paper.
+- **Citation Verification** (README L336): 4-layer citation integrity process — (1) arXiv ID check, (2) CrossRef/DataCite DOI validation, (3) Semantic Scholar title match, (4) LLM relevance scoring — eliminates hallucinated references before integration into paper.
 
 ---
 
@@ -107,28 +107,31 @@ The `researchclaw setup` command:
 - Prompts for LLM provider configuration (OpenAI, Anthropic, etc.)
 - Validates hardware (GPU/CPU detection)
 
-### Execution Modes (v0.4.0+, README L349-359)
+### Execution Modes (v0.4.0+, README L356-364)
 
-Six intervention modes allow researchers to direct critical decisions while automation handles routine stages:
+The system supports fully autonomous execution via `--auto-approve` plus six intervention modes:
 
 ```bash
-# Full automation (no human intervention)
-researchclaw run --topic "Your research idea" --mode auto-approve
+# Fully autonomous (no human intervention required)
+researchclaw run --topic "Your research idea" --auto-approve
 
-# Express mode (minimal human checkpoints)
-researchclaw run --topic "Your research idea" --mode express
+# Gate-only mode (pause at 3 critical pipeline gates)
+researchclaw run --topic "Your research idea" --mode gate-only
 
-# Checkpoint mode (approve at critical pipeline stages)
+# Checkpoint mode (pause at each phase boundary)
 researchclaw run --topic "Your research idea" --mode checkpoint
 
-# Step-by-step (approve each stage)
-researchclaw run --topic "Your research idea" --mode step-by-step
-
-# Co-pilot mode (real-time collaborative human-AI research)
+# Co-pilot mode (deep collaboration at critical stages, auto elsewhere)
 researchclaw run --topic "Your research idea" --mode co-pilot
 
-# Custom mode (user-defined intervention points)
-researchclaw run --topic "Your research idea" --mode custom --config custom.yaml
+# Step-by-step mode (pause after every stage—learn the pipeline)
+researchclaw run --topic "Your research idea" --mode step-by-step
+
+# Express mode (quick review focusing on 3 most critical gates)
+researchclaw run --topic "Your research idea" --mode express
+
+# Custom mode (define per-stage policies via stage_policies config)
+researchclaw run --topic "Your research idea" --mode custom
 ```
 
 ---
@@ -139,7 +142,7 @@ researchclaw run --topic "Your research idea" --mode custom --config custom.yaml
 
 1. **Autonomous Research Workflows**: AutoResearchClaw's multi-agent orchestration pattern—coordinating specialized agents (CodeAgent, BenchmarkAgent, FigureAgent) across pipeline stages—demonstrates scalable patterns for Claude Code multi-agent systems handling long-running, complex tasks.
 
-2. **Human-in-the-Loop Agent Control**: The six intervention modes (full-auto through co-pilot) provide concrete patterns for Claude Code to implement checkpoint-based control, allowing users to maintain oversight while automating routine work.
+2. **Human-in-the-Loop Agent Control**: The seven execution modes (`--auto-approve` baseline plus gate-only, checkpoint, co-pilot, step-by-step, express, custom) provide concrete patterns for Claude Code to implement graded levels of human oversight from fully autonomous to step-by-step collaborative control.
 
 3. **Self-Healing Sandbox Execution**: The hardware-detection and failure-recovery mechanisms in experiment execution are directly applicable to Claude Code's sandbox design for autonomous code execution.
 
