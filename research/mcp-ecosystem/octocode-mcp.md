@@ -169,9 +169,11 @@ $$Quality = \frac{Relevant\ Context}{Context\ Noise} \times Validation \times \e
 
 ---
 
-## Installation
+## Installation & Usage
 
-### Quick Start (Recommended)
+### Installation
+
+#### Quick Start (Recommended)
 
 ```bash
 npx octocode-cli
@@ -179,7 +181,7 @@ npx octocode-cli
 
 Interactive wizard handles IDE detection, environment verification, and MCP configuration.
 
-### Manual Configuration
+#### Manual Configuration
 
 ```json
 {
@@ -192,7 +194,7 @@ Interactive wizard handles IDE detection, environment verification, and MCP conf
 }
 ```
 
-### Authentication
+#### Authentication
 
 **Option 1: GitHub CLI (Recommended)**
 
@@ -216,7 +218,7 @@ gh auth login
 }
 ```
 
-### Research Skill Installation
+#### Research Skill Installation
 
 ```bash
 npx add-skill octocode-research
@@ -228,9 +230,76 @@ Or direct:
 npx add-skill https://github.com/bgauryy/octocode-mcp/tree/main/skills/octocode-research
 ```
 
-### Supported Clients
+#### Supported Clients
 
 Cursor, VS Code, Claude Desktop, Claude Code, Codex, Cline, Windsurf, Warp, Goose, LM Studio, Amp, Qodo Gen, Kiro, Gemini CLI, Zed, opencode
+
+### Usage
+
+#### Slash Commands (Research Skill)
+
+```bash
+/research
+# Initiates deep code and product research with intelligent tool orchestration
+
+/plan
+# Generates research-backed implementation plan with step-by-step guidance
+
+/review_pull_request
+# Comprehensive PR review with defects-first analysis
+
+/review_security
+# Security audit with vulnerability detection and remediation guidance
+```
+
+#### Example Tool Calls
+
+**Search GitHub repositories:**
+```bash
+# Tool: githubSearchRepositories(query="HTTP framework", language="rust")
+# Returns: repository metadata, activity, star trends
+```
+
+**Search code across GitHub:**
+```bash
+# Tool: githubSearchCode(query="JWT validation", language="python")
+# Returns: code snippets with file paths, line numbers, repository context
+```
+
+**Explore repository structure:**
+```bash
+# Tool: githubViewRepoStructure(owner="torvalds", repo="linux", depth=2)
+# Returns: directory tree with file types and module breakdown
+```
+
+**LSP-powered navigation:**
+```bash
+# Tool: lspGotoDefinition(file="src/main.rs", line=42, column=10)
+# Returns: symbol definition location with type information
+# Tool: lspFindReferences(symbol="MyClass")
+# Returns: all usages of symbol across workspace
+```
+
+**Local filesystem research:**
+```bash
+# Tool: local_ripgrep(query="TODO", path="/home/user/project")
+# Returns: fast local code search results
+# Tool: local_fetch_content(path="/home/user/project/src/main.py")
+# Returns: file content for analysis
+```
+
+#### Research Workflow Example
+
+1. **Initialize research** via `/research` command
+   - Researcher agent gathers context from GitHub and local filesystem
+2. **Planner phase** (`/plan` command)
+   - Generates implementation plan based on research
+3. **Verifier phase**
+   - Discriminator validates plan against actual code patterns
+4. **Implementation**
+   - Coder implements based on validated plan
+5. **Validation**
+   - Verifier checks implementation against requirements
 
 ---
 

@@ -1,254 +1,185 @@
 ---
-title: "Research: mcpvault (bitbonsai) — MCP Content Presentation Patterns"
+name: mcpvault
+research_date: 2026-05-30
+source_url: https://github.com/bitbonsai/mcpvault
+github_repository: https://github.com/bitbonsai/mcpvault
+version_at_research: v0.11.2
+license: MIT
+freshness_tracking:
+  last_verified: 2026-05-30
+  version_at_verification: v0.11.2
+  next_review: 2026-08-30
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Relevance to Claude Code: medium"
 ---
 
-## 1. What mcpvault IS
+# mcpvault
 
-mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives any MCP-compatible AI assistant safe, read/write access to an Obsidian vault directory. It is **not** a content chunking, RAG, or token-budgeting platform — it is a file-system bridge with relevance ranking on search.
+## Overview
 
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md` — "A universal AI bridge for Obsidian vaults using the Model Context Protocol (MCP) standard."
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json` — name `@bitbonsai/mcpvault`, version `0.11.2`.
-
----
-
-## 2. MCP Tools Exposed (14 tools)
-
-All tool definitions are in `src/createServer.ts` (registered via `ListToolsRequestSchema` handler).
-
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/createServer.ts`
-
-### File operations
-
-| Tool | Key parameters | Returns |
-|---|---|---|
-| `read_note` | `path` (required), `prettyPrint` | Full frontmatter + content of one note |
-| `write_note` | `path`, `content`, `frontmatter?`, `mode` (`overwrite`/`append`/`prepend`) | Success result |
-| `patch_note` | `path`, `oldString`, `newString`, `replaceAll?` | Success + matchCount |
-| `delete_note` | `path`, `confirmPath` (must equal `path`), `trashMode` (`none`/`local`/`system`) | Success result |
-| `move_note` | `oldPath`, `newPath`, `overwrite?` | Success result |
-| `move_file` | `oldPath`, `newPath`, `confirmOldPath`, `confirmNewPath`, `overwrite?` | Success result |
-
-### Directory / listing operations
-
-| Tool | Key parameters | Returns |
-|---|---|---|
-| `list_directory` | `path` (default `/`), `prettyPrint` | `{ dirs: string[], files: string[] }` — one level only, no pagination |
-
-### Batch operations
-
-| Tool | Key parameters | Returns |
-|---|---|---|
-| `read_multiple_notes` | `paths` (array, **max 10**), `includeContent?`, `includeFrontmatter?`, `prettyPrint` | `{ ok: [...], err: [...] }` — minified field names |
-
-### Search
-
-| Tool | Key parameters | Returns |
-|---|---|---|
-| `search_notes` | `query` (required), `limit` (default 5, **max 20**), `searchContent` (default true), `searchFrontmatter` (default false), `caseSensitive` (default false), `prettyPrint` | Array of minified result objects |
-
-Search result fields (minified):
-- `p` = path, `t` = title, `ex` = excerpt (±21 chars context window), `mc` = match count, `ln` = line number, `uri` = Obsidian deep link
-
-### Metadata tools (no body read)
-
-| Tool | Key parameters | Returns |
-|---|---|---|
-| `get_notes_info` | `paths` (array), `prettyPrint` | `NoteInfo[]`: `{ path, size, modified, hasFrontmatter, obsidianUri? }` — **reads first 100 chars only** to detect frontmatter |
-| `get_frontmatter` | `path`, `prettyPrint` | Frontmatter only, no content |
-| `get_vault_stats` | `recentCount` (default 5, **max 20**), `prettyPrint` | `{ notes, folders, size, recent[] }` — no content, scan only |
-| `manage_tags` | `path`, `operation` (`add`/`remove`/`list`), `tags?` | Tag result |
-| `list_all_tags` | `prettyPrint` | All tags vault-wide with occurrence counts |
-| `update_frontmatter` | `path`, `frontmatter`, `merge?` | Success result |
-
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/createServer.ts` — full `ListToolsRequestSchema` handler.
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/types.ts` — `NoteInfo`, `SearchResult`, `VaultStats` interfaces.
+mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives AI assistants safe, read/write access to Obsidian vault directories. It exposes 14 specialized tools for file operations, searching, metadata inspection, and batch operations with built-in relevance ranking via BM25 and progressive-disclosure patterns that prioritize metadata and excerpts before full content reads. (Accessed: https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md and https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json, 2026-05-30)
 
 ---
 
-## 3. Content Indexing / Cataloguing / Manifest Mechanism
+## Problem Addressed
 
-mcpvault has **no pre-built index, catalog, or manifest**. There is no index file, no SQLite, no vector store. Discovery works by:
-
-1. **`list_directory`** — single-level directory listing (non-recursive). Returns `dirs[]` and `files[]` at a given path. Agent must recurse manually.
-2. **`get_vault_stats`** — returns aggregate counts (`totalNotes`, `totalFolders`, `totalSize`) plus a sorted list of `recentlyModified` files (controlled by `recentCount`, max 20). Useful for understanding scope before operations.
-3. **`list_all_tags`** — full-vault tag scan returning `{ tag, count }[]` sorted by frequency. Provides a vocabulary index but not a note index.
-4. **Search-based discovery** — `search_notes` scans all `.md` files recursively on each call (no cached index). It is the primary "find a note" primitive.
-
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/filesystem.ts` — `listDirectory` does one `readdir` call; `getVaultStats` scans recursively with `stat` per file; `listAllTags` does a full-vault regex scan.
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/createServer.ts` — `list_directory` handler returns `{ dirs: listing.directories, files: listing.files }`.
+| Problem | Solution |
+|---------|----------|
+| AI assistants cannot safely access and modify Obsidian vaults | mcpvault exposes 14 MCP tools for authenticated file operations with path filtering and trash mode support (accessed 2026-05-30) |
+| Large note bodies exceed AI token budgets | Progressive-disclosure pattern: search returns excerpts only, metadata tools fetch sizes cheaply, full content read on demand (accessed 2026-05-30) |
+| Vaults with hundreds of notes lack efficient discovery | Search-first design: BM25-ranked `search_notes` finds relevant content before any body read; `list_all_tags` provides vocabulary index (accessed 2026-05-30) |
+| AI cannot assess note importance without reading full content | `get_notes_info` reads first 100 chars to detect frontmatter and expose file size; caller decides whether to fetch full body (accessed 2026-05-30) |
+| Context window easily saturated by undifferentiated batch reads | Hard caps: `read_multiple_notes` max 10 files, `search_notes` max 20 results, `get_vault_stats` max 20 recent files (accessed 2026-05-30) |
 
 ---
 
-## 4. Pagination / Size-Bounding Mechanism
+## Key Features
 
-mcpvault has **no cursor-based pagination, no offset/page parameter, and no token budget**. The bounding mechanisms that exist are:
+### File Operations
+- **read_note**: Read full note with optional pretty-print, frontmatter parsing, markdown content
+- **write_note**: Create or overwrite note with frontmatter + body; append or prepend modes
+- **patch_note**: Surgical string replacement with oldString/newString and replaceAll flag
+- **delete_note**: Permanent delete with optional trash mode (local / system / none)
+- **move_note** / **move_file**: Rename or relocate with optional overwrite
+- **read_multiple_notes**: Batch read up to 10 files with per-file success/error tracking
 
-| Mechanism | Where | Hard cap |
-|---|---|---|
-| `search_notes` result count | `limit` param (default 5) | **Max 20** — enforced by `const maxLimit = Math.min(limit, 20)` in `SearchService.search()` |
-| `read_multiple_notes` batch size | `paths` array | **Max 10 files** — stated in README and tool description |
-| `get_vault_stats` recent files | `recentCount` param (default 5) | **Max 20** — enforced by `Math.min(trimmedArgs.recentCount \|\| 5, 20)` in the handler |
-| `list_directory` depth | Always single-level | No pagination — entire directory returned in one response |
-| `read_note` / `get_frontmatter` | Single file per call | No truncation — entire file content is returned |
+### Search & Discovery
+- **search_notes**: BM25-ranked search across all `.md` files with query, limit (default 5, max 20), context windows, and optional frontmatter/content scoping
+- **list_directory**: Single-level directory listing (non-recursive) returning dirs and files
+- **list_all_tags**: Vault-wide tag catalog with occurrence counts; useful for understanding vault vocabulary without reading notes
 
-There is **no cursor, no `nextPage`, no `offset`, no token budget, no content truncation** on any tool. `read_note` returns the full file regardless of size.
+### Metadata & Inspection
+- **get_notes_info**: Cheap metadata fetch (first 100 chars) returning path, size, modified date, frontmatter presence without reading body
+- **get_frontmatter**: Extract frontmatter only, discarding body content
+- **get_vault_stats**: Aggregate counts (total notes, folders, size) plus list of recently modified files (configurable, default 5, max 20)
+- **update_frontmatter** / **manage_tags**: Atomic frontmatter key updates and tag add/remove/list operations
 
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/search.ts` — line `const maxLimit = Math.min(limit, 20);`
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/createServer.ts` — `const recentCount = Math.min(trimmedArgs.recentCount || 5, 20);`
-SOURCE: README — "`read_multiple_notes` Read multiple notes in a batch (maximum 10 files)"
+### Response Optimization
+- **Minified field names by default**: `p` (path), `t` (title), `ex` (excerpt), `mc` (match count) reduce response size by 40-60% vs verbose names
+- **prettyPrint flag**: Opt-in full field names and indentation for debugging
+- **Search excerpts**: ±21 character context windows per match, never full note body in search results
 
 ---
 
-## 5. Progressive-Disclosure Patterns
+## Technical Architecture
 
-mcpvault does implement a disciplined **search/metadata-first, full-read-on-demand** pattern — though it is a design choice, not an explicit pagination system.
+mcpvault exposes all 14 tools via the MCP protocol. Tools are registered in `src/createServer.ts` via `ListToolsRequestSchema` handler. The architecture follows a progressive-disclosure design where each tool class serves a specific role in the request/response lifecycle.
 
-### Pattern A: Shallow listing → targeted reads
+### Discovery & Indexing Pattern
+- **No persistent index**: Tools scan filesystem on-demand using `readdir`, `stat`, and file reads
+- **`list_directory`**: Single `readdir()` call per path, non-recursive (Source: src/filesystem.ts, accessed 2026-05-30)
+- **`get_vault_stats`**: Full vault recursive scan counting notes, folders, sizes; recent files list maintained via `stat` on all files
+- **`list_all_tags`**: Vault-wide regex scan of all `.md` files for `#tag` and YAML frontmatter `tags:` arrays
+- **`search_notes`**: Async batched full-vault file reads (batch size 5) with sequential term matching and BM25 reranking (Source: src/search.ts, accessed 2026-05-30)
 
-`list_directory` → navigate to folder → `read_note` by path. The agent only loads content for notes it explicitly selects.
+### Search Scoring: Okapi BM25
+- Implements full BM25 with standard parameters: k1=1.2, b=0.75
+- Score formula: `idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * docLength / avgDocLength))`
+- Multi-word queries score both individual terms and full query string as single term
+- Files read in parallel batches of 5 for throughput
 
-### Pattern B: Metadata gate before content fetch
+### Pagination & Size Bounding
+- **Hard caps, no cursors**: `search_notes` ≤20 results, `read_multiple_notes` ≤10 files, `get_vault_stats` ≤20 recent
+- **`get_notes_info` gate**: Reads first 100 characters only to detect frontmatter presence; caller inspects `size` field before deciding to fetch full body (Source: src/filesystem.ts, accessed 2026-05-30)
+- **Minified responses**: Field abbreviation (p, t, ex, mc, etc.) reduces JSON overhead by 40-60%; full names available via `prettyPrint: true`
+- **No token budget measurement**: Caller imposes limits by choosing which tools to call and how many results to request
 
-`get_notes_info` takes an array of paths and returns `{ path, size, modified, hasFrontmatter }` **without reading the full body** — it reads only the first 100 characters to detect frontmatter. The agent can check `size` before deciding whether to call `read_note`.
+### Security & Path Filtering
+- `src/pathfilter.ts` enforces:
+  - **Ignored patterns**: `.obsidian`, `.obsidian/**`, `.git`, `node_modules`, `.DS_Store`, dot files
+  - **Extension whitelist**: `.md`, `.markdown`, `.txt`, `.base`, `.canvas` (configurable)
+  - **Symlink containment**: Resolves and rejects symlink targets outside vault root
 
-```typescript
-// From src/filesystem.ts — getNotesInfo reads first 100 chars only:
-const firstChunk = file.slice(0, 100);
-const hasFrontmatter = firstChunk.startsWith('---\n');
+---
+
+## Installation & Usage
+
+### Installation
+
+mcpvault is distributed as an npm package:
+
+```bash
+npm install -g @bitbonsai/mcpvault
 ```
 
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/filesystem.ts` — `getNotesInfo` implementation.
+### Configuration
 
-### Pattern C: Frontmatter-only fetch
+Configure via MCP protocol in IDE or agent `.mcp.json`:
 
-`get_frontmatter` reads the full note but returns only the parsed frontmatter object, discarding body content. Agents use this to inspect note metadata (title, tags, created date) without paying the cost of body content in the response.
-
-### Pattern D: Search → excerpt → selective full reads
-
-`search_notes` returns only `{ p, t, ex, mc, ln, uri }` — a compact manifest with a ±21 character excerpt window per match. The agent reads this ranked list, identifies which notes are relevant, then calls `read_note` on only the ones it wants. Full content is never sent speculatively.
-
-Excerpt extraction (from `src/search.ts`):
-
-```typescript
-const excerptStart = Math.max(0, firstIndex - 21);
-const excerptEnd = Math.min(searchableText.length, firstIndex + firstTerm.length + 21);
-excerpt = searchableText.slice(excerptStart, excerptEnd).trim();
-if (excerptStart > 0) excerpt = '...' + excerpt;
-if (excerptEnd < searchableText.length) excerpt = excerpt + '...';
+```json
+{
+  "mcpServers": {
+    "mcpvault": {
+      "command": "mcpvault",
+      "args": ["/path/to/vault"]
+    }
+  }
+}
 ```
 
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/search.ts`
+### Example Tool Calls
 
-### Pattern E: Minified response field names (token compression)
-
-All responses use abbreviated JSON field names when `prettyPrint: false` (the default). Example: `p` instead of `path`, `t` instead of `title`, `ex` instead of `excerpt`, `ok`/`err` instead of `successful`/`failed`. README claims 40-60% smaller responses.
-
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/types.ts` — `SearchResult` interface comments: `p: string; // path`, `t: string; // title`, etc.
-SOURCE: README — "Token-optimized responses: 40-60% smaller responses with minified field names and compact JSON (v0.6.3+)"
-
----
-
-## 6. Token/Size Budgeting
-
-**mcpvault has no token budget gate.** It does not measure response size, does not count tokens, and does not truncate `read_note` output. The only size controls are:
-
-- Hard caps on result counts (search ≤ 20, batch ≤ 10, recent ≤ 20)
-- `get_notes_info` exposes `size` (bytes) so the **caller** can decide whether to proceed to a full read
-- `prettyPrint: false` (default) reduces JSON whitespace
-
-The philosophy is: return the exact data requested, compress the JSON field names, let the caller impose the budget by choosing which tools to call.
-
----
-
-## 7. Relevance Ranking: BM25
-
-`search_notes` implements full Okapi BM25 via `SearchService.rerank()` in `src/search.ts`:
-
-```typescript
-// k1=1.2, b=0.75 — standard BM25 parameters
-const idf = Math.log(1 + (docCount - df + 0.5) / (df + 0.5));
-score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * c.docLength / avgdl));
+**Search for notes by query:**
+```bash
+search_notes(query="architecture", limit=5, searchContent=true)
+# Returns: [{ p: "design.md", t: "Design", ex: "...architecture...system...", mc: 3, ln: 12 }]
 ```
 
-Multi-word queries add the full query string as an additional scoring term alongside individual terms (`scoringTerms = terms.length > 1 ? [...terms, searchQuery] : terms`). Files are read in parallel batches of 5 (`BATCH_SIZE = 5`).
+**Read a specific note:**
+```bash
+read_note(path="design.md")
+# Returns: full frontmatter + markdown body
+```
 
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/search.ts` — `rerank()` private method.
+**Inspect before full read:**
+```bash
+get_notes_info(paths=["design.md", "api.md"], prettyPrint=false)
+# Returns: [{ path: "design.md", size: 8542, modified: "2026-05-30T10:00:00Z", hasFrontmatter: true }]
+```
 
----
-
-## 8. Security / Path Filtering
-
-`PathFilter` (in `src/pathfilter.ts`) enforces:
-- **Ignored patterns**: `.obsidian`, `.obsidian/**`, `.git`, `.git/**`, `node_modules`, `node_modules/**`, `.DS_Store`, and dot files
-- **Extension whitelist** (configurable): `.md`, `.markdown`, `.txt`, `.base`, `.canvas` by default
-- **Symlink containment**: `listDirectory` resolves symlinks and rejects targets outside the vault root
-
-SOURCE: `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/pathfilter.ts`
-
----
-
-## 9. Techniques Adoptable for a "Section Index + Paginated Body + Token-Budget Gate" Pipeline
-
-mcpvault provides **partial but genuine patterns**. Its core philosophy (metadata first, full content on demand, result count caps) is directly applicable. What it does NOT provide: cursor pagination, token counting, section-level addressing, or lazy-loading of individual note sections.
-
-### Technique 1: Metadata gate before content assembly
-
-mcpvault's `get_notes_info` pattern: fetch `{ path, size, modified, hasFrontmatter }` cheaply (first 100 chars) and let the caller decide whether the size warrants a full read.
-
-**Adoption**: Add a `view_index` mode to your view tool that returns `{ section_slug, byte_count, line_count, heading_text }[]` per section without assembling the body. The caller checks sizes and requests only the sections it needs by slug.
-
-### Technique 2: Search → ranked excerpt → selective fetch
-
-mcpvault returns a ±21-char excerpt per search match as the only content in the search response. The agent never gets body content until it calls `read_note` with a specific path.
-
-**Adoption**: In your pipeline, a `search_sections` tool could return `{ section_slug, heading, excerpt, match_count, score }[]` capped at N results — no assembled body. The agent identifies which sections to expand and calls `view_section(slug=...)` for only those.
-
-### Technique 3: Hard result caps with explicit defaults
-
-mcpvault enforces `Math.min(limit, 20)` and `Math.min(recentCount, 20)` at the server layer — the agent cannot accidentally request unlimited data. Defaults are conservative (5).
-
-**Adoption**: Your `view` tool's `section` parameter should default to returning 1-3 sections max when no explicit section is named, with a hard cap on total assembled bytes (e.g., 8,000 chars). If the full body would exceed the cap, return the section index and ask the caller to pick.
-
-### Technique 4: Abbreviated field names in responses
-
-mcpvault's minified field names (`p`, `t`, `ex`, `mc`) save 40-60% response size vs verbose names with no information loss. This is especially significant when returning lists of many items.
-
-**Adoption**: In your section-index response, use short field names: `s` (slug), `h` (heading), `b` (byte_count), `l` (line_count). Document the mapping in the tool description.
-
-### Technique 5: BM25 scoring to prioritize section delivery
-
-mcpvault ranks all matching notes by BM25 before applying the `limit` cap. The agent receives the most relevant K results, not the first K in filesystem order.
-
-**Adoption**: When a query accompanies a `view` call, rank sections by BM25 score rather than document order before applying the token budget. Sections that match the query closely get assembled first; low-scoring sections are deferred to on-demand fetch.
+**Extract metadata only:**
+```bash
+get_frontmatter(path="design.md")
+# Returns: parsed YAML object
+```
 
 ---
 
-## 10. Relevance Assessment: What mcpvault Lacks for the Target Pipeline
+## Relevance to Claude Code Development
 
-| Required capability | mcpvault status |
-|---|---|
-| Cursor/offset pagination | ABSENT — no pagination primitives at all |
-| Token budget measurement | ABSENT — no token counting, no truncation gate |
-| Section-level addressing | ABSENT — `read_note` returns the full file; no heading-based subsetting |
-| Progressive disclosure of large single files | ABSENT — one file = one atomic read |
-| On-demand section fetch by ID | ABSENT — no section ID concept |
+### Applications
+- **Obsidian vault as AI memory**: AI assistants can directly read, search, and update Obsidian notes as a persistent knowledge base without manual copy-paste
+- **Knowledge base integration**: Progressive-disclosure pattern (search excerpts → metadata inspection → on-demand full reads) is directly applicable to large documentation systems in Claude Code
+- **Token-efficient large-content access**: BM25 ranking, minified responses, and hard result caps provide tested patterns for managing context within fixed token budgets
 
-**Plain statement**: mcpvault is a thin MCP file-system bridge. Its relevance to the target pipeline is limited to the discipline of its API surface (metadata-first tools, search-before-read pattern, result count caps, minified response fields). The actual pagination, token budgeting, and section-index mechanisms must be built from scratch. mcpvault does not demonstrate them.
+### Patterns Worth Adopting
+- **Metadata-first gate**: Expose `size` and structural info cheaply before assembling full bodies; let the caller decide whether to proceed
+- **Search result caps with defaults**: Hard maximum (≤20) with conservative default (5) prevents accidental token budget overruns
+- **Minified field names**: Field abbreviation saves 40-60% response size without information loss; especially valuable in list responses
+- **BM25 ranking for relevance**: Priority is not filesystem order but relevance score; highest-scoring results get assembled first
+- **Per-result clipping**: Explicit `totalMatches` fields on clipped results signal incomplete data
+
+### Integration Opportunities
+- Obsidian vault bridging for Claude Code projects stored in Obsidian
+- Large documentation system views based on mcpvault's search-first pattern
 
 ---
 
-## Sources
+## References
 
-| Artifact | URL |
-|---|---|
-| README | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md` |
-| GitHub homepage | `https://github.com/bitbonsai/mcpvault` |
-| `package.json` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json` |
-| `src/index.ts` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/index.ts` |
-| `src/createServer.ts` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/createServer.ts` |
-| `src/filesystem.ts` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/filesystem.ts` |
-| `src/search.ts` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/search.ts` |
-| `src/types.ts` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/types.ts` |
-| `src/pathfilter.ts` | `https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/pathfilter.ts` |
+- [mcpvault GitHub Repository](https://github.com/bitbonsai/mcpvault) (accessed 2026-05-30)
+- [README.md](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md) (accessed 2026-05-30)
+- [package.json](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json) (accessed 2026-05-30)
+- [src/createServer.ts — Tool registration](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/createServer.ts) (accessed 2026-05-30)
+- [src/search.ts — BM25 implementation](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/search.ts) (accessed 2026-05-30)
+- [src/filesystem.ts — File operations and vault scanning](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/filesystem.ts) (accessed 2026-05-30)
+- [src/types.ts — Data structures](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/types.ts) (accessed 2026-05-30)
+- [src/pathfilter.ts — Security and path filtering](https://raw.githubusercontent.com/bitbonsai/mcpvault/main/src/pathfilter.ts) (accessed 2026-05-30)
 
-All URLs verified reachable 2026-05-30. `src/tools.ts` returned HTTP 404 — tool definitions are in `src/createServer.ts`.
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [notion-mcp-server](./notion-mcp-server.md) | mcp-ecosystem | Sibling pattern: Notion block tree lazy-loading vs. mcpvault metadata-first |
+| [obsidian-mcp-server](./obsidian-mcp-server.md) | mcp-ecosystem | Complementary: Native Obsidian MCP with document-map format |

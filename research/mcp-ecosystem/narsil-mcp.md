@@ -206,9 +206,11 @@ Narsil-MCP is a Rust-powered MCP (Model Context Protocol) server providing AI as
 
 ---
 
-## Installation
+## Installation & Usage
 
-### Package Managers
+### Installation
+
+#### Package Managers
 
 ```bash
 # Homebrew (macOS/Linux)
@@ -228,7 +230,7 @@ scoop install narsil-mcp
 nix run github:postrv/narsil-mcp -- --repos ./my-project
 ```
 
-### One-Line Install Scripts
+#### One-Line Install Scripts
 
 ```bash
 # macOS/Linux
@@ -236,6 +238,59 @@ curl -fsSL https://raw.githubusercontent.com/postrv/narsil-mcp/main/install.sh |
 
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/postrv/narsil-mcp/main/install.ps1 | iex
+```
+
+### Usage
+
+#### Running Narsil-MCP
+
+```bash
+# Index a single local repository
+narsil-mcp --repos /path/to/project
+
+# Index with git integration and call graph analysis
+narsil-mcp --repos /path/to/project --git --call-graph
+
+# Enable neural semantic search (requires API key)
+narsil-mcp --repos /path/to/project --neural
+
+# Use with knowledge graph (SPARQL queries)
+narsil-mcp --repos /path/to/project --graph
+
+# Apply custom preset for token optimization
+narsil-mcp --repos /path/to/project --preset minimal
+```
+
+#### Example Tool Calls
+
+**Find symbols across codebase:**
+```bash
+# Via MCP tool: find_symbols(query="MyClass")
+# Returns: [{ name: "MyClass", file: "src/main.rs", line: 42, type: "struct" }]
+```
+
+**Semantic code search:**
+```bash
+# Via MCP tool: search_code(query="HTTP request handler")
+# Returns: BM25-ranked results with file paths and excerpts
+```
+
+**Analyze dependencies:**
+```bash
+# Via MCP tool: get_import_graph(language="python")
+# Returns: dependency graph, identifies circular imports
+```
+
+**Security scanning:**
+```bash
+# Via MCP tool: check_owasp_top10()
+# Returns: vulnerability findings with file paths and remediation
+```
+
+**Supply chain analysis:**
+```bash
+# Via MCP tool: generate_sbom(format="cyclonedx")
+# Returns: SBOM with dependency version info and vulnerability status
 ```
 
 ---
