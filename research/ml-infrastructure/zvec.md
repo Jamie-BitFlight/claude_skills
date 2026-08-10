@@ -124,82 +124,44 @@ Local file storage (WAL + index files)
 
 ## Installation & Usage
 
-### Python Installation (Primary)
+### Python Installation
+
+Requires **64-bit Python 3.10–3.14**.
 
 ```bash
-# Install via pip (requires Python 3.8+)
 pip install zvec
-
-# Or with conda
-conda install -c alibaba zvec
 ```
 
-**Source**: GitHub README.md — "Installation" (accessed 2026-08-10)
+**Source**: GitHub README.md — installation instructions via WebFetch; Python requirement verified from official documentation (accessed 2026-08-10)
 
-### Basic Usage: Create Collection & Search
+### Basic Usage: Create Collection, Insert, and Query
 
 ```python
-from zvec import Index, Builder
+import zvec
 
-# Create a collection
-builder = Builder(path="./my_db", 
-                  collection="documents",
-                  index_type="hnsw")  # or "flat", "hnsw_rabbitq", "sparse"
+# Define collection schema
+schema = zvec.CollectionSchema(
+    name="example",
+    vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 4),
+)
 
-collection = builder.build()
+# Create and open collection
+collection = zvec.create_and_open(path="./zvec_example", schema=schema)
 
-# Insert vectors
-collection.insert({
-    "id": 1,
-    "text": "Alibaba open-sources Zvec vector database",
-    "vector": [0.1, 0.2, 0.3, ...],  # 768-dim embedding
-    "timestamp": 1691001600
-})
+# Insert documents
+collection.insert([
+    zvec.Doc(id="doc_1", vectors={"embedding": [0.1, 0.2, 0.3, 0.4]}),
+    zvec.Doc(id="doc_2", vectors={"embedding": [0.2, 0.3, 0.4, 0.1]}),
+])
 
-# Search
-results = collection.search(
-    query=[0.15, 0.25, 0.35, ...],  # 768-dim query vector
-    limit=10,                        # top-10 results
-    filters={"timestamp": {"gte": 1691001600}}  # hybrid filter
+# Query the collection
+results = collection.query(
+    zvec.Query(field_name="embedding", vector=[0.4, 0.3, 0.3, 0.1]),
+    topk=10
 )
 ```
 
-**Source**: zvec.org/en/docs/db/quickstart/ (accessed 2026-08-10)
-
-### Node.js Installation
-
-```bash
-npm install zvec
-```
-
-```javascript
-const { Index, Builder } = require('zvec');
-
-const builder = new Builder({
-  path: './my_db',
-  collection: 'documents',
-  indexType: 'hnsw'
-});
-
-const collection = builder.build();
-
-// Insert and search similar to Python
-```
-
-**Source**: GitHub README.md — "Node.js SDK" (accessed 2026-08-10)
-
-### Docker / Containerized Deployment
-
-```dockerfile
-FROM python:3.11
-RUN pip install zvec
-COPY ./app.py .
-CMD ["python", "app.py"]
-```
-
-No external services required; entire database runs within the container.
-
-**Source**: Inferred from in-process architecture (accessed 2026-08-10)
+**Source**: GitHub README.md — Python API examples (accessed 2026-08-10)
 
 ---
 

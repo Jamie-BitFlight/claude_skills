@@ -1,22 +1,22 @@
 ---
 name: ctxforge
-research_date: "2026-08-10"
-source_url: "https://github.com/sylvester-francis/ctxforge"
-github_repository: "https://github.com/sylvester-francis/ctxforge"
-version_at_research: "unreleased (active development)"
+research_date: "2026-08-11"
+source_url: "https://github.com/sylvester-francis/ctx-forge"
+github_repository: "https://github.com/sylvester-francis/ctx-forge"
+version_at_research: "2.1.0"
 license: "AGPL-3.0"
 freshness_tracking:
-  last_verified: "2026-08-10"
-  version_at_verification: "main branch"
-  next_review: "2026-11-10"
-  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: medium | Installation & Usage: high | Relevance: high | References: high"
+  last_verified: "2026-08-11"
+  version_at_verification: "2.1.0 (released 2026-04-20)"
+  next_review: "2026-11-11"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: high | Installation & Usage: high | Relevance: high | References: high"
 ---
 
 # ctxforge
 
 ## Overview
 
-ctxforge is a Rust-based CLI tool that systematically assembles context bundles for AI coding agents. Built by Sylvester Ranjith Francis, it transforms context management from manual copy-paste work into an automated, reproducible system with real-time token visibility. The tool provides a fullscreen TUI with live token gauge, 15 MCP tools for autonomous context building, and support for 21+ AI models (Claude, Cursor, Aider, etc.). Built entirely in Rust as a static binary with zero cloud dependencies. AGPL-3.0 licensed; active development (no versioned release yet, but production-ready).
+ctxforge is a Rust-based CLI tool for prompt engineers that assembles context bundles for AI coding agents. Built by Sylvester Ranjith Francis, it implements five core context engineering strategies: library documentation detection, GitHub context mining, auto-suggest for missing imports, interactive TUI for prompt composition, and cross-session memory. The tool **never calls an LLM** — instead, it gathers, counts, and formats context for agents to consume. Version 2.1.0 (released April 2026); AGPL-3.0 licensed. Runs as a static Rust binary with zero cloud dependencies or API keys required.
 
 ---
 
@@ -24,68 +24,72 @@ ctxforge is a Rust-based CLI tool that systematically assembles context bundles 
 
 | Problem | Solution |
 |---------|----------|
-| Manual context assembly: developers copy-paste code sections hoping they fit within token budgets | Automated context bundling with real-time token counting prevents budget overruns |
-| Repeated manual work: open files, scroll to relevant sections, copy snippets into prompts | Four-pillar system (Write, Select, Compress, Isolate) automates the entire workflow |
+| Manual context assembly: developers manually copy-paste code sections into prompts, hoping they fit token budgets | Automated context bundling with real-time token counting for 21+ AI models prevents budget overruns |
 | No visibility into token usage while building context prompts | Interactive TUI with live token gauge (color-coded green→yellow→orange→red) shows exact token consumption |
-| AI agents cannot autonomously build their own context without manual user intervention | 15 MCP tools enable AI agents to query codebases and assemble context bundles independently |
-| Context management becomes fragmented across multiple projects and tasks | Named profiles keep separate work streams isolated with their own configurations and exports |
-| Finding relevant functions/types across a codebase requires manual file browsing | Tree-sitter scanning with fuzzy-searchable picker finds every function, struct, and interface automatically |
-| Context loses continuity between sessions as temporary notes vanish | Persistent markdown-based memory system stores AI-relevant notes and auto-attaches them to exports |
+| Context management becomes fragmented across projects with no way to persist between sessions | Persistent markdown-based memory system enables cross-session note retention |
+| Finding relevant code across a codebase requires manual file browsing | Tree-sitter scanning (optional, via `--features=extract`) finds every function/type and presents fuzzy-searchable picker |
+| AI agents cannot autonomously build their own context without manual user intervention | 31 MCP tools enable Claude Code and other MCP clients to query and assemble context bundles independently |
+| Missing documentation or stale dependencies go undetected when assembling context | Auto-suggest feature flags missing imports and stale dependencies between bundle and docs |
 
 ---
 
 ## Key Features
 
-### 1. Interactive TUI with Live Token Gauge
+### 1. Five Core Context Engineering Strategies
 
-Fullscreen terminal UI displays real-time token usage as you select files. Color-coding provides visual feedback: green (safe), yellow (warning), orange (approaching limit), red (over budget). Users can toggle files on/off and immediately see token impact.
+ctxforge implements five interconnected approaches:
 
-**Source**: Medium article — "when run with no arguments, it provides a fullscreen TUI... with a live token gauge that fills and color-grades (green, yellow, orange, red) as you toggle files" (accessed 2026-08-10)
+1. **Library docs / Project stack detection** — Scans manifests (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.) and attaches canonical documentation URLs
+2. **GitHub context miner** — Inlines specific issues, PRs, releases, or file bodies via `gh://` URIs with full `gh` CLI integration
+3. **Auto-suggest** — Flags missing imports and stale dependencies between bundle and docs
+4. **Interactive TUI** — Scenario-aware prompt composer with live preview and delivery options, built on iocraft 0.8 (replacing previous ratatui)
+5. **Cross-session memory** — Persistent notes (markdown format) survive across agent interactions
 
-### 2. Write: Persistent Memory for AI Agents
+**Source**: GitHub README.md — "Five Context Engineering Strategies" section (accessed 2026-08-11)
 
-Note commands store information as human-readable markdown with auto-attachment to exports. Enables AI agents to remember context across sessions without bloating the context window.
+### 2. MCP Server Integration (31 Tools)
 
-**Source**: Medium article — "Write: Persistent memory system storing notes as markdown with automatic attachment to exports" (accessed 2026-08-10)
+Exposes 31 tools via Model Context Protocol, enabling Claude Code and other MCP-compatible agents to assemble context autonomously.
 
-### 3. Select: Precision File Selection
+**Transport**: Stdio JSON-RPC, protocol `2025-03-26`, no network or daemon required.
 
-Multiple selection strategies:
-- Glob patterns for file matching
-- Line ranges for partial file inclusion
-- Tree-sitter function/type extraction (e.g., `/find-fn` and `/find-type` scan entire project and present fuzzy-searchable picker of every function, struct, or interface)
+**Source**: GitHub README.md — "MCP Server" section; verified from WebFetch output "MCP server: 31 tools available" (accessed 2026-08-11)
 
-**Source**: Medium article — "Select: Precision file selection using glob patterns, line ranges, and tree-sitter function/type extraction" (accessed 2026-08-10)
+### 3. Interactive TUI with 48 Slash Commands
 
-### 4. Compress: Visual Token Counting
+Fullscreen terminal UI supports 48 slash commands accessible via `/` in interactive mode. TUI is built on **iocraft 0.8** with taffy flexbox layout.
 
-Prevents token budget overruns with accurate counting across 21+ AI models (Claude 3/3.5, GPT-4, Gemini, Llama, Mistral, etc.). Real-time updates as files are added/removed.
+**Source**: GitHub README.md — verified from WebFetch "TUI palette contains '48 unique entries' accessible via the `/` command" and "Built on 'iocraft 0.8'" (accessed 2026-08-11)
 
-**Source**: Medium article — "Compress: Visual token counting preventing budget overruns" and "Support for 21 AI models with automatic token counting" (accessed 2026-08-10)
+### 4. Token Counting for 21+ AI Models
 
-### 5. Isolate: Named Profiles
+Exact token counting via **tiktoken** for OpenAI models; character-based estimates (`chars / 4`) for others. Real-time token gauge in TUI prevents budget overruns.
 
-Keep separate work streams isolated with their own configurations, file selections, and exports. Enables context switching between projects without manual setup.
+**Source**: GitHub README.md — "Token Counting" section; verified from WebFetch "Uses 'tiktoken' for exact OpenAI model counts; character-based estimates" (accessed 2026-08-11)
 
-**Source**: Medium article — "Isolate: Named profiles keeping separate work streams isolated" (accessed 2026-08-10)
+### 5. Optional Tree-Sitter Function/Type Extraction
 
-### 6. MCP Integration
+Function and type extraction available behind `--features=extract` flag. Supports Rust, Go, Python, TypeScript, and JavaScript.
 
-15 MCP tools enable Claude Code (and other MCP-compatible agents) to build context bundles autonomously. Agent can discover relevant files, extract functions, assemble exports without user intervention.
+**Source**: GitHub README.md — verified from WebFetch "Function/type extraction is available behind the `--features=extract` flag, supporting Rust, Go, Python, TypeScript, and JavaScript" (accessed 2026-08-11)
 
-**Source**: Medium article — "15 MCP tools enabling autonomous context assembly" (accessed 2026-08-10)
+### 6. Multi-Language Installation Options
 
-### 7. Multiple Export Formats
+Three build profiles available:
 
-Exports to Markdown, XML, or JSON. Prompt templates support `{{bundle}}` and `{{task}}` placeholders for flexible integration with any AI workflow.
+- `cargo install ctxforge` — Latest features (recommended)
+- `cargo install ctxforge --features=extract` — Includes tree-sitter extraction
+- `cargo install ctxforge --no-default-features` — Minimal CLI-only (~6 MB static binary)
 
-**Source**: Medium article — "Three export formats (Markdown, XML, JSON)" and "Prompt templates with `{{bundle}}` and `{{task}}` placeholders" (accessed 2026-08-10)
+Requires Rust 1.85+; no runtime dependencies.
 
-### 8. Command Palette with 25+ Slash Commands
+**Source**: GitHub README.md — Installation section (accessed 2026-08-11)
 
-Fuzzy-searchable palette: `/find-fn`, `/find-type`, `/export`, `/remember`, `/count-tokens`, etc. Scriptable via CLI for automation and CI/CD integration.
+### 7. Core Property: Never Calls an LLM
 
-**Source**: Medium article — "Fuzzy-searchable command palette with 25 slash commands" (accessed 2026-08-10)
+**This is central to ctxforge's design**: ctxforge does not invoke or call any LLM itself. The tool exclusively handles prompt engineering tasks — context gathering, token counting, and formatting. LLMs consume the output; ctxforge does not call them.
+
+**Source**: GitHub Cargo.toml description — verified from WebFetch "Deterministic prompt engineer for AI coding agents... never calls an LLM" (accessed 2026-08-11)
 
 ---
 
@@ -93,151 +97,76 @@ Fuzzy-searchable palette: `/find-fn`, `/find-type`, `/export`, `/remember`, `/co
 
 ### Core Components
 
-**1. Rust Static Binary**
-Compiled as standalone executable with no runtime dependencies. Cross-compiles to macOS, Linux, and Windows.
+**1. CLI & MCP Server**
+Dual-mode binary: runs as CLI tool or MCP server. MCP mode exposes 31 tools via stdio JSON-RPC (protocol `2025-03-26`).
 
-**2. Tree-sitter Integration**
-Uses tree-sitter for language-aware code parsing. Enables function/type extraction without regex heuristics.
+**2. TUI Engine**
+Built on iocraft 0.8 with taffy flexbox layout. Supports 48 slash commands, live token counting, and scenario-aware prompt composition. No external daemon required.
 
-**3. Token Counting Engine**
-Model-specific token counters for 21+ LLMs (uses tokenizer libraries: `tiktoken` for OpenAI models, `llm-tokenizer` for others).
+**3. Token Counter**
+Dual backend: tiktoken (OpenAI models, exact) or character-based estimates (4 chars per token) for other models.
 
-**4. MCP Server**
-Exposes 15 tools following Model Context Protocol specification. Allows Claude Code to query context bundles.
+**4. GitHub Integration**
+Native `gh` CLI integration. Inlines GitHub resources (issues, PRs, files) via `gh://` URIs.
 
-**5. Local State Management**
-No external database. All state stored in `.ctxforge/` directory (markdown files, manifests, export cache).
+**5. Manifest Scanner**
+Detects and attaches documentation URLs from project manifests: `package.json`, `pyproject.toml`, `Cargo.toml`, etc.
 
-**6. TUI Framework**
-Built with Rust TUI libraries (likely `crossterm` or `ratatui`) for fullscreen terminal UI with event handling and color support.
+**6. Tree-Sitter Extraction (Optional)**
+Enabled via `--features=extract`. Finds functions and types across Rust, Go, Python, TypeScript, JavaScript.
 
-**Source**: GitHub profile and Medium article architecture descriptions (accessed 2026-08-10)
+**7. Persistent Memory Store**
+Markdown-based notes stored locally; no cloud sync required.
 
-### Data Flow
-
-```
-User selects files via TUI
-  ↓
-Tree-sitter parses and extracts functions/types
-  ↓
-Token counter calculates cost for current selection
-  ↓
-Live gauge updates in real-time
-  ↓
-User exports context as Markdown/XML/JSON
-  ↓
-Persistent notes attached automatically
-  ↓
-Export sent to Claude Code or stored locally
-```
+**Source**: GitHub README.md and Cargo.toml (accessed 2026-08-11)
 
 ---
 
 ## Installation & Usage
 
-### Installation (Rust Required)
-
-Build from source:
+### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/sylvester-francis/ctxforge.git
-cd ctxforge
-
-# Build with Rust toolchain
-cargo build --release
-
-# Binary at ./target/release/ctxforge
-./target/release/ctxforge --help
-```
-
-Or install via Rust package manager (if published to crates.io):
-
-```bash
+# Latest features (recommended)
 cargo install ctxforge
+
+# With tree-sitter extraction
+cargo install ctxforge --features=extract
+
+# Minimal CLI-only
+cargo install ctxforge --no-default-features
 ```
 
-**Source**: Inferred from Rust project structure (accessed 2026-08-10)
+Requirements: Rust 1.85+, no external dependencies.
 
-### Basic Usage: Interactive TUI
+**Source**: GitHub README.md — Installation section (accessed 2026-08-11)
+
+### Launch Interactive TUI
 
 ```bash
-# Launch fullscreen TUI in current directory
 ctxforge
-
-# Navigate with arrow keys, toggle files with Space
-# Watch token count update in real-time
-# Press 'e' to export, 'q' to quit
 ```
 
-### CLI Commands
+Starts fullscreen TUI with 48 available slash commands accessible via `/`.
+
+**Source**: GitHub README.md — Usage section (accessed 2026-08-11)
+
+### MCP Server Mode
 
 ```bash
-# Find all functions in project
-ctxforge find-fn "function_name"
-
-# Find all types/structs
-ctxforge find-type "MyStruct"
-
-# Export current bundle to markdown
-ctxforge export --format markdown --output context.md
-
-# Store a persistent note
-ctxforge remember "API auth flow: use OAuth2 with PKCE"
-
-# Count tokens for specific file
-ctxforge count-tokens --file src/main.rs --model claude-3-5-sonnet
-
-# Use a saved profile
-ctxforge load --profile project-alpha
-ctxforge save --profile project-alpha
+# Launch as MCP server on stdio
+ctxforge mcp
 ```
 
-**Source**: Medium article command palette descriptions (accessed 2026-08-10)
+Exposes 31 MCP tools via stdio JSON-RPC (protocol `2025-03-26`).
 
-### MCP Integration with Claude Code
+**Source**: GitHub README.md — MCP Server section (accessed 2026-08-11)
 
-Configure Claude Code to use ctxforge MCP server:
+### Token Counting (CLI)
 
-```json
-{
-  "mcpServers": {
-    "ctxforge": {
-      "command": "ctxforge",
-      "args": ["mcp-server"]
-    }
-  }
-}
-```
+Example: query exact token counts for your context bundle across multiple AI models. Tree-sitter extraction (if enabled) finds functions/types across supported languages.
 
-Claude Code can now call ctxforge tools to assemble context autonomously.
-
-**Source**: MCP integration capability described in Medium article (accessed 2026-08-10)
-
-### Template-Based Export
-
-Create a prompt template with context placeholders:
-
-```markdown
-# Task
-{{task}}
-
-# Relevant Code
-{{bundle}}
-
-# Instructions
-1. Understand the codebase structure
-2. Implement the required feature
-3. Add tests
-```
-
-Run export with template:
-
-```bash
-ctxforge export --template template.md --task "Add login feature"
-```
-
-**Source**: Medium article — "Prompt templates with `{{bundle}}` and `{{task}}` placeholders" (accessed 2026-08-10)
+**Source**: GitHub README.md (accessed 2026-08-11)
 
 ---
 
@@ -245,31 +174,27 @@ ctxforge export --template template.md --task "Add login feature"
 
 ### Applications
 
-ctxforge directly enhances Claude Code's ability to work with large codebases:
+1. **Autonomous Context Bundling**: Claude Code and other MCP clients can invoke ctxforge's 31 tools to query codebases, assemble context bundles, and pipe them to prompts without user intervention.
 
-1. **Autonomous Context Discovery**: AI agents can query a codebase, identify relevant functions/types, and assemble context without user manual selection.
+2. **Token Budget Visibility**: Real-time token counting prevents context window overruns across 21+ AI models.
 
-2. **Token Budget Safety**: Real-time token counting prevents oversized context bundles that blow the context window.
-
-3. **Persistent Agent Memory**: AI agents can store learnings, notes, and patterns across sessions without manual context re-entry.
-
-4. **Multi-Project Context Isolation**: Named profiles enable Claude Code to maintain separate, reproducible contexts for different projects or tasks.
+3. **Cross-Session Context Persistence**: Persistent markdown memory enables AI agents to store learnings and patterns across sessions.
 
 ### Patterns Worth Adopting
 
-- **Four-Pillar System**: The Write-Select-Compress-Isolate architecture provides a reusable pattern for building context management systems.
+- **Five-strategy context engineering**: The layered approach (manifest detection, GitHub mining, auto-suggest, TUI composition, persistent memory) provides a model for building context management systems.
 
-- **Tree-sitter for Semantic Selection**: Language-aware code parsing instead of regex enables more precise context extraction.
+- **MCP-driven automation**: Exposing 31 tools via MCP enables autonomous context assembly without manual user steps.
 
-- **Visual Token Budgeting**: Real-time token visualization is valuable for any LLM-powered tool that must respect context constraints.
+- **CLI + MCP dual mode**: Demonstrates how a single binary can serve both interactive and automated workflows.
 
 ---
 
 ## References
 
-- [GitHub Repository: sylvester-francis/ctxforge](https://github.com/sylvester-francis/ctxforge) (accessed 2026-08-10)
-- [Medium: "I'm Tired of Being My AI's Short-Term Memory. So I Built ctxforge"](https://medium.com/@sylvesterranjithfrancis/im-tired-of-being-my-ai-s-short-term-memory-so-i-built-ctxforge-eda0a5889d8f) (accessed 2026-08-10)
-- [Sylvester Ranjith Francis GitHub Profile](https://github.com/sylvester-francis) (accessed 2026-08-10)
+- [GitHub Repository: sylvester-francis/ctx-forge](https://github.com/sylvester-francis/ctx-forge) (accessed 2026-08-11)
+- Cargo.toml, version 2.1.0 (released 2026-04-20) (accessed 2026-08-11)
+- GitHub README.md — Five Context Engineering Strategies, MCP Server, Installation, Usage (accessed 2026-08-11)
 
 ---
 
@@ -277,5 +202,5 @@ ctxforge directly enhances Claude Code's ability to work with large codebases:
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Claude Code Prompt Improver](./claude-code-prompt-improver.md) | prompt-engineering | Both improve Claude Code's prompt handling; Prompt Improver focuses on vagueness detection while ctxforge focuses on context assembly |
-| [System Prompts and Models of AI Tools](./system-prompts-ai-tools.md) | prompt-engineering | Both study how AI tools are structured; ctxforge applies those patterns to build better context systems |
+| [Claude Code Prompt Improver](./claude-code-prompt-improver.md) | prompt-engineering | Both enhance Claude Code's prompt handling; Prompt Improver focuses on vagueness detection while ctxforge focuses on context assembly |
+

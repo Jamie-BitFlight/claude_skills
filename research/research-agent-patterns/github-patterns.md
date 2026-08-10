@@ -5,9 +5,9 @@ source_url: "https://github.com/github-patterns"
 version_at_research: "community-maintained"
 license: "Mixed (individual repos vary)"
 freshness_tracking:
-  last_verified: "2025-12-09"
-  version_at_verification: "as of 2025-12-09"
-  next_review: "2026-03-09"
+  last_verified: "2026-08-11"
+  version_at_verification: "as of 2026-08-11"
+  next_review: "2026-11-11"
   confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: high (code-read) | Installation & Usage: high | Relevance: high | References: high"
 ---
 
@@ -38,13 +38,13 @@ Comprehensive collection of 5 major research agent architecture patterns discove
 ### Pattern Collection Coverage
 
 Research identifies patterns from 40+ awesome lists and specialized research repositories:
-- [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) — 17,825 stars, curated commands/workflows/agents for Claude Code
-- [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) — 5,616 stars, 100+ production-ready specialized agents
-- [hesreallyhim/a-list-of-claude-code-agents](https://github.com/hesreallyhim/a-list-of-claude-code-agents) — 1,073 stars, community-submitted agents
-- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) — 76,332 stars, MCP server collection
-- [wong2/awesome-mcp-servers](https://github.com/wong2/awesome-mcp-servers) — 3,070 stars, curated MCP servers
+- [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) — 52,029 stars, curated commands/workflows/agents for Claude Code
+- [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) — 24,174 stars, 100+ production-ready specialized agents
+- [hesreallyhim/a-list-of-claude-code-agents](https://github.com/hesreallyhim/a-list-of-claude-code-agents) — 1,340 stars, community-submitted agents
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) — 92,033 stars, MCP server collection
+- [wong2/awesome-mcp-servers](https://github.com/wong2/awesome-mcp-servers) — 4,254 stars, curated MCP servers
 
-**Source**: Awesome Lists table (accessed 2025-12-09)
+**Source**: Awesome Lists (accessed 2026-08-11)
 
 ### Pattern 1: Chief of Staff Orchestration
 
