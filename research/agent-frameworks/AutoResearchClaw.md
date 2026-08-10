@@ -1,10 +1,10 @@
 ---
 name: autoresearchclaw
 research_date: 2026-04-03
-source_url: https://github.com/luowang8182/autoresearchclaw
-github_repository: https://github.com/luowang8182/autoresearchclaw
+source_url: https://github.com/aiming-lab/AutoResearchClaw
+github_repository: https://github.com/aiming-lab/AutoResearchClaw
 version_at_research: v0.4.0
-license: Apache 2.0
+license: MIT
 freshness_tracking:
   last_verified: 2026-04-03
   version_at_verification: v0.4.0
@@ -58,15 +58,16 @@ AutoResearchClaw is a fully autonomous research pipeline that transforms a singl
 
 ### 23-Stage Pipeline (8 Phases)
 
-The system orchestrates distinct phases with named components managing each stage:
+The system orchestrates eight distinct phases across 23 sequential stages (README L277-299):
 
-1. **Research Phase** (Stages 1-3): Literature discovery, gap analysis, hypothesis formulation
-2. **Design Phase** (Stages 4-6): Experiment design, baseline selection, configuration generation
-3. **Execution Phase** (Stages 7-14): Sandbox provisioning, code generation, hardware detection, execution, failure recovery
-4. **Analysis Phase** (Stages 15-18): Result aggregation, statistical analysis, evidence validation, visualization
-5. **Peer Review Phase** (Stages 19-20): Multi-agent review, quality gates
-6. **Writing Phase** (Stages 21-22): Paper composition, reference integration
-7. **Publication Phase** (Stage 23): Final quality audit, metadata generation
+1. **Phase A — Research Scoping** (Stages 1-2): Problem definition, scope boundaries
+2. **Phase B — Literature Discovery** (Stages 3-6): Paper search, source validation, knowledge compilation
+3. **Phase C — Knowledge Synthesis** (Stages 7-8): Hypothesis generation, research gap analysis
+4. **Phase D — Experiment Design** (Stages 9-11): Methodology selection, baseline establishment, experiment configuration
+5. **Phase E — Experiment Execution** (Stages 12-13): Sandbox setup, code generation, hardware auto-detection, experiment runs
+6. **Phase F — Analysis & Decision** (Stages 14-15): Result aggregation, statistical validation
+7. **Phase G — Paper Writing** (Stages 16-19): Draft composition, result integration, reference assembly
+8. **Phase H — Finalization** (Stages 20-23): Quality gate (Stage 20 QUALITY_GATE), peer review, citation verification (Stage 23 CITATION_VERIFY), publication preparation
 
 ### Multi-Agent Subsystems (v0.2.0+)
 
@@ -79,7 +80,7 @@ The system orchestrates distinct phases with named components managing each stag
 ### Sandbox Security
 
 - **Docker Hardening** (v0.2.0+): Network-policy-aware sandbox execution prevents unauthorized data exfiltration.
-- **Citation Verification**: 4-layer process (extract → validate source → cross-check arXiv/Semantic Scholar → flag suspicious patterns) removes fabricated references before use.
+- **Citation Verification** (README L331): 4-layer citation integrity process — (1) arXiv ID check, (2) CrossRef/DataCite DOI validation, (3) Semantic Scholar title match, (4) LLM relevance scoring — eliminates hallucinated references before integration into paper.
 
 ---
 
@@ -106,17 +107,28 @@ The `researchclaw setup` command:
 - Prompts for LLM provider configuration (OpenAI, Anthropic, etc.)
 - Validates hardware (GPU/CPU detection)
 
-### Intervention Modes (v0.4.0+)
+### Execution Modes (v0.4.0+, README L349-359)
+
+Six intervention modes allow researchers to direct critical decisions while automation handles routine stages:
 
 ```bash
 # Full automation (no human intervention)
-researchclaw run --topic "..." --auto-approve
+researchclaw run --topic "Your research idea" --mode auto-approve
 
-# Checkpoint-based (approve at critical stages)
-researchclaw run --topic "..." --checkpoint baseline,draft,final
+# Express mode (minimal human checkpoints)
+researchclaw run --topic "Your research idea" --mode express
+
+# Checkpoint mode (approve at critical pipeline stages)
+researchclaw run --topic "Your research idea" --mode checkpoint
 
 # Step-by-step (approve each stage)
-researchclaw run --topic "..." --step-by-step
+researchclaw run --topic "Your research idea" --mode step-by-step
+
+# Co-pilot mode (real-time collaborative human-AI research)
+researchclaw run --topic "Your research idea" --mode co-pilot
+
+# Custom mode (user-defined intervention points)
+researchclaw run --topic "Your research idea" --mode custom --config custom.yaml
 ```
 
 ---

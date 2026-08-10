@@ -6,7 +6,7 @@ title: "gstack — Claude Code Workflow Skills"
 
 ## Overview
 
-gstack is a collection of eight specialized Claude Code workflow skills (prompts + CLI tools) designed to automate the complete software development lifecycle from idea through production. Created by Garry Tan (President & CEO of Y Combinator), the framework replaces generic AI assistance with role-specific cognition—eight different mental models, each optimized for a distinct development phase, with built-in browser automation via Playwright and real-time markdown rendering (accessed 2026-03-14).
+gstack is a collection of eight specialized Claude Code workflow skills (prompts + CLI tools) designed to automate the complete software development lifecycle from idea through production. The framework replaces generic AI assistance with role-specific cognition—eight different mental models, each optimized for a distinct development phase, with built-in browser automation via Playwright and real-time markdown rendering (accessed 2026-03-14).
 
 ---
 

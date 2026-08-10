@@ -60,35 +60,14 @@ Superpowers is a complete software development workflow for AI coding agents, bu
 
 ## Key Features
 
-### Workflow Skills
+Superpowers enforces discipline across the software development lifecycle through 14 composable skills organized into four functional categories:
 
-The framework provides 14 composable skills organized by function, each enforcing a specific discipline in the software development process.
+1. **Testing**: Test-driven-development skill enforces RED-GREEN-REFACTOR cycle before implementation
+2. **Debugging**: Systematic-debugging and verification-before-completion skills enforce root-cause analysis
+3. **Collaboration & Orchestration**: Nine skills spanning brainstorming, planning, execution, code review, and subagent-driven development with two-stage verification
+4. **Meta**: Skills for creating new skills following TDD principles and onboarding to the framework
 
-#### Testing
-
-- **test-driven-development**: RED-GREEN-REFACTOR cycle enforcement with testing anti-patterns reference
-
-#### Debugging
-
-- **systematic-debugging**: 4-phase root cause process with root-cause-tracing, defense-in-depth, and condition-based-waiting techniques
-- **verification-before-completion**: Ensures fixes are actually verified before declaring success
-
-#### Collaboration & Orchestration
-
-- **brainstorming**: Socratic design refinement before implementation
-- **writing-plans**: Detailed implementation plan creation with bite-sized tasks
-- **executing-plans**: Batch execution with human checkpoints
-- **dispatching-parallel-agents**: Concurrent subagent workflows
-- **requesting-code-review**: Pre-review checklist for PR submissions
-- **receiving-code-review**: Systematic response to feedback
-- **using-git-worktrees**: Parallel development branches in isolated workspaces
-- **finishing-a-development-branch**: Merge/PR decision workflow and cleanup
-- **subagent-driven-development**: Fast iteration with two-stage review (spec compliance, then code quality)
-
-#### Meta Skills
-
-- **writing-skills**: Create new skills following TDD principles for documentation
-- **using-superpowers**: Introduction to the skills system and discovery
+Each skill is detailed in the Skills Library section below.
 
 ---
 
