@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Engineering"
+  short_description: "Route Python work through the right engineering workflow"
+  default_prompt: "Use $orchestrate to plan and execute this Python engineering task."

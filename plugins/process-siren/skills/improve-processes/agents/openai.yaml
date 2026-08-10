@@ -1,0 +1,4 @@
+interface:
+  display_name: "Process Improvement"
+  short_description: "Improve an incomplete or ambiguous process before execution"
+  default_prompt: "Use $improve-processes to analyze and improve this workflow."

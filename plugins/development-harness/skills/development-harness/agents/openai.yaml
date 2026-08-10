@@ -1,0 +1,4 @@
+interface:
+  display_name: "Development Harness"
+  short_description: "Route tracked work through the development lifecycle"
+  default_prompt: "Use $development-harness to choose the correct lifecycle step for this work."
