@@ -2,7 +2,7 @@
 title: "Impeccable"
 source_url: "https://github.com/pbakaus/impeccable"
 license: "Apache 2.0 (based on Anthropic's frontend-design skill)"
-version_at_research: "Latest (no formal version tag)"
+version_at_research: "3.5.0"
 research_date: "2026-08-10"
 next_review: "2026-11-10"
 ---
@@ -21,7 +21,7 @@ Impeccable is a design skill system that enhances AI coding agents' ability to g
 |---------|----------|
 | AI-generated interfaces produce repetitive, predictable designs using common templates and palettes | Provides deterministic detection rules (59+ rules) that identify design anti-patterns and enforce design principles |
 | Generic "good design" advice without concrete examples of mistakes to avoid | Explicit anti-pattern taxonomy showing what to avoid (e.g., Inter typeface everywhere, purple-to-blue gradients, nested cards) |
-| Designs lack project context and brand coherence | Mandatory context-gathering protocol (`/teach-impeccable` + `.impeccable.md`) ensuring AI has target audience, use cases, and brand personality before generating designs |
+| Designs lack project context and brand coherence | Mandatory context-gathering protocol (`/impeccable init` + `.impeccable/`) ensuring AI has target audience, use cases, and brand personality before generating designs |
 | Design validation requires human review with no structured quality checks | Audit commands automate technical quality checks without requiring API calls or LLM inference |
 
 ---
@@ -160,7 +160,7 @@ Commands include: `audit`, `polish`, `shape`, `critique`, `craft`, `init`, `docu
 
 4. **Context Protocol**: The mandatory context-gathering protocol demonstrates a pattern for ensuring AI harnesses have adequate project context before generating content, preventing generic output.
 
-5. **Command-Based Workflows**: The 23 specialized commands model a workflow-driven approach to design iteration (audit → normalize → polish) that aligns with multi-agent orchestration patterns used in Claude Code development.
+5. **Command-Based Workflows**: The 23 specialized commands model a workflow-driven approach to design iteration (audit → polish) that aligns with multi-agent orchestration patterns used in Claude Code development.
 
 ---
 
@@ -180,7 +180,7 @@ Codex CLI uses `/prompts:audit` instead of `/audit`, creating a non-standard inv
 
 ### Context Dependency
 
-Design output quality depends entirely on context provided by `/teach-impeccable` or `.impeccable.md`. The skill cannot infer context from code. Projects without context setup will receive generic output, defeating the purpose of the tool.
+Design output quality depends entirely on context provided by `/impeccable init` (which creates `.impeccable/` configuration files). The skill cannot infer context from code. Projects without context setup will receive generic output, defeating the purpose of the tool.
 
 ### No Benchmarking or Evaluation
 

@@ -3,8 +3,8 @@ title: "Obsidian Skills Repository"
 source_url: "https://github.com/kepano/obsidian-skills"
 license: "MIT License"
 version_at_research: "From main branch (no formal release versioning)"
-research_date: "2026-03-12"
-next_review: "2026-06-12"
+research_date: "2026-08-11"
+next_review: "2026-11-11"
 ---
 
 # Obsidian Skills
@@ -118,7 +118,7 @@ git clone https://github.com/kepano/obsidian-skills.git
 
 ### Usage Examples
 
-**Example 1: Obsidian Markdown Syntax** (from official SKILL.md)
+**Example 1: Obsidian Markdown Syntax** (excerpt from official SKILL.md)
 
 Creating a note with wikilinks, callouts, and embeds:
 
@@ -254,12 +254,12 @@ No public benchmarking or user studies document the effectiveness or adoption of
 
 ## References
 
-- [Obsidian Skills GitHub Repository](https://github.com/kepano/obsidian-skills) (accessed 2026-03-12)
-- [Agent Skills Specification](https://agentskills.io/specification) (referenced 2026-03-12)
-- [Obsidian Flavored Markdown Official Docs](https://help.obsidian.md/obsidian-flavored-markdown) (accessed 2026-03-12)
-- [Obsidian Bases Official Docs](https://help.obsidian.md/bases/syntax) (accessed 2026-03-12)
-- [JSON Canvas Spec 1.0](https://jsoncanvas.org/spec/1.0/) (referenced 2026-03-12)
-- [Obsidian CLI Official Docs](https://help.obsidian.md/cli) (accessed 2026-03-12)
+- [Obsidian Skills GitHub Repository](https://github.com/kepano/obsidian-skills) (accessed 2026-08-11)
+- [Agent Skills Specification](https://agentskills.io/specification) (referenced 2026-08-11)
+- [Obsidian Flavored Markdown Official Docs](https://help.obsidian.md/obsidian-flavored-markdown) (accessed 2026-08-11)
+- [Obsidian Bases Official Docs](https://help.obsidian.md/bases/syntax) (accessed 2026-08-11)
+- [JSON Canvas Spec 1.0](https://jsoncanvas.org/spec/1.0/) (referenced 2026-08-11)
+- [Obsidian CLI Official Docs](https://help.obsidian.md/cli) (accessed 2026-08-11)
 
 ---
 
