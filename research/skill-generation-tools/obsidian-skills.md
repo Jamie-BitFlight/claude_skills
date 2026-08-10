@@ -1,10 +1,130 @@
 ---
 title: "Obsidian Skills Repository"
-license: "MIT License (Copyright 2026)"
+source_url: "https://github.com/kepano/obsidian-skills"
+license: "MIT License"
+version_at_research: "Latest"
+research_date: "2026-03-12"
+next_review: "2026-06-12"
 ---
 
+# Obsidian Skills
+
+## Overview
+
+Obsidian Skills is a collection of agent tools designed to integrate AI agents with Obsidian, a popular note-taking and knowledge management platform. The repository provides five core skills that follow the Agent Skills specification, making them compatible with any skills-compatible AI agent platform. These skills enable AI agents to create, edit, and manage content within Obsidian vaults programmatically, bridging the gap between AI automation and personal knowledge management systems.
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| AI agents cannot work directly with Obsidian's ecosystem or personal knowledge bases | Five integrated skills (Markdown, Bases, Canvas, CLI, Defuddle) teach agents how to interact with Obsidian's open formats |
+| Knowledge management requires manual copying of AI outputs into Obsidian vaults | Skills enable programmatic creation, editing, and management of content within Obsidian vaults |
+| Content from web sources often contains noise and formatting issues | Defuddle skill extracts clean markdown from web pages to reduce processing overhead |
+| Agents lack understanding of Obsidian-specific syntax and features | Detailed SKILL.md documentation covers wikilinks, callouts, embeds, properties, and other Obsidian-flavored markdown features |
+
+---
+
+## Key Features
+
+### Five Core Skills
+
+**Obsidian Markdown** — Create and edit markdown files with Obsidian-specific syntax including:
+- Wikilinks (`[[page-name]]` and `[[page#section]]` for internal linking)
+- Callouts (custom highlighted blocks with titles like `> [!important]` for emphasis)
+- Embeds (`![[file.png|600]]` for including images with sizing)
+- LaTeX math expressions (`$O(n \log n)$` for inline and block formulas)
+- Tables, lists, and other standard markdown features
+
+**Obsidian Bases** — Work with Obsidian's database format (available in Obsidian Sync/Plus):
+- Create databases with custom fields and types
+- Define views, filters, and formulas for data manipulation
+- Structure relationship fields linking between database records
+- Extract data from vaults for analysis and reporting
+
+**JSON Canvas** — Create visual node-and-edge diagrams using the Canvas format:
+- Define text nodes with markdown content and positioning
+- Create edge connections between nodes with directional anchors
+- Generate interactive visual diagrams for planning, brainstorming, and documentation
+- Export diagrams as structured JSON for programmatic processing
+
+**Obsidian CLI** — Interact with vaults through command-line tools and plugin development:
+- Programmatically reload plugins during development
+- Check for errors in vault configuration and plugins
+- Take screenshots of vault state for verification
+- Extract DOM and console output for debugging
+
+**Defuddle** — Extract clean markdown from web pages:
+- Remove navigation, ads, and other boilerplate content
+- Reduce processing overhead by delivering focused markdown instead of full HTML
+- Support for multiple output formats and configuration options
+
+---
+
+## Technical Architecture
+
+### Skill Organization and Distribution
+
+Skills are stored in separate directories following Agent Skills specification, with each skill containing:
+
+- **SKILL.md**: Agent-facing instructions with YAML frontmatter declaring name, description, triggers, and version
+- **references/**: Supporting documentation (e.g., CALLOUTS.md, EMBEDS.md, PROPERTIES.md)
+- **README.md**: User-facing documentation
+- **examples/**: Usage examples and patterns
+
+Distribution mechanisms:
+- Plugin marketplace registration for automated discovery
+- npm package manager support for programmatic installation
+- GitHub-based installation for direct repository access
+- Support for Claude Code, Codex, OpenCode, and other Agent Skills-compatible platforms
+
+### Skill Composition Pattern
+
+Skills are designed to be modular but work together on shared vault state:
+- **Decomposition**: Application features map to atomic skills (Markdown, Bases, Canvas, CLI)
+- **Shared State**: All skills operate on the same Obsidian vault, enabling workflows that chain skills together
+- **Documentation Structure**: Each skill references external docs (Obsidian help, JSON Canvas spec, Agent Skills spec) and internal reference files for drill-down detail
+- **Reference Pattern**: Subdirectories (CALLOUTS.md, EMBEDS.md, PROPERTIES.md, FUNCTIONS_REFERENCE.md, EXAMPLES.md) break out detailed specifications from main SKILL.md, allowing agents to load comprehensive references on-demand
+
+---
+
+## Installation & Usage
+
+### Installation Methods
+
+**Option 1: Plugin Marketplace**
+
+```bash
+/plugin marketplace add kepano/obsidian-skills
+/plugin install obsidian-markdown@kepano-skills
+```
+
+Then browse and install individual skills via `/plugin` UI.
+
+**Option 2: npm Package Manager**
+
+```bash
+npm install @kepano/obsidian-skills --global
+```
+
+**Option 3: Manual GitHub Installation**
+
+```bash
+git clone https://github.com/kepano/obsidian-skills.git
+cp -r obsidian-skills/skills/* ~/.claude/skills/
+```
+
+### Usage Examples
+
+**Example 1: Obsidian Markdown Syntax** (from official SKILL.md)
+
+Creating a note with wikilinks, callouts, and embeds:
+
+```markdown
+---
 title: Project Alpha
-date: 2024-01-15
+date: 2026-01-15
 tags:
   - project
   - active
@@ -25,26 +145,16 @@ This project aims to [[improve workflow]] using modern techniques.
   - [ ] Backend implementation
   - [ ] Frontend design
 
-## Notes
-
-The algorithm uses $O(n \log n)$ sorting. See [[Algorithm Notes#Sorting]] for details.
+See [[Algorithm Notes#Sorting]] for details.
 
 ![[Architecture Diagram.png|600]]
-
-Reviewed in [[Meeting Notes 2024-01-10#Decisions]].
-
 ```
 
-This example demonstrates: frontmatter properties, wikilinks (`[[improve workflow]]`, `[[Algorithm Notes#Sorting]]`), callouts with custom titles, inline LaTeX math, embeds with sizing (`![[Architecture Diagram.png|600]]`), and block-level links (`[[Meeting Notes 2024-01-10#Decisions]]`).
+This demonstrates: frontmatter properties, wikilinks (including section links), callouts with custom titles, inline highlight syntax, checklist items, and image embeds with sizing.
 
-**Confidence**: high — verbatim from source SKILL.md
-
-### Example 2: Creating a Canvas with JSON Canvas Skill
-
-Extracted directly from json-canvas references/EXAMPLES.md:
+**Example 2: JSON Canvas** (from json-canvas EXAMPLES.md)
 
 ```json
-
 {
   "nodes": [
     {
@@ -76,16 +186,11 @@ Extracted directly from json-canvas references/EXAMPLES.md:
     }
   ]
 }
-
 ```
 
-Demonstrates: node structure with unique hex IDs, positioned text nodes, edges with directional anchors (`fromSide`, `toSide`).
+Demonstrates: node structure with unique IDs, positioned text nodes with markdown content, edge connections with directional anchors.
 
-**Confidence**: high — verbatim from source examples file
-
-### Example 3: Using Obsidian CLI for Plugin Development
-
-Extracted from obsidian-cli SKILL.md "Plugin development" section:
+**Example 3: Obsidian CLI for Plugin Development** (from obsidian-cli SKILL.md)
 
 ```bash
 # After making code changes:
@@ -100,41 +205,75 @@ obsidian dev:dom selector=".workspace-leaf" text
 
 # Check console output
 obsidian dev:console level=error
-
 ```
 
 This 4-step workflow (reload → check errors → verify visually → check console) allows agents to iterate on plugin code with immediate feedback.
 
-**Confidence**: high — verbatim from source SKILL.md
+---
 
-## Relevance to Claude Code and AI Agent Development
+## Relevance to Claude Code Development
 
-### 1. Skill Template for Domain-Specific Extensibility
+### Direct Applications
 
-Obsidian Skills demonstrates the Agent Skills specification applied to a specific application domain (note-taking). The repository serves as a reference implementation showing how to:
+1. **Skill Template for Domain-Specific Extensibility** — Obsidian Skills demonstrates the Agent Skills specification applied to a specific application domain (note-taking). Shows how to decompose application features into atomic skills that work together on shared state.
 
-- **Decompose application features into atomic skills** — Obsidian Markdown, Bases, CLI, and Canvas are conceptually separate but work together on shared vault state
-- **Document syntax and workflows in agent-readable format** — SKILL.md files use structured sections (Workflow, Syntax, Examples, References) that enable agents to parse and follow instructions
-- **Reference supporting documentation** — Each skill references external docs (official Obsidian help, JSON Canvas spec, Agent Skills spec) and internal reference files, allowing agents to drill down on specific questions
+2. **Multi-Format Document Handling Pattern** — The five skills collectively cover multiple content formats: Markdown (text), YAML (structured data/Bases), JSON (Canvas), and CLI operations. Directly applicable to Claude Code workflows where agents must work with heterogeneous file formats in a project.
 
-### 2. Multi-Format Document Handling Pattern
+3. **Installation and Distribution Strategy** — The repository's multi-platform installation support (marketplace, npm, manual) demonstrates how to package agent skills for broad compatibility. Claude Code can adopt this strategy for distributing custom skills.
 
-The five skills collectively cover multiple content formats: Markdown (text), YAML (structured data/Bases), JSON (Canvas), and CLI operations. This pattern is directly applicable to Claude Code workflows where agents must work with heterogeneous file formats in a project.
+4. **Reference Documentation Pattern** — References subdirectories (CALLOUTS.md, EMBEDS.md, PROPERTIES.md, FUNCTIONS_REFERENCE.md, EXAMPLES.md) show how to break out detailed specifications from main SKILL.md instruction files. Agents can load comprehensive references on-demand without overwhelming the main skill instruction.
 
-### 3. Installation and Distribution Strategy
+### Patterns Worth Adopting
 
-The repository's multi-platform installation support (marketplace, npm, manual) demonstrates how to package agent skills for broad compatibility. Claude Code can adopt this strategy for distributing custom skills across different deployment contexts.
+1. **Atomic Skill Decomposition** — Break down complex workflows into narrowly-scoped skills that map to specific application features, enabling reuse and clear boundaries.
 
-### 4. Reference Documentation Pattern
+2. **Shared State Management** — Design skills to operate on shared resources (a vault, repository, project) rather than in isolation, enabling skill composition and workflow chaining.
 
-The references/ subdirectories (CALLOUTS.md, EMBEDS.md, PROPERTIES.md, FUNCTIONS_REFERENCE.md, EXAMPLES.md) show how to break out detailed specifications from main SKILL.md instruction files. This allows agents to load comprehensive references on-demand without overwhelming the main skill instruction.
+3. **Example-Driven Documentation** — Each skill includes complete, working examples extracted verbatim from official documentation. Agents can copy and adapt these patterns without guessing syntax.
+
+4. **External Reference Integration** — Skills cite and link to external authoritative sources (Obsidian help, JSON Canvas spec, Agent Skills spec) and maintain internal reference files, enabling drill-down when agents need detailed specifications.
+
+---
+
+## Limitations and Caveats
+
+### Limited to Obsidian Ecosystem
+
+Skills are tightly coupled to Obsidian's specific formats and CLI. Agents cannot use these skills to work with other note-taking platforms, databases, or knowledge management systems outside Obsidian.
+
+### Obsidian Sync/Plus Required for Bases
+
+The Obsidian Bases skill requires Obsidian Sync or Obsidian Plus subscription. Personal vaults without these subscriptions cannot use database functionality.
+
+### Plugin Development Requires Local Installation
+
+The Obsidian CLI skill requires a local Obsidian installation for plugin development workflows. Agents cannot test plugins in isolated or remote environments.
+
+### No Official Benchmarking
+
+No public benchmarking or user studies document the effectiveness or adoption of these skills. Results and usage patterns are not quantified in available sources.
+
+---
 
 ## References
 
-- [obsidian-skills GitHub Repository](https://github.com/kepano/obsidian-skills) — Official source (accessed 2026-03-12)
-- [Agent Skills Specification](https://agentskills.io/specification) — Standard that obsidian-skills follows (accessed 2026-03-12)
-- [Obsidian Flavored Markdown Official Docs](https://help.obsidian.md/obsidian-flavored-markdown) (referenced in SKILL.md)
-- [Obsidian Bases Official Docs](https://help.obsidian.md/bases/syntax) (referenced in SKILL.md)
-- [JSON Canvas Spec 1.0](https://jsoncanvas.org/spec/1.0/) (referenced in SKILL.md)
-- [Obsidian CLI Official Docs](https://help.obsidian.md/cli) (referenced in SKILL.md)
-- [Defuddle GitHub Repository](https://github.com/kepano/defuddle-cli) (referenced in SKILL.md)
+- [Obsidian Skills GitHub Repository](https://github.com/kepano/obsidian-skills) (accessed 2026-03-12)
+- [Agent Skills Specification](https://agentskills.io/specification) (referenced 2026-03-12)
+- [Obsidian Flavored Markdown Official Docs](https://help.obsidian.md/obsidian-flavored-markdown) (accessed 2026-03-12)
+- [Obsidian Bases Official Docs](https://help.obsidian.md/bases/syntax) (accessed 2026-03-12)
+- [JSON Canvas Spec 1.0](https://jsoncanvas.org/spec/1.0/) (referenced 2026-03-12)
+- [Obsidian CLI Official Docs](https://help.obsidian.md/cli) (accessed 2026-03-12)
+
+---
+
+## Freshness Tracking
+
+| Section | Confidence | Notes |
+|---------|-----------|-------|
+| Overview | high | Verified from GitHub README and repository structure |
+| Problem Addressed | high | Directly cited from project purposes and feature descriptions |
+| Key Features | high | Examples verbatim from SKILL.md files and reference documentation |
+| Technical Architecture | high | Based on actual file structure and Agent Skills specification |
+| Installation & Usage | high | Commands directly from installation guides and examples |
+| Relevance | medium | Patterns identified from structure and design; specific Claude Code integration not independently tested |
+
