@@ -3,11 +3,11 @@ name: zeroboot
 research_date: "2026-08-10"
 source_url: https://github.com/zerobootdev/zeroboot
 github_repository: https://github.com/zerobootdev/zeroboot
-version_at_research: v1.0.0
+version_at_research: No formal releases (working prototype)
 license: "Apache-2.0"
 freshness_tracking:
   last_verified: "2026-08-10"
-  version_at_verification: v1.0.0
+  version_at_verification: No formal releases
   next_review: "2026-11-10"
   confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: medium, Relevance: medium"
 ---
@@ -43,7 +43,7 @@ Zeroboot is an open-source platform that creates lightweight virtual machine san
 
 - **Minimal memory overhead**: Each fork is a real KVM VM with ~265KB base footprint; unused memory pages shared with template via CoW
 - **Hardware-enforced isolation**: Each fork operates as a separate KVM VM with memory-protection faults preventing cross-sandbox access
-- **Scalable parallelism**: Enables 10,000+ concurrent sandboxes on commodity hardware
+- **Scalable parallelism**: README reports 1,000 concurrent forks completed in 815ms
 
 ### Unified API
 
@@ -83,65 +83,28 @@ Zeroboot uses Firecracker (AWS's lightweight VMM) as the core sandbox engine, co
 
 ## Installation & Usage
 
-### Managed API (Recommended)
-
-```bash
-# Use the cloud-hosted API
-curl -X POST https://api.zeroboot.dev/v1/exec \
-  -H 'Authorization: Bearer YOUR_API_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "code": "print(1 + 1)",
-    "runtime": "python3.11"
-  }'
-```
-
 ### Python SDK
 
 ```python
-from zeroboot import Client
+from zeroboot import Sandbox
 
-client = Client(api_key="your_api_key")
-
-# Execute code in a sandbox
-result = client.exec(
-    code="print('Hello from Zeroboot')",
-    runtime="python3.11"
-)
-
-print(result.stdout)  # "Hello from Zeroboot"
+# Create and use a sandbox
+sb = Sandbox("zb_live_...")  # API key
+result = sb.run("print(1 + 1)")
 ```
 
 ### TypeScript SDK
 
 ```typescript
-import { ZerobootClient } from "zeroboot";
+import { Sandbox } from "@zeroboot/sdk";
 
-const client = new ZerobootClient({ apiKey: "your_api_key" });
-
-const result = await client.exec({
-  code: "console.log('Hello from Zeroboot')",
-  runtime: "node18"
-});
-
-console.log(result.stdout); // "Hello from Zeroboot"
+const sb = new Sandbox("zb_live_...");  // API key
+const result = await sb.run("console.log(1 + 1)");
 ```
 
-### Self-Hosted Deployment
+### Cloud-Hosted API
 
-Requirements:
-- Linux host with KVM support (`/dev/kvm` available)
-- Root or CAP_SYS_ADMIN privileges for Firecracker
-
-```bash
-# Build from source
-git clone https://github.com/zerobootdev/zeroboot.git
-cd zeroboot
-cargo build --release
-
-# Start the local API server
-./target/release/zeroboot-server --listen 0.0.0.0:8080
-```
+Zeroboot provides a managed API service for cloud-based sandbox execution. Both SDKs interact with this API.
 
 (SOURCE: [GitHub - zerobootdev/zeroboot](https://github.com/zerobootdev/zeroboot), accessed 2026-08-10)
 
@@ -153,7 +116,7 @@ cargo build --release
 
 1. **Unsafe Agent Code Execution**: Claude Code agents generate untrusted code. Zeroboot's hardware-enforced isolation enables safe execution of agent-generated Python/JavaScript without compromising host security.
 
-2. **Agentic Inference at Scale**: Multi-agent systems running simultaneous sandboxes (10,000+ concurrent) becomes feasible with sub-millisecond overhead. Zeroboot enables parallel agent execution on fixed hardware resources.
+2. **Agentic Inference at Scale**: Multi-agent systems running simultaneous sandboxes (README reports 1,000 concurrent forks in 815ms) become feasible with sub-millisecond overhead. Zeroboot enables parallel agent execution on fixed hardware resources.
 
 3. **Reproducible Execution Environments**: Template snapshots ensure consistent runtime state across sandbox instances — useful for agent benchmarking and A/B testing different agent strategies.
 
@@ -173,15 +136,15 @@ cargo build --release
 
 ## Limitations and Caveats
 
-1. **Linux/KVM Dependency**: Self-hosted Zeroboot requires Linux with KVM support. Windows and macOS without nested virtualization cannot run self-hosted deployments.
+Per the README, Zeroboot has documented constraints:
 
-2. **Managed API Rate Limits**: Cloud-hosted API may have quota restrictions on concurrent sandbox count and execution time per request (not documented in reviewed sources).
+1. **CSPRNG State Shared Across Forks**: Forks share CSPRNG (cryptographically secure random number generator) state from the snapshot, requiring manual userspace reseeding.
 
-3. **I/O and Network Constraints**: Sandboxes are optimized for compute workloads. I/O performance (disk access, network latency) may not match native execution.
+2. **Single vCPU Per Fork**: Each sandboxed fork is limited to a single virtual CPU.
 
-4. **Limited Runtime Support**: Available runtimes (Python, Node.js) documented; other languages require custom template creation, adding operational complexity.
+3. **No Networking Inside Forks**: Hard constraint — sandboxes do not support network access at all.
 
-5. **Production Maturity**: GitHub repository shows active development; self-hosted deployments are non-trivial and require operational expertise with KVM and Firecracker.
+4. **Template Snapshot Time**: Template updates require a full re-snapshot, which takes approximately 15 seconds.
 
 ---
 

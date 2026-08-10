@@ -2,12 +2,10 @@
 name: omma
 research_date: "2026-08-10"
 source_url: https://omma.build
-github_repository: https://github.com/spline-ai/omma
-version_at_research: v1.0.0
-license: "Proprietary (commercial with free tier)"
+license: "Proprietary (SaaS platform, free tier available)"
 freshness_tracking:
   last_verified: "2026-08-10"
-  version_at_verification: v1.0.0
+  version_at_verification: N/A (cloud-hosted SaaS)
   next_review: "2026-11-10"
   confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium, Installation & Usage: high, Relevance: medium"
 ---
@@ -16,7 +14,7 @@ freshness_tracking:
 
 ## Overview
 
-Omma is an AI-powered creative studio built by Spline that generates interactive digital experiences from natural language descriptions. Users can create websites, web applications, 3D scenes, games, presentations, and data visualizations by describing them in text, with parallel AI agents handling code generation, 3D geometry creation, and material/texture synthesis simultaneously. Launched March 25, 2026, Omma offers free and paid tiers, combining multi-agent parallel execution with interactive output editing. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10; [Omma Documentation](https://omma.build/docs/getting-started/introduction), accessed 2026-08-10; [Omma Product Hunt Launch](https://www.producthunt.com/posts/omma-ai-creative-studio), accessed 2026-08-10)
+Omma is an AI-powered creative studio built by Spline that generates interactive digital experiences from natural language descriptions. Users can create websites, web applications, 3D scenes, games, presentations, and data visualizations by describing them in text, with parallel AI agents handling code generation, 3D geometry creation, and material/texture synthesis simultaneously. Launched March 24, 2026, Omma offers free and paid tiers, combining multi-agent parallel execution with interactive output editing. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10; [Omma Documentation](https://omma.build/docs/getting-started/introduction), accessed 2026-08-10; [Omma Product Hunt Launch](https://www.producthunt.com/posts/omma-ai-creative-studio), accessed 2026-08-10)
 
 ---
 
@@ -65,27 +63,7 @@ Omma is an AI-powered creative studio built by Spline that generates interactive
 
 ## Technical Architecture
 
-Omma's architecture combines three primary processing layers:
-
-1. **Multi-Agent Generation Layer**: Parallel orchestration of specialized AI agents:
-   - Code generation agent (handles HTML, CSS, JavaScript/React)
-   - 3D geometry agent (generates 3D models, coordinates)
-   - Material/texture agent (creates shaders, colors, textures)
-   - Media generation agents (images, video, audio)
-
-2. **Spline 3D Engine Integration**: Built on Spline's motion design platform:
-   - Native 3D rendering pipeline
-   - Interactive 2D and 3D motion design capabilities
-   - Collaborative real-time editing via Canvas
-
-3. **Synthesis & Output Layer**:
-   - Code compilation to runnable web applications
-   - 3D scene assembly and optimization
-   - Media asset management and serving
-
-**Parallel Execution Model** (SOURCE: [Omma Documentation](https://omma.build/docs/getting-started/introduction), accessed 2026-08-10):
-
-Instead of sequential generation (write code → wait → generate 3D → wait → add textures), Omma fans out multiple agents simultaneously to explore different creative directions at once. This reduces total iteration time compared to strictly sequential approaches.
+Omma uses a multi-agent parallel execution approach where specialized AI agents work simultaneously on different aspects of creation (code, 3D models, textures). The platform is built on Spline's motion design engine and provides an interactive Canvas for collaborative editing of generated artifacts. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10)
 
 ---
 
@@ -120,81 +98,25 @@ Result: Omma generates:
 - Integrated with Spline 3D for any 3D elements
 ```
 
-### Creating 3D Experiences
+### Creating Experiences
 
-```
-Prompt: "Build a 3D interactive game where players collect coins 
-in a colorful island environment. Include water, trees, and 
-floating coins with sparkle effects."
+Omma generates interactive digital experiences from natural language descriptions, including websites, web apps, 3D scenes, and games.
 
-Result: Omma generates:
-- Unity/Babylon.js compatible 3D scene
-- 3D models for coins, trees, water
-- Physics simulation for coin collection
-- Particle effects for sparkles
-- Interactive player controls
-```
+### Pricing
 
-### API/Integration
-
-Omma provides webhooks and API endpoints for programmatic creation:
-
-```python
-# Not yet publicly documented; integration likely via REST API
-# POST /api/v1/projects/create
-# {
-#   "prompt": "description of creation",
-#   "format": "website | game | 3d_scene",
-#   "options": { "parallel_agents": 100 }
-# }
-```
-
-### Pricing Tiers (As of 2026-03-25)
-
-**Free Tier** - $0/month
-- Limited daily generations
-- Basic project storage
-- Community support
-
-**Professional Tier** - $29/month
-- 100+ generations/month
-- Priority generation queue
-- Custom project storage
-- Email support
-
-**Enterprise Tier** - Custom pricing
-- Unlimited generations
-- Team collaboration features
-- API access
-- Dedicated support
-
-(SOURCE: [Omma Pricing Page](https://omma.build/pricing), accessed 2026-08-10)
+Omma offers a free tier for limited usage and a Pro tier starting at $29/month for increased generation quotas and priority support. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10)
 
 ---
 
 ## Relevance to Claude Code Development
 
-### Direct Applications
-
-1. **Agentic UI Generation**: Claude Code agents could use Omma's parallel generation API to create interactive UI mockups from natural language specifications, dramatically accelerating UI development.
-
-2. **Multi-Agent Coordination Learning**: Omma's parallel agent pattern (code + 3D + textures) demonstrates effective coordination strategies for multi-agent systems — valuable for Claude Code's own multi-agent orchestration design.
-
-3. **Output Visualization**: Claude Code could integrate Omma to generate visual previews of agent outputs, helping developers understand and validate multi-step agent workflows.
-
 ### Patterns Worth Adopting
 
-1. **Parallel Agent Specialization**: Rather than single generalist agents, split specialized concerns (code generation, testing, documentation) into parallel agents with clear interfaces.
+1. **Parallel Agent Specialization**: Omma's multi-agent approach — running specialized agents in parallel for code, 3D, and textures — demonstrates effective coordination strategies applicable to Claude Code's agent orchestration.
 
 2. **Interactive Output Editing**: The Canvas paradigm of "generate then refine" mirrors agent + human collaboration — agents produce initial artifacts, humans refine via natural language feedback.
 
-3. **Multi-Modal Output Synthesis**: Combining code + visual + interactive elements reflects modern application development; Claude Code could adopt this pattern for holistic artifact generation.
-
-### Integration Opportunities
-
-1. **Claude Code Skill for Omma**: A skill that wraps Omma's API, allowing Claude Code to generate interactive prototypes directly from agent specifications.
-
-2. **Design Handoff Automation**: Agents could generate designs in Omma, then automatically handoff to Claude Code for implementation, closing the design-to-code gap.
+3. **Multi-Modal Output Synthesis**: Combining code + visual + interactive elements reflects modern application development; Claude Code could adopt similar patterns for holistic artifact generation.
 
 ---
 

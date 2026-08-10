@@ -188,7 +188,7 @@ CUA integrates with and builds upon:
 - [CUA Official Documentation](https://cua.ai/docs) (accessed 2026-08-10)
 - [CUA Community Discord](https://discord.gg/cua) (accessed 2026-08-10)
 - [OSWorld Benchmark Dataset](https://www.osworld.dev) (accessed 2026-08-10)
-- [ScreenSpot Evaluation Framework](https://www.screenspot.dev) (accessed 2026-08-10)
+- ScreenSpot Evaluation Framework (referenced in CUA README; official website not accessible)
 
 ---
 

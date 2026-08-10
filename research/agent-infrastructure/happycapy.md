@@ -153,99 +153,51 @@ HappyCapy is cloud-native and requires no installation:
 4. Start describing what you want in natural language
 ```
 
-### Basic Usage Examples
+### Basic Usage
 
-**Example 1: Automate a Report**
-
-```
-User prompt: "Create a Python script that downloads CSV sales data from S3, 
-calculates total revenue by region, and generates a PDF report with charts."
-
-Result:
-- Claude Code analyzes the request
-- Generates Python script with boto3, pandas, matplotlib
-- Creates and executes within sandboxed environment
-- Delivers PDF report to your inbox via Capymail
-- You can reply to ask for refinements
-```
-
-**Example 2: Build a Web Skill**
-
-```
-User prompt: "Create a skill that scrapes product reviews from a URL, 
-analyzes sentiment, and categorizes them into positive, neutral, negative."
-
-Result:
-- HappyCapy generates a reusable skill
-- Skill packaged as npm module or Python package
-- Published to SkillsMP marketplace for sharing
-- Other users can install with single click
-```
-
-**Example 3: Multi-Agent Workflow**
-
-```
-User prompt: "Set up automated daily monitoring: fetch error logs from production,
-analyze patterns, create a Slack summary, and email the team."
-
-With Agent Teams (Max tier):
-- Agent 1 fetches logs
-- Agent 2 analyzes patterns (in parallel)
-- Agent 3 formats Slack message (in parallel)
-- Agents coordinate and send outputs
-- Runs on schedule every morning
-```
-
-### Installation Methods
-
-**Cloud (Recommended)**:
-- Access via browser at https://happycapy.ai — no installation needed
-
-**Self-Hosted (for teams)**:
-- Enterprise tier supports private deployment
-- Contact sales@happycapy.ai for self-hosted licensing
-
-(SOURCE: [HappyCapy Pricing Page](https://happycapy.ai/pricing), accessed 2026-08-10)
+HappyCapy is accessed via web browser at https://happycapy.ai. No installation required. Users describe desired projects in natural language; the platform runs Claude Code agents within a private sandbox to execute tasks.
 
 ---
 
 ## Pricing & Tiers
 
-(as of 2026-02-11, SOURCE: <https://happycapy.ai/pricing>)
+(as of 2026-08-10, SOURCE: [HappyCapy Pricing Page](https://happycapy.ai/pricing))
 
 ### Free Tier — $0/month
 
-**Access to:**
-- Limited Claude Code access
-- Limited MiniMax M2.5 access
-- Limited AI models access via skills
-- Basic sandbox environment (isolated execution)
+- 250 credits monthly
+- Basic sandbox environment
+- Claude model access
 - Custom skill creation
-- Open-source skill compatibility
 
 ### Pro Tier — $20/month ($17/month with annual billing)
 
-**Includes all Free features, plus:**
-- 2,000 monthly Claude Code credits (vs. limited in Free)
-- Unlimited access to 150+ AI models via skills
-- Unlimited MiniMax M2.5 access
-- Sandbox upgrade: 2 cores, 4 GB RAM, 50 GB storage
-- Automation: run recurring tasks in the sandbox
-- Capymail access for sending and receiving emails
-- **Early Bird pricing**: $17/month annually
+- 2,000 credits monthly
+- Upgraded sandbox (2 cores, 4GB RAM, 50GB storage)
+- Frontier model access
+- 3 automations
+- 200 email quota via Capymail
+
+### Plus Tier — $50/month ($42/month with annual billing)
+
+- 5,000 credits monthly
+- Same sandbox specs as Pro
+- 5 automations
+- 2,000 email quota
 
 ### Max Tier — $200/month ($167/month with annual billing)
 
-**Includes all Pro features, plus:**
-- Unlimited Claude Code access
-- Unlimited access to 150+ AI models via skills
-- Sandbox upgrade: 4 cores, 8 GB RAM, 200 GB storage
-- More automations (recurring task capacity)
-- Higher email quota
-- Early access to iOS App
-- Agent teams with GUI (research preview)
-- Priority human support
-- **Early Bird pricing**: $167/month annually
+- 22,000 credits monthly
+- Enhanced sandbox (4 cores, 8GB RAM, 200GB storage)
+- 10 automations
+- 5,000 email quota
+- iOS app early access
+- Agent teams with GUI
+- Priority support
+
+### Team Tier
+
+- Flexible enterprise solutions available
 
 ---
 
