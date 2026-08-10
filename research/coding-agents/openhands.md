@@ -48,6 +48,39 @@ OpenHands is an open-source, model-agnostic platform for building and deploying 
 
 ---
 
+## Key Features
+
+### Model-Agnostic Agent Framework
+
+- Works with Claude, GPT, Qwen, Deepseek, and any LLM (locally or via API)
+- Unified Python SDK and REST API for agent definition and execution
+- CodeAct 2.1 agent achieving 77.6% on SWE-bench Verified with inference-time scaling and automatic context compression
+
+### Multiple Deployment Modes
+
+- **Local**: Python SDK for laptop/local development
+- **CLI**: Terminal-based interface for interactive agent interaction
+- **Cloud**: Hosted deployment with GitHub/GitLab/Slack/Jira integrations and multi-user support
+- **Enterprise**: Source-available self-hosted option for VPC/Kubernetes
+
+### Rich Tool Integration
+
+- Pre-defined tools: Bash execution, file editing, web browsing, MCP client support
+- Custom tool creation via Python
+- Docker/Kubernetes sandboxed execution for safe code testing
+- Native file system, shell, and browser access
+
+### Production-Ready Features
+
+- 30x speedup on SWE-bench evaluation via cloud infrastructure
+- Automatic context compression for long-running tasks
+- Built-in security analysis and guardrails
+- Task planning and decomposition capabilities
+
+**Source**: <https://openhands.dev> and <https://github.com/OpenHands/OpenHands> (accessed 2026-01-26)
+
+---
+
 ## Product Offerings
 
 ### 1. Software Agent SDK

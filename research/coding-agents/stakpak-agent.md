@@ -3,6 +3,32 @@ title: "Stakpak Agent — Secure DevOps AI Agent"
 license: "Apache-2.0"
 ---
 
+# Stakpak Agent
+
+## Overview
+
+Stakpak is a security-hardened, multi-provider AI agent built in Rust, optimized for DevOps and infrastructure automation. The platform provides a terminal UI, REST API, and MCP server interfaces for running autonomous agents that generate infrastructure code, manage deployments, and automate operational tasks while maintaining strict credential security. Stakpak supports local execution on laptops or 24/7 autonomous operation via system services (launchd/systemd), with native integrations for Slack, Telegram, and Discord notifications.
+
+**Core Value Proposition**: Run AI-assisted DevOps work with full control over LLM provider selection (Claude, GPT, Gemini, or custom), credential security (secret substitution), and infrastructure isolation via Docker sandboxing.
+
+**Source**: <https://github.com/stakpak/agent> (accessed 2026-03-13)
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| DevOps agents expose production credentials to LLM APIs | Secret substitution: LLM receives variable references, credentials resolved at execution time |
+| Scaling DevOps automation from local to production requires re-architecture | Single CLI works locally or scales via system services (24/7 autopilot with cron-driven scheduling) |
+| AI agents lack access to infrastructure (Kubernetes, Docker, Terraform) | Secure Docker/Kubernetes runtime sandbox with shell, file system, and tool execution access |
+| DevOps workflows require manual credential management for each tool | Encrypted credential storage in config; mTLS for MCP server communication; warden guardrails block destructive operations |
+| Integrating AI agents into DevOps teams requires custom tooling | Native channel integrations: Slack, Telegram, Discord for notifications and command input; MCP server for IDE integration |
+
+**Source**: <https://github.com/stakpak/agent/blob/main/README.md> and <https://github.com/stakpak/agent/blob/main/GETTING-STARTED.md> (accessed 2026-03-13)
+
+---
+
 ## Purpose & Use Cases
 
 Stakpak is a **security-hardened DevOps AI agent** optimized for operations and infrastructure work. Primary use cases:
@@ -18,7 +44,7 @@ The agent is designed for teams that need AI assistance for DevOps without surre
 
 ---
 
-## Architecture
+## Technical Architecture
 
 Stakpak is structured as a monolithic Rust workspace with separate subsystems:
 
@@ -181,18 +207,20 @@ Multiplexes connections to multiple upstream MCP servers with unified configurat
 
 ---
 
-## Installation
+## Installation & Usage
 
-### Homebrew (Recommended for macOS/Linux)
+### Installation
+
+#### Homebrew (Recommended for macOS/Linux)
 ```bash
 brew tap stakpak/stakpak
 brew install stakpak
 ```
 
-### Binary Release
+#### Binary Release
 Download from [GitHub Releases](https://github.com/stakpak/agent/releases)
 
-### Docker
+#### Docker
 ```bash
 docker pull ghcr.io/stakpak/agent:latest
 
@@ -203,29 +231,27 @@ docker run -it \
   --entrypoint stakpak ghcr.io/stakpak/agent:latest
 ```
 
-### From Source
+#### From Source
 ```bash
 git clone https://github.com/stakpak/agent.git
 cd agent
 cargo build --release
 ```
 
----
+### Usage
 
-## Usage
-
-### Interactive TUI Mode
+#### Interactive TUI Mode
 ```bash
 stakpak                    # Open interactive terminal UI
 stakpak -c <checkpoint>    # Resume from checkpoint
 ```
 
-### Async Mode (Headless)
+#### Async Mode (Headless)
 ```bash
 stakpak --async "Help me understand this codebase"
 ```
 
-### Authentication Setup
+#### Authentication Setup
 ```bash
 # Stakpak managed API key (no card required)
 stakpak auth login --api-key $STAKPAK_API_KEY
@@ -239,7 +265,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-### Autopilot Initialization
+#### Autopilot Initialization
 ```bash
 # Preflight checks (required on remote machines)
 stakpak autopilot doctor
@@ -253,7 +279,7 @@ stakpak onboard
 stakpak up
 ```
 
-### Schedule Management (Non-Interactive)
+#### Schedule Management (Non-Interactive)
 ```bash
 stakpak autopilot schedule add health \
   --cron '*/5 * * * *' \
@@ -264,7 +290,7 @@ stakpak autopilot schedule list
 stakpak autopilot schedule trigger health  # Manual execution
 ```
 
-### Channel Setup
+#### Channel Setup
 ```bash
 stakpak autopilot channel add slack \
   --bot-token $SLACK_BOT_TOKEN \

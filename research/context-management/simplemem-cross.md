@@ -4,6 +4,20 @@ license: "MIT (Copyright 2025 AIMING Lab)"
 next_review: "2026-06-19 (3 months)"
 ---
 
+# SimpleMem-Cross
+
+## Overview
+
+SimpleMem-Cross is a Python library that extends SimpleMem with cross-conversation memory capabilities, enabling LLM agents to retain and retrieve context across independent sessions. Built by AIMING Lab, it combines SQLite for session timeline persistence, LanceDB for semantic vector search, and heuristic observation extraction to automatically identify decisions, discoveries, and learnings from agent conversations. The system achieves 64% performance improvement over Claude-Mem on the LoCoMo benchmark (score: 48) and provides token-budgeted context injection to manage memory size within LLM context windows.
+
+**Core Value Proposition**: Agents automatically retain learnings across conversations without manual memory management, enabling smarter, context-aware decisions in long-running projects spanning days or weeks.
+
+**Composition-based architecture**: SimpleMem-Cross wraps the original SimpleMem library without modification, enabling independent versioning and research artifact preservation while adding cross-session functionality via a new session lifecycle management layer.
+
+**Source**: <https://github.com/aiming-lab/SimpleMem> (accessed 2026-03-19)
+
+---
+
 ## Problem Addressed
 
 Traditional LLM memory systems either:

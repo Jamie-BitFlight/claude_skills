@@ -41,7 +41,19 @@ claude-replay solves a specific problem with AI-assisted coding workflows: sessi
 3. **Format auto-detection** — detects Claude Code (streaming JSON), Cursor, and Codex CLI formats automatically with no user intervention
 4. **Session discovery** — auto-locates sessions from standard storage locations (`~/.claude/projects/`, `~/.cursor/projects/`, `~/.codex/sessions/`)
 
-## Features
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| AI coding sessions are difficult to share with team members | Converts JSONL transcripts into interactive, self-contained HTML files suitable for documentation, blogs, bug reports, and teaching |
+| Screen recordings consume excessive storage and bandwidth | Single HTML file output with compression reduces typical session size by 60-70% using native browser decompression |
+| Raw JSONL transcripts are tedious to navigate and understand | Interactive playback with adjustable speed, step-by-step navigation, and collapsible thinking/tool blocks enables clear session review |
+| Sharing requires manual copying or email attachment | Self-contained HTML can be emailed, hosted, or embedded via iframe with zero external dependencies or CDN requests |
+| Viewing session details requires special tools or manual parsing | Web-based editor provides visual session browser, turn editing, live preview, and one-click export |
+
+**Source**: <https://github.com/es617/claude-replay/blob/main/README.md> (accessed 2026-03-13)
+
+## Key Features
 
 ### Core Playback
 
@@ -128,7 +140,7 @@ Two layers of optimization for zero external dependencies:
 - Open Graph and Twitter Card meta tags for link previews (with default or custom OG image)
 - Deep linking via URL fragment: `replay.html#turn=5` jumps to turn 5
 
-## Architecture
+## Technical Architecture
 
 ### Core Components
 
