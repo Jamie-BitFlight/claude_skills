@@ -36,7 +36,7 @@ Polars is a high-performance DataFrame library written in Rust with bindings for
 
 ### High-Performance Execution
 
-Polars is "blazingly fast" DataFrame library built in Rust without external C dependencies. The multi-threaded query engine automatically parallelizes operations across available CPU cores. Operations run with performance comparable to C/C++ rather than Python or R, enabling interactive analysis on datasets of 10+ GB without manual optimization. (SOURCE: <https://pola-rs.github.io/polars-book/user-guide/> Introduction, accessed 2026-03-17)
+Polars is "blazingly fast" DataFrame library built in Rust without external C dependencies. The multi-threaded query engine automatically parallelizes operations across available CPU cores. Operations run with performance comparable to C/C++ rather than Python or R. (SOURCE: <https://pola-rs.github.io/polars-book/user-guide/> Introduction, accessed 2026-03-17)
 
 ### Multi-Language API
 
@@ -88,24 +88,6 @@ The core query engine is implemented in Rust, providing:
 - Memory safety without garbage collection
 - True parallelism via Rayon data-parallel iterator library
 
-### Query Execution Pipeline
-
-```
-User Query (DataFrame.select/filter/group_by/...)
-    ↓
-Logical Query Plan (IR representation of operations)
-    ↓
-Query Optimizer (reorder predicates, eliminate redundant operations)
-    ↓
-Physical Query Plan (specific execution strategy)
-    ↓
-Parallel Execution (multi-threaded evaluation per column)
-    ↓
-Arrow-Columnar Result
-```
-
-(SOURCE: <https://pola-rs.github.io/polars-book/user-guide/> User Guide, accessed 2026-03-17)
-
 ### API Design
 
 Polars uses eager evaluation by default (operations execute immediately) and supports lazy evaluation mode for deferred execution planning. The API emphasizes method chaining and expression-based operations:
@@ -130,7 +112,7 @@ pip install polars
 or with optional extension support:
 
 ```bash
-pip install polars[parquet,excel]  # Install with Parquet and Excel support
+pip install polars[excel]  # Install with Excel support (Parquet is built-in)
 ```
 
 (SOURCE: <https://docs.pola.rs/user-guide/getting-started/> Getting Started, accessed 2026-03-17)
@@ -158,7 +140,7 @@ print(result)
 ### Data Input/Output
 
 Polars supports reading from and writing to:
-- CSV, Parquet, ORC, JSON
+- CSV, Parquet, JSON
 - Databases (SQL connections via standard connectors)
 - Cloud storage (S3, GCS, etc.) with native streaming support
 - Apache Arrow IPC format
@@ -193,8 +175,6 @@ Node.js bindings enable TypeScript agent systems to use Polars directly, unifyin
 ### Row-Oriented Operations Inefficient
 
 Polars is optimized for column-wise operations. Row-wise access (e.g., iterating over rows) is slower than with pandas and row-based systems. Workflows requiring frequent row-by-row logic should decompose to column operations or use different tools.
-
-### Not mentioned in reviewed sources: Maximum dataset size limits, performance characteristics for sub-1MB datasets where overhead dominates, or comparison benchmarks against Pandas on small (<100MB) datasets.
 
 ### Lazy Evaluation Requires Plan Collection
 

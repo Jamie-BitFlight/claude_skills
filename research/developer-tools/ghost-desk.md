@@ -8,7 +8,7 @@ freshness_tracking:
   last_verified: 2026-03-13
   version_at_verification: v1.0 (launch March 2026)
   next_review: 2026-06-13
-  confidence_map: "Overview: high, Identity: high, Core Features: high, Architecture: medium, Limitations: high, Pricing: high, References: high"
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium, Installation & Usage: high, Relevance: high, References: high"
 ---
 
 # Ghost Desk

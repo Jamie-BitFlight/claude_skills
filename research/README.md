@@ -1730,7 +1730,7 @@ Comprehensive collections of algorithm implementations, code examples, and educa
 
 | Document | Description | Last Updated |
 |---|---|---|
-| [installanywhere-specs-collection.md](./installer-tools/installanywhere-specs-collection.md) | Given a Windows-targeted InstallAnywhere installer (`.exe`), produce a complete understanding of its internal structure such that we can: | 2026-02-19 |
+| [installanywhere-specs-collection.md](./design-notes/installanywhere-specs-collection.md) | Given a Windows-targeted InstallAnywhere installer (`.exe`), produce a complete understanding of its internal structure such that we can: | 2026-02-19 |
 
 ### Utilization
 

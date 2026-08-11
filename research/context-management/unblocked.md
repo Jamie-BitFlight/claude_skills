@@ -18,6 +18,11 @@ freshness_tracking:
 
 Unblocked is a cloud-based context engine and decision-grade information platform that augments AI coding agents with organizational knowledge by synthesizing code history, architectural decisions, team conventions, and cross-functional context from multiple sources (GitHub, Slack, Confluence, Jira, etc.). It enables coding agents to generate production-ready, mergeable code on the first attempt without requiring human intervention between iteration cycles. The platform uses AI-powered retrieval, deconfliction algorithms, and targeted context compression to surface only decision-relevant information, reducing token waste while improving code generation fidelity. (SOURCE: <https://getunblocked.com/>, accessed 2026-03-13)
 
+**Company**: Unblocked Inc. (founded 2020, incorporated December 31, 2020)
+**Funding**: $15M across 2 rounds; latest round $10M seed on January 28, 2022. Investors include Tiger Global Management, Penske Media Corporation, and 19+ others.
+**Employee Count**: 102 (as of February 2025 snapshot)
+**Status**: Active commercial product with 21-day free trial available
+
 ---
 
 ## Problem Addressed
@@ -129,25 +134,25 @@ Responses include the answer text and references (source URLs/lines).
 
 ### Getting Started
 
-Unblocked is a cloud-based SaaS platform with no local installation required. Users access it through:
-
-1. **Web Dashboard**: <https://app.getunblocked.com> (login with company account or SSO)
-2. **IDE Extensions**: Install Unblocked extension for VS Code, JetBrains IDEs, or other editors from respective marketplaces
-3. **API Access**: Authenticate with Personal or Team Access Tokens for programmatic queries
+Unblocked is a cloud-based SaaS platform with no local installation required. Users can start with a 21-day free trial (no credit card required) at <https://getunblocked.com/>.
 
 ### Setup Process
 
-1. Create an Unblocked account on <https://getunblocked.com/>
-2. Start 21-day free trial (no credit card required)
-3. Connect data sources:
-   - GitHub/GitLab/Bitbucket repository access
-   - Confluence/Notion/Google Drive documentation
-   - Jira/Linear/Asana project management
-   - Slack/Microsoft Teams workspace
-4. Configure team permissions and data scopes via Unblocked dashboard
-5. Launch IDE extension or use web dashboard to query organizational context
+The onboarding process requires three primary steps:
 
-(SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, <https://docs.getunblocked.com/billing/unblocked-plans>, accessed 2026-03-13)
+1. **Connect source code** — Link your repository hosting platform (GitHub, GitLab, Bitbucket, etc.) to enable Unblocked to access your codebase.
+
+2. **Connect surrounding systems** — Integrate tools where your team's knowledge lives: messaging platforms (Slack, Microsoft Teams), issue trackers (Jira, Linear, Asana), and documentation systems (Confluence, Notion, Google Drive).
+
+3. **Connect your coding agent and team** — Set up your AI coding agent through the MCP server and invite team members to the platform. Once Unblocked has ingested your material, agents and team members can start using the platform to query organizational context.
+
+Users access Unblocked through:
+- **Web Dashboard**: <https://app.getunblocked.com> (login with company account or SSO)
+- **IDE Extensions**: Install Unblocked extension for VS Code, JetBrains IDEs, or other editors
+- **API Access**: Authenticate with Personal or Team Access Tokens for programmatic queries
+- **MCP Server**: Direct integration with Claude Code and other MCP-compatible agents
+
+(SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, accessed 2026-03-13)
 
 ---
 
