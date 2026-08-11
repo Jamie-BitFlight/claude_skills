@@ -89,7 +89,7 @@ The system orchestrates eight distinct phases across 23 sequential stages (READM
 ### Quick Start
 
 ```bash
-git clone https://github.com/luowang8182/autoresearchclaw.git
+git clone https://github.com/aiming-lab/AutoResearchClaw.git
 cd AutoResearchClaw
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
@@ -156,9 +156,9 @@ researchclaw run --topic "Your research idea" --mode custom
 
 ## References
 
-- [GitHub Repository](https://github.com/luowang8182/autoresearchclaw) (accessed 2026-04-03)
-- [GitHub README](https://github.com/luowang8182/autoresearchclaw/blob/main/README.md) (accessed 2026-04-03)
-- [CHANGELOG](https://github.com/luowang8182/autoresearchclaw/blob/main/CHANGELOG.md) — v0.2.0 through v0.4.0 feature history (accessed 2026-04-03)
+- [GitHub Repository](https://github.com/aiming-lab/AutoResearchClaw) (accessed 2026-04-03)
+- [GitHub README](https://github.com/aiming-lab/AutoResearchClaw/blob/main/README.md) (accessed 2026-04-03)
+- [Releases](https://github.com/aiming-lab/AutoResearchClaw/releases) — v0.2.0 through v0.4.0 feature history (accessed 2026-04-03)
 
 ---
 
