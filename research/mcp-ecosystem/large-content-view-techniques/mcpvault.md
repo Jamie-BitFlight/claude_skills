@@ -16,7 +16,7 @@ freshness_tracking:
 
 ## Overview
 
-mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives AI assistants safe, read/write access to Obsidian vault directories. It exposes 15 tools for file operations, searching, metadata inspection, and batch operations with built-in relevance ranking via BM25 and progressive-disclosure patterns that prioritize metadata and excerpts before full content reads. (Accessed: https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md and https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json, 2026-05-30)
+mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives AI assistants safe, read/write access to Obsidian vault directories. It exposes 15 tools for file operations, searching, metadata inspection, and batch operations with built-in relevance ranking via BM25 and progressive-disclosure patterns that prioritize metadata and excerpts before full content reads. (Accessed: <https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md> and <https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json>, 2026-05-30)
 
 ---
 

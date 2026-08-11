@@ -16,7 +16,7 @@ freshness_tracking:
 
 ## Overview
 
-The `@notionhq/notion-mcp-server` (v2.3.1) is an OpenAPI-spec-driven proxy that exposes 22 MCP tools for interacting with Notion workspaces. It automatically converts Notion's OpenAPI specification into MCP tool definitions and forwards tool calls as HTTP requests to `api.notion.com`. The server implements cursor-based pagination, block tree lazy-loading, and metadata-first access patterns for large hierarchies. (Accessed: https://raw.githubusercontent.com/makenotion/notion-mcp-server/main/README.md, 2026-05-30)
+The `@notionhq/notion-mcp-server` (v2.3.1) is an OpenAPI-spec-driven proxy that exposes 22 MCP tools for interacting with Notion workspaces. It automatically converts Notion's OpenAPI specification into MCP tool definitions and forwards tool calls as HTTP requests to `api.notion.com`. The server implements cursor-based pagination, block tree lazy-loading, and metadata-first access patterns for large hierarchies. (Accessed: <https://raw.githubusercontent.com/makenotion/notion-mcp-server/main/README.md>, 2026-05-30)
 
 ---
 
@@ -101,7 +101,7 @@ The server is built as an **OpenAPI-spec-driven proxy** rather than hand-coded t
 ### Pagination Model: Cursor-Based
 - **Request parameters**: `start_cursor` (opaque token, default undefined), `page_size` (default 100, max 100)
 - **Response fields**: `has_more` (boolean), `next_cursor` (string, present only when `has_more: true`), `results` (array of objects), `type` (e.g., "block", "page", "user")
-- **Mechanism**: Opaque cursor token — treat as black box, not offset arithmetic (Source: https://developers.notion.com/reference/pagination, accessed 2026-05-30)
+- **Mechanism**: Opaque cursor token — treat as black box, not offset arithmetic (Source: <https://developers.notion.com/reference/pagination>, accessed 2026-05-30)
 
 ### Block Tree Lazy-Loading
 - **`has_children` flag**: Every block carries boolean indicating whether children exist
