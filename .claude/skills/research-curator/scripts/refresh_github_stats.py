@@ -12,8 +12,9 @@ calling agent, since entry formatting is not uniform enough across the corpus fo
 a blind find-replace to be safe.
 
 ``stats``: fetches stargazers_count, forks_count, pushed_at, and license for an
-arbitrary list of ``owner/repo`` pairs via PyGithub -- no reason to spend agent
-reasoning on a deterministic API lookup done one repo at a time.
+arbitrary list of ``owner/repo`` pairs in a single aliased GraphQL query (chunked
+at 50 repos per request) -- no reason to spend agent reasoning, or a REST call per
+repo, on a deterministic lookup that GitHub's API already supports batching.
 
 ``scan``: walks a path, extracts every ``github.com/{owner}/{repo}`` URL cited in
 each file, fetches current stats for the unique set, and reports (per file) which
@@ -89,9 +90,6 @@ class CitationFinding(BaseModel):
     live: RepoStats
 
 
-_HTTP_NOT_FOUND = 404
-
-
 def _get_client() -> Github:
     """Build an authenticated PyGithub client from ``GITHUB_TOKEN``.
 
@@ -108,44 +106,73 @@ def _get_client() -> Github:
     return Github(auth=Auth.Token(token))
 
 
-def _fetch_one(gh: Github, owner: str, name: str) -> RepoStats:
-    """Fetch live stats for a single repo, returning ``exists=False`` on 404.
+_GRAPHQL_CHUNK_SIZE = 50
+
+
+def _run_graphql_batch(gh: Github, chunk: list[tuple[str, str]]) -> dict[str, object]:
+    """Run one aliased GraphQL query covering every repo in ``chunk``.
+
+    Mirrors ``backlog_core/gh_client.py``'s ``_graphql_request`` pattern: PyGithub's
+    ``requester.graphql_query`` raises ``GithubException`` whenever the response
+    carries a GraphQL ``errors`` array -- including the ordinary case where one
+    alias in the batch resolves to a nonexistent repo while the others succeed.
+    The exception's ``.data`` attribute still carries the full partial response,
+    so a raise here is not a total failure; only a response with no ``data`` key
+    at all (auth failure, malformed query) is fatal.
 
     Returns:
-        Live stats for the repo, or ``exists=False`` if it does not resolve.
+        The GraphQL response's ``data`` dict, keyed by alias (``r0``, ``r1``, ...).
+
+    Raises:
+        RuntimeError: If the response carries no usable ``data`` at all.
     """
-    try:
-        repo = gh.get_repo(f"{owner}/{name}")
-    except GithubException as exc:
-        if exc.status == _HTTP_NOT_FOUND:
-            return RepoStats(owner=owner, name=name, exists=False)
-        msg = f"GitHub API error fetching {owner}/{name}: {exc}"
-        raise RuntimeError(msg) from exc
-
-    license_spdx_id = None
-    if repo.license is not None:
-        license_spdx_id = repo.license.spdx_id
-
-    return RepoStats(
-        owner=owner,
-        name=name,
-        exists=True,
-        stargazer_count=repo.stargazers_count,
-        fork_count=repo.forks_count,
-        pushed_at=repo.pushed_at.isoformat() if repo.pushed_at else None,
-        license_spdx_id=license_spdx_id,
-        is_archived=repo.archived,
+    fields = "\n".join(
+        f'r{i}: repository(owner: "{owner}", name: "{name}") {{'
+        f" stargazerCount forkCount pushedAt isArchived licenseInfo {{ spdxId }} }}"
+        for i, (owner, name) in enumerate(chunk)
     )
+    query = f"query {{ {fields} }}"
+    try:
+        _headers, response = gh.requester.graphql_query(query, {})
+    except GithubException as exc:
+        data = exc.data.get("data") if isinstance(exc.data, dict) else None
+        if not isinstance(data, dict):
+            msg = f"GraphQL batch query failed with no usable data: {exc}"
+            raise TypeError(msg) from exc
+        return data
+    return response.get("data", {})
 
 
 def _fetch_stats_batch(gh: Github, repos: list[tuple[str, str]]) -> dict[tuple[str, str], RepoStats]:
-    """Fetch live stats for each (owner, name) pair. Deduplicates before fetching.
+    """Fetch live stats for each (owner, name) pair in chunks of 50 aliases per query.
+
+    Deduplicates before fetching so a repo cited many times costs one lookup.
 
     Returns:
         Mapping of (owner, name) to its live stats.
     """
     unique = sorted(set(repos))
-    return {(owner, name): _fetch_one(gh, owner, name) for owner, name in unique}
+    results: dict[tuple[str, str], RepoStats] = {}
+    for start in range(0, len(unique), _GRAPHQL_CHUNK_SIZE):
+        chunk = unique[start : start + _GRAPHQL_CHUNK_SIZE]
+        data = _run_graphql_batch(gh, chunk)
+        for i, (owner, name) in enumerate(chunk):
+            node = data.get(f"r{i}")
+            if not isinstance(node, dict):
+                results[owner, name] = RepoStats(owner=owner, name=name, exists=False)
+                continue
+            license_info = node.get("licenseInfo")
+            results[owner, name] = RepoStats(
+                owner=owner,
+                name=name,
+                exists=True,
+                stargazer_count=node.get("stargazerCount"),
+                fork_count=node.get("forkCount"),
+                pushed_at=node.get("pushedAt"),
+                license_spdx_id=license_info.get("spdxId") if isinstance(license_info, dict) else None,
+                is_archived=node.get("isArchived"),
+            )
+    return results
 
 
 def _extract_repo_citations(text: str) -> list[tuple[int, str, str]]:
