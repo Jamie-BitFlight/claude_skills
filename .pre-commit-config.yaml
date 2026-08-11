@@ -214,6 +214,7 @@ repos:
         entry: uv run .claude/skills/research-curator/scripts/validate_research.py main
         language: system
         stages: [pre-commit]
+        exclude: ^research/(README|CLAUDE)\.md$
         pass_filenames: true
         files: ^research/.*\.md$
 
