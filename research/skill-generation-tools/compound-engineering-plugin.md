@@ -69,11 +69,9 @@ The plugin emphasizes the principle: **"Each unit of engineering work should mak
 
 ### Command Namespace & Routing
 
-All user-facing commands follow the `/ce-{operation}` pattern, mapping to:
-1. Specific skill for workflow guidance
-2. Specialist subagents for execution (research, review, implementation)
+There is no `commands/` directory — every entry point is a skill directory under `skills/`, invoked as a slash-skill on hosts that support that syntax. All but one follow the `ce-{operation}` naming pattern; the exception is `lfg`. The README notes the invocation differs by host: Codex uses `$skill-name` (e.g. `$ce-plan`, `$lfg`) rather than `/skill-name`.
 
-**Source**: GitHub README.md command reference (accessed 2026-08-11)
+**Source**: repository git tree (32 `skills/*/SKILL.md`, no `commands/` or `agents/` paths) and README.md line 106 (accessed 2026-08-11)
 
 ---
 

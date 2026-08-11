@@ -48,7 +48,7 @@ Tessera is a minimal, single-purpose terminal access broker for time-limited, ju
 - **Session isolation**: Each session bound to single guest, single target, single time window; 30-minute idle timeout automatically closes orphaned sessions
 - **Audit logging**: Append-only JSON log records timestamps, all parties, reason, approval outcome, and hashed bootstrap codes (never raw plaintext)
 
-**Source**: README.md "Security note" section; internal/coordinator/coordinator.go, internal/audit/audit.go — accessed 2026-06-18
+**Source**: README.md line 116 (30-minute idle stream timeout), cmd/tessera/share.go line 105 (`-idle-timeout` default `30*time.Minute`, clamped to [1m, 24h]), internal/audit/audit.go — accessed 2026-08-11
 
 ### Architecture & Protocol
 
@@ -56,15 +56,15 @@ Tessera is a minimal, single-purpose terminal access broker for time-limited, ju
 - **Length-prefixed JSON framing**: All control messages use 4-byte big-endian length prefix + JSON payload (max 64 KB); human-debuggable over mTLS
 - **Two-layer encryption**: Outer TLS (agent ↔ coordinator via mTLS), Inner TLS (guest ↔ target endpoint for end-to-end encryption); coordinator relays ciphertext opaque
 
-**Source**: internal/proto/proto.go — accessed 2026-06-18
+**Source**: internal/proto/proto.go — `maxFrame = 1 << 16` (64 KB) at line 11, `binary.BigEndian.PutUint32` 4-byte header at lines 57 and 70 — accessed 2026-08-11
 
 ### Deployment Options
 
-- **Docker**: 18 MB distroless image with all three binaries; `docker compose up -d` for coordinator
+- **Docker**: "a single 18 MB static binary on distroless. One image holds all" three binaries; `docker compose up -d` runs the coordinator (mTLS on 8443, HTTP on 8080)
 - **systemd**: Native binary + service unit for production Linux deployments
-- **Interactive mode**: `tessera join` for guest cert generation, `tessera share` for approval handler
+- **Interactive mode**: running `tessera` with no arguments enters the interactive flow; subcommands are `ca`, `quickstart`, `connect`, `join`, `share`, `token`, `link`, `version`, `help`
 
-**Source**: deploy/DEPLOYING.md, Dockerfile — accessed 2026-06-18
+**Source**: README.md line 156, docker-compose.yml, cmd/tessera/main.go subcommand switch — accessed 2026-08-11
 
 ---
 
@@ -87,7 +87,7 @@ curl http://localhost:8080/healthz  # expect: "ok {version}"
 curl http://localhost:8080/healthz
 ```
 
-**Source**: docker-compose.yml, Dockerfile, deploy/DEPLOYING.md — accessed 2026-06-18
+**Source**: docker-compose.yml (ports 8443/8080), internal/coordinator/http.go `handleHealthz` (responds `ok {version}`), deploy/DEPLOYING.md — accessed 2026-08-11
 
 ### Agent Deployment
 
@@ -102,38 +102,34 @@ agent -coordinator coordinator.example.org:8443 \
   -allow localhost:22,localhost:5432
 ```
 
-**With shell mode recording** (requires pre-existing directory):
+The `agent` binary's full flag set is `-coordinator`, `-server-name`, `-share-id`, `-allow`, `-ca`, `-cert`, `-key`, `-version`. Shell mode and session recording are **not** agent flags — they are `agent.Config` fields (`ShellMode`, `RecordPath`) set by the host-side `tessera share` command, which creates the recording directory itself via `os.MkdirAll(recordPath, 0o700)`:
 
 ```bash
-mkdir -p /var/lib/tessera/sessions
-agent -coordinator ... -shell-mode -record-path /var/lib/tessera/sessions
+tessera share -port 5432 -ttl 120s -idle-timeout 15m
 ```
 
-**Source**: install.sh, cmd/agent/main.go, deploy/DEPLOYING.md — accessed 2026-06-18
+**Source**: cmd/agent/main.go lines 37–44, cmd/tessera/share.go lines 105–243, internal/agent/agent.go lines 33–39 — accessed 2026-08-11
 
 ### Guest Workflow
 
-**1. Generate certificate bundle**:
+**Option A — redeem a one-time code** (`tessera join CODE`). The guest passes the invite code as a positional argument; `-coord-base-url` names the coordinator's HTTP base URL, `-local` sets the local forward address (default `127.0.0.1:13000`), and `-service` picks a service when the share offers more than one. The CA, guest certificate, and guest key are written as `ca.crt` / `guest.crt` / `guest.key`.
+
+**Option B — connect to a known share-id** (no code redemption):
 
 ```bash
-tessera join https://coordinator.example.org
-# Saves to ~/.config/tessera/{cert,key,ca}.pem
-```
-
-**2. Request and forward in one command**:
-
-```bash
-tessera -coordinator coordinator.example.org:8443 \
-  -share-id production-db-host \
-  -target localhost:5432 \
+tessera connect -coordinator coordinator.example.org:8443 \
+  -share-id demo \
+  -target 127.0.0.1:5432 \
   -reason "schema migration" \
-  -local-listen 127.0.0.1:5432
+  -local 127.0.0.1:15432
 
 # [At host terminal: approve with 'y']
-# Guest can now: psql -h 127.0.0.1 -p 5432
+# Guest can now: psql -h 127.0.0.1 -p 15432
 ```
 
-**Source**: cmd/tessera/main.go, README.md "Quick Start" section — accessed 2026-06-18
+`-coordinator`, `-share-id`, and `-target` are required; the local forward address flag is `-local` (default `127.0.0.1:15432`), not `-local-listen`. If `-coordinator` is omitted the CLI falls back to the coordinator recorded in the local config directory.
+
+**Source**: cmd/tessera/main.go `cmdConnect` lines 83–112, cmd/tessera/join.go lines 63–69 and 151–153, README.md "Try it locally" lines 120–142 — accessed 2026-08-11
 
 ---
 
@@ -679,7 +675,7 @@ tessera -coordinator coordinator.example.org:8443 \
 
 2. **Just-In-Time Access in CI/CD**: Build pipelines requiring production access can integrate Tessera approval gates before granting temporary database or SSH access.
 
-3. **Approval Workflow Patterns**: Tessera's consent-based architecture demonstrates a reusable pattern for human-in-the-loop agent workflows — relevant to orchestration skills like `/attune:war-room` that require expert escalation.
+3. **Approval Workflow Patterns**: Tessera's consent-based architecture — a blocking prompt with no timeout, answered where the approver already sits — is a reusable pattern for the human-in-the-loop gates this repository defines in `.claude/rules/proactive-fix-gate.md` and the Autonomous Action Boundary in `.claude/CLAUDE.md`.
 
 ### Patterns Worth Adopting
 

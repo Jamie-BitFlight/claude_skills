@@ -1,20 +1,20 @@
 ---
 name: Claude Night Market
-description: Claude Night Market is a comprehensive Claude Code plugin marketplace providing 16 plugins with 126 skills, 114 commands, and 41 agents for software engineering workflows. The plugins are organized...
+description: Claude Night Market is a Claude Code plugin marketplace providing 23 plugins with 201 skills, 163 commands, and 56 agents for software engineering workflows. The plugins are organized...
 license: MIT
 metadata:
   topic: claude-night-market
   category: skill-generation-tools
   source_url: https://github.com/athola/claude-night-market
   github: athola/claude-night-market
-  version: "1.3.7"
-  verified: "2026-01-31"
-  next_review: "2026-05-01"
+  version: "1.9.17"
+  verified: "2026-08-11"
+  next_review: "2026-11-11"
 ---
 
 ## Overview
 
-Claude Night Market is a comprehensive Claude Code plugin marketplace providing 16 plugins with 126 skills, 114 commands, and 41 agents for software engineering workflows. The plugins are organized in architectural layers (Foundation, Utility, Domain Specialists, Meta) covering git operations, code review, spec-driven development, issue management, multi-LLM delegation, TDD enforcement, and session management. The ecosystem adds approximately 14.8k characters to system prompts and includes cross-session state persistence via Claude Code Tasks (v2.1.16+).
+Claude Night Market is a Claude Code plugin marketplace providing 23 plugins with 201 skills, 163 commands, and 56 agents for software engineering workflows. The plugins are organized in architectural layers (Foundation, Utility, Domain Specialists, Meta) covering git operations, code review, spec-driven development, issue management, multi-LLM delegation, TDD enforcement, and session management. The ecosystem adds approximately 14.8k characters to system prompts and includes cross-session state persistence via Claude Code Tasks (v2.1.16+).
 
 ---
 
@@ -47,7 +47,7 @@ After installation, run once:
 claude --init
 ```
 
-**Source**: GitHub README Installation section (accessed 2026-01-31)
+**Source**: README.md "Install" section lines 18–34 (accessed 2026-08-11). The README documents `sanctum`, `pensive`, and `spec-kit` explicitly; `imbue` and `attune` are confirmed plugin names in `.claude-plugin/marketplace.json` and follow the same `<plugin>@claude-night-market` form.
 
 ### Common Workflow Commands
 
@@ -61,7 +61,7 @@ claude --init
 | Clean codebase | `/unbloat` | conserve |
 | Strategic decision | `/attune:war-room` | attune |
 
-**Source**: GitHub README Common Commands (accessed 2026-01-31)
+**Source**: README.md "The commands you reach for most" table lines 58–70 (accessed 2026-08-11)
 
 ### Targeted Installation (Smaller Footprint)
 
@@ -69,18 +69,17 @@ claude --init
 opkg i gh@athola/claude-night-market --plugins sanctum,pensive
 ```
 
-**Source**: GitHub README alternate installation methods (accessed 2026-01-31)
+**Source**: README.md line 32 (accessed 2026-08-11)
 
 ### Typical Feature Workflow
 
-1. **Brainstorm** — Explore idea scope and constraints
-2. **Specify** — Write structured specification before code
-3. **Plan** — Create implementation plan from spec
-4. **Implement** — Code with spec-driven guidance  
-5. **Review** — Run unified multi-domain code review
-6. **Merge** — Prepare PR and merge with confidence
+1. **Start a feature** — `/attune:mission` routes through brainstorm, specify, plan, and execute phases
+2. **Write the code** — `imbue` enforces a failing test first, so implementation follows the test
+3. **Review before you push** — `/full-review` runs a multi-discipline pass; `/refine-code` cleans up duplication and dead code
+4. **Ship it** — `/prepare-pr` runs quality gates and leaves a clean git state ready for a pull request
+5. **Pick up where you left off** — `/catchup` rebuilds context from recent git history after a break
 
-**Source**: GitHub README Typical Workflow section (accessed 2026-01-31)
+**Source**: README.md "Everyday Use" section lines 39–54 (accessed 2026-08-11)
 
 ---
 
@@ -88,7 +87,7 @@ opkg i gh@athola/claude-night-market --plugins sanctum,pensive
 
 | Problem                                              | Solution                                                                  |
 | ---------------------------------------------------- | ------------------------------------------------------------------------- |
-| Claude Code lacks specialized workflow automation    | 114 slash commands for PR prep, code review, issue resolution, cleanup    |
+| Claude Code lacks specialized workflow automation    | 163 slash commands for PR prep, code review, issue resolution, cleanup    |
 | No governance over AI behavior during development    | Hook-based governance (imbue TDD enforcement, pensive usage tracking)     |
 | Multi-LLM workflows require manual orchestration     | conjure plugin delegates to Gemini/Qwen while retaining strategic oversight |
 | Session context lost between conversations           | sanctum session management with checkpointing and resume strategies       |
@@ -102,19 +101,20 @@ opkg i gh@athola/claude-night-market --plugins sanctum,pensive
 
 ## Key Statistics
 
-| Metric            | Value                     | Date Gathered |
-| ----------------- | ------------------------- | ------------- |
-| GitHub Stars      | 158                       | 2026-01-31    |
-| GitHub Forks      | 19                        | 2026-01-31    |
-| Open Issues       | 61                        | 2026-01-31    |
-| Contributors      | 2                         | 2026-01-31    |
-| Primary Language  | Python                    | 2026-01-31    |
-| Repository Age    | Since 2025-11-23          | 2026-01-31    |
-| Total Plugins     | 16                        | 2026-01-31    |
-| Total Skills      | 126                       | 2026-01-31    |
-| Total Commands    | 114                       | 2026-01-31    |
-| Total Agents      | 41                        | 2026-01-31    |
-| System Prompt     | ~14.8k characters         | 2026-01-31    |
+| Metric            | Value                     | Date Gathered | Source |
+| ----------------- | ------------------------- | ------------- | ------ |
+| GitHub Stars      | 327                       | 2026-08-11    | GitHub API |
+| GitHub Forks      | 35                        | 2026-08-11    | GitHub API |
+| Open Issues       | 14                        | 2026-08-11    | GitHub API |
+| Primary Language  | Python                    | 2026-08-11    | GitHub API |
+| License           | MIT                       | 2026-08-11    | GitHub API |
+| Repository Age    | Since 2025-11-23          | 2026-08-11    | GitHub API `created_at` |
+| Marketplace Version | 1.9.17                  | 2026-08-11    | `.claude-plugin/marketplace.json` |
+| Total Plugins     | 23                        | 2026-08-11    | `.claude-plugin/marketplace.json` |
+| Total Skills      | 201                       | 2026-08-11    | git tree, `plugins/*/skills/*/SKILL.md` |
+| Total Commands    | 163                       | 2026-08-11    | git tree, `plugins/*/commands/*.md` |
+| Total Agents      | 56                        | 2026-08-11    | git tree, `plugins/*/agents/*.md` |
+| System Prompt     | ~14.8k characters         | 2026-01-31    | README (not re-verified) |
 
 ---
 
@@ -126,29 +126,38 @@ opkg i gh@athola/claude-night-market --plugins sanctum,pensive
 | ------------------- | --------------------------------- | ------------------------------------------- |
 | Foundation          | sanctum, leyline, imbue           | Git/sessions, auth/quotas, TDD cycles       |
 | Utility             | conserve, hookify, conjure        | Resource optimization, rules engine, delegation |
-| Domain Specialists  | pensive, spec-kit, minister, memory-palace, archetypes, parseltongue, attune, scribe, scry | Task-specific logic |
+| Domain Specialists  | pensive, spec-kit, minister, memory-palace, archetypes, parseltongue, attune, scribe, scry, cartograph, gauntlet, tome, phantom, oracle, herald, egregore | Task-specific logic |
 | Meta                | abstract                          | Plugin/skill authoring, Makefile generation |
 
 ### Core Plugins
 
-| Plugin          | Skills | Commands | Description                                                  |
-| --------------- | ------ | -------- | ------------------------------------------------------------ |
-| abstract        | 13     | 16       | Meta-skills infrastructure, hook development, evaluation     |
-| attune          | 13     | 11       | Full-cycle project development with war-room expert routing  |
-| archetypes      | 15     | 0        | 14 architecture paradigms from functional-core to microservices |
-| conjure         | 3      | 0        | Intelligent delegation to Gemini/Qwen with strategic oversight |
-| conserve        | 12     | 6        | Context optimization, bloat detection, token conservation    |
-| hookify         | 2      | 5        | Zero-code behavioral rule authoring via markdown             |
-| imbue           | 11     | 3        | Review scaffolding, diff analysis, TDD enforcement           |
-| leyline         | 12     | 1        | OAuth flows, storage patterns, quotas                        |
-| memory-palace   | 7      | 4        | Spatial knowledge organization, skill execution memory       |
-| minister        | 2      | 5        | GitHub issue/project alignment and status dashboards         |
-| parseltongue    | 5      | 3        | Multi-language detection, testing guidance                   |
-| pensive         | 15     | 12       | Multi-domain code review with NASA Power of 10 patterns      |
-| sanctum         | 18     | 18       | Git operations, PR prep, session management                  |
-| scribe          | 3      | 3        | Documentation with AI slop detection, style learning         |
-| scry            | 4      | 3        | Terminal recordings (VHS), browser recordings (Playwright)   |
-| spec-kit        | 3      | 2        | Spec-driven development orchestration                        |
+Counts derived from the repository git tree on 2026-08-11 (`plugins/{name}/skills/*/SKILL.md`, `plugins/{name}/commands/*.md`, `plugins/{name}/agents/*.md`); descriptions quoted from `.claude-plugin/marketplace.json`.
+
+| Plugin          | Skills | Commands | Agents | Description                                                  |
+| --------------- | ------ | -------- | ------ | ------------------------------------------------------------ |
+| abstract        | 15     | 18       | 6      | Skill authoring, hook development, evaluation frameworks, escalation governance |
+| archetypes      | 15     | 0        | 0      | Architecture paradigm selection: 14 paradigms from functional-core to hexagonal |
+| attune          | 14     | 11       | 2      | Full-cycle project development: brainstorm, specify, plan, initialize, execute, polish, war-room |
+| cartograph      | 7      | 1        | 1      | Codebase visualization: architecture, data flow, dependency, call chains, community detection |
+| conjure         | 4      | 0        | 0      | Delegate tasks to external LLMs (Gemini, Qwen) with cheapest-capable model selection |
+| conserve        | 15     | 6        | 5      | Context optimization, bloat detection, CPU/GPU monitoring, token conservation |
+| egregore        | 4      | 5        | 2      | Autonomous agent orchestrator: parallel worktree execution, agent specialization |
+| gauntlet        | 7      | 6        | 1      | Codebase learning via knowledge extraction, code knowledge graph, adaptive challenges |
+| herald          | 0      | 0        | 0      | Standalone notification system: GitHub issue alerts, webhooks for Slack/Discord |
+| hookify         | 2      | 6        | 0      | Behavioral rules engine: safety hooks through markdown configuration |
+| imbue           | 16     | 5        | 1      | TDD enforcement, proof-of-work validation, scope guarding, rigorous reasoning |
+| leyline         | 24     | 3        | 0      | Foundation infrastructure: auth flows, quota management, error patterns, trust |
+| memory-palace   | 9      | 5        | 4      | Spatial knowledge organization: build, navigate, maintain virtual memory palaces |
+| minister        | 3      | 3        | 0      | GitHub issue management, label taxonomy, initiative tracking                  |
+| oracle          | 1      | 1        | 0      | ONNX Runtime inference daemon for ML-enhanced plugin capabilities            |
+| parseltongue    | 4      | 3        | 4      | Python development suite: testing, performance, async patterns, packaging     |
+| pensive         | 15     | 14       | 6      | Multi-discipline code review: architecture, bugs, APIs, blast radius, security |
+| phantom         | 1      | 1        | 1      | Computer use toolkit for driving desktop environments via vision and action API |
+| sanctum         | 19     | 49       | 9      | Git workflows: commit messages, PR prep, docs, version management, sessions   |
+| scribe          | 11     | 9        | 5      | Documentation review, cleanup, generation with AI slop detection, style learning |
+| scry            | 4      | 2        | 1      | Media generation: terminal recordings (VHS), browser recordings (Playwright)  |
+| spec-kit        | 3      | 11       | 3      | Specification-driven development: structured specs, planning, task orchestration |
+| tome            | 8      | 4        | 5      | Multi-source research: code archaeology, community discourse, academic literature |
 
 ### Governance and Quality
 
@@ -197,7 +206,7 @@ npx skills add athola/claude-night-market/sanctum
 
 ### Directory Structure
 
-<eg>
+```text
 plugins/
   <plugin-name>/
     skills/
@@ -209,7 +218,7 @@ plugins/
       <agent-name>.md     # Agent configurations
     hooks/
       <hook-name>.md      # Behavioral hooks
-</eg>
+```
 
 ### Cross-Session State (Claude Code 2.1.16+)
 
@@ -270,7 +279,7 @@ plugins/
 
 2. **Hook Patterns**: imbue's TDD enforcement hooks could inform this repository's quality gates.
 
-3. **Review Domains**: pensive's review taxonomy (15 specialized reviews) could expand coverage.
+3. **Review Domains**: pensive's review taxonomy (15 skills across architecture, bugs, APIs, blast radius, security, tests) could expand coverage.
 
 4. **Delegation Framework**: conjure's delegation-core skill provides patterns for external LLM integration.
 
@@ -280,10 +289,10 @@ plugins/
 
 | Aspect              | Claude Night Market                | This Repository (claude_skills)     |
 | ------------------- | ---------------------------------- | ------------------------------------ |
-| Plugins             | 16 plugins                         | Plugin marketplace                   |
-| Skills              | 126 skills                         | Skill collection                     |
-| Commands            | 114 commands                       | Command collection                   |
-| Agents              | 41 agents                          | Agent collection                     |
+| Plugins             | 23 plugins                         | Plugin marketplace                   |
+| Skills              | 201 skills                         | Skill collection                     |
+| Commands            | 163 commands                       | Command collection                   |
+| Agents              | 56 agents                          | Agent collection                     |
 | Architecture        | 4-layer (Foundation/Utility/Domain/Meta) | Category-based                 |
 | Hook Governance     | TDD enforcement, rigorous reasoning | Skill-based instructions            |
 | Multi-LLM           | Gemini/Qwen delegation             | Single-model focus                   |
@@ -296,11 +305,11 @@ plugins/
 
 | Source                    | URL                                                                        | Accessed   |
 | ------------------------- | -------------------------------------------------------------------------- | ---------- |
-| GitHub Repository         | <https://github.com/athola/claude-night-market>                            | 2026-01-31 |
-| GitHub README             | <https://raw.githubusercontent.com/athola/claude-night-market/master/README.md> | 2026-01-31 |
-| GitHub API (Metadata)     | <https://api.github.com/repos/athola/claude-night-market>                  | 2026-01-31 |
-| Marketplace JSON          | <https://raw.githubusercontent.com/athola/claude-night-market/master/.claude-plugin/marketplace.json> | 2026-01-31 |
+| GitHub Repository         | <https://github.com/athola/claude-night-market>                            | 2026-08-11 |
+| GitHub README             | <https://raw.githubusercontent.com/athola/claude-night-market/master/README.md> | 2026-08-11 |
+| GitHub API (Metadata)     | <https://api.github.com/repos/athola/claude-night-market>                  | 2026-08-11 |
+| Marketplace JSON          | <https://raw.githubusercontent.com/athola/claude-night-market/master/.claude-plugin/marketplace.json> | 2026-08-11 |
 | Capabilities Reference    | <https://raw.githubusercontent.com/athola/claude-night-market/master/book/src/reference/capabilities-reference.md> | 2026-01-31 |
 | Homepage                  | <https://athola.github.io/claude-night-market>                             | 2026-01-31 |
 
-**Research Method**: Information gathered from GitHub repository README, GitHub API for repository metadata (stars, forks, license, dates), marketplace.json for plugin details, and capabilities reference for skill/command/agent counts. Statistics verified via direct API calls on 2026-01-31.
+**Research Method**: Information gathered from GitHub repository README, GitHub API for repository metadata (stars, forks, license, dates), marketplace.json for plugin details, and capabilities reference for skill/command/agent counts. Statistics re-verified via direct GitHub API calls and git-tree enumeration on 2026-08-11; the earlier 2026-01-31 figures (16 plugins / 126 skills / 114 commands / 41 agents, v1.3.7) were superseded.
