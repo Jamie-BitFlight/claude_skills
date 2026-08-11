@@ -16,7 +16,7 @@ freshness_tracking:
 
 ## Overview
 
-mcpskills-cli (v0.1.2) is a command-line tool that bridges Model Context Protocol (MCP) servers with AI agent skills by automatically discovering MCP tools and generating statically-hosted skill files in SKILL.md format. It transforms tool schemas from any Streamable HTTP MCP server into structured documentation with polyglot call scripts (bash, python, node, go, rust), enabling agents to access tools without loading all MCP tools into context. Solves token pollution from traditional MCP loading by converting on-demand discoverable tools into statically-referenced skills. (Accessed: https://github.com/dhanababum/mcpskills-cli README.md, 2026-03-13)
+mcpskills-cli (v0.1.2) is a command-line tool that bridges Model Context Protocol (MCP) servers with AI agent skills by automatically discovering MCP tools and generating statically-hosted skill files in SKILL.md format. It transforms tool schemas from any Streamable HTTP MCP server into structured documentation with polyglot call scripts (bash, python, node, go, rust), enabling agents to access tools without loading all MCP tools into context. Solves token pollution from traditional MCP loading by converting on-demand discoverable tools into statically-referenced skills. (Accessed: <https://github.com/dhanababum/mcpskills-cli> README.md, 2026-03-13)
 
 ---
 
@@ -113,6 +113,7 @@ mcpskills-cli --url http://localhost:8027/mcp/abc123 --token mytoken --name my-d
 ```
 
 Output:
+
 ```
 Credentials saved to ~/.mcps/credentials (chmod 600)
 Skill generated at ~/.cursor/skills/my-db

@@ -280,6 +280,7 @@ Both navigation tools are anchored by symbol *and* location, not by symbol alone
 `lspFindReferences` takes the same plus `includeDeclaration`, `referencesPerPage`, `page`.
 
 **Local filesystem research:**
+
 ```bash
 # Tool: localSearchCode — local code/text search returning file and line anchors
 # Tool: localGetFileContent — read a local file or region
