@@ -101,7 +101,7 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 - Stack multiple skills for complex workflows
 
 **Skill Availability**:
-- Official repository with curated collection of "high-quality Claude Code skills to enhance your development workflow" in Python (53.4%), TeX (44.2%), JavaScript (2.0%), Shell (0.3%) (SOURCE: GitHub repository metadata, accessed 2026-02-13)
+- Official repository with curated collection of "high-quality Claude Code skills to enhance your development workflow" in Python (53.4%), TeX (44.2%), JavaScript (2.0%), Shell (0.3%); 137 stars, 29 forks (SOURCE: GitHub repository metadata, <https://github.com/happycapy-ai/Happycapy-skills>, accessed 2026-08-11)
 - Extensive integration with skills marketplace for pre-built automation components (SOURCE: HappyCapy official site)
 
 ### 5. Agent-to-Inbox Delivery
@@ -275,11 +275,13 @@ HappyCapy is accessed via web browser at https://happycapy.ai. No installation r
 ### Repository Activity
 
 - **Happycapy-skills Repository**:
+  - 137 stars, 29 forks (as of 2026-08-11)
+  - 10 contributors
   - MIT License
   - Primary language: Python
-  - Active development as of 2026-02-13
+  - Last push: 2026-07-21
 
-(SOURCE: GitHub repository, <https://github.com/happycapy-ai/Happycapy-skills>)
+(SOURCE: GitHub repository, <https://github.com/happycapy-ai/Happycapy-skills>, accessed 2026-08-11)
 
 ### Related Ecosystem Projects
 
