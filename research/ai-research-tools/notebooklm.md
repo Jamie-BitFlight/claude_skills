@@ -7,8 +7,8 @@ metadata:
   category: ai-research-tools
   source_url: https://notebooklm.google
   version: "Android 2026.01.06 / iOS 1.21.0"
-  verified: "2026-01-31"
-  next_review: "2026-05-01"
+  verified: "2026-08-11"
+  next_review: "2026-11-11"
 ---
 
 ## Overview
@@ -213,6 +213,80 @@ NotebookLM responses are grounded in user-uploaded content, reducing hallucinati
 - **Spotify Wrapped 2024**: Used NotebookLM's Audio Overview feature to generate personalized podcast-style summaries of individual listening habits.
 - **Enterprise Research**: Adopted by companies and students for document synthesis and research workflows.
 - **Academic Use**: Students use it for studying complex topics and preparing for exams.
+
+---
+
+## Installation & Usage
+
+### Getting Started
+
+**1. Access NotebookLM**
+
+Visit <https://notebooklm.google> and sign in with any Google account. No installation is required beyond a standard browser.
+
+**2. Create a Notebook**
+
+Click "New notebook" to create a workspace. Each notebook is an isolated workspace for organizing and analyzing related documents.
+
+**3. Add Sources**
+
+Click "Add" in the Sources panel to upload your first document. Supported formats include:
+- PDFs
+- Google Docs
+- Google Slides
+- YouTube videos and links
+- Website URLs
+
+Source limits scale by plan: 50 per notebook on the free Standard plan, 100 on Plus, 300 on Pro
+(see Pricing & Limits below).
+
+**4. Ask Questions**
+
+Type a question in the chat panel on the right. The chat responds strictly from your uploaded sources, reducing hallucination by grounding responses in your data.
+
+**5. Generate Overviews**
+
+Click the Studio tab to generate structured outputs from your sources in one click:
+- **Audio Overviews**: Podcast-style conversations in four formats — Deep Dive (the original default), plus Brief, Critique, and Debate (added September 2025) — available in 80+ languages
+- **Video Overviews**: Narrated, animated deep-dive videos (announced at Google I/O in May 2025; rolled out to all users 29 July 2025)
+- **Study Guides**: Structured summaries and key concepts
+- **Flashcards**: Auto-generated review cards
+- **Mind Maps**: Visual concept relationships
+- **Infographics**: Visual summaries with diagrams (launched November 2025, powered by Nano Banana Pro image generation)
+
+Source: [What's new in NotebookLM: Video Overviews and an upgraded Studio](https://blog.google/technology/google-labs/notebooklm-video-overviews-studio-upgrades/) (published 2025-07-29); [NotebookLM rolling new Audio Overview formats](https://9to5google.com/2025/09/02/notebooklm-audio-overview-debate/) (accessed 2026-08-11).
+
+### Platform Availability
+
+| Platform | Access | Requirements |
+|----------|--------|--------------|
+| **Web** | notebooklm.google | Any modern browser |
+| **Android** | Google Play Store | Android 10+ |
+| **iOS** | App Store | iOS 17+ |
+| **iPad** | App Store | iPadOS 17+ |
+
+For desktop users without a dedicated app, create a PWA shortcut: In Chrome/Edge, go to the browser menu, select "Create shortcut" or "Install site as app", and save to your desktop.
+
+Source: [Get started with the NotebookLM mobile app](https://support.google.com/notebooklm/answer/16296687) and [Google launches stand-alone NotebookLM apps for Android and iOS](https://techcrunch.com/2025/05/19/google-launches-standalone-notebooklm-app-for-android/) (accessed 2026-08-11) — Android 10 and above, iOS 17 and above.
+
+### Pricing & Limits
+
+Google publishes three tiers with the following per-user quotas:
+
+| Limit | Standard (free) | Plus | Pro |
+|-------|-----------------|------|-----|
+| Notebooks | 100/user | 200/user | 500/user |
+| Sources per notebook | 50/notebook | 100/notebook | 300/notebook |
+| Chats per day | 50/day | 200/day | 500/day |
+| Audio Overviews per day | 3/day | 6/day | 20/day |
+
+Google notes these limits are subject to change and that "daily quotas are reset after 24 hours."
+
+NotebookLM Plus first became available to individual users through the Google One AI Premium
+subscription on 10 February 2025, having previously been limited to Google Workspace and Google
+Cloud customers.
+
+Source: [NotebookLM usage limits](https://support.google.com/notebooklm/answer/16213268) (accessed 2026-08-11); [Google expands NotebookLM Plus to individual users](https://techcrunch.com/2025/02/10/google-expands-notebooklm-plus-to-individual-users/) (published 2025-02-10).
 
 ---
 
