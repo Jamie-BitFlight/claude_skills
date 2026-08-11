@@ -1,35 +1,90 @@
 ---
-title: "Claude Code Prompt Improver"
+name: claude-code-prompt-improver
+research_date: "2026-03-07"
+source_url: "https://github.com/severity1/claude-code-prompt-improver"
+github_repository: "https://github.com/severity1/claude-code-prompt-improver"
+version_at_research: "0.5.1"
+license: "MIT"
+freshness_tracking:
+  last_verified: "2026-03-07"
+  version_at_verification: "0.5.1"
+  next_review: "2026-06-07"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: high | Installation & Usage: high | Relevance: high | References: high"
 ---
 
 # Claude Code Prompt Improver
 
-## Identity
+## Overview
+
+A UserPromptSubmit hook that enriches vague prompts before Claude Code executes them. Uses the AskUserQuestion tool (Claude Code 2.0.22+) for targeted clarifying questions. The tool intercepts user prompts submitted to Claude Code and evaluates their clarity before execution. Clear prompts proceed without modification; vague prompts trigger the invocation of the `prompt-improver` skill, which conducts systematic research and asks 1-6 grounded clarifying questions based on actual project context before proceeding with the original request. Version 0.5.1 (released 2026-02-14); MIT licensed.
 
 **Repository:** [severity1/claude-code-prompt-improver](https://github.com/severity1/claude-code-prompt-improver)
 **Author:** severity1
-**Version:** 0.5.1 (released 2026-02-14)
-**License:** MIT
 **Language:** Python
-**Repository size:** 3,227 KB (GitHub-reported)
 
-## Overview
+---
 
-"A UserPromptSubmit hook that enriches vague prompts before Claude Code executes them. Uses the AskUserQuestion tool (Claude Code 2.0.22+) for targeted clarifying questions" (README.md, line 3). The tool intercepts user prompts submitted to Claude Code and evaluates their clarity before execution. Clear prompts proceed without modification; vague prompts trigger the invocation of the `prompt-improver` skill, which conducts systematic research and asks 1-6 grounded clarifying questions based on actual project context before proceeding with the original request.
+## Problem Addressed
 
-## Repository Statistics
+| Problem | Solution |
+|---------|----------|
+| Vague prompts lead to misunderstood requirements and require back-and-forth iterations | Automatically detect vague prompts and ask grounded clarifying questions before execution |
+| Clarifying questions often ask generic things that ignore actual project context | Research the codebase and conversation history first; questions are grounded in real project details |
+| Prompt evaluation adds unnecessary token overhead for clear prompts that don't need improvement | Lightweight hook-level evaluation: clear prompts have only ~189 tokens overhead; skill invocation skipped entirely for unambiguous requests |
+| Generic clarification options miss the real options available in the actual project | Derive all question options from codebase research, not assumptions or generic patterns |
+| Evaluating vague prompts requires manual context gathering outside Claude Code | Automated research phase integrates with Claude Code tools (Grep, Glob, Task, Web Search) to gather project context |
 
-- **GitHub stars:** 1,198 (as of 2026-03-07)
-- **Forks:** 104
-- **Open issues:** 4
-- **Contributors:** 2 (severity1: 27 commits; claude: 3 commits)
-- **Repository created:** 2025-10-18
-- **Last updated:** 2026-03-07
-- **Last commit pushed:** 2026-02-14
+---
 
-SOURCE: GitHub REST API (`repos/severity1/claude-code-prompt-improver`) (accessed 2026-03-07)
+---
 
-## Architecture
+## Key Features
+
+### 1. Clarity Evaluation
+
+The hook evaluates whether a prompt is clear enough to execute immediately or requires enrichment. Evaluation uses conversation history to avoid redundant exploration.
+
+**Implementation:** "Wrapped prompt includes evaluation instructions: PROCEED IMMEDIATELY if prompt is detailed/specific OR has sufficient context OR can infer intent. ONLY USE SKILL if genuinely vague" (scripts/improve-prompt.py, lines 58-61).
+
+### 2. Bypass Prefixes
+
+Users can skip evaluation entirely using three bypass mechanisms:
+
+- **`*` prefix:** "User explicitly bypassed improvement - remove * prefix" (scripts/improve-prompt.py, line 36). Example: `claude "* add dark mode"` skips evaluation.
+- **`/` prefix:** Slash commands (built-in and custom) bypass automatically without modification.
+- **`#` prefix:** Memorize feature (e.g., `# remember to use rg over grep`) bypasses evaluation.
+
+### 3. Research Planning
+
+For vague prompts, the skill generates a dynamic research plan before asking questions. "Create a dynamic research plan using TodoWrite before asking questions" (SKILL.md, line 35). The plan is structured as:
+
+1. Check conversation history first (avoid redundant exploration)
+2. Review codebase (Task/Explore for architecture, Grep/Glob for patterns, git log for recent changes, search for errors/TODOs)
+3. Gather additional context (local docs, web documentation, best practices via WebSearch)
+4. Document findings to ground questions
+
+### 4. Grounded Question Generation
+
+Questions are generated from research findings, not assumptions. "Grounded: Every option comes from research (codebase findings, documentation, common patterns)" (SKILL.md, line 62). Questions follow multiple-choice format with 2-4 concrete options per question.
+
+**Question count guidance:**
+- **1-2 questions:** Simple ambiguity (which file? which approach?)
+- **3-4 questions:** Moderate complexity (scope + approach + validation)
+- **5-6 questions:** Complex scenarios (major feature with multiple decision points)
+
+### 5. Token Efficiency
+
+"v0.4.0 Update: Skill-based architecture with hook-level evaluation achieves 31% token reduction. Clear prompts have zero skill overhead, vague prompts get comprehensive research and questioning via the skill" (README.md, line 17).
+
+**Metrics:**
+- **Per-prompt overhead (v0.4.0):** ~189 tokens (evaluation prompt only)
+- **Per-prompt overhead (v0.3.x):** ~275 tokens (embedded evaluation logic)
+- **Token reduction:** ~86 tokens saved per prompt (31% decrease)
+- **30-message session:** ~5.7k tokens (~2.8% of 200k context window), down from ~8.3k (4.1% of 200k)
+
+---
+
+## Technical Architecture
 
 The system is composed of two primary layers working in concert:
 
@@ -82,55 +137,9 @@ Reference files load only when the skill is invoked for a vague prompt, ensuring
 
 This architectural separation achieves significant token savings for the common case (clear prompts) while maintaining comprehensive guidance for vague prompts.
 
-## Features
+---
 
-### 1. Clarity Evaluation
-
-The hook evaluates whether a prompt is clear enough to execute immediately or requires enrichment. Evaluation uses conversation history to avoid redundant exploration.
-
-**Implementation:** "Wrapped prompt includes evaluation instructions: PROCEED IMMEDIATELY if prompt is detailed/specific OR has sufficient context OR can infer intent. ONLY USE SKILL if genuinely vague" (scripts/improve-prompt.py, lines 58-61).
-
-### 2. Bypass Prefixes
-
-Users can skip evaluation entirely using three bypass mechanisms:
-
-- **`*` prefix:** "User explicitly bypassed improvement - remove * prefix" (scripts/improve-prompt.py, line 36). Example: `claude "* add dark mode"` skips evaluation.
-- **`/` prefix:** Slash commands (built-in and custom) bypass automatically without modification.
-- **`#` prefix:** Memorize feature (e.g., `# remember to use rg over grep`) bypasses evaluation.
-
-### 3. Research Planning
-
-For vague prompts, the skill generates a dynamic research plan before asking questions. "Create a dynamic research plan using TodoWrite before asking questions" (SKILL.md, line 35). The plan is structured as:
-
-1. Check conversation history first (avoid redundant exploration)
-2. Review codebase (Task/Explore for architecture, Grep/Glob for patterns, git log for recent changes, search for errors/TODOs)
-3. Gather additional context (local docs, web documentation, best practices via WebSearch)
-4. Document findings to ground questions
-
-### 4. Question Generation
-
-Questions are generated from research findings, not assumptions. "Grounded: Every option comes from research (codebase findings, documentation, common patterns)" (SKILL.md, line 62). Questions follow multiple-choice format with 2-4 concrete options per question.
-
-**Question count guidance:**
-- **1-2 questions:** Simple ambiguity (which file? which approach?)
-- **3-4 questions:** Moderate complexity (scope + approach + validation)
-- **5-6 questions:** Complex scenarios (major feature with multiple decision points)
-
-### 5. Conversation History Awareness
-
-"Check conversation history before exploring codebase" (SKILL.md, line 52). The evaluation and research phases check existing conversation context to avoid redundant exploration, making the tool more efficient in multi-turn conversations.
-
-### 6. Token Efficiency
-
-"v0.4.0 Update: Skill-based architecture with hook-level evaluation achieves 31% token reduction. Clear prompts have zero skill overhead, vague prompts get comprehensive research and questioning via the skill" (README.md, line 17).
-
-**Metrics:**
-- **Per-prompt overhead (v0.4.0):** ~189 tokens (evaluation prompt only)
-- **Per-prompt overhead (v0.3.x):** ~275 tokens (embedded evaluation logic)
-- **Token reduction:** ~86 tokens saved per prompt (31% decrease)
-- **30-message session:** ~5.7k tokens (~2.8% of 200k context window), down from ~8.3k (4.1% of 200k)
-
-## Usage
+## Installation & Usage
 
 ### Normal Use
 

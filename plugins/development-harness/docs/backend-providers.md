@@ -3,7 +3,7 @@
 Reference for implementers planning backend integrations across the full development harness. Covers coordination state (issues, tasks) and durable handoff content (documents) for GitHub (current), Linear, GitLab, and Supabase.
 
 For artifact-specific Protocol details, see [artifact-manifest-backends.md](./artifact-manifest-backends.md).
-For detailed platform research with citations, see [research/task-management/artifact-manifest-backend-providers.md](../../../research/task-management/artifact-manifest-backend-providers.md).
+For detailed platform research with citations, see [research/design-notes/artifact-manifest-backend-providers.md](../../../research/design-notes/artifact-manifest-backend-providers.md).
 For the architect spec, see `~/.dh/projects/{slug}/plan/architect-artifact-manifest.md` (state artifact, access via `artifact_read(artifact_type="architect")`).
 For the feature context and desired outcomes, see `~/.dh/projects/{slug}/plan/feature-context-artifact-manifest.md` (state artifact, access via `artifact_read(artifact_type="feature-context")`).
 
@@ -353,7 +353,7 @@ The development harness uses Protocol-based abstraction to decouple MCP tools fr
 
 ## Platform Capabilities
 
-All data below is sourced from verified research. See [research/task-management/artifact-manifest-backend-providers.md](../../../research/task-management/artifact-manifest-backend-providers.md) for full citations and access dates.
+All data below is sourced from verified research. See [research/design-notes/artifact-manifest-backend-providers.md](../../../research/design-notes/artifact-manifest-backend-providers.md) for full citations and access dates.
 
 ### GitHub (Current Backend)
 
@@ -879,7 +879,7 @@ Backend selection is configured via a config file at server startup. Each MCP se
 ## References
 
 - [graphql-usage-guide.md](./graphql-usage-guide.md) -- `sync_issues_graphql` usage, parameters, anti-patterns, and performance data
-- [research/task-management/artifact-manifest-backend-providers.md](../../../research/task-management/artifact-manifest-backend-providers.md) -- cross-platform research with full citations
+- [research/design-notes/artifact-manifest-backend-providers.md](../../../research/design-notes/artifact-manifest-backend-providers.md) -- cross-platform research with full citations
 - `~/.dh/projects/{slug}/plan/architect-artifact-manifest.md` -- architecture spec for ArtifactBackend Protocol (access via `artifact_read`)
 - `~/.dh/projects/{slug}/plan/feature-context-artifact-manifest.md` -- problem space and desired outcomes (access via `artifact_read`)
 - [artifact-manifest-backends.md](./artifact-manifest-backends.md) -- artifact-specific backend details

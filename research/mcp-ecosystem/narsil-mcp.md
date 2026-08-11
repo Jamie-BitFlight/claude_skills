@@ -206,9 +206,11 @@ Narsil-MCP is a Rust-powered MCP (Model Context Protocol) server providing AI as
 
 ---
 
-## Installation
+## Installation & Usage
 
-### Package Managers
+### Installation
+
+#### Package Managers
 
 ```bash
 # Homebrew (macOS/Linux)
@@ -228,7 +230,7 @@ scoop install narsil-mcp
 nix run github:postrv/narsil-mcp -- --repos ./my-project
 ```
 
-### One-Line Install Scripts
+#### One-Line Install Scripts
 
 ```bash
 # macOS/Linux
@@ -237,6 +239,59 @@ curl -fsSL https://raw.githubusercontent.com/postrv/narsil-mcp/main/install.sh |
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/postrv/narsil-mcp/main/install.ps1 | iex
 ```
+
+### Usage
+
+#### Running Narsil-MCP
+
+```bash
+# Index a single local repository
+narsil-mcp --repos /path/to/project
+
+# Index with git integration and call graph analysis
+narsil-mcp --repos /path/to/project --git --call-graph
+
+# Enable neural semantic embeddings (requires an API key or a custom/local ONNX endpoint)
+narsil-mcp --repos /path/to/project --neural
+
+# Enable the SPARQL/RDF knowledge graph and CCG tools.
+# Only effective if the binary was built with `--features graph` — the default binary is not.
+# Passing --graph to a binary without the feature logs a warning at startup and continues without
+# the SPARQL/CCG tools.
+narsil-mcp --repos /path/to/project --graph
+
+# Apply a tool preset. README-documented values: minimal, balanced, full, security-focused
+narsil-mcp --repos /path/to/project --preset minimal
+```
+
+#### Representative Tools by Category
+
+Descriptions below are the README's own tool-table wording. Argument schemas are not documented in
+the README, so no call signatures are given here — consult the running server's `tools/list` for
+parameter names.
+
+| Category | Tool | README description |
+|---|---|---|
+| Symbols | `find_symbols` | Find structs, classes, functions by type/pattern |
+| Symbols | `find_references` | Find all references to a symbol |
+| Search | `search_code` | Keyword search with relevance ranking |
+| Search | `semantic_search` | BM25-ranked semantic search |
+| Search | `hybrid_search` | Combined BM25 + TF-IDF with rank fusion |
+| Dependencies | `get_import_graph` | Build and analyze import graph |
+| Dependencies | `find_circular_imports` | Detect circular dependencies |
+| Security | `scan_security` | Scan with security rules (OWASP, CWE, crypto, secrets) |
+| Security | `check_owasp_top10` | Scan for OWASP Top 10 2021 vulnerabilities |
+| Security | `suggest_fix` | Get remediation suggestions for findings |
+| Supply chain | `generate_sbom` | Generate SBOM (CycloneDX/SPDX/JSON) |
+| Supply chain | `check_dependencies` | Check for known vulnerabilities (OSV database) |
+
+Note the separation of concerns the table implies: relevance-ranked semantic search is
+`semantic_search`, not `search_code`; circular-import detection is `find_circular_imports`, not
+`get_import_graph`; remediation text comes from `suggest_fix`, not from the scanners; and
+dependency vulnerability status comes from `check_dependencies`, not from `generate_sbom`.
+
+Individual tools can be suppressed by name, e.g.
+`export NARSIL_DISABLED_TOOLS=neural_search,generate_sbom`.
 
 ---
 

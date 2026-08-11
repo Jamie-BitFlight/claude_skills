@@ -4,6 +4,14 @@ license: "MIT"
 next_review: "2026-07-03"
 ---
 
+# Mission Control (Autensa)
+
+## Overview
+
+Autensa (formerly Mission Control) is an Autonomous Product Engine that automates the entire product improvement cycle—from continuous market research through feature deployment—allowing products to improve themselves 24/7. The system orchestrates AI agents to autonomously research markets, ideate features, execute implementations with human approval at decision points, and ship code as pull requests while maintaining user oversight through a swipe-based interface (accessed 2026-04-03).
+
+---
+
 ## Problem Addressed
 
 Traditional product management relies on manual processes: market research, feature ideation, design, implementation, testing, and review are sequential and labor-intensive. Most product teams lack continuous market monitoring, automated research synthesis, or systematic preference capture.

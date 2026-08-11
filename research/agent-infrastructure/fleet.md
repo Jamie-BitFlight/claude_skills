@@ -4,6 +4,14 @@ license: "Mixed (MIT for open source, commercial license for premium features)"
 next_review: "2026-06-28"
 ---
 
+# Fleet
+
+## Overview
+
+Fleet is an open-source MDM (mobile device management) and endpoint management platform built on osquery, enabling organizations to manage devices across macOS, Windows, Linux, Chromebooks, iOS, and Android from a single console. Developed by Fleetdm, Fleet provides real-time device visibility, vulnerability management, compliance automation, and multi-OS support through a unified API and web interface, with production deployments managing hundreds of thousands of hosts. (SOURCE: [Fleet Official Website](https://fleetdm.com/), accessed 2026-08-10; [GitHub - fleetdm/fleet](https://github.com/fleetdm/fleet), accessed 2026-08-10)
+
+---
+
 ## Problem Addressed
 
 Organizations managing large fleets of devices need consolidated visibility and control across heterogeneous environments. Traditional MDM solutions are often rigid, vendor-locked, or designed for smaller deployments. Fleet addresses this by:

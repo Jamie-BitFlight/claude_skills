@@ -42,13 +42,25 @@ current_version: 0.58.1 (released 2026-03-14)
 
 ---
 
-## Summary
+## Overview
 
-Pi is a comprehensive TypeScript monorepo providing tools for building AI agents and managing LLM deployments. It exports seven npm packages with a unified multi-provider LLM API, agent runtime with tool calling, interactive coding agent CLI, TUI framework, web UI components, Slack bot integration, and vLLM pod management. The framework emphasizes minimal defaults with extensibility through prompt templates, skills, extensions, and themes, designed for workflows that require adaptation over prescriptive structure.
+Pi is a comprehensive TypeScript monorepo providing tools for building AI agents and managing LLM deployments. It exports seven npm packages with a unified multi-provider LLM API, agent runtime with tool calling, interactive coding agent CLI, TUI framework, web UI components, Slack bot integration, and vLLM pod management. The framework emphasizes minimal defaults with extensibility through prompt templates, skills, extensions, and themes, designed for workflows that require adaptation over prescriptive structure (accessed 2026-03-14).
 
 ---
 
-## Architecture
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| LLM provider lock-in and inconsistent APIs across providers | Unified multi-provider LLM API (`@mariozechner/pi-ai`) with automatic model discovery and provider credential detection supporting OpenAI, Anthropic, Google, Mistral, Groq, and others |
+| Difficulty building multi-turn agentic workflows | Agent runtime (`@mariozechner/pi-agent-core`) with stateful message management, tool execution, and event streaming for UI integration |
+| No accessible TUI framework for terminal-based agents | Minimal TUI framework (`@mariozechner/pi-tui`) with differential rendering, flicker-free atomic updates, and component system for terminal UI applications |
+| Rigid agent frameworks that don't adapt to workflows | Pi ships with powerful defaults but allows agents to build what they want or install third-party packages matching their workflow (source: pi-coding-agent README) |
+| Multiple UI systems requiring duplicate implementation | Unified approach with TUI framework, web UI components, and Slack bot all built on the same agent runtime and LLM abstraction |
+
+---
+
+## Technical Architecture
 
 The monorepo is organized as a TypeScript workspace with seven interdependent packages:
 
@@ -104,7 +116,7 @@ pi-pods (standalone — uses ai only)
 
 ---
 
-## Features
+## Key Features
 
 ### 1. Multi-Provider LLM API (`pi-ai`)
 

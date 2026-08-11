@@ -3,6 +3,14 @@ title: "Ruflo: Enterprise AI Agent Orchestration Platform"
 license: "MIT"
 ---
 
+# Ruflo: Enterprise AI Agent Orchestration Platform
+
+## Overview
+
+Ruflo is an enterprise-grade agent orchestration platform that extends Claude Code and Codex with 100+ specialized agents, coordinated swarms, self-learning memory, federated communications across machines, and security guardrails. The system enables AI agents to work together as organized teams rather than independently, providing a coordination layer that adds multi-agent capabilities to single-agent coding systems (accessed 2026-04-03).
+
+---
+
 ## Problem Addressed
 
 **Single-Agent Limitation**: Claude Code and similar AI systems traditionally work with a single reasoning model per task, limiting capability to that model's strengths and creating bottlenecks when multiple specialized skills are needed simultaneously.

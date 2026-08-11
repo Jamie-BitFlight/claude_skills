@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 # Prevent duplicate runs when pushing to a PR branch
 concurrency:
@@ -150,6 +151,8 @@ jobs:
   #   mixed-line-ending, check-added-large-files, check-case-conflict,
   #   check-executables-have-shebangs, check-shebang-scripts-are-executable,
   #   check-yaml, check-json, check-toml, check-symlinks, destroyed-symlinks
+  # validate-research-entries remains enabled here so modified entries are
+  # blocking, while the whole-corpus report below remains advisory.
   # =============================================================================
   file-hygiene:
     name: Files / Hygiene checks
@@ -165,7 +168,7 @@ jobs:
 
       - name: Run file hygiene hooks
         env:
-          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,actionlint,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere
+          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,actionlint,shell-fmt-go,shellcheck,auto-sync-manifests,skilllint,ty,enable-rerere,validate-research-entries
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
@@ -173,6 +176,29 @@ jobs:
           else
             uv run prek run --all-files
           fi
+
+  # =============================================================================
+  # Research: validate research entry structure and completeness.
+  # Advisory: as of 2026-08-10, 69/339 entries pre-date the research-curator
+  # template and are missing required body sections (Overview, Problem
+  # Addressed, etc.) — a genuine content gap tracked for remediation, not a
+  # regression from any single change. This whole-corpus report is not wired
+  # into quality-gate until the corpus backlog is cleared.
+  # =============================================================================
+  research-validation:
+    name: Research / Entry validation
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+
+      - name: Validate research entries
+        run: uv run -q prek run validate-research-entries --all-files
 
   # =============================================================================
   # Python: pytest test suite
@@ -232,6 +258,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_REPO: Jamie-BitFlight/claude_skills
+      DH_ALLOW_TEST_NETWORK: "1"
     steps:
       - uses: actions/checkout@v6
         with:

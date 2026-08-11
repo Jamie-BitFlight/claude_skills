@@ -2,6 +2,26 @@
 title: "gstack — Claude Code Workflow Skills"
 ---
 
+# gstack
+
+## Overview
+
+gstack is a collection of eight specialized Claude Code workflow skills (prompts + CLI tools) designed to automate the complete software development lifecycle from idea through production. The framework replaces generic AI assistance with role-specific cognition—eight different mental models, each optimized for a distinct development phase, with built-in browser automation via Playwright and real-time markdown rendering (accessed 2026-03-14).
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Generic AI assistants lack role-specific reasoning | Eight specialized workflow skills provide distinct mental models: founder mode, engineering rigor mode, paranoid reviewer mode, release machine mode, QA mode, etc. |
+| Context blurring across development phases | Explicit cognitive switching between phases—product ideation → architecture → code review → shipping—prevents conflation of different types of judgment |
+| Manual browser testing and verification in headless environments | `/browse` provides token-efficient browser automation via accessibility tree refs instead of full DOM snapshots or expensive MCP protocol overhead |
+| Shipping friction delays deployment | `/ship` automates sync, test, changelog update, versioning, and PR creation to eliminate procrastination on final-mile work |
+| No visibility into team velocity or coding patterns | `/retro` analyzes commit history to extract metrics (commits, LOC, test ratio, shipping streaks) and deliver candid per-person feedback with trend tracking |
+
+---
+
 ## Identity & Metadata
 
 | Field | Value |
@@ -30,9 +50,9 @@ The design philosophy is **cognitive switching** — consciously select which me
 
 ---
 
-## Eight Workflow Skills
+## Key Features
 
-Each skill is implemented as a Markdown-based Claude Code skill file (prompts + instructions). They are discovered and loaded by Claude Code's skill loader.
+Each of the eight core workflow skills is implemented as a Markdown-based Claude Code skill file (prompts + instructions). They are discovered and loaded by Claude Code's skill loader.
 
 ### 1. `/plan-ceo-review` — Founder Mode
 
@@ -175,7 +195,7 @@ Each skill is implemented as a Markdown-based Claude Code skill file (prompts + 
 
 ---
 
-## Installation & Setup
+## Installation & Usage
 
 **Requirements** (source: README.md line 100):
 - Claude Code (any recent version)
@@ -222,7 +242,7 @@ cd ~/.claude/skills/gstack && git fetch origin && git reset --hard origin/main &
 
 ---
 
-## Architecture & Implementation
+## Technical Architecture
 
 ### Repository Structure (source: CLAUDE.md)
 

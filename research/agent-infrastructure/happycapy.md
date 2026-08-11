@@ -2,7 +2,7 @@
 title: "HappyCapy — Agent-Native Computer for Developers"
 ---
 
-## Identity & Overview
+## Overview
 
 HappyCapy is a browser-based agent-native computing platform that transforms any web browser into a complete AI agent workspace. It eliminates the need for local installation, terminal configuration, or technical setup by running Claude Code and autonomous AI agents in a secure cloud sandbox environment, accessible directly from any device with a browser.
 
@@ -12,7 +12,17 @@ HappyCapy is a browser-based agent-native computing platform that transforms any
 
 ---
 
-## Core Architecture & Execution Model
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| AI agents require local setup (terminal, CLI, configuration) — high friction for non-technical users | Browser-based execution eliminates setup; agents run immediately from any device with a browser |
+| Agent development siloed locally on developer's machine — difficult to access remotely | Cloud sandbox runs agents anywhere; accessible from phone, tablet, or remote devices |
+| Agents lack visual interface for monitoring — CLI-only output makes agent behavior opaque | Visual desktop GUI with file manager, terminal, code editor, task panels shows all agent actions in real-time |
+
+---
+
+## Technical Architecture
 
 ### Agent Execution Stack
 
@@ -26,7 +36,7 @@ HappyCapy operates on three-layer architecture:
 
 ### Private Sandbox Execution
 
-"Each user gets their own isolated environment – a little digital space with its own file system and process capabilities. This means Claude Opus or Sonnet can directly read, write, and execute code within that tab. The whole cycle of writing code, running it, and seeing the file changes happen seamlessly, all in one place." (SOURCE: Oreate AI Blog, <http://oreateai.com/blog/happycapy-your-browser-becomes-a-zerofriction-ai-workstation/>, published 2026-02-25)
+Happycapy provides isolated execution environments for each user, enabling Claude to read, write, and execute code within a dedicated sandbox.
 
 Key isolation properties:
 
@@ -41,13 +51,13 @@ Key isolation properties:
 - Claude Sonnet 4.5 (fast execution)
 - MiniMax M2.5 (alternative LLM)
 
-(SOURCE: Product Hunt launch, <https://happycapy.ai/pricing>, accessed 2026-02-11; Ben's Bites newsletter, <https://www.bensbites.com/p/something-big-is-happening>, published 2026-02-11)
+(SOURCE: HappyCapy Pricing Page, <https://happycapy.ai/pricing>, accessed 2026-02-11; Ben's Bites newsletter, <https://www.bensbites.com/p/something-big-is-happening>, published 2026-02-11)
 
 **Broader Model Ecosystem**: "Over 150 AI models via skills" with integration including Veo (video generation), image generators, and various LLMs accessible through unified skill-based interface. (SOURCE: HappyCapy pricing page, <https://happycapy.ai/pricing>, accessed 2026-02-11)
 
 ---
 
-## Key Features & Mechanisms
+## Key Features
 
 ### 1. Browser-Based Agent Computer
 
@@ -68,8 +78,6 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 - Code editor
 - Task panels
 - Live rendering of agent actions and file modifications
-
-"Unlike the command-line interfaces of some other agent systems, Happycapy offers a graphical workstation. The agent's actions, its logs, and any file modifications are all visually presented." (SOURCE: Oreate AI Blog)
 
 **Design Philosophy**: "A GUI built for everyday user. Powerful agents, without the complexity." (SOURCE: HappyCapy official site, <https://happycapy.ai/>, accessed 2026-02-11)
 
@@ -92,12 +100,9 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 - Create custom skills by uploading a zip file or describing requirements in natural language
 - Stack multiple skills for complex workflows
 
-"The system can generate a new Skill for you. It's like having a vast library of ready-made [automation modules]." (SOURCE: Oreate AI Blog)
-
 **Skill Availability**:
-- Official repository: 54 stars, 7 forks on GitHub as of 2026-02-13 (SOURCE: <https://github.com/happycapy-ai/Happycapy-skills>)
-- Curated collection of "high-quality Claude Code skills to enhance your development workflow" in Python (53.4%), TeX (44.2%), JavaScript (2.0%), Shell (0.3%) (SOURCE: GitHub repository metadata, accessed 2026-02-13)
-- Over 170,000 pre-built skills from SkillsMP marketplace (SOURCE: Oreate AI Blog)
+- Official repository, "[a] curated collection of high-quality Claude Code skills to enhance your development workflow"; 137 stars, 29 forks. Language breakdown by bytes: HTML 35.7%, Python 35.7%, TeX 15.5%, Shell 10.3%, JavaScript 1.6%, TypeScript 1.1%, CSS 0.1% (SOURCE: GitHub repository and `/languages` API, <https://github.com/happycapy-ai/Happycapy-skills>, accessed 2026-08-11)
+- Extensive integration with skills marketplace for pre-built automation components (SOURCE: HappyCapy official site)
 
 ### 5. Agent-to-Inbox Delivery
 
@@ -115,43 +120,78 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 
 ---
 
+## Installation & Usage
+
+### Getting Started
+
+**Step 1: Access HappyCapy**
+
+HappyCapy is cloud-native and requires no installation:
+
+```
+1. Open any web browser (Chrome, Edge, Safari, Firefox)
+2. Navigate to https://happycapy.ai
+3. Sign up with email or social login (Google, GitHub)
+4. Accept sandbox environment terms
+5. Launch a new workspace
+```
+
+(SOURCE: [HappyCapy Official Site](https://happycapy.ai), accessed 2026-08-10)
+
+**Step 2: Create a Project**
+
+```
+1. Click "New Project"
+2. Name your project (e.g., "Marketing Report Automation")
+3. Select project type: code, skill, or automation
+4. Start describing what you want in natural language
+```
+
+### Basic Usage
+
+HappyCapy is accessed via web browser at <https://happycapy.ai>. No installation required. Users describe desired projects in natural language; the platform runs Claude Code agents within a private sandbox to execute tasks.
+
+---
+
 ## Pricing & Tiers
 
-(as of 2026-02-11, SOURCE: <https://happycapy.ai/pricing>)
+(as of 2026-08-10, SOURCE: [HappyCapy Pricing Page](https://happycapy.ai/pricing))
 
 ### Free Tier — $0/month
 
-**Access to:**
-- Limited Claude Code access
-- Limited MiniMax M2.5 access
-- Limited AI models access via skills
-- Basic sandbox environment (isolated execution)
+- 250 credits monthly
+- Basic sandbox environment
+- Claude model access
 - Custom skill creation
-- Open-source skill compatibility
 
 ### Pro Tier — $20/month ($17/month with annual billing)
 
-**Includes all Free features, plus:**
-- 2,000 monthly Claude Code credits (vs. limited in Free)
-- Unlimited access to 150+ AI models via skills
-- Unlimited MiniMax M2.5 access
-- Sandbox upgrade: 2 cores, 4 GB RAM, 50 GB storage
-- Automation: run recurring tasks in the sandbox
-- Capymail access for sending and receiving emails
-- **Early Bird pricing**: $17/month annually
+- 2,000 credits monthly
+- Upgraded sandbox (2 cores, 4GB RAM, 50GB storage)
+- Frontier model access
+- 3 automations
+- 200 email quota via Capymail
+
+### Plus Tier — $50/month ($42/month with annual billing)
+
+- 5,000 credits monthly
+- Same sandbox specs as Pro
+- 5 automations
+- 2,000 email quota
 
 ### Max Tier — $200/month ($167/month with annual billing)
 
-**Includes all Pro features, plus:**
-- Unlimited Claude Code access
-- Unlimited access to 150+ AI models via skills
-- Sandbox upgrade: 4 cores, 8 GB RAM, 200 GB storage
-- More automations (recurring task capacity)
-- Higher email quota
-- Early access to iOS App
-- Agent teams with GUI (research preview)
-- Priority human support
-- **Early Bird pricing**: $167/month annually
+- 22,000 credits monthly
+- Enhanced sandbox (4 cores, 8GB RAM, 200GB storage)
+- 10 automations
+- 5,000 email quota
+- iOS app early access
+- Agent teams with GUI
+- Priority support
+
+### Team Tier
+
+- Flexible enterprise solutions available
 
 ---
 
@@ -177,8 +217,6 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 - Knowledge workers and entrepreneurs
 - Indie developers
 - Content creators
-
-(SOURCE: Oreate AI Blog)
 
 ---
 
@@ -212,7 +250,7 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 ### Direct Integration Points
 
 1. **Claude Code Core** — HappyCapy is powered by Claude Code, providing browser-based access without local installation
-2. **Skills Ecosystem** — HappyCapy's Happycapy-skills repository (54 stars) is a curated collection of Claude Code skills demonstrating best practices
+2. **Skills Ecosystem** — HappyCapy's Happycapy-skills repository is a curated collection of Claude Code skills demonstrating best practices for skill development and composition
 3. **GUI Pattern** — Visual agent workflow representation offers insights into agent-friendly interface design, directly applicable to Claude Code's own UI development
 4. **Sandbox Architecture** — Cloud-based execution isolation model relevant to Claude Code's security and environment design
 5. **Multi-Agent Coordination** — Agent teams feature demonstrates multi-agent scaling patterns useful for Claude Code orchestration
@@ -237,13 +275,13 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 ### Repository Activity
 
 - **Happycapy-skills Repository**:
-  - 54 stars, 7 forks (as of 2026-02-13)
-  - 4 contributors (yayaxiyi, MinMinMinM, niveshdandyan, yifeiyang)
-  - Last push: 2026-02-13
+  - 137 stars, 29 forks (as of 2026-08-11)
+  - 10 contributors
   - MIT License
-  - Primary language: Python
+  - Primary language reported by GitHub: HTML (Python is a near-equal second by bytes)
+  - Last push: 2026-07-21
 
-(SOURCE: GitHub repository metadata, <https://github.com/happycapy-ai/Happycapy-skills>)
+(SOURCE: GitHub repository, <https://github.com/happycapy-ai/Happycapy-skills>, accessed 2026-08-11)
 
 ### Related Ecosystem Projects
 
@@ -268,7 +306,7 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 
 3. **Sandbox Resource Limits** — Maximum storage is 200 GB (Max tier), which may be insufficient for some data-intensive workloads. Computational limits (4 cores Max tier) not extensively documented.
 
-4. **Persistent Agent Costs** — Automation quota and email quota limits exist but specific numbers not detailed in publicly available pricing documentation.
+4. **Persistent Agent Costs** — Automation and email quotas vary by plan; consult the current pricing page because quotas and prices may change.
 
 5. **Model Availability** — While 150+ models are accessible, the skill integration mechanism for each model is not detailed; may not all models integrate equally.
 
@@ -309,7 +347,6 @@ The primary sources do not document:
 - **Primary Skills Repository**: <https://github.com/happycapy-ai/Happycapy-skills> (accessed 2026-02-13)
 - **YouTube Review**: Conor Martin, "HappyCapy Review - Run your AI Agents Online," <https://www.youtube.com/watch?v=bYtLWExO5qk> (published 2026-02-11, accessed via search)
 - **SuperGok Article**: Mrsinghh, "Happycapy Agent-Native Computer in the Browser," <https://supergok.com/happycapy-agent-native-computer/> (published 2026-01-28, accessed 2026-03-13)
-- **Oreate AI Blog**: "Happycapy: Your Browser Becomes a Zero-Friction AI Workstation," <http://oreateai.com/blog/happycapy-your-browser-becomes-a-zerofriction-ai-workstation/> (published 2026-02-25, accessed 2026-03-13)
 - **ProductCool Review**: "happycapy — The agent-native computer, for the rest of us," <https://www.productcool.com/product/happycapy> (published 2026-02-11, accessed 2026-03-13)
 - **FunBlocks AI Review**: "happycapy Review: The Agent-Native Computer Redefining Browser Productivity," <https://funblocks.net/aitools/reviews/happycapy> (published 2026-02-11, accessed 2026-03-13)
 - **Ben's Bites Newsletter**: "Something big is happening," <https://www.bensbites.com/p/something-big-is-happening> (published 2026-02-11, accessed 2026-03-13)

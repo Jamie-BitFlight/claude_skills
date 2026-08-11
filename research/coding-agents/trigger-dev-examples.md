@@ -24,6 +24,18 @@ The Trigger.dev examples repository is a curated collection of full-stack and he
 - Created: August 21, 2024
 - Last code push: March 23, 2026
 
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Learning Trigger.dev patterns requires reading documentation and assembling custom code | 29 ready-to-run example projects demonstrating real-world Trigger.dev usage patterns across web frameworks and AI agents |
+| Integrating background job queues with frontends is non-obvious | Web framework examples (Next.js, Remix) demonstrate frontend-to-API-route-to-Trigger.dev integration patterns with webhooks and server actions |
+| Building AI agents requires orchestrating multiple LLM calls and tools | "Building Effective Agents" section with 5 documented patterns: prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer |
+| Real-time agent progress feedback requires custom streaming infrastructure | Trigger.dev Realtime API examples show progress tracking, human-in-the-loop workflows, and live updates for long-running tasks |
+| Starting a Trigger.dev project from scratch requires boilerplate setup | Example projects are production-ready starting points with dependencies, configuration, and environment setup already in place |
+
+**Source**: <https://github.com/triggerdotdev/examples/blob/main/README.md> (accessed 2026-04-11)
+
 ## Key Statistics
 
 - **29 example projects** covering web frameworks, AI agents, data processing, and integrations

@@ -37,10 +37,10 @@ The artifact manifest system (P965) stores manifests in GitHub Issue body with H
 <!-- artifact-manifest:begin -->
 | Type | Path | Status | Agent | Created |
 |------|------|--------|-------|---------|
-| research | research/artifact-manifest-linear-patterns.md | current | artifact-migrate | 2026-03-22T05:59:41.536590+00:00 |
-| research | research/artifact-manifest-jira-asana-monday-patterns.md | current | artifact-migrate | 2026-03-22T05:59:44.902521+00:00 |
-| research | research/artifact-manifest-github-fields.md | current | artifact-migrate | 2026-03-22T05:59:48.525429+00:00 |
-| research | research/artifact-manifest-linear-custom-fields.md | current | artifact-migrate | 2026-03-22T05:59:52.207421+00:00 |
-| research | research/artifact-manifest-gitlab-custom-fields.md | current | artifact-migrate | 2026-03-22T05:59:55.892611+00:00 |
-| research | research/artifact-manifest-gitlab-api-deep.md | current | artifact-migrate | 2026-03-22T05:59:59.488305+00:00 |
+| research | research/design-notes/artifact-manifest-linear-patterns.md | current | artifact-migrate | 2026-03-22T05:59:41.536590+00:00 |
+| research | research/design-notes/artifact-manifest-jira-asana-monday-patterns.md | current | artifact-migrate | 2026-03-22T05:59:44.902521+00:00 |
+| research | research/design-notes/artifact-manifest-github-fields.md | current | artifact-migrate | 2026-03-22T05:59:48.525429+00:00 |
+| research | research/design-notes/artifact-manifest-linear-custom-fields.md | current | artifact-migrate | 2026-03-22T05:59:52.207421+00:00 |
+| research | research/design-notes/artifact-manifest-gitlab-custom-fields.md | current | artifact-migrate | 2026-03-22T05:59:55.892611+00:00 |
+| research | research/design-notes/artifact-manifest-gitlab-api-deep.md | current | artifact-migrate | 2026-03-22T05:59:59.488305+00:00 |
 <!-- artifact-manifest:end -->

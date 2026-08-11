@@ -1,23 +1,214 @@
 ---
-name: 'GitHub Research: Existing Research Agent Patterns'
-description: '| Repository                                                                                                | Stars  | Description                                                                     ...'
-metadata:
-  topic: github-patterns
-  category: research-agent-patterns
-  source_url: https://github.com/github-patterns
-  verified: "2025-12-09"
-  next_review: "2026-03-09"
+name: github-research-agent-patterns
+research_date: "2025-12-09"
+source_url: "https://github.com/github-patterns"
+version_at_research: "community-maintained"
+license: "Mixed (individual repos vary)"
+freshness_tracking:
+  last_verified: "2026-08-11"
+  version_at_verification: "as of 2026-08-11"
+  next_review: "2026-11-11"
+  confidence_map: "Overview: high | Problem Addressed: high | Key Features: high | Technical Architecture: high (code-read) | Installation & Usage: high | Relevance: high | References: high"
 ---
 
-## Awesome Lists Found
+# GitHub Research Agent Patterns
 
-| Repository                                                                                                | Stars  | Description                                                                                                                                            | Last Updated |
+## Overview
+
+Comprehensive collection of 5 major research agent architecture patterns discovered from open-source GitHub repositories, including production-ready Claude Code agent implementations, academic research workflows, and multi-agent orchestration systems. Covers 40+ awesome lists and specialized research repositories with 100+ production-ready agent definitions, 12-agent academic pipelines, Pydantic AI frameworks, and chief-of-staff orchestration models. Research completed December 2025; patterns extracted from yuz207/claude-agents-research-team, adrianstier/research-agent, aldiakhou/codex-main, and curated awesome lists (hesreallyhim/awesome-claude-code, VoltAgent/awesome-claude-code-subagents, punkpeye/awesome-mcp-servers).
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Multi-agent research workflows lack clear orchestration patterns and role definitions | Chief of Staff model (yuz207/claude-agents-research-team) defines explicit team structure, role separation, and request-based coordination |
+| Research findings get lost or fragmented across multiple agent invocations | Context preservation protocol: mandatory agent context files with complete workflow state, findings, and hypothesis before each delegation |
+| No guidance on when to run agents in parallel vs. sequentially, leading to inefficient workflows | Parallel vs. sequential execution rules based on dependency analysis — parallelism for discovery phases, sequences for iterative refinement |
+| Large research outputs exceed context windows and get truncated | Large file write strategy: phase-based pagination and multi-file organization preserves completeness without truncation |
+| Citation management falls out of sync between research phases and final outputs | Dedicated Citation Agent pattern: centralized citation tracking with hash-based keys generated during research, inserted at end |
+| No standard for structuring research evidence, findings, and synthesis | Structured outputs using Pydantic models (Finding, Synthesis, Plan, CitationRequest) enforce consistency and type safety across agents |
+| Academic research workflows lack end-to-end templates from hypothesis through manuscript submission | 12-agent Academic Research Workflow (adrianstier/research-agent): complete pipeline from PRD through literature review, EDA, modeling, figure design, writing, and submission |
+
+---
+
+## Key Features
+
+### Pattern Collection Coverage
+
+Research identifies patterns from 40+ awesome lists and specialized research repositories:
+- [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) — 52,029 stars, curated commands/workflows/agents for Claude Code
+- [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) — 24,174 stars, 100+ production-ready specialized agents
+- [hesreallyhim/a-list-of-claude-code-agents](https://github.com/hesreallyhim/a-list-of-claude-code-agents) — 1,340 stars, community-submitted agents
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) — 92,033 stars, MCP server collection
+- [wong2/awesome-mcp-servers](https://github.com/wong2/awesome-mcp-servers) — 4,254 stars, curated MCP servers
+
+**Source**: Awesome Lists (accessed 2026-08-11)
+
+### Pattern 1: Chief of Staff Orchestration
+
+Stateless agents coordinate via file-based context sharing. Mandatory context files record complete workflow state before each agent invocation. Request-based coordination prevents direct agent-to-agent coupling.
+
+**Key components:**
+- Workflow directory: `agent_notes/[timestamp]_[workflow_name]/`
+- Agent context file: `context_[agent].md` with plan, reasoning, findings, requirements
+- Phase organization: `phase[N]_[agent]_[purpose].md` outputs, `phase[N]_synthesis.md` cross-agent views
+- Parallel vs. sequential execution rules based on dependency analysis
+
+**Documented by**: yuz207/claude-agents-research-team
+
+### Pattern 2: Academic Research Workflow (12-Agent Pipeline)
+
+Complete end-to-end pipeline from hypothesis generation through manuscript submission. Includes explicit agent roles for each research stage: PRD, literature synthesis, EDA, modeling, figure design, scientific writing, reviewer personas, submission packaging.
+
+**Key components:**
+- Research PRD Agent: Convert high-level question to structured research requirements
+- Literature & Conceptual Framework Agent: Synthesize domain knowledge
+- Data QA & Cleaning Agent: Quality assurance
+- EDA Agent: Exploratory data analysis with 15-25 recommended plots
+- Modeling Agent: Statistical analysis plan and model specifications
+- Figure Factory Agent: Design all figures with panel layouts and aesthetics
+- Scientific Writer Agent: Transform analyses into polished manuscript sections
+- Reviewer Agent: Internal multi-persona review
+- Submission Agent: Prepare journal-specific submission materials
+
+**Documented by**: adrianstier/research-agent
+
+### Pattern 3: Iterative Research Loop with Memory
+
+Plan → Execute → Synthesize → Continue/Exit cycle with persistent memory. Each iteration saves plans and synthesis snapshots. Loop exits when plan recommends stop or synthesis recommends exit.
+
+**Key components:**
+- LeadResearcher: coordinates plan, delegates to subagents
+- Subagents: focused research on single aspects
+- Memory persistence: save/recall for plans, findings, citations
+- Temperature control: tuned per agent role (research: 0.2, planning: 0.3, citation: 0.1)
+- Citation tracking: hash-based keys generated during research, aggregated for final bibliography
+
+**Documented by**: aldiakhou/codex-main (Pydantic AI framework)
+
+### Pattern 4: File Organization for Multi-Phase Research
+
+Three pagination strategies for handling large research outputs:
+
+1. **Chief of Staff** (yuz207): Phase-based — agent_notes/[timestamp]/phase1/, phase2/, phase3/
+2. **Pydantic AI** (aldiakhou): Memory-based — in-process JSON storage with iteration snapshots
+3. **Academic** (adrianstier): Aspect-based — research_artifacts/aspect_A/, aspect_B/, aspect_C/ with synthesis referencing all
+
+**Source**: File Organization Patterns section (accessed 2025-12-09)
+
+### Pattern 5: Structured Output Models
+
+Pydantic BaseModel definitions enforce consistency:
+- `Synthesis`: executive_summary, findings, gaps_or_open_questions, recommend_next_iteration
+- `Finding`: subtask_id, aspect, summary, citations
+- `Plan`: steps, continue_research, rationale
+- `CitationRequest`: draft_report_markdown, bibliography
+
+**Source**: PATTERN 4 Codex code examples (accessed 2025-12-09)
+
+---
+
+## Technical Architecture
+
+### Agent Team Structures
+
+**Chief of Staff Model** (yuz207):
+
+```
+Human (You)
+    ↓
+Claude Code (Executive)
+    ↓
+ai-research-lead (Principal Investigator)
+    ├── ml-analyst (Validation)
+    ├── experiment-tracker (Documentation)
+    └── [When needed] Research Engineers
+        ├── architect
+        ├── developer
+        └── debugger
+```
+
+**Pydantic AI Model** (aldiakhou):
+
+```
+User → System → LeadResearcher → Subagents (A,B,...) → Memory → CitationAgent → System
+        ↑____________iterative research loop___________↓
+```
+
+**Academic Model** (adrianstier):
+
+```
+Orchestrator Agent
+    ├── Research PRD Agent
+    ├── Literature Agent
+    ├── Data QA Agent
+    ├── EDA Agent
+    ├── Modeling Agent
+    ├── Figure Factory Agent
+    ├── Scientific Writer Agent
+    ├── Reviewer Agent (multi-persona)
+    └── Submission Agent
+```
+
+**Source**: PATTERN 1-3 architecture diagrams (accessed 2025-12-09)
+
+### Data Flow Patterns
+
+**Chief of Staff context preservation:**
+1. Orchestrator writes agent_notes/[timestamp]_[workflow]/context_[agent].md
+2. Orchestrator invokes Agent(prompt + context file)
+3. Agent reads context, executes, writes phase[N]_[agent]_[purpose].md
+4. Orchestrator reads outputs, creates phase[N]_synthesis.md
+5. Next agent gets synthesis + previous agent outputs
+
+**Pydantic AI iteration loop:**
+1. Planner creates Plan (steps, continue_research boolean)
+2. LeadResearcher invokes subagents for each step
+3. Subagents return Finding (aspect, summary, citations)
+4. LeadResearcher creates Synthesis (executive_summary, gaps, recommend_next_iteration)
+5. If continue_research && recommend_next_iteration: loop to step 1
+6. CitationAgent inserts citations into final report
+
+**Academic workflow progression:**
+- Research PRD Agent → Literature Agent → Data QA Agent → EDA Agent → Modeling Agent → Figure Factory Agent → Writer Agent → Reviewer Agent → Submission Agent
+
+**Source**: Synthesis/Aggregation section (accessed 2025-12-09)
+
+### Mandatory Rules for Multi-Agent Research
+
+**Stateless agents principle**: Each agent invocation starts fresh; agents cannot directly access previous conversation turns. Solution: file-based context sharing with complete state.
+
+**Context preservation protocol (Chief of Staff)**:
+- Create workflow directory before any agent invocation
+- Write agent context file with: overall plan, delegation reasoning, current phase objective, previous findings, critical requirements, hypothesis, file outputs
+- Each agent appends to its output file (never overwrites)
+- Synthesis files reference original outputs, don't over-summarize
+
+**Evidence preservation (Codex pattern)**:
+- Store per-iteration findings separately (preserve source fidelity)
+- Create iteration-level synthesis referencing findings
+- Maintain plans and synthesis snapshots in memory
+- Final aggregation iterates through all findings, preserves aspect/subtask_id context
+
+**Source**: Communication Rules section and Preservation principle (accessed 2025-12-09)
+
+---
+
+## Detailed Technical Content
+
+This section contains the full pattern documentation extracted from GitHub repositories (detailed patterns, implementation code, and architectural specifications). See Key Features and Technical Architecture sections above for structured overview; full implementation details follow:
+
+| Repository                                                                                                | Stars (as of 2025-12-09) | Description                                                                                                                                            | Last Updated |
 | --------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code)                   | 17,825 | A curated list of awesome commands, files, and workflows for Claude Code                                                                               | 2025-12-06   |
 | [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents)     | 5,616  | Production-ready Claude subagents collection with 100+ specialized AI agents for full-stack development, DevOps, data science, and business operations | 2025-12-08   |
 | [hesreallyhim/a-list-of-claude-code-agents](https://github.com/hesreallyhim/a-list-of-claude-code-agents) | 1,073  | A list of Claude Code Sub-Agents submitted by the community                                                                                            | 2025-12-09   |
 | [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)                           | 76,332 | A collection of MCP servers                                                                                                                            | 2025-12-09   |
 | [wong2/awesome-mcp-servers](https://github.com/wong2/awesome-mcp-servers)                                 | 3,070  | A curated list of Model Context Protocol (MCP) servers                                                                                                 | 2025-12-09   |
+
+Current star counts (accessed 2026-08-11): hesreallyhim/awesome-claude-code 52,029; VoltAgent/awesome-claude-code-subagents 24,174; hesreallyhim/a-list-of-claude-code-agents 1,340; punkpeye/awesome-mcp-servers 92,033; wong2/awesome-mcp-servers 4,254. See the bullet list above for these current figures with citation.
 
 ---
 
@@ -1132,9 +1323,114 @@ agent_notes/[timestamp]_[project]/
 
 ---
 
+## Installation & Usage
+
+These are research patterns extracted from open-source repositories. Implementation requires:
+
+### Option 1: Study and Implement Locally
+
+1. **Clone the primary pattern repositories**:
+
+   ```bash
+   git clone https://github.com/yuz207/claude-agents-research-team
+   git clone https://github.com/adrianstier/research-agent
+   git clone https://github.com/aldiakhou/codex-main
+   ```
+
+2. **Read agent definitions** (e.g., `claude-agents-research-team/research-lead.md`)
+
+3. **Adapt pattern for your use case**: Copy the orchestration structure, context preservation protocol, or iteration loop into your workflow
+
+**Source**: Repository links documented (accessed 2025-12-09)
+
+### Option 2: Use Awesome Lists for Agent Selection
+
+Browse curated agent collections:
+
+- [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents): 100+ production-ready agents organized by category (Research & Analysis, Meta & Orchestration)
+- [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code): Workflows, skills, and orchestration patterns
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers): 92,033-star collection of MCP tools for agent integration (accessed 2026-08-11; 76,332 as of 2025-12-09)
+
+**Source**: Awesome Lists Found section (accessed 2025-12-09)
+
+### Option 3: Build with Recommended Architecture
+
+Implement the Chief of Staff + Iterative Loop hybrid:
+
+1. **Set up workflow directory structure**:
+
+   ```bash
+   mkdir -p agent_notes/[timestamp]_[project_name]
+   ```
+
+2. **Write orchestrator script** that:
+   - Creates context files before each agent invocation
+   - Collects outputs into phase directories
+   - Creates synthesis files across phases
+   - Manages iteration loop with exit criteria
+
+3. **Define agent roles** (from patterns): Research Lead, ML Analyst, Experiment Tracker, Architect, Developer, Debugger
+
+4. **Configure memory persistence** (from Pydantic AI pattern): JSON snapshots of plans, findings, citations
+
+**Source**: Recommended Architecture section + Mandatory Rules section (accessed 2025-12-09)
+
+---
+
+## Relevance to Claude Code Development
+
+### Applications
+
+1. **Multi-Agent Orchestration**: Claude Code plugin developers can use Chief of Staff coordination model for complex tasks requiring multiple specialized agents.
+
+2. **Research Automation**: Use academic pipeline patterns to automate research-heavy workflows (literature review, analysis, documentation).
+
+3. **Context Management**: Implement file-based context preservation to enable stateless agent teams without relying on context windows.
+
+4. **Structured Outputs**: Apply Pydantic models for type-safe agent returns and memory persistence.
+
+### Patterns Worth Adopting
+
+- **Chief of Staff context protocol**: File-based state sharing enables agent independence and parallelism
+- **Iterative research loops with exit criteria**: Prevents infinite loops while enabling multi-phase refinement
+- **Dedicated Citation Agent**: Separates citation management from research, enabling accurate bibliographies
+- **Phase-based pagination**: Preserves research evidence without truncation across multiple files
+
+### Integration Opportunities
+
+- Integrate iterative loop pattern into SAM 7-stage pipeline for multi-iteration refinement
+- Add Chief of Staff coordination to agent-orchestration skill for stateless multi-agent teams
+- Implement citation tracking patterns in multi-source synthesis for proper bibliography management
+- Enhance research-curator agent with 12-agent academic pipeline structure
+
+**Source**: Key Takeaways & Recommendations + Integration Opportunities sections (accessed 2025-12-09)
+
+---
+
+## References
+
+- [yuz207/claude-agents-research-team](https://github.com/yuz207/claude-agents-research-team) (accessed 2025-12-09)
+- [adrianstier/research-agent](https://github.com/adrianstier/research-agent) (accessed 2025-12-09)
+- [aldiakhou/codex-main](https://github.com/aldiakhou/codex-main) (accessed 2025-12-09)
+- [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) (accessed 2025-12-09)
+- [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents) (accessed 2025-12-09)
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) (accessed 2025-12-09)
+- [wong2/awesome-mcp-servers](https://github.com/wong2/awesome-mcp-servers) (accessed 2025-12-09)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [CocoIndex Code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | MCP-based semantic code search complements github-patterns' file selection and context discovery |
+| [Screenpipe](../mcp-ecosystem/screenpipe.md) | mcp-ecosystem | Continuous context capture via MCP could enhance Chief of Staff model with ambient project context |
+
+---
+
 ## Integration Opportunities
 
-> Auto-generated by research-context-agent. Review before acting.
+> Discovered during research artifact analysis. Review for applicability.
 
 ### Enhances Existing
 

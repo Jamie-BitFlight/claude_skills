@@ -5,7 +5,7 @@ slug: browser-harness-js
 
 # Browser Harness JS
 
-**Overview**
+## Overview
 
 Browser Harness JS is a minimal JavaScript bridge from LLM agents to the Chrome DevTools Protocol (CDP). It exposes all 652 CDP methods as fully-typed JavaScript wrappers with zero abstraction overhead. Rather than providing convenience helpers (`click()`, `goto()`, `upload_file()`), it routes agent code directly to the underlying protocol, treating "the protocol is the API" as the design principle.
 

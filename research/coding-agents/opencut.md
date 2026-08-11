@@ -16,6 +16,14 @@ category: coding-agents
 **Homepage**: <https://opencut.app>
 **Latest Status**: Rewrite in progress (as of 2026-06-18)
 
+## Overview
+
+OpenCut is a free, open-source video editor available across web, desktop, and mobile platforms, positioned as an open-source alternative to proprietary video editors like CapCut. The project is currently undergoing a complete architectural rewrite from the ground up, introducing modern patterns including plugin-first architecture, MCP server integration for AI agents, cross-platform code sharing via a Rust core, and programmatic editing APIs. The previous stable version (OpenCut Classic) remains available in production; the rewrite is being developed separately at new.opencut.app.
+
+**Current Status**: The rewrite introduces planned features including an Editor API, third-party plugin support, Rust-based cross-platform core, MCP server for AI agents, headless mode for automation, and built-in scripting capabilities. These features are announced but not yet fully implemented or documented in the current repository state (as of 2026-06-18).
+
+**Source**: <https://github.com/opencut-app/opencut/blob/main/README.md> (accessed 2026-06-18)
+
 ## Key Statistics
 
 - **GitHub Stars**: 56,388 (as of 2026-06-18)
