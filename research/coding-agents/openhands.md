@@ -48,6 +48,47 @@ OpenHands is an open-source, model-agnostic platform for building and deploying 
 
 ---
 
+## Key Features
+
+### Model-Agnostic Agent Framework
+
+- Works with Claude, GPT, or any other LLM (locally or via API) — the CLI docs state "You can power it with Claude, GPT, or any other LLM"
+- Unified Python SDK plus integrated REST/WebSocket services for agent definition and execution
+- SWE-bench badge score of 77.6 in the project README (raised from 72.8 in December 2025); the README attributes this to OpenHands as a whole, not to a named agent version. The separately published CodeAct 2.1 agent scored 53% on SWE-Bench Verified when announced in November 2024.
+
+### Multiple Deployment Modes
+
+- **Local**: Python SDK for laptop/local development
+- **CLI**: Terminal-based interface for interactive agent interaction
+- **Cloud**: Hosted deployment; README lists Slack, Jira, and Linear integrations, multi-user support, RBAC and permissions, and conversation sharing. Sign-in is via a GitHub or GitLab account.
+- **Enterprise**: Source-available self-hosted option for VPC/Kubernetes
+
+### Rich Tool Integration
+
+- Pre-defined tools: Bash execution, file editing, web browsing, MCP client support
+- Custom tool creation via Python
+- Docker/Kubernetes sandboxed execution for safe code testing
+- Native file system, shell, and browser access
+
+### Production-Ready Features
+
+- Context compression via the SDK's condenser, for long-running tasks
+- Built-in security analysis (named in the SDK tech report as a differentiator vs. the OpenAI, Claude, and Google SDKs)
+- Task planning and decomposition, via the SDK's `task_tracker` and `planning_file_editor` tools
+- Evaluation tooling: an OpenHands blog post reports "speedups of 30x or more" on agent evaluation by running SWE-Bench Lite 32x parallel in the cloud. This is an evaluation-harness result, not a runtime feature of the agent itself.
+
+**Sources**:
+
+- README as of 2026-01-08 (commit `adfabe7659`, the state at the 2026-01-26 access date): SWE-bench 77.6 badge, deployment modes, Cloud/Enterprise feature lists — <https://github.com/OpenHands/OpenHands/blob/adfabe7659/README.md>
+- SDK tech report, arXiv 2511.03690: sandboxed execution, multi-LLM routing, built-in security analysis, REST/WebSocket services — <https://arxiv.org/abs/2511.03690>
+- SDK tool inventory (`terminal`, `file_editor`, `browser_use`, `task_tracker`, `planning_file_editor`, condenser) — <https://github.com/OpenHands/software-agent-sdk>
+- CodeAct 2.1 53% SWE-Bench Verified score (2024-11-01) — <https://www.openhands.dev/blog/openhands-codeact-21-an-open-state-of-the-art-software-development-agent>
+- 30x evaluation speedup (2024-10-04) — <https://www.openhands.dev/blog/evaluation-of-llms-as-coding-agents-on-swe-bench-at-30x-speed>
+
+All re-verified against primary sources 2026-08-11.
+
+---
+
 ## Product Offerings
 
 ### 1. Software Agent SDK
