@@ -58,6 +58,19 @@ Superpowers is a complete software development workflow for AI coding agents, bu
 
 ---
 
+## Key Features
+
+Superpowers enforces discipline across the software development lifecycle through 14 composable skills organized into four functional categories:
+
+1. **Testing**: Test-driven-development skill enforces RED-GREEN-REFACTOR cycle before implementation
+2. **Debugging**: Systematic-debugging and verification-before-completion skills enforce root-cause analysis
+3. **Collaboration & Orchestration**: Nine skills spanning brainstorming, planning, execution, code review, and subagent-driven development with two-stage verification
+4. **Meta**: Skills for creating new skills following TDD principles and onboarding to the framework
+
+Each skill is detailed in the Skills Library section below.
+
+---
+
 ## Skills Library
 
 ### Testing
@@ -150,7 +163,9 @@ User Request
 
 ---
 
-## Subagent-Driven Development Architecture
+## Technical Architecture
+
+### Subagent-Driven Development Architecture
 
 The flagship workflow dispatches fresh subagents per task with explicit context and two-stage review:
 
@@ -203,7 +218,7 @@ Controller (Main Agent)
 
 ---
 
-## Installation
+## Installation & Usage
 
 ### Claude Code
 
