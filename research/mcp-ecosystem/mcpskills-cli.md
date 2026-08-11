@@ -28,7 +28,7 @@ mcpskills-cli is a command-line tool that bridges Model Context Protocol (MCP) s
 
 > "Generate Agent Skills from MCP server tools. Connects via Streamable HTTP, discovers tools, and outputs a skill with schema docs and a call script in the language of your choice."
 
-The tool solves a specific problem in AI agent architecture: MCP servers expose tools directly to agents, which causes token pollution because agents load all available tools into context. mcpskills-cli transforms MCP tools into statically-generated skill files, which agents load only when needed, reducing token consumption.
+The tool solves a specific problem in AI agent architecture: MCP servers expose tools directly to agents, which causes token pollution because agents load all available tools into context. mcpskills-cli transforms tools from Streamable HTTP MCP endpoints into statically-generated skill files, which agents load only when needed, reducing token consumption.
 
 **Design rationale** (from README):
 
