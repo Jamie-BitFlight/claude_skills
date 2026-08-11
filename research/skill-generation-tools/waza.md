@@ -69,7 +69,9 @@ Each skill has a clear trigger, single responsibility, and explicit scope bounda
 
 - **`/health`** (v3.17.0) — Budget-aware audit of Claude Code setup: checks CLAUDE.md, rules, skills, hooks, MCP servers, behavior. Flags issues by severity. Default summary audit avoids burning quota; deep/full audit available on request. Claude Code only.
 
-### Technical Architecture
+---
+
+## Technical Architecture
 
 **Skill Organization** (Source: `.claude-plugin/marketplace.json`, `AGENTS.md`):
 
