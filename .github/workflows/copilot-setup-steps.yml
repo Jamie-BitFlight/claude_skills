@@ -61,7 +61,6 @@ jobs:
         run: |
           uv run -q python --version
           uv run -q ruff --version
-          uv run -q basedpyright --version
 
       - name: Verify Node toolchain
         run: |
