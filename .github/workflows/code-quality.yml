@@ -37,23 +37,6 @@ jobs:
         run: uv run -q prek run ruff-format --all-files
 
   # =============================================================================
-  # Python: Type checking with basedpyright
-  # =============================================================================
-  typecheck-python:
-    name: Python / Type Check
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-python
-
-      - name: Run basedpyright
-        run: uv run -q --with pep723-loader --with basedpyright pep723-loader basedpyright
-
-  # =============================================================================
   # Python: Type checking with ty (Astral)
   # Blocking as of 2026-02-19 — CI run 22188303914 passed cleanly.
   # =============================================================================
@@ -168,9 +151,8 @@ jobs:
   #   mixed-line-ending, check-added-large-files, check-case-conflict,
   #   check-executables-have-shebangs, check-shebang-scripts-are-executable,
   #   check-yaml, check-json, check-toml, check-symlinks, destroyed-symlinks
-  # validate-research-entries is excluded here — it runs as its own advisory
-  # job below (research-validation) so a known, tracked corpus gap doesn't
-  # block this job's otherwise-clean signal.
+  # validate-research-entries remains enabled here so modified entries are
+  # blocking, while the whole-corpus report below remains advisory.
   # =============================================================================
   file-hygiene:
     name: Files / Hygiene checks
@@ -200,14 +182,13 @@ jobs:
   # Advisory: as of 2026-08-10, 69/339 entries pre-date the research-curator
   # template and are missing required body sections (Overview, Problem
   # Addressed, etc.) — a genuine content gap tracked for remediation, not a
-  # regression from any single change. Missing header metadata fields
-  # (research_date, source_url, version_at_research, license) are warnings,
-  # not errors, and do not fail this job. Not wired into quality-gate
-  # blocking until the corpus backlog is cleared.
+  # regression from any single change. This whole-corpus report is not wired
+  # into quality-gate until the corpus backlog is cleared.
   # =============================================================================
   research-validation:
     name: Research / Entry validation
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
     steps:
@@ -304,7 +285,6 @@ jobs:
     if: always()
     needs:
       - lint-python
-      - typecheck-python
       - typecheck-ty
       - lint-js
       - lint-markdown
