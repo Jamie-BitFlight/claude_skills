@@ -29,7 +29,7 @@ Tessera is a minimal, single-purpose terminal access broker for time-limited, ju
 
 | Problem | Solution |
 |---------|----------|
-| Standing privilege and persistent credentials in production systems | Grant temporary, scoped access on-demand that expires when the session ends; no stored tokens or persistent infrastructure |
+| Standing privilege and persistent access roles in production systems | Grant temporary, scoped access on demand that expires when the session ends; long-lived TLS credentials still require secure storage and rotation |
 | No approval gate for remote access requests | Require explicit human approval at the terminal in real-time before establishing any tunnel |
 | Lack of audit trails for who accessed what | Append-only JSON log records every request, approval, denial, session open/close, and parties involved |
 | SSH key management and compliance overhead | Zero standing keys; ephemeral mTLS certificates per session eliminate key rotation burden |
@@ -728,4 +728,3 @@ tessera -coordinator coordinator.example.org:8443 \
 
 **Verification date**: 2026-06-18
 **Access method**: Git shallow clone (`--depth 1`, commit 36678fda4a537ee101dedbb5a8a023b27b31069d)
-
