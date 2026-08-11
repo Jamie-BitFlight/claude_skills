@@ -48,6 +48,13 @@ _REPO_URL_PATTERN = re.compile(
 )
 _STAR_CLAIM_PATTERN = re.compile(r"([\d,]+(?:\.\d+)?[Kk]?)\s*stars?", re.IGNORECASE)
 
+# Same character classes as _REPO_URL_PATTERN's capture groups, anchored for
+# whole-string validation of CLI-supplied owner/repo pairs (which, unlike
+# scan()'s regex-extracted citations, are not pre-constrained to safe
+# characters and could otherwise break the interpolated GraphQL query string).
+_VALID_OWNER = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$")
+_VALID_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
+
 # GitHub repo names never contain these as their full value; filters out
 # incidental non-repo matches like "github.com/settings" or "github.com/orgs".
 _NON_REPO_PATH_SEGMENTS = frozenset({
@@ -68,11 +75,18 @@ _NON_REPO_PATH_SEGMENTS = frozenset({
 
 
 class RepoStats(BaseModel):
-    """Live GitHub stats for a single repository."""
+    """Live GitHub stats for a single repository.
+
+    ``exists=False, error=None`` means GitHub confirmed the repo does not
+    resolve (a real NOT_FOUND). ``exists=False, error=<reason>`` means the
+    lookup itself could not be completed (malformed input, API failure) --
+    a distinct case a caller should not treat as "confirmed nonexistent."
+    """
 
     owner: str
     name: str
     exists: bool
+    error: str | None = None
     stargazer_count: int | None = None
     fork_count: int | None = None
     pushed_at: str | None = None
@@ -143,10 +157,66 @@ def _run_graphql_batch(gh: Github, chunk: list[tuple[str, str]]) -> dict[str, ob
     return response.get("data", {})
 
 
+def _parse_chunk_response(chunk: list[tuple[str, str]], data: dict[str, object]) -> dict[tuple[str, str], RepoStats]:
+    """Turn one successful chunk response into per-repo results.
+
+    Returns:
+        Mapping of (owner, name) to its live stats for this chunk.
+    """
+    results: dict[tuple[str, str], RepoStats] = {}
+    for i, (owner, name) in enumerate(chunk):
+        node = data.get(f"r{i}")
+        if not isinstance(node, dict):
+            results[owner, name] = RepoStats(owner=owner, name=name, exists=False)
+            continue
+        license_info = node.get("licenseInfo")
+        results[owner, name] = RepoStats(
+            owner=owner,
+            name=name,
+            exists=True,
+            stargazer_count=node.get("stargazerCount"),
+            fork_count=node.get("forkCount"),
+            pushed_at=node.get("pushedAt"),
+            license_spdx_id=license_info.get("spdxId") if isinstance(license_info, dict) else None,
+            is_archived=node.get("isArchived"),
+        )
+    return results
+
+
+def _fetch_chunk_with_isolation(gh: Github, chunk: list[tuple[str, str]]) -> dict[tuple[str, str], RepoStats]:
+    """Fetch one chunk; on total failure, bisect and retry each half to isolate the bad entry.
+
+    A NOT_FOUND-type failure for one alias does not reach here -- it is already
+    handled inside a successful multi-repo response by ``_parse_chunk_response``.
+    This only triggers for failures that break the *whole* query (a malformed
+    owner/name breaking GraphQL syntax, a transient API error, a rate limit) so
+    that one bad or unlucky entry does not silently discard every other result
+    in the same chunk. The isolated failure is reported to stderr and recorded
+    with ``exists=False, error=<reason>`` rather than crashing the batch.
+
+    Returns:
+        Mapping of (owner, name) to its live stats for every repo in ``chunk``.
+    """
+    try:
+        data = _run_graphql_batch(gh, chunk)
+    except TypeError as exc:
+        if len(chunk) == 1:
+            owner, name = chunk[0]
+            typer.echo(f"Could not resolve {owner}/{name}: {exc}", err=True)
+            return {(owner, name): RepoStats(owner=owner, name=name, exists=False, error=str(exc))}
+        mid = len(chunk) // 2
+        left = _fetch_chunk_with_isolation(gh, chunk[:mid])
+        right = _fetch_chunk_with_isolation(gh, chunk[mid:])
+        return {**left, **right}
+    return _parse_chunk_response(chunk, data)
+
+
 def _fetch_stats_batch(gh: Github, repos: list[tuple[str, str]]) -> dict[tuple[str, str], RepoStats]:
     """Fetch live stats for each (owner, name) pair in chunks of 50 aliases per query.
 
     Deduplicates before fetching so a repo cited many times costs one lookup.
+    A chunk-breaking failure isolates and reports the specific bad entry via
+    bisection rather than discarding the whole chunk's results.
 
     Returns:
         Mapping of (owner, name) to its live stats.
@@ -155,23 +225,7 @@ def _fetch_stats_batch(gh: Github, repos: list[tuple[str, str]]) -> dict[tuple[s
     results: dict[tuple[str, str], RepoStats] = {}
     for start in range(0, len(unique), _GRAPHQL_CHUNK_SIZE):
         chunk = unique[start : start + _GRAPHQL_CHUNK_SIZE]
-        data = _run_graphql_batch(gh, chunk)
-        for i, (owner, name) in enumerate(chunk):
-            node = data.get(f"r{i}")
-            if not isinstance(node, dict):
-                results[owner, name] = RepoStats(owner=owner, name=name, exists=False)
-                continue
-            license_info = node.get("licenseInfo")
-            results[owner, name] = RepoStats(
-                owner=owner,
-                name=name,
-                exists=True,
-                stargazer_count=node.get("stargazerCount"),
-                fork_count=node.get("forkCount"),
-                pushed_at=node.get("pushedAt"),
-                license_spdx_id=license_info.get("spdxId") if isinstance(license_info, dict) else None,
-                is_archived=node.get("isArchived"),
-            )
+        results.update(_fetch_chunk_with_isolation(gh, chunk))
     return results
 
 
@@ -202,6 +256,9 @@ def stats(
             typer.echo(f"Skipping malformed repo spec (expected owner/repo): {r}", err=True)
             continue
         owner, name = r.split("/", 1)
+        if not (_VALID_OWNER.match(owner) and _VALID_NAME.match(name)):
+            typer.echo(f"Skipping invalid owner/repo (not a valid GitHub identifier): {r}", err=True)
+            continue
         pairs.append((owner, name))
 
     if not pairs:
