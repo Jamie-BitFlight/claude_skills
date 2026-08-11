@@ -25,48 +25,64 @@ The `@notionhq/notion-mcp-server` (v2.3.1) is an OpenAPI-spec-driven proxy that 
 | Problem | Solution |
 |---------|----------|
 | AI assistants lack structured access to Notion workspaces | notion-mcp-server exposes 22 MCP tools covering search, pages, blocks, comments, users, and database operations (accessed 2026-05-30) |
-| Large page bodies and block trees exceed AI token budgets | Lazy-loading design: `retrieve-a-page` returns properties only; `retrieve-block-children` fetches content separately; agents control depth traversal (accessed 2026-05-30) |
+| Large page bodies and block trees exceed AI token budgets | Lazy-loading design: `API-retrieve-a-page` returns properties only; `API-get-block-children` fetches content separately; agents control depth traversal (accessed 2026-05-30) |
 | Notion's nested hierarchies require multiple API calls to discover structure | Block model carries `has_children: boolean` flag enabling selective tree traversal without pre-fetching all children (accessed 2026-05-30) |
 | Result pagination requires manual cursor iteration | Cursor-based pagination exposed directly: `start_cursor`/`page_size` as tool parameters; `has_more`/`next_cursor` in responses enable agent-controlled iteration (accessed 2026-05-30) |
-| Confusing tool selection in search-before-fetch workflows | `search` returns lightweight result objects (id, title, timestamps) without page body; agents identify targets before calling content tools (accessed 2026-05-30) |
+| Confusing tool selection in search-before-fetch workflows | `API-post-search` returns lightweight result objects (id, title, timestamps) without page body; agents identify targets before calling content tools (accessed 2026-05-30) |
 
 ---
 
 ## Key Features
 
-### Search & Discovery Tools
-- **search**: Semantic search across pages and databases by title with optional type filtering and sorting by `last_edited_time` / `created_time`
+Tool names are not hand-written. `OpenAPIToMCPConverter.convertToMCPTools()` groups every operation
+under the single API name `'API'` and registers each as `` `${apiName}-${operationId}` `` — so the
+name an MCP client sees is `API-` followed by the `operationId` verbatim from
+`scripts/notion-openapi.json`. Listing the operationIds below with their HTTP bindings, taken from
+that spec file (do not assume the REST endpoint's colloquial name matches the operationId — several
+do not).
+
+### Search & Discovery
+- **`API-post-search`** (POST `/v1/search`): Search pages and databases by title, with optional
+  `filter.value` of `page`/`database` and sorting by `last_edited_time`
 
 ### Page Operations
-- **retrieve-a-page**: Fetch page properties (title, status, dates, etc.) — not body content
-- **create-a-page**: Create new page with properties
-- **update-page-properties**: Modify page metadata
-- **move-page**: Relocate page in hierarchy
-- **retrieve-a-page-property**: Get single property item
+- **`API-retrieve-a-page`** (GET `/v1/pages/{page_id}`): Fetch page properties — not body content
+- **`API-post-page`** (POST `/v1/pages`): Create new page with properties
+- **`API-patch-page`** (PATCH `/v1/pages/{page_id}`): Update page properties
+- **`API-move-page`** (POST `/v1/pages/{page_id}/move`): Relocate page in hierarchy
+- **`API-retrieve-a-page-property`** (GET `/v1/pages/{page_id}/properties/{property_id}`): Get a
+  single property item
 
 ### Block Operations (Content Access)
-- **retrieve-a-block**: Fetch single block metadata
-- **retrieve-block-children**: List child blocks (paginated, max 100 per call) with `has_more`/`next_cursor`
-- **append-block-children**: Add new blocks
-- **delete-a-block**: Remove block
-- **update-a-block**: Modify block content
+- **`API-retrieve-a-block`** (GET `/v1/blocks/{block_id}`): Fetch single block metadata
+- **`API-get-block-children`** (GET `/v1/blocks/{block_id}/children`): List child blocks, paginated
+  (`page_size` default 100, maximum 100) with `has_more`/`next_cursor`
+- **`API-patch-block-children`** (PATCH `/v1/blocks/{block_id}/children`): Append new blocks
+- **`API-delete-a-block`** (DELETE `/v1/blocks/{block_id}`): Remove block
+- **`API-update-a-block`** (PATCH `/v1/blocks/{block_id}`): Modify block content
 
 ### Database & Data Source Operations
-- **retrieve-a-database**: Get database metadata plus data source IDs
-- **query-data-source**: Query database with filters and sorts
-- **retrieve-a-data-source**: Get schema and properties
-- **update-a-data-source**: Modify data source properties
-- **create-a-data-source**: Create new data source
-- **list-data-source-templates**: List templates in data source
+- **`API-retrieve-a-database`** (GET `/v1/databases/{database_id}`): Get database metadata plus data
+  source IDs
+- **`API-query-data-source`** (POST `/v1/data_sources/{data_source_id}/query`): Query with filters
+  and sorts
+- **`API-retrieve-a-data-source`** (GET `/v1/data_sources/{data_source_id}`): Get schema and
+  properties
+- **`API-update-a-data-source`** (PATCH `/v1/data_sources/{data_source_id}`): Modify data source
+- **`API-create-a-data-source`** (POST `/v1/data_sources`): Create new data source
+- **`API-list-data-source-templates`** (GET `/v1/data_sources/{data_source_id}/templates`): List
+  templates
 
 ### Comment & User Operations
-- **list-comments**: List comments on block or page
-- **create-a-comment**: Add new comment
-- **list-all-users**: List workspace users
-- **retrieve-a-user**: Get single user details
-- **retrieve-your-token-s-bot-user**: Get integration bot user
+- **`API-retrieve-a-comment`** (GET `/v1/comments`): List comments on a block or page — the
+  operationId reads as singular but the endpoint returns a paginated list
+- **`API-create-a-comment`** (POST `/v1/comments`): Add new comment
+- **`API-get-users`** (GET `/v1/users`): List workspace users
+- **`API-get-user`** (GET `/v1/users/{user_id}`): Get single user details
+- **`API-get-self`** (GET `/v1/users/me`): Get the integration's bot user
 
-Total: **22 tools** exposing Notion REST API v1 (accessed 2026-05-30)
+Total: **22 operationIds** in `scripts/notion-openapi.json`, each becoming one MCP tool
+(accessed 2026-05-30)
 
 ---
 
@@ -76,7 +92,7 @@ The server is built as an **OpenAPI-spec-driven proxy** rather than hand-coded t
 
 ### Tooling Pipeline
 1. **Startup**: `src/init-server.ts` loads bundled OpenAPI JSON spec via `fs.readFileSync`
-2. **Parsing**: `src/openapi-mcp-server/openapi/parser.ts` (`OpenAPIToMCPConverter`) parses every `operationId` into an MCP tool definition
+2. **Parsing**: `src/openapi-mcp-server/openapi/parser.ts` (`OpenAPIToMCPConverter`) parses every `operationId` into an MCP tool definition, keyed as `` `${apiName}-${uniqueName}` `` with `apiName` hard-coded to `'API'`
 3. **Registration**: `src/openapi-mcp-server/mcp/proxy.ts` (`MCPProxy`) registers tools with MCP SDK
 4. **Execution**: Tool calls forwarded as HTTP requests to `api.notion.com` with Bearer token auth
 
@@ -89,13 +105,13 @@ The server is built as an **OpenAPI-spec-driven proxy** rather than hand-coded t
 
 ### Block Tree Lazy-Loading
 - **`has_children` flag**: Every block carries boolean indicating whether children exist
-- **One level at a time**: Agent receives top-level blocks from `retrieve-block-children(page_id)`. Each block with `has_children: true` requires separate `retrieve-block-children(block_id)` call
+- **One level at a time**: Agent receives top-level blocks from `API-get-block-children(block_id=page_id)`. Each block with `has_children: true` requires a separate `API-get-block-children(block_id)` call
 - **Structural types**: Headings, paragraphs, lists, toggles, child pages (accessed 2026-05-30)
 
 ### Progressive-Disclosure Workflow
-1. **Search first**: `search` returns lightweight result objects (id, title, timestamps) without body
-2. **Fetch metadata**: `retrieve-a-page` returns properties only, not body
-3. **Fetch body separately**: `retrieve-block-children` for content
+1. **Search first**: `API-post-search` returns lightweight result objects (id, title, timestamps) without body
+2. **Fetch metadata**: `API-retrieve-a-page` returns properties only, not body
+3. **Fetch body separately**: `API-get-block-children` for content
 4. **Traverse conditionally**: Use `has_children` to decide which blocks to expand
 
 ### Response Optimization
@@ -110,23 +126,43 @@ The server is built as an **OpenAPI-spec-driven proxy** rather than hand-coded t
 
 ### Installation
 
-The Notion MCP server is available via npm:
+The README documents no global-install step. The server is run through `npx` directly from the
+client configuration, published as `@notionhq/notion-mcp-server` with bin name
+`notion-mcp-server`.
 
-```bash
-npm install -g @notionhq/notion-mcp-server
-```
+Before configuring, the README's setup requires creating a Notion internal integration and
+connecting the target pages/databases to it — an integration token alone grants no content access.
 
 ### Configuration
 
-Configure in `.mcp.json` or IDE MCP settings with Notion integration token:
+Two authentication options, both from the README. Option 1 is the one the README marks
+recommended. Note the variable is `NOTION_TOKEN` (not `NOTION_API_TOKEN`) and the token prefix
+is `ntn_`:
 
 ```json
 {
   "mcpServers": {
-    "notion": {
-      "command": "notion-mcp-server",
+    "notionApi": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
       "env": {
-        "NOTION_API_TOKEN": "secret_your_token_here"
+        "NOTION_TOKEN": "ntn_****"
+      }
+    }
+  }
+}
+```
+
+Option 2 passes raw headers instead, for advanced use (e.g. pinning the API version):
+
+```json
+{
+  "mcpServers": {
+    "notionApi": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "OPENAPI_MCP_HEADERS": "{\"Authorization\": \"Bearer ntn_****\", \"Notion-Version\": \"2025-09-03\" }"
       }
     }
   }
@@ -135,28 +171,32 @@ Configure in `.mcp.json` or IDE MCP settings with Notion integration token:
 
 ### Example Workflow
 
+Tool arguments are the OpenAPI operation's own parameter names, since the parser copies each
+`paramObj.name` straight into the tool `inputSchema`.
+
 **Search for a page:**
-```bash
-search(query="My Project", filter={value: "page"})
-# Returns: [{ id: "abc123", title: "My Project", url: "...", last_edited_time: "2026-05-30T..." }]
+
+```text
+API-post-search(query="My Project", filter={"value": "page", "property": "object"})
 ```
 
-**Fetch page properties:**
-```bash
-retrieve-a-page(page_id="abc123")
-# Returns: { id, properties: { title, status, dates, ... }, parent: ... }
+**Fetch page properties (not body):**
+
+```text
+API-retrieve-a-page(page_id="abc123")
 ```
 
 **List child blocks (first page):**
-```bash
-retrieve-block-children(block_id="abc123", page_size=50)
-# Returns: { object: "list", results: [...], has_more: true, next_cursor: "opaque_token" }
+
+```text
+API-get-block-children(block_id="abc123", page_size=50)
+→ { "object": "list", "results": [...], "has_more": true, "next_cursor": "<opaque>" }
 ```
 
 **Paginate to next block batch:**
-```bash
-retrieve-block-children(block_id="abc123", page_size=50, start_cursor="opaque_token")
-# Returns: next batch of blocks
+
+```text
+API-get-block-children(block_id="abc123", page_size=50, start_cursor="<opaque>")
 ```
 
 ---
@@ -169,7 +209,7 @@ retrieve-block-children(block_id="abc123", page_size=50, start_cursor="opaque_to
 - **Progressive-disclosure for complex structures**: Metadata-first approach (fetch properties, then body, then nested content) reduces token consumption on large workspaces
 
 ### Patterns Worth Adopting
-- **Two-phase separation of metadata and body**: `retrieve-a-page` (properties only) vs. `retrieve-block-children` (body) allows agents to decide whether body fetch is necessary
+- **Two-phase separation of metadata and body**: `API-retrieve-a-page` (properties only) vs. `API-get-block-children` (body) allows agents to decide whether body fetch is necessary
 - **Cursor-based pagination with explicit `has_more` signalling**: Opaque cursor tokens prevent agent misuse; `has_more` flag enables lazy iteration
 - **`has_children` flag for selective traversal**: Structural hints allow agents to navigate hierarchies without blind recursion
 - **Search-before-fetch discipline**: Lightweight search results (id, title, timestamps) force agents to identify targets before fetching large bodies
@@ -189,6 +229,7 @@ retrieve-block-children(block_id="abc123", page_size=50, start_cursor="opaque_to
 - [src/init-server.ts — Spec loading](https://raw.githubusercontent.com/makenotion/notion-mcp-server/main/src/init-server.ts) (accessed 2026-05-30)
 - [src/openapi-mcp-server/openapi/parser.ts — Tool generation](https://raw.githubusercontent.com/makenotion/notion-mcp-server/main/src/openapi-mcp-server/openapi/parser.ts) (accessed 2026-05-30)
 - [src/openapi-mcp-server/mcp/proxy.ts — Tool registration and execution](https://raw.githubusercontent.com/makenotion/notion-mcp-server/main/src/openapi-mcp-server/mcp/proxy.ts) (accessed 2026-05-30)
+- [scripts/notion-openapi.json — bundled OpenAPI spec; source of every `operationId` and of the `page_size` default/maximum](https://raw.githubusercontent.com/makenotion/notion-mcp-server/main/scripts/notion-openapi.json) (accessed 2026-05-30)
 - [Notion API Pagination Reference](https://developers.notion.com/reference/pagination) (accessed 2026-05-30)
 - [Notion API Block Reference](https://developers.notion.com/reference/block) (accessed 2026-05-30)
 - [Notion API Search Reference](https://developers.notion.com/reference/post-search) (accessed 2026-05-30)

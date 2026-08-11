@@ -16,7 +16,7 @@ freshness_tracking:
 
 ## Overview
 
-mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives AI assistants safe, read/write access to Obsidian vault directories. It exposes 14 specialized tools for file operations, searching, metadata inspection, and batch operations with built-in relevance ranking via BM25 and progressive-disclosure patterns that prioritize metadata and excerpts before full content reads. (Accessed: https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md and https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json, 2026-05-30)
+mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives AI assistants safe, read/write access to Obsidian vault directories. It exposes 15 tools for file operations, searching, metadata inspection, and batch operations with built-in relevance ranking via BM25 and progressive-disclosure patterns that prioritize metadata and excerpts before full content reads. (Accessed: https://raw.githubusercontent.com/bitbonsai/mcpvault/main/README.md and https://raw.githubusercontent.com/bitbonsai/mcpvault/main/package.json, 2026-05-30)
 
 ---
 
@@ -24,7 +24,7 @@ mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives 
 
 | Problem | Solution |
 |---------|----------|
-| AI assistants cannot safely access and modify Obsidian vaults | mcpvault exposes 14 MCP tools for authenticated file operations with path filtering and trash mode support (accessed 2026-05-30) |
+| AI assistants cannot safely access and modify Obsidian vaults | mcpvault exposes 15 MCP tools for file operations with path filtering and trash mode support (accessed 2026-05-30) |
 | Large note bodies exceed AI token budgets | Progressive-disclosure pattern: search returns excerpts only, metadata tools fetch sizes cheaply, full content read on demand (accessed 2026-05-30) |
 | Vaults with hundreds of notes lack efficient discovery | Search-first design: BM25-ranked `search_notes` finds relevant content before any body read; `list_all_tags` provides vocabulary index (accessed 2026-05-30) |
 | AI cannot assess note importance without reading full content | `get_notes_info` reads first 100 chars to detect frontmatter and expose file size; caller decides whether to fetch full body (accessed 2026-05-30) |
@@ -54,21 +54,21 @@ mcpvault (`@bitbonsai/mcpvault` v0.11.2) is a lightweight MCP server that gives 
 - **update_frontmatter** / **manage_tags**: Atomic frontmatter key updates and tag add/remove/list operations
 
 ### Response Optimization
-- **Minified field names by default**: `p` (path), `t` (title), `ex` (excerpt), `mc` (match count) reduce response size by 40-60% vs verbose names
-- **prettyPrint flag**: Opt-in full field names and indentation for debugging
+- **Minified field names in search results**: `SearchResult` declares `p` (path), `t` (title), `ex` (excerpt), `mc` (matchCount), `ln` (lineNumber), `uri` (obsidianUri). README claims 40-60% smaller responses from minified field names plus compact JSON (v0.6.3+)
+- **prettyPrint flag**: Controls JSON indentation only (`const indent = trimmedArgs.prettyPrint ? 2 : undefined`). It does not restore verbose field names — the minified names are fixed in the `SearchResult` type
 - **Search excerpts**: ±21 character context windows per match, never full note body in search results
 
 ---
 
 ## Technical Architecture
 
-mcpvault exposes all 14 tools via the MCP protocol. Tools are registered in `src/createServer.ts` via `ListToolsRequestSchema` handler. The architecture follows a progressive-disclosure design where each tool class serves a specific role in the request/response lifecycle.
+mcpvault exposes all 15 tools via the MCP protocol. Tools are registered in `src/createServer.ts` via `ListToolsRequestSchema` handler. The architecture follows a progressive-disclosure design where each tool class serves a specific role in the request/response lifecycle.
 
 ### Discovery & Indexing Pattern
 - **No persistent index**: Tools scan filesystem on-demand using `readdir`, `stat`, and file reads
 - **`list_directory`**: Single `readdir()` call per path, non-recursive (Source: src/filesystem.ts, accessed 2026-05-30)
 - **`get_vault_stats`**: Full vault recursive scan counting notes, folders, sizes; recent files list maintained via `stat` on all files
-- **`list_all_tags`**: Vault-wide regex scan of all `.md` files for `#tag` and YAML frontmatter `tags:` arrays
+- **`list_all_tags`**: Recursive scan of every path-filter-allowed note file, counting inline `#tag` matches (regex `/(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/\-]*)/g`) and YAML frontmatter `tags:` array entries; results lowercased and sorted by count
 - **`search_notes`**: Async batched full-vault file reads (batch size 5) with sequential term matching and BM25 reranking (Source: src/search.ts, accessed 2026-05-30)
 
 ### Search Scoring: Okapi BM25
@@ -80,7 +80,7 @@ mcpvault exposes all 14 tools via the MCP protocol. Tools are registered in `src
 ### Pagination & Size Bounding
 - **Hard caps, no cursors**: `search_notes` ≤20 results, `read_multiple_notes` ≤10 files, `get_vault_stats` ≤20 recent
 - **`get_notes_info` gate**: Reads first 100 characters only to detect frontmatter presence; caller inspects `size` field before deciding to fetch full body (Source: src/filesystem.ts, accessed 2026-05-30)
-- **Minified responses**: Field abbreviation (p, t, ex, mc, etc.) reduces JSON overhead by 40-60%; full names available via `prettyPrint: true`
+- **Minified responses**: Field abbreviation (p, t, ex, mc, etc.) in search results; README claims 40-60% smaller responses. `prettyPrint: true` adds indentation, not verbose field names
 - **No token budget measurement**: Caller imposes limits by choosing which tools to call and how many results to request
 
 ### Security & Path Filtering
@@ -95,52 +95,59 @@ mcpvault exposes all 14 tools via the MCP protocol. Tools are registered in `src
 
 ### Installation
 
-mcpvault is distributed as an npm package:
+mcpvault is distributed as the npm package `@bitbonsai/mcpvault`. The README's documented method is `npx` (no install step); the vault path is a positional argument:
+
+```bash
+npx @bitbonsai/mcpvault@latest /path/to/your/obsidian/vault
+```
+
+A global install is documented only as a fallback for a missing `npx`:
 
 ```bash
 npm install -g @bitbonsai/mcpvault
 ```
 
+Requires Node.js `>=20.0.0` (`package.json` `engines`).
+
 ### Configuration
 
-Configure via MCP protocol in IDE or agent `.mcp.json`:
+The README's client configuration passes the vault path as an argument to `npx`:
 
 ```json
 {
   "mcpServers": {
-    "mcpvault": {
-      "command": "mcpvault",
-      "args": ["/path/to/vault"]
+    "obsidian": {
+      "command": "npx",
+      "args": [
+        "@bitbonsai/mcpvault@latest",
+        "/Users/yourname/Documents/MyVault"
+      ]
     }
   }
 }
 ```
 
-### Example Tool Calls
+For Claude Code the README gives:
 
-**Search for notes by query:**
 ```bash
-search_notes(query="architecture", limit=5, searchContent=true)
-# Returns: [{ p: "design.md", t: "Design", ex: "...architecture...system...", mc: 3, ln: 12 }]
+claude mcp add obsidian --scope user npx @bitbonsai/mcpvault /path/to/your/vault
 ```
 
-**Read a specific note:**
-```bash
-read_note(path="design.md")
-# Returns: full frontmatter + markdown body
-```
+### Tool Schemas
 
-**Inspect before full read:**
-```bash
-get_notes_info(paths=["design.md", "api.md"], prettyPrint=false)
-# Returns: [{ path: "design.md", size: 8542, modified: "2026-05-30T10:00:00Z", hasFrontmatter: true }]
-```
+Parameter names below are from the `inputSchema` declarations in `src/createServer.ts`; return
+shapes are from the interfaces in `src/types.ts`.
 
-**Extract metadata only:**
-```bash
-get_frontmatter(path="design.md")
-# Returns: parsed YAML object
-```
+- `search_notes` — params `query` (required), `limit` (default 5, capped at 20), `searchContent`,
+  `searchFrontmatter`, `caseSensitive`, `prettyPrint`. Returns `SearchResult[]`:
+  `{ p, t, ex, mc, ln?, uri? }`.
+- `read_note` — params `path`, `prettyPrint`. Returns the full note (frontmatter + content); no
+  truncation regardless of file size.
+- `get_notes_info` — params `paths` (array), `prettyPrint`. Returns `NoteInfo[]`:
+  `{ path, size, modified, hasFrontmatter, obsidianUri? }`, where `modified` is a numeric
+  millisecond timestamp. Reads only the first 100 characters of each file.
+- `get_frontmatter` — params `path`, `prettyPrint`. Returns parsed frontmatter only, discarding the
+  body.
 
 ---
 
@@ -154,9 +161,9 @@ get_frontmatter(path="design.md")
 ### Patterns Worth Adopting
 - **Metadata-first gate**: Expose `size` and structural info cheaply before assembling full bodies; let the caller decide whether to proceed
 - **Search result caps with defaults**: Hard maximum (≤20) with conservative default (5) prevents accidental token budget overruns
-- **Minified field names**: Field abbreviation saves 40-60% response size without information loss; especially valuable in list responses
+- **Minified field names**: Field abbreviation in list responses trades readability for response size without information loss
 - **BM25 ranking for relevance**: Priority is not filesystem order but relevance score; highest-scoring results get assembled first
-- **Per-result clipping**: Explicit `totalMatches` fields on clipped results signal incomplete data
+- **Server-enforced caps rather than caller trust**: `Math.min(limit, 20)` is applied inside the handler, so a caller cannot request unbounded data even by mistake
 
 ### Integration Opportunities
 - Obsidian vault bridging for Claude Code projects stored in Obsidian
@@ -182,4 +189,4 @@ get_frontmatter(path="design.md")
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [notion-mcp-server](./notion-mcp-server.md) | mcp-ecosystem | Sibling pattern: Notion block tree lazy-loading vs. mcpvault metadata-first |
-| [obsidian-mcp-server](./obsidian-mcp-server.md) | mcp-ecosystem | Complementary: Native Obsidian MCP with document-map format |
+| [obsidian-mcp-server](./obsidian-mcp-server.md) | mcp-ecosystem | Contrast: same target (Obsidian vaults) via the Local REST API plugin instead of direct disk reads, and offers section-level addressing plus a `document-map` projection that mcpvault lacks |

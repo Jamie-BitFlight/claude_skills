@@ -236,57 +236,61 @@ Cursor, VS Code, Claude Desktop, Claude Code, Codex, Cline, Windsurf, Warp, Goos
 
 ### Usage
 
-#### Slash Commands (Research Skill)
+#### Prompt Commands
 
-```bash
-/research
-# Initiates deep code and product research with intelligent tool orchestration
+The MCP server itself ships four prompt commands (README "Commands" section). Two take a required
+argument; two take free-form text.
 
-/plan
-# Generates research-backed implementation plan with step-by-step guidance
+```text
+/research <question>
+# Deep code discovery, documentation analysis, pattern identification, bug investigation.
+# Orchestrates parallel bulk queries with staged analysis.
 
-/review_pull_request
-# Comprehensive PR review with defects-first analysis
+/plan <task>
+# Breaks an ambitious task into steps, researches existing patterns, then guides execution.
 
-/review_security
-# Security audit with vulnerability detection and remediation guidance
+/review_pull_request prUrl: <github pull request url>
+# Defects-first PR review: bugs, security issues, performance, code quality, best practices.
+
+/review_security repoUrl: <github repository url>
+# Repository security audit: vulnerabilities, auth patterns, secrets exposure, remediation.
 ```
 
-#### Example Tool Calls
+#### Tool Names and Argument Schemas
 
-**Search GitHub repositories:**
-```bash
-# Tool: githubSearchRepositories(query="HTTP framework", language="rust")
-# Returns: repository metadata, activity, star trends
-```
+Names and parameters below are read from the published `octocode-mcp@12.0.0` package —
+`dist/tools/toolNames.d.ts` (`STATIC_TOOL_NAMES`) for the registered names, and each tool's
+`dist/tools/*/scheme.d.ts` for its Zod query schema. Every tool takes a `queries` array of these
+objects, plus optional `researchGoal` / `reasoning` annotation fields.
 
-**Search code across GitHub:**
-```bash
-# Tool: githubSearchCode(query="JWT validation", language="python")
-# Returns: code snippets with file paths, line numbers, repository context
-```
+**Search GitHub repositories** — `githubSearchRepositories`
+Query fields: `keywordsToSearch`, `topicsToSearch`, `owner`, `stars`, `size`, `created`,
+`updated`, `match`, `sort`, `limit`, `page`. There is no `query` or `language` field.
 
-**Explore repository structure:**
-```bash
-# Tool: githubViewRepoStructure(owner="torvalds", repo="linux", depth=2)
-# Returns: directory tree with file types and module breakdown
-```
+**Search code across GitHub** — `githubSearchCode`
+Query fields: `keywordsToSearch`, `owner`, `repo`, `extension`, `filename`, `path`, `match`,
+`limit`, `page`. Language is narrowed via `extension`, not a `language` field.
 
-**LSP-powered navigation:**
-```bash
-# Tool: lspGotoDefinition(file="src/main.rs", line=42, column=10)
-# Returns: symbol definition location with type information
-# Tool: lspFindReferences(symbol="MyClass")
-# Returns: all usages of symbol across workspace
-```
+**Explore repository structure** — `githubViewRepoStructure`
+Query fields: `owner`, `repo`, `branch`, `path`, `depth`, `entriesPerPage`, `entryPageNumber`.
+
+**LSP-powered navigation** — `lspGotoDefinition`, `lspFindReferences`, `lspCallHierarchy`
+Both navigation tools are anchored by symbol *and* location, not by symbol alone:
+`lspGotoDefinition` takes `{uri, symbolName, lineHint, orderHint, contextLines}`;
+`lspFindReferences` takes the same plus `includeDeclaration`, `referencesPerPage`, `page`.
 
 **Local filesystem research:**
 ```bash
-# Tool: local_ripgrep(query="TODO", path="/home/user/project")
-# Returns: fast local code search results
-# Tool: local_fetch_content(path="/home/user/project/src/main.py")
-# Returns: file content for analysis
+# Tool: localSearchCode — local code/text search returning file and line anchors
+# Tool: localGetFileContent — read a local file or region
+# Tool: localViewStructure — browse a local directory tree
+# Tool: localFindFiles — find local files and directories by name, path, regex, extension
 ```
+
+> The registered tool names are the camelCase `local*` identifiers above. `local_ripgrep` and
+> `local_fetch_content` appear in the package only as internal source-module directory names
+> (`dist/tools/local_ripgrep/`, whose own header comment reads "Types for local_ripgrep tool
+> (localSearchCode)") — they are not callable tool names.
 
 #### Research Workflow Example
 

@@ -251,47 +251,47 @@ narsil-mcp --repos /path/to/project
 # Index with git integration and call graph analysis
 narsil-mcp --repos /path/to/project --git --call-graph
 
-# Enable neural semantic search (requires API key)
+# Enable neural semantic embeddings (requires an API key or a custom/local ONNX endpoint)
 narsil-mcp --repos /path/to/project --neural
 
-# Use with knowledge graph (SPARQL queries)
+# Enable the SPARQL/RDF knowledge graph and CCG tools.
+# Only effective if the binary was built with `--features graph` — the default binary is not.
+# Passing --graph to a binary without the feature logs a warning at startup and continues without
+# the SPARQL/CCG tools.
 narsil-mcp --repos /path/to/project --graph
 
-# Apply custom preset for token optimization
+# Apply a tool preset. README-documented values: minimal, balanced, full, security-focused
 narsil-mcp --repos /path/to/project --preset minimal
 ```
 
-#### Example Tool Calls
+#### Representative Tools by Category
 
-**Find symbols across codebase:**
-```bash
-# Via MCP tool: find_symbols(query="MyClass")
-# Returns: [{ name: "MyClass", file: "src/main.rs", line: 42, type: "struct" }]
-```
+Descriptions below are the README's own tool-table wording. Argument schemas are not documented in
+the README, so no call signatures are given here — consult the running server's `tools/list` for
+parameter names.
 
-**Semantic code search:**
-```bash
-# Via MCP tool: search_code(query="HTTP request handler")
-# Returns: BM25-ranked results with file paths and excerpts
-```
+| Category | Tool | README description |
+|---|---|---|
+| Symbols | `find_symbols` | Find structs, classes, functions by type/pattern |
+| Symbols | `find_references` | Find all references to a symbol |
+| Search | `search_code` | Keyword search with relevance ranking |
+| Search | `semantic_search` | BM25-ranked semantic search |
+| Search | `hybrid_search` | Combined BM25 + TF-IDF with rank fusion |
+| Dependencies | `get_import_graph` | Build and analyze import graph |
+| Dependencies | `find_circular_imports` | Detect circular dependencies |
+| Security | `scan_security` | Scan with security rules (OWASP, CWE, crypto, secrets) |
+| Security | `check_owasp_top10` | Scan for OWASP Top 10 2021 vulnerabilities |
+| Security | `suggest_fix` | Get remediation suggestions for findings |
+| Supply chain | `generate_sbom` | Generate SBOM (CycloneDX/SPDX/JSON) |
+| Supply chain | `check_dependencies` | Check for known vulnerabilities (OSV database) |
 
-**Analyze dependencies:**
-```bash
-# Via MCP tool: get_import_graph(language="python")
-# Returns: dependency graph, identifies circular imports
-```
+Note the separation of concerns the table implies: relevance-ranked semantic search is
+`semantic_search`, not `search_code`; circular-import detection is `find_circular_imports`, not
+`get_import_graph`; remediation text comes from `suggest_fix`, not from the scanners; and
+dependency vulnerability status comes from `check_dependencies`, not from `generate_sbom`.
 
-**Security scanning:**
-```bash
-# Via MCP tool: check_owasp_top10()
-# Returns: vulnerability findings with file paths and remediation
-```
-
-**Supply chain analysis:**
-```bash
-# Via MCP tool: generate_sbom(format="cyclonedx")
-# Returns: SBOM with dependency version info and vulnerability status
-```
+Individual tools can be suppressed by name, e.g.
+`export NARSIL_DISABLED_TOOLS=neural_search,generate_sbom`.
 
 ---
 
