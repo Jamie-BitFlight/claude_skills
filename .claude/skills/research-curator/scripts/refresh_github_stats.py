@@ -170,15 +170,20 @@ def _parse_chunk_response(chunk: list[tuple[str, str]], data: dict[str, object])
             results[owner, name] = RepoStats(owner=owner, name=name, exists=False)
             continue
         license_info = node.get("licenseInfo")
+        stargazer_count = node.get("stargazerCount")
+        fork_count = node.get("forkCount")
+        pushed_at = node.get("pushedAt")
+        is_archived = node.get("isArchived")
+        license_spdx_id = license_info.get("spdxId") if isinstance(license_info, dict) else None
         results[owner, name] = RepoStats(
             owner=owner,
             name=name,
             exists=True,
-            stargazer_count=node.get("stargazerCount"),
-            fork_count=node.get("forkCount"),
-            pushed_at=node.get("pushedAt"),
-            license_spdx_id=license_info.get("spdxId") if isinstance(license_info, dict) else None,
-            is_archived=node.get("isArchived"),
+            stargazer_count=stargazer_count if isinstance(stargazer_count, int) else None,
+            fork_count=fork_count if isinstance(fork_count, int) else None,
+            pushed_at=pushed_at if isinstance(pushed_at, str) else None,
+            license_spdx_id=license_spdx_id if isinstance(license_spdx_id, str) else None,
+            is_archived=is_archived if isinstance(is_archived, bool) else None,
         )
     return results
 
