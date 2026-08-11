@@ -82,18 +82,6 @@ opkg i gh@athola/claude-night-market --plugins sanctum,pensive
 
 **Source**: GitHub README Typical Workflow section (accessed 2026-01-31)
 
-### Multi-Platform Support
-
-**Cursor** (`.mdc` rules format):
-
-```bash
-./scripts/convert.sh --tool cursor
-```
-
-**Codex, GitHub Copilot, Factory Droid, Qwen, OpenCode** — each has platform-specific installation pattern documented in README.
-
-**Source**: GitHub README Platform Compatibility (accessed 2026-01-31)
-
 ---
 
 ## Problem Addressed

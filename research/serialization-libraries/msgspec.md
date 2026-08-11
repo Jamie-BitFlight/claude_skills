@@ -1,15 +1,15 @@
 ---
 title: "msgspec — Fast Serialization and Validation Library"
-documentation_url: "https://jcristharif.com/msgspec/"
+documentation_url: "https://msgspec.dev"
 license: "BSD-3-Clause (New or Revised)"
 version_at_research: "v0.20.0"
-last_verified: "2026-03-13"
-next_review: "2026-06-13"
+last_verified: "2026-08-11"
+next_review: "2026-11-11"
 ---
 
 ## Overview
 
-`msgspec` is a high-performance serialization and validation library for Python that combines fast JSON, MessagePack, YAML, and TOML encoding/decoding with zero-cost schema validation using standard Python type annotations. The library achieves 6-85x performance improvements over competing libraries like Pydantic, cattrs, and mashumaro while reducing memory footprint to just 0.46 MiB (14.66x smaller than Pydantic 2.5.2).
+`msgspec` is a high-performance serialization and validation library for Python that combines fast JSON, MessagePack, YAML, and TOML encoding/decoding with zero-cost schema validation using standard Python type annotations. The library achieves significant performance improvements (5-60x for struct operations, ~10-80x vs alternatives) over competing libraries like Pydantic, cattrs, and mashumaro.
 
 **Source**: GitHub repository README and official documentation (accessed 2026-03-13)
 
@@ -21,10 +21,10 @@ next_review: "2026-06-13"
 
 | Problem | Solution |
 |---------|----------|
-| Serialization performance overhead in Python applications | Benchmark-optimized JSON/MessagePack implementations that are 6-85x faster than alternatives |
+| Serialization performance overhead in Python applications | Benchmark-optimized JSON/MessagePack implementations with significant performance gains over alternatives |
 | Schema validation requires separate post-processing after deserialization | Single-pass validation during decoding eliminates secondary traversal and object conversion |
 | Serialization libraries have large dependency footprints | Zero required dependencies; optional deps (pyyaml, tomli) for format support only |
-| Struct/dataclass patterns don't provide GC efficiency | `msgspec.Struct` with `gc=False` offers 75x faster garbage collection than standard classes |
+| Struct/dataclass patterns don't provide efficient garbage collection options | `msgspec.Struct` with `gc=False` provides optimized garbage collection behavior |
 | Type annotation schemas require learning domain-specific languages | Define schemas using familiar Python type annotations—no external schema language needed |
 
 **Source**: README.md and benchmarks documentation (accessed 2026-03-13)
@@ -163,7 +163,7 @@ SOURCE: README.md (GitHub repository)
 
 The library is designed for handling both serialization alone (faster JSON/MessagePack replacement) and the complete serialization & validation workflow. It enables defining message schemas using standard Python type annotations without requiring external schema languages.
 
-SOURCE: Official documentation (<https://jcristharif.com/msgspec/>)
+SOURCE: Official documentation (<https://msgspec.dev>)
 
 ---
 
@@ -173,7 +173,7 @@ SOURCE: Official documentation (<https://jcristharif.com/msgspec/>)
 
 `msgspec` JSON and MessagePack implementations benchmark as the fastest serialization options for Python. The library emphasizes performance optimization across all supported formats.
 
-SOURCE: README.md feature list and benchmarks documentation (<https://jcristharif.com/msgspec/benchmarks.html>)
+SOURCE: README.md feature list and benchmarks documentation (<https://msgspec.dev/benchmarks>)
 
 **Performance metrics** (from benchmarks page):
 - JSON validation/decoding is ~6x faster than mashumaro, ~10x faster than cattrs, ~12x faster than Pydantic V2, ~85x faster than Pydantic V1
@@ -525,13 +525,13 @@ These improvements directly translate to reduced latency and resource usage in a
 
 ## References
 
-1. **Official Documentation**: <https://jcristharif.com/msgspec/> (accessed 2026-03-13)
-2. **GitHub Repository**: <https://github.com/jcrist/msgspec> (accessed 2026-03-13)
+1. **Official Documentation**: <https://msgspec.dev> (accessed 2026-08-11)
+2. **GitHub Repository**: <https://github.com/jcrist/msgspec> (accessed 2026-08-11)
 3. **PyPI Package Page**: <https://pypi.org/project/msgspec/>
-4. **Official Benchmarks**: <https://jcristharif.com/msgspec/benchmarks.html> (accessed 2026-03-13)
-5. **API Documentation**: <https://jcristharif.com/msgspec/api.html> (accessed 2026-03-13)
+4. **Official Benchmarks**: <https://msgspec.dev/benchmarks> (accessed 2026-08-11)
+5. **API Documentation**: <https://msgspec.dev/api> (accessed 2026-08-11)
 6. **GitHub Releases**: <https://github.com/jcrist/msgspec/releases> (v0.20.0, released 2025-11-23)
 7. **Repository pyproject.toml**: Configuration and dependency metadata
 8. **Repository LICENSE**: BSD-3-Clause license text
-9. **GitHub Changelog**: <https://github.com/jcrist/msgspec/blob/main/docs/changelog.md> (accessed 2026-03-13)
-10. **Libraries.io**: msgspec 0.20.0 metadata (<https://libraries.io/pypi/msgspec>, accessed 2026-03-13)
+9. **GitHub Changelog**: <https://github.com/jcrist/msgspec/blob/main/docs/changelog.md> (accessed 2026-08-11)
+10. **Libraries.io**: msgspec 0.20.0 metadata (<https://libraries.io/pypi/msgspec>, accessed 2026-08-11)
