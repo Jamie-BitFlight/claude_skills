@@ -36,23 +36,6 @@ jobs:
         run: uv run -q prek run ruff-format --all-files
 
   # =============================================================================
-  # Python: Type checking with basedpyright
-  # =============================================================================
-  typecheck-python:
-    name: Python / Type Check
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-python
-
-      - name: Run basedpyright
-        run: uv run -q --with pep723-loader --with basedpyright pep723-loader basedpyright
-
-  # =============================================================================
   # Python: Type checking with ty (Astral)
   # Blocking as of 2026-02-19 — CI run 22188303914 passed cleanly.
   # =============================================================================
@@ -275,7 +258,6 @@ jobs:
     if: always()
     needs:
       - lint-python
-      - typecheck-python
       - typecheck-ty
       - lint-js
       - lint-markdown
