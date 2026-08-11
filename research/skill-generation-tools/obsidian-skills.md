@@ -81,9 +81,9 @@ Distribution mechanisms:
 
 ### Skill Composition Pattern
 
-Skills are designed to be modular but work together on shared vault state:
+The vault-oriented Markdown, Bases, Canvas, and CLI skills are designed to be modular but work together on shared vault state. Defuddle is an upstream web-page-to-Markdown extraction step and does not read or modify a vault:
 - **Decomposition**: Application features map to atomic skills (Markdown, Bases, Canvas, CLI)
-- **Shared State**: All skills operate on the same Obsidian vault, enabling workflows that chain skills together
+- **Shared State**: Vault-oriented skills operate on the same Obsidian vault, enabling workflows that chain together
 - **Documentation Structure**: Each skill references external docs (Obsidian help, JSON Canvas spec, Agent Skills spec) and internal reference files for drill-down detail
 - **Reference Pattern**: Subdirectories (CALLOUTS.md, EMBEDS.md, PROPERTIES.md, FUNCTIONS_REFERENCE.md, EXAMPLES.md) break out detailed specifications from main SKILL.md, allowing agents to load comprehensive references on-demand
 
@@ -273,4 +273,3 @@ No public benchmarking or user studies document the effectiveness or adoption of
 | Technical Architecture | high | Based on actual file structure and Agent Skills specification |
 | Installation & Usage | high | Commands directly from installation guides and examples |
 | Relevance | medium | Patterns identified from structure and design; specific Claude Code integration not independently tested |
-
