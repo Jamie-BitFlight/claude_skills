@@ -24,7 +24,7 @@ Zeroboot is an open-source platform that creates lightweight virtual machine san
 
 | Problem | Solution |
 |---------|----------|
-| Traditional sandboxes require 27-400ms to spin up — too slow for agentic workflows | Sub-millisecond (0.8ms) VM creation via Firecracker copy-on-write forking |
+| Traditional sandboxes have significant spin-up latency — too slow for agentic workflows | Sub-millisecond (0.8ms) VM creation via Firecracker copy-on-write forking |
 | High memory overhead per sandbox instance — scales poorly for concurrent agent execution | Per-sandbox memory footprint ~265KB via CoW memory mapping; only modified pages consume additional memory |
 | Lack of hardware-enforced isolation — sandbox escapes possible with container-only solutions | Real KVM virtual machines with hardware-enforced memory isolation between instances |
 | Complex infrastructure for reproducible runtime snapshots | Template-based snapshot approach: one-time Firecracker VM boot + capture, then fork pre-configured templates |
@@ -75,7 +75,7 @@ Zeroboot uses Firecracker (AWS's lightweight VMM) as the core sandbox engine, co
    - Modified memory pages automatically copied (CoW semantics)
 
 **Performance Characteristics**:
-- Sandbox creation: < 1ms (vs. 27-400ms for containers)
+- Sandbox creation: < 1ms (vs. traditional container startup overhead)
 - Memory per sandbox: ~265KB base + modified pages (vs. multi-GB for containers)
 - Process isolation: Hardware KVM isolation (vs. namespace isolation for containers)
 
@@ -152,7 +152,6 @@ Per the README, Zeroboot has documented constraints:
 
 - [GitHub - zerobootdev/zeroboot](https://github.com/zerobootdev/zeroboot) (accessed 2026-08-10)
 - [Zeroboot Official Website](https://zeroboot.dev) (accessed 2026-08-10)
-- [Zeroboot API Documentation](https://api.zeroboot.dev/docs) (accessed 2026-08-10)
 - [Sub-millisecond VM Sandboxes via Copy-on-Write Forking](https://dev.to/timmyzinin/how-zeroboot-is-changing-ai-agent-isolation-forever-km) (accessed 2026-08-10)
 - [AI Agent Sandboxes Compared](https://rywalker.com/research/ai-agent-sandboxes) (accessed 2026-08-10)
 

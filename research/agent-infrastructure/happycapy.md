@@ -19,7 +19,6 @@ HappyCapy is a browser-based agent-native computing platform that transforms any
 | AI agents require local setup (terminal, CLI, configuration) — high friction for non-technical users | Browser-based execution eliminates setup; agents run immediately from any device with a browser |
 | Agent development siloed locally on developer's machine — difficult to access remotely | Cloud sandbox runs agents anywhere; accessible from phone, tablet, or remote devices |
 | Agents lack visual interface for monitoring — CLI-only output makes agent behavior opaque | Visual desktop GUI with file manager, terminal, code editor, task panels shows all agent actions in real-time |
-| Running multiple concurrent agents depletes local system resources | Cloud infrastructure scales automatically; support for 10,000+ concurrent agent executions |
 
 ---
 

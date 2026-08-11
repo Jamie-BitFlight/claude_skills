@@ -14,7 +14,7 @@ freshness_tracking:
 
 ## Overview
 
-Omma is an AI-powered creative studio built by Spline that generates interactive digital experiences from natural language descriptions. Users can create websites, web applications, 3D scenes, games, presentations, and data visualizations by describing them in text, with parallel AI agents handling code generation, 3D geometry creation, and material/texture synthesis simultaneously. Launched March 24, 2026, Omma offers free and paid tiers, combining multi-agent parallel execution with interactive output editing. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10; [Omma Documentation](https://omma.build/docs/getting-started/introduction), accessed 2026-08-10; [Omma Product Hunt Launch](https://www.producthunt.com/posts/omma-ai-creative-studio), accessed 2026-08-10)
+Omma is an AI-powered creative studio built by Spline that generates interactive digital experiences from natural language descriptions. Users can create websites, web applications, 3D scenes, games, presentations, and data visualizations by describing them in text, with parallel AI agents handling code generation, 3D geometry creation, and material/texture synthesis simultaneously. Launched March 24, 2026, Omma offers free and paid tiers, combining multi-agent parallel execution with interactive output editing. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10; [Omma Documentation](https://omma.build/docs/getting-started/introduction), accessed 2026-08-10; [Omma Product Hunt Launch](https://www.producthunt.com/products/omma), accessed 2026-08-10)
 
 ---
 
@@ -33,7 +33,7 @@ Omma is an AI-powered creative studio built by Spline that generates interactive
 
 ### Multi-Modal Generation
 
-- **Parallel Agent Architecture**: Up to 100 agents run simultaneously, each specializing in different aspects of creation (code, 3D models, textures, audio)
+- **Parallel Agent Architecture**: Up to 100 agents run simultaneously, each building its own page
 - **Unified Output**: Single natural language prompt generates websites, web apps, 3D scenes, and games in parallel rather than sequentially
 - **Code Generation**: Converts natural language into runnable code with live preview
 - **3D Asset Generation**: Generates 3D geometry, models, and scenes directly from descriptions
@@ -83,28 +83,13 @@ Omma is cloud-native and accessed directly via web browser — no installation r
 7. Export or deploy your creation
 ```
 
-### Usage Example: Creating a Website
-
-```
-Prompt: "Create a landing page for a SaaS product called 'CloudSync'. 
-It should have a navy blue hero section with white text, a features 
-section with 4 features in cards, a pricing table, and a call-to-action 
-button. Include smooth animations when scrolling."
-
-Result: Omma generates:
-- HTML/CSS/JavaScript code for the landing page
-- Responsive design for mobile/tablet/desktop
-- CSS animations for scroll effects
-- Integrated with Spline 3D for any 3D elements
-```
-
 ### Creating Experiences
 
 Omma generates interactive digital experiences from natural language descriptions, including websites, web apps, 3D scenes, and games.
 
 ### Pricing
 
-Omma offers a free tier for limited usage and a Pro tier starting at $29/month for increased generation quotas and priority support. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10)
+Omma offers a free tier for limited usage and a Pro tier starting at $39/month for increased generation quotas and priority support. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10)
 
 ---
 
@@ -128,7 +113,7 @@ Omma offers a free tier for limited usage and a Pro tier starting at $29/month f
 
 3. **3D Asset Originality**: Generated 3D assets may exhibit common patterns or limited geometric diversity — unsuitable for highly specialized or novel 3D experiences.
 
-4. **Export Flexibility**: Export formats and deployment options not fully documented in reviewed sources; some lock-in to Spline ecosystem likely.
+4. **Export Flexibility**: Export formats and deployment options not fully documented in reviewed sources; assets remain within Spline ecosystem.
 
 5. **Concurrent User Limits**: Team tier concurrency limits not documented; unclear how many simultaneous editors Canvas supports per project.
 
@@ -140,7 +125,7 @@ Omma offers a free tier for limited usage and a Pro tier starting at $29/month f
 
 - [Omma Official Website](https://omma.build) (accessed 2026-08-10)
 - [Omma Documentation: Getting Started](https://omma.build/docs/getting-started/introduction) (accessed 2026-08-10)
-- [Omma Product Hunt Launch](https://www.producthunt.com/posts/omma-ai-creative-studio) (accessed 2026-08-10)
+- [Omma Product Hunt Launch](https://www.producthunt.com/products/omma) (accessed 2026-08-10)
 - [Omma Announcement: Production-Ready Motion Design](https://finance.yahoo.com/sectors/technology/articles/omma-spline-unlocks-production-ready-190000087.html) (accessed 2026-08-10)
 - [Omma Review - MakerStack](https://makerstack.co/reviews/omma-review/) (accessed 2026-08-10)
 - [Omma: AI 3D Websites & Apps From Text Prompts](https://www.toolworthy.ai/tool/omma-build) (accessed 2026-08-10)
