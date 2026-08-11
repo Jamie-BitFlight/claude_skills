@@ -1,11 +1,37 @@
 ---
-title: Scrapling — Claude Code Web Scraping Skill
-resource-url: https://github.com/Cedriccmh/claude-code-skill-scrapling
-author: Cedriccmh
+name: scrapling-skill
+research_date: 2026-03-13
+source_url: https://github.com/Cedriccmh/claude-code-skill-scrapling
+github_repository: https://github.com/Cedriccmh/claude-code-skill-scrapling
+upstream_library: https://github.com/D4Vinci/Scrapling
+version_at_research: commit 65bcdc7
 license: MIT
-language: Python
-category: developer-tools
-created: 2026-03-13
+freshness_tracking:
+  last_verified: 2026-03-13
+  version_at_verification: commit 65bcdc7
+  next_review: 2026-06-13
+  confidence_map: "Overview: high, Problem Addressed: high, Features: high, Architecture: high, Installation: high, Relevance: high, References: high"
+---
+
+# Scrapling Skill for Claude Code
+
+## Overview
+
+Scrapling Skill is a Claude Code community skill that wraps the Scrapling Python library to provide intelligent web scraping and HTML data extraction capabilities. It implements an automated decision tree to select optimal Fetcher strategies (curl_cffi, Playwright, Camoufox, or pure parsing) based on target website characteristics, then generates and executes parameterized Python scripts for scraping. The skill supports static pages, Cloudflare-protected sites, form-based login sessions, JavaScript-rendered SPAs, and pure HTML parsing, with built-in site pattern library, cookie vault templates, and comprehensive troubleshooting guides. (SOURCE: <https://github.com/Cedriccmh/claude-code-skill-scrapling> README, accessed 2026-03-13)
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Manual Fetcher selection requires deep knowledge of anti-scraping techniques | Automated decision tree guides selection based on site characteristics (static vs JS-rendered, authentication, Cloudflare protection) |
+| Cloudflare WAF blocks standard HTTP requests | StealthyFetcher with automatic Cloudflare challenge solving via Camoufox headless browser |
+| Cookie management across login sessions is error-prone | FetcherSession with automatic cookie persistence, Cookie Vault template for secure local storage |
+| JavaScript-rendered SPA content requires browser automation | DynamicFetcher with Playwright, DOM interaction support, wait_selector parameter for critical UI elements |
+| Error messages are cryptic and resolution path is unclear | Comprehensive troubleshooting guide indexed by exact error message with working solutions |
+| Successful scraping patterns are lost and must be re-solved | Site pattern library mechanism enables experience accumulation after successful scrapes (SOURCE: SKILL.md 步骤 2 / Step 2, item 6 "沉淀经验（必做）" — accumulate experience, mandatory; verified at commit 65bcdc7 on 2026-08-11) |
+
 ---
 
 ## Identity and Metadata
@@ -36,7 +62,7 @@ Supports static pages, Cloudflare-protected sites, form-based login sessions, Ja
 
 ---
 
-## Features
+## Key Features
 
 ### Fetcher Decision Tree — Automatic Selection
 
@@ -136,7 +162,7 @@ SOURCE: references/troubleshooting.md (accessed 2026-03-13)
 
 ---
 
-## Architecture
+## Technical Architecture
 
 ### Workflow Architecture
 
@@ -196,7 +222,7 @@ SOURCE: api-quick-ref.md, SKILL.md "Cookie 格式速查" and "超时单位速查
 
 ---
 
-## Installation and Setup
+## Installation & Usage
 
 ### Installation Steps
 

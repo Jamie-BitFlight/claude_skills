@@ -1,16 +1,22 @@
 ---
-title: "Unblocked — Context Engine for AI-Driven Development"
-documentation_url: "https://docs.getunblocked.com/"
-license: "Proprietary"
-next_review: "2026-06-13 (90 days)"
+name: unblocked
+research_date: 2026-03-13
+source_url: https://getunblocked.com/
+documentation_url: https://docs.getunblocked.com/
+version_at_research: current
+license: Proprietary
+freshness_tracking:
+  last_verified: 2026-03-13
+  version_at_verification: current
+  next_review: 2026-06-13
+  confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Relevance: high, References: high"
 ---
 
-## Identity
+# Unblocked
 
-**Name**: Unblocked
-**Full Description**: A context engine and decision-grade information platform designed to augment coding agents with organizational knowledge. Unblocked surfaces code history, architectural decisions, team conventions, and cross-functional context (GitHub, Slack, Confluence, Jira, etc.) so that AI agents generate production-ready, mergeable code on the first attempt without requiring human intervention between iteration cycles.
+## Overview
 
-**Core Value Proposition**: "Coding agents can read code. Unblocked gives them the history, decisions, and conventions behind it so they generate mergeable code without the back-and-forth." (SOURCE: <https://getunblocked.com/>, accessed 2026-03-13)
+Unblocked is a cloud-based context engine and decision-grade information platform that augments AI coding agents with organizational knowledge by synthesizing code history, architectural decisions, team conventions, and cross-functional context from multiple sources (GitHub, Slack, Confluence, Jira, etc.). It enables coding agents to generate production-ready, mergeable code on the first attempt without requiring human intervention between iteration cycles. The platform uses AI-powered retrieval, deconfliction algorithms, and targeted context compression to surface only decision-relevant information, reducing token waste while improving code generation fidelity. (SOURCE: <https://getunblocked.com/>, accessed 2026-03-13)
 
 **Company**: Unblocked Inc. (founded 2020, incorporated December 31, 2020)
 **Funding**: $15M across 2 rounds; latest round $10M seed on January 28, 2022. Investors include Tiger Global Management, Penske Media Corporation, and 19+ others.
@@ -19,7 +25,7 @@ next_review: "2026-06-13 (90 days)"
 
 ---
 
-## Problem Statement
+## Problem Addressed
 
 AI coding assistants fail to produce mergeable code on the first attempt because they lack organizational context. Without understanding:
 - Architectural patterns and design decisions
@@ -31,7 +37,7 @@ Agents generate code that "break[s] patterns, miss[es] dependencies, and fail[s]
 
 ---
 
-## Architecture
+## Technical Architecture
 
 ### Context Engine
 
@@ -60,7 +66,7 @@ The engine operates through four mechanisms:
 
 ---
 
-## Features
+## Key Features
 
 ### 1. AI Code Review
 
@@ -121,6 +127,32 @@ The Unblocked API is a REST interface for:
 Responses include the answer text and references (source URLs/lines).
 
 (SOURCE: <https://docs.getunblocked.com/api-reference/quickstart>, accessed 2026-03-13)
+
+---
+
+## Installation & Usage
+
+### Getting Started
+
+Unblocked is a cloud-based SaaS platform with no local installation required. Users can start with a 21-day free trial (no credit card required) at <https://getunblocked.com/>.
+
+### Setup Process
+
+The onboarding process requires three primary steps:
+
+1. **Connect source code** — Link your repository hosting platform (GitHub, GitLab, Bitbucket, etc.) to enable Unblocked to access your codebase.
+
+2. **Connect surrounding systems** — Integrate tools where your team's knowledge lives: messaging platforms (Slack, Microsoft Teams), issue trackers (Jira, Linear, Asana), and documentation systems (Confluence, Notion, Google Drive).
+
+3. **Connect your coding agent and team** — Set up your AI coding agent through the MCP server and invite team members to the platform. Once Unblocked has ingested your material, agents and team members can start using the platform to query organizational context.
+
+Users access Unblocked through:
+- **Web Dashboard**: <https://getunblocked.com/dashboard/get-started> (SOURCE: <https://getunblocked.com/>, accessed 2026-08-11)
+- **IDE Extensions**: Published for Visual Studio Code and JetBrains IDEs (IntelliJ, WebStorm, PyCharm) in their respective marketplaces (SOURCE: <https://plugins.jetbrains.com/plugin/23918-unblocked> and <https://marketplace.visualstudio.com/items?itemName=nextchaptersoftware.unblocked-vscode>, accessed 2026-08-11)
+- **API Access**: Authenticate with Personal or Team Access Tokens for programmatic queries
+- **MCP Server**: "Connect Claude Code, Cursor, GitHub Copilot, or any other MCP client to Unblocked through a single MCP server" (SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, accessed 2026-08-11)
+
+(SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, accessed 2026-03-13)
 
 ---
 
