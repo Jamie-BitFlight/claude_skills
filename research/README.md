@@ -1044,7 +1044,6 @@ AI-powered task management systems designed for AI-driven development workflows.
 | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------ |
 | [claude-task-master.md](./task-management/claude-task-master.md) | Task Master - PRD parsing, task tracking, and MCP integration for Cursor, Windsurf, Claude Code | 2026-01-26   |
 | [vibe-kanban.md](./task-management/vibe-kanban.md)               | Vibe Kanban - Kanban-style orchestration UI for parallel AI coding agent sessions with git worktree isolation | 2026-03-03   |
-| [artifact-manifest-backend-providers.md](./task-management/artifact-manifest-backend-providers.md) | Cross-platform comparison of structured metadata capabilities (GitHub, Linear, GitLab, Supabase) for ArtifactBackend provider implementations | 2026-03-22   |
 | [xyops.md](./task-management/xyops.md)                                                             | xyOps - distributed job orchestration and fleet management platform with visual workflow editor, real-time monitoring, alerting, and remote satellite agent system | 2026-03-26   |
 | [beads.md](./task-management/beads.md) | Beads (bd) — Dolt-powered version-controlled issue tracker for distributed AI workflows: hash-based collision-free IDs, dependency DAG with 4 relationship types, semantic compaction for context window recovery, offline-first with S3/GCS/DoltHub sync (19,673 stars, v0.62.0) | 2026-03-25   |
 | [internal-comms-skill.md](./task-management/internal-comms-skill.md) | Internal-Comms Skill — Codex skill for six internal communication formats (3P updates, newsletters, FAQ, status reports, leadership updates, incident reports) via Composio CLI (Apache-2.0) | 2026-05-10   |
@@ -1543,18 +1542,29 @@ Comprehensive collections of algorithm implementations, code examples, and educa
 ---
 
 
-### Root Research Entries
+### Design Notes
 
-**Location**: [./](./)
+**Location**: [./design-notes/](./design-notes/)
+
+Internal design/status notes for this project's own features -- working investigations written to
+inform an implementation decision (e.g. the ArtifactBackend provider design, the Claude-to-Codex
+plugin port) rather than comprehensive reference entries about an external tool. Excluded from the
+research-entry schema (`_NON_ENTRY_DIRS` in `validate_research.py`).
 
 | Document | Description | Last Updated |
 |---|---|---|
-| [artifact-manifest-github-fields.md](./artifact-manifest-github-fields.md) | GitHub Projects V2 custom fields include text, number, single-select, iteration, date, and user metadata types for structured issue tracking. | 2026-05-12 |
-| [artifact-manifest-gitlab-api-deep.md](./artifact-manifest-gitlab-api-deep.md) | GitLab custom fields are GA as of 18.0 and well documented for UI configuration, but API support remains uneven across GraphQL and REST surfaces. | 2026-05-12 |
-| [artifact-manifest-gitlab-custom-fields.md](./artifact-manifest-gitlab-custom-fields.md) | GitLab offers limited but growing structured metadata capabilities for issues. Custom fields (Premium/Ultimate tier) support four basic types (text, number, single-select, multi-select) with strict limits. API support for custom fields remains incomplete—GraphQL support is partial, and REST API access is minimal. Epics | 2026-05-12 |
-| [artifact-manifest-jira-asana-monday-patterns.md](./artifact-manifest-jira-asana-monday-patterns.md) | All three platforms support linking artifacts to work items, but use fundamentally different mental models: | 2026-05-12 |
-| [artifact-manifest-linear-custom-fields.md](./artifact-manifest-linear-custom-fields.md) | Linear **does not offer traditional custom fields** like GitHub Issues Fields (typed, org-wide metadata). Instead, Linear uses a hybrid approach: | 2026-03-21 |
-| [artifact-manifest-linear-patterns.md](./artifact-manifest-linear-patterns.md) | Linear treats documents and artifacts as **first-class resources** within issues and projects, with multiple linking mechanisms: | 2026-05-12 |
+| [artifact-manifest-github-fields.md](./design-notes/artifact-manifest-github-fields.md) | GitHub Projects V2 custom fields include text, number, single-select, iteration, date, and user metadata types for structured issue tracking. | 2026-05-12 |
+| [artifact-manifest-gitlab-api-deep.md](./design-notes/artifact-manifest-gitlab-api-deep.md) | GitLab custom fields are GA as of 18.0 and well documented for UI configuration, but API support remains uneven across GraphQL and REST surfaces. | 2026-05-12 |
+| [artifact-manifest-gitlab-custom-fields.md](./design-notes/artifact-manifest-gitlab-custom-fields.md) | GitLab offers limited but growing structured metadata capabilities for issues. Custom fields (Premium/Ultimate tier) support four basic types (text, number, single-select, multi-select) with strict limits. API support for custom fields remains incomplete—GraphQL support is partial, and REST API access is minimal. Epics | 2026-05-12 |
+| [artifact-manifest-jira-asana-monday-patterns.md](./design-notes/artifact-manifest-jira-asana-monday-patterns.md) | All three platforms support linking artifacts to work items, but use fundamentally different mental models: | 2026-05-12 |
+| [artifact-manifest-linear-custom-fields.md](./design-notes/artifact-manifest-linear-custom-fields.md) | Linear **does not offer traditional custom fields** like GitHub Issues Fields (typed, org-wide metadata). Instead, Linear uses a hybrid approach: | 2026-03-21 |
+| [artifact-manifest-linear-patterns.md](./design-notes/artifact-manifest-linear-patterns.md) | Linear treats documents and artifacts as **first-class resources** within issues and projects, with multiple linking mechanisms: | 2026-05-12 |
+| [artifact-manifest-backend-providers.md](./design-notes/artifact-manifest-backend-providers.md) | Cross-platform comparison of structured metadata capabilities (GitHub, Linear, GitLab, Supabase) for ArtifactBackend provider implementations | 2026-03-22 |
+| [2026-06-07-claude-skills-codex-port-status.md](./design-notes/2026-06-07-claude-skills-codex-port-status.md) | Claude Skills to Codex Port Status — per-plugin migration tracker (base-port / runtime-validated / needs-deeper-port) for porting claude_skills plugins to Codex CLI | 2026-06-07 |
+| [2026-06-07-claude-to-codex-mapping-matrix.md](./design-notes/2026-06-07-claude-to-codex-mapping-matrix.md) | Claude to Codex Plugin Mapping Matrix — evidence-backed translation rules between `.claude-plugin/` and `.codex-plugin/` manifest concepts, sourced from qualifying dual-target repos | 2026-06-07 |
+| [2026-06-07-dual-target-search-log.md](./design-notes/2026-06-07-dual-target-search-log.md) | Dual-Target Plugin Search Log — search methodology and results log for finding public repos with both Claude and Codex plugin packaging (>4000 stars) | 2026-06-07 |
+| [2026-06-07-ensemble-subagent-port-checklist.md](./design-notes/2026-06-07-ensemble-subagent-port-checklist.md) | Ensemble Subagent Port Checklist — structured fan-out workstream checklist for the Claude-to-Codex plugin porting effort | 2026-06-07 |
+| [2026-06-08-development-harness-skill-taxonomy-report.md](./design-notes/2026-06-08-development-harness-skill-taxonomy-report.md) | Development-Harness Skill Taxonomy Report — evaluates development-harness plugin skills against Anthropic's nine-category skill taxonomy, identifying coverage gaps and overloaded skills | 2026-06-08 |
 
 ### Developer Tooling
 
