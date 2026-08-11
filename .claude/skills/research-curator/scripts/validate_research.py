@@ -367,9 +367,8 @@ def _check_header_fields_text(header_lines: list[str]) -> list[Issue]:
         if not found:
             issues.append({
                 "check": "header_fields",
-                "severity": "warning",
-                "message": f"Missing header field: {field}. "
-                "If this is a new research entry, this field needs to be completed.",
+                "severity": "error",
+                "message": f"Missing header field: {field}",
                 "line": None,
             })
     return issues
@@ -395,9 +394,8 @@ def _check_header_fields_yaml(frontmatter: dict[str, Any]) -> list[Issue]:
         if not found:
             issues.append({
                 "check": "header_fields",
-                "severity": "warning",
-                "message": f"Missing header field: {field} (expected YAML key: {yaml_keys[0]}). "
-                "If this is a new research entry, this field needs to be completed.",
+                "severity": "error",
+                "message": f"Missing header field: {field} (expected YAML key: {yaml_keys[0]})",
                 "line": None,
             })
     return issues

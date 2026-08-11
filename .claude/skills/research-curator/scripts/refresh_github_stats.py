@@ -44,7 +44,7 @@ from pydantic import BaseModel
 app = typer.Typer(add_completion=False)
 
 _REPO_URL_PATTERN = re.compile(
-    r"github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)/([A-Za-z0-9._-]+?)(?:\.git)?(?=[)\]\s\"'>,;]|$)"
+    r"https?://github\.com/([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)/([A-Za-z0-9._-]+?)(?:\.git)?(?=[/#?)\]\s\"'>,;]|$)"
 )
 _STAR_CLAIM_PATTERN = re.compile(r"([\d,]+(?:\.\d+)?[Kk]?)\s*stars?", re.IGNORECASE)
 
