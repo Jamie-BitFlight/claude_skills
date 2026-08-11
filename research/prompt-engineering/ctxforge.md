@@ -63,7 +63,7 @@ Fullscreen terminal UI supports 48 slash commands accessible via `/` in interact
 
 ### 4. Token Counting for 15 Named Models
 
-Exact token counting via **tiktoken** for OpenAI models (including claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5, gpt-4.1 family, o-series, gpt-4o family, gemini-2.5/1.5); character-based estimates (`chars / 4`) for unrecognized models. Real-time token gauge in TUI prevents budget overruns.
+Exact token counting via **tiktoken** (o200k) for OpenAI models — `gpt-4.1`/`-mini`/`-nano`, the o-series (`o4-mini`, `o3`, `o3-mini`, `o1`), and `gpt-4o`/`gpt-4o-mini`. Character-based estimates (`chars / 4`) for all others, including `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `gemini-2.5-pro`/`-flash`, and `gemini-1.5-pro`. Unknown model names fall back to a 200k-window estimate. Real-time token gauge in TUI prevents budget overruns.
 
 **Source**: GitHub README.md — "Supported models" section; verified from WebFetch "Uses 'tiktoken' for exact OpenAI model counts; character-based estimates" (accessed 2026-08-11)
 
