@@ -3,7 +3,7 @@ name: ghost-desk
 research_date: 2026-03-13
 source_url: https://www.ghost-desk.app/
 version_at_research: v1.0
-license: Proprietary (free during launch, paid tiers available)
+license: Proprietary (free tier offered at March 2026 launch; paid-only as of 2026-08-11)
 freshness_tracking:
   last_verified: 2026-03-13
   version_at_verification: v1.0 (launch March 2026)
@@ -15,7 +15,7 @@ freshness_tracking:
 
 ## Overview
 
-Ghost Desk is a Windows-exclusive AI assistant overlay that remains invisible to screen-sharing, recording, and video conferencing software while providing real-time code analysis, voice transcription, and vision-based screenshot interpretation. Powered by Llama 3.3 70B or GPT-4o depending on tier, it uses Windows OS-level APIs (SetWindowDisplayAffinity) to exclude itself from all screen-capture pipelines, enabling developers to access AI assistance during live interviews, meetings, and screenshares without revealing the tool to viewers. (SOURCE: <https://www.ghost-desk.app/>, accessed 2026-03-13)
+Ghost Desk is a Windows-exclusive AI assistant overlay that remains invisible to screen-sharing, recording, and video conferencing software while providing real-time code analysis, voice transcription, and vision-based screenshot interpretation. It is powered by "Groq Llama 3.3 70B & GPT-4o", and the vendor describes the invisibility mechanism as "Hardware DWM capture exclusion [that] renders GhostDesk 100% invisible to Zoom, Teams, Meet, CodeSignal, HackerRank, & screen recorders" — enabling developers to access AI assistance during live interviews, meetings, and screenshares without revealing the tool to viewers. (SOURCE: <https://www.ghost-desk.app/>, accessed 2026-08-11)
 
 ---
 
@@ -23,7 +23,7 @@ Ghost Desk is a Windows-exclusive AI assistant overlay that remains invisible to
 
 | Problem | Solution |
 |---------|----------|
-| AI assistance during technical interviews reveals to proctors that candidate is using AI tools | OS-level invisibility via SetWindowDisplayAffinity API hides overlay from all screen-capture pipelines (Zoom, Teams, OBS, etc.) |
+| AI assistance during technical interviews reveals to proctors that candidate is using AI tools | OS-level "hardware DWM capture exclusion" hides the overlay from screen-capture pipelines (vendor names Zoom, Teams, Meet, CodeSignal, HackerRank, and screen recorders) |
 | Need for code reference/help during live coding sessions visible to viewers | Invisible overlay allows real-time access to code analysis, documentation lookup, and problem-solving without visible changes to screen share |
 | Distraction from primary task when using separate AI tool window | Always-on-top floating interface with keyboard-only activation (Ctrl+Shift+Space) integrates assistance without task-switching |
 | Voice transcription and analysis requires separate tools or manual context-switching | Integrated voice input/output and screenshot analysis in single overlay reduces cognitive load |
@@ -59,7 +59,7 @@ The overlay floats above browsers, IDEs (Visual Studio Code examples shown), ter
 
 ### 2. Screen-Share Invisibility
 
-The core distinguishing feature uses Windows SetWindowDisplayAffinity API at the OS level to exclude the overlay from all screen-capture pipelines. This means:
+The core distinguishing feature is OS-level exclusion of the overlay from screen-capture pipelines, which the vendor markets as "hardware DWM capture exclusion" (SOURCE: <https://www.ghost-desk.app/>, accessed 2026-08-11). This means:
 
 - **Zoom screen shares**: Ghost Desk overlay not visible to viewers
 - **Microsoft Teams**: Overlay excluded from team member views
@@ -114,11 +114,13 @@ All interaction is possible via global keyboard shortcuts:
 
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+Shift+Space | Toggle Ghost Desk visibility |
-| Ctrl+Shift+C | Enable click-through mode |
-| Ctrl+Shift+Q | Quick quit |
+| Ctrl+Shift+Space | "Toggle HUD / Snap & solve LeetCode problem" |
+| Ctrl+Shift+C | "Enable click-through mode (type directly in CoderPad)" |
+| Ctrl+Shift+Up | "Scroll AI code solution without losing browser focus" |
+| Ctrl+Shift+Down | "Scroll AI code solution down" |
+| Ctrl+Shift+Q | "Instant 5ms Panic Mode (Hide & mute HUD instantly)" — hides and mutes the overlay; it does not quit the application |
 
-All shortcuts are fully customizable in settings.
+All shortcuts are fully customizable in settings. (SOURCE: <https://www.ghost-desk.app/>, accessed 2026-08-11)
 
 ### 7. Streaming and Context Management
 
@@ -176,9 +178,9 @@ Upgrade to OpenAI models for higher quality:
 
 ### Window Display Affinity Implementation
 
-Ghost Desk uses the Windows SetWindowDisplayAffinity API to implement screen-share invisibility:
+**Source mechanism** (quoted from the site FAQ as it read on 2026-03-13): "GhostDesk uses the Windows SetWindowDisplayAffinity API to exclude its overlay from all screen-capture pipelines. This means any app that captures the screen — Zoom, Teams, OBS, Windows Game Bar — simply won't include the GhostDesk window. It's an OS-level privacy feature built into Windows."
 
-**Source mechanism** (quoted from FAQ): "GhostDesk uses the Windows SetWindowDisplayAffinity API to exclude its overlay from all screen-capture pipelines. This means any app that captures the screen — Zoom, Teams, OBS, Windows Game Bar — simply won't include the GhostDesk window. It's an OS-level privacy feature built into Windows."
+> **Re-verification note (2026-08-11)**: this quote could not be reproduced against the live site. The string `SetWindowDisplayAffinity` does not appear on <https://www.ghost-desk.app/>, and <https://www.ghost-desk.app/faq> returns HTTP 404. The site now describes the mechanism only as "hardware DWM capture exclusion". Treat the named API as the vendor's 2026-03-13 claim, not as independently confirmed current documentation. The behaviour described (DWM-level capture exclusion) is consistent between both wordings.
 
 The API function excludes the window from:
 - Desktop Windows Manager (DWM) composition
@@ -210,7 +212,7 @@ The architecture processes three input types:
 ### Platform Constraints
 
 - **Windows-only**: No native support for macOS or Linux. The FAQ explicitly states "macOS and Linux versions are being explored but there is no release date yet."
-- **Windows version minimum**: Requires Windows 10 build 19041 or later, or Windows 11. Earlier Windows versions cannot use Ghost Desk due to SetWindowDisplayAffinity API availability (introduced in Windows 7 but requires Desktop Windows Manager compositing on modern builds).
+- **Windows version minimum**: Requires Windows 10 build 19041 or later, or Windows 11 (stated system requirement; the vendor does not document why this floor applies).
 - **RAM requirement**: Minimum 4GB RAM specified; performance on lower-spec systems untested.
 
 ### Functionality Limitations
@@ -236,6 +238,8 @@ The architecture processes three input types:
 ---
 
 ## Pricing and Plans
+
+> **Pricing drift (re-verified 2026-08-11)**: the launch pricing recorded below no longer matches the live site, which now lists 24-Hour $15.00 USD one-time, Monthly $40.00/mo, 3 Months $80.00 one-time, and 6 Months $150.00 one-time — with no free tier and no lifetime plan. The table below is retained as a dated record of launch pricing, not as current pricing. (SOURCE: <https://www.ghost-desk.app/>, accessed 2026-08-11)
 
 **Launch Pricing** (March 2026):
 

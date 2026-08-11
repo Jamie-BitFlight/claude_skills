@@ -147,10 +147,10 @@ The onboarding process requires three primary steps:
 3. **Connect your coding agent and team** — Set up your AI coding agent through the MCP server and invite team members to the platform. Once Unblocked has ingested your material, agents and team members can start using the platform to query organizational context.
 
 Users access Unblocked through:
-- **Web Dashboard**: <https://app.getunblocked.com> (login with company account or SSO)
-- **IDE Extensions**: Install Unblocked extension for VS Code, JetBrains IDEs, or other editors
+- **Web Dashboard**: <https://getunblocked.com/dashboard/get-started> (SOURCE: <https://getunblocked.com/>, accessed 2026-08-11)
+- **IDE Extensions**: Published for Visual Studio Code and JetBrains IDEs (IntelliJ, WebStorm, PyCharm) in their respective marketplaces (SOURCE: <https://plugins.jetbrains.com/plugin/23918-unblocked> and <https://marketplace.visualstudio.com/items?itemName=nextchaptersoftware.unblocked-vscode>, accessed 2026-08-11)
 - **API Access**: Authenticate with Personal or Team Access Tokens for programmatic queries
-- **MCP Server**: Direct integration with Claude Code and other MCP-compatible agents
+- **MCP Server**: "Connect Claude Code, Cursor, GitHub Copilot, or any other MCP client to Unblocked through a single MCP server" (SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, accessed 2026-08-11)
 
 (SOURCE: <https://docs.getunblocked.com/what-is-unblocked>, accessed 2026-03-13)
 

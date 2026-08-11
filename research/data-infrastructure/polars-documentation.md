@@ -36,17 +36,18 @@ Polars is a high-performance DataFrame library written in Rust with bindings for
 
 ### High-Performance Execution
 
-Polars is "blazingly fast" DataFrame library built in Rust without external C dependencies. The multi-threaded query engine automatically parallelizes operations across available CPU cores. Operations run with performance comparable to C/C++ rather than Python or R. (SOURCE: <https://pola-rs.github.io/polars-book/user-guide/> Introduction, accessed 2026-03-17)
+Polars is an "Extremely fast Query Engine for DataFrames, written in Rust", described as "written from the ground up in Rust with multi-threaded, vectorized (SIMD) execution". The multi-threaded query engine parallelizes operations across available CPU cores. (SOURCE: <https://github.com/pola-rs/polars> README, accessed 2026-08-11)
 
 ### Multi-Language API
 
-Polars provides native bindings for:
-- **Python**: `import polars as pl` — full feature parity with Rust core
-- **Rust**: Direct access to core library via `polars` crate
-- **R**: R bindings for integration with R ecosystems
-- **NodeJS**: JavaScript/TypeScript bindings for Node.js applications
+The README lists Polars as "Multi-language: bindings for Python, Rust, Node.js, R, and SQL":
+- **Python**: `import polars as pl` — <https://docs.pola.rs/api/python/stable/reference/index.html>
+- **Rust**: Direct access to the core library via the `polars` crate — <https://docs.rs/polars/latest/polars/>
+- **Node.js**: `nodejs-polars` — <https://pola-rs.github.io/nodejs-polars/index.html>
+- **R**: `r-polars` — <https://pola-rs.github.io/r-polars/index.html>
+- **SQL**: SQL interface over the same query engine
 
-(SOURCE: <https://docs.pola.rs/> Documentation Navigation, accessed 2026-03-17)
+(SOURCE: <https://github.com/pola-rs/polars> README, accessed 2026-08-11)
 
 ### Apache Arrow Foundation
 
@@ -84,13 +85,12 @@ Polars represents data in columnar format (each column is stored contiguously) r
 ### Rust-Based Core
 
 The core query engine is implemented in Rust, providing:
-- No external C/C++ dependencies (faster compilation, easier distribution)
 - Memory safety without garbage collection
-- True parallelism via Rayon data-parallel iterator library
+- Data-parallel execution via the `rayon` crate (declared in the workspace `Cargo.toml` as `rayon = "1.9"`, accessed 2026-08-11)
 
 ### API Design
 
-Polars uses eager evaluation by default (operations execute immediately) and supports lazy evaluation mode for deferred execution planning. The API emphasizes method chaining and expression-based operations:
+Polars offers "Lazy & eager execution: with query optimization out of the box" (SOURCE: <https://github.com/pola-rs/polars> README, accessed 2026-08-11). The eager `DataFrame` API executes operations immediately; the lazy `LazyFrame` API (entered via `scan_*` readers or `.lazy()`) defers execution until `.collect()` so the optimizer can rewrite the plan. The API emphasizes method chaining and expression-based operations:
 
 ```python
 df.select([
@@ -174,7 +174,7 @@ Node.js bindings enable TypeScript agent systems to use Polars directly, unifyin
 
 ### Row-Oriented Operations Inefficient
 
-Polars is optimized for column-wise operations. Row-wise access (e.g., iterating over rows) is slower than with pandas and row-based systems. Workflows requiring frequent row-by-row logic should decompose to column operations or use different tools.
+Polars is optimized for column-wise operations, and the Python API documentation warns against row iteration on the grounds that the underlying data is stored in columnar form. Workflows requiring frequent row-by-row logic should decompose to column operations or use different tools. (No published Polars-vs-pandas row-iteration benchmark was located to quantify the gap.)
 
 ### Lazy Evaluation Requires Plan Collection
 

@@ -30,7 +30,7 @@ Scrapling Skill is a Claude Code community skill that wraps the Scrapling Python
 | Cookie management across login sessions is error-prone | FetcherSession with automatic cookie persistence, Cookie Vault template for secure local storage |
 | JavaScript-rendered SPA content requires browser automation | DynamicFetcher with Playwright, DOM interaction support, wait_selector parameter for critical UI elements |
 | Error messages are cryptic and resolution path is unclear | Comprehensive troubleshooting guide indexed by exact error message with working solutions |
-| Successful scraping patterns are lost and must be re-solved | Site pattern library mechanism enables experience accumulation after successful scrapes (SOURCE: SKILL.md Step 2 "Experience Accumulation", accessed 2026-03-13) |
+| Successful scraping patterns are lost and must be re-solved | Site pattern library mechanism enables experience accumulation after successful scrapes (SOURCE: SKILL.md 步骤 2 / Step 2, item 6 "沉淀经验（必做）" — accumulate experience, mandatory; verified at commit 65bcdc7 on 2026-08-11) |
 
 ---
 

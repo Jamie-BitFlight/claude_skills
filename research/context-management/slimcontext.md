@@ -16,7 +16,7 @@ freshness_tracking:
 
 ## Overview
 
-SlimContext is a lightweight, model-agnostic JavaScript library that compresses chat histories in AI assistant applications using configurable trimming or AI-powered summarization strategies. It preserves system instructions and recent conversation context while reducing token usage, enabling LLM applications to operate efficiently within finite context windows. The library uses a "Bring Your Own Model" (BYOM) pattern, integrating seamlessly with any LLM provider without enforcing specific dependencies. (SOURCE: <https://github.com/agentailor/slimcontext> README, accessed 2026-03-17)
+SlimContext is a lightweight, model-agnostic TypeScript library (distributed on npm) that compresses chat histories in AI assistant applications using configurable trimming or AI-powered summarization strategies. It preserves system instructions and recent conversation context while reducing token usage, enabling LLM applications to operate efficiently within finite context windows. The library uses a "Bring Your Own Model" (BYOM) pattern, integrating seamlessly with any LLM provider without enforcing specific dependencies. (SOURCE: <https://github.com/agentailor/slimcontext> README, accessed 2026-03-17)
 
 ---
 
@@ -30,10 +30,10 @@ SlimContext solves this by providing pluggable compression strategies that reduc
 
 ## Key Statistics
 
-- **22 GitHub stars** (as of 2026-03-17)
-- **0 forks** — early-stage project
-- **1 open issue** — active maintenance
-- **Repository age**: Created 2025-08-22; last activity 2025-09-14 (6 months old)
+- **Repository is ARCHIVED (read-only)** — confirmed via GitHub API `archived: true` on 2026-08-11. No further releases or fixes should be expected; evaluate accordingly before adopting.
+- **23 GitHub stars, 1 fork, 1 open issue** (GitHub API, 2026-08-11; recorded as 22 stars / 0 forks at research time on 2026-03-17)
+- **Repository age**: Created 2025-08-22; last push 2025-09-14 (GitHub API `created_at` / `pushed_at`, 2026-08-11)
+- **Latest release**: v2.1.3, published 2025-09-14 (GitHub API releases, 2026-08-11)
 - **Downloads**: Distribution via npm; no public download metrics available
 - **Topics**: ai, ai-agents, context-engineering, llms, memory
 
