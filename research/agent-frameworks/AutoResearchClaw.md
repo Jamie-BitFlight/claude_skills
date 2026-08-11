@@ -66,14 +66,14 @@ The system orchestrates eight distinct phases across 23 sequential stages (READM
 4. **Phase D — Experiment Design** (Stages 9-11): Methodology selection, baseline establishment, experiment configuration
 5. **Phase E — Experiment Execution** (Stages 12-13): Sandbox setup, code generation, hardware auto-detection, experiment runs
 6. **Phase F — Analysis & Decision** (Stages 14-15): Result aggregation, statistical validation
-7. **Phase G — Paper Writing** (Stages 16-19): Draft composition, result integration, reference assembly
-8. **Phase H — Finalization** (Stages 20-23): Quality gate (Stage 20 QUALITY_GATE), peer review, citation verification (Stage 23 CITATION_VERIFY), publication preparation
+7. **Phase G — Paper Writing** (Stages 16-19): Draft composition, peer review (Stage 18), revision (Stage 19), result integration, reference assembly
+8. **Phase H — Finalization** (Stages 20-23): Quality gate (Stage 20 QUALITY_GATE), citation verification (Stage 23 CITATION_VERIFY), publication preparation
 
 ### Multi-Agent Subsystems (v0.2.0+)
 
 **CodeAgent**: Generates hardware-aware experiment code with auto-detection and adaptation logic.
 
-**BenchmarkAgent**: Executes experiments and collects metrics with self-healing on failure.
+**BenchmarkAgent**: Finds and acquires benchmarks, validates dataset availability, and selects evaluation metrics.
 
 **FigureAgent**: Synthesizes visualization artifacts and statistical summaries from raw results.
 
@@ -104,8 +104,9 @@ researchclaw run --topic "Your research idea" --auto-approve
 The `researchclaw setup` command:
 - Installs all dependencies
 - Verifies Docker and LaTeX availability
-- Prompts for LLM provider configuration (OpenAI, Anthropic, etc.)
 - Validates hardware (GPU/CPU detection)
+
+The subsequent `researchclaw init` command prompts for LLM provider configuration and creates `config.arc.yaml`.
 
 ### Execution Modes (v0.4.0+, README L356-364)
 
