@@ -83,6 +83,7 @@ curl http://localhost:8080/healthz  # expect: "ok {version}"
 ```
 
 **Verify health**:
+
 ```bash
 curl http://localhost:8080/healthz
 ```
