@@ -1,14 +1,14 @@
 ---
 name: slimcontext
-research_date: 2026-03-17
+research_date: 2026-08-11
 source_url: https://github.com/agentailor/slimcontext
 github_repository: https://github.com/agentailor/slimcontext
 version_at_research: v2.1.3
 license: MIT
 freshness_tracking:
-  last_verified: 2026-03-17
+  last_verified: 2026-08-11
   version_at_verification: v2.1.3
-  next_review: 2026-06-17
+  next_review: 2026-11-11
   confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Relevance: high, References: high"
 ---
 
