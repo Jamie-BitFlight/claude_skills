@@ -584,7 +584,7 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
     return {"file": relative, "format": fmt, "status": status, "issues": all_issues}
 
 
-_NON_ENTRY_DIRS = frozenset({"insights", "utilization"})
+_NON_ENTRY_DIRS = frozenset({"insights", "utilization", "design-notes"})
 
 
 def _is_research_entry(file: Path) -> bool:
@@ -593,7 +593,10 @@ def _is_research_entry(file: Path) -> bool:
     Excludes README.md and files under non-entry artifact directories such as
     ``research/insights/`` (improvement/utilization reports written by
     ``research-insight-extractor`` and ``research-utilization-assessor``, which
-    intentionally do not follow the research entry template).
+    intentionally do not follow the research entry template) and
+    ``research/design-notes/`` (internal design/status notes for this project's
+    own features -- working investigations that inform an implementation
+    decision, not comprehensive external-tool reference entries).
     """
     return file.name != "README.md" and not _NON_ENTRY_DIRS.intersection(file.parts)
 
