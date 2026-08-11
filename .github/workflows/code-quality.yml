@@ -285,14 +285,25 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run e2e tests
-        timeout-minutes: 10
-        # --timeout=90 --timeout-method=thread (pytest-timeout): per-test timeout so a hung
+        # Bumped from 10 -> 20: run 31444267046 showed the 11-test sequential e2e suite
+        # (xdist_group serializes it onto one worker) legitimately takes ~30-90s per test
+        # against the real ~800-issue GitHub repo (batch_fetch_statuses does a full
+        # paginated GraphQL fetch of all open issues on every list/status-touching call),
+        # so the previous 10-minute step limit killed the whole run before pytest reached
+        # its end-of-session FAILURES summary — even with a working per-test timeout.
+        timeout-minutes: 20
+        # --timeout=90 --timeout-method=signal (pytest-timeout): per-test timeout so a hung
         # test fails with its own traceback in ~90s instead of the whole step being killed
-        # at the outer 10-minute limit with no diagnostics. Scoped to this invocation only —
-        # not global pytest config — so it cannot mask unrelated slow-but-legitimate tests
-        # elsewhere. See #2839.
+        # with no diagnostics. method=signal (not thread) is deliberate: run 31444267046
+        # showed --timeout-method=thread's timeout action calls os._exit() on the worker
+        # process, which under xdist surfaces only as "node down: Not properly terminated"
+        # with NO traceback for test_l8/test_l9 — destroying the exact diagnostic this
+        # timeout exists to capture. method=signal raises a catchable Failed with a real
+        # traceback at the blocking call instead of killing the process. Scoped to this
+        # invocation only — not global pytest config — so it cannot mask unrelated
+        # slow-but-legitimate tests elsewhere. See #2839.
         run: >-
-          uv run -q pytest -m e2e -v --timeout=90 --timeout-method=thread
+          uv run -q pytest -m e2e -v --timeout=90 --timeout-method=signal
           plugins/development-harness/tests/test_live_validation.py
 
       - name: Emergency cleanup (always runs)
