@@ -89,7 +89,7 @@ Omma generates interactive digital experiences from natural language description
 
 ### Pricing
 
-Omma offers a free tier for limited usage and a Pro tier starting at $39/month for increased generation quotas and priority support. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10)
+Omma offers a free tier for limited usage and a Pro tier starting at $39/month for increased generation quotas and priority support. (SOURCE: [Omma Pricing](https://omma.build/pricing), accessed 2026-08-10)
 
 ---
 
@@ -113,9 +113,7 @@ Omma offers a free tier for limited usage and a Pro tier starting at $39/month f
 
 3. **3D Asset Originality**: Generated 3D assets may exhibit common patterns or limited geometric diversity — unsuitable for highly specialized or novel 3D experiences.
 
-4. **Export Flexibility**: Export formats and deployment options not fully documented in reviewed sources; assets remain within Spline ecosystem.
-
-5. **Concurrent User Limits**: Team tier concurrency limits not documented; unclear how many simultaneous editors Canvas supports per project.
+4. **Concurrent User Limits**: Concurrency and simultaneous editor limits not documented in reviewed sources.
 
 6. **API Maturity**: Public API not yet fully available (as of research date); integration patterns limited to web UI.
 
@@ -126,7 +124,6 @@ Omma offers a free tier for limited usage and a Pro tier starting at $39/month f
 - [Omma Official Website](https://omma.build) (accessed 2026-08-10)
 - [Omma Documentation: Getting Started](https://omma.build/docs/getting-started/introduction) (accessed 2026-08-10)
 - [Omma Product Hunt Launch](https://www.producthunt.com/products/omma) (accessed 2026-08-10)
-- [Omma Announcement: Production-Ready Motion Design](https://finance.yahoo.com/sectors/technology/articles/omma-spline-unlocks-production-ready-190000087.html) (accessed 2026-08-10)
 - [Omma Review - MakerStack](https://makerstack.co/reviews/omma-review/) (accessed 2026-08-10)
 - [Omma: AI 3D Websites & Apps From Text Prompts](https://www.toolworthy.ai/tool/omma-build) (accessed 2026-08-10)
 - [Omma by Spline Business Wire Press Release](https://www.businesswire.com/news/home/20260324015254/en/Omma-by-Spline-Unlocks-Production-Ready-Motion-Design-in-Minutes) (accessed 2026-08-10)

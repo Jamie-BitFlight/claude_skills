@@ -3,11 +3,11 @@ name: cmux
 research_date: "2026-08-10"
 source_url: https://github.com/manaflow-ai/cmux
 github_repository: https://github.com/manaflow-ai/cmux
-version_at_research: v1.38.1
+version_at_research: v0.64.22
 license: "GPL-3.0-or-later (open source) + commercial license option"
 freshness_tracking:
   last_verified: "2026-08-10"
-  version_at_verification: v1.38.1
+  version_at_verification: v0.64.22
   next_review: "2026-11-10"
   confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: high, Installation & Usage: high, Relevance: medium"
 ---

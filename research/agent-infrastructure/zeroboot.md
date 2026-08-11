@@ -76,7 +76,7 @@ Zeroboot uses Firecracker (AWS's lightweight VMM) as the core sandbox engine, co
 
 **Performance Characteristics**:
 - Sandbox creation: < 1ms (vs. traditional container startup overhead)
-- Memory per sandbox: ~265KB base + modified pages (vs. multi-GB for containers)
+- Memory per sandbox: ~265KB base + modified pages (vs. 50MB–128MB for competitors like microsandbox and E2B)
 - Process isolation: Hardware KVM isolation (vs. namespace isolation for containers)
 
 ---

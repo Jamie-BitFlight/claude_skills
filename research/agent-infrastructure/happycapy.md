@@ -36,7 +36,7 @@ HappyCapy operates on three-layer architecture:
 
 ### Private Sandbox Execution
 
-"Each user gets their own isolated environment – a little digital space with its own file system and process capabilities. This means Claude Opus or Sonnet can directly read, write, and execute code within that tab. The whole cycle of writing code, running it, and seeing the file changes happen seamlessly, all in one place." (SOURCE: Oreate AI Blog, <http://oreateai.com/blog/happycapy-your-browser-becomes-a-zerofriction-ai-workstation/>, published 2026-02-25)
+Happycapy provides isolated execution environments for each user, enabling Claude to read, write, and execute code within a dedicated sandbox.
 
 Key isolation properties:
 
@@ -51,7 +51,7 @@ Key isolation properties:
 - Claude Sonnet 4.5 (fast execution)
 - MiniMax M2.5 (alternative LLM)
 
-(SOURCE: Product Hunt launch, <https://happycapy.ai/pricing>, accessed 2026-02-11; Ben's Bites newsletter, <https://www.bensbites.com/p/something-big-is-happening>, published 2026-02-11)
+(SOURCE: HappyCapy Pricing Page, <https://happycapy.ai/pricing>, accessed 2026-02-11; Ben's Bites newsletter, <https://www.bensbites.com/p/something-big-is-happening>, published 2026-02-11)
 
 **Broader Model Ecosystem**: "Over 150 AI models via skills" with integration including Veo (video generation), image generators, and various LLMs accessible through unified skill-based interface. (SOURCE: HappyCapy pricing page, <https://happycapy.ai/pricing>, accessed 2026-02-11)
 
@@ -79,8 +79,6 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 - Task panels
 - Live rendering of agent actions and file modifications
 
-"Unlike the command-line interfaces of some other agent systems, Happycapy offers a graphical workstation. The agent's actions, its logs, and any file modifications are all visually presented." (SOURCE: Oreate AI Blog)
-
 **Design Philosophy**: "A GUI built for everyday user. Powerful agents, without the complexity." (SOURCE: HappyCapy official site, <https://happycapy.ai/>, accessed 2026-02-11)
 
 ### 3. Autonomous Task Execution
@@ -102,12 +100,9 @@ HappyCapy provides a graphical workstation interface with real-time visualizatio
 - Create custom skills by uploading a zip file or describing requirements in natural language
 - Stack multiple skills for complex workflows
 
-"The system can generate a new Skill for you. It's like having a vast library of ready-made [automation modules]." (SOURCE: Oreate AI Blog)
-
 **Skill Availability**:
-- Official repository: 54 stars, 7 forks on GitHub as of 2026-02-13 (SOURCE: <https://github.com/happycapy-ai/Happycapy-skills>)
-- Curated collection of "high-quality Claude Code skills to enhance your development workflow" in Python (53.4%), TeX (44.2%), JavaScript (2.0%), Shell (0.3%) (SOURCE: GitHub repository metadata, accessed 2026-02-13)
-- Over 170,000 pre-built skills from SkillsMP marketplace (SOURCE: Oreate AI Blog)
+- Official repository with curated collection of "high-quality Claude Code skills to enhance your development workflow" in Python (53.4%), TeX (44.2%), JavaScript (2.0%), Shell (0.3%) (SOURCE: GitHub repository metadata, accessed 2026-02-13)
+- Extensive integration with skills marketplace for pre-built automation components (SOURCE: HappyCapy official site)
 
 ### 5. Agent-to-Inbox Delivery
 
@@ -223,8 +218,6 @@ HappyCapy is accessed via web browser at https://happycapy.ai. No installation r
 - Indie developers
 - Content creators
 
-(SOURCE: Oreate AI Blog)
-
 ---
 
 ## Comparison to Alternatives
@@ -257,7 +250,7 @@ HappyCapy is accessed via web browser at https://happycapy.ai. No installation r
 ### Direct Integration Points
 
 1. **Claude Code Core** — HappyCapy is powered by Claude Code, providing browser-based access without local installation
-2. **Skills Ecosystem** — HappyCapy's Happycapy-skills repository (54 stars) is a curated collection of Claude Code skills demonstrating best practices
+2. **Skills Ecosystem** — HappyCapy's Happycapy-skills repository is a curated collection of Claude Code skills demonstrating best practices for skill development and composition
 3. **GUI Pattern** — Visual agent workflow representation offers insights into agent-friendly interface design, directly applicable to Claude Code's own UI development
 4. **Sandbox Architecture** — Cloud-based execution isolation model relevant to Claude Code's security and environment design
 5. **Multi-Agent Coordination** — Agent teams feature demonstrates multi-agent scaling patterns useful for Claude Code orchestration
@@ -282,13 +275,11 @@ HappyCapy is accessed via web browser at https://happycapy.ai. No installation r
 ### Repository Activity
 
 - **Happycapy-skills Repository**:
-  - 54 stars, 7 forks (as of 2026-02-13)
-  - 4 contributors (yayaxiyi, MinMinMinM, niveshdandyan, yifeiyang)
-  - Last push: 2026-02-13
   - MIT License
   - Primary language: Python
+  - Active development as of 2026-02-13
 
-(SOURCE: GitHub repository metadata, <https://github.com/happycapy-ai/Happycapy-skills>)
+(SOURCE: GitHub repository, <https://github.com/happycapy-ai/Happycapy-skills>)
 
 ### Related Ecosystem Projects
 
@@ -354,7 +345,6 @@ The primary sources do not document:
 - **Primary Skills Repository**: <https://github.com/happycapy-ai/Happycapy-skills> (accessed 2026-02-13)
 - **YouTube Review**: Conor Martin, "HappyCapy Review - Run your AI Agents Online," <https://www.youtube.com/watch?v=bYtLWExO5qk> (published 2026-02-11, accessed via search)
 - **SuperGok Article**: Mrsinghh, "Happycapy Agent-Native Computer in the Browser," <https://supergok.com/happycapy-agent-native-computer/> (published 2026-01-28, accessed 2026-03-13)
-- **Oreate AI Blog**: "Happycapy: Your Browser Becomes a Zero-Friction AI Workstation," <http://oreateai.com/blog/happycapy-your-browser-becomes-a-zerofriction-ai-workstation/> (published 2026-02-25, accessed 2026-03-13)
 - **ProductCool Review**: "happycapy — The agent-native computer, for the rest of us," <https://www.productcool.com/product/happycapy> (published 2026-02-11, accessed 2026-03-13)
 - **FunBlocks AI Review**: "happycapy Review: The Agent-Native Computer Redefining Browser Productivity," <https://funblocks.net/aitools/reviews/happycapy> (published 2026-02-11, accessed 2026-03-13)
 - **Ben's Bites Newsletter**: "Something big is happening," <https://www.bensbites.com/p/something-big-is-happening> (published 2026-02-11, accessed 2026-03-13)
