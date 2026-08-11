@@ -101,7 +101,7 @@ Claude Code, Codex, Gemini CLI, Hermes Agent, and Mistral Vibe consume the `SKIL
 
 - **Skill Security Auditor** — Scan any skill for vulnerabilities: command injection, code execution, data exfiltration, prompt injection, supply chain risks, privilege escalation
 - **Production Quality Pipeline** — Linting, security review, and Tessl quality optimization (skills scored 0-100%)
-- **No build/test framework** — Intentional design for portability across platforms
+- **No CI test gate** — The repository includes a local pytest suite, but it is not run in CI
 
 **Source**: README.md Security section and SKILL-AUTHORING-STANDARD.md (accessed 2026-08-11)
 
