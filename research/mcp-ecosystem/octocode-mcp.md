@@ -169,9 +169,11 @@ $$Quality = \frac{Relevant\ Context}{Context\ Noise} \times Validation \times \e
 
 ---
 
-## Installation
+## Installation & Usage
 
-### Quick Start (Recommended)
+### Installation
+
+#### Quick Start (Recommended)
 
 ```bash
 npx octocode-cli
@@ -179,7 +181,7 @@ npx octocode-cli
 
 Interactive wizard handles IDE detection, environment verification, and MCP configuration.
 
-### Manual Configuration
+#### Manual Configuration
 
 ```json
 {
@@ -192,7 +194,7 @@ Interactive wizard handles IDE detection, environment verification, and MCP conf
 }
 ```
 
-### Authentication
+#### Authentication
 
 **Option 1: GitHub CLI (Recommended)**
 
@@ -216,7 +218,7 @@ gh auth login
 }
 ```
 
-### Research Skill Installation
+#### Research Skill Installation
 
 ```bash
 npx add-skill octocode-research
@@ -228,9 +230,81 @@ Or direct:
 npx add-skill https://github.com/bgauryy/octocode-mcp/tree/main/skills/octocode-research
 ```
 
-### Supported Clients
+#### Supported Clients
 
 Cursor, VS Code, Claude Desktop, Claude Code, Codex, Cline, Windsurf, Warp, Goose, LM Studio, Amp, Qodo Gen, Kiro, Gemini CLI, Zed, opencode
+
+### Usage
+
+#### Prompt Commands
+
+The MCP server itself ships four prompt commands (README "Commands" section). Two take a required
+argument; two take free-form text.
+
+```text
+/research <question>
+# Deep code discovery, documentation analysis, pattern identification, bug investigation.
+# Orchestrates parallel bulk queries with staged analysis.
+
+/plan <task>
+# Breaks an ambitious task into steps, researches existing patterns, then guides execution.
+
+/review_pull_request prUrl: <github pull request url>
+# Defects-first PR review: bugs, security issues, performance, code quality, best practices.
+
+/review_security repoUrl: <github repository url>
+# Repository security audit: vulnerabilities, auth patterns, secrets exposure, remediation.
+```
+
+#### Tool Names and Argument Schemas
+
+Names and parameters below are read from the published `octocode-mcp@12.0.0` package —
+`dist/tools/toolNames.d.ts` (`STATIC_TOOL_NAMES`) for the registered names, and each tool's
+`dist/tools/*/scheme.d.ts` for its Zod query schema. Every tool takes a `queries` array of these
+objects, plus optional `researchGoal` / `reasoning` annotation fields.
+
+**Search GitHub repositories** — `githubSearchRepositories`
+Query fields: `keywordsToSearch`, `topicsToSearch`, `owner`, `stars`, `size`, `created`,
+`updated`, `match`, `sort`, `limit`, `page`. There is no `query` or `language` field.
+
+**Search code across GitHub** — `githubSearchCode`
+Query fields: `keywordsToSearch`, `owner`, `repo`, `extension`, `filename`, `path`, `match`,
+`limit`, `page`. Language is narrowed via `extension`, not a `language` field.
+
+**Explore repository structure** — `githubViewRepoStructure`
+Query fields: `owner`, `repo`, `branch`, `path`, `depth`, `entriesPerPage`, `entryPageNumber`.
+
+**LSP-powered navigation** — `lspGotoDefinition`, `lspFindReferences`, `lspCallHierarchy`
+Both navigation tools are anchored by symbol *and* location, not by symbol alone:
+`lspGotoDefinition` takes `{uri, symbolName, lineHint, orderHint, contextLines}`;
+`lspFindReferences` takes the same plus `includeDeclaration`, `referencesPerPage`, `page`.
+
+**Local filesystem research:**
+
+```bash
+# Tool: localSearchCode — local code/text search returning file and line anchors
+# Tool: localGetFileContent — read a local file or region
+# Tool: localViewStructure — browse a local directory tree
+# Tool: localFindFiles — find local files and directories by name, path, regex, extension
+```
+
+> The registered tool names are the camelCase `local*` identifiers above. `local_ripgrep` and
+> `local_fetch_content` appear in the package only as internal source-module directory names
+> (`dist/tools/local_ripgrep/`, whose own header comment reads "Types for local_ripgrep tool
+> (localSearchCode)") — they are not callable tool names.
+
+#### Research Workflow Example
+
+1. **Initialize research** via `/research` command
+   - Researcher agent gathers context from GitHub and local filesystem
+2. **Planner phase** (`/plan` command)
+   - Generates implementation plan based on research
+3. **Verifier phase**
+   - Discriminator validates plan against actual code patterns
+4. **Implementation**
+   - Coder implements based on validated plan
+5. **Validation**
+   - Verifier checks implementation against requirements
 
 ---
 
