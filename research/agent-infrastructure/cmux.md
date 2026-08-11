@@ -77,6 +77,7 @@ The architecture prioritizes performance (GPU rendering, native UI) and simplici
 ### Installation
 
 **Homebrew (recommended)**:
+
 ```bash
 brew tap manaflow-ai/cmux
 brew install --cask cmux

@@ -149,7 +149,7 @@ HappyCapy is cloud-native and requires no installation:
 
 ### Basic Usage
 
-HappyCapy is accessed via web browser at https://happycapy.ai. No installation required. Users describe desired projects in natural language; the platform runs Claude Code agents within a private sandbox to execute tasks.
+HappyCapy is accessed via web browser at <https://happycapy.ai>. No installation required. Users describe desired projects in natural language; the platform runs Claude Code agents within a private sandbox to execute tasks.
 
 ---
 
