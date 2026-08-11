@@ -1,11 +1,141 @@
 ---
 title: "msgspec — Fast Serialization and Validation Library"
-documentation_url: "https://jcristharif.com/msgspec/"
+documentation_url: "https://msgspec.dev"
 license: "BSD-3-Clause (New or Revised)"
-next_review: "2026-06-13 (3 months)"
+version_at_research: "0.21.1"
+last_verified: "2026-08-11"
+next_review: "2026-11-11"
 ---
 
-## Statistics and Community
+## Overview
+
+`msgspec` is a high-performance serialization and validation library for Python that combines fast JSON, MessagePack, YAML, and TOML encoding/decoding with zero-cost schema validation using standard Python type annotations. The README states Structs are "5-60x faster" than dataclasses/attrs for common operations, and that encoding/decoding a supported message with `msgspec` can be "~10-80x faster than alternative libraries."
+
+**Source**: GitHub repository README.md lines 41–45 and 95–99, and official documentation at <https://msgspec.dev> (accessed 2026-08-11)
+
+**Current Status**: Stable production library. Latest release is **0.21.1** (2026-04-12), a bugfix release. Python 3.14 support (including freethreaded mode), Windows `arm64` builds, and the `msgspec.inspect.is_struct` / `is_struct_type` helpers all landed in **0.20.0** (2025-11-24).
+
+**Source**: GitHub `/releases` API and the 0.20.0 / 0.21.1 release notes (accessed 2026-08-11)
+
+---
+
+## Problem Addressed
+
+| Problem | Solution |
+|---------|----------|
+| Serialization performance overhead in Python applications | Benchmark-optimized JSON/MessagePack implementations with significant performance gains over alternatives |
+| Schema validation requires separate post-processing after deserialization | Single-pass validation during decoding eliminates secondary traversal and object conversion |
+| Serialization libraries have large dependency footprints | Zero required dependencies; optional deps (pyyaml, tomli) for format support only |
+| Struct/dataclass patterns don't provide efficient garbage collection options | `msgspec.Struct` with `gc=False` provides optimized garbage collection behavior |
+| Type annotation schemas require learning domain-specific languages | Define schemas using familiar Python type annotations—no external schema language needed |
+
+**Source**: README.md and benchmarks documentation (accessed 2026-03-13)
+
+---
+
+## Technical Architecture
+
+### Core Design Patterns
+
+**Single-pass validation during decoding**: Unlike Pydantic and cattrs which validate after deserializing, msgspec validates types while decoding the wire format. This eliminates secondary object traversal and conversion overhead.
+
+**Zero-copy optimizations**: For large messages, msgspec reuses short dictionary keys (caching mechanism) to reduce memory allocations—more effective than similar optimizations in competitors.
+
+**Native C implementation**: Performance-critical paths are implemented as a C extension; the repository is a mix of Python and C by GitHub's language breakdown.
+
+**Source**: Benchmarks documentation — JSON Serialization & Validation section, Large JSON data section; GitHub `/languages` API (accessed 2026-08-11)
+
+### Key Components
+
+1. **`msgspec.Struct`** — Optimized base class for structured data with automatic `__init__`, `__eq__`, `__repr__`, `__copy__` generation; configuration options for `frozen`, `order`, `gc`, `forbid_unknown_fields`
+2. **`msgspec.json`** — High-performance JSON encoder/decoder
+3. **`msgspec.msgpack`** — MessagePack protocol support
+4. **`msgspec.yaml`** — YAML support (pyyaml backend)
+5. **`msgspec.toml`** — TOML support (tomli/tomli_w)
+6. **`msgspec.inspect`** — Introspection utilities; `is_struct` and `is_struct_type` were added in 0.20.0 (release notes, PR #950)
+7. **Validation layer** — Type checking during decoding with precise JSONPath-style error paths (e.g., `$.groups[0]`)
+
+**Source**: API documentation and module listing (accessed 2026-03-13)
+
+---
+
+## Installation & Usage
+
+### Installation
+
+**Via pip**:
+
+```bash
+pip install msgspec
+```
+
+**Via conda**:
+
+```bash
+conda install -c conda-forge msgspec
+```
+
+**Requires Python 3.10+**
+
+**Source**: PyPI and official documentation (accessed 2026-03-13)
+
+### Basic Usage — Define, Encode, Decode
+
+```python
+import msgspec
+
+# Define schema using type annotations
+class User(msgspec.Struct):
+    """A user account"""
+    name: str
+    groups: set[str] = set()
+    email: str | None = None
+
+# Encode
+alice = User("alice", groups={"admin", "engineering"})
+msg = msgspec.json.encode(alice)
+# Result: b'{"name":"alice","groups":["admin","engineering"],"email":null}'
+
+# Decode with validation
+decoded = msgspec.json.decode(msg, type=User)
+# Returns: User(name='alice', groups={"admin", "engineering"}, email=None)
+
+# Invalid data raises ValidationError with precise path
+msgspec.json.decode(b'{"name":"bob","groups":[123]}', type=User)
+# Raises: msgspec.ValidationError: Expected `str`, got `int` - at `$.groups[0]`
+```
+
+**Source**: README.md examples (accessed 2026-03-13)
+
+### Alternative Formats
+
+```python
+# MessagePack
+msgspec.msgpack.encode(alice)
+
+# YAML (requires pyyaml)
+msgspec.yaml.encode(alice)
+
+# TOML (requires tomli_w)
+msgspec.toml.encode(alice)
+```
+
+**Source**: API documentation and format module listing (accessed 2026-03-13)
+
+### Struct Configuration
+
+```python
+class Config(msgspec.Struct, frozen=True, order=True, kw_only=True):
+    """An immutable, orderable configuration"""
+    timeout: int
+    retries: int = 3
+```
+
+**Options**: `frozen` (pseudo-immutability), `order` (comparison methods), `kw_only` (keyword-only fields), `omit_defaults` (skip defaults in output), `forbid_unknown_fields`, `gc` (garbage collection tracking)
+
+**Source**: API documentation — Struct configuration (accessed 2026-03-13)
+
+---
 
 **GitHub Stars**: 3,632 (as of 2026-03-13)
 SOURCE: GitHub repository page (<https://github.com/jcrist/msgspec>) accessed 2026-03-13
@@ -35,7 +165,7 @@ SOURCE: README.md (GitHub repository)
 
 The library is designed for handling both serialization alone (faster JSON/MessagePack replacement) and the complete serialization & validation workflow. It enables defining message schemas using standard Python type annotations without requiring external schema languages.
 
-SOURCE: Official documentation (<https://jcristharif.com/msgspec/>)
+SOURCE: Official documentation (<https://msgspec.dev>)
 
 ---
 
@@ -45,7 +175,7 @@ SOURCE: Official documentation (<https://jcristharif.com/msgspec/>)
 
 `msgspec` JSON and MessagePack implementations benchmark as the fastest serialization options for Python. The library emphasizes performance optimization across all supported formats.
 
-SOURCE: README.md feature list and benchmarks documentation (<https://jcristharif.com/msgspec/benchmarks.html>)
+SOURCE: README.md feature list and benchmarks documentation (<https://msgspec.dev/benchmarks>)
 
 **Performance metrics** (from benchmarks page):
 - JSON validation/decoding is ~6x faster than mashumaro, ~10x faster than cattrs, ~12x faster than Pydantic V2, ~85x faster than Pydantic V1
@@ -397,13 +527,13 @@ These improvements directly translate to reduced latency and resource usage in a
 
 ## References
 
-1. **Official Documentation**: <https://jcristharif.com/msgspec/> (accessed 2026-03-13)
-2. **GitHub Repository**: <https://github.com/jcrist/msgspec> (accessed 2026-03-13)
+1. **Official Documentation**: <https://msgspec.dev> (accessed 2026-08-11)
+2. **GitHub Repository**: <https://github.com/jcrist/msgspec> (accessed 2026-08-11)
 3. **PyPI Package Page**: <https://pypi.org/project/msgspec/>
-4. **Official Benchmarks**: <https://jcristharif.com/msgspec/benchmarks.html> (accessed 2026-03-13)
-5. **API Documentation**: <https://jcristharif.com/msgspec/api.html> (accessed 2026-03-13)
-6. **GitHub Releases**: <https://github.com/jcrist/msgspec/releases> (v0.20.0, released 2025-11-23)
+4. **Official Benchmarks**: <https://msgspec.dev/benchmarks> (accessed 2026-08-11)
+5. **API Documentation**: <https://msgspec.dev/api> (accessed 2026-08-11)
+6. **GitHub Releases**: <https://github.com/jcrist/msgspec/releases> (latest 0.21.1 published 2026-04-12; 0.20.0 published 2025-11-24, accessed 2026-08-11)
 7. **Repository pyproject.toml**: Configuration and dependency metadata
 8. **Repository LICENSE**: BSD-3-Clause license text
-9. **GitHub Changelog**: <https://github.com/jcrist/msgspec/blob/main/docs/changelog.md> (accessed 2026-03-13)
-10. **Libraries.io**: msgspec 0.20.0 metadata (<https://libraries.io/pypi/msgspec>, accessed 2026-03-13)
+9. **GitHub Changelog**: <https://github.com/jcrist/msgspec/blob/main/docs/changelog.md> (accessed 2026-08-11)
+10. **PyPI JSON API**: <https://pypi.org/pypi/msgspec/json> (version 0.21.1, `requires_python: >=3.10`, accessed 2026-08-11)
