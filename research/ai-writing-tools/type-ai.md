@@ -35,9 +35,9 @@ Type.ai is an AI-first document editor designed for long-form professional writi
 | ----------------- | ----------------------------- | ------------- |
 | Active Writers    | 300k+ ("Trusted by 300k+ writers") | 2026-08-11 |
 | Max Document Size | 150,000 words                 | 2026-08-11    |
-| Pricing (Basic)   | $8/month, $96/year            | 2026-08-11    |
-| Pricing (Pro)     | $16/month, $192/year          | 2026-08-11    |
-| Pricing (Max)     | $64/month, $768/year          | 2026-08-11    |
+| Pricing (Basic)   | $12/month, or $8/month billed annually ($96/year) | 2026-08-11 |
+| Pricing (Pro)     | $24/month, or $16/month billed annually ($192/year) | 2026-08-11 |
+| Pricing (Max)     | $96/month, or $64/month billed annually ($768/year) | 2026-08-11 |
 | Annual Discount   | 33% off vs. monthly billing   | 2026-08-11    |
 | YC Batch          | Y Combinator company          | 2026-01-31    |
 
@@ -273,9 +273,9 @@ Source: [type.ai](https://type.ai/) homepage (accessed 2026-08-11).
 | Plan | Monthly | Annual | Positioning |
 |------|---------|--------|-------------|
 | Free | $0/mo | — | "Try Type for free and start your story today" |
-| Basic | $8/mo | $96/year | "Perfect for shorter form content or stories" |
-| Pro (Most Popular) | $16/mo | $192/year | "Great for longer works like a novel or screenplay"; "3x the AI usage of Basic" |
-| Max | $64/mo | $768/year | "Ideal for writing multiple books a year"; "12x the AI usage of Basic" |
+| Basic | $12/mo, or $8/mo billed annually | $96/year | "Perfect for shorter form content or stories" |
+| Pro (Most Popular) | $24/mo, or $16/mo billed annually | $192/year | "Great for longer works like a novel or screenplay"; "3x the AI usage of Basic" |
+| Max | $96/mo, or $64/mo billed annually | $768/year | "Ideal for writing multiple books a year"; "12x the AI usage of Basic" |
 
 Annual billing carries "33% savings" on every paid tier. All paid plans include "Latest from
 Anthropic, OpenAI, and Google" models and "Hands on, priority email support".
