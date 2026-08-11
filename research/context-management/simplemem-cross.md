@@ -14,7 +14,7 @@ SimpleMem-Cross is a Python library that extends SimpleMem with cross-conversati
 
 **Composition-based architecture**: SimpleMem-Cross wraps the original SimpleMem library without modification, enabling independent versioning and research artifact preservation while adding cross-session functionality via a new session lifecycle management layer.
 
-**Source**: <https://github.com/aiming-lab/SimpleMem> (accessed 2026-03-19)
+**Sources**: <https://github.com/aiming-lab/SimpleMem/blob/main/cross/README.md> — LoCoMo comparison table (SimpleMem 48, Claude-Mem 29.3, +64%), SQLite/LanceDB split, heuristic observation extraction, token-budgeted injection, composition-over-modification design. Root README announcement dated 02/09/2026: <https://github.com/aiming-lab/SimpleMem> (accessed 2026-03-19; re-verified 2026-08-11)
 
 ---
 
