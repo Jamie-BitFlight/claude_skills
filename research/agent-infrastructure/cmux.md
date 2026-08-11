@@ -100,18 +100,18 @@ brew install --cask cmux --no-quarantine
 
 ```bash
 # Create a new workspace
-cmux new -s workspace-name
+cmux new-workspace
 
 # SSH into a remote machine and create a workspace
-cmux ssh user@remote
+cmux ssh user@remote --command "claude code project/"
 
-# Split panes horizontally
-cmux split -h
+# Create a browser pane
+cmux new-pane --browser
 
-# Split panes vertically
-cmux split -v
+# Send text to a terminal surface
+cmux send --text "command to run"
 
-# Send a notification to the current pane
+# Send a notification to a workspace
 cmux notify "Agent completed task"
 ```
 
