@@ -99,7 +99,7 @@ Pipes are scheduled AI agents defined as markdown files (`pipe.md`). Each pipe i
 Screenpipe runs as an MCP server, allowing AI assistants to query screen history:
 
 - **Works with**: Claude Desktop, Cursor, VS Code (Cline, Continue), any MCP-compatible client
-- **Installation**: `claude mcp add screenpipe -- npx -y screenpipe-mcp`
+- **Claude Code installation**: `claude mcp add screenpipe -- npx -y screenpipe-mcp`; configure Claude Desktop in its own MCP settings JSON instead
 - **Transport**: stdio (default) or HTTP with bearer auth (for remote clients)
 - **Tools exposed**: `search_content` (standard), full toolset in stdio mode (export-video, list-meetings, activity-summary, search-elements, frame-context)
 

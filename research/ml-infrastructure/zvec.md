@@ -156,7 +156,7 @@ collection.insert([
 
 # Query the collection
 results = collection.query(
-    zvec.Query(field_name="embedding", vector=[0.4, 0.3, 0.3, 0.1]),
+    zvec.VectorQuery(field_name="embedding", vector=[0.4, 0.3, 0.3, 0.1]),
     topk=10
 )
 ```
