@@ -222,7 +222,7 @@ NotebookLM responses are grounded in user-uploaded content, reducing hallucinati
 
 **1. Access NotebookLM**
 
-Visit https://notebooklm.google and sign in with any Google account. No installation is required beyond a standard browser.
+Visit <https://notebooklm.google> and sign in with any Google account. No installation is required beyond a standard browser.
 
 **2. Create a Notebook**
 
@@ -232,7 +232,7 @@ Click "New notebook" to create a workspace. Each notebook is an isolated workspa
 
 Click "Add" in the Sources panel to upload your first document. Supported formats include:
 - PDFs
-- Google Docs  
+- Google Docs
 - Google Slides
 - YouTube videos and links
 - Website URLs

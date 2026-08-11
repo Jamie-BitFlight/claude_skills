@@ -90,7 +90,7 @@ Awesome AI Apps is not installed as a single package; instead, it's a reference 
 
 **1. Browse the Repository**
 
-Visit the GitHub repository at https://github.com/Arindam200/awesome-ai-apps to view the full project list organized by category.
+Visit the GitHub repository at <https://github.com/Arindam200/awesome-ai-apps> to view the full project list organized by category.
 
 **2. Clone the Entire Repository**
 

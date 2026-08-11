@@ -214,7 +214,7 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 
 **1. Access Type.ai**
 
-Visit https://type.ai in your web browser. No installation is required — Type.ai is a web-based SaaS application accessible from any modern browser (Chrome, Firefox, Safari, Edge).
+Visit <https://type.ai> in your web browser. No installation is required — Type.ai is a web-based SaaS application accessible from any modern browser (Chrome, Firefox, Safari, Edge).
 
 **2. Sign Up or Log In**
 
