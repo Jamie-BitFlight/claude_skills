@@ -25,21 +25,116 @@ Tessera is a minimal, single-purpose terminal access broker for time-limited, ju
 
 ---
 
-## Problem Domain
+## Problem Addressed
 
-Tessera addresses the access control pattern known as "zero standing privilege": grant temporary, scoped access on-demand rather than maintaining persistent credentials or roles.
+| Problem | Solution |
+|---------|----------|
+| Standing privilege and persistent access roles in production systems | Grant temporary, scoped access on demand that expires when the session ends; long-lived TLS credentials still require secure storage and rotation |
+| No approval gate for remote access requests | Require explicit human approval at the terminal in real-time before establishing any tunnel |
+| Lack of audit trails for who accessed what | Append-only JSON log records every request, approval, denial, session open/close, and parties involved |
+| SSH key management and compliance overhead | Zero standing keys; ephemeral mTLS certificates per session eliminate key rotation burden |
+| Coordinator single point of failure | Transparent by design; agent initiates outbound connection, never accepts inbound; coordinator failure orphans sessions but doesn't lock out host |
 
-**Use cases** ([README: When you might use it](https://github.com/emmayusufu/tessera#when-you-might-use-it)):
-- On-call engineers requiring emergency access to production systems
-- Contractors needing temporary SSH to a customer's machines
-- Privileged operations that require human oversight (e.g., database migrations)
-- Incident response with approval trails
-
-**Key constraint**: "Tessera only makes sense as a consent-based tool: the host always approves, access is scoped to a session, and everything is audited. It is not a backdoor." ([README: Security note](https://github.com/emmayusufu/tessera#security-note))
+**Source**: README.md "When you might use it" section and "Security note" — accessed 2026-06-18
 
 ---
 
-## Architecture Overview
+## Key Features
+
+### Access Control & Approval
+
+- **Consent-gated workflow**: Host approves each request at terminal in real-time; no token or magic link — decision happens where the admin sits
+- **Binary approval model**: Host types 'y' or 'n'; no timeout — request waits indefinitely until explicitly answered
+- **Session isolation**: Each session bound to single guest, single target, single time window; 30-minute idle timeout automatically closes orphaned sessions
+- **Audit logging**: Append-only JSON log records timestamps, all parties, reason, approval outcome, and hashed bootstrap codes (never raw plaintext)
+
+**Source**: README.md line 116 (30-minute idle stream timeout), cmd/tessera/share.go line 105 (`-idle-timeout` default `30*time.Minute`, clamped to [1m, 24h]), internal/audit/audit.go — accessed 2026-08-11
+
+### Architecture & Protocol
+
+- **Three-party design**: Coordinator (broker), Agent (target-side), Client (guest-side) with clear responsibility boundaries
+- **Length-prefixed JSON framing**: All control messages use 4-byte big-endian length prefix + JSON payload (max 64 KB); human-debuggable over mTLS
+- **Two-layer encryption**: Outer TLS (agent ↔ coordinator via mTLS), Inner TLS (guest ↔ target endpoint for end-to-end encryption); coordinator relays ciphertext opaque
+
+**Source**: internal/proto/proto.go — `maxFrame = 1 << 16` (64 KB) at line 11, `binary.BigEndian.PutUint32` 4-byte header at lines 57 and 70 — accessed 2026-08-11
+
+### Deployment Options
+
+- **Docker**: "a single 18 MB static binary on distroless. One image holds all" three binaries; `docker compose up -d` runs the coordinator (mTLS on 8443, HTTP on 8080)
+- **systemd**: Native binary + service unit for production Linux deployments
+- **Interactive mode**: running `tessera` with no arguments enters the interactive flow; subcommands are `ca`, `quickstart`, `connect`, `join`, `share`, `token`, `link`, `version`, `help`
+
+**Source**: README.md line 156, docker-compose.yml, cmd/tessera/main.go subcommand switch — accessed 2026-08-11
+
+---
+
+## Installation & Usage
+
+### Coordinator Setup
+
+**Quick start (Docker)**:
+
+```bash
+git clone https://github.com/emmayusufu/tessera.git
+cd tessera
+docker build -t tessera .
+docker compose up -d
+curl http://localhost:8080/healthz  # expect: "ok {version}"
+```
+
+**Verify health**:
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+**Source**: docker-compose.yml (ports 8443/8080), internal/coordinator/http.go `handleHealthz` (responds `ok {version}`), deploy/DEPLOYING.md — accessed 2026-08-11
+
+### Agent Deployment
+
+**Install and run agent on target host**:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/emmayusufu/tessera/main/install.sh | bash
+
+# Run agent (example: allow SSH and PostgreSQL)
+agent -coordinator coordinator.example.org:8443 \
+  -share-id production-db-host \
+  -allow localhost:22,localhost:5432
+```
+
+The `agent` binary's full flag set is `-coordinator`, `-server-name`, `-share-id`, `-allow`, `-ca`, `-cert`, `-key`, `-version`. Shell mode and session recording are **not** agent flags — they are `agent.Config` fields (`ShellMode`, `RecordPath`) set by the host-side `tessera share` command, which creates the recording directory itself via `os.MkdirAll(recordPath, 0o700)`:
+
+```bash
+tessera share -port 5432 -ttl 120s -idle-timeout 15m
+```
+
+**Source**: cmd/agent/main.go lines 37–44, cmd/tessera/share.go lines 105–243, internal/agent/agent.go lines 33–39 — accessed 2026-08-11
+
+### Guest Workflow
+
+**Option A — redeem a one-time code** (`tessera join CODE`). The guest passes the invite code as a positional argument; `-coord-base-url` names the coordinator's HTTP base URL, `-local` sets the local forward address (default `127.0.0.1:13000`), and `-service` picks a service when the share offers more than one. The CA, guest certificate, and guest key are written as `ca.crt` / `guest.crt` / `guest.key`.
+
+**Option B — connect to a known share-id** (no code redemption):
+
+```bash
+tessera connect -coordinator coordinator.example.org:8443 \
+  -share-id demo \
+  -target 127.0.0.1:5432 \
+  -reason "schema migration" \
+  -local 127.0.0.1:15432
+
+# [At host terminal: approve with 'y']
+# Guest can now: psql -h 127.0.0.1 -p 15432
+```
+
+`-coordinator`, `-share-id`, and `-target` are required; the local forward address flag is `-local` (default `127.0.0.1:15432`), not `-local-listen`. If `-coordinator` is omitted the CLI falls back to the coordinator recorded in the local config directory.
+
+**Source**: cmd/tessera/main.go `cmdConnect` lines 83–112, cmd/tessera/join.go lines 63–69 and 151–153, README.md "Try it locally" lines 120–142 — accessed 2026-08-11
+
+---
+
+## Technical Architecture
 
 ### Three-Component System
 
@@ -573,7 +668,30 @@ tessera -coordinator coordinator.example.org:8443 \
 
 ---
 
-## Integration Opportunities
+## Relevance to Claude Code Development
+
+### Applications
+
+1. **Secure Access for Agent Deployment**: Claude agents deployed in production can use Tessera to request terminal access with audit trails, ensuring no standing credentials in the environment.
+
+2. **Just-In-Time Access in CI/CD**: Build pipelines requiring production access can integrate Tessera approval gates before granting temporary database or SSH access.
+
+3. **Approval Workflow Patterns**: Tessera's consent-based architecture — a blocking prompt with no timeout, answered where the approver already sits — is a reusable pattern for the human-in-the-loop gates this repository defines in `.claude/rules/proactive-fix-gate.md` and the Autonomous Action Boundary in `.claude/CLAUDE.md`.
+
+### Patterns Worth Adopting
+
+- **Consent Gates Over Token Gatekeeping**: Explicit human approval at decision points (like Tessera's terminal prompt) is more transparent than token-based checks that agents can't see.
+- **Append-Only Audit Trails**: The pattern of synchronous fsync + mutex-protected JSON logging is applicable to session tracking in multi-agent workflows.
+- **Minimal Credential Footprint**: Ephemeral certificates per session eliminate the credential rotation burden that besets traditional systems.
+
+### Integration Opportunities
+
+- Integrate Tessera client as an MCP server within Claude Code to enable secure remote access workflows directly from agents.
+- Use Tessera's approval model in orchestration patterns for high-stakes deployments (e.g., production migrations).
+
+---
+
+## Integration Opportunities (Extended)
 
 1. **Centralized audit aggregation**: Extend audit.Log to ship events to CloudWatch, Datadog, or Splunk
 2. **Policy engine**: Replace binary approval with policy check (e.g., "grant if time < 17:00 and reason contains 'incident'")
@@ -598,14 +716,15 @@ tessera -coordinator coordinator.example.org:8443 \
 
 ---
 
-## Source Materials
+## References
 
-- **Repository**: <https://github.com/emmayusufu/tessera>
-  - README.md (all sections cited)
-  - Source: internal/coordinator/, internal/agent/, internal/client/, internal/proto/, internal/audit/, internal/certs/
-  - Build: Makefile, go.mod, .github/workflows/release.yml
-  - Deployment: deploy/DEPLOYING.md, deploy/tessera-coordinator.service
+- [Tessera GitHub Repository](https://github.com/emmayusufu/tessera) (accessed 2026-06-18)
+- [README.md — How it compares](https://github.com/emmayusufu/tessera/blob/main/README.md#how-it-compares) (accessed 2026-06-18)
+- [README.md — Security note](https://github.com/emmayusufu/tessera/blob/main/README.md#security-note) (accessed 2026-06-18)
+- [DEPLOYING.md — Deployment Guide](https://github.com/emmayusufu/tessera/blob/main/deploy/DEPLOYING.md) (accessed 2026-06-18)
+- [install.sh — Installation Script](https://github.com/emmayusufu/tessera/blob/main/install.sh) (accessed 2026-06-18)
+- [cmd/agent/main.go — Agent Entrypoint](https://github.com/emmayusufu/tessera/blob/main/cmd/agent/main.go) (accessed 2026-06-18)
+- [cmd/tessera/main.go — Client Entrypoint](https://github.com/emmayusufu/tessera/blob/main/cmd/tessera/main.go) (accessed 2026-06-18)
 
 **Verification date**: 2026-06-18
 **Access method**: Git shallow clone (`--depth 1`, commit 36678fda4a537ee101dedbb5a8a023b27b31069d)
-
