@@ -6,13 +6,13 @@ metadata:
   topic: type-ai
   category: ai-writing-tools
   source_url: https://type.ai
-  verified: "2026-01-31"
-  next_review: "2026-05-01"
+  verified: "2026-08-11"
+  next_review: "2026-11-11"
 ---
 
 ## Overview
 
-Type.ai is an AI-first document editor designed for long-form professional writing. Unlike chat-based AI tools (ChatGPT, Claude), Type.ai embeds AI capabilities directly into a feature-rich document editor, making it an alternative for writing tasks that require an involved editing process. Trusted by 200k+ writers, it supports documents up to 130,000 words and provides deeply integrated AI features for generating, revising, and reviewing books, essays, novels, screenplays, and other long-form documents.
+Type.ai is an AI-first document editor designed for long-form professional writing. Unlike chat-based AI tools (ChatGPT, Claude), Type.ai embeds AI capabilities directly into a feature-rich document editor, making it an alternative for writing tasks that require an involved editing process. Trusted by 300k+ writers, it supports documents as long as 150,000 words and provides deeply integrated AI features for generating, revising, and reviewing books, essays, novels, screenplays, and other long-form documents.
 
 ---
 
@@ -20,10 +20,10 @@ Type.ai is an AI-first document editor designed for long-form professional writi
 
 | Problem                                              | Solution                                                          |
 | ---------------------------------------------------- | ----------------------------------------------------------------- |
-| Chat-based AI tools lack integrated editing workflow | Document editor with embedded AI commands via Cmd+K               |
+| Chat-based AI tools lack integrated editing workflow | Document editor with keyboard-invoked inline AI commands           |
 | Prompt engineering required to use LLMs effectively  | Context-aware AI that understands document intent as you write    |
 | Template-based AI writing tools constrain creativity | Flexible commands that adapt to any writing task                  |
-| Difficult to edit long documents in AI chat tools    | Purpose-built editor supporting documents up to 130,000 words     |
+| Difficult to edit long documents in AI chat tools    | Purpose-built editor supporting documents up to 150,000 words     |
 | Multiple tools needed for writing workflow           | Unified platform: generate, rewrite, review, and organize         |
 | AI tools don't maintain document context             | AI improves suggestions based on document context over time       |
 
@@ -33,12 +33,15 @@ Type.ai is an AI-first document editor designed for long-form professional writi
 
 | Metric            | Value                         | Date Gathered |
 | ----------------- | ----------------------------- | ------------- |
-| Active Writers    | 200,000+                      | 2026-01-31    |
-| Max Document Size | 130,000 words                 | 2026-01-31    |
-| Pricing (Annual)  | $12/month ($144/year)         | 2026-01-31    |
-| Pricing (Monthly) | $29/month                     | 2026-01-31    |
-| First Year Disc.  | 48% off                       | 2026-01-31    |
+| Active Writers    | 300k+ ("Trusted by 300k+ writers") | 2026-08-11 |
+| Max Document Size | 150,000 words                 | 2026-08-11    |
+| Pricing (Basic)   | $12/month, or $8/month billed annually ($96/year) | 2026-08-11 |
+| Pricing (Pro)     | $24/month, or $16/month billed annually ($192/year) | 2026-08-11 |
+| Pricing (Max)     | $96/month, or $64/month billed annually ($768/year) | 2026-08-11 |
+| Annual Discount   | 33% off vs. monthly billing   | 2026-08-11    |
 | YC Batch          | Y Combinator company          | 2026-01-31    |
+
+Source: [type.ai](https://type.ai/) homepage and [type.ai/pricing](https://type.ai/pricing) (accessed 2026-08-11).
 
 ---
 
@@ -46,7 +49,7 @@ Type.ai is an AI-first document editor designed for long-form professional writi
 
 ### AI Writing Capabilities
 
-- **Cmd+K Commands**: Instant AI access while writing to generate or transform text
+- **Inline AI Commands**: Keyboard-invoked commands generate or transform text in place (see Installation & Usage for the exact shortcuts)
 - **Context Awareness**: AI understands document context and improves with usage
 - **Draft Generation**: Generate complete drafts from prompts or outlines
 - **Rewriting**: Sentence and paragraph rewriting with multiple style options
@@ -54,31 +57,35 @@ Type.ai is an AI-first document editor designed for long-form professional writi
 
 ### Document Editor
 
-- **Long-Form Support**: Documents up to 130,000 words (full novels/books)
-- **Dark Mode**: Full dark mode interface for extended writing sessions
-- **Word/PDF Import**: Import existing Word documents and PDFs
-- **Export Options**: Export to Word, PDF, and other formats
-- **Document Organization**: Tools for organizing multiple documents
+- **Long-Form Support**: "documents as long as 150,000 words"; longer manuscripts are split across multiple documents
+- **Offline Capability**: "Full offline capability" for writing without an internet connection
+- **Version History**: Built-in document version history
+- **Word/PDF Import**: "import and edit Word documents and PDFs"
+- **Export Options**: "export them as Word docs, PDFs, and AI narrated audio files"; drafts can also be shared as a view-only URL
 
 ### AI Models
 
-- **GPT-5**: Access to OpenAI's latest model
-- **Claude 4.5 Sonnet**: Access to Anthropic's Claude models
-- **Speed Mode**: GPT-3.5 for faster responses
-- **Power Mode**: GPT-4o+ for more accurate and creative outputs
+Type does not publish specific model names or versions. Its stated position is "Access to premium
+AI models from Anthropic, OpenAI, and Google", with all paid plans including "Latest from
+Anthropic, OpenAI, and Google". Plans differ by AI usage allowance, not by model tier — Pro
+includes "3x the AI usage of Basic" and Max "12x the AI usage of Basic".
+
+Source: [type.ai](https://type.ai/) homepage and [type.ai/pricing](https://type.ai/pricing) (accessed 2026-08-11).
 
 ### Free AI Writing Tools
 
-- **AI Email Writer**: Generate polished professional emails
-- **Paragraph Rewriter**: Rewrite and polish paragraphs
-- **Sentence Rewriter**: Rewrite individual sentences
-- **Writing Templates**: Pre-built templates for various content types
+Available at [type.ai/ai-writing-tools](https://type.ai/ai-writing-tools) without login: AI Story
+Generator, AI Novel Writer, AI Book Writer, Fan Fiction Generator, Character Name Generator, Plot
+Generator, Book Title Generator, Sentence Rewriter, and Paragraph Rewriter.
+
+Source: [type.ai/ai-writing-tools](https://type.ai/ai-writing-tools) (accessed 2026-08-11).
 
 ### Privacy and Data
 
-- **No Model Training**: Does not train AI models on user data
-- **Private Documents**: User uploads and documents remain private
-- **Money-Back Guarantee**: Satisfaction guarantee on subscriptions
+- **No Model Training**: "No AI models are trained on your data, ever" — Type's FAQ extends this to the third-party AI providers it integrates
+- **Private Documents**: "All of your uploads and documents in Type remain private to you"; draft content is visible to others only if a view-only link is published via the Share menu
+
+Source: [type.ai](https://type.ai/) homepage and [blog.type.ai/faqs](https://blog.type.ai/faqs) (accessed 2026-08-11).
 
 ---
 
@@ -90,8 +97,7 @@ Type.ai is an AI-first document editor designed for long-form professional writi
 | ---------------- | --------------------------------------- |
 | Platform         | Web-based SaaS                          |
 | Editor           | Custom document editor                  |
-| AI Integration   | OpenAI (GPT-3.5, GPT-4o, GPT-5)         |
-| AI Integration   | Anthropic (Claude 4.5 Sonnet)           |
+| AI Integration   | Anthropic, OpenAI, Google (models not individually published) |
 | Analytics        | Amplitude, Google Analytics             |
 | Infrastructure   | Webflow (marketing), Custom app         |
 
@@ -102,9 +108,7 @@ User Input
     |
 Document Context Analysis
     |
-Cmd+K Command Invocation
-    |
-AI Model Selection (Speed/Power)
+Inline Command Invocation (e.g. Generate Content, Command+semicolon)
     |
 Context-Aware Generation/Transformation
     |
@@ -116,7 +120,7 @@ In-Place Document Update
 Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into the writing workflow:
 
 1. Write in a full-featured document editor
-2. Invoke AI commands inline with Cmd+K
+2. Invoke AI commands inline via keyboard shortcut
 3. AI uses document context for better suggestions
 4. Results appear directly in document
 5. Continue editing seamlessly
@@ -148,7 +152,7 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 
 ### Content Types
 
-- Books and novels (up to 130k words)
+- Books and novels (up to 150k words)
 - Essays and articles
 - Marketing content
 - Screenplays
@@ -166,15 +170,15 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 
 2. **Context-Aware Assistance**: The document context awareness pattern (AI improving suggestions based on surrounding content) parallels how Claude Code should use codebase context for better suggestions.
 
-3. **Command Invocation UX**: The Cmd+K command interface is similar to command palette patterns. Type.ai shows how to make AI commands discoverable and accessible inline.
+3. **Command Invocation UX**: Type.ai's per-command keyboard shortcuts show how to make AI commands discoverable and accessible inline.
 
-4. **Long-Form Content Handling**: Supporting 130k word documents demonstrates patterns for handling large context windows, relevant for Claude Code's work with large codebases.
+4. **Long-Form Content Handling**: Supporting 150k word documents demonstrates patterns for handling large context windows, relevant for Claude Code's work with large codebases.
 
 ### Patterns Worth Adopting
 
 1. **Inline AI Commands**: Rather than switching to a chat interface, invoke AI inline within the work context.
 
-2. **Mode Selection**: Speed Mode vs Power Mode pattern allows users to trade off between response time and quality - applicable to code generation.
+2. **Usage-Tier Design**: Usage allowances can distinguish plans without exposing model tiers, a useful pattern for product limits and billing.
 
 3. **Context Accumulation**: AI improving with usage as it learns document context - could inform session-aware skill development.
 
@@ -188,7 +192,7 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 
 2. **Editor Integration Patterns**: How Type.ai handles inline suggestions and transformations could inform VSCode/IDE integrations.
 
-3. **Model Switching**: The Speed/Power mode pattern for model selection is directly applicable to Claude Code's model selection for different task types.
+3. **Usage Tiering**: Type.ai's plans differ by AI usage allowance rather than by exposed model tier, keeping model selection an implementation detail rather than a user-facing choice.
 
 ### Comparison with Claude Code
 
@@ -197,10 +201,105 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 | Primary Use        | Long-form writing              | Code development              |
 | Interface          | Document editor with AI        | CLI with AI                   |
 | Context Handling   | Document-aware                 | Codebase-aware                |
-| AI Invocation      | Cmd+K inline commands          | Natural language prompts      |
+| AI Invocation      | Inline commands via shortcuts  | Natural language prompts      |
 | Output             | Text transformations           | Code and explanations         |
 | Model Options      | GPT + Claude                   | Claude models                 |
 | Target Users       | Writers, marketers             | Developers                    |
+
+---
+
+## Installation & Usage
+
+### Getting Started
+
+**1. Access Type.ai**
+
+Visit <https://type.ai> in your web browser. No installation is required — Type.ai is a web-based SaaS application accessible from any modern browser (Chrome, Firefox, Safari, Edge).
+
+**2. Sign Up or Log In**
+
+Create a free account to begin. A Free ($0/mo) tier is available alongside the paid Basic, Pro, and Max plans.
+
+**3. Create Your First Document**
+
+Click "New Document" to start writing. You can:
+- Start with a blank page
+- Import existing Word documents or PDFs
+- Use writing templates for common formats (essays, blog posts, etc.)
+
+**4. Use Inline AI Commands**
+
+Type's inline commands generate content at the cursor. Each has a dedicated keyboard shortcut
+(PC users substitute Ctrl for Command):
+
+| Command | Shortcut | Behavior |
+|---------|----------|----------|
+| Generate Content | Command + `;` | "generate AI content by issuing a detailed prompt from anywhere within your document" |
+| Write Sentence | Command + `.` | "generates and inserts context-aware text at your cursor's position" |
+| Write Paragraph | Command + `/` | "creates and inserts a new paragraph wherever your cursor is located" |
+| Write List | Command + `J` | "Generates and inserts a list at your cursor's position" |
+| Continue Writing | Option + Command + `/` | "Produces freeform text based on the existing content in your document" |
+| Generate Section Headline | Command + Shift + `U` | "Creates and inserts a section header that summarizes the content following the cursor" |
+| Generate Document Headline | Command + Shift + `Y` | "Generates and inserts a headline that encapsulates the overall content of your document" |
+
+Source: [Write On! The Magic of Inline Commands](https://blog.type.ai/post/writing-with-ai-commands) (accessed 2026-08-11).
+
+**5. Apply AI Edits to Existing Text**
+
+To edit rather than generate, "highlight some text in a Type document, tap the 'AI' button, and
+select an editing command" (these editing commands are called Brushes). Suggestions appear inline
+and are accepted or rejected individually:
+
+| Action | Shortcut |
+|--------|----------|
+| Accept edit | `A` |
+| Reject edit | `R` |
+| Accept all | Command + Enter |
+| Next suggestion | Shift + Command + `.` |
+| Previous suggestion | Shift + Command + `,` |
+| Dismiss all | Escape |
+
+Source: [Type: A Faster AI Document Editor](https://blog.type.ai/post/introducing-a-faster-way-to-edit-with-ai) (accessed 2026-08-11).
+
+**6. Export Your Work**
+
+Finished documents "export ... as Word docs, PDFs, and AI narrated audio files". Drafts can also
+be published as a view-only URL via the Share menu.
+
+Source: [type.ai](https://type.ai/) homepage (accessed 2026-08-11).
+
+### Pricing Tiers
+
+| Plan | Monthly | Annual | Positioning |
+|------|---------|--------|-------------|
+| Free | $0/mo | — | "Try Type for free and start your story today" |
+| Basic | $12/mo, or $8/mo billed annually | $96/year | "Perfect for shorter form content or stories" |
+| Pro (Most Popular) | $24/mo, or $16/mo billed annually | $192/year | "Great for longer works like a novel or screenplay"; "3x the AI usage of Basic" |
+| Max | $96/mo, or $64/mo billed annually | $768/year | "Ideal for writing multiple books a year"; "12x the AI usage of Basic" |
+
+Annual billing carries "33% savings" on every paid tier. All paid plans include "Latest from
+Anthropic, OpenAI, and Google" models and "Hands on, priority email support".
+
+Source: [type.ai/pricing](https://type.ai/pricing) (accessed 2026-08-11).
+
+### Key Features When Using Type.ai
+
+1. **Document Context**: AI learns document context throughout your writing session, improving suggestions over time.
+
+2. **Long-Form Support**: "documents as long as 150,000 words" — for longer manuscripts Type
+   recommends splitting the work across multiple documents.
+
+3. **Free Writing Tools**: Nine tools are accessible without login — see the Free AI Writing Tools
+   subsection under Key Features for the full list.
+
+4. **Privacy**: "No AI models are trained on your data, ever" and "All of your uploads and
+   documents in Type remain private to you." Type's FAQ extends this to third-party providers:
+   Type does not use your data to train any AI models, nor do the third-party AI providers it
+   integrates.
+
+5. **Offline and Version History**: "Full offline capability" plus built-in version history.
+
+Source: [type.ai](https://type.ai/) homepage and [blog.type.ai/faqs](https://blog.type.ai/faqs) (accessed 2026-08-11).
 
 ---
 

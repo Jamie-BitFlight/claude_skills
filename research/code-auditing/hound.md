@@ -64,8 +64,8 @@ Hound is a language-agnostic AI auditor that autonomously builds and refines ada
 
 ### 3. Dynamic Model Switching
 
-- **Scout Models**: Lightweight models (GPT-4o-mini) handle exploration
-- **Strategist Models**: Heavyweight models (GPT-5, Claude Opus) provide deep reasoning
+- **Scout Models**: Lighter exploration models (`config.yaml.example` default: `gpt-5-mini`); a separate lightweight utility model (`gpt-4o-mini`) handles quick low-cost tasks such as dedup
+- **Strategist Models**: Heavyweight models (`config.yaml.example` default: `gpt-5`; Claude Opus selectable via `--strategist-platform anthropic --strategist-model claude-3-opus`) provide deep reasoning
 - **Cost Efficiency**: Expert workflows mirrored while keeping costs efficient
 - **Multi-Provider Support**: OpenAI, Anthropic, Google Gemini (Vertex AI)
 
@@ -246,31 +246,47 @@ On a five-project subset of ScaBench:
 
 ---
 
-## Installation
+## Installation & Usage
+
+### Installation
+
+**1. Clone Repository**
 
 ```bash
-# Clone repository
 git clone https://github.com/scabench-org/hound.git
 cd hound
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure API keys
-export OPENAI_API_KEY=your_key_here
-# Optional: Anthropic, Google Vertex AI
-
-# Copy and edit config
-cp hound/config.yaml.example hound/config.yaml
 ```
 
----
+**2. Install Dependencies**
 
-## Configuration Options
+```bash
+pip install -r requirements.txt
+```
+
+**3. Configure API Keys**
+
+Set up environment variables for your LLM provider:
+
+```bash
+export OPENAI_API_KEY=your_key_here
+# Optional: Anthropic, Google Vertex AI
+export ANTHROPIC_API_KEY=your_key_here
+```
+
+**4. Configure Hound**
+
+```bash
+cp hound/config.yaml.example hound/config.yaml
+# Edit hound/config.yaml with your preferred settings
+```
+
+Source: [hound README](https://github.com/scabench-org/hound#installation) — Installation and Configuration sections; `ANTHROPIC_API_KEY` confirmed in [config.yaml.example](https://github.com/scabench-org/hound/blob/main/config.yaml.example) (accessed 2026-08-11).
+
+### Configuration Options
 
 **Model Configuration**:
 
-- Scout model: Lightweight exploration (default: gpt-4o-mini)
+- Scout model: Lightweight exploration (default: gpt-5-mini)
 - Strategist model: Deep reasoning (default: gpt-5)
 - QA finalizer: Hypothesis review (default: gpt-5)
 
