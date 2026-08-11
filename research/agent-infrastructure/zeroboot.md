@@ -16,7 +16,7 @@ freshness_tracking:
 
 ## Overview
 
-Zeroboot is an open-source platform that creates lightweight virtual machine sandboxes in under a millisecond using copy-on-write (CoW) forking technology. Implemented in Rust and licensed under Apache-2.0, Zeroboot enables extremely fast, isolated code execution environments for AI agent applications, addressing the performance limitations of traditional sandbox solutions. (SOURCE: [GitHub - zerobootdev/zeroboot](https://github.com/zerobootdev/zeroboot), accessed 2026-08-10; [Zeroboot Official Site](https://zeroboot.dev), accessed 2026-08-10)
+Zeroboot is an open-source platform that creates lightweight virtual machine sandboxes in under a millisecond using copy-on-write (CoW) forking technology. Implemented in Rust and licensed under Apache-2.0, Zeroboot enables extremely fast, isolated code execution environments for AI agent applications, addressing the performance limitations of traditional sandbox solutions. (SOURCE: [GitHub - zerobootdev/zeroboot](https://github.com/zerobootdev/zeroboot), accessed 2026-08-11)
 
 ---
 
@@ -142,7 +142,7 @@ Per the README, Zeroboot has documented constraints:
 
 2. **Single vCPU Per Fork**: Each sandboxed fork is limited to a single virtual CPU.
 
-3. **No Networking Inside Forks**: Hard constraint — sandboxes do not support network access at all.
+3. **No Networking Inside Forks**: "No networking inside forks. Sandboxes communicate via serial I/O only."
 
 4. **Template Snapshot Time**: Template updates require a full re-snapshot, which takes approximately 15 seconds.
 
@@ -151,7 +151,7 @@ Per the README, Zeroboot has documented constraints:
 ## References
 
 - [GitHub - zerobootdev/zeroboot](https://github.com/zerobootdev/zeroboot) (accessed 2026-08-10)
-- [Zeroboot Official Website](https://zeroboot.dev) (accessed 2026-08-10)
+- `https://zeroboot.dev` — 302 redirect to the GitHub repository, not an independent source (checked 2026-08-11)
 - [Sub-millisecond VM Sandboxes via Copy-on-Write Forking](https://dev.to/timmyzinin/how-zeroboot-is-changing-ai-agent-isolation-forever-km) (accessed 2026-08-10)
 - [AI Agent Sandboxes Compared](https://rywalker.com/research/ai-agent-sandboxes) (accessed 2026-08-10)
 

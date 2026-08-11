@@ -45,7 +45,7 @@ cmux is an open-source Ghostty-based terminal multiplexer for macOS, purpose-bui
 - **Notification rings and highlighting**: Blue rings appear around active panes; tabs illuminate when agents emit notifications
 - **OSC sequence support**: Reads terminal sequences (OSC 9/99/777) for structured notifications
 - **CLI notification interface**: `cmux notify` command for wiring Claude Code and other agent frameworks directly into cmux
-- **Selective attention**: Scan up to 10 running sessions without switching into any of them
+- **Selective attention**: Sidebar surfaces which pane needs attention across splits and tabs; `Cmd+Shift+U` jumps to the most recent unread notification
 
 ### Extensibility & Integration
 
@@ -82,47 +82,35 @@ brew tap manaflow-ai/cmux
 brew install --cask cmux
 ```
 
-**DMG (direct download)**:
-```bash
-# Download from GitHub releases
-# https://github.com/manaflow-ai/cmux/releases
-```
+**DMG (direct download)**: `https://github.com/manaflow-ai/cmux/releases/latest/download/cmux-macos.dmg` — open the `.dmg` and drag cmux to Applications. cmux auto-updates via Sparkle.
 
-**Nightly builds**:
-```bash
-brew tap manaflow-ai/cmux --force
-brew install --cask cmux --no-quarantine
-```
+**Nightly builds**: a separate app with its own bundle ID, downloaded as a DMG from `https://github.com/manaflow-ai/cmux/releases/download/nightly/cmux-nightly-macos.dmg`. It is built from the latest `main` commit and auto-updates via its own Sparkle feed. There is no Homebrew tap for nightly.
 
-(SOURCE: [GitHub - manaflow-ai/cmux](https://github.com/manaflow-ai/cmux), accessed 2026-08-10)
+(SOURCE: [GitHub - manaflow-ai/cmux README](https://github.com/manaflow-ai/cmux), "Install" and "Nightly Builds" sections, accessed 2026-08-11)
 
 ### Basic Usage
 
 ```bash
 # Create a new workspace
-cmux new-workspace
+cmux new-workspace --name "task" --cwd "$PWD"
 
-# SSH into a remote machine and create a workspace
-cmux ssh user@remote --command "claude code project/"
+# SSH into a remote machine and create a workspace, running an initial command
+cmux ssh user@remote --command 'omp "investigate auth"'
 
-# Create a browser pane
-cmux new-pane --browser
+# Run Claude Code's teammate mode, with teammates as native splits
+cmux claude-teams
 
-# Send text to a terminal surface
-cmux send --text "command to run"
+# Create a browser pane pointed at a local dev server
+cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type browser --url http://localhost:3000
 
-# Send a notification to a workspace
-cmux notify "Agent completed task"
+# Send input to a terminal surface
+cmux send --surface "$CMUX_SURFACE_ID" "git status\n"
+
+# Emit a notification
+cmux notify --title "Done" --body "Task complete"
 ```
 
-### Agent Integration Example
-
-**Claude Code Integration**:
-```bash
-# Start cmux and Claude Code in a new pane
-cmux new -s claude
-cmux send "claude" "claude code myproject/" Enter
-```
+(SOURCE: [cmux workspace command reference](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-workspace/references/commands.md), accessed 2026-08-11; `cmux ssh` and `cmux claude-teams` from the [README](https://github.com/manaflow-ai/cmux), accessed 2026-08-11)
 
 ---
 

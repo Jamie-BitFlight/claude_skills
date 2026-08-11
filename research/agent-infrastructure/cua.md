@@ -31,7 +31,7 @@ CUA addresses three critical needs in autonomous agent development:
 
 2. **Agent evaluation and benchmarking**: Standardized evaluation framework for measuring agent capability and performance on real-world tasks using datasets like OSWorld, ScreenSpot, and Windows Arena.
 
-3. **Non-disruptive automation**: Background computer-use automation that operates without interrupting user workflows or requiring accessibility surface modifications, enabling seamless integration of autonomous agents with human users.
+3. **Non-disruptive automation**: Background computer-use automation that drives native desktop apps "without stealing the cursor or focus", enabling autonomous agents to work alongside a human on the same machine. (SOURCE: [GitHub - trycua/cua README](https://github.com/trycua/cua), accessed 2026-08-11)
 
 ---
 
@@ -39,7 +39,7 @@ CUA addresses three critical needs in autonomous agent development:
 
 ### Core Components
 
-1. **Cua Driver** — Background automation for macOS native applications. Agents operate on non-accessibility surfaces including Chromium content and canvas-based tools without interfering with user interaction.
+1. **Cua Driver** — Background computer-use driver for macOS, Windows, and Linux that "[s]peaks MCP over stdio; drives native macOS apps without stealing focus." Linux supports X11 and compositor-specific Wayland routes. Attaching to an existing logged-in Chromium profile is supported but must be requested explicitly (`cua-driver mcp --grant existing-profile`). (SOURCE: [`libs/cua-driver/README.md`](https://github.com/trycua/cua/blob/main/libs/cua-driver/README.md), accessed 2026-08-11)
 
 2. **Cua Sandbox** — Unified API supporting multiple runtime environments:
    - Linux containers
@@ -108,7 +108,7 @@ The platform emphasizes interoperability, allowing agents built with CUA to run 
 
 4. **Cross-platform automation** — Scripts and workflows that adapt to different operating systems through CUA's unified environment API.
 
-5. **Human-agent collaboration** — Background agents operating on systems without interrupting user workflows or requiring accessibility modifications.
+5. **Human-agent collaboration** — Background agents driving desktop apps without stealing the cursor or focus from the human using the same machine.
 
 ---
 
@@ -166,7 +166,7 @@ CUA integrates with and builds upon:
 
 2. **Benchmarking Agent Behavior**: CUA's integration with OSWorld, ScreenSpot, and Windows Arena datasets enables standardized evaluation of agent capabilities — valuable for Claude Code plugin developers testing agent-driven workflows.
 
-3. **Non-Disruptive Automation**: The non-accessibility-surface approach enables agents to interact with applications (Chromium, canvas tools) without triggering accessibility APIs, useful for automation that must coexist with user workflows.
+3. **Non-Disruptive Automation**: Cua Drivers "click, type, and verify without stealing the cursor or focus" on macOS, Windows, and Linux, so an agent can drive native desktop apps in the background while a human keeps working in the foreground. (SOURCE: [GitHub - trycua/cua README](https://github.com/trycua/cua), "Cua Drivers" section, accessed 2026-08-11.) Note that on macOS the driver still requires Accessibility and Screen Recording grants attributed to a responsible app identity — see [`libs/cua-driver/README.md`](https://github.com/trycua/cua/blob/main/libs/cua-driver/README.md), "macOS process identity and permissions".
 
 ### Patterns Worth Adopting
 
@@ -186,7 +186,7 @@ CUA integrates with and builds upon:
 
 - [GitHub - trycua/cua](https://github.com/trycua/cua) (accessed 2026-08-10)
 - [CUA Official Documentation](https://cua.ai/docs) (accessed 2026-08-10)
-- [CUA Community Discord](https://discord.gg/cua) (accessed 2026-08-10)
+- [CUA Community Discord](https://discord.com/invite/mVnXXpdE85) (linked from the repo README; accessed 2026-08-11)
 - [OSWorld Benchmark Dataset](https://www.osworld.dev) (accessed 2026-08-10)
 - ScreenSpot Evaluation Framework (referenced in CUA README; official website not accessible)
 

@@ -63,7 +63,7 @@ Omma is an AI-powered creative studio built by Spline that generates interactive
 
 ## Technical Architecture
 
-Omma uses a multi-agent parallel execution approach where specialized AI agents work simultaneously on different aspects of creation (code, 3D models, textures). The platform is built on Spline's motion design engine and provides an interactive Canvas for collaborative editing of generated artifacts. (SOURCE: [Omma Official Website](https://omma.build), accessed 2026-08-10)
+Omma "orchestrates multiple AI agents working simultaneously", and "a single prompt can fan out up to 100 agents in parallel — each building its own page." Output is produced onto "[a] collaborative canvas where parallel AI agents build real pages, with realtime multiplayer editing." Omma is built by Spline, whose existing product is a browser-based 3D and motion design tool; the internal engine architecture is not documented in public sources. (SOURCE: [Omma Official Website](https://omma.build) and [Omma Documentation: Getting Started](https://omma.build/docs/getting-started/introduction), accessed 2026-08-11)
 
 ---
 
@@ -89,7 +89,7 @@ Omma generates interactive digital experiences from natural language description
 
 ### Pricing
 
-Omma offers a free tier for limited usage and a Pro tier starting at $39/month for increased generation quotas and priority support. (SOURCE: [Omma Pricing](https://omma.build/pricing), accessed 2026-08-10)
+Credit-metered tiers: Free ($0, 50 credits/month), Pro ($39/mo, 3,000 credits/month — "[f]ull creative suite with images, 3D models and custom domains"), Max ($129/seat/mo, 12,000 credits/month), and Enterprise (custom pricing and credits). (SOURCE: [Omma Pricing](https://omma.build/pricing), accessed 2026-08-11)
 
 ---
 
@@ -115,7 +115,7 @@ Omma offers a free tier for limited usage and a Pro tier starting at $39/month f
 
 4. **Concurrent User Limits**: Concurrency and simultaneous editor limits not documented in reviewed sources.
 
-6. **API Maturity**: Public API not yet fully available (as of research date); integration patterns limited to web UI.
+5. **API Maturity**: No public API is documented in the sources reviewed; integration patterns are limited to the web UI.
 
 ---
 
