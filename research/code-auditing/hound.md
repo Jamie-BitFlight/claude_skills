@@ -64,8 +64,8 @@ Hound is a language-agnostic AI auditor that autonomously builds and refines ada
 
 ### 3. Dynamic Model Switching
 
-- **Scout Models**: Lightweight models (GPT-4o-mini) handle exploration
-- **Strategist Models**: Heavyweight models (GPT-5, Claude Opus) provide deep reasoning
+- **Scout Models**: Lighter exploration models (`config.yaml.example` default: `gpt-5-mini`); a separate lightweight utility model (`gpt-4o-mini`) handles quick low-cost tasks such as dedup
+- **Strategist Models**: Heavyweight models (`config.yaml.example` default: `gpt-5`; Claude Opus selectable via `--strategist-platform anthropic --strategist-model claude-3-opus`) provide deep reasoning
 - **Cost Efficiency**: Expert workflows mirrored while keeping costs efficient
 - **Multi-Provider Support**: OpenAI, Anthropic, Google Gemini (Vertex AI)
 
@@ -280,7 +280,7 @@ cp hound/config.yaml.example hound/config.yaml
 # Edit hound/config.yaml with your preferred settings
 ```
 
-Source: GitHub repository installation guide (accessed 2026-08-10).
+Source: [hound README](https://github.com/scabench-org/hound#installation) — Installation and Configuration sections; `ANTHROPIC_API_KEY` confirmed in [config.yaml.example](https://github.com/scabench-org/hound/blob/main/config.yaml.example) (accessed 2026-08-11).
 
 ### Configuration Options
 

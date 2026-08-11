@@ -1,14 +1,14 @@
 ---
 name: awesome-ai-apps
-research_date: 2026-08-10
+research_date: 2026-08-11
 source_url: https://github.com/Arindam200/awesome-ai-apps
 github_repository: https://github.com/Arindam200/awesome-ai-apps
-version_at_research: Latest
+version_at_research: "No tagged releases; default branch as of 2026-07-30"
 license: MIT
 freshness_tracking:
-  last_verified: 2026-08-10
-  version_at_verification: Latest
-  next_review: 2026-11-10
+  last_verified: 2026-08-11
+  version_at_verification: "No tagged releases; default branch as of 2026-07-30"
+  next_review: 2026-11-11
   confidence_map: "Overview: high, Problem Addressed: high, Key Features: high, Technical Architecture: medium, Installation & Usage: high, Relevance to Claude Code: medium"
 ---
 
@@ -16,9 +16,9 @@ freshness_tracking:
 
 ## Overview
 
-Awesome AI Apps is a comprehensive, community-curated collection of 129 practical projects, tutorials, and recipes for building powerful LLM-powered applications. The repository showcases real-world implementations across eight primary categories: starter agents, simple agents, voice agents, MCP agents, memory agents, RAG applications, advanced agents, and fine-tuning examples. It demonstrates how to build AI applications using modern frameworks like LangChain, LangGraph, CrewAI, and AutoGen, with support for multiple LLM providers including Claude, GPT, and open-source alternatives.
+Awesome AI Apps is a comprehensive, community-curated collection of 129 practical projects, tutorials, and recipes for building powerful LLM-powered applications. The repository showcases real-world implementations across eight primary categories: starter agents, simple agents, voice agents, MCP agents, memory agents, RAG applications, advanced agents, and fine-tuning examples. It demonstrates how to build AI applications using modern frameworks like LangChain, LangGraph, CrewAI, and AutoGen. The README describes the collection as covering "text agents, voice assistants, RAG apps, and MCP-backed tools."
 
-Source: GitHub repository documentation (accessed 2026-08-10).
+Source: [GitHub repository README](https://github.com/Arindam200/awesome-ai-apps) (accessed 2026-08-11).
 
 ---
 
@@ -33,7 +33,7 @@ Source: GitHub repository documentation (accessed 2026-08-10).
 | Building systems with long-term memory and context retention | 13 memory agent projects demonstrating context management techniques |
 | Implementing RAG (Retrieval Augmented Generation) systems | 18 RAG applications showing document indexing and retrieval patterns |
 
-Source: GitHub repository structure and project descriptions (accessed 2026-08-10).
+Source: [GitHub repository README](https://github.com/Arindam200/awesome-ai-apps) category listings and per-project descriptions (accessed 2026-08-11).
 
 ---
 
@@ -52,12 +52,14 @@ Source: GitHub repository structure and project descriptions (accessed 2026-08-1
 
 ### Technology Stack Coverage
 
-- **LLM Frameworks**: LangChain, LangGraph, CrewAI, AutoGen, Pydantic AI
-- **LLM Providers**: Claude (Anthropic), GPT (OpenAI), open-source alternatives via Nebius
+Named in the README's per-project descriptions:
+
+- **LLM Frameworks**: LangChain, LangGraph, CrewAI, AutoGen, PydanticAI, Agno, Mastra, OpenAI Agents SDK
+- **LLM Providers**: Nebius Token Factory (the repository's sponsor, and the provider named in the largest share of projects), OpenAI, and Google Gemini. Anthropic is not named anywhere in the README, though `ANTHROPIC`/`anthropic` does appear in the repository's project source code.
 - **Infrastructure**: Qdrant and Weaviate for retrieval, LiveKit and Pipecat for voice
 - **Integration Standards**: Model Context Protocol (MCP) for extensible tool connections
 
-Source: GitHub repository technology index (accessed 2026-08-10).
+Source: [GitHub repository README](https://github.com/Arindam200/awesome-ai-apps) project listings (accessed 2026-08-11); provider presence cross-checked against the repository's own code search.
 
 ---
 
@@ -70,13 +72,15 @@ Awesome AI Apps is structured as a curated index with practical code examples. E
 3. **README Documentation** — Setup instructions and usage patterns
 4. **Category Classification** — Links to related patterns and frameworks
 
-The repository leverages Git as the primary distribution mechanism. Each project is either:
-- A link to an external repository with live examples
-- An embedded folder within the awesome-ai-apps repository with self-contained code
+The repository leverages Git as the primary distribution mechanism. Every README entry links to a
+folder inside the repository itself (e.g. `starter_ai_agents/agno_starter`,
+`mcp_ai_agents/database_mcp_agent`, `rag_apps/graphrag_neo4j`) rather than to an external
+repository — each project is self-contained code checked into this repo.
 
-No central deployment platform or API backend is required; examples run locally or via cloud services (OpenAI, Anthropic APIs).
+No central deployment platform or API backend is required; examples run locally against
+third-party LLM APIs.
 
-Source: Repository structure (accessed 2026-08-10).
+Source: [GitHub repository README](https://github.com/Arindam200/awesome-ai-apps) project links (accessed 2026-08-11).
 
 ---
 
@@ -97,38 +101,43 @@ cd awesome-ai-apps
 
 **3. Navigate to a Specific Project**
 
-Each project lives in its own subdirectory with independent setup instructions:
+Each project lives in its own subdirectory (note the underscore naming) with independent setup instructions:
 
 ```bash
-cd starter-agents/example-project-name
-# Follow the project's README for installation
+cd starter_ai_agents/agno_starter  # Example: Start with Agno starter
 ```
 
-**4. Set Up Individual Projects**
-
-Most projects require:
+**4. Set Up Environment Variables**
 
 ```bash
-# Install dependencies (vary by framework)
+cp .env.example .env  # Copy example environment file
+# Edit .env with your API keys
+```
+
+**5. Install Dependencies**
+
+```bash
+# Using pip
 pip install -r requirements.txt
-# or
-npm install
 
-# Configure API keys
-export OPENAI_API_KEY=your_key
-export ANTHROPIC_API_KEY=your_key
-
-# Run the project
-python main.py
+# OR using uv (recommended - faster)
+uv sync
 # or
-node index.js
+uv pip install -e .
 ```
 
-**5. Explore Via the Web**
+**6. Run the Project**
 
-Use GitHub's web interface to browse projects without cloning — useful for reading code and READMEs directly.
+```bash
+python main.py
+# or for Streamlit apps
+streamlit run app.py
+```
 
-Source: GitHub repository structure and project READMEs (accessed 2026-08-10).
+Prerequisites stated by the README: Python 3.10+ (3.11+ recommended for newer projects), Git, a
+package manager (`pip` or `uv`), and API keys for most projects.
+
+Source: [README — Getting Started](https://github.com/Arindam200/awesome-ai-apps#getting-started) (accessed 2026-08-11).
 
 ---
 
@@ -138,7 +147,7 @@ Source: GitHub repository structure and project READMEs (accessed 2026-08-10).
 
 1. **Example Patterns for Claude Code Skills**: The repository's project organization (eight categories, clear documentation) mirrors how Claude Code skills should be structured for discoverability and reuse.
 
-2. **Multi-Framework Integration Examples**: Shows how to integrate Claude API alongside other LLM providers (GPT, Gemini) — useful for Claude Code's multi-provider considerations.
+2. **Multi-Provider Integration Examples**: Shows the same agent patterns implemented against several LLM providers (Nebius, OpenAI, Google Gemini) — useful for reasoning about provider-portable agent design.
 
 3. **Voice Agent Reference**: Voice agents category demonstrates patterns for real-time, interactive systems similar to potential Claude Code voice-assisted workflows.
 
@@ -162,9 +171,10 @@ Source: GitHub repository structure and project READMEs (accessed 2026-08-10).
 
 ## References
 
-- [GitHub Repository](https://github.com/Arindam200/awesome-ai-apps) (accessed 2026-08-10)
-- [Project Categories](https://github.com/Arindam200/awesome-ai-apps#project-categories) README documentation (accessed 2026-08-10)
-- [Technology Frameworks](https://github.com/Arindam200/awesome-ai-apps#technologies) - Project index (accessed 2026-08-10)
+- [GitHub Repository](https://github.com/Arindam200/awesome-ai-apps) (accessed 2026-08-11)
+- [README — Featured AI Apps](https://github.com/Arindam200/awesome-ai-apps#-featured-ai-apps) — per-category project listings and counts (accessed 2026-08-11)
+- [README — Getting Started](https://github.com/Arindam200/awesome-ai-apps#getting-started) — prerequisites and quick-start steps (accessed 2026-08-11)
+- [LICENSE](https://github.com/Arindam200/awesome-ai-apps/blob/main/LICENSE) — MIT (accessed 2026-08-11)
 
 ---
 
@@ -172,6 +182,6 @@ Source: GitHub repository structure and project READMEs (accessed 2026-08-10).
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [LangChain](../developer-tools/langchain.md) | developer-tools | Primary framework for building agents in awesome-ai-apps examples |
-| [CrewAI](../agent-frameworks/crewai.md) | agent-frameworks | Multi-agent orchestration framework featured prominently in repository |
-| [Model Context Protocol](../mcp-ecosystem/mcp.md) | mcp-ecosystem | 14 MCP-focused projects demonstrate protocol integration patterns |
+| [The Unwind AI](./the-unwind-ai.md) | ai-research-tools | Companion newsletter to `awesome-llm-apps`, the closest analogue: a curated open-source collection of LLM/agent/RAG example apps |
+| [Agno](../agent-frameworks/agno.md) | agent-frameworks | Agno is the framework behind the repository's `starter_ai_agents/agno_starter` example |
+| [AI Agents Frameworks](../agent-frameworks/ai-agents-frameworks.md) | agent-frameworks | Surveys the same framework landscape (LangChain, LangGraph, CrewAI, AutoGen) the repository's starter agents demonstrate |
