@@ -88,6 +88,10 @@ Softaworks Agent Toolkit is a curated collection of 43 skills for AI coding agen
 | `/sync-skills-readme`          | Update README skills table                 |
 | `/viral-tweet`                 | Optimize tweet ideas for engagement        |
 
+---
+
+## Installation & Usage
+
 ### Installation Methods
 
 1. **Quick Install (Recommended)**: `npx skills add softaworks/agent-toolkit` - Works with Claude Code, Codex, Cursor, AdaL

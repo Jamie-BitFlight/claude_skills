@@ -45,7 +45,9 @@ Skill Seekers is an open-source Python tool that automatically converts document
 
 ---
 
-## Supported Data Sources
+## Key Features
+
+### Supported Data Sources
 
 ### 1. Documentation Websites
 
@@ -74,7 +76,7 @@ Skill Seekers is an open-source Python tool that automatically converts document
 
 ---
 
-## Supported Output Platforms
+### Supported Output Platforms
 
 | Platform             | Format             | Auto Upload | AI Enhancement | API Key Required  |
 | -------------------- | ------------------ | ----------- | -------------- | ----------------- |
@@ -85,7 +87,7 @@ Skill Seekers is an open-source Python tool that automatically converts document
 
 ---
 
-## Three-Stream GitHub Architecture (v2.6.0+)
+### Three-Stream GitHub Architecture (v2.6.0+)
 
 The tool splits GitHub repository analysis into three complementary streams:
 
@@ -114,7 +116,7 @@ The tool splits GitHub repository analysis into three complementary streams:
 
 ---
 
-## C3.x Codebase Analysis System
+### C3.x Codebase Analysis System
 
 ### C3.1: Design Pattern Extraction
 
@@ -140,7 +142,9 @@ Extracts test cases as usage examples.
 
 ---
 
-## Installation Options
+## Installation & Usage
+
+### Installation Options
 
 ```bash
 # PyPI (Recommended)
@@ -166,7 +170,7 @@ pip install -e .
 
 ---
 
-## Basic Usage Workflow
+### Basic Usage Workflow
 
 ```bash
 # Step 1: Install
@@ -186,7 +190,7 @@ skill-seekers upload react.zip
 
 ---
 
-## Multi-Source Unified Scraping (v2.0.0+)
+### Multi-Source Unified Scraping (v2.0.0+)
 
 Combine documentation + GitHub + PDF in one skill with conflict detection:
 
@@ -208,7 +212,7 @@ skill-seekers scrape \
 
 ---
 
-## Configuration System (v2.7.0+)
+### Configuration System (v2.7.0+)
 
 ### Multi-Token Management
 
@@ -253,7 +257,7 @@ skill-seekers resume github_react_20260117_143022
 
 ---
 
-## Bootstrap Skill - Self-Hosting (v2.7.0+)
+### Bootstrap Skill - Self-Hosting (v2.7.0+)
 
 Generate skill-seekers as a Claude Code skill to use within Claude:
 
@@ -278,7 +282,7 @@ ls ~/.claude/skills/skill-seekers/SKILL.md
 
 ---
 
-## Private Config Repositories (v2.2.0+)
+### Private Config Repositories (v2.2.0+)
 
 For team collaboration:
 
@@ -292,7 +296,7 @@ For team collaboration:
 
 ---
 
-## Preset Configurations Available
+### Preset Configurations Available
 
 24 preset configs for popular frameworks:
 

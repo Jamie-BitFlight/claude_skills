@@ -10,7 +10,11 @@ license: Personal Use License (commercial use requires authorization)
 
 # Huashu Design
 
+## Overview
+
 **Huashu Design** (花叔Design) is a Claude Code skill that generates high-fidelity design deliverables directly from text prompts using HTML as the primary production tool. Users describe what they need in natural language, and the skill produces clickable prototypes, animated videos, presentation decks with editable PowerPoint export, data visualizations, and design direction recommendations—all without opening Figma, After Effects, or any GUI.
+
+---
 
 ## Problem Addressed
 
