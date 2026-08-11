@@ -286,7 +286,7 @@ Source: [hound README](https://github.com/scabench-org/hound#installation) — I
 
 **Model Configuration**:
 
-- Scout model: Lightweight exploration (default: gpt-4o-mini)
+- Scout model: Lightweight exploration (default: gpt-5-mini)
 - Strategist model: Deep reasoning (default: gpt-5)
 - QA finalizer: Hypothesis review (default: gpt-5)
 

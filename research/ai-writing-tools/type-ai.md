@@ -178,7 +178,7 @@ Unlike chat interfaces (ChatGPT, Claude), Type.ai integrates AI directly into th
 
 1. **Inline AI Commands**: Rather than switching to a chat interface, invoke AI inline within the work context.
 
-2. **Mode Selection**: Speed Mode vs Power Mode pattern allows users to trade off between response time and quality - applicable to code generation.
+2. **Usage-Tier Design**: Usage allowances can distinguish plans without exposing model tiers, a useful pattern for product limits and billing.
 
 3. **Context Accumulation**: AI improving with usage as it learns document context - could inform session-aware skill development.
 
