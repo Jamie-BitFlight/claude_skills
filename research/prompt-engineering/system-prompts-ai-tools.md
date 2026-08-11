@@ -89,6 +89,76 @@ Content is gathered through:
 
 ---
 
+## Installation & Usage
+
+This repository is a community-maintained archive of system prompts and model configurations. It does not require installation; access the content directly via GitHub or DeepWiki search.
+
+### Option 1: Browse on GitHub
+
+Visit the [system-prompts-and-models-of-ai-tools GitHub Repository](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools) and navigate by tool name. Each directory contains markdown and text files with full system prompts and tool definitions.
+
+**File structure for each tool:**
+
+```
+claude-code/
+  └── system-prompt.md        # Full Claude Code system prompt
+  └── tools.md               # MCP tool definitions
+  └── model-info.md          # Model configuration details
+```
+
+**Source**: Repository structure documented at GitHub README (accessed 2026-02-23)
+
+### Option 2: AI-Powered Search with DeepWiki
+
+Use [DeepWiki's semantic search](https://deepwiki.com/x1xhlol/system-prompts-and-models-of-ai-tools) to find system prompt content across all 30+ tools. Search for patterns: "file editing tool", "context window size", "safety constraints", "refusal behavior", etc.
+
+**Example search**:
+
+```
+Query: "How does Cursor handle file creation?"
+Result: Returns relevant sections from Cursor's system-prompt.md with context
+```
+
+**Source**: DeepWiki integration mentioned in repository README (accessed 2026-02-23)
+
+### Option 3: Clone the Repository Locally
+
+```bash
+# Clone the full repository
+git clone https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools.git
+
+# Navigate to a tool
+cd system-prompts-and-models-of-ai-tools/claude-code
+
+# View system prompt
+cat system-prompt.md
+
+# View tool definitions
+cat tools.md
+```
+
+All content is in plain text and markdown for easy diffing, version control, and local analysis.
+
+**Source**: Repository structure supports local cloning (accessed 2026-02-23)
+
+### Contributing New Prompts
+
+The repository accepts community submissions via:
+
+1. **GitHub Issues**: Submit prompt content or correction suggestions as issues
+2. **Pull Requests**: Contribute newly discovered or updated system prompts directly
+3. **Community discussion**: Engage with other researchers in existing issues
+
+Each contribution should include:
+- Full verbatim system prompt text
+- Source documentation (how the prompt was obtained)
+- Tool version and disclosure date
+- Any relevant context about changes from previous versions
+
+**Source**: Community contribution model indicated by issue-based discussions on GitHub (accessed 2026-02-23)
+
+---
+
 ## Relevance to Claude Code Development
 
 ### Applications
