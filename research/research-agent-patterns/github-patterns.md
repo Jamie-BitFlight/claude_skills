@@ -115,6 +115,7 @@ Pydantic BaseModel definitions enforce consistency:
 ### Agent Team Structures
 
 **Chief of Staff Model** (yuz207):
+
 ```
 Human (You)
     ↓
@@ -130,12 +131,14 @@ ai-research-lead (Principal Investigator)
 ```
 
 **Pydantic AI Model** (aldiakhou):
+
 ```
 User → System → LeadResearcher → Subagents (A,B,...) → Memory → CitationAgent → System
         ↑____________iterative research loop___________↓
 ```
 
 **Academic Model** (adrianstier):
+
 ```
 Orchestrator Agent
     ├── Research PRD Agent
@@ -1327,6 +1330,7 @@ These are research patterns extracted from open-source repositories. Implementat
 ### Option 1: Study and Implement Locally
 
 1. **Clone the primary pattern repositories**:
+
    ```bash
    git clone https://github.com/yuz207/claude-agents-research-team
    git clone https://github.com/adrianstier/research-agent
@@ -1354,6 +1358,7 @@ Browse curated agent collections:
 Implement the Chief of Staff + Iterative Loop hybrid:
 
 1. **Set up workflow directory structure**:
+
    ```bash
    mkdir -p agent_notes/[timestamp]_[project_name]
    ```

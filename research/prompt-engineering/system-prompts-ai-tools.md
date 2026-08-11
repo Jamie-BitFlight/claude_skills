@@ -98,6 +98,7 @@ This repository is a community-maintained archive of system prompts and model co
 Visit the [system-prompts-and-models-of-ai-tools GitHub Repository](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools) and navigate by tool name. Each directory contains markdown and text files with full system prompts and tool definitions.
 
 **File structure for each tool:**
+
 ```
 claude-code/
   └── system-prompt.md        # Full Claude Code system prompt
@@ -112,6 +113,7 @@ claude-code/
 Use [DeepWiki's semantic search](https://deepwiki.com/x1xhlol/system-prompts-and-models-of-ai-tools) to find system prompt content across all 30+ tools. Search for patterns: "file editing tool", "context window size", "safety constraints", "refusal behavior", etc.
 
 **Example search**:
+
 ```
 Query: "How does Cursor handle file creation?"
 Result: Returns relevant sections from Cursor's system-prompt.md with context
