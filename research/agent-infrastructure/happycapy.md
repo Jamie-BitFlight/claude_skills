@@ -306,7 +306,7 @@ HappyCapy is accessed via web browser at <https://happycapy.ai>. No installation
 
 3. **Sandbox Resource Limits** — Maximum storage is 200 GB (Max tier), which may be insufficient for some data-intensive workloads. Computational limits (4 cores Max tier) not extensively documented.
 
-4. **Persistent Agent Costs** — Automation quota and email quota limits exist but specific numbers not detailed in publicly available pricing documentation.
+4. **Persistent Agent Costs** — Automation and email quotas vary by plan; consult the current pricing page because quotas and prices may change.
 
 5. **Model Availability** — While 150+ models are accessible, the skill integration mechanism for each model is not detailed; may not all models integrate equally.
 
