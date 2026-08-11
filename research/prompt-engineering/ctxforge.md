@@ -24,7 +24,7 @@ ctxforge is a Rust-based CLI tool for prompt engineers that assembles context bu
 
 | Problem | Solution |
 |---------|----------|
-| Manual context assembly: developers manually copy-paste code sections into prompts, hoping they fit token budgets | Automated context bundling with real-time token counting for 21+ AI models prevents budget overruns |
+| Manual context assembly: developers manually copy-paste code sections into prompts, hoping they fit token budgets | Automated context bundling with real-time token counting for 15 named models prevents budget overruns |
 | No visibility into token usage while building context prompts | Interactive TUI with live token gauge (color-coded green→yellow→orange→red) shows exact token consumption |
 | Context management becomes fragmented across projects with no way to persist between sessions | Persistent markdown-based memory system enables cross-session note retention |
 | Finding relevant code across a codebase requires manual file browsing | Tree-sitter scanning (optional, via `--features=extract`) finds every function/type and presents fuzzy-searchable picker |
@@ -61,11 +61,11 @@ Fullscreen terminal UI supports 48 slash commands accessible via `/` in interact
 
 **Source**: GitHub README.md — verified from WebFetch "TUI palette contains '48 unique entries' accessible via the `/` command" and "Built on 'iocraft 0.8'" (accessed 2026-08-11)
 
-### 4. Token Counting for 21+ AI Models
+### 4. Token Counting for 15 Named Models
 
-Exact token counting via **tiktoken** for OpenAI models; character-based estimates (`chars / 4`) for others. Real-time token gauge in TUI prevents budget overruns.
+Exact token counting via **tiktoken** for OpenAI models (including claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5, gpt-4.1 family, o-series, gpt-4o family, gemini-2.5/1.5); character-based estimates (`chars / 4`) for unrecognized models. Real-time token gauge in TUI prevents budget overruns.
 
-**Source**: GitHub README.md — "Token Counting" section; verified from WebFetch "Uses 'tiktoken' for exact OpenAI model counts; character-based estimates" (accessed 2026-08-11)
+**Source**: GitHub README.md — "Supported models" section; verified from WebFetch "Uses 'tiktoken' for exact OpenAI model counts; character-based estimates" (accessed 2026-08-11)
 
 ### 5. Optional Tree-Sitter Function/Type Extraction
 
@@ -176,7 +176,7 @@ Example: query exact token counts for your context bundle across multiple AI mod
 
 1. **Autonomous Context Bundling**: Claude Code and other MCP clients can invoke ctxforge's 31 tools to query codebases, assemble context bundles, and pipe them to prompts without user intervention.
 
-2. **Token Budget Visibility**: Real-time token counting prevents context window overruns across 21+ AI models.
+2. **Token Budget Visibility**: Real-time token counting prevents context window overruns across 15 named models.
 
 3. **Cross-Session Context Persistence**: Persistent markdown memory enables AI agents to store learnings and patterns across sessions.
 

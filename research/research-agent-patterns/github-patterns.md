@@ -197,13 +197,15 @@ Orchestrator Agent
 
 This section contains the full pattern documentation extracted from GitHub repositories (detailed patterns, implementation code, and architectural specifications). See Key Features and Technical Architecture sections above for structured overview; full implementation details follow:
 
-| Repository                                                                                                | Stars  | Description                                                                                                                                            | Last Updated |
+| Repository                                                                                                | Stars (as of 2025-12-09) | Description                                                                                                                                            | Last Updated |
 | --------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
 | [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code)                   | 17,825 | A curated list of awesome commands, files, and workflows for Claude Code                                                                               | 2025-12-06   |
 | [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents)     | 5,616  | Production-ready Claude subagents collection with 100+ specialized AI agents for full-stack development, DevOps, data science, and business operations | 2025-12-08   |
 | [hesreallyhim/a-list-of-claude-code-agents](https://github.com/hesreallyhim/a-list-of-claude-code-agents) | 1,073  | A list of Claude Code Sub-Agents submitted by the community                                                                                            | 2025-12-09   |
 | [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)                           | 76,332 | A collection of MCP servers                                                                                                                            | 2025-12-09   |
 | [wong2/awesome-mcp-servers](https://github.com/wong2/awesome-mcp-servers)                                 | 3,070  | A curated list of Model Context Protocol (MCP) servers                                                                                                 | 2025-12-09   |
+
+Current star counts (accessed 2026-08-11): hesreallyhim/awesome-claude-code 52,029; VoltAgent/awesome-claude-code-subagents 24,174; hesreallyhim/a-list-of-claude-code-agents 1,340; punkpeye/awesome-mcp-servers 92,033; wong2/awesome-mcp-servers 4,254. See the bullet list above for these current figures with citation.
 
 ---
 
@@ -1343,7 +1345,7 @@ Browse curated agent collections:
 
 - [VoltAgent/awesome-claude-code-subagents](https://github.com/VoltAgent/awesome-claude-code-subagents): 100+ production-ready agents organized by category (Research & Analysis, Meta & Orchestration)
 - [hesreallyhim/awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code): Workflows, skills, and orchestration patterns
-- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers): 76,332-star collection of MCP tools for agent integration
+- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers): 92,033-star collection of MCP tools for agent integration (accessed 2026-08-11; 76,332 as of 2025-12-09)
 
 **Source**: Awesome Lists Found section (accessed 2025-12-09)
 
