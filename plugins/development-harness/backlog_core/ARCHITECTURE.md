@@ -13,16 +13,36 @@ All logic originates from: `.claude/skills/backlog/scripts/backlog.py`
 
 Each agent MUST read the full source file and extract ONLY the functions assigned to their module.
 
-## I/O Modules (post-YAML migration)
+## Storage Ownership and File Cache
 
-Local file I/O is handled by two dedicated modules:
+The configured backend is the only storage boundary visible to the CLI, MCP server, and operations
+layer. Work items, grooming, plans, artifact manifests, and artifact content are always accessed
+through that backend's protocols.
 
-- `yaml_io.py` — pure-YAML read/write for backlog items (`.yaml` format). Primary path for all
-  new items. Uses `ruamel.yaml` directly; no `python-frontmatter` dependency.
-- `github_sync.py` — bidirectional GitHub issue body conversion. `render_issue_body` serialises a
-  `BacklogItem` to GitHub markdown; `parse_issue_body` reconstructs a `BacklogItem` from issue
-  body text; `merge_item` merges local and remote items with conflict resolution rules. Uses
-  `entry_blocks.py` for timestamped div block handling.
+Backends fall into two storage categories:
+
+- **Remote-capable providers** — GitHub, GitLab, Linear, Jira, and equivalent network providers are
+  authoritative when reachable. Each provider privately owns a durable `FileCache` that supplies
+  offline reads and queues offline mutations. Successful provider reads and writes refresh the
+  corresponding cache records.
+- **Local providers** — Beads, SQLite, and Memory use their native storage directly. They do not
+  instantiate `FileCache`, do not read or write backlog YAML, and do not pay file-cache overhead.
+
+`FileCache` is constructed by the backend factory and injected only into remote-capable providers.
+It is private to the selected provider: it is not exposed through `BacklogConfig`, and callers must
+not obtain or manipulate it independently.
+
+The cache owns all local persistence needed for remote-provider continuity:
+
+- `yaml_io.py` — private YAML serialisation used only by `FileCache` for backlog snapshots,
+  grooming, synchronization checkpoints, and pending mutations.
+- Cached plan and artifact files plus their manifests and provider revisions.
+- The durable pending-write queue used while the provider is unreachable.
+
+`github_sync.py` remains a pure provider-format adapter. `render_issue_body` serialises a
+`BacklogItem` to GitHub markdown; `parse_issue_body` reconstructs a `BacklogItem` from issue body
+text; `merge_item` merges local and remote items with conflict resolution rules. It performs no
+cache I/O.
 
 **Bulk migration**: `scripts/migrate_backlog_to_yaml.py` converts an existing backlog directory
 from `.md` frontmatter files to `.yaml` format in-place. It uses `yaml_io.load_item` and
@@ -32,19 +52,31 @@ from `.md` frontmatter files to `.yaml` format in-place. It uses `yaml_io.load_i
 
 ```text
 models.py             ← standalone, no imports from other mcp modules
-parsing.py            ← imports from models; provides loads_frontmatter/dump_frontmatter (ruamel.yaml-based)
+parsing.py            ← imports from models; pure parsing, selection, and transformation helpers
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
-yaml_io.py            ← pure-YAML read/write for .yaml backlog items; imports from models, parsing
+yaml_io.py            ← private YAML codec imported only by file_cache.py
+file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
 gh_client.py          ← imports from models, parsing
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imported by backend implementations
 backend_protocol.py   ← BacklogBackend Protocol, BacklogConfig, create_backend; imports from models (type hints only)
-backends/             ← GitHubBackend, SQLiteBackend, InMemoryBackend; each implements BacklogBackend Protocol
-operations.py         ← imports from models, parsing, backend_protocol, yaml_io
+backends/             ← provider implementations; remote providers privately compose FileCache
+operations.py         ← imports from models, pure helpers, and backend_protocol only
 dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
 server.py             ← imports from models, operations, dispatch_state, backend_protocol
 backlog.py            ← imports from operations (thin CLI wrapper)
 ```
+
+The required storage dependency direction is:
+
+```text
+CLI / MCP → operations → configured backend protocol
+                         ├─ remote provider → remote API + private FileCache → yaml_io
+                         └─ local provider  → native store only
+```
+
+Direct dependencies from `operations.py`, `server.py`, or general parsing helpers to `file_cache.py`,
+`yaml_io.py`, or cache paths are forbidden. Import-boundary tests must enforce this rule.
 
 ## Output Pattern
 
@@ -157,15 +189,19 @@ All constants, all exception classes, all Pydantic models.
 
 ## Module: parsing.py
 
-**Responsibility**: File parsing, item search, slug generation, body section utilities, view helpers, normalize helpers.
+**Responsibility**: Pure item parsing and transformation, item search, slug generation, body section
+utilities, view helpers, and normalize helpers. Runtime backlog-directory traversal belongs to
+`FileCache`, not this provider-neutral module.
 
 **Current active functions** (post-YAML migration):
 
 - Date helpers: `today()`, `now_iso()`
 - Slug/title: `title_to_slug()`, `normalize_issue_title()`, `infer_type()`
 - Selector: `parse_issue_selector()`
-- Item parsing: `parse_item_file()` (legacy `.md` path — deprecated, kept for migration tooling),
-  `parse_backlog_from_directory()`, `parse_backlog()`
+- Item parsing: `parse_item_file()` (legacy `.md` path — deprecated and restricted to migration
+  tooling). Existing `parse_backlog_from_directory()` and `parse_backlog()` entry points are
+  migration debt; runtime callers must use the configured backend, and remote cache traversal moves
+  behind `FileCache`.
 - Item search: `find_item()` (dedup rule: when multiple title-substring matches share exactly one distinct issue number, returns the first match instead of raising `AmbiguousSelectorError`; still raises when matches have different issue numbers, or when any matching item is unnumbered), `find_fuzzy_duplicates()`
 - Item filtering: `items_needing_issues()`, `items_with_issues()`
 - Issue body: `build_issue_body()`, `build_issue_body_from_file()`
@@ -200,9 +236,9 @@ GitHub issue section bodies. Each entry is identified by an ISO timestamp used a
 
 ## Module: yaml_io.py
 
-**Responsibility**: Pure-YAML read/write for `.yaml` backlog item files. Primary I/O path for all
-new items. Provides a format-detecting reader that falls back to the legacy `.md` parser during
-transition.
+**Responsibility**: Private YAML codec for `FileCache`. It is not a storage API for operations,
+server tools, local backends, or provider-neutral business logic. Provides a format-detecting
+reader that falls back to the legacy `.md` parser during migration.
 
 **Public API** (`__all__`): `detect_format`, `load_item`, `load_item_text`, `save_item`
 
@@ -216,6 +252,40 @@ transition.
 - `.md` load path delegates to `parsing.parse_item_file()` and emits `DeprecationWarning`
 
 **Imports from other modules**: `from .models import BacklogItem`, `from .parsing import parse_item_file`
+
+**Allowed consumer**: `file_cache.py` and explicit migration tooling only. Runtime imports from
+`operations.py`, `server.py`, or backend-neutral helpers are architecture violations.
+
+---
+
+## Module: file_cache.py
+
+**Responsibility**: Durable offline cache owned privately by a remote-capable backend. It is the
+only runtime component permitted to read or write backlog YAML and cached plan or artifact files.
+
+**Stored state**:
+
+- Provider snapshots for backlog items and grooming content
+- Cached plans, artifact manifests, and artifact content
+- Last acknowledged provider revision and synchronization fingerprint
+- Pending mutations created while the provider is unreachable
+
+**Offline behavior**:
+
+- Reads return the latest cached value with explicit stale-state metadata.
+- Creates, updates, grooming changes, plans, and artifact mutations update the cache atomically and
+  append a durable pending mutation.
+- A missing cache record is reported as unavailable data, never as an authoritative empty result.
+
+**Reconnect behavior**:
+
+- The owning provider reconciles pending mutations against the last acknowledged provider revision.
+- Applied mutations update the provider revision and fingerprint before leaving the queue.
+- Concurrent provider changes produce an explicit conflict and retain the pending mutation.
+- Failed synchronization never discards cached content or queued work.
+
+**Dependency direction**: provider backend → `file_cache.py` → `yaml_io.py`. No higher-level module
+may access the cache directly.
 
 ---
 
@@ -299,36 +369,75 @@ do not import from `gh_client.py`, `operations.py`, or `server.py`)
 
 ## Module: backend_protocol.py
 
-**Responsibility**: Defines the `BacklogBackend` Protocol and `BacklogConfig` dataclass. Provides `create_backend()` factory and `get_config()` / `set_config()` / `reset_config()` module-level accessors. Decouples all operations and server code from any specific storage platform.
+**Responsibility**: Defines the backend protocols and `BacklogConfig` dataclass. Provides the
+`create_backend()` factory and `get_config()` / `set_config()` / `reset_config()` module-level
+accessors. Decouples operations and server code from provider APIs, native stores, and file-cache
+implementation details.
 
-**Public API** (`__all__`): `BacklogBackend`, `BacklogConfig`, `IssueCommentNode`, `IssueNode`, `MilestoneFullNode`, `create_backend`, `get_config`, `reset_config`
+**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `BranchBackend`, `BacklogConfig`,
+provider-neutral node types, `create_backend`, `get_config`, `set_config`, `reset_config`
 
-- `BacklogBackend` — `@runtime_checkable` Protocol defining the full backend contract. Method groups: repository access, GraphQL utilities, issue CRUD, issue comments, status mutations, milestones/projects, task issues, sync/serialisation (including rendering methods), and integration branches.
-- `BacklogConfig` — dataclass wrapping the active `BacklogBackend` instance; passed by dependency injection to `operations.py` and `server.py`.
-- `create_backend(name)` — factory that instantiates the backend by name (`"github"`, `"sqlite"`, `"memory"`, `"beads"`). Resolution order: explicit name → `BACKLOG_BACKEND` env var → `backlog.backend` in `.dh/config.yaml` → `.beads/dh-backend` marker auto-detect → default `"github"`.
+- `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
+  contract. Optional provider capabilities use separate protocols such as `SyncProvider` and
+  `BranchBackend`.
+- `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
+  injection to `operations.py` and `server.py`. It does not expose a cache object.
+- `create_backend(name)` — sole composition root for backend storage. It resolves the configured
+  provider, creates a `FileCache` for remote-capable providers, and injects it into that provider.
+  Local providers are created without a cache. Resolution order is explicit name →
+  `BACKLOG_BACKEND` environment variable → `backlog.backend` in `.dh/config.yaml` →
+  `.beads/dh-backend` marker auto-detect → default `"github"`.
 - `get_config()` — returns the module-level `BacklogConfig` singleton, auto-initialising on first call.
 
-**Rendering utilities via protocol dispatch**: Rendering methods (`section_heading`, `render_groomed_section`, `section_display_title`) are part of the `BacklogBackend` Protocol surface. Callers access rendering through the active backend rather than importing directly from `github_sync`. Shared rendering logic lives in `rendering.py` and is used by all backend implementations.
+**Rendering utilities via protocol dispatch**: Rendering methods (`section_heading`,
+`render_groomed_section`, `section_display_title`) are part of the `WorkItemBackend` protocol
+surface. Callers access rendering through the active backend rather than importing directly from
+`github_sync`. Shared rendering logic lives in `rendering.py` and is used by backend implementations.
 
-**Imports from other modules**: `from .models import ...` (type annotations only, under `TYPE_CHECKING`). Does NOT import from `gh_client`, `github_sync`, or `github_branches` — those are implementation details of the GitHub backend.
+**Imports from other modules**: `from .models import ...` (type annotations only, under
+`TYPE_CHECKING`) plus backend constructors at the composition root. It does not expose or proxy
+provider-specific APIs or file-cache operations.
 
 ---
 
 ## Backends: backends/
 
-**Responsibility**: Platform-specific implementations of `BacklogBackend`.
+**Responsibility**: Platform-specific implementations of `WorkItemBackend` and optional capability
+protocols.
 
-- `backends/github_backend.py` — `GitHubBackend`: delegates to `gh_client.py`, `github_sync.py`, `github_branches.py`. Requires `GITHUB_TOKEN`. Default backend.
-- `backends/sqlite_backend.py` — `SQLiteBackend`: local 6-table SQLite schema, WAL mode. No external credentials.
-- `backends/memory_backend.py` — `InMemoryBackend`: in-memory test double. No persistence.
+- `backends/github_backend.py` — remote-capable `GitHubBackend`: delegates to GitHub adapters and
+  privately owns the injected `FileCache`. Requires `GITHUB_TOKEN`. Default backend.
+- Future GitLab, Linear, Jira, and equivalent network backends follow the same remote-provider
+  composition: provider API plus a private `FileCache`.
+- `backends/sqlite_backend.py` — local `SQLiteBackend`: native SQLite storage. No `FileCache` and no
+  backlog YAML access.
+- `backends/memory_backend.py` — local `InMemoryBackend`: in-process native storage. No persistence,
+  `FileCache`, or backlog YAML access.
+- `backends/beads_backend.py` — local `BeadsBackend`: native Beads/Dolt storage through `bd`. No
+  `FileCache` and no backlog YAML access.
 
-Each backend imports from `backend_protocol` (for TypedDicts and config) and `models`. Backend selection is resolved at startup via `create_backend()`; consumers access the active backend through `get_config().backend`.
+Backend selection is resolved once via `create_backend()`; consumers access only
+`get_config().backend`. Remote backends may import `file_cache.py`; local backends must not.
+
+### Provider-owned artifacts and plans
+
+The configured backend is also the single routing decision for plans, grooming, artifact manifests,
+and artifact content. A backend may implement these capabilities through internal provider-specific
+components, but callers must not independently choose a second artifact or filesystem provider.
+
+For a remote provider, artifact and plan reads and writes participate in the same cache and pending
+mutation rules as work-item content. For Beads, SQLite, and Memory, those values remain in native
+backend storage only. Unsupported capabilities fail explicitly through the selected backend; they
+must not fall back to YAML or another provider.
 
 ---
 
 ## Module: operations.py
 
-**Responsibility**: High-level CRUD operations that combine parsing, GitHub, and file I/O. Each public function returns a dict or list and takes an optional `output: Output` parameter.
+**Responsibility**: Provider-neutral orchestration over the configured backend. Each public function
+returns a structured result and takes an optional `output: Output` parameter. Operations may combine
+business rules and pure transformations, but all persistence, provider communication, cache access,
+and artifact access go through `get_config().backend`.
 
 **Functions extracted/refactored from backlog.py**:
 
@@ -348,9 +457,12 @@ Each backend imports from `backend_protocol` (for TypedDicts and config) and `mo
 
 **Imports from other modules**:
 - `from .models import ...`
-- `from .parsing import ...`
-- `from .gh_client import ...`
-- `from .yaml_io import ...`
+- Pure, filesystem-free helpers from `parsing.py`
+- Protocols and `get_config()` from `backend_protocol.py`
+
+`operations.py` must not import `yaml_io.py`, `file_cache.py`, provider clients, provider-format
+adapters, or local backend implementations. Existing direct YAML and provider-client access is
+migration debt and does not describe a permitted architecture.
 
 ---
 
