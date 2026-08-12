@@ -18,16 +18,10 @@ With this plugin installed, Claude will:
 - Manage a configured-provider backlog (GitHub is the default deployment) and escalate to you only when constraints genuinely require human judgment
 - Execute milestone-scale work with true parallel orchestration using isolated git worktrees
 
-The underlying workflow could be assembled manually from provider CLIs and MCP calls. The harness
-packages those mechanics into stable agent-facing operations: consistent stage inputs and outputs,
-provider-neutral instructions, automatic progress tracking through hooks, structured search and
-filtering, and direct access to the relevant section or artifact without repeated lookup and parsing.
-Agents keep the work that needs judgment—research, diagnosis, design, review, and synthesis—while
-scripts and tools handle deterministic mechanics.
-
-This README is a mixed human-and-agent overview. Installation, configuration, usage, and ordinary
-troubleshooting are documented in capability terms; implementation architecture and contributor
-requirements live in the linked developer references.
+The harness keeps work consistent from intake through verified delivery, preserves progress and
+evidence across sessions, and makes the relevant backlog item, plan, task, or artifact directly
+available at each stage. Claude handles repeatable workflow coordination while escalating decisions
+that require your judgment.
 
 ## Quick Start
 
