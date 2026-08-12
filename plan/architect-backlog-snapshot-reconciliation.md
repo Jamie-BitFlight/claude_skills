@@ -1,5 +1,8 @@
 # Architect Spec: Provider-Neutral Backlog Snapshot Reconciliation
 
+> **Audience: contributor/developer.** This is the implementation decision record; consumer
+> setup, usage, and recovery guidance belong in plugin documentation.
+
 **Tracking:** `claude_skills-7t0`
 
 **Date:** 2026-08-12
@@ -13,7 +16,8 @@
 ## 1. Decision
 
 Replace the separate startup refresh, groomed-content push, and bulk-pull implementations with one
-provider-neutral reconciliation capability on remote-capable backends:
+provider-neutral reconciliation capability on remote-capable backends. This document remains target
+state until its migration gates close:
 
 ```python
 class SyncProvider(Protocol):
@@ -21,15 +25,18 @@ class SyncProvider(Protocol):
 ```
 
 The selected remote backend owns its provider API adapter and private `FileCache`; its `reconcile()`
-method delegates classification, merge policy, checkpoint policy, and no-op suppression to
-`reconciliation.py`. Existing MCP parameters retain their meaning and existing result keys remain;
+method delegates pure classification, merge, checkpoint-decision, and no-op policy to
+`reconciliation.py`. The backend applies returned persistence actions and checkpoint decisions
+through its private cache. Existing MCP parameters retain their meaning and existing result keys remain;
 plan create/update add an optional opaque `owner_reference` for non-numeric providers. Their
 operation-layer functions become thin adapters around this capability.
 
-This architecture replaces the earlier per-item dirty-flag proposal. It adds no second outbox or
-parallel local authority: the provider-owned `FileCache` supplies the one durable pending-mutation
-queue required for offline writes. Local edits remain protected by a persisted content fingerprint
-and the existing entry-aware merge.
+This architecture replaces the earlier per-item dirty-flag proposal. Each remote-capable backend's
+private `FileCache` owns its cache records, checkpoints, and one durable pending-mutation queue for
+offline writes; reconciliation owns no persistence or queue. Cache-record updates and queue appends
+are atomic, queued mutations are idempotent, and partial replay retains every unapplied or conflicted
+mutation. Local edits remain protected by a persisted content fingerprint and the existing entry-aware
+merge.
 
 ## 2. Goals and non-goals
 
@@ -109,7 +116,8 @@ document type. Reconciliation reuses the pure parse, render, and entry-aware mer
 `github_sync.py`; a future provider adapter translates at its edge only if its native representation
 differs. The engine receives provider snapshots and logical cache records from the owning backend and
 returns classified actions to it. Only the backend's private `FileCache` reads or writes YAML,
-checkpoints, artifact content, or queued mutations.
+checkpoints, artifact content, or queued mutations. Beads, SQLite, and Memory use native storage
+only and never instantiate `FileCache` or access backlog YAML.
 
 ### 4.2 Why this seam is deep
 
@@ -234,11 +242,13 @@ projection before hashing. The artifact manifest copied from `original_body`, pr
 local-only metadata are excluded. This prevents a newly fetched provider body from contaminating the calculation of
 whether the local item changed.
 
-- `metadata.sync_fingerprint` is the body checkpoint established by the last durable pull, push, or no-op comparison.
+- `metadata.sync_fingerprint` is the body checkpoint established by the last durable pull, push, or no-op comparison;
+  the remote backend's `FileCache` persists it.
 - `metadata.updated_at` stores the last observed opaque provider revision.
 - `metadata.last_synced` retains its current legacy meaning and is not read by reconciliation. Removing or migrating it
   is separate cleanup.
-- `.last_sync` stores the provider snapshot's `sync_started_at` and controls incremental snapshot scope.
+- `.last_sync` stores the provider snapshot's `sync_started_at` and controls incremental snapshot scope; the remote
+  backend's `FileCache` owns this checkpoint.
 
 No bulk migration is required. A missing fingerprint is a bootstrap conflict: merge local and provider body content,
 then establish the first checkpoint only after the required local write and provider patch or equality check succeeds.
@@ -263,8 +273,8 @@ patch.
 | --- | --- | --- |
 | Unchanged | Neither body differs from the baseline | Update provider-owned fields or revision only if needed; otherwise no-op. |
 | Local only | Local differs; provider body matches baseline | Render the local item and patch only when that body differs from the snapshot. |
-| Remote only | Provider differs; local matches baseline | Parse provider body and ask the owning backend to persist it through `FileCache`. |
-| Concurrent | Both differ | Apply the existing entry-aware merge; the backend persists it through `FileCache` and patches only if the merged body differs. |
+| Remote only | Provider differs; local matches baseline | Return a local persistence action; the owning backend persists it through its private `FileCache`. |
+| Concurrent | Both differ | Apply the existing entry-aware merge; return the local action and provider patch, while the backend persists through its private `FileCache`. |
 | Bootstrap | No baseline | Treat as concurrent, then establish the first checkpoint. |
 | Force pull | `request.force` | Replace synchronized local content from the provider without merging. |
 | Remote only item | Snapshot item has no cached linked item | Ask the owning remote backend to create its private cache record. |
@@ -329,23 +339,23 @@ GitHub does not provide an atomic compare-and-swap argument on `updateIssue`; th
 best-effort optimistic guard. The adapter must keep the preflight and mutation adjacent, and a later reconciliation
 will detect any race through revision and fingerprint mismatch.
 
-## 9. Cache, queue, and failure rules
+## 9. Cache, queue, and failure rules (remote backend responsibility)
 
-- Persist a remote-only or force-pulled cache record before updating its per-item checkpoint.
+- The owning remote backend persists a remote-only or force-pulled cache record before updating its per-item checkpoint.
 - For local-only changes, update the checkpoint only after an applied patch or confirmed body equality.
 - For concurrent/bootstrap changes, persist the merged cache record first. If the merged body differs remotely, update
   the checkpoint only after its patch applies. A failed patch leaves the merged body dirty by fingerprint mismatch.
 - A `conflict` patch result leaves the item checkpoint unchanged and increments `conflicts`; it is retried because its
   local fingerprint still differs.
 - An `error` patch result leaves the item checkpoint unchanged and increments `failures`.
-- Write `.last_sync = snapshot.sync_started_at` only after a complete snapshot was fetched and reconciliation completed
-  with zero failures. Conflicts are processed outcomes and do not block the global watermark because their per-item
-  fingerprint remains dirty.
+- The owning remote backend writes `.last_sync = snapshot.sync_started_at` only after a complete snapshot was fetched
+  and reconciliation completed with zero failures. Conflicts are processed outcomes and do not block the global
+  watermark because their per-item fingerprint remains dirty.
 - Any partial snapshot fetch raises and leaves `.last_sync` unchanged.
 - Use the existing sync lock to serialize startup, explicit sync-now, `backlog_sync`, and bulk pull reconciliation.
-- When the provider is unreachable, the backend atomically updates its cache record and appends a
-  pending mutation with a stable idempotency key. A missing cache record returns unavailable data,
-  not an empty authoritative result.
+- When the provider is unreachable, the backend's `FileCache` atomically updates its cache record and appends a
+  pending mutation with a stable idempotency key. A missing cache record returns unavailable data, not an empty
+  authoritative result.
 - Reconnect replay applies queued mutations against their base revisions. It removes only provider-
   acknowledged entries; conflicts, failures, and unattempted entries after partial replay remain
   durable for the next reconciliation.
@@ -434,8 +444,8 @@ real output dependency.
    - Add import-boundary tests proving operations, server, reconciliation, and local backends cannot
      import `yaml_io` or open cache paths.
 3. **Deep reconciliation engine**
-   - Implement fingerprinting, classification, field ownership, merge, checkpoint policy, result
-     counts, dry-run, force, deletion, and failure policy without filesystem access.
+   - Implement fingerprinting, classification, field ownership, merge, checkpoint decisions, result
+     counts, dry-run, force, deletion, and failure policy without filesystem access or persistence.
    - Test unchanged, local-only, remote-only, concurrent, bootstrap, force, provider deletion, and
      remotely closed/local-content-change behavior with test-local provider and cache doubles.
 4. **GitHub reconciliation and content composition** (depends on 2 and 3)

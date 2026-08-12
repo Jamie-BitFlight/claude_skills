@@ -6,15 +6,39 @@ related:
   - skills/work-backlog-item/references/workflows/groom/groom.md
   - skills/work-backlog-item/references/workflows/groom/finalize.md
 created: 2026-03-30
-updated: 2026-04-06
-source: "Derived from verified sources: state-machine.md (Phase 2 analysis), architect spec Issue #398 Sections 2 and 8, codebase architecture analysis Section 2. Updated 2026-04-06 for skill consolidation and backend-agnostic model."
+updated: 2026-08-12
+source: "Derived from the lifecycle workflows and configured-backend contracts. Keep provider wire formats, cache policy, and capability details in backend-providers.md."
 ---
 
 # Backlog Item Lifecycle — Canonical Reference
 
 This document is the authoritative reference for the backlog item lifecycle state machine,
-stage transitions, state persistence, and data architecture. All routes within
+stage transitions, and consumer-visible persistence behavior. All routes within
 `work-backlog-item` that modify item state MUST enforce only the transitions defined here.
+
+## Consumer workflow
+
+Use the configured backlog provider through the supported MCP tool or CLI operation. Treat
+`item_ref`, selectors, issue references, artifact references, and plan addresses as opaque
+strings: pass them back exactly as returned and never infer a provider's numeric format.
+
+Run the stages in order: create, groom, work, then close or resolve. Use `backlog_list` or
+`backlog_view` for lookup, `backlog_update`/`backlog_groom` for lifecycle writes, and the
+SAM `sam_plan`/`sam_task` tools (or their CLI equivalents) for plan and task progress. Use
+`artifact_list` and `artifact_read` for artifact discovery and retrieval. Let those tools
+parse selectors, search, filter, address, and progress; reserve agent reasoning for evidence
+interpretation, diagnosis, synthesis, and decisions.
+
+Completion criterion: the returned logical reference, status, and provider outcome are
+recorded; a missing or unavailable result is reported with its warning/error metadata rather
+than replaced with a guessed local value.
+
+## Contributor boundary
+
+Contributors MUST route every lifecycle read and write through `backlog_core.operations` and
+the configured backend capability. Keep provider-specific identifiers, wire field names,
+timestamps, cache paths, and reconciliation mechanics inside adapters. Do not make consumer
+workflow text depend on a GitHub issue number, YAML path, or provider-native API.
 
 ---
 
@@ -65,7 +89,7 @@ stateDiagram-v2
 | `blocked-grooming` | `blocked` | RT-ICA BLOCKED during grooming — missing information prevents grooming |
 | `blocked-work` | `blocked` | AC verification FAIL during work — implementation issue prevents completion |
 | `in-milestone` | `in-milestone` | Assigned to a milestone, awaiting work |
-| `in-progress` | `in-progress` | Work started, plan file created, implementation underway |
+| `in-progress` | `in-progress` | Work started, opaque plan address recorded, implementation underway |
 | `done` | `done` | Implementation complete, AC verified PASS, checklist 100% |
 | `resolved` | `resolved` | Item closed without full implementation (obsolete, invalid, superseded) |
 | `closed` | `closed` | Terminal state — milestone archived, item no longer active |
@@ -140,7 +164,7 @@ NEXT-token handoff model where separate skills passed control to each other.
 
 | Stage | Route | Workflow file | Produces | Status on completion |
 |---|---|---|---|---|
-| Create | `create` | `workflows/create/scope.md` + `start.md` | `item_ref` (`#N`), backend issue | `needs-grooming` |
+| Create | `create` | `workflows/create/scope.md` + `start.md` | Opaque `item_ref`, optional provider issue | `needs-grooming` |
 | Groom | `groom` | `workflows/groom/scope.md` + `start.md` | DEEP item with all required sections (defined in finalize.md) | `groomed` |
 | Work | `work` | `workflows/work/scope.md` + `start.md` | SAM plan | `open/groomed` → `in-progress` |
 
@@ -212,36 +236,44 @@ Updated 2026-04-06 for pipeline model replacing NEXT-token handoffs.
 
 ---
 
-## 3. State Persistence
+## 3. State persistence and provider outcomes
 
-State is persisted through the `BacklogBackend` Protocol (`backlog_core/backend_protocol.py`).
-The active backend is the source of truth. When local cache and the backend disagree, the
-backend wins.
+Route lifecycle state through the configured `WorkItemBackend` and its optional
+`ContentProvider`/`SyncProvider` capabilities. The provider owns the authoritative record;
+the workflow consumes logical objects and references. Do not assume that every provider has a
+remote source, a local cache, or the same identifier type.
 
-All state mutations go through the shared `backlog_core.operations` layer — reachable via MCP
-tools (`backlog_update`, `backlog_groom`, `backlog_close`, `backlog_resolve`) or their CLI
-equivalents (`backlog update`, `backlog groom`, `backlog close`, `backlog resolve`; see
-[Backend Providers](./backend-providers.md) "CLI vs MCP Capability Surface"). Direct edits to
-local cache files or backend-native APIs bypass sync logic and are prohibited.
+All lifecycle mutations go through `backlog_core.operations`, exposed through the MCP tools
+(`backlog_update`, `backlog_groom`, `backlog_close`, `backlog_resolve`) and the provider-neutral
+CLI where that command exists. In Beads-backed projects, use `bd` for native issue, status,
+dependency, readiness, label, notes, and metadata operations. Use the MCP or CLI surface for
+operations that the native provider does not expose. Never edit a provider-private cache or
+reconstruct a provider record from a path.
 
 ### Persistence Layers
 
-| Layer | Purpose | Access method |
+| Layer | Consumer-visible contract | Ownership and outcome |
 |---|---|---|
-| Backend | Source of truth for status, priority, sections, comments | MCP tools (`mcp__plugin_dh_backlog__*`) or the CLI (`backlog ...`) |
-| Local cache | Read-optimized derived copy of backend state | Written only by MCP tools or the CLI; never edited directly |
-| SAM plans | Task decomposition and execution state | SAM MCP tools (`mcp__plugin_dh_sam__*`) or the CLI (`plan ...`) |
-| Active-task context | Ephemeral session state for task execution | Written by `/dh:start-task`, deleted after completion |
+| Configured work-item provider | Status, priority, sections, comments, and logical item references | Authoritative for the selected backend |
+| GitHub provider cache | Local snapshots, content records, checkpoints, and pending writes | Private to the GitHub adapter; reads are marked `stale: true` when served offline |
+| Beads provider | Native `bd` issue records and KV content | Cache-free native local provider; `bd` availability/errors propagate as unavailable |
+| SQLite provider | Local SQLite work-item/content records | Native local provider; no remote reconciliation is implied |
+| Memory provider | Process-local work-item/content records | Test-only durability; data ends with the provider instance |
+| Configured backend plan/task capability | Plan content, task state, and progress | Use `sam_plan`/`sam_task` or `plan` CLI with the returned opaque plan address; do not select a second provider |
+| Active-task context | Ephemeral execution context | Written by `/dh:start-task`; delete after completion |
 
-### Backend Selection
+### Backend selection
 
-Resolution order:
+Resolve the backlog provider in this order:
 
-1. `BACKLOG_BACKEND` environment variable
-2. `backlog.backend` in `.dh/config.yaml` (project root, then `~/.dh/`)
-3. Default: `github`
+1. `BACKLOG_BACKEND` environment variable.
+2. `backlog.backend` in project `.dh/config.yaml`, then user `~/.dh/config.yaml`.
+3. `backend.name` in those config files.
+4. The project `.beads/dh-backend` marker, which explicitly selects `beads`.
+5. `github` for backlog operations.
 
-Available backends: `github` (default), `sqlite` (local, no credentials), `memory` (test double).
+The supported identifiers are `github`, `beads`, `sqlite`, and `memory`. Selection is a
+configuration concern; consumer workflow must not branch on a provider's wire format.
 
 See [Backend Providers](./backend-providers.md) for full Protocol reference, method groups,
 and configuration.
@@ -253,22 +285,49 @@ and configuration.
 | `status` | MCP tools | Current lifecycle state (`needs-grooming`, `groomed`, `blocked`, etc.) |
 | `priority` | `backlog_add` | P0, P1, P2, or Ideas |
 | `groomed` | `backlog_groom` | Date when grooming completed (set after all required sections present — defined in finalize.md) |
-| `plan` | `backlog_update(plan=...)` | SAM plan address (`P{id}`) — a backend reference, not a file path |
-| `issue` | `backlog_add` | Backend issue identifier (`#N` format) |
+| `reference` | provider create/read | Opaque logical item reference returned by the provider |
+| `plan` | `backlog_update(plan=...)` | Opaque SAM plan address — pass it to `sam_plan`/`plan` unchanged; it is not a file path |
+| `issue` | provider adapter | Optional provider-native issue identifier retained for adapter use |
 | `milestone` | `group-items-to-milestone` | Milestone identifier |
 | Groomed sections | `backlog_groom` | RT-ICA, Impact Radius, Fact-Check, and other groomed subsections |
 
-### SAM Plan Files
+### SAM plans and task addresses
 
-Created by `add-new-feature` Phase 4 via `sam_create`. Managed by the SAM MCP server.
-Access via `sam_task(plan="P{id}", task="T{M}", config={"action":"read"})` (MCP) or
-`plan read --address P{id}` (CLI), and `sam_plan(config={"action":"list","search":"{slug}"})`
-(MCP) or `plan list --search {slug}` (CLI) — not via filesystem path. (`sam_read`/`sam_list` are
-deprecated tool names — see [TASK_FILE_FORMAT.md](./TASK_FILE_FORMAT.md) "Deprecated Tools".)
+Create plans with `sam_plan(config={"action":"create", ...})` (MCP) or `plan create` (CLI),
+then use the same configured backend for plan content, task state, and progress. Read a task
+with `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"read"})` (MCP)
+or `plan read --address {plan_address}` (CLI). Discover plans with
+`sam_plan(config={"action":"list","search":"{search_term}"})` or `plan list --search
+{search_term}`. These tools resolve addresses; do not inspect or infer filesystem paths.
+(`sam_read`/`sam_list` are deprecated names; see
+[TASK_FILE_FORMAT.md](./TASK_FILE_FORMAT.md) "Deprecated Tools".)
 
-The plan address is written to the backlog item via
-`backlog_update(selector='{item_ref}', plan='P{id}')`. The `plan` field is a backend
-reference, not a filesystem path.
+Do not select or instantiate a separate plan/task provider. The active-task context is only an
+ephemeral session pointer to the returned addresses; it is not a plan store, cache, or source of
+truth.
+
+Write the returned opaque plan address to the backlog item with
+`backlog_update(selector='{item_ref}', plan='{plan_address}')`. The `plan` field is a logical
+provider reference, not a filesystem path or a guaranteed `P...` token.
+
+### Stale and unavailable results
+
+Propagate provider outcome metadata to the agent:
+
+- A GitHub cache-backed read can return `stale: true` when the remote is unavailable. Use the
+  content only as an explicitly stale snapshot and report that status before making decisions.
+- A queued offline write is `pending: true`; do not claim remote acknowledgement until the
+  provider reports replay success.
+- A cache miss, invalid native record, missing `bd` executable, or provider API failure is an
+  unavailable result. Report the provider error and stop or request recovery; do not silently
+  fall back to GitHub or a local file.
+- Native local providers (`beads`, `sqlite`, `memory`) do not imply a remote copy. Their
+  successful reads are authoritative for that selected provider, and their failures remain
+  provider failures.
+
+Completion criterion: every consumer-facing response preserves the selected provider's
+`stale`, `pending`, warning, or error signal, and no route claims synchronization that the
+provider did not acknowledge.
 
 SOURCE: Codebase architecture analysis Issue #398 (accessed 2026-03-30), Section 2.
 Updated 2026-04-06 for backend-agnostic model.
@@ -293,7 +352,7 @@ may modify lifecycle state without being added to this table.
 | `blocked` | `needs-grooming` | (user re-queues) | User provides missing info; operator runs `groom` again |
 | `blocked` | `resolved` | any route | User cancels item; explicit reason provided |
 | `groomed` | `in-milestone` | `group-items-to-milestone` | Item assigned to open milestone |
-| `in-milestone` | `in-progress` | `work-backlog-item work` | RT-ICA APPROVED AND SAM plan file created |
+| `in-milestone` | `in-progress` | `work-backlog-item work` | RT-ICA APPROVED AND SAM plan address recorded |
 | `in-milestone` | `groomed` | `work-backlog-item work` | RT-ICA BLOCKED — item pulled back for re-grooming |
 | `in-progress` | `done` | `work-backlog-item close` | Plan checklist 100% AND AC verified PASS |
 | `in-progress` | `resolved` | `work-backlog-item resolve` | `verified` marker present AND explicit summary |
@@ -379,9 +438,10 @@ metadata:
   status: needs-grooming | groomed | in-milestone | in-progress | done | resolved | closed | blocked
   priority: P0 | P1 | P2 | Ideas
   groomed: {YYYY-MM-DD} | null
-  issue: {item_ref #N} | null
+  reference: {opaque item reference}
+  issue: {provider-native issue identifier} | null
   milestone: {milestone identifier} | null
-  plan: {plan address P{id}} | null
+  plan: {opaque plan address} | null
   updated_at: {ISO timestamp}
 ```
 
@@ -508,7 +568,7 @@ SOURCE: Architect spec Issue #398, Section 9 (AC7 severity policy decision) (acc
 - [Work Scope](../skills/work-backlog-item/references/workflows/work/scope.md) — Work stage scope boundary
 - [Groom Workflow](../skills/work-backlog-item/references/workflows/groom/start.md) — groom stage index
 - [Groom Finalize](../skills/work-backlog-item/references/workflows/groom/finalize.md) — output validation and write procedure
-- [Backend Providers](./backend-providers.md) — BacklogBackend Protocol, available backends, configuration
+- [Backend Providers](./backend-providers.md) — provider capabilities, configuration, and transport boundaries
 - [State Machine](../skills/backlog/references/state-machine.md) — canonical state DAG source
-- [Feasibility Gate](../skills/work-backlog-item/references/feasibility-gate.md) — work stage feasibility check
-- Architect Spec — access via `artifact_read(item_id=398, artifact_type="architect")` — authoritative design decisions
+- [Feasibility Gate](../skills/work-backlog-item/references/workflows/work/feasibility-gate.md) — work stage feasibility check
+- Architect Spec — access via `artifact_read(item_id="<provider-reference>", artifact_type="architect")` — authoritative design decisions
