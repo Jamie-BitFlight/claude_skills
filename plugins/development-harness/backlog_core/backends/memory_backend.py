@@ -37,6 +37,13 @@ from backlog_core.models import (
     BacklogItem,
     BacklogItemMetadata,
     BranchInfo,
+    ContentConflictError,
+    ContentKind,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
     GroomedData,
     IssueLocalFields,
     IssueStatus,
@@ -121,6 +128,58 @@ class InMemoryBackend:
 
         # Branches: {name: BranchInfo}
         self._branches: dict[str, BranchInfo] = {}
+
+        self._content: dict[tuple[str, str, str, str], ContentRecord] = {}
+
+    def list_content(self, query: ContentQuery) -> list[ContentRecord]:
+        """Return the requested bounded page from in-memory content."""
+        records = [
+            record
+            for record in self._content.values()
+            if record.reference.kind == query.kind
+            and record.owner_reference == query.owner_reference
+            and query.search.casefold() in record.reference.name.casefold()
+        ]
+        records.sort(
+            key=lambda record: (record.reference.namespace, record.reference.artifact_type, record.reference.name)
+        )
+        return records[query.offset : query.offset + query.limit]
+
+    def get_content(self, reference: ContentRef) -> ContentRecord:
+        """Return one in-memory content record by logical identity."""
+        try:
+            return self._content[self._content_key(reference)]
+        except KeyError:
+            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}") from None
+
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        """Create or replace one in-memory content record."""
+        key = self._content_key(request.reference)
+        current = self._content.get(key)
+        current_revision = current.revision if current is not None else ""
+        if request.expected_revision and request.expected_revision != current_revision:
+            raise ContentConflictError("Content revision no longer matches")
+        owner_reference = request.reference.namespace
+        if request.reference.kind == ContentKind.PLAN:
+            owner_reference = (
+                request.owner_reference
+                if request.owner_reference is not None
+                else current.owner_reference
+                if current is not None
+                else ""
+            )
+        record = ContentRecord(
+            reference=request.reference,
+            owner_reference=owner_reference,
+            content=request.content,
+            revision=uuid.uuid4().hex,
+        )
+        self._content[key] = record
+        return record
+
+    @staticmethod
+    def _content_key(reference: ContentRef) -> tuple[str, str, str, str]:
+        return (reference.kind, reference.namespace, reference.artifact_type, reference.name)
 
     # ------------------------------------------------------------------
     # Repository access

@@ -48,6 +48,13 @@ from backlog_core.models import (
     BacklogItem,
     BacklogItemMetadata,
     BranchInfo,
+    ContentConflictError,
+    ContentKind,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
     GroomedData,
     IssueLocalFields,
     IssueStatus,
@@ -108,6 +115,17 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS content_records (
+    kind             TEXT NOT NULL,
+    namespace        TEXT NOT NULL,
+    artifact_type    TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    owner_reference  TEXT NOT NULL,
+    content           TEXT NOT NULL,
+    revision          INTEGER NOT NULL,
+    PRIMARY KEY (kind, namespace, artifact_type, name)
+);
+
 PRAGMA journal_mode=WAL;
 """
 
@@ -153,6 +171,78 @@ class SQLiteBackend:
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SCHEMA_SQL)
         self._conn.commit()
+
+    def list_content(self, query: ContentQuery) -> list[ContentRecord]:
+        """Return the requested bounded page from SQLite content."""
+        rows = self._conn.execute(
+            "SELECT * FROM content_records WHERE kind = ? AND owner_reference = ? "
+            "AND instr(lower(name), lower(?)) > 0 ORDER BY namespace, artifact_type, name LIMIT ? OFFSET ?",
+            (query.kind, query.owner_reference, query.search, query.limit, query.offset),
+        ).fetchall()
+        return [self._content_record(row) for row in rows]
+
+    def get_content(self, reference: ContentRef) -> ContentRecord:
+        """Return one SQLite content record by logical identity."""
+        row = self._conn.execute(
+            "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
+            self._content_key(reference),
+        ).fetchone()
+        if row is None:
+            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+        return self._content_record(row)
+
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        """Create or replace one SQLite content record.
+
+        Returns:
+            The stored record with its new revision.
+        """
+        current = self._conn.execute(
+            "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
+            self._content_key(request.reference),
+        ).fetchone()
+        current_revision = str(current["revision"]) if current is not None else ""
+        if request.expected_revision and request.expected_revision != current_revision:
+            raise ContentConflictError("Content revision no longer matches")
+        owner_reference = request.reference.namespace
+        if request.reference.kind == ContentKind.PLAN:
+            owner_reference = (
+                request.owner_reference
+                if request.owner_reference is not None
+                else str(current["owner_reference"])
+                if current is not None
+                else ""
+            )
+        revision = int(current_revision or "0") + 1
+        self._conn.execute(
+            "INSERT INTO content_records "
+            "(kind, namespace, artifact_type, name, owner_reference, content, revision) VALUES (?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(kind, namespace, artifact_type, name) DO UPDATE SET "
+            "owner_reference = excluded.owner_reference, content = excluded.content, revision = excluded.revision",
+            (*self._content_key(request.reference), owner_reference, request.content, revision),
+        )
+        self._conn.commit()
+        return ContentRecord(
+            reference=request.reference,
+            owner_reference=owner_reference,
+            content=request.content,
+            revision=str(revision),
+        )
+
+    @staticmethod
+    def _content_key(reference: ContentRef) -> tuple[str, str, str, str]:
+        return (reference.kind, reference.namespace, reference.artifact_type, reference.name)
+
+    @staticmethod
+    def _content_record(row: sqlite3.Row) -> ContentRecord:
+        return ContentRecord(
+            reference=ContentRef(
+                kind=row["kind"], namespace=row["namespace"], artifact_type=row["artifact_type"], name=row["name"]
+            ),
+            owner_reference=row["owner_reference"],
+            content=row["content"],
+            revision=str(row["revision"]),
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
