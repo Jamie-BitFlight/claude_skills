@@ -22,7 +22,7 @@ class SyncProvider(Protocol):
 
 The selected remote backend owns its provider API adapter and private `FileCache`; its `reconcile()`
 method delegates classification, merge policy, checkpoint policy, and no-op suppression to
-`reconciliation.py`. Existing MCP tools keep their public parameters and result shapes; their
+`reconciliation.py`. Existing MCP tools keep their public parameters and existing result keys; their
 operation-layer functions become thin adapters around this capability.
 
 This architecture replaces the earlier per-item dirty-flag proposal. It adds no second outbox or
@@ -211,12 +211,17 @@ class ReconcileResult(BaseModel):
     file_paths: dict[str, str] = Field(default_factory=dict)
     diffs: dict[str, str] = Field(default_factory=dict)
     patch_results: list[PatchResult] = Field(default_factory=list)
+    stale: bool = False
+    unavailable_references: list[str] = Field(default_factory=list)
+    pending_mutations: int = 0
 ```
 
 Counts describe completed outcomes, not attempted work. `provider_patches` counts only `applied` patch results.
 `conflicts` includes optimistic-precondition conflicts. `failures` includes fetch, local-persistence, and provider errors.
 The wrapper maps this result to its existing public keys and emits a compact progress message containing fetched pages,
-fetched items, local updates, provider patches, no-ops, conflicts, and failures.
+fetched items, local updates, provider patches, no-ops, conflicts, failures, stale state, unavailable
+references, and pending mutations. Existing keys remain; wrappers add `stale`, `unavailable`, and
+`pending` so callers never mistake offline cache state for an authoritative empty result.
 
 ## 6. Checkpoints and fingerprints
 
@@ -346,7 +351,8 @@ will detect any race through revision and fingerprint mismatch.
 
 ## 10. Entry-point mapping
 
-Public MCP parameters and result keys do not change.
+Public MCP parameters do not change. Existing result keys retain their meaning; reconciliation adds
+the explicit `stale`, `unavailable`, and `pending` keys described in section 5.3.
 
 ### Startup and explicit sync-now
 
@@ -399,6 +405,15 @@ alone.
 Execute this dependency graph. Tasks on the same row may run in parallel; every edge represents a
 real output dependency.
 
+```text
+1 contracts
+├─→ 2 FileCache ─┐
+├─→ 3 engine ────┼─→ 4 GitHub composition ─┐
+└─→ 5 local providers ─────────────────────┼─→ 6 high-level routing
+                                             └───────────────┘
+6 routing → 7 lifecycle → 8 documentation → 9 independent acceptance
+```
+
 1. **Models and backend capability**
    - Add `sync_fingerprint`, reconciliation request/result models, and the one-method
      `SyncProvider.reconcile()` capability without changing `WorkItemBackend`.
@@ -416,33 +431,37 @@ real output dependency.
      counts, dry-run, force, deletion, and failure policy without filesystem access.
    - Test unchanged, local-only, remote-only, concurrent, bootstrap, force, provider deletion, and
      remotely closed/local-content-change behavior with test-local provider and cache doubles.
-4. **GitHub backend composition**
+4. **GitHub backend composition** (depends on 2 and 3)
    - Construct `FileCache` only for GitHub and compose it with the reconciliation engine behind
      `GitHubBackend.reconcile()`.
    - Implement 100-item snapshot pages, bounded targeted aliases, inclusive-watermark deduplication,
      revision preflight, and at-most-25-item body mutation batches.
    - Test tombstones, no-op omission, offline queueing, idempotent/partial replay, partial fetch
      failure, and patch conflict/error mapping.
-5. **Operation, plan, and artifact routing**
+5. **Local-provider native content capabilities** (depends on 1; parallel with 2 and 3)
+   - Implement `ContentProvider` on Beads, SQLite, and Memory using only native storage.
+   - Preserve opaque provider identifiers and return explicit unsupported errors rather than YAML
+     or alternate-provider fallback.
+6. **Operation, plan, and artifact routing** (depends on 4 and 5)
    - Replace startup refresh, sync push, bulk pull, and selector pull internals with the selected
      backend's reconciliation capability.
    - Route plans, grooming, artifact manifests, and artifact content through capabilities on the
      configured backend; remove independent artifact/task provider selection and filesystem fallback.
    - Preserve MCP parameters, output keys, dry-run, force, and diff behavior. Delete superseded paths
      only after wrapper tests pass.
-6. **Startup gating and progress**
+7. **Startup gating and progress** (depends on 6)
    - Gate lifespan and sync-now on `SyncProvider`; map `ReconcileResult` into `SyncState` and compact
      output messages.
    - Test that Memory, SQLite, and Beads start no sync task, perform no network/cache access, and use
      only native backend storage.
-7. **Documentation alignment**
+8. **Documentation alignment** (depends on 7)
    - Correct current contributor and consumer documents against `backlog_core/ARCHITECTURE.md` and
      mark obsolete storage designs superseded.
    - Classify documents by contributor/developer, installation/configuration/usage, or mixed overview
      frame and remove implementation leakage from consumer documents.
    - Replace deterministic manual parsing, lookup, filtering, addressing, and state-update steps with
      tools where practical.
-8. **Lifecycle fixture and acceptance**
+9. **Lifecycle fixture and independent acceptance** (depends on 8)
    - Disable startup sync explicitly in the live fixture while preserving L1-L11; assert L8/L9 linked
      scope and bounded fetched counts.
    - Run targeted tests, Ruff, ty, affected prek hooks, live lifecycle, and independent verification.
@@ -464,7 +483,10 @@ real output dependency.
 - Offline remote reads return cached data marked stale; missing cache records return unavailable;
   offline writes queue durably and idempotently; conflicts and partial replay retain unapplied work.
 - Import-boundary tests reject direct runtime YAML/cache access outside `FileCache` and migration tooling.
-- Existing wrapper-level tests pass without MCP parameter or result-shape changes.
+- Existing wrapper-level tests pass without MCP parameter changes or changes to the meaning of
+  existing result keys; tests also cover the additive offline-state keys.
+- README and consumer documentation describe logical capabilities and recovery without cache paths,
+  provider wire formats, Python module names, or internal call graphs.
 - Live L1-L11 completes within the CI timeout, and L8/L9 perform no full historical closed-issue refresh.
 
 ## 14. Risks and decisions held
