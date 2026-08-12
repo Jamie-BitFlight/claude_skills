@@ -75,12 +75,7 @@ def dh_env(tmp_path: Path):
 
     dh_state = str(tmp_path / "dh_state")
     env = os.environ.copy()
-    env.update({
-        "DH_STATE_HOME": dh_state,
-        "BACKLOG_BACKEND": "sqlite",
-        "GITHUB_TOKEN": "",
-        "GH_TOKEN": "",
-    })
+    env.update({"DH_STATE_HOME": dh_state, "BACKLOG_BACKEND": "sqlite", "GITHUB_TOKEN": "", "GH_TOKEN": ""})
 
     saved_dh_home = os.environ.get("DH_STATE_HOME")
     os.environ["DH_STATE_HOME"] = dh_state
