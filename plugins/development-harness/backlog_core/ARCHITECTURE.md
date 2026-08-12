@@ -54,12 +54,12 @@ from `.md` frontmatter files to `.yaml` format in-place. It uses `yaml_io.load_i
 models.py             ← standalone, no imports from other mcp modules
 parsing.py            ← imports from models; pure parsing, selection, and transformation helpers
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
-yaml_io.py            ← private YAML codec imported only by file_cache.py
+yaml_io.py            ← private YAML codec imported only by file_cache.py and migration tooling
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
 gh_client.py          ← imports from models, parsing
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imported by backend implementations
-backend_protocol.py   ← BacklogBackend Protocol, BacklogConfig, create_backend; imports from models (type hints only)
+backend_protocol.py   ← protocols/config plus composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
 operations.py         ← imports from models, pure helpers, and backend_protocol only
 dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
@@ -430,6 +430,10 @@ mutation rules as work-item content. For Beads, SQLite, and Memory, those values
 backend storage only. Unsupported capabilities fail explicitly through the selected backend; they
 must not fall back to YAML or another provider.
 
+The existing independent `create_artifact_provider()` calls in `operations.py` and `server.py`,
+including the server's `LocalFilesystemArtifactProvider` fallback, are migration debt. They must be
+replaced by artifact capabilities obtained from the configured backend.
+
 ---
 
 ## Module: operations.py
@@ -461,8 +465,12 @@ and artifact access go through `get_config().backend`.
 - Protocols and `get_config()` from `backend_protocol.py`
 
 `operations.py` must not import `yaml_io.py`, `file_cache.py`, provider clients, provider-format
-adapters, or local backend implementations. Existing direct YAML and provider-client access is
-migration debt and does not describe a permitted architecture.
+adapters, or local backend implementations. Existing direct YAML, provider-client, and independent
+artifact-provider access is migration debt and does not describe a permitted architecture.
+
+The same restriction applies to `reconciliation.py`: its current direct `parse_backlog`,
+`load_item`, and `save_item` usage must move behind the remote provider's `FileCache`. Reconciliation
+classifies snapshots and asks the provider to persist outcomes; it does not own filesystem storage.
 
 ---
 
