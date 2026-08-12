@@ -457,6 +457,8 @@ implementation details.
 
   class ContentRef(BaseModel):
       kind: ContentKind
+      namespace: str = ""
+      artifact_type: str = ""
       name: str
 
   class ContentQuery(BaseModel):
@@ -474,25 +476,36 @@ implementation details.
       stale: bool = False
       pending: bool = False
 
+  class ContentWrite(BaseModel):
+      reference: ContentRef
+      content: str
+      owner_reference: str | None = None
+      expected_revision: str = ""
+
   @runtime_checkable
   class ContentProvider(Protocol):
       def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
       def get_content(self, reference: ContentRef) -> ContentRecord: ...
-      def put_content(
-          self,
-          reference: ContentRef,
-          content: str,
-          owner_reference: str = "",
-          expected_revision: str = "",
-      ) -> ContentRecord: ...
+      def put_content(self, request: ContentWrite) -> ContentRecord: ...
   ```
 
-  `ContentRef(kind, name)` is stable identity within one project-scoped backend instance; ownership
-  is mutable record metadata and never participates in the storage key. Updating `owner_reference`
-  through `put_content()` therefore reassigns a plan atomically without copying or leaving a stale
-  record. A non-empty owner is the opaque work-item identifier from that backend; an empty value
-  means unlinked content in that backend instance's project namespace. Providers must not share
-  names across backend instances or project roots. `list_content()` provides bounded plan discovery
+  The complete `ContentRef` is storage identity. Plans require empty `namespace` and
+  `artifact_type`, so `(PLAN, "", "", plan_id)` remains stable while mutable
+  `ContentRecord.owner_reference` is reassigned. Artifact manifests require the owning work-item
+  reference as `namespace` and use the canonical name `manifest`. Artifact content requires both
+  the owning work-item namespace and `artifact_type`, producing
+  `(ARTIFACT_CONTENT, item_reference, artifact_type, artifact_id)`. Pydantic model validation
+  rejects references that violate these kind-specific invariants. This prevents equal artifact
+  paths on different items or under different artifact types from colliding.
+
+  For plans, `ContentWrite.owner_reference=None` preserves the current owner; any string, including
+  `""`, atomically reassigns or unlinks it. For artifact kinds, ownership is fixed by
+  `ContentRef.namespace`; validation rejects a non-`None` write owner that conflicts with that
+  namespace.
+
+  An empty plan owner means unlinked content in the backend instance's project namespace.
+  Providers must not share plan names across backend instances or project roots.
+  `list_content()` provides bounded plan discovery
   without requiring a known name; artifact callers normally address content directly. `revision`
   is opaque and compared only for equality. Remote offline reads may return `stale=True`; accepted
   offline writes return `pending=True`. Local-provider results set both flags false. Missing cached remote data raises
@@ -500,14 +513,18 @@ implementation details.
   the capability raises `UnsupportedCapabilityError`. No caller selects a second provider after any
   of these outcomes.
 
-  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add optional
-  `owner_reference: str = ""`. The operation rejects requests that provide both. It stringifies
-  `issue` for numeric providers and otherwise passes `owner_reference` unchanged to the configured
-  backend. This preserves existing callers while allowing opaque Beads and future provider IDs.
+  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add
+  `owner_reference: str | None = None`. For update, `None` preserves ownership, a non-empty string
+  reassigns it, and explicit `""` unlinks it. For create, `None` normalizes to unlinked `""`.
+  The operation rejects `issue` together with any non-`None` owner reference, stringifies `issue`
+  for numeric providers, and otherwise passes the opaque value unchanged. This preserves existing
+  callers while allowing Beads and future provider IDs.
 - `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
   injection to `operations.py` and `server.py`. It does not expose a cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured
   provider, creates a `FileCache` for remote-capable providers, and injects it into that provider.
+  GitHub also privately composes its existing issue/Gist plan and artifact persistence adapters
+  behind `ContentProvider`; their provider wire formats do not escape the backend.
   Local providers are created without a cache. Resolution order is explicit name →
   `BACKLOG_BACKEND` environment variable → `backlog.backend` in `.dh/config.yaml` →
   `.beads/dh-backend` marker auto-detect → default `"github"`.

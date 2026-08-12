@@ -353,8 +353,9 @@ will detect any race through revision and fingerprint mismatch.
 ## 10. Entry-point mapping
 
 Existing public MCP parameters retain their meaning. Plan create/update add optional
-`owner_reference: str = ""` for opaque provider identifiers and reject requests that also provide
-`issue`; the existing numeric `issue` input remains supported. Existing result keys retain their meaning; reconciliation adds
+`owner_reference: str | None = None` for opaque provider identifiers and reject a non-`None` value
+together with `issue`; update distinguishes omitted/preserve from explicit empty/unlink, while create
+normalizes omitted to unlinked. The existing numeric `issue` input remains supported. Existing result keys retain their meaning; reconciliation adds
 the explicit `stale`, `unavailable`, and `pending` keys described in section 5.3.
 
 ### Startup and explicit sync-now
@@ -420,6 +421,9 @@ real output dependency.
 1. **Models and backend capability**
    - Add `sync_fingerprint`, reconciliation request/result models, and the one-method
      `SyncProvider.reconcile()` capability without changing `WorkItemBackend`.
+   - Add content list/get/put models and errors, including a typed write request whose optional
+     owner field distinguishes preserving, reassigning, and unlinking a plan. Keep plan identity stable by kind/name while
+     validating artifact identity as owner namespace plus artifact type and artifact ID.
    - Reserve `metadata.updated_at` for the last observed provider revision.
    - Add focused model and runtime protocol tests.
 2. **Provider-owned FileCache**
@@ -434,18 +438,21 @@ real output dependency.
      counts, dry-run, force, deletion, and failure policy without filesystem access.
    - Test unchanged, local-only, remote-only, concurrent, bootstrap, force, provider deletion, and
      remotely closed/local-content-change behavior with test-local provider and cache doubles.
-4. **GitHub backend composition** (depends on 2 and 3)
+4. **GitHub reconciliation and content composition** (depends on 2 and 3)
    - Construct `FileCache` only for GitHub and compose it with the reconciliation engine behind
      `GitHubBackend.reconcile()`.
    - Implement 100-item snapshot pages, bounded targeted aliases, inclusive-watermark deduplication,
      revision preflight, and at-most-25-item body mutation batches.
    - Test tombstones, no-op omission, offline queueing, idempotent/partial replay, partial fetch
      failure, and patch conflict/error mapping.
+   - Implement `ContentProvider` on GitHub by privately adapting the existing GitHub plan and
+     artifact persistence components plus `FileCache`; support bounded online/offline list/get/put
+     and ensure owner, artifact type, and artifact ID all participate in artifact identity.
 5. **Local-provider native content capabilities** (depends on 1; parallel with 2 and 3)
    - Implement `ContentProvider` list/get/put operations on Beads, SQLite, and Memory using only
      native storage, including bounded plan discovery and the project-level namespace for unlinked plans.
-   - Key content by stable kind/name identity and update mutable owner metadata atomically so owner
-     reassignment cannot leave duplicate records.
+   - Keep plan identity stable across mutable owner reassignment. Key artifact manifests by owner
+     namespace and artifact content by owner namespace plus artifact type and artifact ID.
    - Preserve opaque provider identifiers and return explicit unsupported errors rather than YAML
      or alternate-provider fallback.
 6. **Operation, plan, and artifact routing** (depends on 4 and 5)
@@ -482,6 +489,9 @@ real output dependency.
 - Equal rendered bodies cause zero provider mutations.
 - GitHub list retrieval uses pages of 100, targeted retrieval avoids per-item requests, inclusive duplicates are
   removed, and mutations use batches of at most 25.
+- Every configured backend, including GitHub, implements plan and artifact list/get/put before
+  independent routing is removed. Two owners may store the same artifact type/ID independently,
+  and one owner may store the same artifact ID under different types independently.
 - Partial snapshot fetch failure does not advance `.last_sync`.
 - Failed patches do not advance item checkpoints and are retried.
 - Non-sync backends launch no background task and perform no GitHub access.
