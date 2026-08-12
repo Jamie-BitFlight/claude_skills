@@ -1,5 +1,10 @@
 # Backlog MCP Package — Architecture Spec
 
+> **Status: target architecture.** The provider-owned `FileCache` boundary described here is the
+> required end state. Direct YAML access and independently selected artifact/task providers named
+> as migration debt below remain in the current implementation until the linked implementation
+> tasks remove them.
+
 ## Overview
 
 Extract all business logic from `.claude/skills/backlog/scripts/backlog.py` into a clean Python package at `.claude/skills/backlog/backlog_core/`. The package exposes the same functionality through two thin wrappers:
@@ -284,6 +289,11 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 - Concurrent provider changes produce an explicit conflict and retain the pending mutation.
 - Failed synchronization never discards cached content or queued work.
 
+The cache-record update and queue append are one durable transaction. Every queued mutation has a
+stable idempotency key derived from its logical object, base revision, and intended content. Replay
+removes only mutations explicitly acknowledged by the provider; after a partial replay, applied
+entries remain checkpointed and every unapplied, conflicted, or failed entry remains queued.
+
 **Dependency direction**: provider backend → `file_cache.py` → `yaml_io.py`. No higher-level module
 may access the cache directly.
 
@@ -327,7 +337,9 @@ do not import from `gh_client.py`, `operations.py`, or `server.py`)
 
 ## Module: rendering.py
 
-**Responsibility**: Backend-neutral shared rendering utilities for backlog sections. Extracts rendering logic from `github_sync` into a location all three `BacklogBackend` implementations (GitHub, SQLite, memory) can import, ensuring identical section rendering across backends.
+**Responsibility**: Backend-neutral shared rendering utilities for backlog sections. Extracts
+rendering logic from `github_sync` into a location `WorkItemBackend` implementations can import,
+ensuring identical logical section rendering where the provider representation requires it.
 
 **Dependency direction**: `models ← rendering` (must remain acyclic; do not import from `github_sync`, `operations`, `gh_client`, or `server`)
 

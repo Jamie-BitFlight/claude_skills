@@ -12,20 +12,23 @@
 
 ## 1. Decision
 
-Replace the separate startup refresh, groomed-content push, and bulk-pull implementations with one deep
-`reconciliation` module:
+Replace the separate startup refresh, groomed-content push, and bulk-pull implementations with one
+provider-neutral reconciliation capability on remote-capable backends:
 
 ```python
-def reconcile_backlog(provider: SyncProvider, request: ReconcileRequest) -> ReconcileResult: ...
+class SyncProvider(Protocol):
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult: ...
 ```
 
-The module owns local classification, merge policy, checkpointing, and no-op suppression. Providers own snapshot
-retrieval, provider revisions, pagination, targeted lookup, and mutation batching. Existing MCP tools keep their public
-parameters and result shapes; their operation-layer functions become thin adapters around this interface.
+The selected remote backend owns its provider API adapter and private `FileCache`; its `reconcile()`
+method delegates classification, merge policy, checkpoint policy, and no-op suppression to
+`reconciliation.py`. Existing MCP tools keep their public parameters and result shapes; their
+operation-layer functions become thin adapters around this capability.
 
-This architecture replaces the earlier offline-first proposal. It does not add dirty flags, an outbox, or new
-write-through behaviour. Local edits remain protected by a persisted content fingerprint and the existing entry-aware
-merge.
+This architecture replaces the earlier per-item dirty-flag proposal. It adds no second outbox or
+parallel local authority: the provider-owned `FileCache` supplies the one durable pending-mutation
+queue required for offline writes. Local edits remain protected by a persisted content fingerprint
+and the existing entry-aware merge.
 
 ## 2. Goals and non-goals
 
@@ -35,7 +38,8 @@ merge.
 - Classify unchanged, local-only, remote-only, concurrent, bootstrap, and deleted-provider states locally.
 - Avoid provider mutations when the rendered provider body is already correct.
 - Preserve local edits with the existing entry-aware merge.
-- Keep provider state, labels, and revisions remote-authoritative.
+- Keep provider state, labels, and revisions remote-authoritative when reachable, while preserving
+  queued offline mutations until acknowledged or resolved.
 - Advance global and per-item checkpoints only when their required work is durable.
 - Make startup sync a no-op for backends that do not implement the optional sync interface.
 - Keep L1-L11 live lifecycle coverage without starting an unrelated production-repository refresh.
@@ -68,37 +72,43 @@ duplicated local closed-item update sequence between `_reconcile_closed_issues()
 
 ### 4.1 External interface
 
-Create `plugins/development-harness/backlog_core/reconciliation.py`. Its only public operation is
-`reconcile_backlog()`. Callers do not paginate, render provider queries, classify conflicts, or dispatch mutations.
+Create `plugins/development-harness/backlog_core/reconciliation.py`. It is an internal engine used by
+remote-capable backends. Operations and server callers do not import it, paginate, access cache
+paths, render provider queries, classify conflicts, or dispatch mutations.
 
-The optional provider interface is separate from `WorkItemBackend`:
+The optional backend capability is separate from `WorkItemBackend`:
 
 ```python
 @runtime_checkable
 class SyncProvider(Protocol):
-    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
-    def apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]: ...
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult: ...
 ```
 
-Place `SyncProvider` in `backlog_core/backend_types.py` and re-export it through `backend_protocol.py`. Place the
-Pydantic request, snapshot, patch, and result models in `backlog_core/models.py`. This keeps dependency direction
-acyclic:
+Place `SyncProvider` in `backlog_core/backend_types.py` and re-export it through
+`backend_protocol.py`. Place the Pydantic request and result models in `backlog_core/models.py`.
+Provider snapshot and patch models remain internal to remote-provider implementations and the
+engine. This keeps dependency direction acyclic:
 
 ```text
-models <- backend_types <- reconciliation <- operations <- server
-                  ^              ^
-                  |              |
-             GitHubBackend ------+
+models <- backend_types <- operations <- server
+              ^               |
+              |               v
+        remote backend -> reconciliation
+              |
+              +-> provider API adapter
+              +-> private FileCache -> yaml_io
 ```
 
-`GitHubBackend` is the production adapter. Reconciliation tests use a small in-memory adapter that implements the same
-two methods. Memory, SQLite, and Beads backends do not implement `SyncProvider` and gain no stubs or capability flags.
+`GitHubBackend` is the first production implementation. Engine tests use test-local provider and
+cache doubles. Memory, SQLite, and Beads backends do not implement `SyncProvider`, instantiate
+`FileCache`, or gain stubs or capability flags.
 
 `ProviderItem.body` and `ProviderPatch.body` use the repository's canonical backlog Markdown, not a provider-native
 document type. Reconciliation reuses the pure parse, render, and entry-aware merge functions already in
-`github_sync.py`; a future provider adapter translates at its edge only if its native representation differs. The
-reconciler imports local parsing and YAML persistence directly from `parsing.py` and `yaml_io.py`, not from
-`operations.py`, which prevents an import cycle without adding a speculative local-storage interface.
+`github_sync.py`; a future provider adapter translates at its edge only if its native representation
+differs. The engine receives provider snapshots and logical cache records from the owning backend and
+returns classified actions to it. Only the backend's private `FileCache` reads or writes YAML,
+checkpoints, artifact content, or queued mutations.
 
 ### 4.2 Why this seam is deep
 
@@ -247,12 +257,12 @@ patch.
 | --- | --- | --- |
 | Unchanged | Neither body differs from the baseline | Update provider-owned fields or revision only if needed; otherwise no-op. |
 | Local only | Local differs; provider body matches baseline | Render the local item and patch only when that body differs from the snapshot. |
-| Remote only | Provider differs; local matches baseline | Parse provider body into the local item and save it. |
-| Concurrent | Both differ | Apply the existing entry-aware merge, save it locally, and patch only if the merged body differs. |
+| Remote only | Provider differs; local matches baseline | Parse provider body and ask the owning backend to persist it through `FileCache`. |
+| Concurrent | Both differ | Apply the existing entry-aware merge; the backend persists it through `FileCache` and patches only if the merged body differs. |
 | Bootstrap | No baseline | Treat as concurrent, then establish the first checkpoint. |
 | Force pull | `request.force` | Replace synchronized local content from the provider without merging. |
-| Remote only item | Snapshot item has no local linked item | Create the local cache record using existing naming and parsing rules. |
-| Provider deleted | Targeted tombstone for a linked local item | Preserve the local file, clear its provider link and sync checkpoints, and report `deleted_provider_items += 1`. |
+| Remote only item | Snapshot item has no cached linked item | Ask the owning remote backend to create its private cache record. |
+| Provider deleted | Targeted tombstone for a linked cached item | Preserve cached content, clear its provider link and sync checkpoints, and report `deleted_provider_items += 1`. |
 
 The deletion policy converts a confirmed remote deletion into a local-only item without data loss. A later explicit
 `backlog_sync` may recreate it through the existing missing-issue creation pass. Transient fetch failures never produce
@@ -280,9 +290,9 @@ checkpoint after any required local provider-field update succeeds.
 
 ## 8. Provider snapshot and patch semantics
 
-### 8.1 GitHub snapshot retrieval
+### 8.1 GitHub provider API snapshot retrieval
 
-`GitHubBackend.fetch_snapshot()` delegates to private helpers in `gh_client.py`:
+The private GitHub snapshot adapter delegates to bounded helpers in `gh_client.py`:
 
 - List pages use `first: 100`; cursor handling remains inside the adapter.
 - Incremental listing uses an inclusive `since` watermark.
@@ -299,9 +309,9 @@ checkpoint after any required local provider-field update succeeds.
 The adapter may issue multiple bounded requests, but the reconciler receives one normalized snapshot and has no cursor
 knowledge.
 
-### 8.2 GitHub patch application
+### 8.2 GitHub provider API patch application
 
-`GitHubBackend.apply_patches()`:
+The private GitHub patch adapter:
 
 1. Resolves current revisions for the patch references through targeted alias batches.
 2. Returns `conflict` without mutation when a current revision differs from `expected_revision`.
@@ -313,12 +323,12 @@ GitHub does not provide an atomic compare-and-swap argument on `updateIssue`; th
 best-effort optimistic guard. The adapter must keep the preflight and mutation adjacent, and a later reconciliation
 will detect any race through revision and fingerprint mismatch.
 
-## 9. Persistence and failure rules
+## 9. Cache, queue, and failure rules
 
-- Save a remote-only or force-pulled local item before updating its per-item checkpoint.
+- Persist a remote-only or force-pulled cache record before updating its per-item checkpoint.
 - For local-only changes, update the checkpoint only after an applied patch or confirmed body equality.
-- For concurrent/bootstrap changes, save the merged local item first. If the merged body differs remotely, update the
-  checkpoint only after its patch applies. A failed patch leaves the merged body locally dirty by fingerprint mismatch.
+- For concurrent/bootstrap changes, persist the merged cache record first. If the merged body differs remotely, update
+  the checkpoint only after its patch applies. A failed patch leaves the merged body dirty by fingerprint mismatch.
 - A `conflict` patch result leaves the item checkpoint unchanged and increments `conflicts`; it is retried because its
   local fingerprint still differs.
 - An `error` patch result leaves the item checkpoint unchanged and increments `failures`.
@@ -327,6 +337,12 @@ will detect any race through revision and fingerprint mismatch.
   fingerprint remains dirty.
 - Any partial snapshot fetch raises and leaves `.last_sync` unchanged.
 - Use the existing sync lock to serialize startup, explicit sync-now, `backlog_sync`, and bulk pull reconciliation.
+- When the provider is unreachable, the backend atomically updates its cache record and appends a
+  pending mutation with a stable idempotency key. A missing cache record returns unavailable data,
+  not an empty authoritative result.
+- Reconnect replay applies queued mutations against their base revisions. It removes only provider-
+  acknowledged entries; conflicts, failures, and unattempted entries after partial replay remain
+  durable for the next reconciliation.
 
 ## 10. Entry-point mapping
 
@@ -345,18 +361,18 @@ Public MCP parameters and result keys do not change.
 ### `backlog_sync`
 
 - Retain `sync_create_missing_issues()` first.
-- Reparse local items after creation.
-- Reconcile all linked references with `scope=LINKED` and the existing `dry_run` value.
+- Ask the selected backend to reconcile all linked references with `scope=LINKED` and the existing
+  `dry_run` value; the backend obtains its current logical records from native storage or private cache.
 - Map applied provider body patches to `pushed`; preserve `created`, `pushed`, `dry_run`, `messages`, `warnings`, and
   `errors`.
 
 ### `backlog_pull`
 
-- Bulk pull retains P0/P1 missing-issue creation, then reconciles all candidate linked references in one `LINKED`
-  request. Map local synchronized-content updates to `pulled`; preserve `skipped`, `total`, `dry_run`, optional `diff`,
-  and output arrays.
-- Selector pull resolves one local/provider reference, issues one `TARGETED` request, and preserves `file_path`,
-  optional `diff`, and output arrays.
+- Bulk pull retains P0/P1 missing-issue creation, then asks the selected backend to reconcile all
+  candidate linked references in one `LINKED` request. Map synchronized-content updates to `pulled`;
+  preserve `skipped`, `total`, `dry_run`, optional `diff`, and output arrays.
+- Selector pull resolves one logical/provider reference through the selected backend, issues one
+  `TARGETED` request, and preserves `file_path`, optional `diff`, and output arrays during migration.
 - `force` is forwarded unchanged. `include_diff` is true only when the existing `diff` parameter is true.
 
 Remove `_sync_full`, `_sync_incremental`, `_reconcile_closed_issues`, `_reconcile_single_closed_issue`,
@@ -380,37 +396,56 @@ alone.
 
 ## 12. Subsequent implementation plan
 
-Complete tasks in order. Each task leaves runnable tests at the reconciler interface or current wrapper interface.
+Execute this dependency graph. Tasks on the same row may run in parallel; every edge represents a
+real output dependency.
 
-1. **Models and optional protocol**
-   - Add `sync_fingerprint` and the Pydantic reconciliation models to `models.py`.
-   - Stop local mutation helpers from stamping `metadata.updated_at`; local content freshness comes from the fingerprint,
-     while `updated_at` is reserved for the last observed provider revision.
-   - Add and re-export `SyncProvider` without changing `WorkItemBackend`.
-   - Add model validation tests for scopes, tombstones, and patch-result states.
-2. **Deep reconciliation module**
-   - Implement fingerprinting, classification, field ownership, local persistence, merge, checkpoint, result counts,
-     dry-run, force, deletion, and failure policy in `reconciliation.py`.
-   - Test unchanged, local-only, remote-only, concurrent, bootstrap, force, provider deletion, and remotely closed with
-     local content changes through an in-memory `SyncProvider` adapter.
-   - Assert local-only metadata survives pull/merge and only differing bodies produce patches.
-3. **GitHub adapter**
-   - Implement snapshot list and targeted alias helpers with 100-item list pages and inclusive-watermark deduplication.
-   - Implement revision preflight and 25-item body mutation batches returning one `PatchResult` per patch.
-   - Test pagination, targeted batching without per-item fetches, tombstones, no-op omission, partial fetch failure, and
-     patch conflict/error mapping.
-4. **Operation wrappers**
-   - Replace startup refresh, sync push, bulk pull, and selector pull internals with reconciliation requests.
-   - Preserve current MCP parameters, output keys, dry-run behaviour, force behaviour, and diff behaviour.
-   - Delete the superseded helper paths only after wrapper tests pass.
-5. **Startup gating and progress**
-   - Gate lifespan and sync-now on `SyncProvider`.
-   - Map `ReconcileResult` progress into `SyncState` and compact output messages.
-   - Test that Memory, SQLite, and Beads backends start no task and perform no GitHub access.
-6. **Lifecycle fixture and acceptance**
-   - Disable startup sync explicitly in the live fixture while preserving L1-L11.
-   - Assert L8/L9 linked scope and bounded fetched counts.
-   - Run targeted development-harness tests, Ruff, ty, affected prek hooks, and the live lifecycle.
+1. **Models and backend capability**
+   - Add `sync_fingerprint`, reconciliation request/result models, and the one-method
+     `SyncProvider.reconcile()` capability without changing `WorkItemBackend`.
+   - Reserve `metadata.updated_at` for the last observed provider revision.
+   - Add focused model and runtime protocol tests.
+2. **Provider-owned FileCache**
+   - Move YAML snapshots, checkpoints, plan/artifact cache records, and the durable pending-mutation
+     queue behind `FileCache`.
+   - Make cache-record updates plus queue appends atomic; add stable idempotency keys and partial-
+     replay retention.
+   - Add import-boundary tests proving operations, server, reconciliation, and local backends cannot
+     import `yaml_io` or open cache paths.
+3. **Deep reconciliation engine**
+   - Implement fingerprinting, classification, field ownership, merge, checkpoint policy, result
+     counts, dry-run, force, deletion, and failure policy without filesystem access.
+   - Test unchanged, local-only, remote-only, concurrent, bootstrap, force, provider deletion, and
+     remotely closed/local-content-change behavior with test-local provider and cache doubles.
+4. **GitHub backend composition**
+   - Construct `FileCache` only for GitHub and compose it with the reconciliation engine behind
+     `GitHubBackend.reconcile()`.
+   - Implement 100-item snapshot pages, bounded targeted aliases, inclusive-watermark deduplication,
+     revision preflight, and at-most-25-item body mutation batches.
+   - Test tombstones, no-op omission, offline queueing, idempotent/partial replay, partial fetch
+     failure, and patch conflict/error mapping.
+5. **Operation, plan, and artifact routing**
+   - Replace startup refresh, sync push, bulk pull, and selector pull internals with the selected
+     backend's reconciliation capability.
+   - Route plans, grooming, artifact manifests, and artifact content through capabilities on the
+     configured backend; remove independent artifact/task provider selection and filesystem fallback.
+   - Preserve MCP parameters, output keys, dry-run, force, and diff behavior. Delete superseded paths
+     only after wrapper tests pass.
+6. **Startup gating and progress**
+   - Gate lifespan and sync-now on `SyncProvider`; map `ReconcileResult` into `SyncState` and compact
+     output messages.
+   - Test that Memory, SQLite, and Beads start no sync task, perform no network/cache access, and use
+     only native backend storage.
+7. **Documentation alignment**
+   - Correct current contributor and consumer documents against `backlog_core/ARCHITECTURE.md` and
+     mark obsolete storage designs superseded.
+   - Classify documents by contributor/developer, installation/configuration/usage, or mixed overview
+     frame and remove implementation leakage from consumer documents.
+   - Replace deterministic manual parsing, lookup, filtering, addressing, and state-update steps with
+     tools where practical.
+8. **Lifecycle fixture and acceptance**
+   - Disable startup sync explicitly in the live fixture while preserving L1-L11; assert L8/L9 linked
+     scope and bounded fetched counts.
+   - Run targeted tests, Ruff, ty, affected prek hooks, live lifecycle, and independent verification.
 
 ## 13. Acceptance criteria
 
@@ -424,6 +459,11 @@ Complete tasks in order. Each task leaves runnable tests at the reconciler inter
 - Partial snapshot fetch failure does not advance `.last_sync`.
 - Failed patches do not advance item checkpoints and are retried.
 - Non-sync backends launch no background task and perform no GitHub access.
+- Beads, SQLite, and Memory instantiate no `FileCache`, access no backlog YAML, and route work,
+  grooming, plans, and artifacts only through native backend capabilities.
+- Offline remote reads return cached data marked stale; missing cache records return unavailable;
+  offline writes queue durably and idempotently; conflicts and partial replay retain unapplied work.
+- Import-boundary tests reject direct runtime YAML/cache access outside `FileCache` and migration tooling.
 - Existing wrapper-level tests pass without MCP parameter or result-shape changes.
 - Live L1-L11 completes within the CI timeout, and L8/L9 perform no full historical closed-issue refresh.
 
