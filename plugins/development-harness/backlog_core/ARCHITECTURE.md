@@ -57,14 +57,16 @@ from `.md` frontmatter files to `.yaml` format in-place. It uses `yaml_io.load_i
 
 ```text
 models.py             ← standalone, no imports from other mcp modules
+backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
 parsing.py            ← imports from models; pure parsing, selection, and transformation helpers
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
 yaml_io.py            ← private YAML codec imported only by file_cache.py and migration tooling
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
+reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
 gh_client.py          ← imports from models, parsing
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imported by backend implementations
-backend_protocol.py   ← protocols/config plus composition root; imports backend constructors
+backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
 operations.py         ← imports from models, pure helpers, and backend_protocol only
 dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
@@ -115,27 +117,52 @@ class GroomedData(BaseModel):
     subsections: dict[str, str] = Field(default_factory=dict)
 
 
-class BacklogItem(BaseModel):
-    """Parsed backlog item — replaces untyped dict."""
+class BacklogItemMetadata(BaseModel):
+    """Durable logical and provider checkpoint fields."""
 
-    title: str = ""
-    description: str = ""
     source: str = "Not specified"
     added: str = ""
     priority: str = ""
+    item_type: str = Field(default="Feature", alias="type", serialization_alias="type")
     status: str = ""
-    item_type: str = "Feature"
     issue: str = ""
+    last_synced: str = ""
+    updated_at: str = ""
+    groomed: str = ""
     plan: str = ""
-    section: str = ""
+    topic: str = ""
+    research_first: str = ""
+    files: str = ""
+    suggested_location: str = ""
+    close_reason: str = ""
+    assignees: list[str] = Field(default_factory=list)
+    labels: list[str] = Field(default_factory=list)
+    milestone: str = ""
+    milestone_info: MilestoneInfo = Field(default_factory=MilestoneInfo)
+    layer: str = ""
+    language: str = ""
+    stack: str = ""
+    followup_to: str = ""
+    sync_fingerprint: str = ""
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+
+class BacklogItem(BaseModel):
+    """Logical backlog item with nested durable metadata."""
+
+    title: str = ""
+    description: str = ""
+    metadata: BacklogItemMetadata = Field(default_factory=BacklogItemMetadata)
     file_path: str = ""
     skip: bool = False
-    last_synced: str = ""
     sections: dict[str, Section | GroomedData] = Field(default_factory=dict)
 
 
 # Notes:
-# - `file_path` and `skip` are excluded from YAML serialisation (yaml_io.save_item).
+# - `metadata` owns provider reference/revision, sync fingerprint, status, priority, plan address,
+#   and other durable logical fields.
+# - `file_path` and `skip` are runtime-only fields excluded by FileCache serialisation.
 # - `sections` holds Entry-bearing sections ("fact_check", "rt_ica", "issue_classification")
 #   plus a "groomed" key (GroomedData). Populated by github_sync.parse_issue_body.
 
@@ -299,6 +326,19 @@ may access the cache directly.
 
 ---
 
+## Module: reconciliation.py
+
+**Responsibility**: Filesystem-free reconciliation policy used internally by remote-capable
+backends. It compares normalized provider snapshots with logical cached records, applies canonical
+merge and field-ownership rules, and returns cache/provider actions plus outcome counts.
+
+The module imports only models and pure parse/render/merge helpers. It does not import
+`backend_protocol.py`, `operations.py`, `file_cache.py`, `yaml_io.py`, provider clients, or path
+resolvers. The owning backend supplies snapshots and records, executes returned actions through its
+private provider adapter and `FileCache`, then reports a `ReconcileResult`.
+
+---
+
 ## Module: github_sync.py
 
 **Responsibility**: Bidirectional conversion between `BacklogItem` and GitHub issue body markdown.
@@ -381,17 +421,89 @@ ensuring identical logical section rendering where the provider representation r
 
 ## Module: backend_protocol.py
 
-**Responsibility**: Defines the backend protocols and `BacklogConfig` dataclass. Provides the
-`create_backend()` factory and `get_config()` / `set_config()` / `reset_config()` module-level
-accessors. Decouples operations and server code from provider APIs, native stores, and file-cache
+**Responsibility**: Re-exports contracts defined in `backend_types.py`, defines `BacklogConfig`, and
+provides the `create_backend()` factory plus `get_config()` / `set_config()` / `reset_config()`.
+This keeps operations and server code decoupled from provider APIs, native stores, and file-cache
 implementation details.
 
-**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `BranchBackend`, `BacklogConfig`,
-provider-neutral node types, `create_backend`, `get_config`, `set_config`, `reset_config`
+**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `ContentProvider`, `BranchBackend`,
+`BacklogConfig`, provider-neutral node types, `create_backend`, `get_config`, `set_config`,
+`reset_config`
 
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
   contract. Optional provider capabilities use separate protocols such as `SyncProvider` and
-  `BranchBackend`.
+  `ContentProvider` and `BranchBackend`.
+- `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
+  only by remote-capable backends.
+- `ContentProvider` — logical plan/artifact capability implemented by the configured backend:
+
+  ```python
+  class ContentProviderError(Exception):
+      """Base error for logical content capability failures."""
+
+  class ContentUnavailableError(ContentProviderError):
+      """Requested content is not available from the selected backend."""
+
+  class ContentConflictError(ContentProviderError):
+      """The expected revision no longer matches provider state."""
+
+  class UnsupportedCapabilityError(ContentProviderError):
+      """The selected backend does not implement logical content storage."""
+
+  class ContentKind(StrEnum):
+      PLAN = "plan"
+      ARTIFACT_MANIFEST = "artifact_manifest"
+      ARTIFACT_CONTENT = "artifact_content"
+
+  class ContentRef(BaseModel):
+      kind: ContentKind
+      name: str
+
+  class ContentQuery(BaseModel):
+      kind: ContentKind
+      owner_reference: str = ""
+      search: str = ""
+      offset: int = Field(default=0, ge=0)
+      limit: int = Field(default=100, ge=1, le=100)
+
+  class ContentRecord(BaseModel):
+      reference: ContentRef
+      owner_reference: str = ""
+      content: str
+      revision: str = ""
+      stale: bool = False
+      pending: bool = False
+
+  @runtime_checkable
+  class ContentProvider(Protocol):
+      def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
+      def get_content(self, reference: ContentRef) -> ContentRecord: ...
+      def put_content(
+          self,
+          reference: ContentRef,
+          content: str,
+          owner_reference: str = "",
+          expected_revision: str = "",
+      ) -> ContentRecord: ...
+  ```
+
+  `ContentRef(kind, name)` is stable identity within one project-scoped backend instance; ownership
+  is mutable record metadata and never participates in the storage key. Updating `owner_reference`
+  through `put_content()` therefore reassigns a plan atomically without copying or leaving a stale
+  record. A non-empty owner is the opaque work-item identifier from that backend; an empty value
+  means unlinked content in that backend instance's project namespace. Providers must not share
+  names across backend instances or project roots. `list_content()` provides bounded plan discovery
+  without requiring a known name; artifact callers normally address content directly. `revision`
+  is opaque and compared only for equality. Remote offline reads may return `stale=True`; accepted
+  offline writes return `pending=True`. Local-provider results set both flags false. Missing cached remote data raises
+  `ContentUnavailableError`, revision mismatch raises `ContentConflictError`, and a backend without
+  the capability raises `UnsupportedCapabilityError`. No caller selects a second provider after any
+  of these outcomes.
+
+  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add optional
+  `owner_reference: str = ""`. The operation rejects requests that provide both. It stringifies
+  `issue` for numeric providers and otherwise passes `owner_reference` unchanged to the configured
+  backend. This preserves existing callers while allowing opaque Beads and future provider IDs.
 - `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
   injection to `operations.py` and `server.py`. It does not expose a cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured

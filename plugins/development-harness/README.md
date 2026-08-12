@@ -74,7 +74,8 @@ What happens:
 5. A plan validator checks the task file for completeness and feasibility
 6. A context-gathering agent writes a context manifest so subsequent agents have full situational awareness
 
-All outputs land in `~/.dh/projects/{your-project}/plan/` as named files. The active artifact provider records an artifact manifest so worktree-isolated agents can discover them; the default deployment uses a GitHub issue body for that manifest.
+The resulting context, architecture, and plan remain available to subsequent workflow stages and
+worktree-isolated agents through the workflow storage selected during setup.
 
 **RT-ICA Gate**: Before planning begins, Claude runs a Reverse Thinking Information Completeness Assessment. If any required information is genuinely missing (not just derivable), planning blocks and you are asked to provide it. This prevents plans built on assumptions.
 
@@ -222,30 +223,10 @@ Executes a groomed milestone with full parallel isolation. For each wave:
 
 This is what enables true parallel milestone execution: multiple independent Claude instances, each working on a separate issue in its own worktree, coordinated by the parent orchestrator.
 
-This is illustrative — `/dh:kage-bunshin`'s own SKILL.md resolves the real script path via
-`${CLAUDE_SKILL_DIR}`, a Claude Code substitution that only applies inside a loaded SKILL.md, not
-in this README. Invoke the skill rather than copying `spawn.py`'s path from here:
+Invoke the skill with the work to delegate; it manages session creation and status tracking:
 
-```bash
-SPAWN="spawn.py"  # path resolved by /dh:kage-bunshin's own SKILL.md when it runs
-SID=$(uuidgen)
-
-# Spawn a session
-$SPAWN --session-id $SID spawn --name worker-42 --model haiku \
-  "Load /dh:work-backlog-item #42. Execute the full workflow."
-
-# Check status
-$SPAWN --session-id $SID status --name worker-42
-
-# Steer mid-flight
-$SPAWN --session-id $SID send --name worker-42 \
-  "Deprioritize UI. Focus on API contract first."
-
-# Read what's on screen
-$SPAWN --session-id $SID read --name worker-42
-
-# Stop when done
-$SPAWN --session-id $SID stop --name worker-42
+```text
+/dh:kage-bunshin "Run independent backlog items for milestone 42 in parallel"
 ```
 
 ---
@@ -469,27 +450,13 @@ The harness ships 27 specialist agents invoked automatically during pipeline sta
 
 ## State Management
 
-All state lives outside the repository at `~/.dh/projects/{project-slug}/`:
+Backlog durability follows the configured backend. Beads and SQLite persist backlog state locally;
+Memory keeps it for the current process only. Plans, tasks, artifacts, progress, and validation
+evidence use the workflow storage selected during setup, whose durability depends on that selection.
+Use persistent storage when work must survive restarts or remain available to other agents.
 
-```text
-plan/
-  feature-context-{slug}.md       Discovery output (S1)
-  architect-{slug}.md             Architecture specification (S2)
-  P{id}-{slug}.yaml               Task plan (S4)
-  T0-baseline-{slug}.yaml         Pre-implementation baseline
-  TN-verification-{slug}.yaml     Post-implementation verification
-  QG{NNN}-qg-{slug}.yaml          Quality gate plan
-backlog/                          Local cache of selected-backend items
-context/
-  active-task-{session-id}.json   Ephemeral task tracking (deleted after task)
-kage-bunshin/
-  registry.json                   Active parallel session registry
-dispatch-state.db                 Wave execution state (SQLite)
-```
-
-`{project-slug}` is derived from your absolute project path with `/` replaced by `-`. Override the base location with the `DH_STATE_HOME` environment variable (useful for CI and testing).
-
-The `.dh/` directory inside your repository holds committed project configuration only. Runtime state never pollutes your working tree.
+The `.dh/` directory inside your repository holds committed project configuration only. Runtime
+workflow state does not pollute your working tree.
 
 ---
 
@@ -519,7 +486,9 @@ You have a Python project and want to add rate limiting to your API.
 /dh:add-new-feature "add rate limiting to the API endpoints"
 ```
 
-Claude runs 6 research phases. You're consulted if any required information is genuinely missing (e.g., "what rate limit strategy — token bucket or fixed window?"). Artifacts land in `~/.dh/projects/{your-project}/plan/`.
+Claude runs 6 research phases. You're consulted if any required information is genuinely missing
+(e.g., "what rate limit strategy — token bucket or fixed window?"). The resulting plan remains
+available through the configured backend.
 
 **Step 2: Execute the plan**
 
