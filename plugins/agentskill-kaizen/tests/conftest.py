@@ -3,7 +3,6 @@
 Provides reusable test fixtures for:
 - Sample JSONL transcript files on disk
 - Pre-extracted tool sequence dicts
-- Frustration-signal test data
 - FastMCP Context mock factory
 
 ``mcp/`` is prepended to ``sys.path`` so ``import server`` resolves to
@@ -49,22 +48,6 @@ if _MCP_DIR not in sys.path:
 def _make_assistant_tool_use(tool_name: str) -> dict[str, Any]:
     """Build a minimal assistant record containing a single tool_use block."""
     return {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": tool_name, "input": {}}]}}
-
-
-def _make_user_message(text: str, *, timestamp: str = "") -> dict[str, Any]:
-    """Build a minimal user record with string content."""
-    record: dict[str, Any] = {"type": "user", "message": {"content": text}}
-    if timestamp:
-        record["timestamp"] = timestamp
-    return record
-
-
-def _make_user_message_blocks(blocks: list[dict[str, str]], *, timestamp: str = "") -> dict[str, Any]:
-    """Build a user record with list-of-blocks content."""
-    record: dict[str, Any] = {"type": "user", "message": {"content": blocks}}
-    if timestamp:
-        record["timestamp"] = timestamp
-    return record
 
 
 # ---------------------------------------------------------------------------
@@ -121,35 +104,6 @@ def multi_session_jsonl(jsonl_dir: Path) -> Path:
         records = [_make_assistant_tool_use(t) for t in tools]
         fpath = jsonl_dir / f"{name}.jsonl"
         fpath.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
-    return jsonl_dir
-
-
-@pytest.fixture
-def frustration_jsonl(jsonl_dir: Path) -> Path:
-    """Write JSONL files containing user messages with frustration signals.
-
-    Returns:
-        Path to the directory containing the JSONL files.
-    """
-    jsonl_dir.mkdir(parents=True, exist_ok=True)
-
-    records = [
-        _make_user_message("no, that's wrong", timestamp="2026-01-01T00:00:00Z"),
-        _make_user_message("looks good to me", timestamp="2026-01-01T00:01:00Z"),
-        _make_user_message("wait, hold on a second", timestamp="2026-01-01T00:02:00Z"),
-        _make_user_message("why did you do that again?", timestamp="2026-01-01T00:03:00Z"),
-        # toolUseResult records should be skipped
-        {
-            "type": "user",
-            "toolUseResult": True,
-            "message": {"content": "no this is wrong"},
-            "timestamp": "2026-01-01T00:04:00Z",
-        },
-        # assistant record should be skipped
-        _make_assistant_tool_use("Read"),
-    ]
-    fpath = jsonl_dir / "frustration-session.jsonl"
-    fpath.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
     return jsonl_dir
 
 

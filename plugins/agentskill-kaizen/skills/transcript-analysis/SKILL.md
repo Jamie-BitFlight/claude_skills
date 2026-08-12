@@ -1,11 +1,11 @@
 ---
 name: transcript-analysis
-description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, detecting user frustration signals, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema (kaizen-analysis get_transcript_jsonl_schema or MCP resource kaizen://session-log/schema or references/jsonl-schema.md), arbitrary DuckDB SQL over JSONL via kaizen-duckdb execute_query, cookbook query patterns, 10 analysis dimensions, and lightweight process mining methodology.
+description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema (kaizen-analysis get_transcript_jsonl_schema or MCP resource kaizen://session-log/schema or references/jsonl-schema.md), arbitrary DuckDB SQL over JSONL via kaizen-duckdb execute_query, cookbook query patterns, nine analysis dimensions, and lightweight process mining methodology.
 ---
 
 # Transcript Analysis
 
-Analyze Claude Code JSONL session transcripts to detect anti-patterns, inefficiencies, user frustration, and workflow improvement opportunities.
+Analyze Claude Code JSONL session transcripts to detect anti-patterns, inefficiencies, and workflow improvement opportunities.
 
 ## Data Location
 
@@ -67,41 +67,31 @@ Extract from tool results where `is_error: true`. Classify error types:
 - Pre-commit hook failures (exit code 1)
 - Missing binary / command not found
 
-### 3. User Frustration Signals
-
-Extract from `user` records where `toolUseResult` is absent. Match patterns:
-
-- `[Request interrupted by user]` — Ctrl+C
-- `[Request interrupted by user for tool use]` — tool denial
-- Direct corrections — "No,", "Don't", "Stop", "Why did you", "wrong", "incorrect"
-
-Filter out system-generated content (XML tags, session continuation messages, skill injections).
-
-### 4. Missing Tooling Opportunities
+### 3. Missing Tooling Opportunities
 
 Identify repeated multi-step manual workflows across sessions via tool-sequence trigram analysis. High-frequency trigrams like `Bash → Bash → Bash` or `Read → Read → Read` suggest missing scripts or skills.
 
-### 5. Subagent Delegation Patterns
+### 4. Subagent Delegation Patterns
 
 Extract from `Task` tool_use blocks. Track `subagent_type`, `description`, `model`. Flag when `general-purpose` is used where a specialized agent exists.
 
-### 6. Shortest Path Analysis
+### 5. Shortest Path Analysis
 
 Compare successful vs failed attempts at the same goal. Measure tool-call count between goal statement (user turn) and successful outcome (final assistant turn). High variance across sessions for similar goals indicates wasted steps.
 
-### 7. Red Herring Detection
+### 6. Red Herring Detection
 
 Track investigation branches that get abandoned. Signal: a sequence of Read/Grep/Bash calls on a topic followed by `compact_boundary` or direction change without resolution. Cross-session frequency of the same abandoned paths reveals systematic red herrings.
 
-### 8. System Process Interruptions
+### 7. System Process Interruptions
 
 Extract `system.compact_boundary`, `system.api_error`, and hook-related `progress` events. Map their position relative to active work to identify when system processes derailed correct execution paths.
 
-### 9. Missing Hooks
+### 8. Missing Hooks
 
 Identify manual corrections that recur across sessions. When the same correction appears 3+ times, it is a candidate for automated prevention via PreToolUse hook (deny + redirect) or SubagentStart hook (inject context).
 
-### 10. DuckDB SQL Querying
+### 9. DuckDB SQL Querying
 
 Use `kaizen-analysis` **`get_transcript_jsonl_schema`** or resource **`kaizen://session-log/schema`** for the full path reference, then `kaizen-duckdb` **`execute_query`** for **any** SQL over JSONL (`read_ndjson_auto` with **absolute** paths). You are not limited to the cookbook queries.
 
@@ -115,7 +105,6 @@ Use the `kaizen-analysis` MCP server tools for analyses SQL cannot express:
 - `discover_process_model` — Lightweight transition model over tool-call sequences
 - `check_conformance` — Compare sessions against a reference process model
 - `find_frequent_patterns` — PrefixSpan sequential pattern mining
-- `detect_frustration_signals` — NLP extraction from user turns
 - `cluster_sessions` — Trace clustering by behavioral similarity
 
 ## Analysis Workflow

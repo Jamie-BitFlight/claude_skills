@@ -45,7 +45,7 @@ Generate fixes for the top anti-patterns:
 ```
 /agentskill-kaizen:analyze
 /agentskill-kaizen:analyze --project -home-user-repos-myproject
-/agentskill-kaizen:analyze --dimensions tool-misuse,errors,frustration
+/agentskill-kaizen:analyze --dimensions tool-misuse,errors,tooling-gaps
 ```
 
 Runs the `transcript-analyst` agent across your session corpus. The agent queries JSONL files
@@ -88,13 +88,12 @@ With `--install`, approved proposals are applied immediately.
 
 ## What the Analysis Finds
 
-Ten dimensions analyzed across your session history:
+Nine dimensions analyzed across your session history:
 
 | Dimension | What it finds |
 |-----------|---------------|
 | Tool Misuse | Bash calls for file read/write/search instead of built-in tools |
 | Repeated Errors | Edit-before-Read patterns, stale edits, denied tool calls |
-| User Frustration | Corrections, denials, interrupts, "you keep doing this" signals |
 | Tooling Gaps | Multi-step sequences that repeat identically and could be a single script |
 | Delegation Patterns | Whether Claude uses specialist agents or defaults to general-purpose |
 | Shortest Path | Wasted steps when the same goal was reached faster in other sessions |
@@ -168,7 +167,6 @@ next session.
 | Skill | `kaizen-improvement` | Templates for improvement output generation |
 | Skill | `meta-inspector` | Extracts specific data points from large transcripts and analysis reports without loading raw data into orchestrator context — orchestrator-invoked only |
 | MCP Server | `kaizen-analysis` | FastMCP server: process mining, pattern detection, clustering, DuckDB queries |
-| Dashboard | Panel/Bokeh | Live sentiment visualization; access via `open_dashboard` MCP tool |
 
 ## Structure
 
@@ -184,7 +182,6 @@ plugins/agentskill-kaizen/
 │   ├── generate-hooks.md
 │   └── report.md
 ├── mcp/
-│   ├── dashboard.py          # Panel/Bokeh sentiment dashboard (daemon thread)
 │   └── server.py             # FastMCP server: process mining, clustering, DuckDB
 ├── skills/
 │   ├── agentskill-kaizen-meta-docs/
@@ -197,7 +194,6 @@ plugins/agentskill-kaizen/
 │       └── SKILL.md
 └── tests/
     ├── conftest.py
-    ├── test_dashboard.py
     └── test_server.py
 ```
 
@@ -208,8 +204,8 @@ plugins/agentskill-kaizen/
 - `uvx` — runs the DuckDB MCP server
 - Session transcripts in `~/.claude/projects/` — generated automatically by Claude Code
 
-The first run downloads Python dependencies for the analysis server (fastmcp, pandas,
-prefixspan). Subsequent runs use the cached environment.
+The first run downloads Python dependencies for the analysis server (fastmcp, prefixspan).
+Subsequent runs use the cached environment.
 
 ## License
 

@@ -14,7 +14,7 @@ from server import mcp
 
 
 async def test_mcp_server_lists_expected_tools() -> None:
-    """Server exposes the eight analysis tools plus open_dashboard via MCP."""
+    """Server exposes the six process-analysis tools via MCP."""
     async with Client(mcp) as client:
         tools = await client.list_tools()
 
@@ -25,9 +25,7 @@ async def test_mcp_server_lists_expected_tools() -> None:
         "discover_process_model",
         "check_conformance",
         "find_frequent_patterns",
-        "detect_frustration_signals",
         "cluster_sessions",
-        "open_dashboard",
     }
 
 

@@ -3,18 +3,12 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
-#     "pandas>=2.0.0",
 #     "prefixspan>=0.5.2",
-#     "panel>=1.3.0",
-#     "hvplot>=0.9.0",
-#     "holoviews>=1.18.0",
-#     "bokeh>=3.3.0",
 # ]
 # ///
 """Kaizen Analysis MCP Server.
 
-Exposes process mining, pattern mining, frustration detection,
-and session clustering as MCP tools for the transcript-analyst agent.
+Exposes process and pattern analysis tools for the transcript-analyst agent.
 
 Tools:
     get_transcript_jsonl_schema - Full session JSONL schema markdown (same as resource below)
@@ -24,7 +18,6 @@ Resources:
     discover_process_model - Lightweight transition model discovery
     check_conformance - Transition-model conformance checking
     find_frequent_patterns - PrefixSpan sequential pattern mining
-    detect_frustration_signals - Regex-based frustration signal extraction
     cluster_sessions - Deterministic clustering on tool-call sequence profiles
 """
 
@@ -34,7 +27,6 @@ import asyncio
 import json
 import operator
 import pathlib
-import re
 from typing import Any
 
 from fastmcp import Context, FastMCP
@@ -63,24 +55,6 @@ _READONLY_ANNOTATIONS: dict[str, bool] = {
     "idempotentHint": True,
     "openWorldHint": False,
 }
-
-_DASHBOARD_ANNOTATIONS: dict[str, bool] = {
-    "readOnlyHint": False,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": True,
-}
-
-# ---------------------------------------------------------------------------
-# Frustration signal patterns
-# ---------------------------------------------------------------------------
-
-_FRUSTRATION_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("correction", re.compile(r"\b(?:no[,.]?\s|don'?t|wrong|incorrect|stop|undo|revert)\b", re.IGNORECASE)),
-    ("denial", re.compile(r"\b(?:that'?s not|i didn'?t|never|absolutely not)\b", re.IGNORECASE)),
-    ("interrupt", re.compile(r"\b(?:wait|hold on|cancel|abort|forget it|nevermind)\b", re.IGNORECASE)),
-    ("frustration", re.compile(r"\b(?:why did you|you keep|again\?|still wrong|broken)\b", re.IGNORECASE)),
-]
 
 mcp = FastMCP("kaizen-analysis", mask_error_details=False)
 
@@ -196,34 +170,6 @@ def _resolve_glob(glob_path: str) -> list[str]:
 
 def _build_process_model(sequences: dict[str, list[str]]) -> ProcessModel:
     return build_process_model(sequences)
-
-
-def _extract_user_text(message: dict[str, Any]) -> str:
-    """Extract plain text from a user message content field.
-
-    Handles both string content and list-of-blocks content formats.
-
-    Args:
-        message: The ``message`` dict from a ``user`` record.
-
-    Returns:
-        Extracted text, or empty string if no text found.
-    """
-    content = message.get("content")
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for block in content:
-            if isinstance(block, dict):
-                if block.get("type") == "text":
-                    text = block.get("text", "")
-                    if isinstance(text, str):
-                        parts.append(text)
-            elif isinstance(block, str):
-                parts.append(block)
-        return " ".join(parts)
-    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -480,64 +426,6 @@ async def find_frequent_patterns(
 # TODO: Restore Annotated[..., Field(...)] parameter annotations once
 # https://github.com/PrefectHQ/fastmcp/issues/3238 is resolved.
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def detect_frustration_signals(glob_path: str) -> list[dict[str, str]]:
-    """Detect user frustration signals in JSONL transcripts.
-
-    Scans user-type messages for patterns indicating corrections,
-    denials, interrupts, and expressions of frustration. Filters
-    out system-generated messages (tool results).
-
-    Args:
-        glob_path: Glob pattern for JSONL transcript files to scan for
-            frustration signals.
-
-    Returns:
-        List of dicts with ``session_id``, ``timestamp``,
-        ``signal_type``, and ``message_text``.
-    """
-
-    def _scan(glob: str) -> list[dict[str, str]]:
-        files = _resolve_glob(glob)
-        signals: list[dict[str, str]] = []
-
-        for file_path in files:
-            session_id = file_path.rsplit("/", maxsplit=1)[-1].removesuffix(".jsonl")
-            records = _read_jsonl(file_path)
-
-            for record in records:
-                if record.get("type") != "user":
-                    continue
-                if record.get("toolUseResult"):
-                    continue
-
-                message = record.get("message")
-                if not isinstance(message, dict):
-                    continue
-
-                text = _extract_user_text(message)
-                if not text:
-                    continue
-
-                timestamp = record.get("timestamp", "")
-
-                for signal_type, pattern in _FRUSTRATION_PATTERNS:
-                    if pattern.search(text):
-                        signals.append({
-                            "session_id": session_id,
-                            "timestamp": str(timestamp),
-                            "signal_type": signal_type,
-                            "message_text": text,
-                        })
-                        break  # One signal per message
-
-        return signals
-
-    return await asyncio.to_thread(_scan, glob_path)
-
-
-# TODO: Restore Annotated[..., Field(...)] parameter annotations once
-# https://github.com/PrefectHQ/fastmcp/issues/3238 is resolved.
-@mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def cluster_sessions(
     glob_path: str = "",
     sequences: dict[str, list[str]] | None = None,
@@ -579,35 +467,5 @@ async def cluster_sessions(
     return await asyncio.to_thread(cluster_tool_sequences, resolved, effective_clusters, _TOP_TOOLS_PER_CLUSTER)
 
 
-@mcp.tool(annotations=_DASHBOARD_ANNOTATIONS)
-def open_dashboard() -> dict[str, str | bool]:
-    """Return the Kaizen sentiment dashboard URL.
-
-    Does not open a browser — opening the browser while Tornado is
-    initializing causes IOLoop exhaustion and a blank/unresponsive page.
-    Copy the returned URL and open it manually.
-
-    Returns:
-        Dict with ``url`` and a human-readable ``message``.
-
-    Raises:
-        ToolError: If the dashboard is not running.
-    """
-    from dashboard import get_dashboard_url  # ruff: ignore[import-outside-top-level]
-
-    url = get_dashboard_url()
-    if url is None:
-        raise ToolError("Dashboard is not running. The MCP server may have failed to start the dashboard thread.")
-
-    return {
-        "url": url,
-        "opened_browser": False,
-        "message": f"Dashboard is running at {url} — open this URL in your browser",
-    }
-
-
 if __name__ == "__main__":
-    from dashboard import start_dashboard
-
-    start_dashboard()
     mcp.run()

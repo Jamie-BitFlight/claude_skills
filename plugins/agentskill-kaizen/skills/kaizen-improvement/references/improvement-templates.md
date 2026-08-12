@@ -114,7 +114,7 @@ Output: Proposed addition to project CLAUDE.md.
 
 **Finding:** {description of project-wide issue}
 **Frequency:** {N} occurrences across {M} sessions
-**Impact:** {cost in wasted tokens, user frustration, failed tasks}
+**Impact:** {cost in wasted tokens, repeated process failures, failed tasks}
 
 ### Proposed Addition
 
