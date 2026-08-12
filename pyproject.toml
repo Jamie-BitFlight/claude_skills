@@ -37,7 +37,6 @@ dev = [
     "pydantic>=2.12.5",
     "pygithub>=2.9.0",
     "pypfmt>=1.1.11",
-    "pyright>=1.1.411",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "pytest-mock>=3.15.1",
@@ -499,7 +498,6 @@ convention = "google"
 "requests".msg = "Use httpx instead. httpx has built-in type annotations and is the project standard."
 
 [tool.mypy]
-# Project uses ty (basedpyright) for type checking. Exclude all to avoid mypy extension errors.
 exclude = [".*"]
 
 [tool.basedpyright]

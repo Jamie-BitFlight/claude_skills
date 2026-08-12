@@ -316,12 +316,9 @@ is a reason to investigate and ask, not a reason to revert.
 
 ## Type Checking
 
-Two type checkers run in CI:
-
-1. **ty** (Astral, primary) — `uv run ty check .`. `mypy` is legacy and being migrated away from
-   this repo's own code; plugin-facing *documentation* keeps mypy as a secondary option since
-   external plugin users may still run it.
-2. **basedpyright** (secondary) — run via `pep723-loader`
+This repository enforces **ty** (Astral) only: `uv run ty check .`. `mypy`,
+`pyright`, and `basedpyright` are not repository quality gates; references to
+them in plugin-facing documentation describe options for external plugin users.
 
 ### Known ty overrides (in `pyproject.toml [tool.ty]`)
 
@@ -349,7 +346,6 @@ Quality Gate requires ALL of these to pass:
 | Job | What it does |
 |-----|-------------|
 | `lint-python` | Ruff lint + format (via prek) |
-| `typecheck-python` | basedpyright |
 | `typecheck-ty` | ty (Astral) |
 | `lint-js` | Biome (JS/TS/JSON) |
 | `lint-markdown` | markdownlint-cli2 |

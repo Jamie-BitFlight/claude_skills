@@ -1,0 +1,10 @@
+{
+  "lsp": {
+    "basedpyright": {
+      "disabled": true
+    },
+    "ty": {
+      "priority": 100
+    }
+  }
+}
