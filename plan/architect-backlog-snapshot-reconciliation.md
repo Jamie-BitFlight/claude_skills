@@ -22,7 +22,8 @@ class SyncProvider(Protocol):
 
 The selected remote backend owns its provider API adapter and private `FileCache`; its `reconcile()`
 method delegates classification, merge policy, checkpoint policy, and no-op suppression to
-`reconciliation.py`. Existing MCP tools keep their public parameters and existing result keys; their
+`reconciliation.py`. Existing MCP parameters retain their meaning and existing result keys remain;
+plan create/update add an optional opaque `owner_reference` for non-numeric providers. Their
 operation-layer functions become thin adapters around this capability.
 
 This architecture replaces the earlier per-item dirty-flag proposal. It adds no second outbox or
@@ -46,7 +47,7 @@ and the existing entry-aware merge.
 
 ### Non-goals
 
-- Changing MCP tool parameters or removing existing result keys.
+- Removing or changing the meaning of existing MCP tool parameters or result keys.
 - Moving explicit status transitions into reconciliation.
 - Synchronising comments, milestones, projects, branches, or pull requests.
 - Migrating every existing local item before first use.
@@ -351,7 +352,9 @@ will detect any race through revision and fingerprint mismatch.
 
 ## 10. Entry-point mapping
 
-Public MCP parameters do not change. Existing result keys retain their meaning; reconciliation adds
+Existing public MCP parameters retain their meaning. Plan create/update add optional
+`owner_reference: str = ""` for opaque provider identifiers and reject requests that also provide
+`issue`; the existing numeric `issue` input remains supported. Existing result keys retain their meaning; reconciliation adds
 the explicit `stale`, `unavailable`, and `pending` keys described in section 5.3.
 
 ### Startup and explicit sync-now
@@ -441,6 +444,8 @@ real output dependency.
 5. **Local-provider native content capabilities** (depends on 1; parallel with 2 and 3)
    - Implement `ContentProvider` list/get/put operations on Beads, SQLite, and Memory using only
      native storage, including bounded plan discovery and the project-level namespace for unlinked plans.
+   - Key content by stable kind/name identity and update mutable owner metadata atomically so owner
+     reassignment cannot leave duplicate records.
    - Preserve opaque provider identifiers and return explicit unsupported errors rather than YAML
      or alternate-provider fallback.
 6. **Operation, plan, and artifact routing** (depends on 4 and 5)
@@ -448,7 +453,8 @@ real output dependency.
      backend's reconciliation capability.
    - Route plans, grooming, artifact manifests, and artifact content through capabilities on the
      configured backend; remove independent artifact/task provider selection and filesystem fallback.
-   - Preserve MCP parameters, output keys, dry-run, force, and diff behavior. Delete superseded paths
+   - Preserve existing MCP parameter semantics, output keys, dry-run, force, and diff behavior; add
+     the optional opaque plan `owner_reference` input. Delete superseded paths
      only after wrapper tests pass.
 7. **Startup gating and progress** (depends on 6)
    - Gate lifespan and sync-now on `SyncProvider`; map `ReconcileResult` into `SyncState` and compact
@@ -484,8 +490,9 @@ real output dependency.
 - Offline remote reads return cached data marked stale; missing cache records return unavailable;
   offline writes queue durably and idempotently; conflicts and partial replay retain unapplied work.
 - Import-boundary tests reject direct runtime YAML/cache access outside `FileCache` and migration tooling.
-- Existing wrapper-level tests pass without MCP parameter changes or changes to the meaning of
-  existing result keys; tests also cover the additive offline-state keys.
+- Existing wrapper-level tests pass without changes to existing MCP parameter semantics or existing
+  result-key meanings; tests also cover opaque plan owners, owner reassignment, and additive
+  offline-state keys.
 - README and consumer documentation describe logical capabilities and recovery without cache paths,
   provider wire formats, Python module names, or internal call graphs.
 - Live L1-L11 completes within the CI timeout, and L8/L9 perform no full historical closed-issue refresh.

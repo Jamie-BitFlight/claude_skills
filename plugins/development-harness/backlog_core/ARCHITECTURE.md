@@ -456,7 +456,6 @@ implementation details.
       ARTIFACT_CONTENT = "artifact_content"
 
   class ContentRef(BaseModel):
-      owner_reference: str = ""
       kind: ContentKind
       name: str
 
@@ -469,6 +468,7 @@ implementation details.
 
   class ContentRecord(BaseModel):
       reference: ContentRef
+      owner_reference: str = ""
       content: str
       revision: str = ""
       stale: bool = False
@@ -479,21 +479,31 @@ implementation details.
       def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
       def get_content(self, reference: ContentRef) -> ContentRecord: ...
       def put_content(
-          self, reference: ContentRef, content: str, expected_revision: str = ""
+          self,
+          reference: ContentRef,
+          content: str,
+          owner_reference: str = "",
+          expected_revision: str = "",
       ) -> ContentRecord: ...
   ```
 
-  Each backend instance is scoped by the composition root to exactly one project. A non-empty
-  `owner_reference` is the opaque work-item identifier from that backend; an empty value places an
-  unlinked plan in that backend instance's project namespace. Providers must not share that empty-owner
-  namespace across backend instances or project roots. `name` is the
-  provider-neutral plan ID or artifact address. `list_content()` provides bounded plan discovery
+  `ContentRef(kind, name)` is stable identity within one project-scoped backend instance; ownership
+  is mutable record metadata and never participates in the storage key. Updating `owner_reference`
+  through `put_content()` therefore reassigns a plan atomically without copying or leaving a stale
+  record. A non-empty owner is the opaque work-item identifier from that backend; an empty value
+  means unlinked content in that backend instance's project namespace. Providers must not share
+  names across backend instances or project roots. `list_content()` provides bounded plan discovery
   without requiring a known name; artifact callers normally address content directly. `revision`
   is opaque and compared only for equality. Remote offline reads may return `stale=True`; accepted
   offline writes return `pending=True`. Local-provider results set both flags false. Missing cached remote data raises
   `ContentUnavailableError`, revision mismatch raises `ContentConflictError`, and a backend without
   the capability raises `UnsupportedCapabilityError`. No caller selects a second provider after any
   of these outcomes.
+
+  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add optional
+  `owner_reference: str = ""`. The operation rejects requests that provide both. It stringifies
+  `issue` for numeric providers and otherwise passes `owner_reference` unchanged to the configured
+  backend. This preserves existing callers while allowing opaque Beads and future provider IDs.
 - `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
   injection to `operations.py` and `server.py`. It does not expose a cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured
