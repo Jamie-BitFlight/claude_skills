@@ -227,16 +227,6 @@ Invoke the skill with the work to delegate; it manages session creation and stat
 
 ```text
 /dh:kage-bunshin "Run independent backlog items for milestone 42 in parallel"
-
-# Steer mid-flight
-$SPAWN --session-id $SID send --name worker-42 \
-  "Deprioritize UI. Focus on API contract first."
-
-# Read what's on screen
-$SPAWN --session-id $SID read --name worker-42
-
-# Stop when done
-$SPAWN --session-id $SID stop --name worker-42
 ```
 
 ---
@@ -460,10 +450,10 @@ The harness ships 27 specialist agents invoked automatically during pipeline sta
 
 ## State Management
 
-The configured backend preserves backlog items, plans, tasks, artifacts, progress, and validation
-evidence across sessions. Remote-capable providers continue serving previously synchronized work
-during an outage and reconcile pending changes when connectivity returns. Local providers such as
-Beads and SQLite keep the same workflow state in their native storage.
+Backlog durability follows the configured backend. Beads and SQLite persist backlog state locally;
+Memory keeps it for the current process only. Plans, tasks, artifacts, progress, and validation
+evidence use the workflow storage selected during setup, whose durability depends on that selection.
+Use persistent storage when work must survive restarts or remain available to other agents.
 
 The `.dh/` directory inside your repository holds committed project configuration only. Runtime
 workflow state does not pollute your working tree.

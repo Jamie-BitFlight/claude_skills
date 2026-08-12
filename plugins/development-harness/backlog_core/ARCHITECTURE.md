@@ -456,9 +456,16 @@ implementation details.
       ARTIFACT_CONTENT = "artifact_content"
 
   class ContentRef(BaseModel):
-      owner_reference: str
+      owner_reference: str = ""
       kind: ContentKind
       name: str
+
+  class ContentQuery(BaseModel):
+      kind: ContentKind
+      owner_reference: str = ""
+      search: str = ""
+      offset: int = 0
+      limit: int | None = None
 
   class ContentRecord(BaseModel):
       reference: ContentRef
@@ -469,16 +476,19 @@ implementation details.
 
   @runtime_checkable
   class ContentProvider(Protocol):
+      def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
       def get_content(self, reference: ContentRef) -> ContentRecord: ...
       def put_content(
           self, reference: ContentRef, content: str, expected_revision: str = ""
       ) -> ContentRecord: ...
   ```
 
-  `owner_reference` is the opaque work-item identifier from the configured backend; `name` is the
-  provider-neutral plan ID or artifact address within that item. `revision` is opaque and compared
-  only for equality. Remote offline reads may return `stale=True`; accepted offline writes return
-  `pending=True`. Local-provider results set both flags false. Missing cached remote data raises
+  A non-empty `owner_reference` is the opaque work-item identifier from the configured backend; an
+  empty value places an unlinked plan in the backend's project-level namespace. `name` is the
+  provider-neutral plan ID or artifact address. `list_content()` provides bounded plan discovery
+  without requiring a known name; artifact callers normally address content directly. `revision`
+  is opaque and compared only for equality. Remote offline reads may return `stale=True`; accepted
+  offline writes return `pending=True`. Local-provider results set both flags false. Missing cached remote data raises
   `ContentUnavailableError`, revision mismatch raises `ContentConflictError`, and a backend without
   the capability raises `UnsupportedCapabilityError`. No caller selects a second provider after any
   of these outcomes.

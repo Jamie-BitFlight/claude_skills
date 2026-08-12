@@ -439,7 +439,8 @@ real output dependency.
    - Test tombstones, no-op omission, offline queueing, idempotent/partial replay, partial fetch
      failure, and patch conflict/error mapping.
 5. **Local-provider native content capabilities** (depends on 1; parallel with 2 and 3)
-   - Implement `ContentProvider` on Beads, SQLite, and Memory using only native storage.
+   - Implement `ContentProvider` list/get/put operations on Beads, SQLite, and Memory using only
+     native storage, including bounded plan discovery and the project-level namespace for unlinked plans.
    - Preserve opaque provider identifiers and return explicit unsupported errors rather than YAML
      or alternate-provider fallback.
 6. **Operation, plan, and artifact routing** (depends on 4 and 5)
