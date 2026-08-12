@@ -28,7 +28,7 @@ from . import models as _models
 from .artifact_provider import create_artifact_provider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config
-from .backend_types import GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode
+from .backend_types import GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
 from .entry_blocks import ENTRY_RE, _render_entry_raw, generate_diff, parse_entries, strike_entry as strike_entry_block
 from .models import (
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
@@ -53,6 +53,8 @@ from .models import (
     MilestoneInfo,
     Output,
     PullRequestRef,
+    ReconcileRequest,
+    ReconcileScope,
     SamTask,
     SamTasksResult,
     Section,
@@ -86,6 +88,7 @@ from .parsing import (
     today,
     view_result_from_local_item,
 )
+from .reconciliation import reconcile_backlog
 from .rendering import SECTION_HEADING
 from .yaml_io import load_item, save_item
 
@@ -2293,6 +2296,24 @@ def refresh_local_cache_from_github(
         (closed) issues.
     """
     out = output or Output()
+    backend = get_config().backend
+    if isinstance(backend, SyncProvider):
+        last_sync_path = _dh_paths.state_root() / ".last_sync"
+        since = "" if full_refresh or not last_sync_path.exists() else last_sync_path.read_text(encoding="utf-8").strip()
+        references = [item.metadata.issue for item in items_with_issues(parse_backlog())]
+        scope = ReconcileScope.INCREMENTAL if since else ReconcileScope.INITIAL
+        result = reconcile_backlog(
+            backend,
+            ReconcileRequest(scope=scope, references=references, since=since),
+        )
+        if result.failures == 0:
+            last_sync_path.parent.mkdir(parents=True, exist_ok=True)
+            last_sync_path.write_text(datetime.now(UTC).isoformat(), encoding="utf-8")
+        out.info(
+            f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
+            f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures."
+        )
+        return {"refreshed": result.local_updates, "reconciled": result.deleted_provider_items, **out.to_dict()}
     repo_obj = try_get_github(repo)
     if repo_obj is None:
         msg = "GitHub unavailable: GITHUB_TOKEN not set or token is invalid. Cannot refresh local cache."

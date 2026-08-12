@@ -8,13 +8,14 @@ gh_client, github_sync, or github_branches.  No business logic lives here.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
+from backlog_core.models import BacklogError, PatchResult, ProviderItem, ProviderSnapshot
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from datetime import datetime
 
     from github.Repository import Repository
 
@@ -28,7 +29,9 @@ if TYPE_CHECKING:
         IssueStatus,
         MergeResult,
         Output,
+        ProviderPatch,
         PullRequestRef,
+        ReconcileRequest,
         SamTask,
         ViewItemResult,
     )
@@ -166,6 +169,88 @@ class GitHubBackend:
     def _update_issues_graphql_batch(self, repo: Repository, updates: list[tuple[str, str]]) -> None:
         """Update issue bodies in bulk using aliased GraphQL mutations."""
         gh_client._update_issues_graphql_batch(repo, updates)
+
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+        """Fetch one normalized bounded GitHub snapshot for reconciliation.
+
+        Returns:
+            Provider snapshot whose pagination remains private to this adapter.
+        """
+        repo = self.get_github()
+        owner, repo_name = repo.full_name.split("/", 1)
+        state = "OPEN" if request.scope.value == "initial" and not request.references else "OPEN,CLOSED"
+        issues = self._fetch_issues_graphql(
+            repo, owner, repo_name, state=state, first=100, since=request.since or None
+        )
+        references = set(request.references)
+        if references:
+            issues = [issue for issue in issues if f"#{issue['number']}" in references]
+        items = [
+            ProviderItem(
+                provider_id=issue["id"],
+                reference=f"#{issue['number']}",
+                title=issue["title"],
+                body=issue["body"],
+                state=issue["state"],
+                labels=[label["name"] for label in issue["labels"]],
+                revision=issue["updatedAt"],
+            )
+            for issue in issues
+        ]
+        return ProviderSnapshot(items=items, sync_started_at=datetime.now(UTC).isoformat(), pages_fetched=1)
+
+    def apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+        """Apply optimistic GitHub body patches and return one outcome per patch.
+
+        Returns:
+            Patch results indexed by the stable provider reference.
+        """
+        if not patches:
+            return []
+        repo = self.get_github()
+        owner, repo_name = repo.full_name.split("/", 1)
+        patch_by_reference = {patch.reference: patch for patch in patches}
+        current_by_reference = {
+            f"#{issue['number']}": issue
+            for issue in self._fetch_issues_graphql(repo, owner, repo_name, state="OPEN,CLOSED", first=100)
+            if f"#{issue['number']}" in patch_by_reference
+        }
+        applicable: list[ProviderPatch] = []
+        results_by_reference: dict[str, PatchResult] = {}
+        for patch in patches:
+            issue = current_by_reference.get(patch.reference)
+            if issue is None:
+                results_by_reference[patch.reference] = PatchResult(
+                    provider_id=patch.provider_id, reference=patch.reference, status="error", message="Issue not found"
+                )
+                continue
+            if issue["updatedAt"] != patch.expected_revision:
+                results_by_reference[patch.reference] = PatchResult(
+                    provider_id=patch.provider_id,
+                    reference=patch.reference,
+                    status="conflict",
+                    revision=issue["updatedAt"],
+                )
+                continue
+            applicable.append(patch)
+        if applicable:
+            try:
+                self._update_issues_graphql_batch(repo, [(patch.provider_id, patch.body) for patch in applicable])
+            except BacklogError as exc:
+                for patch in applicable:
+                    results_by_reference[patch.reference] = PatchResult(
+                        provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
+                    )
+            else:
+                for patch in applicable:
+                    issue = current_by_reference[patch.reference]
+                    results_by_reference[patch.reference] = PatchResult(
+                        provider_id=patch.provider_id,
+                        reference=patch.reference,
+                        status="applied",
+                        revision=issue["updatedAt"],
+                    )
+        return [results_by_reference[patch.reference] for patch in patches]
 
     def sync_issues_graphql(
         self,

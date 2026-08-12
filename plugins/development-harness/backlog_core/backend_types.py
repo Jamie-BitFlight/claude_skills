@@ -20,7 +20,11 @@ if TYPE_CHECKING:
         IssueStatus,
         MergeResult,
         Output,
+        PatchResult,
+        ProviderPatch,
+        ProviderSnapshot,
         PullRequestRef,
+        ReconcileRequest,
         SamTask,
         ViewItemResult,
     )
@@ -186,6 +190,14 @@ class WorkItemBackend(Protocol):
     def section_heading(self) -> dict[str, str]: ...
     def render_groomed_section(self, groomed: GroomedData) -> str: ...
     def section_display_title(self, key: str, groomed_date: str = "") -> str: ...
+
+
+@runtime_checkable
+class SyncProvider(Protocol):
+    """Optional provider snapshot and body-patching surface for reconciliation."""
+
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
+    def apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]: ...
 
 
 @runtime_checkable

@@ -37,6 +37,7 @@ from .backend_types import (
     LabelNode,
     MilestoneFullNode,
     MilestoneNode,
+    SyncProvider,
     WorkItemBackend,
 )
 
@@ -59,6 +60,7 @@ __all__ = [
     "LabelNode",
     "MilestoneFullNode",
     "MilestoneNode",
+    "SyncProvider",
     "WorkItemBackend",
     "create_backend",
     "get_config",

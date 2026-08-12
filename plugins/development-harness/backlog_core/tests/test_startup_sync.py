@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from backlog_core.backend_types import BacklogConfig as BackendConfig
 from backlog_core.models import BackendUnavailableError, BacklogError
 from backlog_core.sync_engine import _startup_sync_loop
 from backlog_core.sync_state import (
@@ -1174,6 +1175,23 @@ class TestKillSwitch:
             f"When kill-switch is false, startup sync must be skipped entirely. "
             f"Got {launch_count} launch(es). Finding #8."
         )
+
+    async def test_sync_skipped_when_backend_lacks_reconciliation(self, mocker: MockerFixture) -> None:
+        from backlog_core.backends.memory_backend import InMemoryBackend
+
+        reset_sync_state()
+
+        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
+        mocker.patch("backlog_core.server._get_config", return_value=BackendConfig(backend=InMemoryBackend()))
+        mocker.patch("backlog_core.server._active_startup_sync_task", None)
+        create_task = mocker.patch("backlog_core.server.asyncio.create_task")
+
+        from backlog_core.server import _backlog_lifespan
+
+        async with _backlog_lifespan(object()):
+            pass
+
+        create_task.assert_not_called()
 
     async def test_sync_runs_when_kill_switch_enabled(self, mocker: MockerFixture) -> None:
         """startup sync IS launched when the kill-switch is true (default)."""

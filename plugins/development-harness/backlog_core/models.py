@@ -733,6 +733,7 @@ class BacklogItemMetadata(BaseModel):
     issue: str = ""
     last_synced: str = ""
     updated_at: str = ""
+    sync_fingerprint: str = ""
     groomed: str = ""
     plan: str = ""
     topic: str = ""
@@ -1017,6 +1018,83 @@ class BacklogItem(BaseModel):
         self.topic = self.metadata.topic
 
         return self
+
+
+class ProviderItem(BaseModel):
+    """Normalized provider work item used by reconciliation."""
+
+    provider_id: str
+    reference: str
+    title: str
+    body: str
+    state: str
+    labels: list[str]
+    revision: str
+    exists: bool = True
+
+
+class ProviderSnapshot(BaseModel):
+    """Bounded provider state observed during one reconciliation run."""
+
+    items: list[ProviderItem]
+    sync_started_at: str
+    pages_fetched: int = 0
+
+
+class ProviderPatch(BaseModel):
+    """Optimistic body update requested from a provider."""
+
+    provider_id: str
+    reference: str
+    expected_revision: str
+    body: str
+
+
+class PatchResult(BaseModel):
+    """Provider outcome for one requested body update."""
+
+    provider_id: str
+    reference: str
+    status: Literal["applied", "conflict", "error"]
+    revision: str = ""
+    message: str = ""
+
+
+class ReconcileScope(StrEnum):
+    """Provider snapshot scope selected by reconciliation callers."""
+
+    INITIAL = "initial"
+    INCREMENTAL = "incremental"
+    LINKED = "linked"
+    TARGETED = "targeted"
+
+
+class ReconcileRequest(BaseModel):
+    """Typed request for a provider-neutral backlog reconciliation pass."""
+
+    scope: ReconcileScope
+    references: list[str] = Field(default_factory=list)
+    since: str = ""
+    dry_run: bool = False
+    force: bool = False
+    include_diff: bool = False
+
+
+class ReconcileResult(BaseModel):
+    """Completed reconciliation outcomes and optional changed-item details."""
+
+    fetched_pages: int = 0
+    fetched_items: int = 0
+    local_updates: int = 0
+    provider_patches: int = 0
+    no_ops: int = 0
+    conflicts: int = 0
+    failures: int = 0
+    deleted_provider_items: int = 0
+    changed_references: list[str] = Field(default_factory=list)
+    file_paths: dict[str, str] = Field(default_factory=dict)
+    diffs: dict[str, str] = Field(default_factory=dict)
+    patch_results: list[PatchResult] = Field(default_factory=list)
 
 
 class Output(BaseModel):

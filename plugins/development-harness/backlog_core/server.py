@@ -35,7 +35,7 @@ from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
-from .backend_types import GitHubExtras, IssueNode as _IssueNode
+from .backend_types import GitHubExtras, IssueNode as _IssueNode, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
@@ -1551,7 +1551,7 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
     #   if RUNNING is already set (second lifespan entry) we skip create_task so
     #   only one background sync task runs per process lifetime.
     global _active_startup_sync_task  # ruff: ignore[global-statement]
-    if _startup_sync_enabled() and state.try_start():
+    if _startup_sync_enabled() and isinstance(_get_config().backend, SyncProvider) and state.try_start():
         bg_task: asyncio.Task[None] | None = asyncio.create_task(_sync_engine._startup_sync_loop(state))
         _register_bg_task(bg_task)
         # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
@@ -1639,6 +1639,8 @@ async def sync_now(
             messages (list[str]): Informational messages about the action taken.
     """
     state = get_sync_state()
+    if not isinstance(_get_config().backend, SyncProvider):
+        return {"triggered": False, "sync_state": state.to_dict(), "messages": ["Active backend does not support reconciliation."]}
 
     # Reset terminal states so the new attempt starts fresh.  Done before the
     # claim so the returned snapshot reflects the fresh RUNNING state, not the
