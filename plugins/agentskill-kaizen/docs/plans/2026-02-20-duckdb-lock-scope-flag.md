@@ -204,7 +204,7 @@ Then `/commit-staged`
 **NOTE**: This plan was written when BACKLOG.md was the single-file backlog. The architecture has since changed: GitHub Issues are the source of truth, and `.claude/backlog/` per-item files are the local cache. Use `uv run .claude/skills/backlog/scripts/backlog.py add` instead of editing files directly.
 
 **Context:**
-The plugin runs two MCP servers: `kaizen-duckdb` (motherduck, SQL queries) and `kaizen-analysis` (custom server.py, PM4Py tools + dashboard). The question is whether `sentiment-score.py` as a standalone script should instead be an MCP tool in `server.py`, and whether the two servers can be consolidated. This needs investigation before any architectural change.
+The plugin runs two MCP servers: `kaizen-duckdb` (motherduck, SQL queries) and `kaizen-analysis` (custom server.py, process-mining tools + dashboard). The question is whether `sentiment-score.py` as a standalone script should instead be an MCP tool in `server.py`, and whether the two servers can be consolidated. This needs investigation before any architectural change.
 
 **Step 1: Add a P2 backlog item via the backlog script**
 

@@ -1,6 +1,6 @@
 ---
 name: transcript-analysis
-description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, detecting user frustration signals, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema (kaizen-analysis get_transcript_jsonl_schema or MCP resource kaizen://session-log/schema or references/jsonl-schema.md), arbitrary DuckDB SQL over JSONL via kaizen-duckdb execute_query, cookbook query patterns, 10 analysis dimensions, and PM4Py process mining methodology.
+description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, detecting user frustration signals, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema (kaizen-analysis get_transcript_jsonl_schema or MCP resource kaizen://session-log/schema or references/jsonl-schema.md), arbitrary DuckDB SQL over JSONL via kaizen-duckdb execute_query, cookbook query patterns, 10 analysis dimensions, and lightweight process mining methodology.
 ---
 
 # Transcript Analysis
@@ -112,7 +112,7 @@ For the arbitrary-query workflow and examples, see [DuckDB Query Patterns](./ref
 Use the `kaizen-analysis` MCP server tools for analyses SQL cannot express:
 
 - `extract_tool_sequences` — Convert JSONL → ordered tool-call arrays per session
-- `discover_process_model` — PM4Py Heuristic Miner on tool-call event logs
+- `discover_process_model` — Lightweight transition model over tool-call sequences
 - `check_conformance` — Compare sessions against a reference process model
 - `find_frequent_patterns` — PrefixSpan sequential pattern mining
 - `detect_frustration_signals` — NLP extraction from user turns

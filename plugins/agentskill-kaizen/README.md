@@ -164,7 +164,7 @@ next session.
 | Command | `/agentskill-kaizen:generate-hooks` | Translate findings into hook configurations |
 | Agent | `transcript-analyst` | Deep SQL/process-mining analysis of JSONL transcripts — emits explicit `STATUS: DONE` block and `SendMessage` to team lead on completion |
 | Agent | `improvement-generator` | Generates hooks, skill patches, CLAUDE.md updates — emits explicit `STATUS: DONE` block and `SendMessage` to team lead on completion |
-| Skill | `transcript-analysis` | DuckDB query patterns, JSONL schema, PM4Py methodology |
+| Skill | `transcript-analysis` | DuckDB query patterns, JSONL schema, process mining methodology |
 | Skill | `kaizen-improvement` | Templates for improvement output generation |
 | Skill | `meta-inspector` | Extracts specific data points from large transcripts and analysis reports without loading raw data into orchestrator context — orchestrator-invoked only |
 | MCP Server | `kaizen-analysis` | FastMCP server: process mining, pattern detection, clustering, DuckDB queries |
@@ -208,8 +208,8 @@ plugins/agentskill-kaizen/
 - `uvx` — runs the DuckDB MCP server
 - Session transcripts in `~/.claude/projects/` — generated automatically by Claude Code
 
-The first run downloads Python dependencies for the analysis server (fastmcp, pm4py, pandas,
-prefixspan, scikit-learn). Subsequent runs use the cached environment.
+The first run downloads Python dependencies for the analysis server (fastmcp, pandas,
+prefixspan). Subsequent runs use the cached environment.
 
 ## License
 

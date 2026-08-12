@@ -1,28 +1,9 @@
-"""Unit and direct-call tests for the kaizen-analysis MCP server module.
-
-Covers helpers and tools invoked on the imported module. MCP protocol coverage
-(list_tools, call_tool, read_resource) lives in ``test_server_mcp.py`` using
-``Client(mcp)`` in-memory transport.
-
-Tests cover:
-- Helper functions: _read_jsonl, _extract_tools_from_records, _resolve_glob,
-  _build_event_log, _extract_user_text, _extract_tool_sequences_impl,
-  _resolve_sequences
-- Session log schema helpers and resource function
-- Async MCP tools (direct call): get_transcript_jsonl_schema, extract_tool_sequences,
-  discover_process_model, check_conformance, find_frequent_patterns,
-  detect_frustration_signals, cluster_sessions
-- Edge cases: empty globs, malformed JSONL, zero tool calls,
-  n_clusters > sessions, empty sequences
-"""
-
 from __future__ import annotations
 
 import json
 import sys
 from typing import TYPE_CHECKING
 
-import pandas as pd
 import pytest
 import server as kaizen_server
 
@@ -218,58 +199,28 @@ class TestResolveGlob:
         assert "nested.jsonl" in result[0]
 
 
-# ===================================================================
-# Helper: _build_event_log
-# ===================================================================
+class TestBuildProcessModel:
+    def test_builds_model_from_sequences(self, sample_sequences: dict[str, list[str]]) -> None:
+        model = kaizen_server._build_process_model(sample_sequences)
 
+        assert model.session_count == 3
+        assert model.event_count == 9
+        assert "Read" in model.activity_set
+        assert ("Read", "Grep") in model.transition_set
 
-class TestBuildEventLog:
-    """Tests for _build_event_log -- PM4Py DataFrame construction."""
+    def test_returns_empty_model_for_empty_sequences(self) -> None:
+        model = kaizen_server._build_process_model({})
 
-    def test_builds_dataframe_from_sequences(self, sample_sequences: dict[str, list[str]]) -> None:
-        """Produces DataFrame with expected columns and row count."""
-        df = kaizen_server._build_event_log(sample_sequences)
+        assert model.session_count == 0
+        assert model.event_count == 0
+        assert not model.activity_set
+        assert not model.transition_set
 
-        assert isinstance(df, pd.DataFrame)
-        assert not df.empty
-        # Total rows: 3 + 2 + 4 = 9
-        assert len(df) == 9
-        assert "case:concept:name" in df.columns
-        assert "concept:name" in df.columns
-        assert "time:timestamp" in df.columns
+    def test_preserves_start_and_end_tools(self) -> None:
+        model = kaizen_server._build_process_model({"s1": ["Read", "Write"]})
 
-    def test_returns_empty_dataframe_for_empty_sequences(self) -> None:
-        """Empty sequences dict yields empty DataFrame."""
-        df = kaizen_server._build_event_log({})
-
-        assert isinstance(df, pd.DataFrame)
-        assert df.empty
-
-    def test_preserves_session_ids(self, sample_sequences: dict[str, list[str]]) -> None:
-        """Session IDs appear in the case:concept:name column."""
-        df = kaizen_server._build_event_log(sample_sequences)
-
-        session_ids = set(df["case:concept:name"].unique())
-        assert session_ids == {"session-one", "session-two", "session-three"}
-
-    def test_preserves_tool_names(self) -> None:
-        """Tool names appear in the concept:name column."""
-        sequences = {"s1": ["Read", "Write"]}
-
-        df = kaizen_server._build_event_log(sequences)
-
-        tool_names = list(df["concept:name"])
-        assert tool_names == ["Read", "Write"]
-
-    def test_timestamps_are_monotonically_increasing_within_session(self) -> None:
-        """Timestamps within a session increase by 1 second per event."""
-        sequences = {"s1": ["A", "B", "C"]}
-
-        df = kaizen_server._build_event_log(sequences)
-
-        timestamps = list(df["time:timestamp"])
-        for i in range(1, len(timestamps)):
-            assert timestamps[i] > timestamps[i - 1]
+        assert model.start_set == frozenset({"Read"})
+        assert model.end_set == frozenset({"Write"})
 
 
 # ===================================================================
@@ -796,7 +747,6 @@ class TestClusterSessions:
     async def test_clusters_sessions_from_sequences(
         self, sample_sequences: dict[str, list[str]], mock_context: AsyncMock
     ) -> None:
-        """KMeans clustering returns clusters and profiles."""
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
         assert "clusters" in result

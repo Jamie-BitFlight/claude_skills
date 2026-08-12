@@ -1,0 +1,199 @@
+"""Pure-Python process models for Kaizen tool-call sequences."""
+
+from __future__ import annotations
+
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import TypeAlias, TypedDict
+
+Transition: TypeAlias = tuple[str, str]
+ToolSequences: TypeAlias = Mapping[str, Sequence[str]]
+
+
+class ConformanceDiagnostics(TypedDict):
+    """Per-session conformance metrics for a target trace."""
+
+    session_id: str
+    trace_is_fit: bool
+    trace_fitness: float
+    missing_tokens: int
+    remaining_tokens: int
+    consumed_tokens: int
+    produced_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class ActivityCount:
+    """Observed count for one tool activity."""
+
+    name: str
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class TransitionCount:
+    """Observed count for one source-to-target tool transition."""
+
+    source: str
+    target: str
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessModel:
+    """Activity, transition, start, and end sets mined from tool traces."""
+
+    session_count: int
+    event_count: int
+    activity_counts: tuple[ActivityCount, ...]
+    transition_counts: tuple[TransitionCount, ...]
+    start_counts: tuple[ActivityCount, ...]
+    end_counts: tuple[ActivityCount, ...]
+    activity_set: frozenset[str]
+    transition_set: frozenset[Transition]
+    start_set: frozenset[str]
+    end_set: frozenset[str]
+
+
+def build_process_model(sequences: ToolSequences) -> ProcessModel:
+    """Build a transition model from session tool-call sequences.
+
+    Returns:
+        Process model with activity, transition, start, and end counts.
+    """
+    activity_counter: Counter[str] = Counter()
+    transition_counter: Counter[Transition] = Counter()
+    start_counter: Counter[str] = Counter()
+    end_counter: Counter[str] = Counter()
+
+    for tools in sequences.values():
+        if not tools:
+            continue
+        activity_counter.update(tools)
+        transition_counter.update(_transitions(tools))
+        start_counter[tools[0]] += 1
+        end_counter[tools[-1]] += 1
+
+    return ProcessModel(
+        session_count=len(sequences),
+        event_count=sum(activity_counter.values()),
+        activity_counts=_activity_counts(activity_counter),
+        transition_counts=_transition_counts(transition_counter),
+        start_counts=_activity_counts(start_counter),
+        end_counts=_activity_counts(end_counter),
+        activity_set=frozenset(activity_counter),
+        transition_set=frozenset(transition_counter),
+        start_set=frozenset(start_counter),
+        end_set=frozenset(end_counter),
+    )
+
+
+def render_process_model(model: ProcessModel) -> str:
+    """Render a process model as a readable text summary.
+
+    Returns:
+        Multi-line process model summary.
+    """
+    sections = [
+        "Process model",
+        f"Sessions: {model.session_count}",
+        f"Events: {model.event_count}",
+        "",
+        "Activities:",
+        *_render_activities(model.activity_counts),
+        "",
+        "Start activities:",
+        *_render_activities(model.start_counts),
+        "",
+        "Transitions:",
+        *_render_transitions(model.transition_counts),
+        "",
+        "End activities:",
+        *_render_activities(model.end_counts),
+    ]
+    return "\n".join(sections)
+
+
+def check_sequence_conformance(
+    target_sequences: ToolSequences, reference_model: ProcessModel
+) -> list[ConformanceDiagnostics]:
+    """Compare target sequences against a reference process model.
+
+    Returns:
+        Per-session conformance diagnostics.
+    """
+    return [_diagnose_sequence(session_id, tools, reference_model) for session_id, tools in target_sequences.items()]
+
+
+def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessModel) -> ConformanceDiagnostics:
+    observed_transitions = _transitions(tools)
+    unexpected_transition_count = sum(
+        1 for transition in observed_transitions if transition not in model.transition_set
+    )
+    start_mismatch = bool(tools) and tools[0] not in model.start_set
+    end_mismatch = bool(tools) and tools[-1] not in model.end_set
+    empty_trace_mismatch = not tools and model.event_count > 0
+
+    missing_tokens = unexpected_transition_count + int(start_mismatch) + int(end_mismatch) + int(empty_trace_mismatch)
+    produced_tokens = len(tools)
+    consumed_tokens = max(0, produced_tokens - missing_tokens)
+    remaining_tokens = len(model.transition_set - frozenset(observed_transitions))
+
+    return {
+        "session_id": session_id,
+        "trace_is_fit": missing_tokens == 0,
+        "trace_fitness": _trace_fitness(missing_tokens, tools),
+        "missing_tokens": missing_tokens,
+        "remaining_tokens": remaining_tokens,
+        "consumed_tokens": consumed_tokens,
+        "produced_tokens": produced_tokens,
+    }
+
+
+def _trace_fitness(missing_tokens: int, tools: Sequence[str]) -> float:
+    checks = max(1, len(tools) - 1)
+    return round(max(0.0, 1.0 - (missing_tokens / checks)), 6)
+
+
+def _transitions(tools: Sequence[str]) -> list[Transition]:
+    return [(tools[index], tools[index + 1]) for index in range(len(tools) - 1)]
+
+
+def _activity_counts(counter: Counter[str]) -> tuple[ActivityCount, ...]:
+    return tuple(
+        ActivityCount(name=name, count=count)
+        for name, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))
+    )
+
+
+def _transition_counts(counter: Counter[Transition]) -> tuple[TransitionCount, ...]:
+    return tuple(
+        TransitionCount(source=source, target=target, count=count)
+        for (source, target), count in sorted(counter.items(), key=lambda item: (-item[1], item[0][0], item[0][1]))
+    )
+
+
+def _render_activities(counts: tuple[ActivityCount, ...]) -> list[str]:
+    if not counts:
+        return ["- none"]
+    return [f"- {entry.name}: {entry.count}" for entry in counts]
+
+
+def _render_transitions(counts: tuple[TransitionCount, ...]) -> list[str]:
+    if not counts:
+        return ["- none"]
+    return [f"- {entry.source} -> {entry.target}: {entry.count}" for entry in counts]
+
+
+__all__ = [
+    "ActivityCount",
+    "ConformanceDiagnostics",
+    "ProcessModel",
+    "ToolSequences",
+    "Transition",
+    "TransitionCount",
+    "build_process_model",
+    "check_sequence_conformance",
+    "render_process_model",
+]
