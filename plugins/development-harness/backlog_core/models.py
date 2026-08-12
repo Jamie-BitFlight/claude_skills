@@ -15,7 +15,7 @@ import sys
 import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, assert_never
 
 import git
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
@@ -510,6 +510,22 @@ class BacklogError(Exception):
     """General backlog operation error."""
 
 
+class ContentProviderError(Exception):
+    """Base error for logical content capability failures."""
+
+
+class ContentUnavailableError(ContentProviderError):
+    """Raised when requested content is unavailable from the selected backend."""
+
+
+class ContentConflictError(ContentProviderError):
+    """Raised when an expected content revision no longer matches provider state."""
+
+
+class UnsupportedCapabilityError(ContentProviderError):
+    """Raised when the selected backend lacks a required logical capability."""
+
+
 class ItemNotFoundError(BacklogError):
     """Raised when a backlog item cannot be found by the given selector."""
 
@@ -733,6 +749,7 @@ class BacklogItemMetadata(BaseModel):
     issue: str = ""
     last_synced: str = ""
     updated_at: str = ""
+    sync_fingerprint: str = ""
     groomed: str = ""
     plan: str = ""
     topic: str = ""
@@ -1017,6 +1034,171 @@ class BacklogItem(BaseModel):
         self.topic = self.metadata.topic
 
         return self
+
+
+class ProviderItem(BaseModel):
+    """Normalized provider work item used by reconciliation."""
+
+    provider_id: str
+    reference: str
+    title: str
+    body: str
+    state: str
+    labels: list[str]
+    revision: str
+    exists: bool = True
+
+
+class ProviderSnapshot(BaseModel):
+    """Bounded provider state observed during one reconciliation run."""
+
+    items: list[ProviderItem]
+    sync_started_at: str
+    pages_fetched: int = 0
+
+
+class ProviderPatch(BaseModel):
+    """Optimistic body update requested from a provider."""
+
+    provider_id: str
+    reference: str
+    expected_revision: str
+    body: str
+
+
+class PatchResult(BaseModel):
+    """Provider outcome for one requested body update."""
+
+    provider_id: str
+    reference: str
+    status: Literal["applied", "conflict", "error"]
+    revision: str = ""
+    message: str = ""
+
+
+class ReconcileScope(StrEnum):
+    """Provider snapshot scope selected by reconciliation callers."""
+
+    INITIAL = "initial"
+    INCREMENTAL = "incremental"
+    LINKED = "linked"
+    TARGETED = "targeted"
+
+
+class ReconcileRequest(BaseModel):
+    """Typed request for a provider-neutral backlog reconciliation pass."""
+
+    scope: ReconcileScope
+    references: list[str] = Field(default_factory=list)
+    since: str = ""
+    dry_run: bool = False
+    force: bool = False
+    include_diff: bool = False
+
+
+class ContentKind(StrEnum):
+    """Logical content categories supported by configured backends."""
+
+    PLAN = "plan"
+    ARTIFACT_MANIFEST = "artifact_manifest"
+    ARTIFACT_CONTENT = "artifact_content"
+
+
+class ContentRef(BaseModel):
+    """Immutable logical identity for a plan or artifact record."""
+
+    kind: ContentKind
+    namespace: str = ""
+    artifact_type: str = ""
+    name: str
+
+    @model_validator(mode="after")
+    def _validate_kind_identity(self) -> ContentRef:
+        if not self.name:
+            raise ValueError("content name must not be empty")
+        match self.kind:
+            case ContentKind.PLAN:
+                if self.namespace:
+                    raise ValueError("plan namespace must be empty")
+                if self.artifact_type:
+                    raise ValueError("plan artifact type must be empty")
+            case ContentKind.ARTIFACT_MANIFEST:
+                if not self.namespace:
+                    raise ValueError("manifest owner namespace must not be empty")
+                if self.artifact_type:
+                    raise ValueError("manifest artifact type must be empty")
+                if self.name != "manifest":
+                    raise ValueError("manifest canonical name must be 'manifest'")
+            case ContentKind.ARTIFACT_CONTENT:
+                if not self.namespace:
+                    raise ValueError("content owner namespace must not be empty")
+                if not self.artifact_type:
+                    raise ValueError("content type must not be empty")
+            case unreachable:
+                assert_never(unreachable)
+        return self
+
+
+class ContentQuery(BaseModel):
+    """Bounded discovery request for logical backend content."""
+
+    kind: ContentKind
+    owner_reference: str = ""
+    search: str = ""
+    offset: int = Field(default=0, ge=0)
+    limit: int = Field(default=100, ge=1, le=100)
+
+
+class ContentRecord(BaseModel):
+    """Logical content returned by the configured backend."""
+
+    reference: ContentRef
+    owner_reference: str = ""
+    content: str
+    revision: str = ""
+    stale: bool = False
+    pending: bool = False
+
+
+class ContentWrite(BaseModel):
+    """Typed logical content write with optional ownership reassignment."""
+
+    reference: ContentRef
+    content: str
+    owner_reference: str | None = None
+    expected_revision: str = ""
+
+    @model_validator(mode="after")
+    def _validate_artifact_owner(self) -> ContentWrite:
+        match self.reference.kind:
+            case ContentKind.PLAN:
+                pass
+            case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
+                if self.owner_reference is not None and self.owner_reference != self.reference.namespace:
+                    raise ValueError("owner_reference conflicts with artifact namespace")
+            case unreachable:
+                assert_never(unreachable)
+        return self
+
+
+class ReconcileResult(BaseModel):
+    """Completed reconciliation outcomes and optional changed-item details."""
+
+    fetched_pages: int = 0
+    fetched_items: int = 0
+    local_updates: int = 0
+    provider_patches: int = 0
+    no_ops: int = 0
+    conflicts: int = 0
+    failures: int = 0
+    deleted_provider_items: int = 0
+    changed_references: list[str] = Field(default_factory=list)
+    file_paths: dict[str, str] = Field(default_factory=dict)
+    diffs: dict[str, str] = Field(default_factory=dict)
+    patch_results: list[PatchResult] = Field(default_factory=list)
+    stale: bool = False
+    unavailable_references: list[str] = Field(default_factory=list)
+    pending_mutations: int = 0
 
 
 class Output(BaseModel):

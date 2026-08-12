@@ -31,14 +31,17 @@ from .backend_types import (
     AssigneeNode,
     BacklogConfig,
     BranchBackend,
+    ContentProvider,
     GitHubExtras,
     IssueCommentNode,
     IssueNode,
     LabelNode,
     MilestoneFullNode,
     MilestoneNode,
+    SyncProvider,
     WorkItemBackend,
 )
+from .models import ContentConflictError, ContentProviderError, ContentUnavailableError, UnsupportedCapabilityError
 
 if TYPE_CHECKING:
     import types
@@ -53,12 +56,18 @@ __all__ = [
     "AssigneeNode",
     "BacklogConfig",
     "BranchBackend",
+    "ContentConflictError",
+    "ContentProvider",
+    "ContentProviderError",
+    "ContentUnavailableError",
     "GitHubExtras",
     "IssueCommentNode",
     "IssueNode",
     "LabelNode",
     "MilestoneFullNode",
     "MilestoneNode",
+    "SyncProvider",
+    "UnsupportedCapabilityError",
     "WorkItemBackend",
     "create_backend",
     "get_config",

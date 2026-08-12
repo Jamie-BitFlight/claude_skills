@@ -15,12 +15,18 @@ if TYPE_CHECKING:
         BackendStatus,
         BacklogItem,
         BranchInfo,
+        ContentQuery,
+        ContentRecord,
+        ContentRef,
+        ContentWrite,
         GroomedData,
         IssueLocalFields,
         IssueStatus,
         MergeResult,
         Output,
         PullRequestRef,
+        ReconcileRequest,
+        ReconcileResult,
         SamTask,
         ViewItemResult,
     )
@@ -186,6 +192,22 @@ class WorkItemBackend(Protocol):
     def section_heading(self) -> dict[str, str]: ...
     def render_groomed_section(self, groomed: GroomedData) -> str: ...
     def section_display_title(self, key: str, groomed_date: str = "") -> str: ...
+
+
+@runtime_checkable
+class SyncProvider(Protocol):
+    """Optional one-method reconciliation capability for remote backends."""
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult: ...
+
+
+@runtime_checkable
+class ContentProvider(Protocol):
+    """Optional logical plan and artifact content capability."""
+
+    def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
+    def get_content(self, reference: ContentRef) -> ContentRecord: ...
+    def put_content(self, request: ContentWrite) -> ContentRecord: ...
 
 
 @runtime_checkable
