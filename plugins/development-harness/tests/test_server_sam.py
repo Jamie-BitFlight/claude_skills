@@ -148,6 +148,25 @@ async def test_backlog_get_sam_tasks_shape() -> None:
     assert response["tasks"][0]["task_id"] == "T1"
 
 
+async def test_backlog_get_sam_tasks_accepts_opaque_parent_reference() -> None:
+    op_result = {
+        "tasks": [],
+        "count": 0,
+        "parent_issue_number": "bd-a1b2",
+        "stale": False,
+        "unavailable": False,
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
+
+    with patch("dh_core.operations.get_sam_tasks", return_value=op_result) as operation:
+        response = await _call("backlog_get_sam_tasks", {"parent_issue_number": "bd-a1b2"})
+
+    operation.assert_called_once()
+    assert response["parent_issue_number"] == "bd-a1b2"
+
+
 # ---------------------------------------------------------------------------
 # backlog_update_sam_task_status
 # ---------------------------------------------------------------------------

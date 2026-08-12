@@ -7,33 +7,27 @@ parameter and returns ``{...result, **out.to_dict()}``.
 
 from __future__ import annotations
 
-import contextlib
-import json
 import operator
 import re
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, NotRequired, TypeGuard
 
-import dh_paths as _dh_paths
 from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException, GithubObject  # GithubObject used only by create_milestone (ADR-004)
-from ruamel.yaml import YAMLError
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
+from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
 
 from . import models as _models
-from .artifact_provider import create_artifact_provider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config
-from .backend_types import GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode
-from .entry_blocks import ENTRY_RE, _render_entry_raw, generate_diff, parse_entries, strike_entry as strike_entry_block
+from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .entry_blocks import ENTRY_RE, _render_entry_raw, parse_entries
 from .models import (
-    COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
     ITEM_TYPE_ALIASES,
-    MIN_FRONTMATTER_PARTS,
     SECTION_HEADING_ALIAS,
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
@@ -43,6 +37,11 @@ from .models import (
     BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    ContentKind,
+    ContentQuery,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
     DuplicateItemError,
     Entry,
     GroomedData,
@@ -53,33 +52,23 @@ from .models import (
     MilestoneInfo,
     Output,
     PullRequestRef,
+    ReconcileRequest,
+    ReconcileScope,
     SamTask,
-    SamTasksResult,
     Section,
     SectionEntryDict,
     SectionEntryMetadata,
     ValidationError,
     ViewItemResult,
     parse_issue_number,
-    resolve_repo,
 )
 from .parsing import (
-    _MdPost,
-    build_body_extra_only,
-    dump_frontmatter,
-    extract_description_from_issue_body,
-    extract_groomed_section,
-    extract_normalize_metadata,
-    extract_sections,
     find_fuzzy_duplicates,
     find_item,
-    issues_to_title_map,
     items_needing_issues,
     items_with_issues,
-    loads_frontmatter,
     normalize_issue_title,
     now_iso,
-    parse_backlog,
     parse_issue_selector,
     parse_sam_task_metadata,
     title_to_slug,
@@ -87,9 +76,34 @@ from .parsing import (
     view_result_from_local_item,
 )
 from .rendering import SECTION_HEADING
-from .yaml_io import load_item, save_item
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
+
+
+class _SamTaskRow(TypedDict):
+    task_id: str
+    feature: str
+    status: str
+    agent: str
+    priority: int
+    skills: list[str]
+    dependencies: list[str]
+    issue_number: int
+    issue_url: str
+    title: str
+
+
+class _SamTaskLookupResult(TypedDict):
+    tasks: list[_SamTaskRow]
+    count: int
+    parent_issue_number: int | str
+    stale: bool
+    pending: bool
+    unavailable: bool
+    messages: list[str]
+    warnings: list[str]
+    errors: list[str]
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -102,6 +116,10 @@ if TYPE_CHECKING:
 # Tests can patch via mocker.patch("backlog_core.operations.X").
 # Each wrapper delegates to get_config().backend.X(...).
 # ---------------------------------------------------------------------------
+
+
+def _work_item(reference: str) -> BacklogItem:
+    return get_config().backend.get_work_item(reference)
 
 
 def get_github(repo: str = "", timeout: int = 15) -> Repository:
@@ -136,24 +154,6 @@ def create_issue_for_item(
     return get_config().backend.create_issue_for_item(repository, item, dry_run, output)
 
 
-def sync_groomed_to_github_issue(
-    repo_obj: Repository,
-    issue_num: int,
-    groomed_content: str,
-    section_name: str | None = None,
-    output: Output | None = None,
-) -> bool:
-    """Write groomed section into a specific section of an issue body.
-
-    Returns:
-        True if the issue body was updated, False otherwise.
-    """
-    backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("sync_groomed_to_github_issue requires a GitHub-backed backend")
-    return backend.sync_groomed_to_github_issue(repo_obj, issue_num, groomed_content, section_name, output)
-
-
 def fetch_github_issue_body(repo_obj: Repository, issue_num: int, output: Output | None = None) -> str | None:
     """Fetch the raw body of an issue.
 
@@ -173,7 +173,6 @@ def sync_issues_graphql(
     milestone_number: int | None = None,
     since: datetime | None = None,
     callback: Callable[[IssueNode], None] | None = None,
-    track_timestamp: bool = False,
 ) -> list[IssueNode]:
     """Bulk-fetch issues with optional progress callback.
 
@@ -192,7 +191,6 @@ def sync_issues_graphql(
         milestone_number=milestone_number,
         since=since,
         callback=callback,
-        track_timestamp=track_timestamp,
     )
 
 
@@ -606,15 +604,8 @@ def _md_reconstruct_body_from_sections(
 # ---------------------------------------------------------------------------
 
 
-def _apply_updates_to_yaml_item(filepath: Path, updates: dict[str, str | dict[str, object]], set_synced: bool) -> None:
-    """Apply *updates* dict to a ``.yaml`` backlog item via yaml_io round-trip.
-
-    Args:
-        filepath: Path to the ``.yaml`` file.
-        updates: Mapping of field-name → value or ``"metadata"`` → nested dict.
-        set_synced: When ``True``, stamps ``metadata.last_synced`` with now.
-    """
-    item = load_item(filepath)
+def _apply_updates_to_item(reference: str, updates: dict[str, str | dict[str, object]], set_synced: bool) -> None:
+    item = _work_item(reference)
     for key, value in updates.items():
         if key == "metadata" and isinstance(value, dict):
             for meta_key, meta_val in value.items():
@@ -628,62 +619,22 @@ def _apply_updates_to_yaml_item(filepath: Path, updates: dict[str, str | dict[st
             setattr(item.metadata, key, str(value))
     if set_synced:
         item.metadata.last_synced = now_iso()
-    save_item(item)
-
-
-def _apply_updates_to_md_item(filepath: Path, updates: dict[str, str | dict[str, object]], set_synced: bool) -> None:
-    """Apply *updates* dict to a legacy ``.md`` backlog item via frontmatter round-trip.
-
-    Args:
-        filepath: Path to the ``.md`` file.
-        updates: Mapping of field-name → value or ``"metadata"`` → nested dict.
-        set_synced: When ``True``, stamps ``metadata.last_synced`` with now.
-    """
-    text = filepath.read_text(encoding="utf-8")
-    post = loads_frontmatter(text)
-    meta = post.metadata
-    for key, value in updates.items():
-        if key == "metadata" and isinstance(value, dict):
-            raw_nested = meta.get("metadata")
-            nested_dict: dict[str, str] = (
-                {str(k): str(v) for k, v in raw_nested.items()} if isinstance(raw_nested, dict) else {}
-            )
-            for mk, mv in value.items():
-                nested_dict[mk] = json.dumps(mv.model_dump()) if isinstance(mv, MilestoneInfo) else str(mv)
-            if set_synced:
-                nested_dict["last_synced"] = now_iso()
-            meta["metadata"] = nested_dict
-        else:
-            meta[key] = value if isinstance(value, str) else {str(k): str(v) for k, v in value.items()}
-    if set_synced and "metadata" not in updates:
-        raw_nested = meta.get("metadata")
-        nested_dict2: dict[str, str] = (
-            {str(k): str(v) for k, v in raw_nested.items()} if isinstance(raw_nested, dict) else {}
-        )
-        nested_dict2["last_synced"] = now_iso()
-        meta["metadata"] = nested_dict2
-    filepath.write_text(dump_frontmatter(_MdPost(meta, post.content)), encoding="utf-8")
+    get_config().backend.put_work_item(item)
 
 
 def update_item_metadata(
-    filepath: Path, updates: dict[str, str | dict[str, object]], set_synced: bool = False, output: Output | None = None
+    reference: str, updates: dict[str, str | dict[str, object]], set_synced: bool = False, output: Output | None = None
 ) -> dict[str, str | bool | list[str]]:
-    """Update per-item file frontmatter. Supports nested metadata.plan, metadata.issue, etc.
+    """Update a work item through its opaque backend reference.
 
     When set_synced=True, also sets metadata.last_synced to current UTC time.
 
-    For ``.yaml`` files, uses the yaml_io round-trip (load_item / save_item).
-    For legacy ``.md`` files, uses the frontmatter round-trip to preserve format.
-
     Returns:
-        Dict with filepath and updated flag plus output messages.
+        Dict with compatibility filepath and updated flag plus output messages.
     """
     out = output or Output()
-    if filepath.suffix == ".yaml":
-        _apply_updates_to_yaml_item(filepath, updates, set_synced)
-    else:
-        _apply_updates_to_md_item(filepath, updates, set_synced)
-    return {"filepath": str(filepath), "updated": True, **out.to_dict()}
+    _apply_updates_to_item(reference, updates, set_synced)
+    return {"filepath": reference, "updated": True, **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------
@@ -721,7 +672,7 @@ def _extract_changes(result: Mapping[str, object]) -> dict[str, str | int | bool
 
 
 def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output | None = None) -> int | None:
-    """Create GitHub issue for item and update per-item file metadata.
+    """Create GitHub issue for item and update backend-owned metadata.
 
     Returns:
         Issue number if created, None otherwise.
@@ -738,29 +689,29 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
     else:
         if not issue_num:
             return None
-        filepath_str = item.file_path
-        if filepath_str:
-            update_item_metadata(Path(filepath_str), {"metadata": {"issue": f"#{issue_num}"}}, output=out)
+        reference = item.reference
+        if reference:
+            update_item_metadata(reference, {"metadata": {"issue": f"#{issue_num}"}}, output=out)
         return issue_num
 
 
 def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Output | None = None) -> bool:
-    """Update the name field in the per-item file. Syncs to GitHub issue title if linked.
+    """Update the backend-owned item title. Syncs to GitHub issue title if linked.
 
     Returns:
-        True if updated, False if no file path on item.
+        True if updated, False if no backend reference on item.
     """
     out = output or Output()
-    filepath_str = item.file_path
-    if not filepath_str:
+    reference = item.reference
+    if not reference:
         return False
-    update_item_metadata(Path(filepath_str), {"name": title}, output=out)
+    update_item_metadata(reference, {"name": title}, output=out)
 
     issue_ref = item.issue
     if issue_ref:
         if get_config().backend.issue_id_type == "string":
             # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
-            # Local title was already updated above; no GitHub sync needed.
+            # Backend-owned title was already updated above; no GitHub sync needed.
             return True
         repository = try_get_github(repo)
         if repository is not None:
@@ -780,33 +731,33 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 
 
 def _update_item_description(item: BacklogItem, description: str, output: Output | None = None) -> bool:
-    """Update the description field in the per-item file. Local-only, no GitHub sync.
+    """Update the backend-owned item description. Provider-only, no GitHub sync.
 
     Returns:
-        True if updated, False if no file path on item.
+        True if updated, False if no backend reference on item.
     """
     out = output or Output()
-    filepath_str = item.file_path
-    if not filepath_str:
+    reference = item.reference
+    if not reference:
         return False
-    update_item_metadata(Path(filepath_str), {"description": description}, output=out)
+    update_item_metadata(reference, {"description": description}, output=out)
     return True
 
 
 def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Output | None = None) -> bool:
-    """Apply plan update: write to GitHub Issue first (comment), then update local cache.
+    """Apply plan update through GitHub and the configured backend.
 
-    GH-first: posts a plan comment on the linked GitHub Issue before updating local.
-    If GH is unavailable, local update still succeeds.
+    Posts a plan comment on the linked GitHub Issue before updating the backend-owned record.
+    If GitHub is unavailable, the backend update still succeeds.
 
     Returns:
         True if updated, False otherwise.
     """
     out = output or Output()
-    filepath_str = item.file_path
-    if not filepath_str:
+    reference = item.reference
+    if not reference:
         return False
-    update_item_metadata(Path(filepath_str), {"metadata": {"plan": plan}}, output=out)
+    update_item_metadata(reference, {"metadata": {"plan": plan}}, output=out)
 
     # GH-first: post plan reference as a comment on the linked issue
     issue_ref = item.issue
@@ -861,12 +812,20 @@ def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", o
         return
 
     try:
-        provider = create_artifact_provider(repo=resolve_repo(repo))
+        provider = get_config().backend
+        if not isinstance(provider, ContentProvider):
+            raise ContentUnavailableError("Active backend does not support artifact content")
         registry = ArtifactRegistry()
-        manifest = provider.get_manifest(issue_number)
+        owner = f"#{issue_number}"
+        reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=owner, name="manifest")
+        try:
+            record = provider.get_content(reference)
+            manifest = _models.ArtifactManifest.model_validate_json(record.content)
+        except ContentUnavailableError:
+            manifest = _models.ArtifactManifest(issue_number=issue_number)
         entry = ArtifactEntry(artifact_type=ArtifactType.TASK_PLAN, artifact_id=plan)
         updated_manifest = registry.register(manifest, entry)
-        provider.set_manifest(issue_number, updated_manifest)
+        provider.put_content(ContentWrite(reference=reference, content=updated_manifest.model_dump_json()))
         out.info(f"  Artifact registered: task-plan {plan} on issue #{issue_number}")
     except (BacklogError, GithubException, OSError, RuntimeError) as exc:
         out.warn(f"  WARNING: Artifact registration failed for {plan} on issue #{issue_number}: {exc}")
@@ -994,8 +953,8 @@ def _normalize_section_key(name: str) -> str:
     return name
 
 
-def _write_groomed_to_yaml_item(
-    filepath: Path,
+def _write_groomed_to_item(
+    reference: str,
     groomed_content: str,
     section_name: str | None = None,
     *,
@@ -1005,14 +964,13 @@ def _write_groomed_to_yaml_item(
     added_date: str = "0000-00-00",
     append: bool = False,
 ) -> None:
-    """Write groomed content into a YAML BacklogItem file.
+    """Write groomed content into a backend-owned work item.
 
-    Loads the item, updates the relevant section, sets the groomed date on
-    metadata, and saves.  Mirrors the logic of ``_write_groomed_to_item_file``
-    for ``.yaml`` files.
+    Loads the item by opaque reference, updates the relevant section, sets the
+    groomed date on metadata, and persists it through the configured backend.
 
     Args:
-        filepath: Path to the ``.yaml`` or legacy ``.md`` item file.
+        reference: Opaque stable work-item reference.
         groomed_content: The text to write into the section.
         section_name: Named section to update.  When ``None`` the top-level
             ``groomed`` section (stored as ``GroomedData``) is updated.
@@ -1024,7 +982,7 @@ def _write_groomed_to_yaml_item(
         append: When ``True``, always append a new entry rather than updating
             by id.
     """
-    item = load_item(filepath)
+    item = _work_item(reference)
     today_str = today()
     item.metadata.groomed = today_str
 
@@ -1049,11 +1007,11 @@ def _write_groomed_to_yaml_item(
         )
         item.sections[section_key] = section
 
-    save_item(item)
+    get_config().backend.put_work_item(item)
 
 
-def _write_groomed_to_item_file(
-    filepath: Path,
+def _write_groomed_to_reference(
+    reference: str,
     groomed_content: str,
     section_name: str | None = None,
     output: Output | None = None,
@@ -1064,15 +1022,10 @@ def _write_groomed_to_item_file(
     added_date: str = "0000-00-00",
     append: bool = False,
 ) -> None:
-    """Merge groomed content into per-item file.
-
-    Delegates to :func:`_write_groomed_to_yaml_item` for all file formats.
-    Legacy ``.md`` files are loaded via :func:`load_item` (which uses
-    :func:`~backlog_core.parsing.parse_item_file`) and saved back as YAML,
-    completing the P964 migration for any remaining ``.md`` items.
+    """Merge groomed content into a backend-owned work item.
 
     Args:
-        filepath: Path to the backlog item file (``.yaml`` or ``.md``).
+        reference: Opaque stable work-item reference.
         groomed_content: Content to merge into the item.
         section_name: Named section to update; when ``None`` the top-level
             ``groomed`` section is replaced.
@@ -1084,8 +1037,8 @@ def _write_groomed_to_item_file(
         append: When ``True``, always append a new entry rather than updating
             by id.
     """
-    _write_groomed_to_yaml_item(
-        filepath,
+    _write_groomed_to_item(
+        reference,
         groomed_content,
         section_name,
         entry_id=entry_id,
@@ -1094,74 +1047,6 @@ def _write_groomed_to_item_file(
         added_date=added_date,
         append=append,
     )
-
-
-def _ensure_github_issue(item: BacklogItem, filepath: Path, repo: str, output: Output | None = None) -> str | None:
-    """Create GitHub issue if item doesn't have one.
-
-    Uses try_get_github for graceful fallback when GitHub is unavailable.
-
-    Returns:
-        Issue ref like '#42', or None if no issue was created.
-    """
-    out = output or Output()
-    repository = try_get_github(repo)
-    if not repository:
-        out.info("  INFO: GitHub unavailable — working locally only")
-        return None
-    try:
-        issue_num = create_issue_for_item(repository, item, dry_run=False, output=out)
-    except (GithubException, BacklogError) as e:
-        out.warn(f"  WARNING: Could not create issue: {e}")
-        return None
-    else:
-        if not issue_num:
-            return None
-        update_item_metadata(filepath, {"metadata": {"issue": f"#{issue_num}"}}, set_synced=True, output=out)
-        out.info(f"  Created GitHub issue #{issue_num}")
-        return f"#{issue_num}"
-
-
-def _write_groomed_to_github(
-    issue_ref: str, content: str, section_name: str | None, repo: str, output: Output | None = None
-) -> bool:
-    """Write groomed content to GitHub issue.
-
-    Gracefully falls back to local-only when GitHub is unavailable.
-
-    Returns:
-        True if content was synced to GitHub, False otherwise.
-    """
-    out = output or Output()
-    repository = try_get_github(repo)
-    if not repository:
-        out.info(f"  INFO: GitHub unavailable — {issue_ref} will sync on next `backlog pull` or `backlog sync`")
-        return False
-    try:
-        num = parse_issue_number(issue_ref)
-        if num is None:
-            msg = f"Invalid issue ref: {issue_ref!r}"
-            raise ValueError(msg)
-        updated = sync_groomed_to_github_issue(repository, num, content, section_name, output=out)
-    except (GithubException, BacklogError) as e:
-        out.warn(f"  WARNING: Could not sync to GitHub: {e}")
-        return False
-    else:
-        if updated:
-            out.info(f"  Synced to GitHub issue {issue_ref}")
-            # Remove status:needs-grooming label via GraphQL fetch-then-update (ADR-003)
-            try:
-                owner, repo_name = repository.full_name.split("/", 1)
-                issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
-                label_ids = [lbl["id"] for lbl in issue_node["labels"] if lbl["name"] != "status:needs-grooming"]
-                if len(label_ids) != len(issue_node["labels"]):
-                    # Label was present — update with it removed
-                    _update_issue_graphql(repository, issue_node["id"], label_ids=label_ids)
-            except (GithubException, BacklogError) as e:
-                out.warn(f"  WARNING: Could not update grooming label: {e}")
-        else:
-            out.info(f"  No changes to sync to GitHub issue {issue_ref}")
-        return updated
 
 
 _AC_CHECKBOX_RE = re.compile(r"^- \[[ xX]\]", re.MULTILINE)
@@ -1186,6 +1071,21 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
         output.warn(_AC_OVERLAP_MSG)
 
 
+def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
+    backend = get_config().backend
+    if not item.issue or not isinstance(backend, SyncProvider):
+        return
+    try:
+        result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+    except BackendUnavailableError:
+        output.info(f"Queued {item.issue} for provider reconciliation.")
+        return
+    output.info(
+        f"Reconciled {item.issue}: {result.provider_patches} provider patch(es), "
+        f"{result.pending_mutations} pending mutation(s), {result.failures} failure(s)."
+    )
+
+
 def _handle_update_groomed(
     item: BacklogItem,
     groomed_content_val: str,
@@ -1198,31 +1098,15 @@ def _handle_update_groomed(
     reason: str | None = None,
     append: bool = False,
 ) -> None:
-    """Handle groomed content update: GitHub-first, then cache locally.
-
-    Write order: (1) GitHub issue (canonical), (2) local file (cache).
-    If item has no existing issue, skips GitHub sync and writes locally only.
-    Sets last_synced after successful GitHub write.
-    """
+    """Handle groomed content through the configured backend and its sync capability."""
     out = output or Output()
-    filepath = Path(item.file_path)
-    issue_ref = item.issue
-
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
     if section_name == "Acceptance Criteria":
         _check_ac_overlap(item, out)
 
-    # Step 1: Write to GitHub FIRST (canonical source of truth), but only if
-    # the item already has an issue. Groom must not create a new issue as a
-    # side-effect — issue creation is handled by backlog_add and backlog_update.
-    github_synced = False
-    if issue_ref:
-        github_synced = _write_groomed_to_github(issue_ref, groomed_content_val, section_name, repo, output=out)
-
-    # Step 2: Write to local file (cache) with entry block wrapping
-    _write_groomed_to_item_file(
-        filepath,
+    _write_groomed_to_reference(
+        item.reference,
         groomed_content_val,
         section_name,
         output=out,
@@ -1232,25 +1116,17 @@ def _handle_update_groomed(
         added_date=added_date,
         append=append,
     )
-    out.info(f"Updated {filepath.name} with groomed content")
-
-    # Step 3: Set last_synced if GitHub write succeeded
-    if github_synced:
-        update_item_metadata(filepath, {"metadata": {"last_synced": now_iso()}}, output=out)
+    out.info(f"Updated {item.reference} with groomed content")
+    _reconcile_groomed_item(item, out)
 
 
 def _handle_batch_groomed(
     item: BacklogItem, sections: dict[str, str], repo: str, output: Output | None = None
 ) -> list[str]:
-    """Write multiple groomed sections atomically: local writes first, then GitHub sync.
-
-    Phase 1: Loop through sections and call _write_groomed_to_item_file for each.
-    Phase 2: If item has an issue, loop through sections and call _write_groomed_to_github
-             for each. All GitHub API calls occur after all local writes complete.
-             Sets last_synced timestamp after any successful GitHub sync.
+    """Write multiple groomed sections, then reconcile the linked item once.
 
     Args:
-        item: BacklogItem with file_path set.
+        item: BacklogItem with a stable backend reference.
         sections: Mapping of section name to raw content (entry-block wrapping applied automatically).
         repo: GitHub repo slug (e.g. "owner/repo").
         output: Optional Output aggregator.
@@ -1262,18 +1138,17 @@ def _handle_batch_groomed(
         BacklogError: If item has no file_path.
     """
     out = output or Output()
-    if not item.file_path:
-        msg = "Item has no file path"
+    if not item.reference:
+        msg = "Item has no backend reference"
         raise BacklogError(msg)
-    filepath = Path(item.file_path)
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
     # Phase 1: Local writes — load once, apply all sections in memory, save once.
     # Loading once avoids the legacy-MD-parser-on-YAML-content failure that occurs
-    # when save_item writes YAML to a .md filepath and a subsequent load_item on
+    # when a YAML write targets a .md filepath and a subsequent backend read on
     # that same path incorrectly re-parses it as Markdown, losing prior sections.
     written: list[str] = []
-    batch_item = load_item(filepath)
+    batch_item = _work_item(item.reference)
     today_str = today()
     batch_item.metadata.groomed = today_str
     for section_name, content in sections.items():
@@ -1285,56 +1160,19 @@ def _handle_batch_groomed(
         )
         batch_item.sections[section_key] = section
         written.append(section_key)
-    save_item(batch_item)
-    out.info(f"Updated {filepath.name} with {len(written)} groomed section(s)")
+    get_config().backend.put_work_item(batch_item)
+    out.info(f"Updated {item.reference} with {len(written)} groomed section(s)")
 
     if "Acceptance Criteria" in sections:
         _check_ac_overlap(item, out)
 
-    # Phase 2: GitHub sync — only after all local writes succeed.
-    if item.issue:
-        github_synced = False
-        for section_name, content in sections.items():
-            synced = _write_groomed_to_github(item.issue, content, section_name, repo, output=out)
-            github_synced = github_synced or synced
-        if github_synced:
-            update_item_metadata(filepath, {"metadata": {"last_synced": now_iso()}}, output=out)
+    _reconcile_groomed_item(batch_item, out)
 
     return written
 
 
-def _overwrite_body_from_github(filepath: Path, issue_body: str) -> None:
-    """Replace the body of a local cache file with content from GitHub issue body.
-
-    Preserves frontmatter, replaces everything after it.
-    """
-    text = filepath.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return
-    parts = text.split("---", 2)
-    if len(parts) < MIN_FRONTMATTER_PARTS:
-        return
-    # Keep frontmatter, replace body
-    new_content = "---" + parts[1] + "---\n\n" + issue_body.strip() + "\n"
-    filepath.write_text(new_content, encoding="utf-8")
-
-
-def _close_cleanup(item: BacklogItem, issue_ref: str, repo: str, output: Output | None = None) -> None:
-    """Remove local per-item file after close (canonical state lives in GitHub)."""
-    out = output or Output()
-    filepath_str = item.file_path
-    if not filepath_str:
-        return
-    filepath = Path(filepath_str)
-    try:
-        filepath.unlink()
-        out.info(f"  Removed local file {filepath.name} (canonical: GH #{issue_ref.lstrip('#')})")
-    except FileNotFoundError:
-        pass
-
-
 def _pull_if_issue_selector(selector: str, repo: str, output: Output | None = None) -> None:
-    """Fetch a GitHub issue into the local cache when selector resolves to an issue number.
+    """Fetch a GitHub issue into the provider-backed record when selector resolves to an issue number.
 
     Calls pull_single_issue when parse_issue_selector returns a number. No-op otherwise.
 
@@ -1345,402 +1183,12 @@ def _pull_if_issue_selector(selector: str, repo: str, output: Output | None = No
     """
     issue_num = parse_issue_selector(selector)
     if issue_num:
-        pull_single_issue(get_github(repo), int(issue_num), output=output)
-
-
-def _parse_md_body_extra_fields(body: str) -> tuple[str, str, str, str, str, str]:
-    """Extract bold-key fields from legacy .md body until first ## heading.
-
-    Parses lines of the form ``**Key**: value`` appearing before any ``##``
-    heading and returns the six named fields used by the normalisation step.
-
-    Args:
-        body: Markdown body string from a legacy .md backlog item.
-
-    Returns:
-        Tuple of (desc, suggested, research, decision, files_val, required_work).
-    """
-    field_map = _models.FIELD_TO_INDEX
-    field_re = re.compile(r"^\*\*([^*]+)\*\*:\s*(.*)$", re.DOTALL)
-    result: list[str] = ["", "", "", "", "", ""]
-    current_key = ""
-    current_val: list[str] = []
-
-    def _flush() -> None:
-        if current_key and current_key.lower() in field_map:
-            result[field_map[current_key.lower()]] = "\n".join(current_val).strip()
-
-    for line in body.splitlines():
-        if line.startswith("## "):
-            _flush()
-            current_key = ""
-            break
-        m = field_re.match(line)
-        if m:
-            _flush()
-            current_key = m.group(1).strip()
-            current_val = [m.group(2).strip()] if m.group(2).strip() else []
-        elif current_key:
-            current_val.append(line)
-    else:
-        _flush()
-
-    return (result[0], result[1], result[2], result[3], result[4], result[5])
-
-
-def _build_normalized_content(filepath: Path, output: Output | None = None) -> str | None:
-    """Build normalized content for one file.
-
-    Returns:
-        Normalized content string or None if skip.
-    """
-    out = output or Output()
-    try:
-        text = filepath.read_text(encoding="utf-8")
-    except OSError as e:
-        out.warn(f"  Skip {filepath.name}: {e}")
-        return None
-    if not text.startswith("---"):
-        return None
-    try:
-        post = loads_frontmatter(text)
-        fm: dict[str, str | dict[str, str]] = {
-            k: (v if isinstance(v, dict) else str(v)) for k, v in post.metadata.items()
-        }
-    except (ValueError, KeyError, TypeError, YAMLError):
-        return None
-    meta_raw = fm.get("metadata")
-    meta: dict[str, str] = {str(k): str(v) for k, v in meta_raw.items()} if isinstance(meta_raw, dict) else {}
-    md = extract_normalize_metadata(fm, meta)
-    if not md["name"]:
-        return None
-    parsed = _parse_md_body_extra_fields(post.content)
-    if parsed[0] and not md["description"]:
-        md["description"] = parsed[0]
-    groomed = extract_groomed_section(post.content)
-    new_body = build_body_extra_only(parsed[1], parsed[2], parsed[3], parsed[4], parsed[5], groomed)
-    new_meta: dict[str, str | dict[str, str]] = {
-        "name": md["name"],
-        "description": md["description"],
-        "metadata": {
-            "source": md["source"],
-            "added": md["added"],
-            "priority": md["priority"],
-            "type": md["type_val"],
-            "status": md["status"],
-            "issue": md["issue"],
-            "plan": md["plan"],
-            "groomed": md["groomed"],
-        },
-    }
-    return dump_frontmatter(_MdPost(new_meta, new_body))
-
-
-def _normalize_item_file(filepath: Path, dry_run: bool, output: Output | None = None) -> bool:
-    """Normalize one backlog item file.
-
-    Returns:
-        True if updated, False if skipped.
-    """
-    content = _build_normalized_content(filepath, output=output)
-    if content is None:
-        return False
-    if not dry_run:
-        filepath.write_text(content, encoding="utf-8")
-    return True
+        pull_single_issue(int(issue_num), output=output)
 
 
 # ---------------------------------------------------------------------------
 # Pull helpers
 # ---------------------------------------------------------------------------
-
-
-def _pull_item_create_new(
-    item: BacklogItem,
-    issue_num: int,
-    issue_ref: str,
-    title: str,
-    github_body: str,
-    dry_run: bool,
-    output: Output | None = None,
-) -> bool:
-    """Create a new local file from a GitHub issue body.
-
-    Returns:
-        True if created (or would create in dry-run).
-    """
-    out = output or Output()
-    slug = title_to_slug(title)
-    priority = item.priority or "P2"
-    filename = f"{priority.lower()}-{slug}.yaml"
-    filepath = _models.get_backlog_dir() / filename
-    _models.get_backlog_dir().mkdir(parents=True, exist_ok=True)
-    if dry_run:
-        out.info(f"  [dry-run] Would create {filename} from #{issue_num}: {title}")
-        return True
-    remote_item = parse_issue_body_sync(github_body, item)
-    new_item = BacklogItem(
-        title=title,
-        description=remote_item.description or item.description,
-        source=item.source,
-        added=item.added or today(),
-        priority=priority,
-        item_type=item.item_type,
-        status="open",
-        issue=issue_ref,
-        plan=item.plan,
-        sections=remote_item.sections,
-    )
-    new_item.file_path = str(filepath)
-    save_item(new_item)
-    out.info(f"  Created #{issue_num} -> {filename}: {title}")
-    return True
-
-
-def _pick_entry(local_e: Entry, remote_e: Entry) -> tuple[str, bool]:
-    """Pick the winning entry when both sides have the same ID.
-
-    Returns:
-        Tuple of (raw_entry_text, was_modified).
-    """
-    local_raw = _render_entry_raw(local_e)
-    remote_raw = _render_entry_raw(remote_e)
-    if local_raw == remote_raw:
-        return local_raw, False
-    if local_e.struck and not remote_e.struck:
-        return local_raw, True
-    if remote_e.struck and not local_e.struck:
-        return remote_raw, True
-    if local_e.struck and remote_e.struck:
-        local_ts = local_e.struck_at or ""
-        remote_ts = remote_e.struck_at or ""
-        winner_raw = remote_raw if remote_ts > local_ts else local_raw
-        return winner_raw, remote_ts != local_ts
-    # Both active: keep longer content
-    winner_raw = remote_raw if len(remote_e.content) > len(local_e.content) else local_raw
-    return winner_raw, remote_e.content != local_e.content
-
-
-def _merge_entry_bodies(local_content: str, remote_content: str) -> tuple[str, bool]:
-    """Merge two section bodies using entry-aware rules.
-
-    Merge rules:
-    - Entry only on one side: keep it.
-    - Both sides, one struck: keep struck version.
-    - Both sides, both active: keep longer content.
-    - Both sides, both struck: keep later struck timestamp.
-
-    Returns:
-        Tuple of (merged_content, was_modified).
-    """
-    local_entries = {e.id: e for e in parse_entries(local_content, show="all")}
-    remote_entries = {e.id: e for e in parse_entries(remote_content, show="all")}
-
-    all_ids = sorted(set(local_entries) | set(remote_entries))
-    result_parts: list[str] = []
-    modified = False
-
-    for eid in all_ids:
-        local_e = local_entries.get(eid)
-        remote_e = remote_entries.get(eid)
-
-        if local_e and remote_e:
-            raw, changed = _pick_entry(local_e, remote_e)
-            result_parts.append(raw)
-            modified = modified or changed
-        elif local_e:
-            result_parts.append(_render_entry_raw(local_e))
-        elif remote_e:
-            result_parts.append(_render_entry_raw(remote_e))
-            modified = True
-
-    return "\n\n".join(result_parts), modified
-
-
-def _pull_item_update_existing(
-    item: BacklogItem,
-    issue_num: int,
-    title: str,
-    filepath: Path,
-    github_body: str,
-    dry_run: bool,
-    force: bool,
-    diff_mode: bool = False,
-    output: Output | None = None,
-) -> tuple[bool, str]:
-    """Update an existing local file with content from a GitHub issue body.
-
-    For ``.yaml`` files, uses the yaml_io / github_sync round-trip:
-    ``parse_issue_body`` → ``merge_item`` → ``save_item``.
-    For legacy ``.md`` files, preserves the frontmatter + body approach.
-
-    Returns:
-        Tuple of (was_updated, diff_string). diff_string is non-empty only when
-        diff_mode is True and dry_run is True.
-    """
-    out = output or Output()
-
-    if filepath.suffix == ".yaml":
-        return _pull_item_update_yaml(item, issue_num, title, filepath, github_body, dry_run, force, output=out)
-
-    # Legacy .md path
-    return _pull_item_update_md(item, issue_num, title, filepath, github_body, dry_run, force, diff_mode, output=out)
-
-
-def _pull_item_update_yaml(
-    item: BacklogItem,
-    issue_num: int,
-    title: str,
-    filepath: Path,
-    github_body: str,
-    dry_run: bool,
-    force: bool,
-    output: Output | None = None,
-) -> tuple[bool, str]:
-    """YAML-format pull: model-level merge via github_sync.
-
-    Returns:
-        Tuple of (was_updated, diff_string). diff_string is always empty for YAML path.
-    """
-    out = output or Output()
-    remote_item = parse_issue_body_sync(github_body, item)
-    remote_item.file_path = item.file_path
-    merged = merge_item_models(item, remote_item)
-    merged.file_path = item.file_path
-    modified = merged.sections != item.sections or merged.description != item.description
-
-    if not modified:
-        return False, ""
-
-    if dry_run:
-        out.info(f"  [dry-run] Would merge #{issue_num} -> {filepath.name}: {title}")
-        return True, ""
-
-    save_item(remote_item if force else merged)
-    out.info(f"  Pulled #{issue_num} -> {filepath.name}: {title}")
-    return True, ""
-
-
-def _pull_item_update_md(
-    item: BacklogItem,
-    issue_num: int,
-    title: str,
-    filepath: Path,
-    github_body: str,
-    dry_run: bool,
-    force: bool,
-    diff_mode: bool = False,
-    output: Output | None = None,
-) -> tuple[bool, str]:
-    """Legacy .md-format pull: frontmatter + body section merge.
-
-    Returns:
-        Tuple of (was_updated, diff_string). diff_string is non-empty only when
-        diff_mode is True and dry_run is True.
-    """
-    out = output or Output()
-    raw_text = filepath.read_text(encoding="utf-8")
-    raw_parts = raw_text.split("---", 2)
-    local_body = raw_parts[2].strip() if len(raw_parts) >= MIN_FRONTMATTER_PARTS else raw_text
-
-    if force:
-        return _pull_md_force(issue_num, title, filepath, local_body, github_body, dry_run, diff_mode, output=out)
-
-    local_sections = extract_sections(local_body)
-    github_sections = extract_sections(github_body)
-    result_sections: dict[str, str] = dict(local_sections)
-    entry_modified = False
-
-    for heading, gh_content in github_sections.items():
-        if heading in local_sections:
-            merged_content, section_changed = _merge_entry_bodies(local_sections[heading], gh_content)
-            if section_changed:
-                result_sections[heading] = merged_content
-                entry_modified = True
-        else:
-            result_sections[heading] = gh_content
-            entry_modified = True
-
-    if not entry_modified:
-        return False, ""
-
-    diff_str = ""
-    if dry_run:
-        out.info(f"  [dry-run] Would merge #{issue_num} -> {filepath.name}: {title}")
-        if diff_mode:
-            diff_str = generate_diff(local_body, github_body)
-        return True, diff_str
-
-    final_body = _md_reconstruct_body_from_sections(local_sections, github_sections, result_sections)
-    md_post = loads_frontmatter(filepath.read_text(encoding="utf-8"))
-    filepath.write_text(dump_frontmatter(_MdPost(md_post.metadata, final_body)), encoding="utf-8")
-    out.info(f"  Pulled #{issue_num} -> {filepath.name}: {title}")
-    return True, ""
-
-
-def _pull_md_force(
-    issue_num: int,
-    title: str,
-    filepath: Path,
-    local_body: str,
-    github_body: str,
-    dry_run: bool,
-    diff_mode: bool,
-    output: Output | None = None,
-) -> tuple[bool, str]:
-    """Force-overwrite a legacy .md file from GitHub issue body.
-
-    Returns:
-        Tuple of (was_updated, diff_string).
-    """
-    out = output or Output()
-    if dry_run:
-        out.info(f"  [dry-run] Would overwrite {filepath.name} from #{issue_num}: {title}")
-        diff_str = generate_diff(local_body, github_body) if diff_mode else ""
-        return True, diff_str
-    md_post = loads_frontmatter(filepath.read_text(encoding="utf-8"))
-    filepath.write_text(dump_frontmatter(_MdPost(md_post.metadata, github_body)), encoding="utf-8")
-    out.info(f"  Pulled #{issue_num} -> {filepath.name}: {title}")
-    return True, ""
-
-
-def _pull_item(
-    item: BacklogItem,
-    repo_obj: Repository,
-    dry_run: bool,
-    force: bool,
-    diff_mode: bool = False,
-    output: Output | None = None,
-) -> tuple[bool, bool, str]:
-    """Pull GitHub issue body into local per-item file.
-
-    Returns:
-        Tuple of (was_pulled, had_error, diff_string).
-        had_error is True when the GitHub fetch failed (404, network error, etc.).
-        diff_string is non-empty only when diff_mode is True and dry_run is True.
-    """
-    out = output or Output()
-    issue_ref = item.issue
-    issue_num = parse_issue_number(issue_ref)
-    if issue_num is None:
-        return False, False, ""
-
-    title = item.title
-    filepath_str = item.file_path
-
-    github_body = fetch_github_issue_body(repo_obj, issue_num, output=out)
-    if github_body is None:
-        out.error(f"#{issue_num}: fetch failed (404 or network error) — skipped")
-        return False, True, ""
-
-    if not filepath_str or not Path(filepath_str).exists():
-        created = _pull_item_create_new(item, issue_num, issue_ref, title, github_body, dry_run, output=out)
-        return created, False, ""
-
-    was_pulled, diff_str = _pull_item_update_existing(
-        item, issue_num, title, Path(filepath_str), github_body, dry_run, force, diff_mode=diff_mode, output=out
-    )
-    return was_pulled, False, diff_str
 
 
 # ---------------------------------------------------------------------------
@@ -1798,33 +1246,22 @@ def _check_for_duplicates(title: str, force: bool) -> None:
     """
     if force:
         return
-    existing_items = parse_backlog()
+    existing_items = get_config().backend.list_work_items()
     duplicates = find_fuzzy_duplicates(title, existing_items)
     if not duplicates:
         return
     raise DuplicateItemError(duplicates)
 
 
-def _resolve_filepath(priority: str, slug: str) -> Path:
-    """Return a collision-free Path inside _models.BACKLOG_DIR for (priority, slug).
-
-    Appends a numeric suffix when the base filename already exists.
-
-    Args:
-        priority: Item priority string (e.g. "high").
-        slug: URL-safe slug derived from the item title.
-
-    Returns:
-        A Path that does not yet exist on disk.
-    """
-    _models.get_backlog_dir().mkdir(parents=True, exist_ok=True)
+def _resolve_reference(priority: str, slug: str) -> str:
     base = f"{priority.lower()}-{slug}"
-    filepath = _models.get_backlog_dir() / f"{base}.yaml"
+    reference = base
+    existing_references = {item.reference for item in get_config().backend.list_work_items()}
     idx = 0
-    while filepath.exists():
+    while reference in existing_references:
         idx += 1
-        filepath = _models.get_backlog_dir() / f"{base}-{idx}.yaml"
-    return filepath
+        reference = f"{base}-{idx}"
+    return reference
 
 
 def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> int | None:
@@ -1906,21 +1343,6 @@ def _build_item_body(research_first: str, files: str, suggested_location: str) -
     return "\n".join(parts) + "\n" if parts else ""
 
 
-def _write_local_item(filepath: Path, fm_str: str, body: str, issue_num: int | None, out: Output) -> None:
-    """Write the frontmatter + body to disk and mark synced when an issue exists.
-
-    Args:
-        filepath: Destination path (must not already exist).
-        fm_str: Rendered frontmatter block.
-        body: Markdown body section.
-        issue_num: GitHub issue number, or None for local-only items.
-        out: Output collector forwarded to update_item_metadata.
-    """
-    filepath.write_text(fm_str.rstrip() + "\n\n" + body, encoding="utf-8")
-    if issue_num:
-        update_item_metadata(filepath, {}, set_synced=True, output=out)
-
-
 # ---------------------------------------------------------------------------
 # Public API: ADD
 # ---------------------------------------------------------------------------
@@ -1939,7 +1361,7 @@ def add_item(
     repo: str = "",
     output: Output | None = None,
 ) -> dict[str, str | int | bool | list[str]]:
-    """Add item to backlog. Creates per-item file and a backend issue.
+    """Add an item through the configured backend and optionally create its native issue.
 
     Dispatches issue creation to the active backend:
 
@@ -1949,11 +1371,11 @@ def add_item(
       nanoid (e.g. ``"bd-a3f8"``).
 
     Returns:
-        Dict with title, priority, filepath, and optionally item_ref.
+        Dict with title, priority, logical reference, compatibility ``file_path``, and optionally item_ref.
 
     Raises:
         ValidationError: If priority or type_ is not a recognized value. No
-            file is written and no backend issue is created when raised.
+            item is stored and no backend issue is created when raised.
     """
     _validate_add_item_priority(priority)
     _validate_add_item_type(type_)
@@ -1964,9 +1386,7 @@ def add_item(
 
     today_str = today()
     slug = title_to_slug(title)
-    filepath = _resolve_filepath(priority, slug)
-
-    # Backend-first: try to create a backend issue BEFORE writing local file.
+    # Backend-first: try to create a backend issue BEFORE storing the backend record.
     # _try_create_backend_issue_ref returns the issue ref string ready to store,
     # or an empty string when the backend is unavailable or creation fails.
     item_data = BacklogItem(
@@ -1981,8 +1401,9 @@ def add_item(
         suggested_location=suggested_location,
     )
     issue_ref = _try_create_backend_issue_ref(item_data, repo, out)
+    item_reference = issue_ref or _resolve_reference(priority, slug)
 
-    # Build BacklogItem and write as YAML (single write)
+    # Build and persist the backend-owned work item
     item_to_write = BacklogItem(
         title=title,
         description=description,
@@ -1992,21 +1413,26 @@ def add_item(
         item_type=type_,
         status="open",
         issue=issue_ref,
+        reference=item_reference,
         research_first=research_first,
         files=files,
         suggested_location=suggested_location,
     )
     if issue_ref:
         item_to_write.metadata.last_synced = now_iso()
-    item_to_write.file_path = str(filepath)
-    save_item(item_to_write)
+    get_config().backend.put_work_item(item_to_write)
 
-    out.info(f"Backlog item created.\n  Title: {title}\n  Priority: {priority}\n  File: {filepath.name}")
+    out.info(f"Backlog item created.\n  Title: {title}\n  Priority: {priority}\n  Reference: {item_reference}")
     if issue_ref:
         out.info(f"  Issue: {issue_ref}")
     out.info(f"Next steps: /groom-backlog-item {title}  /work-backlog-item {title}")
 
-    result: dict[str, str | int | bool | list[str]] = {"title": title, "priority": priority, "file_path": str(filepath)}
+    result: dict[str, str | int | bool | list[str]] = {
+        "title": title,
+        "priority": priority,
+        "reference": item_reference,
+        "file_path": item_reference,
+    }
     if issue_ref:
         result["item_ref"] = issue_ref
     return {**result, **out.to_dict()}
@@ -2017,242 +1443,6 @@ def add_item(
 # ---------------------------------------------------------------------------
 
 
-def _closed_issue_cutoff(local_items: list[BacklogItem]) -> datetime:
-    """Return the since cutoff for closed-issue reconciliation.
-
-    Uses the most recent metadata.last_synced across all local items, or
-    falls back to 30 days ago when no last_synced values are available.
-
-    Args:
-        local_items: Parsed local backlog items.
-
-    Returns:
-        UTC-aware datetime to use as the ``since`` parameter.
-    """
-    last_synced_values: list[datetime] = []
-    for item in local_items:
-        if item.last_synced:
-            with contextlib.suppress(ValueError):
-                last_synced_values.append(datetime.fromisoformat(item.last_synced))
-    if last_synced_values:
-        return max(last_synced_values)
-    return datetime.now(UTC) - timedelta(days=30)
-
-
-def _build_issue_to_item_index(local_items: list[BacklogItem]) -> dict[int, BacklogItem]:
-    """Build a mapping from GitHub issue number to non-terminal local BacklogItems.
-
-    Only includes items with non-terminal status so already-closed items are
-    not re-processed.
-
-    Args:
-        local_items: Parsed local backlog items.
-
-    Returns:
-        Dict mapping integer issue numbers to their BacklogItem.
-    """
-    index: dict[int, BacklogItem] = {}
-    for item in local_items:
-        if not item.issue:
-            continue
-        num = parse_issue_number(item.issue)
-        if num is not None and item.status not in _TERMINAL_STATUSES:
-            index[num] = item
-    return index
-
-
-def _reconcile_single_closed_issue(
-    issue_node: IssueNode, issue_number: int, output: Output, issue_to_item: dict[int, BacklogItem]
-) -> int:
-    """Update a single closed issue's local cache file to status=closed.
-
-    Used by the incremental sync path where each closed issue is processed
-    individually as it arrives from the combined OPEN+CLOSED fetch.
-
-    Args:
-        issue_node: GraphQL issue node already known to be CLOSED.
-        issue_number: Issue number extracted from the node.
-        output: Output collector for info/warn messages.
-        issue_to_item: Pre-built index from ``_build_issue_to_item_index``.
-            Callers must build this once before the per-issue loop to avoid
-            O(N) ``parse_backlog`` calls.
-
-    Returns:
-        1 if the local item was updated, 0 otherwise.
-    """
-    # Skip PRs
-    if issue_node.get("isPullRequest"):
-        return 0
-    if (local_item := issue_to_item.get(issue_number)) is None:
-        return 0  # no local file — skip silently
-    filepath = Path(local_item.file_path)
-    if not filepath.exists():
-        return 0
-    update_item_metadata(filepath, {"metadata": {"status": "closed"}}, output=output)
-    output.info(f"  Reconciled #{issue_number} — updated local status to closed.")
-    return 1
-
-
-def _reconcile_closed_issues(repo_obj: Repository, open_issue_numbers: set[int], output: Output) -> int:
-    """Fetch recently closed GitHub issues and update local cache files.
-
-    For each closed issue that has a local file with non-terminal status,
-    updates the local file's status to ``closed``.  Open issues take
-    precedence — any issue number present in ``open_issue_numbers`` is
-    skipped.  Closed issues with no matching local file are skipped silently.
-    Pull requests are filtered out.
-
-    Args:
-        repo_obj: Authenticated PyGitHub Repository object.
-        open_issue_numbers: Issue numbers already processed in the open pass.
-        output: Output collector for info/warn messages.
-
-    Returns:
-        Count of local items updated to status=closed.
-    """
-    local_items = parse_backlog()
-    cutoff = _closed_issue_cutoff(local_items)
-    issue_to_item = _build_issue_to_item_index(local_items)
-
-    owner, repo_name = repo_obj.full_name.split("/", 1)
-    try:
-        closed_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="CLOSED")
-    except BacklogError as e:
-        output.warn(f"  WARNING: Could not fetch closed issues: {e}")
-        return 0
-
-    reconciled = 0
-    for issue_node in closed_issues:
-        # Filter by cutoff — GraphQL has no since parameter; do it client-side
-        closed_at_str = issue_node.get("closedAt") or ""
-        if closed_at_str:
-            try:
-                closed_at = datetime.fromisoformat(closed_at_str)
-                if closed_at < cutoff.replace(tzinfo=UTC):
-                    continue
-            except ValueError:
-                pass
-        # Skip PRs — GraphQL issues endpoint excludes PRs, but guard anyway
-        if issue_node.get("isPullRequest"):
-            continue
-        issue_number = issue_node.get("number", 0)
-        if issue_number in open_issue_numbers:
-            continue  # open takes precedence
-        if (local_item := issue_to_item.get(issue_number)) is None:
-            continue  # no local file — skip silently
-        filepath = Path(local_item.file_path)
-        if not filepath.exists():
-            continue
-        update_item_metadata(filepath, {"metadata": {"status": "closed"}}, output=output)
-        output.info(f"  Reconciled #{issue_number} — updated local status to closed.")
-        reconciled += 1
-    return reconciled
-
-
-def _sync_incremental(
-    repo_obj: Repository,
-    owner: str,
-    repo_name: str,
-    label_names: list[str] | None,
-    since: str,
-    out: Output,
-    progress_callback: Callable[[int, int | None], None] | None = None,
-) -> tuple[int, int]:
-    """Perform a single-pass incremental sync for issues updated since *since*.
-
-    Args:
-        repo_obj: Authenticated PyGitHub Repository object.
-        owner: Repository owner login.
-        repo_name: Repository name without owner prefix.
-        label_names: Optional label filter.
-        since: ISO 8601 timestamp — only issues updated at or after this time.
-        out: Output collector.
-        progress_callback: Optional callable invoked after each issue is written.
-            Receives ``(items_done, items_total)``.
-
-    Returns:
-        Tuple of (refreshed_count, reconciled_count).
-
-    Raises:
-        BacklogError: Propagated from ``sync_issues_graphql`` on GraphQL errors.
-    """
-    since_dt: datetime | None = datetime.fromisoformat(since) if since else None
-    all_issues = sync_issues_graphql(
-        repo_obj, owner, repo_name, state="OPEN,CLOSED", labels=label_names, since=since_dt
-    )
-    # Build the index once here so _reconcile_single_closed_issue does not call
-    # parse_backlog() on every iteration (O(N*M) → O(N+M)).
-    local_items = parse_backlog()
-    issue_to_item = _build_issue_to_item_index(local_items)
-    count = 0
-    reconciled = 0
-    items_total = len(all_issues)
-    if progress_callback is not None:
-        progress_callback(0, items_total)
-    for items_processed, issue_node in enumerate(all_issues, start=1):
-        issue_number = issue_node.get("number", 0)
-        if issue_node.get("state", "OPEN") == "OPEN":
-            _write_issue_node_to_cache(issue_node, issue_number, out)
-            count += 1
-        else:
-            reconciled += _reconcile_single_closed_issue(issue_node, issue_number, out, issue_to_item)
-        if progress_callback is not None:
-            progress_callback(items_processed, items_total)
-    if count:
-        out.info(f"  Refreshed {count} issue(s) from GitHub into local cache.")
-    if reconciled:
-        out.info(f"  Reconciled {reconciled} externally closed issue(s).")
-    return count, reconciled
-
-
-def _sync_full(
-    repo_obj: Repository,
-    owner: str,
-    repo_name: str,
-    label_names: list[str] | None,
-    out: Output,
-    progress_callback: Callable[[int, int | None], None] | None = None,
-) -> tuple[int, int]:
-    """Perform a full two-pass sync (OPEN then CLOSED).
-
-    Args:
-        repo_obj: Authenticated PyGitHub Repository object.
-        owner: Repository owner login.
-        repo_name: Repository name without owner prefix.
-        label_names: Optional label filter.
-        out: Output collector.
-        progress_callback: Optional callable invoked after each open issue is written.
-            Receives ``(items_done, items_total)``.
-
-    Returns:
-        Tuple of (refreshed_count, reconciled_count).
-
-    Raises:
-        BacklogError: Propagated from ``sync_issues_graphql`` when the open-issue
-            fetch fails — the caller drives OFFLINE/retry handling.
-    """
-    open_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN", labels=label_names)
-
-    open_issue_numbers: set[int] = set()
-    count = 0
-    items_total = len(open_issues)
-    if progress_callback is not None:
-        progress_callback(0, items_total)
-    for issue_node in open_issues:
-        issue_number = issue_node.get("number", 0)
-        _write_issue_node_to_cache(issue_node, issue_number, out)
-        open_issue_numbers.add(issue_number)
-        count += 1
-        if progress_callback is not None:
-            progress_callback(count, items_total)
-    out.info(f"  Refreshed {count} issue(s) from GitHub into local cache.")
-
-    reconciled = _reconcile_closed_issues(repo_obj, open_issue_numbers, out)
-    if reconciled:
-        out.info(f"  Reconciled {reconciled} externally closed issue(s).")
-    return count, reconciled
-
-
 def refresh_local_cache_from_github(
     repo: str = "",
     label: str | None = None,
@@ -2260,71 +1450,34 @@ def refresh_local_cache_from_github(
     full_refresh: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
 ) -> dict[str, int | list[str]]:
-    """Fetch open and recently closed GitHub Issues and update local cache files.
-
-    When a ``.last_sync`` timestamp file exists in the project state root and
-    ``full_refresh`` is ``False``, performs an incremental sync: fetches all
-    issues (OPEN and CLOSED) updated since the recorded timestamp in a single
-    GraphQL request.  This avoids redundant full-page fetches on subsequent
-    runs.
-
-    When no ``.last_sync`` file exists, or when ``full_refresh=True`` is
-    passed, falls back to the full two-pass fetch (OPEN then CLOSED).
-
-    Open issues are fetched and written to local cache files via
-    pull_single_issue.  Closed issues are cross-referenced against local
-    files: items with matching issue numbers and non-terminal local status
-    are updated to status=closed.  Open issues take precedence — if an
-    issue appears in both result sets the open processing wins.
+    """Reconcile provider items through the configured backend.
 
     Args:
-        repo: GitHub repository slug (``owner/name``).  Defaults to the
-            value resolved by ``try_get_github``.
+        repo: Provider repository slug retained for wrapper compatibility.
         label: Optional label name to restrict the fetch.
         output: Optional ``Output`` accumulator for messages.
-        full_refresh: When ``True``, ignore any cached ``.last_sync``
-            timestamp and perform a full two-pass fetch.
+        full_refresh: Request an initial provider snapshot instead of an
+            incremental snapshot.
         progress_callback: Optional callable invoked after each issue is
-            written to cache.  Receives ``(items_done, items_total)``.
-            Existing callers that omit this parameter are unaffected.
+            reconciled. Receives ``(items_done, items_total)``.
 
     Returns:
         Dict with count of refreshed (open) issues and count of reconciled
         (closed) issues.
     """
     out = output or Output()
-    repo_obj = try_get_github(repo)
-    if repo_obj is None:
-        msg = "GitHub unavailable: GITHUB_TOKEN not set or token is invalid. Cannot refresh local cache."
-        raise BackendUnavailableError(msg)
-
-    owner, repo_name = repo_obj.full_name.split("/", 1)
-    label_names: list[str] | None = [label] if label else None
-
-    # Determine incremental vs full fetch
-    last_sync_path = _dh_paths.state_root() / ".last_sync"
-    since: str | None = None
-    if not full_refresh and last_sync_path.exists():
-        since = last_sync_path.read_text(encoding="utf-8").strip() or None
-
-    # Record sync start BEFORE fetching — avoids a race where issues updated
-    # between fetch completion and write would be missed on the next incremental run.
-    sync_start = datetime.now(UTC).isoformat()
-
-    if since is not None:
-        count, reconciled = _sync_incremental(
-            repo_obj, owner, repo_name, label_names, since, out, progress_callback=progress_callback
-        )
-    else:
-        count, reconciled = _sync_full(
-            repo_obj, owner, repo_name, label_names, out, progress_callback=progress_callback
-        )
-
-    # Persist sync timestamp so the next run can use incremental mode
-    last_sync_path.parent.mkdir(parents=True, exist_ok=True)
-    last_sync_path.write_text(sync_start, encoding="utf-8")
-
-    return {"refreshed": count, "reconciled": reconciled, **out.to_dict()}
+    backend = get_config().backend
+    if not isinstance(backend, SyncProvider):
+        out.info("Active backend does not support reconciliation.")
+        return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+    references = [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
+    scope = ReconcileScope.INITIAL if full_refresh else ReconcileScope.INCREMENTAL
+    result = backend.reconcile(ReconcileRequest(scope=scope, references=references))
+    out.info(
+        f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
+        f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures."
+    )
+    return {"refreshed": result.local_updates, "reconciled": result.deleted_provider_items, **out.to_dict()}
 
 
 def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
@@ -2346,7 +1499,7 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     if num is not None:
         info = status_map.get(num)
         return info.status if info is not None else "needs-grooming"
-    # Non-integer issue ref (beads nanoid) or no issue — use local YAML status.
+    # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
     return item.status or "needs-grooming"
 
 
@@ -2454,8 +1607,8 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
         "description": item.description,
         "body": _build_item_search_body(item),
     }
-    if item.file_path:
-        entry["file_path"] = item.file_path
+    if item.reference:
+        entry["file_path"] = item.reference
     if item.groomed:
         entry["groomed"] = item.groomed
     if item.issue:
@@ -2491,10 +1644,10 @@ def list_items(
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
-    """List backlog items. Default reads local cache only. Use from_github=True to refresh first.
+    """List backlog items. Default reads provider-backed record only. Use from_github=True to refresh first.
 
     Args:
-        from_github: Refresh local cache from GitHub Issues before listing.
+        from_github: Refresh provider-backed record from GitHub Issues before listing.
         label: Filter by GitHub label (applied during refresh).
         section: Filter by priority section — P0, P1, P2, or Ideas (case-insensitive).
         status: Filter by status value e.g. 'needs-grooming', 'status:in-progress'.
@@ -2520,7 +1673,7 @@ def list_items(
     out = output or Output()
     if from_github:
         refresh_local_cache_from_github(repo, label, output=out)
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     # Start with non-skipped items that have a section. The skip flag may be set
     # for reasons other than terminal status (e.g. malformed entries), so we
     # always exclude skip=True items regardless of include_closed. The
@@ -2532,7 +1685,7 @@ def list_items(
     # Linear).  Those backends raise NotImplementedError from
     # batch_fetch_statuses because their issue IDs are strings with no integer
     # representation (BacklogBackend.supports_batch_status_fetch == False).
-    # The local YAML status field is authoritative for such backends — pass an
+    # The backend-owned status field is authoritative for such backends — pass an
     # empty map.  _item_derived_status and _build_list_entry both fall back to
     # item.status when the map is empty.
     if get_config().backend.supports_batch_status_fetch:
@@ -2572,14 +1725,14 @@ def link_followup(selector: str, followup_to: str, output: Output | None = None)
         ItemNotFoundError: When *selector* does not match any backlog item.
     """
     out = output or Output()
-    item = find_item(parse_backlog(), selector)
+    item = find_item(get_config().backend.list_work_items(), selector)
     if not item:
         raise ItemNotFoundError(selector)
-    filepath_str = item.file_path
-    if not filepath_str:
+    reference = item.reference
+    if not reference:
         msg = f"Item {selector!r} has no file_path — cannot persist followup_to"
         raise BacklogError(msg)
-    update_item_metadata(Path(filepath_str), {"metadata": {"followup_to": followup_to}}, output=out)
+    update_item_metadata(reference, {"metadata": {"followup_to": followup_to}}, output=out)
     out.info(f"  Linked follow-up: {item.title} -> {followup_to or '(cleared)'}")
     return {"title": item.title, "followup_to": followup_to, **out.to_dict()}
 
@@ -2600,7 +1753,7 @@ def list_followups(followup_to: str, output: Output | None = None) -> dict[str, 
         ``issue``, ``followup_to``), ``count``, and output messages.
     """
     out = output or Output()
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     matches = [it for it in items if not it.skip and it.metadata.followup_to == followup_to]
     result_items = [
         {"title": it.title, "section": it.section, "issue": it.issue, "followup_to": it.metadata.followup_to}
@@ -2650,9 +1803,9 @@ def _build_sections_index_from_body(body: str) -> str:
     r"""Build a ``## Sections`` index block from a raw body string.
 
     Produces the same format as :func:`_render_section_index` but derives
-    section data from the live body string rather than the local YAML cache.
+    section data from the live body string rather than the backend-owned structured record.
     Used when *result.body* is populated from GitHub so that live data is
-    preferred over the local cache, maintaining cache coherence under concurrent
+    preferred over the provider-backed record, maintaining cache coherence under concurrent
     groom writes.
 
     Returns empty string when *body* is empty or contains no ``### `` headers.
@@ -2726,7 +1879,7 @@ def _resolve_section_indices(candidates: list[str], section: str) -> list[int]:
 
     Args:
         candidates: Ordered list of section-name strings to match against
-            (display titles for YAML items, raw header text for bodies).
+            (display titles for backend-owned structured items, raw header text for bodies).
         section: Filter expression.
 
     Addressability fallback (issue #2495, M1): the numeric/comma/regex forms are
@@ -3121,9 +2274,9 @@ def _paginate_body_result(result: ViewItemResult, body: str, offset: int, limit:
 
 
 def _populate_yaml_item_content(result: ViewItemResult, item: BacklogItem, section: str | None) -> None:
-    """Populate *result* with body and sections for a YAML item (full-content path).
+    """Populate *result* with body and sections for a backend-owned structured item (full-content path).
 
-    YAML items have structured ``sections`` but no raw body string.  This helper
+    backend-owned structured items have structured ``sections`` but no raw body string.  This helper
     renders the body from the structured sections and populates ``result.body``
     and ``result.sections``.  When *section* is provided the output is filtered.
 
@@ -3176,7 +2329,7 @@ def _compact_entry_count(sec: _SectionMetadata | GroomedSectionMetadata) -> int:
 
 
 def _populate_yaml_item_compact(result: ViewItemResult, item: BacklogItem) -> None:
-    """Populate *result* with sections_metadata for a YAML item (compact path).
+    """Populate *result* with sections_metadata for a backend-owned structured item (compact path).
 
     Args:
         result: Mutable ViewItemResult to update in-place.
@@ -3310,7 +2463,7 @@ def _assemble_view_compact(
 
     Sets ``sections_metadata`` and ``sections_index`` without retaining the full
     body.  Delegates to the GitHub-body path when *body* is non-empty, otherwise
-    falls back to the local YAML item.
+    falls back to the backend-owned structured item.
 
     When *section* is provided, ``sections_metadata`` is narrowed to only the
     matching section (case-insensitive name match).  ``sections_index`` is
@@ -3366,27 +2519,27 @@ def _sections_from_body_or_yaml(
     1. Body has entry-block wrappers (``<div><sub>timestamp</sub>…</div>``) —
        ``_build_sections_metadata`` extracts real entry IDs from the blocks.
     2. Body has ``##``/``###`` section headers but no entry blocks:
-       a. If the YAML item's section names cover every header in the body,
+       a. If the backend-owned structured item's section names cover every header in the body,
           prefer YAML — it carries real persisted entry IDs.  Zero-timestamp
           IDs produced by ``_build_sections_metadata`` on a plain-text body
           would corrupt ``since``-based filtering and discard stored IDs.
-       b. Otherwise (body headers differ from YAML sections, or no YAML item),
+       b. Otherwise (body headers differ from YAML sections, or no backend-owned structured item),
           parse the body directly — the body is the authoritative source for
-          which sections exist when the YAML item is absent or stale.
+          which sections exist when the backend-owned structured item is absent or stale.
     3. No body headers — YAML fallback (``_build_sections_from_yaml_item``).
     4. Neither source available — return ``{}``.
 
     The subset check in step 2a resolves the tension between two requirements:
     (a) GitHub-enriched bodies must not corrupt stored entry IDs by silently
     replacing them with zero-timestamp fallbacks; and (b) plain-text bodies
-    whose headers differ from the YAML item (e.g. a paginated slice that lands
-    on a section not in the local YAML, or no YAML item at all) must still
+    whose headers differ from the backend-owned structured item (e.g. a paginated slice that lands
+    on a section not in the backend-owned structured item, or no backend-owned structured item at all) must still
     produce correct ``result.sections`` from the live body content.
 
     Args:
         body: The (possibly paginated) body string to inspect.
-        item: Local YAML item whose structured sections carry real entry IDs.
-            May be ``None`` when no local item is available.
+        item: Local backend-owned structured item whose structured sections carry real entry IDs.
+            May be ``None`` when no backend-owned item is available.
         show: Entry display filter forwarded to ``_build_sections_metadata``.
         since: ISO date/datetime filter forwarded to ``_build_sections_metadata``.
 
@@ -3403,7 +2556,7 @@ def _sections_from_body_or_yaml(
             if body_header_names.issubset(yaml_section_names):
                 # YAML covers all body headers — use it to preserve real entry IDs.
                 return _build_sections_from_yaml_item(item)
-        # Body headers not fully covered by YAML (or no YAML item) — body wins.
+        # Body headers not fully covered by YAML (or no backend-owned structured item) — body wins.
         return _build_sections_metadata(body, show, since, section=None)
     # Body has no section headers — YAML fallback.
     if item and item.sections:
@@ -3486,7 +2639,7 @@ def _assemble_view_content(
             # Build the section index from the FULL body so agents see it
             # regardless of body source, but DEFER prepending it until after
             # pagination (#2495 M1) so the index never consumes the page budget.
-            # Prefer live body data over local YAML cache for cache coherence.
+            # Prefer live body data over backend-owned structured record for cache coherence.
             # The index is display-only; metadata is built from ``body`` (without
             # it) so no spurious ``Sections`` key is produced.  Both the metadata
             # build and the index build are skipped under pagination: pagination
@@ -3576,7 +2729,7 @@ def view_item(
         section: Optional section name filter.  When the item has a raw body (GitHub
             items), narrows the body to the matching ``## `` or ``### `` header and
             sets ``result.section_filter_miss = True`` when no header matches.
-            For YAML items with structured sections but no raw body, supports
+            For backend-owned structured items with structured sections but no raw body, supports
             numeric index (``"2"``), comma-separated indices (``"0,2"``),
             regex (``"/impact.*/``), or substring match.
 
@@ -3592,7 +2745,7 @@ def view_item(
     # an omitted filter (full content), not a no-match. strip() preserves real
     # values like "0". (PR #2496 Codex finding.)
     section = (section or "").strip() or None
-    item = find_item(parse_backlog(), selector)
+    item = find_item(get_config().backend.list_work_items(), selector)
     issue_num = parse_issue_selector(selector)
 
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
@@ -3602,9 +2755,9 @@ def view_item(
         if not enriched:
             if not item:
                 raise ItemNotFoundError(selector)
-            out.warnings.append("backend unreachable — sections_index reflects local cache, may be stale")
+            out.warnings.append("backend unreachable — sections_index reflects provider-backed record, may be stale")
         # Restore groomed date from local item — the enrichment path has no
-        # access to local YAML frontmatter, so preserve the date string.
+        # access to backend-owned metadata, so preserve the date string.
         if item:
             result.groomed = item.metadata.groomed
     elif not item:
@@ -3732,158 +2885,12 @@ def sync_create_missing_issues(
         new_normalized = normalize_issue_title(item.title)
         if new_normalized not in existing_issues:
             existing_issues[new_normalized] = issue_num
-        # Update per-item file metadata with issue number
-        filepath_str = item.file_path
-        if filepath_str:
-            update_item_metadata(Path(filepath_str), {"metadata": {"issue": f"#{issue_num}"}}, output=out)
+        # Update backend-owned metadata with issue number
+        reference = item.reference
+        if reference:
+            update_item_metadata(reference, {"metadata": {"issue": f"#{issue_num}"}}, output=out)
 
     return {"created": created, **out.to_dict()}
-
-
-def _build_groomed_update_list(
-    groomed_items: list[BacklogItem], issue_lookup: dict[int, IssueNode], out: Output
-) -> tuple[list[tuple[str, str]], dict[str, int]]:
-    """Build ``(node_id, body)`` pairs for items that have a resolved GitHub issue.
-
-    Items with invalid issue refs or no matching issue in ``issue_lookup`` emit
-    a warning and are skipped.
-
-    Args:
-        groomed_items: BacklogItems that have a groomed section and a non-empty
-            ``issue`` field.
-        issue_lookup: Mapping from issue number to IssueNode fetched from GitHub.
-        out: Output collector for warning messages.
-
-    Returns:
-        Tuple of (updates, node_id_to_num) where ``updates`` is the list of
-        ``(node_id, body)`` pairs ready to pass to the dispatch helper and
-        ``node_id_to_num`` maps each node ID back to its issue number for logs.
-    """
-    updates: list[tuple[str, str]] = []
-    node_id_to_num: dict[str, int] = {}
-    for item in groomed_items:
-        issue_ref = item.issue
-        issue_num = parse_issue_number(issue_ref)
-        if issue_num is None:
-            out.warn(f"  WARNING: Skipping item with invalid issue ref '{issue_ref}'")
-            continue
-        issue_node = issue_lookup.get(issue_num)
-        if issue_node is None:
-            out.warn(f"  WARNING: Issue #{issue_num} not found in bulk fetch (may be closed)")
-            continue
-        body = render_issue_body(item, original_body=issue_node["body"])
-        node_id = issue_node["id"]
-        updates.append((node_id, body))
-        node_id_to_num[node_id] = issue_num
-    return updates, node_id_to_num
-
-
-def _dispatch_issue_body_updates(
-    repository: Repository, updates: list[tuple[str, str]], node_id_to_num: dict[str, int], out: Output
-) -> int:
-    """Send ``(node_id, body)`` updates to GitHub, returning the count pushed.
-
-    Uses batch mutations when the backend supports them; falls back to
-    per-item updates otherwise.  Per-chunk fallback is already handled inside
-    ``_update_issues_graphql_batch``.
-
-    Args:
-        repository: Authenticated PyGithub Repository.
-        updates: List of ``(node_id, body)`` pairs to apply.
-        node_id_to_num: Mapping from node ID to issue number for log messages.
-        out: Output collector.
-
-    Returns:
-        Number of issues successfully updated.
-    """
-    pushed = 0
-    if get_config().backend.supports_batch_issue_update:
-        try:
-            _update_issues_graphql_batch(repository, updates)
-            pushed = len(updates)
-            for node_id, _body in updates:
-                out.info(f"  Updated issue #{node_id_to_num[node_id]}")
-        except (GithubException, BacklogError) as e:
-            out.warn(f"  WARNING: Batch update failed, falling back to per-item: {e}")
-            for node_id, body in updates:
-                num = node_id_to_num[node_id]
-                try:
-                    _update_issue_graphql(repository, node_id, body=body)
-                    out.info(f"  Updated issue #{num}")
-                    pushed += 1
-                except (GithubException, BacklogError) as item_e:
-                    out.warn(f"  WARNING: Could not update issue #{num}: {item_e}")
-    else:
-        for node_id, body in updates:
-            num = node_id_to_num[node_id]
-            try:
-                _update_issue_graphql(repository, node_id, body=body)
-                out.info(f"  Updated issue #{num}")
-                pushed += 1
-            except (GithubException, BacklogError) as e:
-                out.warn(f"  WARNING: Could not update issue #{num}: {e}")
-    return pushed
-
-
-def sync_push_groomed_content(
-    items: list[BacklogItem],
-    repo: str,
-    dry_run: bool,
-    output: Output | None = None,
-    *,
-    repository: Repository | None = None,
-    open_issues: list[IssueNode] | None = None,
-) -> dict[str, int | bool | list[str]]:
-    """Pass 2 of sync: push groomed content to existing GitHub issues.
-
-    Skips items with no '## Groomed' section in their body.
-
-    Args:
-        items: Full backlog item list.
-        repo: Repository in ``owner/repo`` format.  Ignored when ``repository``
-            is provided.
-        dry_run: When True, log actions without making changes.
-        output: Optional Output collector for status/warning messages.
-        repository: Optional pre-connected Repository object.  When provided,
-            the ``get_github`` call is skipped (item 8 — single connection per
-            ``sync_items`` pass).
-        open_issues: Optional pre-fetched list of open IssueNode dicts.  When
-            provided, the ``sync_issues_graphql`` call is skipped (item 6 —
-            single GraphQL fetch per ``sync_items`` pass).
-
-    Returns:
-        Dict with count of pushed items.
-    """
-    out = output or Output()
-    groomed_items = [it for it in items_with_issues(items) if "groomed" in it.sections]
-    if not groomed_items:
-        out.info("No items with groomed content to push.")
-        return {"pushed": 0, **out.to_dict()}
-    out.info(f"Found {len(groomed_items)} item(s) with groomed content to push to GitHub:")
-    if dry_run:
-        for it in groomed_items:
-            issue_ref = it.issue
-            out.info(f"  [dry-run] Would update issue {issue_ref}: {it.title[:60]}")
-        return {"pushed": 0, "dry_run": True, **out.to_dict()}
-    if repository is None:
-        repository = get_github(repo)
-    owner, repo_name = repository.full_name.split("/", 1)
-
-    # Bulk-fetch all issue nodes to avoid N+1 GraphQL queries
-    issue_numbers: set[int] = set()
-    for item in groomed_items:
-        num = parse_issue_number(item.issue)
-        if num is not None:
-            issue_numbers.add(num)
-
-    # Use pre-fetched list when provided; otherwise fetch open issues now
-    if open_issues is None:
-        open_issues = sync_issues_graphql(repository, owner, repo_name, state="OPEN")
-    issue_lookup = {node["number"]: node for node in open_issues if node["number"] in issue_numbers}
-
-    updates, node_id_to_num = _build_groomed_update_list(groomed_items, issue_lookup, out)
-    pushed = _dispatch_issue_body_updates(repository, updates, node_id_to_num, out)
-    return {"pushed": pushed, **out.to_dict()}
 
 
 def sync_items(
@@ -3899,39 +2906,28 @@ def sync_items(
         Dict with sync results.
     """
     out = output or Output()
-    items = parse_backlog()
+    backend = get_config().backend
+    if isinstance(backend, SyncProvider):
+        create_result = sync_create_missing_issues(get_config().backend.list_work_items(), repo, dry_run, output=out)
+        linked_items = items_with_issues(get_config().backend.list_work_items())
+        references = list(dict.fromkeys(item.issue for item in linked_items))
+        result = backend.reconcile(
+            ReconcileRequest(scope=ReconcileScope.LINKED, references=references, dry_run=dry_run)
+        )
+        out.info(
+            f"Reconciled linked items: {result.fetched_pages} pages, {result.fetched_items} items, "
+            f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
+            f"{result.conflicts} conflicts, {result.failures} failures."
+        )
+        return {
+            "created": create_result.get("created", 0),
+            "pushed": result.provider_patches,
+            "dry_run": dry_run,
+            **out.to_dict(),
+        }
 
-    # Determine whether each pass has actual work to do.
-    needs_create = bool(items_needing_issues(items))
-    needs_push = any("groomed" in it.sections for it in items_with_issues(items))
-
-    # Only perform the shared fetch when BOTH passes need live GitHub access.
-    # If only one pass has work, that pass will use its own internal lazy fetch.
-    # If dry_run is set, no pass requires a live connection.
-    repository: Repository | None = None
-    open_issues: list[IssueNode] | None = None
-    existing_issues: dict[str, int] | None = None
-
-    if (not dry_run) and needs_create and needs_push:
-        repository = get_github(repo)
-        owner, repo_name = repository.full_name.split("/", 1)
-        out.info("Fetching open issues from GitHub...")
-        open_issues = sync_issues_graphql(repository, owner, repo_name, state="OPEN")
-        out.info(f"  Found {len(open_issues)} open issues.")
-        existing_issues = issues_to_title_map(open_issues)
-
-    create_result = sync_create_missing_issues(
-        items, repo, dry_run, output=out, repository=repository, existing_issues=existing_issues
-    )
-    push_result = sync_push_groomed_content(
-        items, repo, dry_run, output=out, repository=repository, open_issues=open_issues
-    )
-    return {
-        "created": create_result.get("created", 0),
-        "pushed": push_result.get("pushed", 0),
-        "dry_run": dry_run,
-        **out.to_dict(),
-    }
+    out.info("Active backend does not support reconciliation.")
+    return {"created": 0, "pushed": 0, "dry_run": dry_run, **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------
@@ -3962,11 +2958,11 @@ def close_item(
     if reason not in VALID_CLOSE_REASONS:
         msg = f"Invalid close reason: {reason!r}. Valid reasons: {', '.join(VALID_CLOSE_REASONS)}"
         raise ValidationError(msg)
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     item = find_item(items, selector)
     if not item:
         _pull_if_issue_selector(selector, repo, output=out)
-        items = parse_backlog()
+        items = get_config().backend.list_work_items()
         item = find_item(items, selector)
     if not item:
         raise ItemNotFoundError(selector)
@@ -3986,22 +2982,22 @@ def close_item(
 
     today()
 
-    filepath_str = item.file_path
-    if not filepath_str:
-        msg = "Item has no file path"
+    reference = item.reference
+    if not reference:
+        msg = "Item has no backend reference"
         raise BacklogError(msg)
     already_closed = item.status.lower() in {"closed", "done"}
     if already_closed:
         out.info("Item already closed.")
         return {"title": item.title, "already_closed": True, **out.to_dict()}
 
-    update_item_metadata(Path(filepath_str), {"metadata": {"status": "closed", "close_reason": reason}}, output=out)
+    update_item_metadata(reference, {"metadata": {"status": "closed", "close_reason": reason}}, output=out)
 
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
     if issue_ref:
         close_github_issue(issue_ref, reason, reference=reference, comment=comment, repo=repo, output=out)
     if cleanup and issue_ref:
-        _close_cleanup(item, issue_ref, repo, output=out)
+        out.info("Cleanup is managed by the configured backend.")
 
     return {"title": item.title, "closed": True, "reason": reason, **out.to_dict()}
 
@@ -4037,11 +3033,11 @@ def resolve_item(
     if not summary.strip():
         msg = "summary is required (what was done)"
         raise ValidationError(msg)
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     item = find_item(items, selector)
     if not item:
         _pull_if_issue_selector(selector, repo, output=out)
-        items = parse_backlog()
+        items = get_config().backend.list_work_items()
         item = find_item(items, selector)
     if not item:
         raise ItemNotFoundError(selector)
@@ -4061,9 +3057,9 @@ def resolve_item(
 
     today()
 
-    filepath_str = item.file_path
-    if not filepath_str:
-        msg = "Item has no file path"
+    reference = item.reference
+    if not reference:
+        msg = "Item has no backend reference"
         raise BacklogError(msg)
     already_done = item.status.lower() in {"done", "resolved", "completed"}
     if already_done:
@@ -4073,7 +3069,7 @@ def resolve_item(
     metadata: dict[str, object] = {"status": "done", "priority": "completed"}
     if plan:
         metadata["plan"] = plan
-    update_item_metadata(Path(filepath_str), {"metadata": metadata}, output=out)
+    update_item_metadata(reference, {"metadata": metadata}, output=out)
 
     out.info(f'Backlog item "{item.title}" resolved.')
     if issue_ref:
@@ -4088,7 +3084,7 @@ def resolve_item(
             output=out,
         )
     if cleanup and issue_ref:
-        _close_cleanup(item, issue_ref, repo, output=out)
+        out.info("Cleanup is managed by the configured backend.")
 
     return {"title": item.title, "resolved": True, "summary": summary, **out.to_dict()}
 
@@ -4108,7 +3104,7 @@ def _apply_issue_status_labels(
 
     For backends whose ``issue_id_type`` is ``"string"`` — where ``item.issue``
     may be empty or hold an opaque string ID (e.g. a beads nanoid) — writes the
-    status directly to the local YAML cache file via :func:`update_item_metadata`.
+    status directly through the configured backend via :func:`update_item_metadata`.
     This prevents the status change from becoming a silent no-op on such backends
     (BUG-3).  The ``apply_status_in_progress`` backend call is still issued when
     ``item.issue`` is a string ID so the backend can claim the item (e.g.
@@ -4140,8 +3136,8 @@ def _apply_issue_status_labels(
             apply_status_in_progress(item, repo, output=output)
             # Local YAML update: list_items skips live batch-status fetch for
             # string-ID backends, so write status locally to keep the view current.
-            if item.file_path:
-                update_item_metadata(Path(item.file_path), {"metadata": {"status": "in-progress"}}, output=output)
+            if item.reference:
+                update_item_metadata(item.reference, {"metadata": {"status": "in-progress"}}, output=output)
         elif has_integer_issue:
             apply_status_in_progress(item, repo, output=output)
         result["status"] = "in-progress"
@@ -4186,7 +3182,7 @@ def _apply_groomed_update(
     Extracted from update_item to keep cyclomatic complexity within limit.
 
     Args:
-        item: Resolved BacklogItem with file_path set.
+        item: Resolved BacklogItem with a stable backend reference.
         result: Partial result dict already containing ``title`` key.
         groomed_file: Path to groomed content file (single-section path).
         groomed_content: Raw groomed content string (single-section path).
@@ -4207,8 +3203,8 @@ def _apply_groomed_update(
         BacklogError: If item has no file_path.
         ValidationError: If resolved single-section content is empty.
     """
-    if not item.file_path:
-        msg = "Item has no file path"
+    if not item.reference:
+        msg = "Item has no backend reference"
         raise BacklogError(msg)
 
     if sections is not None:
@@ -4285,11 +3281,11 @@ def update_item(
         ``sections_written: list[str]`` and ``groomed_updated: bool``.
     """
     out = output or Output()
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     item = find_item(items, selector)
     if not item:
         _pull_if_issue_selector(selector, repo, output=out)
-        items = parse_backlog()
+        items = get_config().backend.list_work_items()
         item = find_item(items, selector)
     if not item:
         raise ItemNotFoundError(selector)
@@ -4361,7 +3357,7 @@ def groom_item(
     sections: dict[str, str] | None = None,
     mark_groomed: bool = False,
 ) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
-    """Write groomed content into per-item file. Delegates to update_item.
+    """Write groomed content through the configured backend. Delegates to update_item.
 
     Args:
         selector: Item selector (title, issue ref, or file path).
@@ -4387,7 +3383,7 @@ def groom_item(
     """
     out = output or Output()
     has_input = groomed_file or groomed_content or (section and content) or sections is not None
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     item = find_item(items, selector)
     if not item:
         _pull_if_issue_selector(selector, repo, output=out)
@@ -4414,15 +3410,15 @@ def groom_item(
         # Proceed directly to mark_groomed handling below.
         result = {}
     if mark_groomed and "error" not in result:
-        fresh_items = parse_backlog()
+        fresh_items = get_config().backend.list_work_items()
         fresh_item = find_item(fresh_items, selector)
         if not fresh_item:
             out.warn(f"  mark_groomed requested but item '{selector}' not found after re-parse — status not advanced")
             result["mark_groomed_skipped"] = True
             result["mark_groomed_skip_reason"] = f"Item '{selector}' not found in re-parsed backlog"
         else:
-            if fresh_item.file_path:
-                update_item_metadata(Path(fresh_item.file_path), {"metadata": {"status": "groomed"}}, output=out)
+            if fresh_item.reference:
+                update_item_metadata(fresh_item.reference, {"metadata": {"status": "groomed"}}, output=out)
                 result["mark_groomed_applied"] = True
                 out.info("  Status: groomed (local)")
             if fresh_item.issue:
@@ -4437,73 +3433,6 @@ def groom_item(
 # ---------------------------------------------------------------------------
 # Public API: STRIKE ENTRY
 # ---------------------------------------------------------------------------
-
-
-def _match_in_section(text: str, section: str, match: re.Match[str]) -> bool:
-    """Return True if *match* falls within the ``### {section}`` subsection."""
-    section_re = re.compile(
-        rf"### {re.escape(section.strip())}[^\n]*\n([\s\S]*?)(?=\n### |\n## |\Z)", re.IGNORECASE | re.MULTILINE
-    )
-    section_match = section_re.search(text)
-    if not section_match:
-        return False
-    return section_match.start(1) <= match.start() <= section_match.end(1)
-
-
-def _apply_strike(text: str, entry_id: str, reason: str, section: str | None) -> str:
-    """Find entry by *entry_id* in *text*, strike it, and return updated text.
-
-    Returns:
-        The updated text with the struck entry.
-
-    Raises:
-        ValueError: If entry_id is not found.
-    """
-    for match in ENTRY_RE.finditer(text):
-        if match.group(1) != entry_id:
-            continue
-        if section and not _match_in_section(text, section, match):
-            continue
-        struck = strike_entry_block(match.group(0), reason)
-        return text[: match.start()] + struck + text[match.end() :]
-    msg = f"Entry '{entry_id}' not found"
-    raise ValueError(msg)
-
-
-def _strike_yaml_entry(filepath: Path, entry_id: str, reason: str, section: str | None) -> None:
-    """Strike an entry in a YAML BacklogItem file.
-
-    Loads the item, finds the entry with matching *entry_id* in the specified
-    section (or any section when *section* is ``None``), marks it as struck,
-    and saves the file.
-
-    Args:
-        filepath: Path to the ``.yaml`` item file.
-        entry_id: Timestamp ID of the entry to strike.
-        reason: Human-readable strike reason.
-        section: Optional section name to scope the search.
-
-    Raises:
-        ValueError: If the entry is not found.
-    """
-    item = load_item(filepath)
-    struck_at = now_iso()
-
-    for sec_name, sec_data in item.sections.items():
-        if not isinstance(sec_data, Section):
-            continue
-        if section and sec_name.lower() != section.lower():
-            continue
-        for entry in sec_data.entries:
-            if entry.id == entry_id:
-                entry.struck = True
-                entry.struck_at = struck_at
-                entry.struck_reason = reason
-                save_item(item)
-                return
-
-    msg = f"Entry '{entry_id}' not found"
-    raise ValueError(msg)
 
 
 def strike_entry(
@@ -4530,53 +3459,40 @@ def strike_entry(
         ValueError: If entry_id not found in the item body.
     """
     out = output or Output()
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
     item = find_item(items, selector)
     if not item:
         raise ItemNotFoundError(selector)
-    if not item.file_path:
-        msg = "Item has no file path"
+    if not item.reference:
+        msg = "Item has no backend reference"
         raise BacklogError(msg)
 
-    filepath = Path(item.file_path)
+    struck_at = now_iso()
+    found = False
+    for section_name, section_data in item.sections.items():
+        if not isinstance(section_data, Section) or (section and section_name.lower() != section.lower()):
+            continue
+        for entry in section_data.entries:
+            if entry.id == entry_id:
+                entry.struck = True
+                entry.struck_at = struck_at
+                entry.struck_reason = reason
+                found = True
+                break
+        if found:
+            break
+    if not found:
+        msg = f"Entry '{entry_id}' not found in item '{item.title}'"
+        if section:
+            msg += f" section '{section}'"
+        raise ValueError(msg)
 
-    if filepath.suffix == ".yaml":
-        try:
-            _strike_yaml_entry(filepath, entry_id, reason, section)
-        except ValueError:
-            msg = f"Entry '{entry_id}' not found in item '{item.title}'"
-            if section:
-                msg += f" section '{section}'"
-            raise ValueError(msg) from None
-    else:
-        text = filepath.read_text(encoding="utf-8")
-        try:
-            text = _apply_strike(text, entry_id, reason, section)
-        except ValueError:
-            msg = f"Entry '{entry_id}' not found in item '{item.title}'"
-            if section:
-                msg += f" section '{section}'"
-            raise ValueError(msg) from None
-        filepath.write_text(text, encoding="utf-8")
-
-    out.info(f"Struck entry {entry_id} in {filepath.name}")
-
-    # Sync to GitHub if item has an issue
-    if item.issue:
-        repository = try_get_github(_models.get_default_repo())
-        if repository:
-            try:
-                num = parse_issue_number(item.issue)
-                if num is None:
-                    msg_0 = f"Invalid issue ref: {item.issue!r}"
-                    raise ValueError(msg_0)
-                owner, repo_name = repository.full_name.split("/", 1)
-                issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
-                body = render_issue_body(item, original_body=issue_node["body"])
-                _update_issue_graphql(repository, issue_node["id"], body=body)
-                out.info(f"  Synced strike to GitHub issue {item.issue}")
-            except (GithubException, BacklogError) as e:
-                out.warn(f"  WARNING: Could not sync to GitHub: {e}")
+    backend = get_config().backend
+    backend.put_work_item(item)
+    out.info(f"Struck entry {entry_id} in {item.reference}")
+    if item.issue and isinstance(backend, SyncProvider):
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+        out.info(f"  Reconciled strike for {item.issue}")
 
     return {"title": item.title, "entry_id": entry_id, "struck": True, **out.to_dict()}
 
@@ -4587,26 +3503,21 @@ def strike_entry(
 
 
 def normalize_items(dry_run: bool = False, output: Output | None = None) -> dict[str, int | bool | list[str]]:
-    """Rewrite per-item files to research-style metadata, remove body duplication.
+    """Normalize all work items through the configured backend.
 
     Returns:
         Dict with count of normalized items.
     """
     out = output or Output()
-    if not _models.get_backlog_dir().exists():
-        msg = f"{_models.get_backlog_dir()} not found"
-        raise BacklogError(msg)
-    pattern = re.compile(r"^(p0|p1|p2|ideas|completed)-[a-z0-9-]+\.(md|yaml)$", re.IGNORECASE)
-    yaml_files = list(_models.get_backlog_dir().glob("*.yaml"))
-    md_files = list(_models.get_backlog_dir().glob("*.md"))
-    yaml_stems = {f.stem for f in yaml_files}
-    all_candidate_files = yaml_files + [f for f in md_files if f.stem not in yaml_stems]
-    files = sorted(f for f in all_candidate_files if pattern.match(f.name))
-    if not files:
-        out.info("No backlog item files found")
+    items = get_config().backend.list_work_items()
+    if not items:
+        out.info("No backlog items found")
         return {"normalized": 0, **out.to_dict()}
-    updated = sum(1 for f in files if _normalize_item_file(f, dry_run, output=out))
-    out.info(f"Normalized {updated} item file(s)" + (" [dry-run]" if dry_run else ""))
+    if not dry_run:
+        for item in items:
+            get_config().backend.put_work_item(item)
+    updated = len(items)
+    out.info(f"Normalized {updated} item(s)" + (" [dry-run]" if dry_run else ""))
     return {"normalized": updated, "dry_run": dry_run, **out.to_dict()}
 
 
@@ -4636,102 +3547,15 @@ def _issue_fields_to_metadata(fields: IssueLocalFields) -> dict[str, str | list[
 # ---------------------------------------------------------------------------
 
 
-def _write_issue_node_to_cache(
-    issue_node: IssueNode, issue_num: int, out: Output, filepath: Path | None = None, diff_mode: bool = False
-) -> tuple[Path | None, str]:
-    """Write or update the local cache file for an already-fetched IssueNode.
-
-    Extracted from pull_single_issue so that bulk sync callers can reuse this
-    logic without a redundant per-issue GraphQL round-trip.
-
-    Args:
-        issue_node: IssueNode TypedDict already fetched from GraphQL.
-        issue_num: GitHub issue number (used for frontmatter and messages).
-        out: Output collector for messages and warnings.
-        filepath: Local path to write. If None, derived from issue title and priority.
-        diff_mode: When True, computes a unified diff of old vs new body content.
-
-    Returns:
-        Tuple of (filepath written or None on error, diff string or empty string).
-    """
-    fields = issue_to_local_fields(issue_node)
-    # Strip conventional-commit prefix from title (e.g., "feat: Title" -> "Title")
-    clean_title = _COMMIT_PREFIX_RE.sub("", fields.title).strip()
-
-    if filepath is None:
-        slug = title_to_slug(clean_title)
-        filename = f"{fields.priority.lower()}-{slug}.yaml"
-        filepath = _models.get_backlog_dir() / filename
-
-    _models.get_backlog_dir().mkdir(parents=True, exist_ok=True)
-
-    diff_str = ""
-    if filepath.exists():
-        # Capture old body before update when diff is requested
-        old_body = ""
-        if diff_mode:
-            old_text = filepath.read_text(encoding="utf-8")
-            parts = old_text.split("---", 2)
-            old_body = parts[2].strip() if len(parts) >= MIN_FRONTMATTER_PARTS else old_text
-        # Update existing file: overwrite description, body, metadata
-        update_item_metadata(
-            filepath,
-            {
-                "name": clean_title,
-                "description": extract_description_from_issue_body(fields.body),
-                "metadata": {
-                    "issue": f"#{issue_num}",
-                    "priority": fields.priority,
-                    "type": fields.item_type,
-                    "status": fields.status,
-                    "last_synced": now_iso(),
-                    **_issue_fields_to_metadata(fields),
-                },
-            },
-            output=out,
-        )
-        # Overwrite body sections from GitHub issue body
-        _overwrite_body_from_github(filepath, fields.body)
-        if diff_mode:
-            diff_str = generate_diff(old_body, fields.body)
-    else:
-        # Create new cache file from GitHub issue as YAML
-        remote_item = parse_issue_body_sync(fields.body)
-        new_item = BacklogItem(
-            title=clean_title,
-            description=extract_description_from_issue_body(fields.body),
-            source=f"GitHub Issue #{issue_num}",
-            added=today(),
-            priority=fields.priority,
-            item_type=fields.item_type,
-            status=fields.status,
-            issue=f"#{issue_num}",
-            sections=remote_item.sections,
-        )
-        new_item.metadata.last_synced = now_iso()
-        for attr, val in _issue_fields_to_metadata(fields).items():
-            setattr(new_item.metadata, attr, val)
-        new_item.file_path = str(filepath)
-        save_item(new_item)
-
-    return filepath, diff_str
-
-
 def pull_single_issue(
-    repo_obj: Repository,
-    issue_num: int,
-    filepath: Path | None = None,
-    output: Output | None = None,
-    diff_mode: bool = False,
-) -> dict[str, Path | str | list[str] | None]:
-    """Fetch a GitHub issue and write/update the local cache file.
+    issue_num: int, output: Output | None = None, diff_mode: bool = False
+) -> dict[str, str | list[str] | None]:
+    """Reconcile one GitHub issue through the configured sync backend.
 
     If filepath is None, derives it from the issue title and priority.
 
     Args:
-        repo_obj: PyGitHub Repository object.
         issue_num: GitHub issue number to fetch.
-        filepath: Local path to write. If None, derived from issue title and priority.
         output: Optional Output collector for messages and warnings.
         diff_mode: When True, computes a unified diff of old vs new body content and
             includes it in the return dict under the ``"diff"`` key.
@@ -4742,27 +3566,24 @@ def pull_single_issue(
         content was unchanged).
     """
     out = output or Output()
-
-    try:
-        owner, repo_name = repo_obj.full_name.split("/", 1)
-        issue_node = _fetch_issue_graphql(repo_obj, owner, repo_name, issue_num)
-    except BacklogError as e:
-        out.warn(f"  WARNING: Could not fetch issue #{issue_num}: {e}")
+    backend = get_config().backend
+    if not isinstance(backend, SyncProvider):
+        out.info("Active backend does not support reconciliation.")
         return {"file_path": None, **out.to_dict()}
-
-    written_path, diff_str = _write_issue_node_to_cache(
-        issue_node, issue_num, out, filepath=filepath, diff_mode=diff_mode
+    reference = f"#{issue_num}"
+    reconciliation = backend.reconcile(
+        ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff_mode)
     )
-    result: dict[str, Path | str | list[str] | None] = {"file_path": written_path, **out.to_dict()}
+    result: dict[str, str | list[str] | None] = {"file_path": reconciliation.file_paths.get(reference), **out.to_dict()}
     if diff_mode:
-        result["diff"] = diff_str
+        result["diff"] = reconciliation.diffs.get(reference, "")
     return result
 
 
 def pull_by_selector(
     selector: str, repo: str = "", output: Output | None = None, diff: bool = False
 ) -> dict[str, str | list[str] | None]:
-    """Pull a single GitHub issue into the local cache by selector.
+    """Pull a single GitHub issue into the provider-backed record by selector.
 
     Supports issue number selectors (#N, bare number, URL) and title substrings.
     For issue number selectors, fetches directly from GitHub.
@@ -4781,47 +3602,52 @@ def pull_by_selector(
         optionally 'diff' (unified diff string) when diff=True.
 
     Raises:
-        ItemNotFoundError: If selector matches no item in the local cache.
+        ItemNotFoundError: If selector matches no item in the provider-backed record.
         BacklogError: If matched item has no linked GitHub issue.
     """
     out = output or Output()
     issue_num_str = parse_issue_selector(selector)
-    if issue_num_str:
-        result = pull_single_issue(get_github(repo), int(issue_num_str), output=out, diff_mode=diff)
-        filepath = result.get("file_path")
-        ret: dict[str, str | list[str] | None] = {"file_path": str(filepath) if filepath else None, **out.to_dict()}
-        if diff and "diff" in result:
-            ret["diff"] = str(result["diff"])
+    if not issue_num_str:
+        # Title substring: find item in provider-backed record then pull by its issue number
+        items = get_config().backend.list_work_items()
+        item = find_item(items, selector)
+        if item is None:
+            raise ItemNotFoundError(selector)
+
+        issue_ref = item.issue
+        if not issue_ref:
+            msg = f"Item '{item.title}' has no linked GitHub issue. Use backlog_pull() for bulk pull."
+            raise BacklogError(msg)
+
+        issue_num_str = parse_issue_selector(issue_ref)
+        if not issue_num_str:
+            msg = f"Could not parse issue number from '{issue_ref}'"
+            raise BacklogError(msg)
+
+    reference = f"#{int(issue_num_str)}"
+    backend = get_config().backend
+    if isinstance(backend, SyncProvider):
+        result = backend.reconcile(
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff)
+        )
+        out.info(
+            f"Reconciled targeted item: {result.fetched_pages} pages, {result.fetched_items} items, "
+            f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
+            f"{result.conflicts} conflicts, {result.failures} failures."
+        )
+        ret: dict[str, str | list[str] | None] = {"file_path": result.file_paths.get(reference), **out.to_dict()}
+        if diff and (changed_diff := result.diffs.get(reference)) is not None:
+            ret["diff"] = changed_diff
         return ret
 
-    # Title substring: find item in local cache then pull by its issue number
-    items = parse_backlog()
-    item = find_item(items, selector)
-    if item is None:
-        raise ItemNotFoundError(selector)
-
-    issue_ref = item.issue
-    if not issue_ref:
-        msg = f"Item '{item.title}' has no linked GitHub issue. Use backlog_pull() for bulk pull."
-        raise BacklogError(msg)
-
-    issue_num_str = parse_issue_selector(issue_ref)
-    if not issue_num_str:
-        msg = f"Could not parse issue number from '{issue_ref}'"
-        raise BacklogError(msg)
-
-    result = pull_single_issue(get_github(repo), int(issue_num_str), output=out, diff_mode=diff)
-    filepath = result.get("file_path")
-    ret = {"file_path": str(filepath) if filepath else None, **out.to_dict()}
-    if diff and "diff" in result:
-        ret["diff"] = str(result["diff"])
-    return ret
+    out.info("Active backend does not support reconciliation.")
+    return {"file_path": None, **out.to_dict()}
 
 
 def pull_items(
     repo: str = "", dry_run: bool = False, force: bool = False, diff: bool = False, output: Output | None = None
 ) -> dict[str, int | bool | str | list[str]]:
-    """Pull issue body content from GitHub into local per-item files.
+    """Reconcile linked issue content through the configured sync backend.
 
     Also auto-migrates P0/P1 items that lack GitHub Issues by creating them.
     Merges by section — keeps longer version of each section.
@@ -4831,15 +3657,17 @@ def pull_items(
         Dict with count of pulled items.
     """
     out = output or Output()
-    items = parse_backlog()
+    items = get_config().backend.list_work_items()
 
     # Auto-migration: create missing GitHub Issues for P0/P1 items
-    items_without_issues = [it for it in items if it.section in {"P0", "P1"} and not it.skip and not it.issue]
-    if items_without_issues:
-        out.info(f"Auto-migrating {len(items_without_issues)} P0/P1 item(s) to GitHub Issues...")
+    if any(it.section in {"P0", "P1"} and not it.skip and not it.issue for it in items):
+        out.info(
+            f"Auto-migrating {sum(it.section in {'P0', 'P1'} and not it.skip and not it.issue for it in items)} "
+            "P0/P1 item(s) to GitHub Issues..."
+        )
         sync_create_missing_issues(items, repo, dry_run, output=out)
         # Re-parse after migration to pick up updated issue numbers
-        items = parse_backlog()
+        items = get_config().backend.list_work_items()
 
     candidates = [it for it in items if it.issue and not it.skip]
 
@@ -4847,69 +3675,46 @@ def pull_items(
         out.info("No items with GitHub issue numbers found.")
         return {"pulled": 0, **out.to_dict()}
 
-    total = len(candidates)
-    out.info(f"Checking {total} item(s) with GitHub issues...")
-    repository = get_github(repo)
-    pulled = 0
-    skipped = 0
-    diff_parts: list[str] = []
-    for item in candidates:
-        was_pulled, had_error, diff_str = _pull_item(item, repository, dry_run, force, diff_mode=diff, output=out)
-        if was_pulled:
-            pulled += 1
-        elif had_error:
-            skipped += 1
-        if diff_str:
-            diff_parts.append(diff_str)
+    backend = get_config().backend
+    if isinstance(backend, SyncProvider):
+        result = backend.reconcile(
+            ReconcileRequest(
+                scope=ReconcileScope.LINKED,
+                references=list(dict.fromkeys(item.issue for item in candidates)),
+                dry_run=dry_run,
+                force=force,
+                include_diff=diff,
+            )
+        )
+        out.info(
+            f"Reconciled linked items: {result.fetched_pages} pages, {result.fetched_items} items, "
+            f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
+            f"{result.conflicts} conflicts, {result.failures} failures."
+        )
+        if diff and result.diffs:
+            return {
+                "pulled": result.local_updates,
+                "skipped": result.failures,
+                "total": len(candidates),
+                "dry_run": dry_run,
+                "diff": "\n".join(result.diffs.values()),
+                **out.to_dict(),
+            }
+        return {
+            "pulled": result.local_updates,
+            "skipped": result.failures,
+            "total": len(candidates),
+            "dry_run": dry_run,
+            **out.to_dict(),
+        }
 
-    if pulled == 0 and skipped == 0:
-        out.info("Nothing to pull — local files are up to date.")
-    else:
-        suffix = " [dry-run]" if dry_run else ""
-        parts = [f"Pulled {pulled} of {total} item(s){suffix}"]
-        if skipped:
-            parts.append(f"{skipped} skipped due to fetch errors")
-        out.info(", ".join(parts) + ".")
-
-    result: dict[str, int | bool | str | list[str]] = {
-        "pulled": pulled,
-        "skipped": skipped,
-        "total": total,
-        "dry_run": dry_run,
-        **out.to_dict(),
-    }
-    if diff and diff_parts:
-        result["diff"] = "\n".join(diff_parts)
-    return result
+    out.info("Active backend does not support reconciliation.")
+    return {"pulled": 0, "skipped": 0, "total": len(candidates), "dry_run": dry_run, **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------
 # Public API: SAM TASK OPERATIONS
 # ---------------------------------------------------------------------------
-
-
-def _write_sam_task_cache(tasks: list[dict[str, object]], parent_issue_number: int) -> bool:
-    """Write SAM task list to ``~/.claude/context/sam-tasks-{feature_slug}.json``.
-
-    Returns:
-        True when the cache file was written, False when no feature slug
-        could be derived from the task list and the write was skipped.
-    """
-    feature_slug = _extract_feature_slug(tasks)
-    if not feature_slug:
-        return False
-    cache_dir = _dh_paths.context_dir()
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / f"sam-tasks-{feature_slug}.json"
-    payload = {
-        "feature_slug": feature_slug,
-        "parent_issue_number": parent_issue_number,
-        "synced_at": now_iso(),
-        "count": len(tasks),
-        "tasks": tasks,
-    }
-    cache_file.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    return True
 
 
 def _sub_issues_to_task_dicts(sub_issues: list[IssueNode]) -> list[dict[str, object]]:
@@ -4995,71 +3800,104 @@ def create_sam_task(
 
 
 def get_sam_tasks(
-    parent_issue_number: int, refresh_cache: bool = True, repo: str = "", output: Output | None = None
-) -> SamTasksResult:
-    """Fetch all SAM task sub-issues for a parent story issue.
-
-    When GitHub is unavailable, falls back to the local cache file
-    ``~/.claude/context/sam-tasks-{feature_slug}.json``.
+    parent_issue_number: int | str, refresh_cache: bool = True, repo: str = "", output: Output | None = None
+) -> _SamTaskLookupResult:
+    """Return SAM tasks from plans owned by a backend work item.
 
     Args:
-        parent_issue_number: Issue number of the parent story (without ``#``).
-        refresh_cache: Write cache file after a successful GitHub fetch when ``True``.
-        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
+        parent_issue_number: Native parent work-item reference.
+        refresh_cache: Retained for caller compatibility; providers own refresh policy.
+        repo: Retained for caller compatibility; the configured backend owns location.
         output: Optional Output collector.
 
     Returns:
-        Dict with ``tasks`` (list of task dicts), ``count``, ``parent_issue_number``,
-        and output messages.
+        SAM task rows plus explicit provider availability and freshness metadata.
     """
     out = output or Output()
-
-    gh_repo = try_get_github(repo)
-    if gh_repo is None:
-        # Offline fallback: scan cache directory for any matching cache file
-        cache_dir = _dh_paths.context_dir()
-        cache_files = list(cache_dir.glob("sam-tasks-*.json")) if cache_dir.exists() else []
-        # Try all cache files; find one that has the right parent_issue_number
-        for cache_file in cache_files:
-            try:
-                cached: dict[str, object] = json.loads(cache_file.read_text(encoding="utf-8"))
-                if cached.get("parent_issue_number") == parent_issue_number:
-                    out.warn(f"  WARNING: GitHub unavailable — returning cached tasks from {cache_file.name}")
-                    cached_tasks_raw = cached.get("tasks", [])
-                    cached_tasks: list[dict[str, object]] = [
-                        {str(k): v for k, v in item.items()}
-                        for item in (cached_tasks_raw if isinstance(cached_tasks_raw, list) else [])
-                        if isinstance(item, dict)
-                    ]
-                    count_raw = cached.get("count", len(cached_tasks))
-                    return {
-                        "tasks": cached_tasks,
-                        "count": int(count_raw) if isinstance(count_raw, int) else len(cached_tasks),
-                        "parent_issue_number": parent_issue_number,
-                        "messages": out.messages,
-                        "warnings": out.warnings,
-                        "errors": out.errors,
-                    }
-            except (json.JSONDecodeError, OSError):
-                continue
-        out.warn(f"  WARNING: GitHub unavailable and no cache found for parent #{parent_issue_number}")
+    _ = refresh_cache, repo
+    backend = get_config().backend
+    if not isinstance(backend, ContentProvider):
+        out.error("Active backend does not support SAM task content")
         return {
             "tasks": [],
             "count": 0,
             "parent_issue_number": parent_issue_number,
+            "stale": False,
+            "pending": False,
+            "unavailable": True,
             "messages": out.messages,
             "warnings": out.warnings,
             "errors": out.errors,
         }
 
-    sub_issues = get_task_issues(gh_repo, parent_issue_number, output=out)
-    tasks = _sub_issues_to_task_dicts(sub_issues)
-    if refresh_cache and tasks and not _write_sam_task_cache(tasks, parent_issue_number):
-        out.warn("  WARNING: Could not write SAM task cache — no feature slug found in tasks")
+    parent = str(parent_issue_number)
+    owner_references = {parent, f"#{parent}"} if isinstance(parent_issue_number, int) else {parent}
+    for item in backend.list_work_items():
+        if parent in {item.reference.lstrip("#"), item.issue.lstrip("#")}:
+            owner_references.update(reference for reference in (item.reference, item.issue) if reference)
+
+    records = {}
+    try:
+        for owner_reference in owner_references:
+            for record in backend.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference=owner_reference)):
+                records[record.reference.name] = record
+    except ContentUnavailableError as exc:
+        out.error(str(exc))
+        return {
+            "tasks": [],
+            "count": 0,
+            "parent_issue_number": parent_issue_number,
+            "stale": False,
+            "pending": False,
+            "unavailable": True,
+            "messages": out.messages,
+            "warnings": out.warnings,
+            "errors": out.errors,
+        }
+
+    tasks: list[_SamTaskRow] = []
+    stale = any(record.stale for record in records.values())
+    pending = any(record.pending for record in records.values())
+    try:
+        plans = [Plan.model_validate_json(record.content) for record in records.values()]
+    except ValueError as exc:
+        out.error(f"SAM task content is invalid: {exc}")
+        return {
+            "tasks": [],
+            "count": 0,
+            "parent_issue_number": parent_issue_number,
+            "stale": stale,
+            "pending": pending,
+            "unavailable": True,
+            "messages": out.messages,
+            "warnings": out.warnings,
+            "errors": out.errors,
+        }
+    for plan in plans:
+        tasks.extend(
+            {
+                "task_id": task.id,
+                "feature": plan.feature,
+                "status": task.status,
+                "agent": task.agent or "",
+                "priority": int(task.priority),
+                "skills": task.skills,
+                "dependencies": task.dependencies,
+                "issue_number": task.github_issue or 0,
+                "issue_url": "",
+                "title": task.title,
+            }
+            for task in plan.tasks
+        )
+    if stale:
+        out.warn("SAM tasks were served from provider-owned stale content")
     return {
         "tasks": tasks,
         "count": len(tasks),
         "parent_issue_number": parent_issue_number,
+        "stale": stale,
+        "pending": pending,
+        "unavailable": False,
         "messages": out.messages,
         "warnings": out.warnings,
         "errors": out.errors,
@@ -5145,7 +3983,11 @@ def get_ready_sam_tasks(
     out = output or Output()
     tasks_result = get_sam_tasks(parent_issue_number, refresh_cache=True, repo=repo, output=out)
     tasks_raw = tasks_result.get("tasks", [])
-    tasks: list[dict[str, object]] = tasks_raw if isinstance(tasks_raw, list) else []
+    tasks = (
+        [{str(key): value for key, value in task.items()} for task in tasks_raw if isinstance(task, dict)]
+        if isinstance(tasks_raw, list)
+        else []
+    )
     feature_slug = _extract_feature_slug(tasks)
     status_by_id = _build_task_status_map(tasks)
     ready: list[dict[str, object]] = [

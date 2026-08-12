@@ -51,6 +51,7 @@ from sam_schema.core.task_backend_types import (
 )
 
 _PLAN_UPDATE_TA: TypeAdapter[_PlanFieldsUpdate] = TypeAdapter(_PlanFieldsUpdate)
+_PLAN_UPDATE_TA.rebuild(_types_namespace={"PlanState": PlanState})
 _TASK_UPDATE_TA: TypeAdapter[_TaskFieldsUpdate] = TypeAdapter(_TaskFieldsUpdate)
 
 # All valid TaskStatus values.

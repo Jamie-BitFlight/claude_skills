@@ -130,6 +130,23 @@ class InMemoryBackend:
         self._branches: dict[str, BranchInfo] = {}
 
         self._content: dict[tuple[str, str, str, str], ContentRecord] = {}
+        self._work_items: dict[str, BacklogItem] = {}
+
+    def list_work_items(self) -> list[BacklogItem]:
+        """List native in-memory work items."""
+        return list(self._work_items.values())
+
+    def get_work_item(self, reference: str) -> BacklogItem:
+        """Get a work item by its stable reference."""
+        try:
+            return self._work_items[reference]
+        except KeyError:
+            raise KeyError(reference) from None
+
+    def put_work_item(self, item: BacklogItem) -> None:
+        """Upsert a work item under its stable reference."""
+        item.reference = item.reference or item.issue or uuid.uuid4().hex
+        self._work_items[item.reference] = item
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return the requested bounded page from in-memory content."""
@@ -137,7 +154,7 @@ class InMemoryBackend:
             record
             for record in self._content.values()
             if record.reference.kind == query.kind
-            and record.owner_reference == query.owner_reference
+            and (query.owner_reference is None or record.owner_reference == query.owner_reference)
             and query.search.casefold() in record.reference.name.casefold()
         ]
         records.sort(
@@ -160,7 +177,7 @@ class InMemoryBackend:
         if request.expected_revision and request.expected_revision != current_revision:
             raise ContentConflictError("Content revision no longer matches")
         owner_reference = request.reference.namespace
-        if request.reference.kind == ContentKind.PLAN:
+        if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
             owner_reference = (
                 request.owner_reference
                 if request.owner_reference is not None
@@ -299,7 +316,6 @@ class InMemoryBackend:
         milestone_number: int | None = None,
         since: datetime | None = None,
         callback: Callable[[IssueNode], None] | None = None,
-        track_timestamp: bool = False,
     ) -> list[IssueNode]:
         """Return stored issues, calling callback for each."""
         issues = self._fetch_issues_graphql(

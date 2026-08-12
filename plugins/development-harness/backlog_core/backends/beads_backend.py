@@ -178,8 +178,7 @@ class BeadsBackend:
     - ``supports_batch_issue_update = False`` — beads does not expose GraphQL.
     - ``issue_id_type = "string"`` — beads issues are identified by string
       nanoids (e.g. ``"bd-a3f8"``).  When ``item.issue`` is absent, the item
-      title is used as the selector.  The list command skips live batch-status
-      fetch and relies on the local YAML cache instead.
+      title is used as the selector.
     - ``supports_branches = False`` — beads does not manage git branches;
       callers must check this flag before invoking ``BranchBackend`` methods.
 
@@ -201,6 +200,52 @@ class BeadsBackend:
         """Store the runner; do not touch the filesystem or spawn processes."""
         self._runner: _BdRunnerLike = runner if runner is not None else BdRunner()
 
+    def list_work_items(self) -> list[BacklogItem]:
+        """List work items projected from native Beads issues."""
+        issues = parse_issue_list(self._runner.run_json(["list", "--all"]))
+        items: list[BacklogItem] = []
+        for issue in issues:
+            try:
+                item = BacklogItem.model_validate_json(issue.notes or "")
+            except (ValidationError, ValueError):
+                item = BacklogItem(title=issue.title)
+            item.title = issue.title
+            item.description = issue.description or item.description
+            item.issue = issue.id
+            item.reference = issue.id
+            item.status = issue.status.value
+            item.priority = f"P{int(issue.priority)}"
+            item.item_type = issue.type.value
+            items.append(item)
+        return items
+
+    def get_work_item(self, reference: str) -> BacklogItem:
+        """Get a native Beads issue by its nanoid reference."""
+        for item in self.list_work_items():
+            if reference == item.reference:
+                return item
+        raise KeyError(reference)
+
+    def put_work_item(self, item: BacklogItem) -> None:
+        """Upsert canonical work-item content on a native Beads issue."""
+        if not item.issue:
+            item.issue = self.create_beads_issue_for_item(item) or ""
+        if not item.issue:
+            raise ContentUnavailableError("Beads work item could not be created")
+        item.reference = item.issue
+        self._runner.run_text([
+            "update",
+            item.issue,
+            "--title",
+            item.title,
+            "--description",
+            item.description,
+            "--notes",
+            item.model_dump_json(),
+            "--status",
+            item.status,
+        ])
+
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return the requested bounded page from the native Beads KV store."""
         try:
@@ -221,7 +266,7 @@ class BeadsBackend:
                 raise ContentUnavailableError("Beads content store returned an invalid record") from exc
             if (
                 record.reference.kind == query.kind
-                and record.owner_reference == query.owner_reference
+                and (query.owner_reference is None or record.owner_reference == query.owner_reference)
                 and query.search.casefold() in record.reference.name.casefold()
             ):
                 records.append(record)
@@ -244,7 +289,7 @@ class BeadsBackend:
         if request.expected_revision and request.expected_revision != current_revision:
             raise ContentConflictError("Content revision no longer matches")
         owner_reference = request.reference.namespace
-        if request.reference.kind == ContentKind.PLAN:
+        if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
             owner_reference = (
                 request.owner_reference
                 if request.owner_reference is not None

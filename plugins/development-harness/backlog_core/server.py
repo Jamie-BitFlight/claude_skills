@@ -30,23 +30,25 @@ from pydantic import Field
 from ruamel.yaml import YAML as _YAML
 
 from . import models as _models, sync_engine as _sync_engine
-from .artifact_migration import migrate_dry_run, migrate_live_run
-from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
-from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
-from .backend_types import GitHubExtras, IssueNode as _IssueNode
+from .backend_types import ContentProvider, GitHubExtras, IssueNode as _IssueNode, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
 from .models import (
     ArtifactContent,
     ArtifactEntry,
+    ArtifactManifest,
     ArtifactStatus,
     ArtifactType,
     BackendAvailability as _BackendAvailability,
     BackendStatus as _BackendStatus,
     BacklogError,
+    ContentKind,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
     DispatchItemRecord as _DispatchItemRecord,
     DispatchSpawnSummary as _DispatchSpawnSummary,
     DispatchWaveRecord as _DispatchWaveRecord,
@@ -64,6 +66,7 @@ if TYPE_CHECKING:
     from .operations import ImpactRadiusItem as _ImpactRadiusItem
 
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
+ItemId: TypeAlias = int | str
 
 # Module-level logger for done-callback exception reporting.
 # Named _sync_task_log so tests can patch backlog_core.server._sync_task_log.
@@ -1551,7 +1554,7 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
     #   if RUNNING is already set (second lifespan entry) we skip create_task so
     #   only one background sync task runs per process lifetime.
     global _active_startup_sync_task  # ruff: ignore[global-statement]
-    if _startup_sync_enabled() and state.try_start():
+    if _startup_sync_enabled() and isinstance(_get_config().backend, SyncProvider) and state.try_start():
         bg_task: asyncio.Task[None] | None = asyncio.create_task(_sync_engine._startup_sync_loop(state))
         _register_bg_task(bg_task)
         # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
@@ -1618,7 +1621,9 @@ async def sync_status() -> dict[str, object]:
     )
 )
 async def sync_now(
-    full_refresh: Annotated[bool, Field(description="Ignore .last_sync timestamp and do a full two-pass sync")] = False,
+    full_refresh: Annotated[
+        bool, Field(description="Ignore the provider checkpoint and perform a full reconciliation")
+    ] = False,
 ) -> dict[str, object]:
     """Trigger an immediate background sync or return progress of an in-flight sync.
 
@@ -1629,8 +1634,8 @@ async def sync_now(
     fresh sync.
 
     Args:
-        full_refresh: When True, ignore any cached .last_sync timestamp and
-            perform a full two-pass sync (open then closed issues).
+        full_refresh: When True, ignore the provider checkpoint and perform a
+            full reconciliation.
 
     Returns:
         Dict with fields:
@@ -1639,6 +1644,12 @@ async def sync_now(
             messages (list[str]): Informational messages about the action taken.
     """
     state = get_sync_state()
+    if not isinstance(_get_config().backend, SyncProvider):
+        return {
+            "triggered": False,
+            "sync_state": state.to_dict(),
+            "messages": ["Active backend does not support reconciliation."],
+        }
 
     # Reset terminal states so the new attempt starts fresh.  Done before the
     # claim so the returned snapshot reflects the fresh RUNNING state, not the
@@ -1686,7 +1697,7 @@ async def backlog_add(
         ),
     ] = None,
 ) -> dict:
-    """Add a new item to the backlog. Creates a per-item file and a GitHub issue.
+    """Add a new item through the configured backend and optionally create its native issue.
 
     Use priority P0 for must-have, P1 for should-have, P2 for could-have,
     or Ideas for exploratory items.
@@ -2995,7 +3006,7 @@ async def backlog_groom(
         ),
     ] = False,
 ) -> dict:
-    """Write groomed content into a backlog item's per-item file and sync to its GitHub issue.
+    """Write groomed content through the configured backend and sync its linked GitHub issue.
 
     Provide section + content for section updates. Use entry_id to replace
     a specific entry, or replace_section=True to strike all entries and
@@ -3051,7 +3062,7 @@ async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
 ) -> dict:
-    """Normalize all per-item files to research-style metadata format and remove body duplication.
+    """Normalize all work items through the configured backend.
 
     This is a one-off maintenance operation. Use dry_run=true to preview
     what would change.
@@ -3093,7 +3104,7 @@ async def backlog_pull(
     ] = False,
     diff: Annotated[bool, Field(description="Include entry-level diff output showing local vs remote changes")] = False,
 ) -> dict:
-    """Pull issue body content from GitHub into local per-item files.
+    """Reconcile linked issue content through the configured sync backend.
 
     When selector is provided, pulls a single issue by #N, bare number,
     GitHub URL, or title substring. When omitted, pulls all issues.
@@ -3183,14 +3194,16 @@ async def backlog_create_sam_task(
     )
 )
 async def backlog_get_sam_tasks(
-    parent_issue_number: Annotated[int, Field(description="Parent story issue number (GitHub issue integer)")],
-    refresh_cache: Annotated[bool, Field(description="Write updated cache after fetching")] = True,
+    parent_issue_number: Annotated[
+        int | str, Field(description="Parent work-item reference (GitHub issue integer or provider-native string)")
+    ],
+    refresh_cache: Annotated[
+        bool, Field(description="Compatibility flag; the configured provider owns refresh")
+    ] = True,
 ) -> dict:
-    """Return all SAM task sub-issues for a parent story issue.
+    """Return SAM tasks owned by a configured-backend work item.
 
-    Returns tasks list with SamTask fields plus issue_number and issue_url.
-    Falls back to local cache if GitHub is unavailable.
-    Use to inspect per-task status from the GitHub source of truth.
+    Returns tasks plus explicit provider freshness and availability state.
     """
     out = Output()
     try:
@@ -3239,11 +3252,9 @@ async def backlog_update_sam_task_status(
 # ---------------------------------------------------------------------------
 
 _artifact_registry = ArtifactRegistry()
+
+
 # TODO(H05): Move to FastMCP lifespan context — eliminate module-level singleton.
-_artifact_provider: ArtifactBackend | None = None
-_artifact_provider_warning: str | None = None
-
-
 def _require_artifact_entries(entries: list, label: str) -> None:
     """Raise BacklogError when no artifact entries are found.
 
@@ -3258,38 +3269,28 @@ def _require_artifact_entries(entries: list, label: str) -> None:
         raise BacklogError(label)
 
 
-def _get_artifact_provider() -> ArtifactBackend:
-    """Return (or lazily create) the ArtifactBackend singleton.
+def _get_artifact_provider() -> ContentProvider:
+    provider = _get_config().backend
+    if not isinstance(provider, ContentProvider):
+        raise ContentUnavailableError("Active backend does not support artifact content")
+    return provider
 
-    Deferred so the provider is created after ``_init_models()`` has resolved
-    the repo slug and project root from the ``--project-dir`` argument.
 
-    When the configured remote backend is unavailable or unconfigured, falls
-    back to :class:`~backlog_core.artifact_provider_local.LocalFilesystemArtifactProvider`
-    and sets ``_artifact_provider_warning`` so every artifact MCP tool surfaces
-    the degraded-mode notice to callers.
+def _manifest_reference(item_id: ItemId) -> ContentRef:
+    return ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=str(item_id), name="manifest")
 
-    Returns:
-        Initialised ``ArtifactBackend`` instance.  Never raises — falls back
-        to the local filesystem provider when the remote backend fails to
-        initialise.
-    """
-    global _artifact_provider, _artifact_provider_warning  # ruff: ignore[global-statement]
-    if _artifact_provider is not None:
-        return _artifact_provider
-    provider: ArtifactBackend
-    repo = _models.get_default_repo()
-    if not repo:
-        provider = LocalFilesystemArtifactProvider(root_worktree=_dh_paths.git_project_root())
-    else:
-        try:
-            provider = create_artifact_provider(repo=repo, root_worktree=_models.get_repo_root())
-        except (GitHubUnavailableError, BacklogError):
-            provider = LocalFilesystemArtifactProvider(root_worktree=_dh_paths.git_project_root())
-    _artifact_provider = provider
-    if isinstance(provider, LocalFilesystemArtifactProvider):
-        _artifact_provider_warning = "Artifacts stored in local filesystem provider. Remote sync unavailable."
-    return _artifact_provider
+
+def _load_manifest(provider: ContentProvider, item_id: ItemId) -> ArtifactManifest:
+    try:
+        return ArtifactManifest.model_validate_json(provider.get_content(_manifest_reference(item_id)).content)
+    except ContentUnavailableError:
+        return ArtifactManifest(issue_number=item_id)
+
+
+def _save_manifest(provider: ContentProvider, manifest: ArtifactManifest) -> None:
+    provider.put_content(
+        ContentWrite(reference=_manifest_reference(manifest.issue_number), content=manifest.model_dump_json())
+    )
 
 
 @mcp.tool(
@@ -3329,30 +3330,21 @@ async def artifact_register(
         str | None,
         Field(
             description=(
-                "Optional artifact content to store as a GitHub issue comment. "
-                "When provided the content is stored in a collapsible comment identified by type+path. "
-                "When omitted only the manifest entry is registered (backward-compatible)."
+                "Optional artifact body written through the selected content provider. "
+                "When omitted only the manifest entry is registered."
             )
         ),
     ] = None,
 ) -> dict:
-    """Upsert an artifact entry in the manifest for a GitHub issue.
+    """Upsert an artifact entry in provider-owned logical content.
 
     Idempotent by (artifact_type, artifact_id). If an entry with the same type and
     artifact_id already exists it is updated in-place (status, agent, timestamp).
     If only the type matches but the artifact_id differs, a new row is added.
 
-    Content upload follows three-tier resolution:
-
-    1. **Explicit content** — when *content* is provided, it is uploaded
-       directly to a structured GitHub issue comment so it can be retrieved
-       via ``artifact_read`` even from worktree-isolated agents.
-    2. **Auto-read from local file** — when *content* is ``None`` but a local
-       file exists at *artifact_id* (resolved against the root worktree), the
-       file is read automatically and uploaded as in tier 1.
-    3. **Manifest-only** — when *content* is ``None`` and no local file exists,
-       the manifest entry is registered without content storage.  A warning is
-       emitted so callers can detect the gap.
+    When *content* is provided, it is written under the selected backend's
+    logical artifact-content reference. When it is omitted, only the manifest
+    entry is registered.
 
     Returns:
         Dict with registered (bool), artifact_count (int), action (str),
@@ -3362,8 +3354,6 @@ async def artifact_register(
     out = Output()
     try:
         provider = _get_artifact_provider()
-        if _artifact_provider_warning is not None:
-            out.warnings.append(_artifact_provider_warning)
         artifact_type_enum = ArtifactType(artifact_type)
         status_enum = ArtifactStatus(status)
         entry = ArtifactEntry(
@@ -3375,32 +3365,28 @@ async def artifact_register(
         )
 
         def _run() -> RegisterResult:
-            manifest = provider.get_manifest(item_id)
+            manifest = _load_manifest(provider, item_id)
             updated_manifest = _artifact_registry.register(manifest, entry)
-            provider.set_manifest(item_id, updated_manifest)
+            _save_manifest(provider, updated_manifest)
             # Determine action: "updated" if entry pre-existed, "added" otherwise.
             existed = any(
                 e.artifact_type == artifact_type_enum and e.artifact_id == artifact_id for e in manifest.artifacts
             )
             action = "updated" if existed else "added"
 
-            # Content upload — three-way resolution:
-            # 1. Explicit content provided → use it directly.
-            # 2. No explicit content but local file exists → read and upload.
-            # 3. Neither → register manifest entry only; emit a warning.
-            upload_content: str | None = content
-            if upload_content is None:
-                upload_content = provider.read_local_artifact_content(artifact_id)
-                if upload_content is None:
-                    out.warn(
-                        f"No content provided and no local file found at {artifact_id!r}. "
-                        "Manifest entry registered without content storage."
+            content_stored = content is not None
+            if content is not None:
+                provider.put_content(
+                    ContentWrite(
+                        reference=ContentRef(
+                            kind=ContentKind.ARTIFACT_CONTENT,
+                            namespace=str(item_id),
+                            artifact_type=artifact_type,
+                            name=artifact_id,
+                        ),
+                        content=content,
                     )
-
-            content_stored = False
-            if upload_content is not None:
-                provider.store_artifact_content(item_id, artifact_type, artifact_id, upload_content)
-                content_stored = True
+                )
 
             return RegisterResult(
                 registered=True,
@@ -3443,12 +3429,10 @@ async def artifact_list(
     out = Output()
     try:
         provider = _get_artifact_provider()
-        if _artifact_provider_warning is not None:
-            out.warnings.append(_artifact_provider_warning)
         type_filter: ArtifactType | None = ArtifactType(artifact_type) if artifact_type else None
 
         def _run() -> list[dict]:
-            manifest = provider.get_manifest(item_id)
+            manifest = _load_manifest(provider, item_id)
             if type_filter is not None:
                 entries = _artifact_registry.get_by_type(manifest, type_filter)
             else:
@@ -3489,12 +3473,10 @@ async def artifact_get(
     out = Output()
     try:
         provider = _get_artifact_provider()
-        if _artifact_provider_warning is not None:
-            out.warnings.append(_artifact_provider_warning)
         type_enum = ArtifactType(artifact_type)
 
         def _run() -> list[dict]:
-            manifest = provider.get_manifest(item_id)
+            manifest = _load_manifest(provider, item_id)
             entries = _artifact_registry.get_by_type(manifest, type_enum)
             return [e.model_dump(mode="json") for e in entries]
 
@@ -3522,33 +3504,23 @@ async def artifact_read(
     ],
     artifact_type: Annotated[str, Field(description="Artifact type whose content to read")],
 ) -> dict:
-    """Read the file content for an artifact registered on a backlog item.
+    """Read provider-owned logical content for a registered artifact.
 
-    Content retrieval order:
-
-    1. GitHub issue comments — searches for a stored artifact content comment
-       matching the artifact type and path.  This succeeds even when the local
-       filesystem file does not exist (e.g. from a worktree-isolated agent).
-    2. Local filesystem fallback — when no GitHub comment is found, resolves
-       the artifact path against the root worktree.
-
-    Path safety (filesystem path): the provider validates that the resolved
-    path is under the repository root (path traversal prevention).
+    The selected ContentProvider resolves the artifact by owner, type, and
+    logical identifier. This layer does not access local artifact files.
 
     Returns:
         Dict with type (str), path (str), content (str), status (str), and
-        output messages/warnings. Returns error key on type-not-found, path
-        safety violation, or when content is not found via either source.
+        output messages/warnings. Returns error key on type-not-found or when
+        the selected provider has no matching content.
     """
     out = Output()
     try:
         provider = _get_artifact_provider()
-        if _artifact_provider_warning is not None:
-            out.warnings.append(_artifact_provider_warning)
         type_enum = ArtifactType(artifact_type)
 
         def _run() -> ArtifactContent:
-            manifest = provider.get_manifest(item_id)
+            manifest = _load_manifest(provider, item_id)
             entries = _artifact_registry.get_by_type(manifest, type_enum)
             _require_artifact_entries(entries, f"No artifacts of type '{artifact_type}' found for item #{item_id}")
             # Sort by created_at desc so the most recently registered entry comes first.
@@ -3563,18 +3535,14 @@ async def artifact_read(
                     f"returning most recent ({entry.artifact_id!r}). Skipped: {skipped}"
                 )
 
-            # 1. Try GitHub comment storage first.
-            github_content = provider.read_artifact_content_from_remote(item_id, artifact_type, entry.artifact_id)
-            if github_content is not None:
-                return ArtifactContent(
-                    artifact_type=entry.artifact_type,
-                    path=entry.artifact_id,
-                    content=github_content,
-                    status=entry.status,
+            content = provider.get_content(
+                ContentRef(
+                    kind=ContentKind.ARTIFACT_CONTENT,
+                    namespace=str(item_id),
+                    artifact_type=artifact_type,
+                    name=entry.artifact_id,
                 )
-
-            # 2. Fall back to local filesystem.
-            content = provider.read_artifact_content(entry.artifact_id)
+            ).content
             return ArtifactContent(
                 artifact_type=entry.artifact_type, path=entry.artifact_id, content=content, status=entry.status
             )
@@ -3952,25 +3920,17 @@ async def backlog_create_project(
         return {"error": str(e), **out.to_dict()}
 
 
-def _dispatch_plan_path(milestone_number: int) -> Path:
-    """Return the canonical dispatch plan path for a milestone.
-
-    Delegates to :func:`dispatch_schema.dispatch_plan_path`, resolving the
-    project root from ``_models.BACKLOG_DIR``.
-
-    Args:
-        milestone_number: GitHub milestone number.
-
-    Returns:
-        Path to ``plan/milestone-{N}-dispatch.yaml`` under the project root.
-    """
-    # Use the git project root for dispatch plan path resolution.
-    # BACKLOG_DIR now points to ~/.dh/projects/{slug}/backlog/ and cannot be
-    # used to derive the project root by walking up with .parent.parent.
-    return _ds.dispatch_plan_path(milestone_number, _models.get_repo_root())
+def _dispatch_reference(milestone_number: int) -> ContentRef:
+    return ContentRef(kind=ContentKind.DISPATCH_PLAN, name=f"dispatch-milestone-{milestone_number}")
 
 
-def _try_register_dispatch_plan_artifact(item_id: ItemId, plan_path: Path) -> None:
+def _read_dispatch_plan(milestone_number: int) -> _ds.DispatchPlan:
+    return _ds.DispatchPlan.model_validate_json(
+        _get_artifact_provider().get_content(_dispatch_reference(milestone_number)).content
+    )
+
+
+def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str) -> None:
     """Register the newly written dispatch plan file as a dispatch-plan artifact.
 
     Best-effort: logs a warning on any failure but never raises.  Called after
@@ -3979,28 +3939,27 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, plan_path: Path) -> No
 
     Args:
         item_id: Issue number or beads string identifier to register the artifact against.
-        plan_path: Absolute or repo-relative path to the created plan file.
+        artifact_id: Logical identifier for the stored dispatch plan.
     """
     log = _logging.getLogger(__name__)
     try:
-        repo = _models.get_default_repo()
-        if not repo:
-            log.warning("dispatch_create_plan: skipping artifact registration — DEFAULT_REPO not set")
-            return
-        provider = create_artifact_provider(repo=repo, root_worktree=_models.get_repo_root())
+        provider = _get_artifact_provider()
         entry = ArtifactEntry(
             artifact_type=ArtifactType.DISPATCH_PLAN,
-            artifact_id=str(plan_path),
+            artifact_id=artifact_id,
             status=ArtifactStatus.CURRENT,
             agent="dispatch_create_plan",
         )
-        manifest = provider.get_manifest(item_id)
+        manifest = _load_manifest(provider, item_id)
         updated_manifest = _artifact_registry.register(manifest, entry)
-        provider.set_manifest(item_id, updated_manifest)
-        log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", plan_path, item_id)
+        _save_manifest(provider, updated_manifest)
+        log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", artifact_id, item_id)
     except (BacklogError, _GithubException) as exc:
         log.warning(
-            "dispatch_create_plan: artifact registration failed for item %s (path=%s): %s", item_id, plan_path, exc
+            "dispatch_create_plan: artifact registration failed for item %s (artifact=%s): %s",
+            item_id,
+            artifact_id,
+            exc,
         )
 
 
@@ -4019,11 +3978,10 @@ async def dispatch_read(milestone_number: Annotated[int, Field(description="GitH
         Dict with ``milestone_number`` and ``plan`` (full plan
         as a nested dict), or ``error`` on failure.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     try:
-        plan = await asyncio.to_thread(_ds.read_dispatch_plan, plan_path)
-    except FileNotFoundError:
-        return {"error": f"Dispatch plan not found: {plan_path}", "milestone_number": milestone_number}
+        plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
+    except ContentUnavailableError:
+        return {"error": "Dispatch plan not found", "milestone_number": milestone_number}
     except ValueError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     return {"milestone_number": milestone_number, "plan": plan.model_dump()}
@@ -4049,10 +4007,9 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
         Dict with ``is_valid`` (bool), ``errors`` (list[str]), and
         ``warnings`` (list[str]), or ``error`` on file/parse failure.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     try:
-        plan = await asyncio.to_thread(_ds.read_dispatch_plan, plan_path)
-    except (FileNotFoundError, ValueError) as exc:
+        plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
+    except (ContentUnavailableError, ValueError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
     return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
@@ -4082,10 +4039,9 @@ async def dispatch_stale_check(
         ``removed_issues`` (list[int]), and ``message`` (str).
         Returns ``error`` on file/parse or GitHub failure.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     try:
-        plan = await asyncio.to_thread(_ds.read_dispatch_plan, plan_path)
-    except (FileNotFoundError, ValueError) as exc:
+        plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
+    except (ContentUnavailableError, ValueError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
 
     def _fetch_milestone_issue_numbers() -> list[int]:
@@ -4172,8 +4128,6 @@ async def dispatch_create_plan(
         Error dict contains an ``error`` key.
     """
     out = Output()
-    plan_path = _dispatch_plan_path(milestone_number)
-
     # Verify plan.milestone.number matches the milestone_number parameter
     if plan.milestone.number != milestone_number:
         return {
@@ -4186,26 +4140,24 @@ async def dispatch_create_plan(
         }
 
     # Check for existing file when overwrite is False
-    if not overwrite and plan_path.exists():
-        return {
-            "error": (f"Plan file already exists: {plan_path}. Pass overwrite=True to replace it."),
-            "milestone_number": milestone_number,
-            **out.to_dict(),
-        }
+    if not overwrite:
+        try:
+            _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
+        except ContentUnavailableError:
+            pass
+        else:
+            return {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()}
 
     # 6. Write atomically
     try:
-        await asyncio.to_thread(_ds.write_dispatch_plan, plan, plan_path)
-    except ValueError as exc:
-        return {
-            "error": f"Cannot write plan (symlink target rejected): {exc}",
-            "milestone_number": milestone_number,
-            **out.to_dict(),
-        }
-    except OSError as exc:
-        return {"error": f"Failed to write plan file: {exc}", "milestone_number": milestone_number, **out.to_dict()}
+        await asyncio.to_thread(
+            _get_artifact_provider().put_content,
+            ContentWrite(reference=_dispatch_reference(milestone_number), content=plan.model_dump_json()),
+        )
+    except BacklogError as exc:
+        return {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
 
-    out.info(f"Wrote dispatch plan to {plan_path}")
+    out.info(f"Stored dispatch plan {milestone_number}")
 
     # 7. Post-write validation
     is_valid: bool | None = None
@@ -4219,7 +4171,7 @@ async def dispatch_create_plan(
 
     # 8. Artifact registration (best-effort)
     if issue is not None:
-        _try_register_dispatch_plan_artifact(issue, plan_path)
+        _try_register_dispatch_plan_artifact(issue, _dispatch_reference(milestone_number).name)
 
     wave_count = len(plan.waves)
     item_count = sum(len(wave.items) for wave in plan.waves)
@@ -4291,66 +4243,6 @@ async def dispatch_conflicts(
         "conflict_groups": [cg.model_dump() for cg in conflict_groups],
         "count": len(conflict_groups),
     }
-
-
-# ---------------------------------------------------------------------------
-# artifact_migrate MCP tool
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool(
-    annotations=ToolAnnotations(
-        title="Migrate Artifacts", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
-    )
-)
-async def artifact_migrate(
-    item_id: Annotated[
-        int | None,
-        Field(description="Migrate artifacts for a specific item only (GitHub issue integer). Omit to scan all items."),
-    ] = None,
-    dry_run: Annotated[
-        bool, Field(description="When true, report what would be migrated without making any API calls.")
-    ] = False,
-) -> dict:
-    """Migrate existing plan/research artifacts into the artifact manifest system.
-
-    Scans ``plan/`` and ``research/`` directories for artifact files,
-    determines the artifact type from the filename pattern, extracts the
-    linked GitHub issue number from YAML frontmatter (falling back to slug
-    matching against backlog items), and calls the artifact_register logic
-    for each discovered file.
-
-    When ``item_id`` is provided the tool also checks the existing
-    manifest for that item: any already-registered entry that has
-    ``content_stored=False`` is re-registered so the auto-upload path can
-    run and upload the local file content.
-
-    Safe to re-run — the registry upserts on ``(artifact_type, path)``
-    so existing entries are updated in-place rather than duplicated.
-
-    Returns:
-        Dict with ``migrated`` (int), ``skipped`` (int), ``failed`` (int),
-        and ``details`` (list of per-artifact outcome dicts).  Each detail
-        dict contains ``path``, ``type``, ``issue``, and ``outcome``.
-        On error, dict contains an ``error`` key.
-    """
-    out = Output()
-
-    if dry_run:
-        try:
-            result = await asyncio.to_thread(migrate_dry_run, item_id)
-        except OSError as exc:
-            return {"error": f"Discovery failed: {exc}", **out.to_dict()}
-        return {**result, **out.to_dict()}
-
-    try:
-        result = await asyncio.to_thread(migrate_live_run, item_id, out)
-    except GitHubUnavailableError as exc:
-        return {"error": str(exc), **out.to_dict()}
-    except (BacklogError, _GithubException, OSError) as exc:
-        return {"error": f"Migration failed: {exc}", **out.to_dict()}
-
-    return {**result, **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------
@@ -4862,8 +4754,8 @@ async def dispatch_spawn(
         on completion, or ``error`` on failure.
     """
     try:
-        plan = await asyncio.to_thread(_ds.read_dispatch_plan, _dispatch_plan_path(milestone))
-    except FileNotFoundError:
+        plan = await asyncio.to_thread(_read_dispatch_plan, milestone)
+    except ContentUnavailableError:
         return {"error": f"Dispatch plan not found for milestone {milestone}", "milestone": milestone}
     except ValueError as exc:
         return {"error": f"Invalid dispatch plan: {exc}", "milestone": milestone}

@@ -86,6 +86,7 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
     # Given: opaque plan and artifact identifiers whose values must not be interpreted.
     assert isinstance(local_provider, ContentProvider)
     plan_ref = ContentRef(kind=ContentKind.PLAN, name="plan://opaque/%E2%98%83")
+    dispatch_ref = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
     owners = ("owner:alpha/7", "owner:beta/9")
     artifact_refs = (
         ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=owners[0], name="manifest"),
@@ -106,6 +107,25 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
     unlinked = local_provider.put_content(
         ContentWrite(reference=plan_ref, content="v3", owner_reference="", expected_revision=reassigned.revision)
     )
+    dispatch_created = local_provider.put_content(
+        ContentWrite(reference=dispatch_ref, content="dispatch-v1", owner_reference=owners[0])
+    )
+    dispatch_preserved = local_provider.put_content(
+        ContentWrite(reference=dispatch_ref, content="dispatch-v1.1", expected_revision=dispatch_created.revision)
+    )
+    dispatch_reassigned = local_provider.put_content(
+        ContentWrite(reference=dispatch_ref, content="dispatch-v2", owner_reference=owners[1])
+    )
+    dispatch = local_provider.put_content(
+        ContentWrite(reference=dispatch_ref, content="dispatch-v3", owner_reference="")
+    )
+    other_dispatch = local_provider.put_content(
+        ContentWrite(
+            reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-11"),
+            content="other-dispatch",
+            owner_reference=owners[0],
+        )
+    )
     for index, reference in enumerate(artifact_refs):
         local_provider.put_content(ContentWrite(reference=reference, content=f"artifact-{index}"))
 
@@ -113,6 +133,13 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
     assert created.reference == preserved.reference == reassigned.reference == unlinked.reference == plan_ref
     assert preserved.owner_reference == owners[0]
     assert unlinked.owner_reference == ""
+    assert dispatch.reference == dispatch_ref
+    assert [
+        dispatch_created.owner_reference,
+        dispatch_preserved.owner_reference,
+        dispatch_reassigned.owner_reference,
+        dispatch.owner_reference,
+    ] == [owners[0], owners[0], owners[1], ""]
     assert local_provider.get_content(plan_ref).content == "v3"
     assert [local_provider.get_content(ref).content for ref in artifact_refs] == [
         "artifact-0",
@@ -122,6 +149,10 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
         "artifact-4",
     ]
     assert local_provider.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference="")) == [unlinked]
+    assert local_provider.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN, owner_reference="")) == [dispatch]
+    assert local_provider.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN, owner_reference=owners[0])) == [
+        other_dispatch
+    ]
     assert local_provider.list_content(
         ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference=owners[0], offset=1, limit=1)
     ) == [local_provider.get_content(artifact_refs[4])]
@@ -132,6 +163,36 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
         )
     with pytest.raises(ContentUnavailableError):
         local_provider.get_content(ContentRef(kind=ContentKind.PLAN, name="missing/opaque"))
+
+
+@pytest.mark.unit
+def test_native_content_discovery_when_owner_filter_is_omitted_or_empty(local_provider: ContentProvider) -> None:
+    # Given: plans linked to different opaque owners and one project-level plan.
+    records = [
+        local_provider.put_content(
+            ContentWrite(
+                reference=ContentRef(kind=ContentKind.PLAN, name="P-alpha"), content="alpha", owner_reference="bd-a1"
+            )
+        ),
+        local_provider.put_content(
+            ContentWrite(
+                reference=ContentRef(kind=ContentKind.PLAN, name="P-beta"), content="beta", owner_reference="bd-b2"
+            )
+        ),
+        local_provider.put_content(
+            ContentWrite(
+                reference=ContentRef(kind=ContentKind.PLAN, name="P-project"), content="project", owner_reference=""
+            )
+        ),
+    ]
+
+    # When: discovery requests all owners, then only the project namespace.
+    all_owners = local_provider.list_content(ContentQuery(kind=ContentKind.PLAN))
+    unowned = local_provider.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference=""))
+
+    # Then: omitted ownership discovers every plan while empty ownership remains exact.
+    assert all_owners == [records[0], records[1], records[2]]
+    assert unowned == [records[2]]
 
 
 @pytest.mark.unit

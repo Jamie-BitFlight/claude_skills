@@ -203,6 +203,23 @@ def test_backend_config_yaml_dh_subdir_beads_honored(tmp_path: Path, monkeypatch
     assert type(_bp.create_backend()).__name__ == "BeadsBackend"
 
 
+def test_sqlite_factory_uses_persistent_project_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Configured SQLite uses the project's durable state database."""
+    from backlog_core.backends.sqlite_backend import SQLiteBackend
+
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    state_root = tmp_path / "state"
+    dh_paths_mock = _make_dh_paths_mock(project_root)
+    dh_paths_mock.state_root.return_value = state_root
+    monkeypatch.setattr(_bp, "_dh_paths", dh_paths_mock)
+
+    backend = _bp.create_backend("sqlite")
+
+    assert isinstance(backend, SQLiteBackend)
+    assert (state_root / "backlog.sqlite3").is_file()
+
+
 # ---------------------------------------------------------------------------
 # Auto-detect _auto_detect_beads
 # ---------------------------------------------------------------------------

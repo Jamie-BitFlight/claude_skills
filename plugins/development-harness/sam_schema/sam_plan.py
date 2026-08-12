@@ -8,10 +8,12 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, NoReturn
+from typing import Annotated, Literal, NoReturn
 
 import dh_paths
 import typer
+from backlog_core.backend_protocol import get_config
+from backlog_core.backend_types import ContentProvider
 from backlog_core.models import Output
 from dh_core import operations
 from pydantic import ValidationError
@@ -28,10 +30,10 @@ from sam_schema.cli_inputs import (
 )
 from sam_schema.core.action_models import TaskDefinition
 from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
+from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.backends.local_yaml import plan_id_from_path
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.models import Complexity, CreatePlanError, PlanState, Priority, TaskStatus
-from sam_schema.core.task_config import get_backend
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -55,9 +57,6 @@ except ImportError:
     _BACKLOG_CORE_AVAILABLE = False
     _SYNC_ERRORS = (OSError, ValueError)
 
-if TYPE_CHECKING:
-    from dh_core.protocols import TaskBackend
-
 app = typer.Typer(name="plan", help="SAM plan and task operations.", no_args_is_help=True, rich_markup_mode=None)
 
 
@@ -75,14 +74,21 @@ def _emit(value: object) -> None:
 
 def _address(value: str) -> tuple[str, str | None]:
     try:
-        return parse_address(value)
+        plan_ref, task_ref = parse_address(value)
     except ValueError as exc:
         _error(str(exc))
         raise AssertionError from exc
+    raw_plan, _, _ = value.partition("/")
+    if re.fullmatch(r"P[0-9a-f]{8}", raw_plan, re.IGNORECASE):
+        return raw_plan, task_ref
+    return plan_ref, task_ref
 
 
-def _backend(plan_dir: Path) -> TaskBackend:
-    return get_backend(str(plan_dir))
+def _backend() -> ContentTaskProvider:
+    provider = get_config().backend
+    if not isinstance(provider, ContentProvider):
+        _error("Active backend does not support plan content")
+    return ContentTaskProvider(provider)
 
 
 def _task_options(
@@ -146,9 +152,6 @@ def list_plans(
     filters: Annotated[list[str] | None, typer.Option("--filter")] = None,
 ) -> None:
     """List plans as a compact JSON envelope."""
-    directory = _plan_dir(plan_dir)
-    if not directory.exists():
-        _error(f"Plan directory does not exist: {directory}")
     filter_by_key: dict[str, str] | None = None
     if filters:
         filter_by_key = {}
@@ -157,9 +160,7 @@ def list_plans(
             if not separator or not key:
                 _error(f"--filter expects 'key=value', got: {item!r}")
             filter_by_key[key] = value
-    result = operations.list_plans(
-        _backend(directory), search=search, offset=offset, limit=limit, filter_by_key=filter_by_key
-    )
+    result = operations.list_plans(_backend(), search=search, offset=offset, limit=limit, filter_by_key=filter_by_key)
     _emit({
         "items": [item.model_dump(mode="json", by_alias=True, exclude_none=True) for item in result],
         "count": len(result),
@@ -174,7 +175,7 @@ def read(
 ) -> None:
     """Read a plan or task by address."""
     plan_ref, task_ref = _address(address)
-    backend = _backend(_plan_dir(plan_dir))
+    backend = _backend()
     try:
         if task_ref is None:
             _emit(operations.read_plan(backend, plan_ref))
@@ -196,7 +197,7 @@ def state(
     if task_ref is None:
         _error(f"Address '{address}' does not include a task component")
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
-    backend = _backend(_plan_dir(plan_dir))
+    backend = _backend()
     try:
         result = operations.update_task_status(backend, plan_ref, task_id, new_status)
     except (PlanNotFoundError, TaskNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
@@ -215,7 +216,7 @@ def ready(
     if task_ref is not None:
         _error("--plan-address must identify a plan, not a task")
     try:
-        _emit(operations.get_ready_tasks(_backend(_plan_dir(plan_dir)), plan_ref, full=full))
+        _emit(operations.get_ready_tasks(_backend(), plan_ref, full=full))
     except (PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
 
@@ -227,21 +228,14 @@ def status(
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
 ) -> None:
     """Show plan progress status."""
-    directory = _plan_dir(plan_dir)
-    backend = _backend(directory)
+    backend = _backend()
     if all_plans:
-        if not directory.exists():
-            _error(f"Plan directory does not exist: {directory}")
         results: list[dict[str, object]] = []
-        for candidate in sorted(directory.iterdir()):
-            if candidate.suffix not in {".yaml", ".md"} and not candidate.is_dir():
-                continue
+        for summary in operations.list_plans(backend):
             try:
-                entry = operations.get_plan_status(backend, plan_id_from_path(candidate)).model_dump(mode="json")
-                entry["path"] = str(candidate)
-                results.append(entry)
+                results.append(operations.get_plan_status(backend, summary.plan_id).model_dump(mode="json"))
             except _PLAN_LOAD_ERRORS as exc:
-                typer.echo(f"Warning: skipping {candidate}: {exc}", err=True)
+                typer.echo(f"Warning: skipping {summary.plan_id}: {exc}", err=True)
         _emit(results)
         return
     if plan_address is None:
@@ -278,9 +272,8 @@ def create(
         config = CreatePlanInput(
             slug=slug, goal=goal, tasks=[] if task is None else [task], context=context, issue=issue
         )
-        result = operations.create_plan(
-            _backend(_plan_dir(plan_dir)), **config.to_config().model_dump(exclude={"action"})
-        )
+        action_config = config.to_config()
+        result = operations.create_plan(_backend(), **action_config.model_dump(exclude={"action", "owner_reference"}))
     except (ValidationError, ValueError, OSError) as exc:
         _error(str(exc))
     if isinstance(result, CreatePlanError):
@@ -370,7 +363,7 @@ def update(
             _error(str(exc))
     try:
         result = operations.update_plan_fields(
-            _backend(_plan_dir(plan_dir)),
+            _backend(),
             plan_ref,
             context=context,
             set_fields=values,
@@ -394,7 +387,7 @@ def claim(
         _error(f"Address '{address}' does not include a task component")
     task_id = f"T{task_ref}" if task_ref.isdigit() else task_ref
     try:
-        _emit(operations.claim_task(_backend(_plan_dir(plan_dir)), plan_ref, task_id))
+        _emit(operations.claim_task(_backend(), plan_ref, task_id))
     except (PlanNotFoundError, TaskNotFoundError, FileNotFoundError, FormatDetectionError, ValueError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
 
@@ -407,7 +400,7 @@ def validate(
     """Validate a plan against the canonical schema."""
     plan_ref, _ = _address(address)
     try:
-        result = operations.read_plan(_backend(_plan_dir(plan_dir)), plan_ref)
+        result = operations.read_plan(_backend(), plan_ref)
     except (PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
     except (ValueError, TypeError) as exc:
@@ -462,7 +455,7 @@ def append_task(
             if task is None:
                 _error("--task-id and --task-title are required (or use --stdin)")
         config = AppendTaskInput(plan_address=plan_ref, task=task)
-        result = operations.append_task(_backend(_plan_dir(plan_dir)), plan_ref, config.task)
+        result = operations.append_task(_backend(), plan_ref, config.task)
     except (ValidationError, ValueError, PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
     _emit(result)
@@ -478,7 +471,7 @@ def finalize(
     if task_ref is not None:
         _error("--plan-address must identify a plan, not a task")
     try:
-        _emit(operations.finalize_plan(_backend(_plan_dir(plan_dir)), plan_ref))
+        _emit(operations.finalize_plan(_backend(), plan_ref))
     except (PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
 
@@ -556,7 +549,7 @@ def _migrate_one(plan_path: Path, dry_run: bool) -> tuple[Path | None, str]:
     """
     plan_ref = plan_id_from_path(plan_path)
     try:
-        result = operations.read_plan(_backend(plan_path.parent), plan_ref)
+        result = operations.read_plan(_backend(), plan_ref)
     except _PLAN_LOAD_ERRORS:
         return _migrate_one_fallback(plan_path, dry_run)
     output_path = _canonical_output_path(plan_path)
@@ -631,7 +624,9 @@ def _attempt_backlog_sync() -> None:
             typer.echo("Backlog synced to GitHub.", err=True)
 
 
-def _migrate_all(plan_dir: Path, dry_run: bool, skip_sync: bool, backlog_dir: Path) -> dict[str, object]:
+def _migrate_all(
+    plan_dir: Path, dry_run: bool, skip_sync: bool, backlog_dir: Path
+) -> dict[str, str | int | bool | list[str]]:
     """Migrate every legacy plan in a directory and return a JSON summary.
 
     Returns:

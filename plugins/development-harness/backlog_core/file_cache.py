@@ -7,16 +7,22 @@ import hashlib
 import json
 import os
 import tempfile
+import warnings
+from io import StringIO
 from pathlib import Path
 from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 
-from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite
-from .yaml_io import load_item, save_item
+from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
+from .yaml_io import load_item, load_item_text, save_item
 
 _STATE_FILE: Final = "cache.yaml"
+
+
+class LegacyMigrationError(ValueError):
+    """Legacy item cannot be migrated without data loss."""
 
 
 class PendingMutation(BaseModel):
@@ -38,6 +44,20 @@ class CacheCheckpoint(BaseModel):
     fingerprint: str
 
 
+class _ProviderSnapshotCheckpoint(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    watermark: str = Field(min_length=1)
+
+
+class _PendingWorkItemMutation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    idempotency_key: str
+    key: str
+    item: BacklogItem
+
+
 class ReplayAcknowledgement(BaseModel):
     """Applied provider mutation and its resulting checkpoint."""
 
@@ -54,6 +74,8 @@ class _CacheState(BaseModel):
     records: list[ContentRecord] = Field(default_factory=list)
     checkpoints: list[CacheCheckpoint] = Field(default_factory=list)
     pending: list[PendingMutation] = Field(default_factory=list)
+    pending_work_items: list[_PendingWorkItemMutation] = Field(default_factory=list)
+    snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
 
 
 class FileCache:
@@ -110,6 +132,24 @@ class FileCache:
         """Return pending mutations in durable insertion order."""
         return list(self._load_state().pending)
 
+    def _queue_work_item(self, key: str, item: BacklogItem) -> _PendingWorkItemMutation:
+        payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+        mutation = _PendingWorkItemMutation(
+            idempotency_key=hashlib.sha256(f"{key}:{payload}".encode()).hexdigest(), key=key, item=item
+        )
+        state = self._load_state()
+        pending = [entry for entry in state.pending_work_items if entry.key != key]
+        self._save_state(state.model_copy(update={"pending_work_items": [*pending, mutation]}))
+        return mutation
+
+    def _pending_work_item_mutations(self) -> list[_PendingWorkItemMutation]:
+        return list(self._load_state().pending_work_items)
+
+    def _acknowledge_work_items(self, keys: set[str]) -> None:
+        state = self._load_state()
+        pending = [entry for entry in state.pending_work_items if entry.key not in keys]
+        self._save_state(state.model_copy(update={"pending_work_items": pending}))
+
     def get_checkpoint(self, reference: ContentRef) -> CacheCheckpoint | None:
         """Return the last acknowledged checkpoint for a logical record."""
         for checkpoint in self._load_state().checkpoints:
@@ -122,6 +162,13 @@ class FileCache:
         state = self._load_state()
         checkpoints = [entry for entry in state.checkpoints if entry.reference != checkpoint.reference]
         self._save_state(state.model_copy(update={"checkpoints": [*checkpoints, checkpoint]}))
+
+    def _get_snapshot_checkpoint(self) -> _ProviderSnapshotCheckpoint | None:
+        return self._load_state().snapshot_checkpoint
+
+    def _set_snapshot_checkpoint(self, checkpoint: _ProviderSnapshotCheckpoint) -> None:
+        state = self._load_state()
+        self._save_state(state.model_copy(update={"snapshot_checkpoint": checkpoint}))
 
     def acknowledge_replay(self, acknowledgements: list[ReplayAcknowledgement]) -> None:
         """Checkpoint only applied mutations while retaining all other queued work."""
@@ -148,8 +195,85 @@ class FileCache:
             state.model_copy(update={"records": records, "checkpoints": checkpoints, "pending": remaining})
         )
 
+    def verify_legacy_item(self, source: Path) -> tuple[BacklogItem, list[str]]:
+        """Parse a legacy item and verify its YAML representation without persisting it.
+
+        Args:
+            source: Legacy Markdown item to verify.
+
+        Returns:
+            The parsed item and its mismatched field names.
+
+        Raises:
+            ValueError: If the legacy YAML data cannot be parsed.
+        """
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                item = load_item(source)
+            reloaded = load_item_text(self._serialize_item(item), source.with_suffix(".yaml"))
+        except YAMLError as exc:
+            raise ValueError(str(exc)) from exc
+        before = item.model_dump(exclude={"file_path", "skip"})
+        after = reloaded.model_dump(exclude={"file_path", "skip"})
+        return item, [key for key in before if before.get(key) != after.get(key)]
+
+    def migrate_legacy_item(self, source: Path) -> Path:
+        """Persist one verified legacy item as a YAML snapshot beside its source.
+
+        Args:
+            source: Legacy Markdown item to migrate.
+
+        Returns:
+            The written YAML path.
+
+        Raises:
+            ValueError: If the conversion cannot round-trip without data loss.
+        """
+        item, mismatches = self.verify_legacy_item(source)
+        if mismatches:
+            raise LegacyMigrationError(f"Mismatched fields: {mismatches}")
+        destination = source.with_suffix(".yaml")
+        try:
+            save_item(item, destination)
+            reloaded = load_item(destination)
+        except YAMLError as exc:
+            raise ValueError(str(exc)) from exc
+        before = item.model_dump(exclude={"file_path", "skip"})
+        after = reloaded.model_dump(exclude={"file_path", "skip"})
+        if before != after:
+            destination.unlink(missing_ok=True)
+            mismatches = [key for key in before if before.get(key) != after.get(key)]
+            raise LegacyMigrationError(
+                f"Round-trip verification failed — .yaml removed. Mismatched fields: {mismatches}"
+            )
+        return destination
+
     def _load_item_snapshot(self, relative_path: Path) -> BacklogItem:
         return load_item(self._snapshot_path(relative_path))
+
+    def _save_work_item_snapshot(self, key: str, item: BacklogItem) -> None:
+        number = parse_issue_number(key)
+        relative_path = Path("issues") / f"{number}.yaml" if number is not None else Path(key)
+        self._save_item_snapshot(item, relative_path)
+
+    def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:
+        item_root = self._root / "items"
+        if not item_root.exists():
+            return []
+        return [
+            (relative.as_posix(), self._load_item_snapshot(relative))
+            for relative in (path.relative_to(item_root) for path in sorted(item_root.rglob("*.yaml")))
+        ]
+
+    @staticmethod
+    def _serialize_item(item: BacklogItem) -> str:
+        output = StringIO()
+        yaml = YAML(typ="rt")
+        yaml.default_flow_style = False
+        yaml.width = 2147483647
+        yaml.dump(item.model_dump(exclude={"file_path", "skip"}), output)
+        return output.getvalue()
 
     def _save_item_snapshot(self, item: BacklogItem, relative_path: Path) -> None:
         destination = self._snapshot_path(relative_path)

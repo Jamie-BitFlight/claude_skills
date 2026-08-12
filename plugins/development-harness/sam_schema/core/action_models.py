@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from sam_schema.core.models import _BEADS_ID_PATTERN, STATUS_MAP, TASK_ID_PATTERN, Task, TaskStatus
 
@@ -220,6 +220,15 @@ class CreatePlanConfig(_ActionConfigBase):
             "file as a task-plan artifact on the issue."
         ),
     )
+    owner_reference: str | None = Field(
+        default=None, description="Optional opaque backend owner reference for the created plan."
+    )
+
+    @model_validator(mode="after")
+    def _exclusive_owner(self) -> CreatePlanConfig:
+        if self.issue is not None and self.owner_reference is not None:
+            raise ValueError("issue and owner_reference cannot be combined")
+        return self
 
 
 class ListPlansConfig(_ActionConfigBase):
@@ -299,6 +308,16 @@ class UpdatePlanConfig(_ActionConfigBase):
     section_content: str | None = Field(
         default=None, description="Body text for the appended section. Used with append_section_name and task_id."
     )
+    owner_reference: str | None = Field(
+        default=None, description="Optional opaque backend owner reference; empty unlinks the plan."
+    )
+
+    @model_validator(mode="after")
+    def _exclusive_owner(self) -> UpdatePlanConfig:
+        has_issue = self.set_fields_json is not None and self.set_fields_json.get("issue") is not None
+        if self.owner_reference is not None and has_issue:
+            raise ValueError("issue and owner_reference cannot be combined")
+        return self
 
 
 class AppendTaskConfig(_ActionConfigBase):

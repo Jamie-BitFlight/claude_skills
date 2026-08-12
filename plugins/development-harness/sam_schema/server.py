@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import tiktoken
+from backlog_core.backend_protocol import get_config as get_backlog_config
+from backlog_core.backend_types import ContentProvider
 from dh_core import operations
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
@@ -38,6 +39,7 @@ from sam_schema.core.action_models import (
     UpdatePlanConfig,
     UpdateTaskConfig,
 )
+from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.models import (
     ActiveTaskClearResult,
@@ -60,10 +62,6 @@ from sam_schema.core.models import (
     UpdatePlanResult,
     UpdateTaskResult,
 )
-from sam_schema.core.task_config import TaskConfig, create_task_backend, get_backend, get_task_config, set_task_config
-
-if TYPE_CHECKING:
-    from sam_schema.core.task_backend import TaskBackend
 
 _log = logging.getLogger(__name__)
 
@@ -75,13 +73,6 @@ _DEFAULT_SESSION_ID = "_default"
 _STEM_MIN_PARTS_FOR_NUMBER: int = 2
 _STEM_MIN_PARTS_FOR_SLUG: int = 3
 
-# Initialize the default backend at module import time.
-# Tests may call set_task_config() before importing this module to inject a custom backend.
-try:
-    get_task_config()
-except RuntimeError:
-    set_task_config(TaskConfig(backend=create_task_backend()))
-
 # Initialize the context backend at module import time.
 # Tests may call set_context_config() before importing this module to inject a custom backend.
 try:
@@ -90,24 +81,12 @@ except RuntimeError:
     set_context_config(ContextConfig(backend=create_context_backend()))
 
 
-def _get_backend(plan_dir_str: str) -> TaskBackend:
-    """Return the appropriate TaskBackend for the given plan_dir.
-
-    Delegates to the shared :func:`sam_schema.core.task_config.get_backend` so that
-    both the MCP server and the CLI use the same backend-resolution logic.
-
-    The MCP server always passes ``wrap_gist=True`` so that explicit plan
-    directories are also wrapped in ``GistTaskLayer`` for write-through to
-    GitHub Gist (matching pre-refactor MCP behaviour).
-
-    Args:
-        plan_dir_str: The ``plan_dir`` parameter from the MCP tool call.
-
-    Returns:
-        :class:`~sam_schema.core.task_backend.TaskBackend` instance to use for
-        this tool call.
-    """
-    return get_backend(plan_dir_str, wrap_gist=True)
+def _get_backend(plan_dir_str: str) -> ContentTaskProvider:
+    del plan_dir_str
+    provider = get_backlog_config().backend
+    if not isinstance(provider, ContentProvider):
+        raise ToolError("Active backend does not support plan content")
+    return ContentTaskProvider(provider)
 
 
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).
@@ -253,6 +232,8 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResul
     )
     if isinstance(result, CreatePlanError):
         raise ToolError(f"{result.error}: {result.reason} (hint: {result.hint})")
+    if config.owner_reference is not None:
+        backend.set_owner(result.plan_id, config.owner_reference)
     return result
 
 
@@ -319,7 +300,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> Upda
         (bool) and ``address`` (plan identifier) fields.
     """
     backend = _get_backend(plan_dir)
-    return operations.update_plan_fields(
+    result = operations.update_plan_fields(
         backend,
         plan,
         context=config.context,
@@ -328,6 +309,9 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> Upda
         append_section_name=config.append_section_name,
         section_content=config.section_content,
     )
+    if config.owner_reference is not None:
+        backend.set_owner(plan, config.owner_reference)
+    return result
 
 
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> AppendTaskResult:
@@ -616,10 +600,7 @@ def sam_active_task(
                     "Call sam_active_task(action='set', plan=..., task=...) first."
                 )
                 raise ToolError(msg)
-            if active.plan_dir is None:
-                task_backend = _get_backend(str(Path(active.task_file_path).parent))
-            else:
-                task_backend = _get_backend(active.plan_dir)
+            task_backend = _get_backend(active.plan_dir or "")
             return operations.update_active_task(
                 ctx_backend,
                 resolved_session,

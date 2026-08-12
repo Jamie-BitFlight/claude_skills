@@ -12,17 +12,20 @@ root CLI by ``cli.py``.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Annotated
 
 import typer
+from backlog_core.backend_protocol import get_config
+from backlog_core.backend_types import ContentProvider
 from dh_core import operations
 
 from sam_schema.cli_output import err, output_json
 from sam_schema.core.addressing import AddressingError, parse_address
+from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.context_backend import ContextBackend
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
-from sam_schema.core.task_config import get_backend
 
 __all__ = ["DEFAULT_SESSION_ID", "app"]
 
@@ -66,6 +69,13 @@ def _context_backend() -> ContextBackend:
         return get_context_config().backend
 
 
+def _plan_backend() -> ContentTaskProvider:
+    provider = get_config().backend
+    if not isinstance(provider, ContentProvider):
+        err("Active backend does not support plan content")
+    return ContentTaskProvider(provider)
+
+
 @app.command(name="get")
 def active_task_get(session_id: Annotated[str | None, _SESSION_OPTION] = None) -> None:
     """Show the active task context for a session."""
@@ -88,8 +98,12 @@ def active_task_set(
         plan_ref, task_id = parse_address(address)
     except AddressingError as exc:
         err(str(exc))
+    raw_plan, _, _ = address.partition("/")
+    if re.fullmatch(r"P[0-9a-f]{8}", raw_plan, re.IGNORECASE):
+        plan_ref = raw_plan
     if not task_id:
         err(f"Address '{address}' must include a task ID (e.g. --address P<plan>/T<task>).")
+    task_id = f"T{task_id}" if task_id.isdigit() else task_id
     # Typer hands every option through as str, but ActiveTaskContext accepts
     # int (GitHub issue number) or a beads-ID str. Coerce digit-only input to
     # int so `--parent-issue 42` behaves the same as the MCP tool, which is
@@ -131,11 +145,10 @@ def active_task_update(
             err(f"Invalid --set-fields-json: {exc}")
         if not isinstance(parsed_fields, dict):
             err("--set-fields-json must be a JSON object.")
-    task_dir = active.plan_dir if active.plan_dir is not None else str(Path(active.task_file_path).parent)
     result = operations.update_active_task(
         ctx_backend,
         resolved_session,
-        get_backend(task_dir),
+        _plan_backend(),
         set_fields_json=parsed_fields,
         append_section=append_section,
         section_content=section_content,

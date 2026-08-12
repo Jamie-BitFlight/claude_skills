@@ -911,6 +911,7 @@ class BacklogItem(BaseModel):
     """
 
     title: str = ""
+    reference: str = ""
     description: str = ""
     type_: str = Field(default="", exclude=True)
     section: str = Field(default="", exclude=True)
@@ -1015,6 +1016,7 @@ class BacklogItem(BaseModel):
         # forms are always equivalent.  Use self.metadata (post-validation) as
         # the source of truth to keep flat fields in sync.
         self.priority = self.metadata.priority
+        self.section = self.metadata.priority
         self.issue = self.metadata.issue
         self.source = self.metadata.source or "Not specified"
         self.added = self.metadata.added
@@ -1100,6 +1102,7 @@ class ContentKind(StrEnum):
     """Logical content categories supported by configured backends."""
 
     PLAN = "plan"
+    DISPATCH_PLAN = "dispatch_plan"
     ARTIFACT_MANIFEST = "artifact_manifest"
     ARTIFACT_CONTENT = "artifact_content"
 
@@ -1117,7 +1120,7 @@ class ContentRef(BaseModel):
         if not self.name:
             raise ValueError("content name must not be empty")
         match self.kind:
-            case ContentKind.PLAN:
+            case ContentKind.PLAN | ContentKind.DISPATCH_PLAN:
                 if self.namespace:
                     raise ValueError("plan namespace must be empty")
                 if self.artifact_type:
@@ -1140,10 +1143,14 @@ class ContentRef(BaseModel):
 
 
 class ContentQuery(BaseModel):
-    """Bounded discovery request for logical backend content."""
+    """Bounded discovery request for logical backend content.
+
+    ``owner_reference=None`` discovers every owner, while ``""`` selects only
+    project-level unowned plans.
+    """
 
     kind: ContentKind
-    owner_reference: str = ""
+    owner_reference: str | None = None
     search: str = ""
     offset: int = Field(default=0, ge=0)
     limit: int = Field(default=100, ge=1, le=100)
@@ -1171,7 +1178,7 @@ class ContentWrite(BaseModel):
     @model_validator(mode="after")
     def _validate_artifact_owner(self) -> ContentWrite:
         match self.reference.kind:
-            case ContentKind.PLAN:
+            case ContentKind.PLAN | ContentKind.DISPATCH_PLAN:
                 pass
             case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
                 if self.owner_reference is not None and self.owner_reference != self.reference.namespace:

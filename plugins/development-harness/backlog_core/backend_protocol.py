@@ -201,7 +201,11 @@ def create_backend(name: str | None = None) -> WorkItemBackend:
         return InMemoryBackend()
 
     if resolved == "sqlite":
-        return SQLiteBackend()
+        if _dh_paths is None:
+            return SQLiteBackend()
+        db_path = _dh_paths.state_root() / "backlog.sqlite3"
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return SQLiteBackend(str(db_path))
 
     if resolved == "beads":
         return BeadsBackend()

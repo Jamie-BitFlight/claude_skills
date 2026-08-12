@@ -34,9 +34,8 @@ Usage
 from __future__ import annotations
 
 import sys
-import warnings
 from dataclasses import dataclass, field
-from io import StringIO, TextIOWrapper
+from io import TextIOWrapper
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -56,10 +55,9 @@ if str(_HARNESS_DIR) not in sys.path:
     sys.path.insert(0, str(_HARNESS_DIR))
 
 import typer
-from backlog_core.yaml_io import load_item, load_item_text, save_item
+from backlog_core.file_cache import FileCache
 from dh_paths import compute_slug
 from pydantic import ValidationError
-from ruamel.yaml import YAML, YAMLError
 
 from cli_output import err, output_json
 
@@ -137,27 +135,6 @@ def _has_frontmatter(text: str) -> bool:
     return "---" in text[3:]
 
 
-def _item_to_yaml_str(item: BacklogItem) -> str:
-    """Serialise a BacklogItem to a YAML string without touching the filesystem.
-
-    Uses the same YAML settings as yaml_io.save_item for an accurate in-memory
-    round-trip.
-
-    Args:
-        item: BacklogItem to serialise.
-
-    Returns:
-        YAML-formatted string.
-    """
-    data = item.model_dump(exclude={"file_path", "skip"})
-    yaml = YAML(typ="rt")
-    yaml.default_flow_style = False
-    yaml.width = 2147483647
-    out = StringIO()
-    yaml.dump(data, out)
-    return out.getvalue()
-
-
 def _dry_run_section_info(item: BacklogItem) -> tuple[int, list[str]]:
     """Return section count and section keys from a BacklogItem.
 
@@ -195,24 +172,10 @@ def migrate_file_dry_run(md_path: Path) -> tuple[BacklogItem, bool, str]:
     if not _has_frontmatter(text):
         raise ValueError("No frontmatter — not a backlog item file")
 
-    # Suppress DeprecationWarning — expected for .md files during migration
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        item = load_item(md_path)
-
-    yaml_path = md_path.with_suffix(".yaml")
-    yaml_str = _item_to_yaml_str(item)
-    reloaded = load_item_text(yaml_str, yaml_path)
-
-    pre_dump = item.model_dump(exclude={"file_path", "skip"})
-    post_dump = reloaded.model_dump(exclude={"file_path", "skip"})
-
-    if pre_dump == post_dump:
+    item, mismatches = FileCache(md_path.parent).verify_legacy_item(md_path)
+    if not mismatches:
         return item, True, ""
-
-    # Build a diff summary for the user
-    diff_keys = [k for k in pre_dump if pre_dump.get(k) != post_dump.get(k)]
-    detail = f"Mismatched fields: {diff_keys}"
+    detail = f"Mismatched fields: {mismatches}"
     return item, False, detail
 
 
@@ -240,25 +203,7 @@ def migrate_file_live(md_path: Path) -> Path:
     if not _has_frontmatter(text):
         raise ValueError("No frontmatter — not a backlog item file")
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        item = load_item(md_path)
-
-    yaml_path = md_path.with_suffix(".yaml")
-    save_item(item, yaml_path)
-
-    reloaded = load_item(yaml_path)
-
-    pre_dump = item.model_dump(exclude={"file_path", "skip"})
-    post_dump = reloaded.model_dump(exclude={"file_path", "skip"})
-
-    if pre_dump != post_dump:
-        yaml_path.unlink(missing_ok=True)
-        diff_keys = [k for k in pre_dump if pre_dump.get(k) != post_dump.get(k)]
-        raise ValueError(
-            f"Round-trip verification failed — .yaml removed, .md preserved.\n  Mismatched fields: {diff_keys}"
-        )
-
+    yaml_path = FileCache(md_path.parent).migrate_legacy_item(md_path)
     md_path.rename(md_path.with_suffix(".md.bak"))
     return yaml_path
 
@@ -322,7 +267,7 @@ def run_dry_run(backlog_dir: Path) -> MigrationReport:
                 result["detail"] = detail
                 report.errors.append((str(md_path), detail))
             report.results.append(result)
-        except (OSError, ValueError, KeyError, TypeError, AttributeError, YAMLError, ValidationError) as exc:
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, ValidationError) as exc:
             report.errors.append((str(md_path), str(exc)))
             report.results.append({"file": md_path.name, "status": "error", "error": str(exc)})
 
@@ -370,7 +315,7 @@ def run_migration(backlog_dir: Path) -> MigrationReport:
             migrate_file_live(md_path)
             report.migrated += 1
             report.results.append({"file": md_path.name, "status": "migrated"})
-        except (OSError, ValueError, KeyError, TypeError, AttributeError, YAMLError, ValidationError) as exc:
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, ValidationError) as exc:
             report.errors.append((str(md_path), str(exc)))
             report.results.append({"file": md_path.name, "status": "error", "error": str(exc)})
 

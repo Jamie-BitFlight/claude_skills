@@ -3,8 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement
-from backlog_core.models import ContentKind, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite
+from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
+from backlog_core.models import (
+    BacklogItem,
+    ContentKind,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+)
 
 
 def _reference(namespace: str, artifact_type: str = "research") -> ContentRef:
@@ -32,6 +39,51 @@ def test_file_cache_round_trips_complete_content_reference_without_collision(tmp
         "content-0",
         "content-1",
         "content-2",
+    ]
+
+
+def test_file_cache_round_trips_provider_snapshot_checkpoint(tmp_path: Path) -> None:
+    # Given: a provider-owned cache with one acknowledged global snapshot
+    cache = FileCache(tmp_path)
+
+    # When: the checkpoint is stored and the cache is reopened
+    cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z"))
+    reopened = FileCache(tmp_path)
+
+    # Then: the exact provider watermark remains durable
+    assert reopened._get_snapshot_checkpoint() == _ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z")
+
+
+def test_file_cache_coalesces_work_item_intent_and_reopens_it(tmp_path: Path) -> None:
+    # Given: two offline edits for one provider-linked work item
+    cache = FileCache(tmp_path)
+    first = BacklogItem(title="One", description="first")
+    first.metadata.issue = "#1"
+    second = first.model_copy(deep=True)
+    second.description = "second"
+
+    # When: both edits are queued and the cache is reopened
+    cache._queue_work_item("#1", first)
+    latest = cache._queue_work_item("#1", second)
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+
+    # Then: only the latest durable intent remains for idempotent replay
+    assert pending == [latest]
+
+
+def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> None:
+    # Given: snapshots persisted beneath separate private cache directories
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    cache._save_work_item_snapshot("plans/P12.yaml", BacklogItem(title="Plan snapshot"))
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: it receives ordered logical keys and typed work items, never paths
+    assert [(key, item.title) for key, item in snapshots] == [
+        ("issues/12.yaml", "Issue snapshot"),
+        ("plans/P12.yaml", "Plan snapshot"),
     ]
 
 

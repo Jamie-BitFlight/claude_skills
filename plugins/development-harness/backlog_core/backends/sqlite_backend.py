@@ -126,6 +126,11 @@ CREATE TABLE IF NOT EXISTS content_records (
     PRIMARY KEY (kind, namespace, artifact_type, name)
 );
 
+CREATE TABLE IF NOT EXISTS work_item_records (
+    reference TEXT PRIMARY KEY,
+    content   TEXT NOT NULL
+);
+
 PRAGMA journal_mode=WAL;
 """
 
@@ -172,12 +177,43 @@ class SQLiteBackend:
         self._conn.executescript(_SCHEMA_SQL)
         self._conn.commit()
 
+    def list_work_items(self) -> list[BacklogItem]:
+        """List native SQLite work items.
+
+        Returns:
+            Persisted work items.
+        """
+        rows = self._conn.execute("SELECT content FROM work_item_records ORDER BY reference").fetchall()
+        return [BacklogItem.model_validate_json(row["content"]) for row in rows]
+
+    def get_work_item(self, reference: str) -> BacklogItem:
+        """Get a work item by its stable reference.
+
+        Returns:
+            The matching work item.
+        """
+        row = self._conn.execute("SELECT content FROM work_item_records WHERE reference = ?", (reference,)).fetchone()
+        if row is not None:
+            return BacklogItem.model_validate_json(row["content"])
+        raise KeyError(reference)
+
+    def put_work_item(self, item: BacklogItem) -> None:
+        """Upsert a work item under its stable reference."""
+        item.reference = item.reference or item.issue or uuid.uuid4().hex
+        reference = item.reference
+        self._conn.execute(
+            "INSERT INTO work_item_records (reference, content) VALUES (?, ?) "
+            "ON CONFLICT(reference) DO UPDATE SET content = excluded.content",
+            (reference, item.model_dump_json()),
+        )
+        self._conn.commit()
+
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return the requested bounded page from SQLite content."""
         rows = self._conn.execute(
-            "SELECT * FROM content_records WHERE kind = ? AND owner_reference = ? "
+            "SELECT * FROM content_records WHERE kind = ? AND (? IS NULL OR owner_reference = ?) "
             "AND instr(lower(name), lower(?)) > 0 ORDER BY namespace, artifact_type, name LIMIT ? OFFSET ?",
-            (query.kind, query.owner_reference, query.search, query.limit, query.offset),
+            (query.kind, query.owner_reference, query.owner_reference, query.search, query.limit, query.offset),
         ).fetchall()
         return [self._content_record(row) for row in rows]
 
@@ -205,7 +241,7 @@ class SQLiteBackend:
         if request.expected_revision and request.expected_revision != current_revision:
             raise ContentConflictError("Content revision no longer matches")
         owner_reference = request.reference.namespace
-        if request.reference.kind == ContentKind.PLAN:
+        if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
             owner_reference = (
                 request.owner_reference
                 if request.owner_reference is not None
@@ -513,7 +549,6 @@ class SQLiteBackend:
         milestone_number: int | None = None,
         since: datetime | None = None,
         callback: Callable[[IssueNode], None] | None = None,
-        track_timestamp: bool = False,
     ) -> list[IssueNode]:
         """Return stored issues, calling callback for each.
 
@@ -526,7 +561,6 @@ class SQLiteBackend:
             milestone_number: Optional milestone number to filter by.
             since: Ignored.
             callback: Optional function called for each fetched IssueNode.
-            track_timestamp: Ignored.
 
         Returns:
             List of ``IssueNode`` TypedDicts.

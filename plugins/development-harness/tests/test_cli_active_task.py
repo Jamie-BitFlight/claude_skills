@@ -59,7 +59,7 @@ def test_set_get_clear_round_trip() -> None:
     """set stores the address; get reads it back; clear removes it."""
     stored = _run("set", "--address", "P1/T3")["active_task"]
     assert stored["plan"] == "1"
-    assert stored["task"] == "3"
+    assert stored["task"] == "T3"
 
     assert _run("get")["active_task"]["plan"] == "1"
 
@@ -99,7 +99,7 @@ def test_cli_and_mcp_share_the_same_context_store() -> None:
 
     assert mcp_view.active_task is not None
     assert mcp_view.active_task.plan == "7"
-    assert mcp_view.active_task.task == "2"
+    assert mcp_view.active_task.task == "T2"
 
 
 def test_backend_is_selectable_not_hardcoded_local(monkeypatch) -> None:

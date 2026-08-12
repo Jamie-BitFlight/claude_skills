@@ -3,15 +3,13 @@
 Proves the same logical operation through both transports produces equivalent
 results.  The structural parity (both delegate to ``dh_core.operations``) is
 already proven by ``test_server_operation_boundary.py``; these tests verify the
-runtime pattern works end-to-end against a shared state directory.
+runtime pattern works end-to-end against a shared SQLite provider.
 
 Covered operations:
 - Backlog list (CLI adds item, both list it)
 - Query filter (both filter by the same key and get the same results)
 
-Plan CRUD parity tests use explicit plan_dir to bypass the config singleton
-and issue=None to skip Gist write-through. The network guard in conftest.py
-forces GistTaskLayer to fall back to local cache for read/status/list.
+Plan CRUD parity tests use an explicit ``plan_dir``.
 """
 
 from __future__ import annotations
@@ -29,18 +27,14 @@ _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
-import contextlib
-
-import backlog_core.models as _bc_models
 from backlog_core.backend_protocol import reset_config as _reset_bp_config, set_config as _set_bp_config
 from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogConfig as _ModelsBacklogConfig
+from backlog_core.backends.sqlite_backend import SQLiteBackend
+from backlog_core.models import BacklogItem
 from backlog_core.server import mcp as _backlog_mcp
 from sam_schema import artifacts, dispatch
 from sam_schema.cli import app
-from sam_schema.core.backends.local_context_backend import LocalContextBackend
-from sam_schema.core.context_config import ContextConfig, get_context_config, reset_context_config, set_context_config
 from sam_schema.server import mcp as _sam_mcp
 from typer.testing import CliRunner
 
@@ -71,60 +65,57 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
 
 @pytest.fixture
 def dh_env(tmp_path: Path):
-    """Provide an isolated DH_STATE_HOME with memory backends for both transports.
+    """Provide an isolated SQLite backlog provider shared by both transports.
 
-    The CLI subprocess reads BACKLOG_BACKEND/TASKBACKEND/CONTEXTBACKEND env vars.
-    The in-process MCP calls read the respective singletons, so we patch them to
-    appropriate backends explicitly.  Both transports share the same state
-    directory so file-based operations see the same state.
+    The CLI selects SQLite through ``BACKLOG_BACKEND``. The in-process MCP
+    server receives the same SQLite file directly, because process-local
+    provider singletons cannot otherwise be shared with the CLI subprocess.
     """
     import dh_paths
-
-    real_root = dh_paths.infer_project_root()
-    bd = dh_paths.backlog_dir(project_root=real_root)
-    bd.mkdir(parents=True, exist_ok=True)
-
-    # In-process: force the backlog backend to InMemoryBackend so MCP calls
-    # don't auto-init a GitHubBackend and hit the network.
-    _set_bp_config(_BPBacklogConfig(backend=InMemoryBackend()))
-    existing = _bc_models._config
-    saved_bc_config = existing
-    _bc_models._config = _ModelsBacklogConfig(
-        repo_root=real_root, backlog_dir=bd, default_repo=existing.default_repo if existing is not None else ""
-    )
 
     dh_state = str(tmp_path / "dh_state")
     env = os.environ.copy()
     env.update({
         "DH_STATE_HOME": dh_state,
-        "BACKLOG_BACKEND": "memory",
-        "TASKBACKEND": "memory",
-        "CONTEXTBACKEND": "local",
+        "BACKLOG_BACKEND": "sqlite",
         "GITHUB_TOKEN": "",
         "GH_TOKEN": "",
     })
 
-    # In-process: point dh_paths and context config at the test state home so
-    # MCP calls share the same file-based context store as the CLI subprocess.
     saved_dh_home = os.environ.get("DH_STATE_HOME")
     os.environ["DH_STATE_HOME"] = dh_state
-    saved_ctx_config = None
-    with contextlib.suppress(RuntimeError):
-        saved_ctx_config = get_context_config()
-    set_context_config(ContextConfig(backend=LocalContextBackend()))
+    db_path = dh_paths.state_root() / "backlog.sqlite3"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    _set_bp_config(_BPBacklogConfig(backend=SQLiteBackend(str(db_path))))
 
     yield env
 
-    # Teardown: reset singletons so downstream tests get fresh config
-    reset_context_config()
-    if saved_ctx_config is not None:
-        set_context_config(saved_ctx_config)
     if saved_dh_home is not None:
         os.environ["DH_STATE_HOME"] = saved_dh_home
     else:
         os.environ.pop("DH_STATE_HOME", None)
     _reset_bp_config()
-    _bc_models._config = saved_bc_config
+
+
+async def test_memory_provider_is_process_local(dh_env: dict[str, str]) -> None:
+    """A memory-backed CLI item is absent from the fresh MCP provider."""
+    memory_env = {**dh_env, "BACKLOG_BACKEND": "memory"}
+
+    cli_result = _run_cli(
+        ["backlog", "add", "--title", "Memory Only", "--description", "test", "--priority", "P1"], env=memory_env
+    )
+    _set_bp_config(_BPBacklogConfig(backend=InMemoryBackend()))
+    mcp_list = await call_mcp_tool(_backlog_mcp, "backlog_list", {})
+
+    assert cli_result["title"] == "Memory Only"
+    assert "Memory Only" not in {item["title"] for item in mcp_list.get("items", [])}
+
+
+def test_sqlite_round_trip_restores_section_from_priority(tmp_path: Path) -> None:
+    backend = SQLiteBackend(str(tmp_path / "backlog.sqlite3"))
+    backend.put_work_item(BacklogItem(title="Round Trip", priority="P1", reference="p1-round-trip"))
+
+    assert backend.get_work_item("p1-round-trip").section == "P1"
 
 
 # ---------------------------------------------------------------------------
@@ -1337,13 +1328,6 @@ def test_dispatch_create_plan_rejects_undeclared_conflict_group(monkeypatch: pyt
             {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/research.md"},
             {"artifact_type": "research", "path": "plan/research.md", "content": "# Research", "status": "current"},
         ),
-        (
-            "migrate",
-            "artifact_migrate",
-            ["--item-id", "42", "--old-artifact-id", "plan/old.md", "--new-artifact-id", "plan/new.md"],
-            {"item_id": 42, "dry_run": False, "old_artifact_id": "plan/old.md", "new_artifact_id": "plan/new.md"},
-            {"migrated": 1},
-        ),
     ],
 )
 def test_artifact_cli_forwards_named_options(
@@ -1407,18 +1391,6 @@ def test_artifact_cli_forwards_named_options(
             {"item_id": "bd-a3f8", "artifact_type": "research", "artifact_id": "plan/research.md"},
             {"artifact_type": "research", "path": "plan/research.md", "content": "# Research", "status": "current"},
         ),
-        (
-            "migrate",
-            "artifact_migrate",
-            ["--item-id", "bd-a3f8", "--old-artifact-id", "plan/old.md", "--new-artifact-id", "plan/new.md"],
-            {
-                "item_id": "bd-a3f8",
-                "dry_run": False,
-                "old_artifact_id": "plan/old.md",
-                "new_artifact_id": "plan/new.md",
-            },
-            {"migrated": 1},
-        ),
     ],
 )
 def test_artifact_cli_preserves_nonnumeric_item_id(
@@ -1440,6 +1412,12 @@ def test_artifact_cli_preserves_nonnumeric_item_id(
     result = _runner.invoke(app, ["artifact", command, *args])
     _assert_compact_result(result, payload)
     mock_operation.assert_called_once_with(**kwargs)
+
+
+def test_artifact_cli_has_no_migrate_command() -> None:
+    result = _runner.invoke(app, ["artifact", "migrate"])
+    assert result.exit_code != 0
+    assert "No such command 'migrate'" in result.stderr
 
 
 def test_forwarding_diagnostics_are_stderr_only(monkeypatch: pytest.MonkeyPatch) -> None:

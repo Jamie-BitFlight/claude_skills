@@ -11,12 +11,14 @@ from backlog_core.models import (
     BacklogItem,
     ContentKind,
     ContentQuery,
+    ContentRecord,
     ContentRef,
     ContentWrite,
     ProviderPatch,
     ReconcileRequest,
     ReconcileScope,
 )
+from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
 
 
@@ -171,10 +173,10 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     # Then: the pure engine result and durable cache mutation are both completed internally
     assert result.fetched_items == 1
     assert result.local_updates == 1
-    assert result.file_paths["#1"].endswith("issues/1.yaml")
+    assert result.changed_references == ["#1"]
     assert not hasattr(backend, "fetch_snapshot")
     assert not hasattr(backend, "apply_patches")
-    assert cache._load_item_snapshot(Path("issues/1.yaml")).metadata.sync_fingerprint
+    assert cache._work_item_snapshots()[0][1].metadata.sync_fingerprint
 
 
 def test_github_content_provider_preserves_plan_identity_while_reassigning_owner(tmp_path: Path) -> None:
@@ -239,6 +241,148 @@ def test_github_content_provider_discovers_remote_plans_with_empty_cache(tmp_pat
     # Then: the remote index is authoritative and refreshes the private cache
     assert [(record.reference.name, record.content) for record in listed] == [("Premote", "remote body")]
     assert cache.get_content(ContentRef(kind=ContentKind.PLAN, name="Premote")).content == "remote body"
+
+
+def test_github_content_provider_round_trips_dispatch_content_without_sam_plan_index(tmp_path: Path) -> None:
+    # Given: an online provider with no cached content.
+    remote_content: dict[tuple[int, str, str], str] = {}
+    artifact_provider = MagicMock()
+    artifact_provider.store_artifact_content.side_effect = lambda owner, artifact_type, path, content: (
+        remote_content.__setitem__((owner, artifact_type, path), content)
+    )
+    artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
+        remote_content.get((owner, artifact_type, path))
+    )
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: a dispatch plan is created, preserved, reassigned, and unlinked.
+    created = backend.put_content(
+        ContentWrite(reference=reference, content='{"milestone":{"number":10}}', owner_reference="#1")
+    )
+    preserved = backend.put_content(
+        ContentWrite(
+            reference=reference,
+            content='{"milestone":{"number":10},"state":"draft"}',
+            expected_revision=created.revision,
+        )
+    )
+    reassigned = backend.put_content(
+        ContentWrite(
+            reference=reference,
+            content='{"milestone":{"number":10},"state":"ready"}',
+            owner_reference="#2",
+            expected_revision=preserved.revision,
+        )
+    )
+    written = backend.put_content(
+        ContentWrite(
+            reference=reference,
+            content='{"milestone":{"number":10},"state":"final"}',
+            owner_reference="",
+            expected_revision=reassigned.revision,
+        )
+    )
+    other_reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-11")
+    other = backend.put_content(
+        ContentWrite(reference=other_reference, content='{"milestone":{"number":11}}', owner_reference="#3")
+    )
+    fresh_backend = GitHubBackend(cache=FileCache(tmp_path / "fresh"), artifact_provider=artifact_provider)
+    fresh_backend.try_get_github = MagicMock(return_value=MagicMock())
+    dispatch_records = fresh_backend.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
+    unowned_dispatch_records = fresh_backend.list_content(
+        ContentQuery(kind=ContentKind.DISPATCH_PLAN, owner_reference="")
+    )
+    owned_dispatch_records = fresh_backend.list_content(
+        ContentQuery(kind=ContentKind.DISPATCH_PLAN, owner_reference="#3")
+    )
+    sam_records = fresh_backend.list_content(ContentQuery(kind=ContentKind.PLAN))
+
+    # Then: dispatch content round-trips independently and SAM discovery stays empty.
+    assert [
+        created.owner_reference,
+        preserved.owner_reference,
+        reassigned.owner_reference,
+        written.owner_reference,
+    ] == ["#1", "#1", "#2", ""]
+    assert written.reference == reference
+    assert [(record.reference, record.content) for record in dispatch_records] == [
+        (reference, '{"milestone":{"number":10},"state":"final"}'),
+        (other_reference, '{"milestone":{"number":11}}'),
+    ]
+    assert unowned_dispatch_records == [written]
+    assert owned_dispatch_records == [other]
+    assert sam_records == []
+
+
+def test_github_content_provider_reads_legacy_name_only_dispatch_index(tmp_path: Path) -> None:
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
+    remote_content = {
+        (2531, "dispatch-plan-index", "dispatch-plan/index.json"): '["dispatch-milestone-10"]',
+        (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): "legacy",
+    }
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
+        remote_content.get((owner, artifact_type, path))
+    )
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    records = backend.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN, owner_reference=""))
+
+    assert [(record.reference, record.owner_reference, record.content) for record in records] == [
+        (reference, "", "legacy")
+    ]
+
+
+def test_artifact_registry_client_plan_read_never_uses_local_artifact_storage() -> None:
+    # Given: a remote miss and a local file that must not participate in GitHub plan reads
+    provider = MagicMock()
+    provider.read_artifact_content_from_remote.return_value = None
+    provider.read_local_artifact_content.return_value = "wrong local plan"
+    client = ArtifactRegistryClient(provider)
+
+    # When: the plan is absent from its configured remote provider
+    content = client.read(42)
+
+    # Then: the client reports the miss without accessing arbitrary local artifact storage
+    assert content is None
+    provider.read_local_artifact_content.assert_not_called()
+
+
+def test_artifact_registry_client_index_read_never_uses_local_artifact_storage() -> None:
+    # Given: a remote index miss and a local file that must not participate in GitHub index reads
+    provider = MagicMock()
+    provider.read_artifact_content_from_remote.return_value = None
+    provider.read_local_artifact_content.return_value = "wrong local index"
+    client = ArtifactRegistryClient(provider)
+
+    # When: the index is absent from its configured remote provider
+    content = client.read_index(2531)
+
+    # Then: the client reports the miss without accessing arbitrary local artifact storage
+    assert content is None
+    provider.read_local_artifact_content.assert_not_called()
+
+
+def test_github_content_provider_reads_cached_plan_while_github_is_offline(tmp_path: Path) -> None:
+    # Given: a cached plan and an unreachable GitHub provider
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="Pcached")
+    cache.cache_content(
+        ContentRecord(reference=reference, owner_reference="#42", content="cached plan", revision="cached-revision")
+    )
+    artifact_provider = MagicMock()
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=None)
+
+    # When: the plan is requested while the configured provider is unavailable
+    cached = backend.get_content(reference)
+
+    # Then: the provider-owned FileCache serves an explicitly stale copy without any artifact filesystem access
+    assert (cached.content, cached.stale) == ("cached plan", True)
+    artifact_provider.read_local_artifact_content.assert_not_called()
 
 
 def test_github_content_provider_queues_offline_write_and_returns_stale_cache(tmp_path: Path) -> None:

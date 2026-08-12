@@ -9,9 +9,10 @@ gh_client, github_sync, or github_branches.  No business logic lives here.
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import dh_paths as _dh_paths
@@ -21,10 +22,11 @@ from sam_schema.core.plan_id_index import PlanIndexEntry, create_plan_id_index
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
-from backlog_core.file_cache import FileCache, ReplayAcknowledgement
+from backlog_core.file_cache import FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.models import (
     ArtifactManifest,
     BacklogError,
+    BacklogItem,
     ContentConflictError,
     ContentKind,
     ContentQuery,
@@ -45,6 +47,7 @@ from backlog_core.reconciliation import (
     ActionResult,
     LogicalCacheRecord,
     ReconcileExecution,
+    ReconcileOutcome,
     finalize_reconciliation,
     reconcile_backlog,
 )
@@ -57,7 +60,6 @@ if TYPE_CHECKING:
     from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode
     from backlog_core.models import (
         BackendStatus,
-        BacklogItem,
         BranchInfo,
         GroomedData,
         IssueLocalFields,
@@ -90,7 +92,7 @@ class _GitHubPlanPersistence:
         entries = [
             entry
             for entry in self._entries()
-            if self._owner(entry) == query.owner_reference
+            if (query.owner_reference is None or self._owner(entry) == query.owner_reference)
             and query.search.casefold() in f"{entry.plan_id} {entry.slug}".casefold()
         ]
         return [self._record(entry) for entry in entries[query.offset : query.offset + query.limit]]
@@ -164,6 +166,126 @@ class _GitHubPlanPersistence:
         return f"sam-plan/unlinked/{plan_id}.yaml"
 
 
+class _GitHubDispatchPersistence:
+    _CONTENT_TYPE = "dispatch-plan"
+    _INDEX_TYPE = "dispatch-plan-index"
+    _INDEX_PATH = "dispatch-plan/index.json"
+
+    def __init__(self, provider: ArtifactBackend) -> None:
+        self._provider = provider
+        self._sentinel_issue = create_plan_id_index(ArtifactRegistryClient(provider))._sentinel_issue
+
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+        entries = [
+            entry
+            for entry in self._entries()
+            if (query.owner_reference is None or entry.owner_reference == query.owner_reference)
+            and query.search.casefold() in entry.name.casefold()
+        ]
+        records = [self._record(entry) for entry in entries]
+        return records[query.offset : query.offset + query.limit]
+
+    def get(self, reference: ContentRef) -> ContentRecord:
+        entry = next((entry for entry in self._entries() if entry.name == reference.name), None)
+        if entry is None:
+            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+        return self._record(entry)
+
+    def put(self, request: ContentWrite) -> ContentRecord:
+        entries = self._entries()
+        entry = next((entry for entry in entries if entry.name == request.reference.name), None)
+        current = self._record(entry) if entry is not None else None
+        if request.expected_revision and (current is None or current.revision != request.expected_revision):
+            raise ContentConflictError("Content revision no longer matches")
+        owner_reference = (
+            request.owner_reference
+            if request.owner_reference is not None
+            else current.owner_reference
+            if current is not None
+            else ""
+        )
+        self._provider.store_artifact_content(
+            self._sentinel_issue, self._CONTENT_TYPE, self._content_path(request.reference.name), request.content
+        )
+        if entry is None or entry.owner_reference != owner_reference:
+            self._store_entries([
+                *[candidate for candidate in entries if candidate.name != request.reference.name],
+                _DispatchIndexEntry(name=request.reference.name, owner_reference=owner_reference),
+            ])
+        return ContentRecord(
+            reference=request.reference,
+            owner_reference=owner_reference,
+            content=request.content,
+            revision=GitHubBackend._content_revision(request.content),
+        )
+
+    def _record(self, entry: _DispatchIndexEntry) -> ContentRecord:
+        content = self._provider.read_artifact_content_from_remote(
+            self._sentinel_issue, self._CONTENT_TYPE, self._content_path(entry.name)
+        )
+        if content is None:
+            reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name)
+            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+        return ContentRecord(
+            reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name),
+            owner_reference=entry.owner_reference,
+            content=content,
+            revision=GitHubBackend._content_revision(content),
+        )
+
+    def _entries(self) -> Sequence[_DispatchIndexEntry]:
+        content = self._provider.read_artifact_content_from_remote(
+            self._sentinel_issue, self._INDEX_TYPE, self._INDEX_PATH
+        )
+        if content is None:
+            return []
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ContentUnavailableError("Dispatch content index is invalid") from exc
+        if isinstance(data, list) and all(isinstance(name, str) for name in data):
+            return [_DispatchIndexEntry(name=name, owner_reference="") for name in data]
+        if not isinstance(data, dict) or data.get("version") != 1:
+            raise ContentUnavailableError("Dispatch content index is invalid")
+        raw_entries = data.get("entries")
+        if not isinstance(raw_entries, list):
+            raise ContentUnavailableError("Dispatch content index is invalid")
+        entries: list[_DispatchIndexEntry] = []
+        for raw_entry in raw_entries:
+            if not isinstance(raw_entry, dict):
+                raise ContentUnavailableError("Dispatch content index is invalid")
+            name = raw_entry.get("name")
+            owner_reference = raw_entry.get("owner_reference")
+            if not isinstance(name, str) or not isinstance(owner_reference, str):
+                raise ContentUnavailableError("Dispatch content index is invalid")
+            entries.append(_DispatchIndexEntry(name=name, owner_reference=owner_reference))
+        return entries
+
+    def _store_entries(self, entries: Sequence[_DispatchIndexEntry]) -> None:
+        self._provider.store_artifact_content(
+            self._sentinel_issue,
+            self._INDEX_TYPE,
+            self._INDEX_PATH,
+            json.dumps(
+                {
+                    "version": 1,
+                    "entries": [{"name": entry.name, "owner_reference": entry.owner_reference} for entry in entries],
+                },
+                separators=(",", ":"),
+            ),
+        )
+
+    @staticmethod
+    def _content_path(name: str) -> str:
+        return f"dispatch-plan/{name}.json"
+
+
+@dataclass(frozen=True, slots=True)
+class _DispatchIndexEntry:
+    name: str
+    owner_reference: str
+
+
 class GitHubBackend:
     """Backend implementation delegating to gh_client, github_sync, and github_branches.
 
@@ -206,9 +328,9 @@ class GitHubBackend:
         """
         self._repo = repo
         self._cache = cache or FileCache(_dh_paths.state_root() / "github-cache")
-        self._cache_root = self._cache._root
         self._artifact_provider = artifact_provider or GitHubGistArtifactProvider(repo=repo)
         self._plan_persistence = plan_persistence or _GitHubPlanPersistence(self._artifact_provider)
+        self._dispatch_persistence = _GitHubDispatchPersistence(self._artifact_provider)
 
     # ------------------------------------------------------------------
     # Repository access
@@ -237,6 +359,30 @@ class GitHubBackend:
             BackendStatus with availability enum, last_check timestamp, and message.
         """
         return gh_client.probe_backend_status(repo or self._repo)
+
+    def list_work_items(self) -> list[BacklogItem]:
+        """List work items from the provider-private cache.
+
+        Returns:
+            Persisted work items.
+        """
+        return [record.item for record in self._load_reconcile_records()]
+
+    def get_work_item(self, reference: str) -> BacklogItem:
+        """Get a cached work item by stable reference.
+
+        Returns:
+            The matching work item.
+        """
+        for record in self._load_reconcile_records():
+            if reference == record.item.reference:
+                return record.item
+        raise KeyError(reference)
+
+    def put_work_item(self, item: BacklogItem) -> None:
+        """Persist a work-item intent for provider reconciliation."""
+        reference = item.reference or item.issue or hashlib.sha256(item.title.encode()).hexdigest()
+        self._cache._queue_work_item(reference, item.model_copy(update={"reference": reference}))
 
     # ------------------------------------------------------------------
     # GraphQL utilities
@@ -532,22 +678,19 @@ class GitHubBackend:
         """Reconcile provider state through the pure engine and private cache.
 
         Returns:
-            Completed reconciliation counts with changed cache paths.
+            Completed reconciliation counts with changed logical references.
         """
-        snapshot = self._fetch_snapshot(request)
-        plan = reconcile_backlog(self._load_reconcile_records(), snapshot, request)
+        effective_request = self._with_snapshot_checkpoint(request)
+        snapshot = self._fetch_snapshot(effective_request)
+        plan = reconcile_backlog(self._load_reconcile_records(), snapshot, effective_request)
         cache_results: list[ActionResult] = []
-        file_paths: dict[str, str] = {}
         for action in (entry for entry in plan.cache_actions if entry.phase == "before_provider"):
-            path = self._cache_path(action.key)
             try:
-                self._cache._save_item_snapshot(action.record.item, path)
+                self._cache._save_work_item_snapshot(action.key, action.record.item)
             except OSError:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="error"))
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
-                if action.record.item.metadata.issue:
-                    file_paths[action.record.item.metadata.issue] = str(self._cache_root / "items" / path)
 
         patch_results = self._apply_patches(plan.provider_patches)
         applied_revisions = {
@@ -559,35 +702,54 @@ class GitHubBackend:
                 continue
             metadata = action.record.item.metadata.model_copy(update={"updated_at": revision})
             item = action.record.item.model_copy(update={"metadata": metadata})
-            path = self._cache_path(action.key)
             try:
-                self._cache._save_item_snapshot(item, path)
+                self._cache._save_work_item_snapshot(action.key, item)
             except OSError:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="error"))
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
-                if item.metadata.issue:
-                    file_paths[item.metadata.issue] = str(self._cache_root / "items" / path)
 
         outcome = finalize_reconciliation(
             plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
         )
-        return outcome.result.model_copy(update={"file_paths": file_paths})
+        self._advance_snapshot_checkpoint(effective_request.scope, plan.snapshot_checkpoint, outcome)
+        if outcome.result.failures == 0 and outcome.result.conflicts == 0 and not effective_request.dry_run:
+            acknowledged = {
+                mutation.key
+                for mutation in self._cache._pending_work_item_mutations()
+                if mutation.item.metadata.issue in {item.reference for item in snapshot.items}
+            }
+            self._cache._acknowledge_work_items(acknowledged)
+        pending_mutations = len(self._cache.pending_mutations()) + len(self._cache._pending_work_item_mutations())
+        return outcome.result.model_copy(update={"pending_mutations": pending_mutations})
+
+    def _with_snapshot_checkpoint(self, request: ReconcileRequest) -> ReconcileRequest:
+        match request.scope:
+            case ReconcileScope.INCREMENTAL:
+                if request.since:
+                    return request
+                checkpoint = self._cache._get_snapshot_checkpoint()
+                if checkpoint is None:
+                    return request.model_copy(update={"scope": ReconcileScope.INITIAL})
+                return request.model_copy(update={"since": checkpoint.watermark})
+            case ReconcileScope.INITIAL | ReconcileScope.LINKED | ReconcileScope.TARGETED:
+                return request
+
+    def _advance_snapshot_checkpoint(self, scope: ReconcileScope, watermark: str, outcome: ReconcileOutcome) -> None:
+        if (
+            outcome.advance_snapshot_checkpoint
+            and outcome.result.conflicts == 0
+            and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
+        ):
+            self._cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark=watermark))
 
     def _load_reconcile_records(self) -> list[LogicalCacheRecord]:
-        records: list[LogicalCacheRecord] = []
-        item_root = self._cache_root / "items"
-        if not item_root.exists():
-            return records
-        for path in sorted(item_root.rglob("*.yaml")):
-            relative = path.relative_to(item_root)
-            records.append(LogicalCacheRecord(key=str(relative), item=self._cache._load_item_snapshot(relative)))
-        return records
-
-    @staticmethod
-    def _cache_path(key: str) -> Path:
-        number = parse_issue_number(key)
-        return Path("issues") / f"{number}.yaml" if number is not None else Path(key)
+        records_by_key = {
+            key: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
+        }
+        for mutation in self._cache._pending_work_item_mutations():
+            records_by_key[mutation.key] = LogicalCacheRecord(key=mutation.key, item=mutation.item)
+        return list(records_by_key.values())
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return a bounded cache-backed discovery page for GitHub content."""
@@ -599,11 +761,16 @@ class GitHubBackend:
                 for record in records:
                     self._cache.cache_content(record)
                 return records
+            if query.kind == ContentKind.DISPATCH_PLAN:
+                records = list(self._dispatch_persistence.list(query))
+                for record in records:
+                    self._cache.cache_content(record)
+                return records
         records = [
             record.model_copy(update={"stale": not online})
             for record in self._cache._load_state().records
             if record.reference.kind == query.kind
-            and record.owner_reference == query.owner_reference
+            and (query.owner_reference is None or record.owner_reference == query.owner_reference)
             and query.search.casefold() in record.reference.name.casefold()
         ]
         records.sort(
@@ -673,6 +840,8 @@ class GitHubBackend:
         match reference.kind:
             case ContentKind.PLAN:
                 return self._plan_persistence.get(reference)
+            case ContentKind.DISPATCH_PLAN:
+                return self._dispatch_persistence.get(reference)
             case ContentKind.ARTIFACT_MANIFEST:
                 manifest = self._artifact_provider.get_manifest(self._owner_number(reference.namespace))
                 content = manifest.model_dump_json(by_alias=True)
@@ -695,6 +864,8 @@ class GitHubBackend:
         owner_reference = request.reference.namespace
         if request.reference.kind == ContentKind.PLAN:
             return self._plan_persistence.put(request)
+        if request.reference.kind == ContentKind.DISPATCH_PLAN:
+            return self._dispatch_persistence.put(request)
         if request.expected_revision:
             current_revision = (
                 cached.revision
@@ -772,7 +943,6 @@ class GitHubBackend:
         milestone_number: int | None = None,
         since: datetime | None = None,
         callback: Callable[[IssueNode], None] | None = None,
-        track_timestamp: bool = False,
     ) -> list[IssueNode]:
         """Bulk-fetch issues with optional progress callback.
 
@@ -788,7 +958,6 @@ class GitHubBackend:
             milestone_number=milestone_number,
             since=since,
             callback=callback,
-            track_timestamp=track_timestamp,
         )
 
     def create_issue_for_item(
