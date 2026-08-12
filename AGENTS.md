@@ -298,6 +298,17 @@ discarding an unexpected diff (`git checkout`, `git restore`, `git reset --hard`
 and confirm it is unintended rather than assuming it is an agent artifact — an unexplained change
 is a reason to investigate and ask, not a reason to revert.
 
+### Branch-transfer preflight
+
+1. Before branch switching, selective checkout or cherry-pick, stash cleanup, or source-branch deletion, run
+   `uv run scripts/audit_branch_transfer.py --source <source-ref> --base <base-ref> --target <target-ref> --manifest <manifest.json>`.
+2. Build the compact JSON manifest using the schema in `uv run scripts/audit_branch_transfer.py --help`; record
+   each source-only commit and changed path as transferred, intentionally excluded with a non-empty reason, or
+   preserved by a named recovery ref.
+
+Complete the operation only when the guard emits `{"ok":true}`: the manifest accounts for every source-only
+commit and changed path.
+
 ## Testing Patterns
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`
@@ -357,6 +368,9 @@ Quality Gate requires ALL of these to pass:
 | `test-node` | npm test (if defined) |
 
 ## Backlog & Planning System
+
+Before creating or updating Beads, skills, or persistent agent memories, load `writing-for-agents`; write ordered
+steps with checkable, exhaustive completion criteria and keep each shared reference in one source.
 
 ### Backlog (provider-native plus structured MCP operations)
 
