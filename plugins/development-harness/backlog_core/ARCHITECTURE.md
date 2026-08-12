@@ -464,8 +464,8 @@ implementation details.
       kind: ContentKind
       owner_reference: str = ""
       search: str = ""
-      offset: int = 0
-      limit: int | None = None
+      offset: int = Field(default=0, ge=0)
+      limit: int = Field(default=100, ge=1, le=100)
 
   class ContentRecord(BaseModel):
       reference: ContentRef
@@ -483,8 +483,10 @@ implementation details.
       ) -> ContentRecord: ...
   ```
 
-  A non-empty `owner_reference` is the opaque work-item identifier from the configured backend; an
-  empty value places an unlinked plan in the backend's project-level namespace. `name` is the
+  Each backend instance is scoped by the composition root to exactly one project. A non-empty
+  `owner_reference` is the opaque work-item identifier from that backend; an empty value places an
+  unlinked plan in that backend instance's project namespace. Providers must not share that empty-owner
+  namespace across backend instances or project roots. `name` is the
   provider-neutral plan ID or artifact address. `list_content()` provides bounded plan discovery
   without requiring a known name; artifact callers normally address content directly. `revision`
   is opaque and compared only for equality. Remote offline reads may return `stale=True`; accepted

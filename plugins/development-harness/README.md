@@ -75,7 +75,7 @@ What happens:
 6. A context-gathering agent writes a context manifest so subsequent agents have full situational awareness
 
 The resulting context, architecture, and plan remain available to subsequent workflow stages and
-worktree-isolated agents through the configured backend.
+worktree-isolated agents through the workflow storage selected during setup.
 
 **RT-ICA Gate**: Before planning begins, Claude runs a Reverse Thinking Information Completeness Assessment. If any required information is genuinely missing (not just derivable), planning blocks and you are asked to provide it. This prevents plans built on assumptions.
 
