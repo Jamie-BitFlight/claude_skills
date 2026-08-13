@@ -503,6 +503,14 @@ max-complexity = 12
 # A (builtin-shadowing) and N (naming) often must mirror the external module's real names
 # verbatim; ANN softening (e.g. Any) reflects that the systems below the stub aren't ours to
 # manage — we can't always express their real shape more precisely than upstream does.
+"scripts/validate_codex_skill_activation.py" = [
+    "C901",
+    "D",
+    "DOC",
+    "PLR0912",
+    "TRY",
+]
+"tests/test_validate_codex_skill_activation.py" = ["RUF069"]
 "typings/**" = ["A", "ANN", "N"]
 
 [tool.ruff.lint.pycodestyle]

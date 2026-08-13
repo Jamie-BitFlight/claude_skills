@@ -38,7 +38,6 @@ import httpx
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.table import Table
 
 # Console setup
 console = Console()
@@ -436,6 +435,18 @@ def build_version_section(releases: list[dict[str, str]], current_doc_version: s
     return "\n".join(lines) + "\n"
 
 
+def _merge_version_section(skill_file: Path, new_content: str) -> str:
+    content = skill_file.read_text(encoding="utf-8")
+    match = VERSION_SECTION_PATTERN.search(content)
+    if match is None:
+        return new_content
+    existing_lines = match.group(2).splitlines()
+    if existing_lines and existing_lines[0].startswith("Current latest version:"):
+        existing_lines = existing_lines[1:]
+    existing_content = "\n".join(existing_lines).strip()
+    return f"{new_content.rstrip()}\n\n{existing_content}\n" if existing_content else new_content
+
+
 def update_skill_file(skill_file: Path, version_content: str) -> None:
     """Update the Version Information section in SKILL.md.
 
@@ -453,7 +464,9 @@ def update_skill_file(skill_file: Path, version_content: str) -> None:
     content = skill_file.read_text(encoding="utf-8")
 
     if VERSION_SECTION_PATTERN.search(content):
-        new_content = VERSION_SECTION_PATTERN.sub(f"## Version Information\n\n{version_content}", content)
+        new_content = VERSION_SECTION_PATTERN.sub(
+            lambda _: f"## Version Information\n\n{version_content}", content
+        )
     else:
         new_content = content.rstrip() + f"\n\n## Version Information\n\n{version_content}\n"
 
@@ -461,30 +474,23 @@ def update_skill_file(skill_file: Path, version_content: str) -> None:
 
 
 def display_release_summary(releases: list[dict[str, str]]) -> None:
-    """Print a summary table of releases to the console.
+    """Print a compact JSON release summary.
 
     Args:
         releases: List of release dicts
     """
-    table = Table(title="uv Releases Summary")
-    table.add_column("Version", style="cyan")
-    table.add_column("Date", style="green")
-    table.add_column("Breaking", style="red")
-    table.add_column("Features", style="blue")
-
+    summary: list[dict[str, int | str]] = []
     for r in releases[:15]:
         cats = categorize_release(r["body"])
-        breaking_count = len(cats["breaking"])
-        feature_count = len(cats["features"])
-
-        table.add_row(
-            r["version"],
-            r["date"],
-            str(breaking_count) if breaking_count else "-",
-            str(feature_count) if feature_count else "-",
+        summary.append(
+            {
+                "version": r["version"],
+                "date": r["date"],
+                "breaking": len(cats["breaking"]),
+                "features": len(cats["features"]),
+            }
         )
-
-    console.print(table)
+    print(json.dumps(summary, separators=(",", ":")))
 
 
 def main(
@@ -547,6 +553,10 @@ def main(
         else:
             new_releases = releases
 
+        if not new_releases:
+            update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
+            raise typer.Exit(code=0)
+
         console.print(
             f"Found [cyan]{len(releases)}[/cyan] total releases, [green]{len(new_releases)}[/green] newer than baseline"
         )
@@ -557,13 +567,13 @@ def main(
         if dry_run:
             console.print(Panel("Dry run mode - no files modified", title="Dry Run", border_style="yellow"))
             # Still build the content to show what would change
-            version_content = build_version_section(new_releases, baseline)
+            version_content = _merge_version_section(skill_file, build_version_section(new_releases, baseline))
             console.print("\n[bold]Would write to Version Information section:[/bold]\n")
             console.print(version_content)
             raise typer.Exit(code=0)
 
         # Build and write version section
-        version_content = build_version_section(new_releases, baseline)
+        version_content = _merge_version_section(skill_file, build_version_section(new_releases, baseline))
         update_skill_file(skill_file, version_content)
 
         latest_version = releases[0]["version"]

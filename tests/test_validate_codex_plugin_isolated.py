@@ -99,6 +99,12 @@ def test_copy_distribution_preserves_same_name_plugin_behavior() -> None:
         validator.cleanup_workspace(workspace)
 
 
+def test_relative_output_file_is_resolved_before_temp_project_cwd() -> None:
+    output_file = validator._resolve_output_file(Path("reports/smoke.txt"), "plugin")
+
+    assert output_file == (Path.cwd() / "reports/smoke.txt").resolve()
+
+
 def test_git_project_fixture_creates_repository() -> None:
     workspace = validator.create_temp_workspace("development-harness")
     try:

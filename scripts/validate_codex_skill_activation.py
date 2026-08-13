@@ -6,19 +6,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
-import select
+import queue
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import validate_codex_plugin_isolated as isolated
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MATRIX_PATH = REPO_ROOT / "plan" / "codex-skill-activation-matrix.jsonl"
+MATRIX_PATH = REPO_ROOT / "tests" / "fixtures" / "codex-skill-activation-matrix.jsonl"
 MCP_CONFIG_NAMES = frozenset({".mcp.json", ".mcp.codex.json"})
 BLOCKED_ITEM_TYPES = frozenset({"commandExecution", "fileChange", "mcpToolCall"})
 APP_SERVER_COMMAND = ("codex", "--disable", "apps", "app-server")
@@ -50,9 +49,7 @@ def create_parser() -> argparse.ArgumentParser:
     """Build the activation-harness command-line parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plugin", default="xdg-base-directory")
-    parser.add_argument(
-        "--target", required=True, help="Matrix target: <plugin-id>:<skill>."
-    )
+    parser.add_argument("--target", required=True, help="Matrix target: <plugin-id>:<skill>.")
     parser.add_argument("--expect-contains", action="append", default=[])
     parser.add_argument("--evidence-file", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=float, default=45.0)
@@ -77,9 +74,7 @@ def tree_sha256(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
-            raise HarnessError(
-                f"Plugin tree contains a symbolic link: {path.relative_to(root)}"
-            )
+            raise HarnessError(f"Plugin tree contains a symbolic link: {path.relative_to(root)}")
         relative = path.relative_to(root).as_posix().encode("utf-8")
         if path.is_dir():
             digest.update(b"D\0" + relative + b"\0")
@@ -89,23 +84,15 @@ def tree_sha256(root: Path) -> str:
                 while chunk := stream.read(65_536):
                     digest.update(chunk)
         else:
-            raise HarnessError(
-                f"Plugin tree contains an unsupported entry: {path.relative_to(root)}"
-            )
+            raise HarnessError(f"Plugin tree contains an unsupported entry: {path.relative_to(root)}")
     return digest.hexdigest()
 
 
 def resolve_installed_skill(plugin_cache_root: Path, skill_name: str) -> InstalledSkill:
     """Resolve one skill from exactly one installed plugin version."""
-    versions = [
-        path
-        for path in plugin_cache_root.iterdir()
-        if path.is_dir() and not path.is_symlink()
-    ]
+    versions = [path for path in plugin_cache_root.iterdir() if path.is_dir() and not path.is_symlink()]
     if len(versions) != 1:
-        raise HarnessError(
-            f"Expected one installed plugin version, found {len(versions)}"
-        )
+        raise HarnessError(f"Expected one installed plugin version, found {len(versions)}")
     plugin_root = versions[0]
     skill_path = plugin_root / "skills" / skill_name / "SKILL.md"
     if skill_path.is_symlink():
@@ -118,9 +105,7 @@ def resolve_installed_skill(plugin_cache_root: Path, skill_name: str) -> Install
         raise HarnessError("Installed skill is not a regular file")
     return InstalledSkill(
         path=resolved_skill,
-        relative_path=resolved_skill.relative_to(
-            plugin_cache_root.resolve(strict=True)
-        ),
+        relative_path=resolved_skill.relative_to(plugin_cache_root.resolve(strict=True)),
         sha256=sha256_file(resolved_skill),
         tree_sha256=tree_sha256(resolved_root),
     )
@@ -143,22 +128,13 @@ def load_matrix_target(target: str) -> dict[str, object]:
 
 def ensure_no_mcp_configuration(plugin_root: Path) -> None:
     """Keep MCP-bearing plugins in the separate FastMCP validation lane."""
-    names = [
-        path.name for path in plugin_root.rglob("*") if path.name in MCP_CONFIG_NAMES
-    ]
+    names = [path.name for path in plugin_root.rglob("*") if path.name in MCP_CONFIG_NAMES]
     if names:
-        raise HarnessError(
-            "Plugin declares MCP configuration; use the FastMCP validation lane"
-        )
+        raise HarnessError("Plugin declares MCP configuration; use the FastMCP validation lane")
 
 
 def build_turn_request(
-    *,
-    thread_id: str,
-    skill_name: str,
-    skill_path: Path,
-    task_text: str,
-    project_dir: Path,
+    *, thread_id: str, skill_name: str, skill_path: Path, task_text: str, project_dir: Path
 ) -> dict[str, object]:
     """Create the documented explicit-skill app-server turn request."""
     return {
@@ -177,12 +153,7 @@ def build_turn_request(
     }
 
 
-def observe_event(
-    message: dict[str, object],
-    *,
-    observed_methods: list[str],
-    response_fragments: list[str],
-) -> None:
+def observe_event(message: dict[str, object], *, observed_methods: list[str], response_fragments: list[str]) -> None:
     """Record safe event metadata and reject behavior outside this test lane."""
     method = message.get("method")
     if not isinstance(method, str):
@@ -194,9 +165,7 @@ def observe_event(
     if method.startswith("mcpServer/"):
         server_name = params.get("name")
         detail = f" for {server_name}" if isinstance(server_name, str) else ""
-        raise HarnessError(
-            f"MCP event observed in read-only activation lane: {method}{detail}"
-        )
+        raise HarnessError(f"MCP event observed in read-only activation lane: {method}{detail}")
     if method.endswith("/requestApproval"):
         raise HarnessError(f"Unexpected approval request: {method}")
     item = params.get("item")
@@ -230,6 +199,17 @@ class AppServerClient:
         self.process = process
         self.deadline = deadline
         self.buffer = b""
+        if process.stdout is None:
+            raise HarnessError("App-server stdout is unavailable")
+        self._stdout_chunks: queue.Queue[bytes | None] = queue.Queue()
+        threading.Thread(target=self._read_stdout, daemon=True).start()
+
+    def _read_stdout(self) -> None:
+        if self.process.stdout is None:
+            return
+        for line in iter(self.process.stdout.readline, b""):
+            self._stdout_chunks.put(line)
+        self._stdout_chunks.put(None)
 
     def send(self, message: dict[str, object]) -> None:
         if self.process.stdin is None:
@@ -238,8 +218,6 @@ class AppServerClient:
         self.process.stdin.flush()
 
     def receive(self) -> dict[str, object]:
-        if self.process.stdout is None:
-            raise HarnessError("App-server stdout is unavailable")
         while True:
             message, self.buffer = pop_jsonl_message(self.buffer)
             if message is not None:
@@ -247,34 +225,22 @@ class AppServerClient:
             remaining = self.deadline - time.monotonic()
             if remaining <= 0:
                 raise HarnessError("Timed out waiting for app-server")
-            readable, _, _ = select.select(
-                [self.process.stdout.fileno()], [], [], remaining
-            )
-            if not readable:
-                raise HarnessError("Timed out waiting for app-server")
-            chunk = os.read(self.process.stdout.fileno(), 65_536)
-            if not chunk:
-                raise HarnessError(
-                    "App-server closed stdout before completing the turn"
-                )
+            try:
+                chunk = self._stdout_chunks.get(timeout=remaining)
+            except queue.Empty:
+                raise HarnessError("Timed out waiting for app-server") from None
+            if chunk is None:
+                raise HarnessError("App-server closed stdout before completing the turn")
             self.buffer += chunk
 
     def request(
-        self,
-        message: dict[str, object],
-        *,
-        observed_methods: list[str],
-        response_fragments: list[str],
+        self, message: dict[str, object], *, observed_methods: list[str], response_fragments: list[str]
     ) -> dict[str, object]:
         self.send(message)
         request_id = message["id"]
         while True:
             response = self.receive()
-            observe_event(
-                response,
-                observed_methods=observed_methods,
-                response_fragments=response_fragments,
-            )
+            observe_event(response, observed_methods=observed_methods, response_fragments=response_fragments)
             if "id" not in response:
                 continue
             if response["id"] != request_id:
@@ -284,17 +250,11 @@ class AppServerClient:
             result = response.get("result")
             if not isinstance(result, dict):
                 raise HarnessError("App-server response has no object result")
-            return result
+            return {str(key): value for key, value in result.items()}
 
 
 def run_app_server(
-    *,
-    env: dict[str, str],
-    project_dir: Path,
-    skill_name: str,
-    skill_path: Path,
-    task_text: str,
-    timeout_seconds: float,
+    *, env: dict[str, str], project_dir: Path, skill_name: str, skill_path: Path, task_text: str, timeout_seconds: float
 ) -> ActivationResult:
     """Run one explicit skill turn and reject any unsafe event category."""
     process = subprocess.Popen(
@@ -313,12 +273,7 @@ def run_app_server(
             {
                 "method": "initialize",
                 "id": 1,
-                "params": {
-                    "clientInfo": {
-                        "name": "codex-plugin-activation-validator",
-                        "version": "1",
-                    }
-                },
+                "params": {"clientInfo": {"name": "codex-plugin-activation-validator", "version": "1"}},
             },
             observed_methods=observed_methods,
             response_fragments=response_fragments,
@@ -328,11 +283,7 @@ def run_app_server(
             {
                 "method": "thread/start",
                 "id": 2,
-                "params": {
-                    "cwd": str(project_dir),
-                    "approvalPolicy": "never",
-                    "sandbox": "read-only",
-                },
+                "params": {"cwd": str(project_dir), "approvalPolicy": "never", "sandbox": "read-only"},
             },
             observed_methods=observed_methods,
             response_fragments=response_fragments,
@@ -340,38 +291,37 @@ def run_app_server(
         thread = thread_result.get("thread")
         if not isinstance(thread, dict) or not isinstance(thread.get("id"), str):
             raise HarnessError("App-server did not return a thread id")
+        thread_id = thread.get("id")
+        if not isinstance(thread_id, str):
+            raise HarnessError("App-server did not return a thread id")
         turn_request = build_turn_request(
-            thread_id=thread["id"],
+            thread_id=thread_id,
             skill_name=skill_name,
             skill_path=skill_path,
             task_text=task_text,
             project_dir=project_dir,
         )
         turn_result = client.request(
-            turn_request,
-            observed_methods=observed_methods,
-            response_fragments=response_fragments,
+            turn_request, observed_methods=observed_methods, response_fragments=response_fragments
         )
         turn = turn_result.get("turn")
         if not isinstance(turn, dict) or not isinstance(turn.get("id"), str):
             raise HarnessError("App-server did not return a turn id")
+        turn_id = turn.get("id")
+        if not isinstance(turn_id, str):
+            raise HarnessError("App-server did not return a turn id")
         while True:
             event = client.receive()
-            observe_event(
-                event,
-                observed_methods=observed_methods,
-                response_fragments=response_fragments,
-            )
+            observe_event(event, observed_methods=observed_methods, response_fragments=response_fragments)
             if event.get("method") != "turn/completed":
                 continue
-            params = event["params"]
+            params = event.get("params")
             if not isinstance(params, dict) or not isinstance(params.get("turn"), dict):
                 raise HarnessError("Malformed turn completion event")
-            completed_turn = params["turn"]
-            if (
-                completed_turn.get("id") != turn["id"]
-                or completed_turn.get("status") != "completed"
-            ):
+            completed_turn = params.get("turn")
+            if not isinstance(completed_turn, dict):
+                raise HarnessError("Malformed turn completion event")
+            if completed_turn.get("id") != turn_id or completed_turn.get("status") != "completed":
                 raise HarnessError("Skill turn did not complete successfully")
             break
         response_text = "".join(response_fragments)
@@ -391,9 +341,7 @@ def run_app_server(
 
 def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> None:
     """Run a setup command without exposing its output or ambient credentials."""
-    completed = subprocess.run(
-        argv, cwd=cwd, env=env, text=True, capture_output=True, check=False
-    )
+    completed = subprocess.run(argv, cwd=cwd, env=env, text=True, capture_output=True, check=False)
     if completed.returncode != 0:
         raise HarnessError(f"{label} failed with exit code {completed.returncode}")
 
@@ -401,9 +349,7 @@ def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -
 def write_evidence(path: Path, evidence: dict[str, object]) -> None:
     """Write only redacted, commit-safe activation evidence."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -414,9 +360,7 @@ def main() -> int:
         target = load_matrix_target(args.target)
         workspace = isolated.create_temp_workspace(args.plugin)
         if not args.target.startswith(f"{workspace.plugin_id}:"):
-            raise HarnessError(
-                "Target plugin id does not match the selected plugin directory"
-            )
+            raise HarnessError("Target plugin id does not match the selected plugin directory")
         skill_name = args.target.removeprefix(f"{workspace.plugin_id}:")
         if not skill_name or "/" in skill_name:
             raise HarnessError("Target skill name is invalid")
@@ -424,59 +368,37 @@ def main() -> int:
         source_digest = tree_sha256(workspace.plugin_dir)
         env = isolated.build_env(args.path_prefix, workspace.codex_home)
         run_silent(
-            [
-                "codex",
-                "plugin",
-                "marketplace",
-                "add",
-                str(workspace.marketplace_source),
-            ],
+            ["codex", "plugin", "marketplace", "add", str(workspace.marketplace_source)],
             cwd=workspace.project_dir,
             env=env,
             label="marketplace registration",
         )
         run_silent(
-            [
-                "codex",
-                "plugin",
-                "add",
-                f"{workspace.plugin_id}@{workspace.marketplace_name}",
-            ],
+            ["codex", "plugin", "add", f"{workspace.plugin_id}@{workspace.marketplace_name}"],
             cwd=workspace.project_dir,
             env=env,
             label="plugin installation",
         )
-        cache_root = (
-            workspace.codex_home
-            / "plugins"
-            / "cache"
-            / workspace.marketplace_name
-            / workspace.plugin_id
-        )
+        cache_root = workspace.codex_home / "plugins" / "cache" / workspace.marketplace_name / workspace.plugin_id
         installed = resolve_installed_skill(cache_root, skill_name)
         if installed.tree_sha256 != source_digest:
-            raise HarnessError(
-                "Installed cache tree does not match the distributed plugin tree"
-            )
+            raise HarnessError("Installed cache tree does not match the distributed plugin tree")
         if args.copy_auth_from_current_home:
             isolated.copy_auth_from_current_home(workspace)
+        task_text = target.get("task_text")
+        if not isinstance(task_text, str):
+            raise HarnessError("Mapped target has no task text")
         result = run_app_server(
             env=env,
             project_dir=workspace.project_dir,
-            skill_name=args.target,
+            skill_name=skill_name,
             skill_path=installed.path,
-            task_text=target["task_text"],
+            task_text=task_text,
             timeout_seconds=args.timeout_seconds,
         )
-        matched = [
-            token
-            for token in args.expect_contains
-            if token.casefold() in result.response_text.casefold()
-        ]
+        matched = [token for token in args.expect_contains if token.casefold() in result.response_text.casefold()]
         if len(matched) != len(args.expect_contains):
-            raise HarnessError(
-                "Skill response did not meet the supplied behavioral assertion"
-            )
+            raise HarnessError("Skill response did not meet the supplied behavioral assertion")
         write_evidence(
             args.evidence_file,
             {
@@ -486,9 +408,7 @@ def main() -> int:
                 "installed_tree_sha256": installed.tree_sha256,
                 "observed_methods": list(result.observed_methods),
                 "response_characters": len(result.response_text),
-                "response_sha256": hashlib.sha256(
-                    result.response_text.encode()
-                ).hexdigest(),
+                "response_sha256": hashlib.sha256(result.response_text.encode()).hexdigest(),
                 "skill_sha256": installed.sha256,
                 "source_tree_sha256": source_digest,
                 "status": "PASSED",
@@ -497,12 +417,7 @@ def main() -> int:
         )
         print(f"Activation evidence written to: {args.evidence_file}")
         return 0
-    except (
-        HarnessError,
-        OSError,
-        subprocess.SubprocessError,
-        json.JSONDecodeError,
-    ) as error:
+    except (HarnessError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     finally:

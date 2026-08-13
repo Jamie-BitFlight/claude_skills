@@ -6,7 +6,6 @@ import json
 import sys
 from pathlib import Path
 
-
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 
 import generate_codex_skill_activation_matrix as generator
@@ -17,12 +16,9 @@ def test_checked_in_matrix_matches_declared_plugin_skills() -> None:
     rows = generator.apply_overrides(generator.build_rows(), generator.load_overrides())
     checked_in = generator.MATRIX_PATH.read_text(encoding="utf-8")
 
-    assert len(rows) == 245
+    assert len(rows) == 246
     assert checked_in == generator.render_rows(rows)
-    assert all(
-        row["status"] in {"NO_ORACLE", "MAPPED", "BLOCKED", "PASSED", "FAILED"}
-        for row in rows
-    )
+    assert all(row["status"] in {"NO_ORACLE", "MAPPED", "BLOCKED", "PASSED", "FAILED"} for row in rows)
     for row in rows:
         if row["status"] == "NO_ORACLE":
             assert row["task_source"] is None
@@ -38,4 +34,4 @@ def test_checked_in_matrix_matches_declared_plugin_skills() -> None:
     parsed_rows = [json.loads(line) for line in checked_in.splitlines()]
     targets = [row["target"] for row in parsed_rows]
     assert targets == sorted(targets)
-    assert len({row["target"] for row in parsed_rows}) == 245
+    assert len({row["target"] for row in parsed_rows}) == 246

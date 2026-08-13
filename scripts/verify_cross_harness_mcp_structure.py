@@ -13,6 +13,7 @@ repositories, or run a plugin. Those are separate, more expensive stages.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -100,7 +101,14 @@ def inspect_tree(candidate: dict[str, Any]) -> dict[str, Any]:
     repository = candidate["repository"]
     branch = candidate["default_branch"]
     if branch is None:
-        return {"repository": repository, "status": "tree_unavailable", "reason": "repository has no default branch"}
+        return {
+            "repository": repository,
+            "rank": candidate["rank"],
+            "stars": candidate["stars"],
+            "forks": candidate["forks"],
+            "status": "tree_unavailable",
+            "reason": "repository has no default branch",
+        }
 
     tree = run_gh_json(["api", f"repos/{repository}/git/trees/{branch}?recursive=1"])
     paths = sorted(entry["path"] for entry in tree.get("tree", []) if entry.get("type") == "blob")
@@ -143,13 +151,19 @@ def inspect_tree(candidate: dict[str, Any]) -> dict[str, Any]:
 
 
 def write_output(
-    output: Path, input_path: Path, input_partial: bool, records: list[dict[str, Any]], complete: bool
+    output: Path,
+    input_path: Path,
+    input_fingerprint: str,
+    input_partial: bool,
+    records: list[dict[str, Any]],
+    complete: bool,
 ) -> None:
     """Atomically persist structure records after each requested repository.
 
     Args:
         output: Destination JSON path.
         input_path: Original ranked-candidate dataset.
+        input_fingerprint: Digest of the candidate input used for resumption.
         input_partial: Whether the source dataset was flagged as partial.
         records: Existing rank-ordered structure records.
         complete: Whether every input candidate received a record.
@@ -160,6 +174,7 @@ def write_output(
         "generated_at": datetime.now(UTC).isoformat(),
         "scope": "repository-tree structure only; no manifest or MCP content was read and no plugin was executed",
         "source_rankings": str(input_path),
+        "source_rankings_fingerprint": input_fingerprint,
         "source_rankings_partial": input_partial,
         "complete": complete,
         "records": records,
@@ -194,7 +209,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_existing_records(output: Path) -> list[dict[str, Any]]:
+def load_existing_records(output: Path, input_fingerprint: str) -> list[dict[str, Any]]:
     """Load records from a prior interrupted verifier run.
 
     Returns:
@@ -206,6 +221,8 @@ def load_existing_records(output: Path) -> list[dict[str, Any]]:
     records = payload.get("records")
     if not isinstance(records, list):
         raise TypeError(f"Malformed verifier output: {output}")
+    if payload.get("source_rankings_fingerprint") != input_fingerprint:
+        return []
     return records
 
 
@@ -219,11 +236,19 @@ def main() -> int:
     candidate_data = json.loads(args.input.read_text(encoding="utf-8"))
     if candidate_data.get("partial") and not args.allow_partial_input:
         raise RuntimeError("Candidate input is partial; pass --allow-partial-input to use it explicitly")
-    candidates = candidate_data.get("eligible_candidates")
-    if not isinstance(candidates, list):
+    raw_candidates = candidate_data.get("eligible_candidates")
+    if not isinstance(raw_candidates, list):
         raise TypeError(f"Malformed candidate input: {args.input}")
+    candidates: list[dict[str, Any]] = []
+    for candidate in raw_candidates:
+        if not isinstance(candidate, dict):
+            raise TypeError(f"Malformed candidate input: {args.input}")
+        candidates.append(candidate)
 
-    records = [] if args.refresh else load_existing_records(args.output)
+    input_fingerprint = hashlib.sha256(
+        json.dumps(candidates, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    records = [] if args.refresh else load_existing_records(args.output, input_fingerprint)
     completed_repositories = {record["repository"] for record in records}
     for rank, candidate in enumerate(candidates, start=1):
         candidate["rank"] = rank
@@ -242,10 +267,14 @@ def main() -> int:
             }
         records.append(record)
         records.sort(key=itemgetter("rank"))
-        write_output(args.output, args.input, candidate_data.get("partial", False), records, complete=False)
+        write_output(
+            args.output, args.input, input_fingerprint, candidate_data.get("partial", False), records, complete=False
+        )
         time.sleep(args.delay_seconds)
 
-    write_output(args.output, args.input, candidate_data.get("partial", False), records, complete=True)
+    write_output(
+        args.output, args.input, input_fingerprint, candidate_data.get("partial", False), records, complete=True
+    )
     print(f"Wrote {len(records)} structure records to {args.output}")
     return 0
 

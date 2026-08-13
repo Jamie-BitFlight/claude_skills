@@ -1,41 +1,62 @@
 #!/usr/bin/env python3
+"""Synchronize Codex plugin manifests from their Claude plugin metadata."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_DIR = ROOT / "plugins"
+SHORT_DESCRIPTION_LIMIT = 240
 
 
 def title_case_from_kebab(name: str) -> str:
+    """Convert a kebab-case plugin identifier to a display name.
+
+    Returns:
+        The display name.
+    """
     return " ".join(part.capitalize() for part in name.split("-") if part)
 
 
+def _short_description(description: str) -> str:
+    if len(description) <= SHORT_DESCRIPTION_LIMIT:
+        return description
+    return f"{description[:237].rsplit(' ', 1)[0]}..."
+
+
 def detect_capabilities(plugin_dir: Path) -> list[str]:
+    """Return interface capabilities implied by plugin components."""
     capabilities = ["Interactive"]
     if (plugin_dir / "skills").is_dir():
         capabilities.append("Read")
-    if any(
-        (
-            (plugin_dir / "commands").is_dir(),
-            (plugin_dir / "hooks").is_dir(),
-            (plugin_dir / "hooks.json").is_file(),
-            (plugin_dir / ".mcp.json").is_file(),
-            (plugin_dir / ".app.json").is_file(),
-        )
-    ):
+    if any((
+        (plugin_dir / "commands").is_dir(),
+        (plugin_dir / "hooks").is_dir(),
+        (plugin_dir / "hooks.json").is_file(),
+        (plugin_dir / ".mcp.json").is_file(),
+        (plugin_dir / ".app.json").is_file(),
+    )):
         capabilities.append("Write")
     return list(dict.fromkeys(capabilities))
 
 
 def load_json(path: Path) -> dict:
-    return json.loads(path.read_text())
+    """Load a JSON object from a UTF-8 file.
+
+    Returns:
+        The decoded JSON object.
+    """
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def sync_mcp_file(plugin_dir: Path) -> bool:
+    """Normalize a plugin MCP file to a direct server map when possible.
+
+    Returns:
+        Whether the file was written.
+    """
     claude_manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
     mcp_path = plugin_dir / ".mcp.json"
 
@@ -64,6 +85,11 @@ def sync_mcp_file(plugin_dir: Path) -> bool:
 
 
 def sync_manifest(plugin_dir: Path) -> bool:
+    """Synchronize one Codex manifest and report whether it changed.
+
+    Returns:
+        Whether the manifest was changed.
+    """
     manifest_path = plugin_dir / ".codex-plugin" / "plugin.json"
     if not manifest_path.is_file():
         return False
@@ -75,8 +101,10 @@ def sync_manifest(plugin_dir: Path) -> bool:
         manifest["skills"] = "./skills/"
         changed = True
 
-    if (plugin_dir / ".mcp.json").is_file() and manifest.get("mcpServers") != "./.mcp.json":
-        manifest["mcpServers"] = "./.mcp.json"
+    mcp_manifest = manifest.get("mcpServers")
+    mcp_path = mcp_manifest if isinstance(mcp_manifest, str) else "./.mcp.json"
+    if (plugin_dir / mcp_path).is_file() and manifest.get("mcpServers") != mcp_path:
+        manifest["mcpServers"] = mcp_path
         changed = True
 
     if (plugin_dir / ".app.json").is_file() and manifest.get("apps") != "./.app.json":
@@ -96,12 +124,15 @@ def sync_manifest(plugin_dir: Path) -> bool:
 
     interface = {
         "displayName": display_name,
-        "shortDescription": description,
+        "shortDescription": _short_description(description),
         "longDescription": description,
         "developerName": developer_name,
         "category": "Developer Tools",
         "capabilities": detect_capabilities(plugin_dir),
     }
+    existing_interface = manifest.get("interface")
+    if isinstance(existing_interface, dict) and "defaultPrompt" in existing_interface:
+        interface["defaultPrompt"] = existing_interface["defaultPrompt"]
 
     if manifest.get("interface") != interface:
         manifest["interface"] = interface
@@ -114,6 +145,11 @@ def sync_manifest(plugin_dir: Path) -> bool:
 
 
 def main() -> int:
+    """Synchronize every Codex plugin manifest in the repository.
+
+    Returns:
+        Process exit status.
+    """
     changed = 0
     for plugin_dir in sorted(PLUGINS_DIR.iterdir()):
         if not plugin_dir.is_dir():

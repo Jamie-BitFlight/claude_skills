@@ -18,10 +18,12 @@ def resolve_project_root(project_root: str | None) -> Path:
     Priority: explicit *project_root* argument, then the launcher-provided
     ``CLAUDE_PROJECT_DIR`` environment variable (set by this plugin's
     ``.claude-plugin/plugin.json`` mcpServers.env entry via
-    ``${CLAUDE_PROJECT_DIR}`` substitution), then the process working
-    directory. ``Path.cwd()`` alone is not a safe default — MCP server
-    subprocesses are sometimes launched with a cwd inside the installed
-    plugin cache rather than the project being worked on.
+    ``${CLAUDE_PROJECT_DIR}`` substitution), then Codex's forwarded agent
+    ``PWD`` (only when ``CODEX_THREAD_ID`` is present — Codex does not set
+    ``CLAUDE_PROJECT_DIR``), then the process working directory.
+    ``Path.cwd()`` alone is not a safe default — MCP server subprocesses are
+    sometimes launched with a cwd inside the installed plugin cache rather
+    than the project being worked on.
 
     Args:
         project_root: Optional project root path supplied by the caller.
@@ -34,4 +36,8 @@ def resolve_project_root(project_root: str | None) -> Path:
     env_root = os.environ.get("CLAUDE_PROJECT_DIR", "").strip()
     if env_root:
         return Path(env_root)
+    if os.environ.get("CODEX_THREAD_ID"):
+        pwd = os.environ.get("PWD", "").strip()
+        if pwd:
+            return Path(pwd)
     return Path.cwd()

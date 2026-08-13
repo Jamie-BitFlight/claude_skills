@@ -41,7 +41,7 @@ DISCOVERY_QUERIES = (
 )
 METADATA_BATCH_SIZE = 50
 GITHUB_CODE_SEARCH_RESULT_LIMIT = 1000
-CHECKPOINT_SCHEMA_VERSION = 1
+CHECKPOINT_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -99,12 +99,14 @@ def write_checkpoint(
     hits: list[dict[str, str]],
     summaries: dict[str, dict[str, Any]],
     metadata: dict[str, dict[str, Any]],
+    page_size: int,
 ) -> None:
     """Atomically write partial collection data after every remote request."""
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".tmp")
     payload = {
         "schema_version": CHECKPOINT_SCHEMA_VERSION,
+        "page_size": page_size,
         "updated_at": datetime.now(UTC).isoformat(),
         "hits": hits,
         "query_summaries": summaries,
@@ -115,7 +117,7 @@ def write_checkpoint(
 
 
 def load_checkpoint(
-    checkpoint_path: Path,
+    checkpoint_path: Path, page_size: int
 ) -> tuple[list[dict[str, str]], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Load a compatible checkpoint, or return an empty collection state.
 
@@ -127,6 +129,8 @@ def load_checkpoint(
     payload = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     if payload.get("schema_version") != CHECKPOINT_SCHEMA_VERSION:
         raise RuntimeError(f"Unsupported checkpoint schema: {checkpoint_path}")
+    if payload.get("page_size") != page_size:
+        raise RuntimeError(f"Checkpoint page size does not match requested page size: {checkpoint_path}")
     hits = payload.get("hits")
     summaries = payload.get("query_summaries")
     metadata = payload.get("metadata")
@@ -340,7 +344,7 @@ def main() -> int:
         Process exit status.
     """
     args = parse_args()
-    all_hits, summaries_by_query, metadata = load_checkpoint(args.checkpoint)
+    all_hits, summaries_by_query, metadata = load_checkpoint(args.checkpoint, args.page_size)
     explicit_seed_repositories = sorted(set(args.seed_repository), key=str.casefold)
     for repository in explicit_seed_repositories:
         if repository.count("/") != 1 or any(not segment for segment in repository.split("/")):
@@ -360,7 +364,7 @@ def main() -> int:
             summary["complete"] = False
 
     def persist() -> None:
-        write_checkpoint(args.checkpoint, all_hits, summaries_by_query, metadata)
+        write_checkpoint(args.checkpoint, all_hits, summaries_by_query, metadata, args.page_size)
 
     for query in DISCOVERY_QUERIES:
         search_code(

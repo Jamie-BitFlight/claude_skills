@@ -197,8 +197,13 @@ def create_temp_workspace(plugin_name: str) -> ValidationWorkspace:
     plugins_root.mkdir(parents=True, exist_ok=True)
 
     source_plugin_dir = resolve_plugin_dir(plugin_name)
+    for source_path in source_plugin_dir.rglob("*"):
+        if ".venv" in source_path.relative_to(source_plugin_dir).parts:
+            continue
+        if source_path.is_symlink() and not source_path.resolve().is_relative_to(source_plugin_dir.resolve()):
+            raise HarnessError(f"Plugin contains a symlink outside its distribution: {source_path}")
     copied_plugin_dir = plugins_root / plugin_name
-    shutil.copytree(source_plugin_dir, copied_plugin_dir)
+    shutil.copytree(source_plugin_dir, copied_plugin_dir, ignore=shutil.ignore_patterns(".venv", "__pycache__"))
     plugin_id = load_plugin_id(copied_plugin_dir)
 
     marketplace_root = root / ".agents" / "plugins"
@@ -320,6 +325,10 @@ def default_output_file(plugin_name: str) -> Path:
         The default smoke output path.
     """
     return Path.cwd() / f"{plugin_name}.codex-smoke.txt"
+
+
+def _resolve_output_file(output_file: Path | None, plugin_name: str) -> Path:
+    return (output_file or default_output_file(plugin_name)).expanduser().resolve()
 
 
 def current_codex_home() -> Path:
@@ -452,7 +461,7 @@ def main() -> int:
         if args.git_project:
             _initialize_git_project(workspace)
         zip_archive = maybe_zip_unzip_plugin(workspace, args.plugin) if args.zip_unzip else None
-        output_file = args.output_file or default_output_file(args.plugin)
+        output_file = _resolve_output_file(args.output_file, args.plugin)
 
         if not args.run:
             print_plan(workspace, args.prompt, output_file, args.path_prefix, zip_archive)

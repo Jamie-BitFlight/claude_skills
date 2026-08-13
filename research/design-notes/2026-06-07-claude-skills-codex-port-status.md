@@ -209,7 +209,7 @@ Important QA correction:
 - `uv` was not installed initially; installed successfully to `~/.local/bin` using Astral's installer.
 - `/usr/local/bin/node` and `/usr/local/bin/npx` are broken on this machine because they reference a missing ICU library.
 - Working replacements already exist at `~/.volta/bin/node` and `~/.volta/bin/npx`.
-- Added [with_plugin_runtime_env.sh](/Users/jamienelson/Documents/Codex/2026-06-07/can-you-clone-the-https-github/claude_skills/scripts/with_plugin_runtime_env.sh:1) to standardize plugin validation with:
+- Added [with_plugin_runtime_env.sh](../../scripts/with_plugin_runtime_env.sh) to standardize plugin validation with:
   - `PATH="$HOME/.local/bin:$HOME/.volta/bin:$PATH"`
 - Re-running MCP-heavy validation through that fixed runtime path removed the obvious `uv`/`node` launcher failures, but did not make plugin-scoped MCP namespaces appear in-session.
 - Direct isolated probing showed a deeper Codex runtime limitation for plugin-local MCP:
@@ -229,14 +229,14 @@ Important QA correction:
 
 ## Implementation Notes
 
-- Added [sync_codex_plugin_manifests.py](/Users/jamienelson/Documents/Codex/2026-06-07/can-you-clone-the-https-github/claude_skills/scripts/sync_codex_plugin_manifests.py:1) to keep Codex manifests reproducible on this machine.
-- Added [with_plugin_runtime_env.sh](/Users/jamienelson/Documents/Codex/2026-06-07/can-you-clone-the-https-github/claude_skills/scripts/with_plugin_runtime_env.sh:1) to validate plugins with a known-good runtime `PATH`.
-- Added [validate_codex_plugin_isolated.py](/Users/jamienelson/Documents/Codex/2026-06-07/can-you-clone-the-https-github/claude_skills/scripts/validate_codex_plugin_isolated.py:1) to validate a single plugin from a copied/zipped temp marketplace outside this repository.
+- Added [sync_codex_plugin_manifests.py](../../scripts/sync_codex_plugin_manifests.py) to keep Codex manifests reproducible on this machine.
+- Added [with_plugin_runtime_env.sh](../../scripts/with_plugin_runtime_env.sh) to validate plugins with a known-good runtime `PATH`.
+- Added [validate_codex_plugin_isolated.py](../../scripts/validate_codex_plugin_isolated.py) to validate a single plugin from a copied/zipped temp marketplace outside this repository.
 - Isolated `codex exec` requires authentication in the temp `CODEX_HOME`; the harness supports explicit `--copy-auth-from-current-home` and cleans the temp home by default.
 - Repo-marketplace validation and copied/zipped validation answer different questions:
   - repo-marketplace validation proves Codex can install/use the plugin through the documented marketplace flow
   - copied/zipped validation is an extra portability stress test, not the baseline Codex install model
-- Added [2026-06-08-claude-variable-compatibility-matrix.md](/Users/jamienelson/Documents/Codex/2026-06-07/can-you-clone-the-https-github/claude_skills/research/claude-code-plugins/2026-06-08-claude-variable-compatibility-matrix.md:1) to classify `CLAUDE_*` usage by portability surface and migration rule.
+- Added [2026-06-08-claude-variable-compatibility-matrix.md](../claude-code-plugins/2026-06-08-claude-variable-compatibility-matrix.md) to classify `CLAUDE_*` usage by portability surface and migration rule.
 - Normalized existing root `.mcp.json` files from a non-documented top-level `mcpServers` wrapper to the documented direct server-map shape.
 - Generated missing root `.mcp.json` files for plugins whose Claude manifests carried inline MCP config:
   - `development-harness`

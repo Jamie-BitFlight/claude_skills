@@ -7,11 +7,10 @@ import json
 import re
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).parents[1]
 PLUGINS_ROOT = REPO_ROOT / "plugins"
-MATRIX_PATH = REPO_ROOT / "plan" / "codex-skill-activation-matrix.jsonl"
-OVERRIDES_PATH = REPO_ROOT / "plan" / "codex-skill-activation-overrides.json"
+MATRIX_PATH = REPO_ROOT / "tests" / "fixtures" / "codex-skill-activation-matrix.jsonl"
+OVERRIDES_PATH = REPO_ROOT / "tests" / "fixtures" / "codex-skill-activation-overrides.json"
 FRONTMATTER_NAME = re.compile(r"^name:\s*([^\s#]+)\s*$", re.MULTILINE)
 
 
@@ -25,7 +24,11 @@ def load_plugin_id(manifest_path: Path) -> str:
 
 
 def load_skill_name(skill_path: Path) -> str:
-    """Read the declared skill name without interpreting the skill body."""
+    """Read the declared skill name without interpreting the skill body.
+
+    Returns:
+        The declared skill name.
+    """
     content = skill_path.read_text(encoding="utf-8")
     if not content.startswith("---\n"):
         raise ValueError(f"Skill frontmatter is missing: {skill_path}")
@@ -39,7 +42,11 @@ def load_skill_name(skill_path: Path) -> str:
 
 
 def build_rows(repo_root: Path = REPO_ROOT) -> list[dict[str, object]]:
-    """Build one unresolved evidence record for each declared plugin-surface skill."""
+    """Build one unresolved evidence record for each declared plugin-surface skill.
+
+    Returns:
+        Inventory rows for all declared skills.
+    """
     rows: list[dict[str, object]] = []
     plugins_root = repo_root / "plugins"
 
@@ -55,27 +62,25 @@ def build_rows(repo_root: Path = REPO_ROOT) -> list[dict[str, object]]:
 
         for skill_path in sorted(skills_root.rglob("SKILL.md")):
             skill_name = load_skill_name(skill_path)
-            rows.append(
-                {
-                    "target": f"{plugin_id}:{skill_name}",
-                    "plugin_id": plugin_id,
-                    "skill": skill_name,
-                    "source_path": skill_path.relative_to(repo_root).as_posix(),
-                    "task_source": None,
-                    "task_text": None,
-                    "expected_outcome": None,
-                    "safety_class": "UNCLASSIFIED",
-                    "chain": [],
-                    "status": "NO_ORACLE",
-                    "evidence": {
-                        "distribution": None,
-                        "cache_provenance": None,
-                        "injection": None,
-                        "behavior": None,
-                        "safety": None,
-                    },
-                }
-            )
+            rows.append({
+                "target": f"{plugin_id}:{skill_name}",
+                "plugin_id": plugin_id,
+                "skill": skill_name,
+                "source_path": skill_path.relative_to(repo_root).as_posix(),
+                "task_source": None,
+                "task_text": None,
+                "expected_outcome": None,
+                "safety_class": "UNCLASSIFIED",
+                "chain": [],
+                "status": "NO_ORACLE",
+                "evidence": {
+                    "distribution": None,
+                    "cache_provenance": None,
+                    "injection": None,
+                    "behavior": None,
+                    "safety": None,
+                },
+            })
 
     rows.sort(key=lambda row: str(row["target"]))
     targets = [str(row["target"]) for row in rows]
@@ -85,67 +90,60 @@ def build_rows(repo_root: Path = REPO_ROOT) -> list[dict[str, object]]:
 
 
 def render_rows(rows: list[dict[str, object]]) -> str:
-    """Render stable JSONL so matrix changes remain reviewable in Git."""
+    """Render stable JSONL so matrix changes remain reviewable in Git.
+
+    Returns:
+        The rendered JSONL document.
+    """
     return "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows)
 
 
 def load_overrides() -> dict[str, dict[str, object]]:
-    """Load reviewed evidence fields without permitting inventory changes."""
+    """Load reviewed evidence fields without permitting inventory changes.
+
+    Returns:
+        The target-to-override mapping.
+    """
     if not OVERRIDES_PATH.is_file():
         return {}
     overrides = json.loads(OVERRIDES_PATH.read_text(encoding="utf-8"))
     if not isinstance(overrides, dict):
-        raise ValueError(
-            f"Activation-matrix overrides must be an object: {OVERRIDES_PATH}"
-        )
+        raise TypeError(f"Activation-matrix overrides must be an object: {OVERRIDES_PATH}")
     for target, override in overrides.items():
         if not isinstance(target, str) or not isinstance(override, dict):
-            raise ValueError(f"Activation-matrix override is invalid: {target!r}")
+            raise TypeError(f"Activation-matrix override is invalid: {target!r}")
     return overrides
 
 
-def apply_overrides(
-    rows: list[dict[str, object]],
-    overrides: dict[str, dict[str, object]],
-) -> list[dict[str, object]]:
-    """Merge evidence fields while preserving the manifest-derived inventory."""
-    mutable_fields = {
-        "task_source",
-        "task_text",
-        "expected_outcome",
-        "safety_class",
-        "chain",
-        "status",
-        "evidence",
-    }
+def apply_overrides(rows: list[dict[str, object]], overrides: dict[str, dict[str, object]]) -> list[dict[str, object]]:
+    """Merge evidence fields while preserving the manifest-derived inventory.
+
+    Returns:
+        The updated inventory rows.
+    """
+    mutable_fields = {"task_source", "task_text", "expected_outcome", "safety_class", "chain", "status", "evidence"}
     targets = {str(row["target"]) for row in rows}
     unknown_targets = sorted(set(overrides) - targets)
     if unknown_targets:
-        raise ValueError(
-            "Activation-matrix overrides reference unknown targets: "
-            f"{unknown_targets}"
-        )
+        raise ValueError(f"Activation-matrix overrides reference unknown targets: {unknown_targets}")
 
     for row in rows:
         override = overrides.get(str(row["target"]), {})
         unknown_fields = sorted(set(override) - mutable_fields)
         if unknown_fields:
-            raise ValueError(
-                "Activation-matrix override has immutable fields: "
-                f"{unknown_fields}"
-            )
+            raise ValueError(f"Activation-matrix override has immutable fields: {unknown_fields}")
         row.update(override)
     return rows
 
 
 def main() -> int:
-    """Write the current inventory scaffold or verify the checked-in version."""
+    """Write the current inventory scaffold or verify the checked-in version.
+
+    Returns:
+        Process exit status.
+    """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="Fail if the matrix is stale.",
-    )
+    parser.add_argument("--check", action="store_true", help="Fail if the matrix is stale.")
     args = parser.parse_args()
 
     rows = apply_overrides(build_rows(), load_overrides())
