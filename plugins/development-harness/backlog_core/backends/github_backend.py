@@ -199,27 +199,12 @@ class _GitHubDispatchPersistence:
         entries = self._entries()
         entry = next((entry for entry in entries if entry.name == request.reference.name), None)
         current = self._record(entry) if entry is not None else None
-        if request.expected_revision and (current is None or current.revision != request.expected_revision):
-            raise ContentConflictError("Content revision no longer matches")
         owner_reference = (
-            request.owner_reference
-            if request.owner_reference is not None
-            else current.owner_reference
-            if current is not None
-            else ""
+            request.owner_reference if request.owner_reference is not None else current and current.owner_reference
         )
-        self._provider.store_artifact_content(
-            self._sentinel_issue,
-            self._CONTENT_TYPE,
-            self._content_path(request.reference.name),
-            self._serialize_envelope(request.reference.name, owner_reference, request.content),
-        )
-        return ContentRecord(
-            reference=request.reference,
-            owner_reference=owner_reference,
-            content=request.content,
-            revision=GitHubBackend._content_revision(request.content),
-        )
+        if current is not None and current.content == request.content and current.owner_reference == owner_reference:
+            return current
+        raise UnsupportedCapabilityError("GitHub dispatch writes are not supported")
 
     def _record(self, entry: _DispatchIndexEntry) -> ContentRecord:
         stored_content = self._provider.read_artifact_content_from_remote(
@@ -806,6 +791,8 @@ class GitHubBackend:
         """
         cached = self._cached_content(request.reference)
         if self.try_get_github() is None:
+            if request.create_only and cached is not None:
+                raise ContentConflictError("Content already exists")
             if request.expected_revision and (cached is None or cached.revision != request.expected_revision):
                 raise ContentConflictError("Content revision no longer matches")
             base = cached or ContentRecord(

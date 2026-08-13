@@ -100,6 +100,19 @@ def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> N
     ]
 
 
+def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:
+    # Given: an opaque provider key and an item whose backend reference is meaningful
+    cache = FileCache(tmp_path)
+    item = BacklogItem(title="Opaque snapshot", reference="ece.37")
+
+    # When: the snapshot is saved and loaded by a fresh cache instance
+    cache._save_work_item_snapshot("ece.37", item)
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the opaque key is discoverable and the item's reference survives
+    assert [(key, snapshot.reference) for key, snapshot in snapshots] == [("ece.37.yaml", "ece.37")]
+
+
 def test_file_cache_distinguishes_stale_hit_from_unavailable_miss(tmp_path: Path) -> None:
     # Given: one cached provider record
     cache = FileCache(tmp_path)

@@ -4126,23 +4126,26 @@ async def dispatch_create_plan(
             **out.to_dict(),
         }
 
-    # Check for existing file when overwrite is False
-    if not overwrite:
-        try:
-            _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
-        except ContentNotFoundError:
-            pass
-        else:
+    try:
+        current = _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
+    except ContentNotFoundError:
+        write = ContentWrite(
+            reference=_dispatch_reference(milestone_number), content=plan.model_dump_json(), create_only=True
+        )
+    else:
+        if not overwrite:
             return {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()}
+        write = ContentWrite(
+            reference=_dispatch_reference(milestone_number),
+            content=plan.model_dump_json(),
+            expected_revision=current.revision,
+        )
 
     # 6. Write atomically
-    dispatch_content = plan.model_dump_json()
+    dispatch_content = write.content
     try:
-        await asyncio.to_thread(
-            _get_artifact_provider().put_content,
-            ContentWrite(reference=_dispatch_reference(milestone_number), content=dispatch_content),
-        )
-    except BacklogError as exc:
+        await asyncio.to_thread(_get_artifact_provider().put_content, write)
+    except (BacklogError, ContentConflictError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
 
     out.info(f"Stored dispatch plan {milestone_number}")

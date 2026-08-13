@@ -792,6 +792,31 @@ class TestDispatchCreatePlan:
         assert data["is_valid"] is True
         assert _has_dispatch_plan(target)
 
+    async def test_create_plan_conflicts_when_concurrent_create_wins(
+        self, patch_create_plan_path: InMemoryBackend, valid_plan_dict: dict, mocker: MockerFixture
+    ) -> None:
+        # Given: another creator persists the same plan after this tool confirms absence.
+        original_put = patch_create_plan_path.put_content
+
+        def create_before_requested_write(request: ContentWrite) -> ContentRecord:
+            original_put(ContentWrite(reference=request.reference, content="concurrent creation", create_only=True))
+            return original_put(request)
+
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=create_before_requested_write)
+
+        # When: the tool attempts its original create.
+        async with Client(mcp) as client:
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
+
+        # Then: create_only rejects the stale create and preserves the winner.
+        assert "error" in result.data
+        assert (
+            patch_create_plan_path.get_content(
+                ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
+            ).content
+            == "concurrent creation"
+        )
+
     async def test_create_plan_kebab_case_keys(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan accepts kebab-case alias keys in the plan dict.
 
@@ -905,6 +930,39 @@ class TestDispatchCreatePlan:
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["item_count"] == 2
         assert _has_dispatch_plan(existing_plan_file)
+
+    async def test_create_plan_overwrite_conflicts_when_observed_revision_changes(
+        self, existing_plan_file: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        # Given: an existing plan whose revision changes between the tool read and write.
+        original_put = existing_plan_file.put_content
+
+        def replace_before_requested_write(request: ContentWrite) -> ContentRecord:
+            original_put(
+                ContentWrite(
+                    reference=request.reference,
+                    content="concurrent replacement",
+                    expected_revision=existing_plan_file.get_content(request.reference).revision,
+                )
+            )
+            return original_put(request)
+
+        mocker.patch.object(existing_plan_file, "put_content", side_effect=replace_before_requested_write)
+
+        # When: overwrite=True attempts to update against the observed revision.
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan", {"milestone_number": 10, "plan": _make_valid_plan_dict(), "overwrite": True}
+            )
+
+        # Then: the stale update conflicts and cannot replace the concurrent content.
+        assert "error" in result.data
+        assert (
+            existing_plan_file.get_content(
+                ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
+            ).content
+            == "concurrent replacement"
+        )
 
     async def test_create_plan_with_issue(
         self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture

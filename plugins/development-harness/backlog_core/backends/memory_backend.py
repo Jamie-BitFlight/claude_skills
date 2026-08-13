@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from threading import RLock
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
@@ -130,6 +131,7 @@ class InMemoryBackend:
         self._branches: dict[str, BranchInfo] = {}
 
         self._content: dict[tuple[str, str, str, str], ContentRecord] = {}
+        self._content_lock = RLock()
         self._work_items: dict[str, BacklogItem] = {}
 
     def list_work_items(self) -> list[BacklogItem]:
@@ -174,28 +176,31 @@ class InMemoryBackend:
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Create or replace one in-memory content record."""
-        key = self._content_key(request.reference)
-        current = self._content.get(key)
-        current_revision = current.revision if current is not None else ""
-        if request.expected_revision and request.expected_revision != current_revision:
-            raise ContentConflictError("Content revision no longer matches")
-        owner_reference = request.reference.namespace
-        if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
-            owner_reference = (
-                request.owner_reference
-                if request.owner_reference is not None
-                else current.owner_reference
-                if current is not None
-                else ""
+        with self._content_lock:
+            key = self._content_key(request.reference)
+            current = self._content.get(key)
+            current_revision = current.revision if current is not None else ""
+            if request.create_only and current is not None:
+                raise ContentConflictError("Content already exists")
+            if request.expected_revision and request.expected_revision != current_revision:
+                raise ContentConflictError("Content revision no longer matches")
+            owner_reference = request.reference.namespace
+            if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
+                owner_reference = (
+                    request.owner_reference
+                    if request.owner_reference is not None
+                    else current.owner_reference
+                    if current is not None
+                    else ""
+                )
+            record = ContentRecord(
+                reference=request.reference,
+                owner_reference=owner_reference,
+                content=request.content,
+                revision=uuid.uuid4().hex,
             )
-        record = ContentRecord(
-            reference=request.reference,
-            owner_reference=owner_reference,
-            content=request.content,
-            revision=uuid.uuid4().hex,
-        )
-        self._content[key] = record
-        return record
+            self._content[key] = record
+            return record
 
     @staticmethod
     def _content_key(reference: ContentRef) -> tuple[str, str, str, str]:

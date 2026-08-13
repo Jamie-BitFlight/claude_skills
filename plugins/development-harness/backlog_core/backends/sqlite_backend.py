@@ -31,6 +31,7 @@ import json
 import sqlite3
 import uuid
 from datetime import UTC, datetime
+from threading import RLock
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
@@ -174,6 +175,7 @@ class SQLiteBackend:
         self._db_path = db_path
         self._conn = sqlite3.connect(db_path, check_same_thread=False, detect_types=sqlite3.PARSE_DECLTYPES)
         self._conn.row_factory = sqlite3.Row
+        self._content_lock = RLock()
         self._conn.executescript(_SCHEMA_SQL)
         self._conn.commit()
 
@@ -233,13 +235,15 @@ class SQLiteBackend:
         Returns:
             The stored record with its new revision.
         """
-        with self._conn:
+        with self._content_lock, self._conn:
             self._conn.execute("BEGIN IMMEDIATE")
             current = self._conn.execute(
                 "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
                 self._content_key(request.reference),
             ).fetchone()
             current_revision = str(current["revision"]) if current is not None else ""
+            if request.create_only and current is not None:
+                raise ContentConflictError("Content already exists")
             if request.expected_revision and request.expected_revision != current_revision:
                 raise ContentConflictError("Content revision no longer matches")
             owner_reference = request.reference.namespace

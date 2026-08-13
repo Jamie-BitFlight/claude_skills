@@ -362,6 +362,8 @@ class BeadsBackend:
         with _beads_content_lock():
             current = self._find_content(request.reference)
             current_revision = current.revision if current is not None else ""
+            if request.create_only and current is not None:
+                raise ContentConflictError("Content already exists")
             if request.expected_revision and request.expected_revision != current_revision:
                 raise ContentConflictError("Content revision no longer matches")
             owner_reference = request.reference.namespace

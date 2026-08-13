@@ -271,6 +271,46 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
     assert backend._apply_patches.call_count == 1
 
 
+def test_github_queued_title_rename_survives_reconnect(tmp_path: Path) -> None:
+    # Given: an offline queued rename that GitHub's body-only patch path cannot represent
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = BacklogItem(title="Issue 1", description="provider body")
+    baseline.metadata.issue = "#1"
+    baseline.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
+    renamed = baseline.model_copy(update={"title": "Renamed offline"})
+    backend.put_work_item(renamed)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body=backend.render_issue_body(baseline),
+                    state="OPEN",
+                    labels=["feature"],
+                    revision="rev-1",
+                )
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    backend._apply_patches = MagicMock(
+        return_value=[PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
+    )
+
+    # When: the provider reconnects without a lossless title mutation path
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    # Then: the rename remains durably queued instead of being acknowledged as synchronized
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+    assert result.conflicts == 1
+    assert [mutation.item.title for mutation in pending] == ["Renamed offline"]
+    assert backend._apply_patches.call_args.args[0][0].body
+
+
 def test_github_plan_discovery_lists_all_owners_when_owner_is_omitted(monkeypatch: pytest.MonkeyPatch) -> None:
     # Given: linked and unlinked plans in the provider-native index
     entries = [

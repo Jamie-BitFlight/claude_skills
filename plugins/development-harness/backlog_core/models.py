@@ -1179,9 +1179,12 @@ class ContentWrite(BaseModel):
     content: str
     owner_reference: str | None = None
     expected_revision: str = ""
+    create_only: bool = False
 
     @model_validator(mode="after")
     def _validate_artifact_owner(self) -> ContentWrite:
+        if self.create_only and self.expected_revision:
+            raise ValueError("create_only and expected_revision are mutually exclusive")
         match self.reference.kind:
             case ContentKind.PLAN | ContentKind.DISPATCH_PLAN:
                 pass

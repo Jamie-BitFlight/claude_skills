@@ -247,6 +247,8 @@ class FileCache:
     def _save_work_item_snapshot(self, key: str, item: BacklogItem) -> None:
         number = parse_issue_number(key)
         relative_path = Path("issues") / f"{number}.yaml" if number is not None else Path(key)
+        if number is None and relative_path.suffix not in {".yaml", ".yml"}:
+            relative_path = Path(f"{relative_path}.yaml")
         self._save_item_snapshot(item, relative_path)
 
     def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:

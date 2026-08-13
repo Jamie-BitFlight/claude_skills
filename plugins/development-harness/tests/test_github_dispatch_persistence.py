@@ -14,6 +14,7 @@ from backlog_core.models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
+    UnsupportedCapabilityError,
 )
 
 
@@ -62,27 +63,23 @@ class _RemoteGistProvider:
         return {filename: content for filename, content in self.files.items() if filename.startswith(filename_prefix)}
 
 
-def test_overlapping_dispatch_plan_inserts_remain_discoverable() -> None:
+def test_current_dispatch_envelopes_remain_discoverable() -> None:
     provider = _RemoteGistProvider()
-    first = _GitHubDispatchPersistence(provider)
-    second = _GitHubDispatchPersistence(provider)
-    provider.before_next_store = second
-
-    first.put(
-        ContentWrite(
-            reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-1"),
-            owner_reference="#1",
-            content='{"milestone":1}',
-        )
+    provider.files["dispatch-plan--dispatch-milestone-1.json"] = _GitHubDispatchPersistence._serialize_envelope(
+        "dispatch-milestone-1", "#1", '{"milestone":1}'
     )
+    provider.files["dispatch-plan--dispatch-milestone-2.json"] = _GitHubDispatchPersistence._serialize_envelope(
+        "dispatch-milestone-2", "#2", '{"milestone":2}'
+    )
+    persistence = _GitHubDispatchPersistence(provider)
 
-    records = first.list(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
+    records = persistence.list(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
 
     assert {(record.reference.name, record.owner_reference, record.content) for record in records} == {
         ("dispatch-milestone-1", "#1", '{"milestone":1}'),
         ("dispatch-milestone-2", "#2", '{"milestone":2}'),
     }
-    assert "dispatch-plan/index.json" not in provider.store_paths
+    assert provider.store_paths == []
 
 
 def test_legacy_shared_index_entries_remain_discoverable() -> None:
@@ -118,12 +115,8 @@ def test_dispatch_name_round_trips_when_gist_filename_is_lossy() -> None:
     persistence = _GitHubDispatchPersistence(provider)
     name = "dispatch/a--b"
 
-    persistence.put(
-        ContentWrite(
-            reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name=name),
-            owner_reference="#1",
-            content='{"milestone":1}',
-        )
+    provider.files["dispatch-plan--dispatch--a--b.json"] = _GitHubDispatchPersistence._serialize_envelope(
+        name, "#1", '{"milestone":1}'
     )
 
     record = persistence.get(ContentRef(kind=ContentKind.DISPATCH_PLAN, name=name))
@@ -144,6 +137,47 @@ def test_unavailable_dispatch_enumeration_does_not_write_an_empty_index() -> Non
             )
         )
 
+    assert provider.store_paths == []
+
+
+def test_dispatch_create_fails_closed_without_store() -> None:
+    provider = _RemoteGistProvider()
+    persistence = _GitHubDispatchPersistence(provider)
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-new")
+
+    with pytest.raises(UnsupportedCapabilityError, match="dispatch writes"):
+        persistence.put(ContentWrite(reference=reference, content="new", create_only=True))
+
+    assert provider.store_paths == []
+
+
+def test_dispatch_update_fails_closed_without_store() -> None:
+    provider = _RemoteGistProvider()
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-update")
+    provider.files["dispatch-plan--dispatch-milestone-update.json"] = _GitHubDispatchPersistence._serialize_envelope(
+        reference.name, "#1", "current"
+    )
+    persistence = _GitHubDispatchPersistence(provider)
+
+    with pytest.raises(UnsupportedCapabilityError, match="dispatch writes"):
+        persistence.put(ContentWrite(reference=reference, content="updated", owner_reference="#1"))
+
+    assert provider.store_paths == []
+    assert persistence.get(reference).content == "current"
+
+
+def test_dispatch_noop_returns_existing_record_without_store() -> None:
+    provider = _RemoteGistProvider()
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-noop")
+    provider.files["dispatch-plan--dispatch-milestone-noop.json"] = _GitHubDispatchPersistence._serialize_envelope(
+        reference.name, "#1", "current"
+    )
+    persistence = _GitHubDispatchPersistence(provider)
+
+    current = persistence.get(reference)
+    result = persistence.put(ContentWrite(reference=reference, owner_reference="#1", content="current"))
+
+    assert result == current
     assert provider.store_paths == []
 
 

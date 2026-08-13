@@ -27,9 +27,9 @@ from backlog_core.reconciliation import (
 )
 
 
-def _item(description: str, *, reference: str = "#1", fingerprint: str = "") -> BacklogItem:
+def _item(description: str, *, reference: str = "#1", fingerprint: str = "", title: str = "Example") -> BacklogItem:
     return BacklogItem(
-        title="Example",
+        title=title,
         description=description,
         metadata=BacklogItemMetadata(
             source="test",
@@ -45,11 +45,13 @@ def _item(description: str, *, reference: str = "#1", fingerprint: str = "") -> 
     )
 
 
-def _provider(body: str, *, state: str = "OPEN", exists: bool = True, reference: str = "#1") -> ProviderItem:
+def _provider(
+    body: str, *, state: str = "OPEN", exists: bool = True, reference: str = "#1", title: str = "Example"
+) -> ProviderItem:
     return ProviderItem(
         provider_id=f"node-{reference}",
         reference=reference,
-        title="Example",
+        title=title,
         body=body,
         state=state,
         labels=["feature"],
@@ -103,6 +105,44 @@ def test_unchanged_body_is_a_no_op() -> None:
     assert plan.provider_patches == []
     assert plan.cache_actions == []
     assert plan.result.no_ops == 1
+
+
+def test_unchanged_title_is_a_no_op() -> None:
+    baseline = _item("same")
+    local = baseline.model_copy(deep=True)
+    local.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
+    local.metadata.labels = ["feature"]
+    local.metadata.updated_at = "rev-1"
+
+    plan = _plan(local, _provider(render_issue_body(baseline)))
+
+    assert plan.provider_patches == []
+    assert plan.cache_actions == []
+    assert plan.result.no_ops == 1
+
+
+def test_local_title_change_stays_pending_without_checkpoint() -> None:
+    baseline = _item("same")
+    local = _item("same", fingerprint=synchronized_fingerprint(baseline), title="Local rename")
+
+    plan = _plan(local, _provider(render_issue_body(baseline)))
+
+    assert plan.cache_actions[0].record.item.title == "Local rename"
+    assert not any(action.phase == "checkpoint" for action in plan.cache_actions)
+    assert plan.provider_patches == []
+    assert plan.result.conflicts == 1
+
+
+def test_remote_title_change_updates_local_state() -> None:
+    baseline = _item("same")
+    local = _item("same", fingerprint=synchronized_fingerprint(baseline))
+
+    plan = _plan(local, _provider(render_issue_body(baseline), title="Provider rename"))
+
+    updated = plan.cache_actions[0].record.item
+    assert updated.title == "Provider rename"
+    assert updated.metadata.sync_fingerprint == synchronized_fingerprint(updated)
+    assert plan.provider_patches == []
 
 
 def test_equal_body_updates_provider_fields_without_patch() -> None:

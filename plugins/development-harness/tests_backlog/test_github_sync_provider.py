@@ -5,7 +5,7 @@ from typing import Protocol
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core.backends.github_backend import GitHubBackend
+from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactManifest,
@@ -307,9 +307,18 @@ def test_github_content_provider_discovers_remote_plans_with_empty_cache(tmp_pat
     assert cache.get_content(ContentRef(kind=ContentKind.PLAN, name="Premote")).content == "remote body"
 
 
-def test_github_content_provider_round_trips_dispatch_content_without_sam_plan_index(tmp_path: Path) -> None:
-    # Given: an online provider with no cached content.
-    remote_content: dict[tuple[int, str, str], str] = {}
+def test_github_content_provider_reads_dispatch_content_without_sam_plan_index(tmp_path: Path) -> None:
+    # Given: two provider-owned dispatch envelopes and no SAM plan index.
+    remote_content: dict[tuple[int, str, str], str] = {
+        (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): (
+            _GitHubDispatchPersistence._serialize_envelope(
+                "dispatch-milestone-10", "", '{"milestone":{"number":10},"state":"final"}'
+            )
+        ),
+        (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-11.json"): (
+            _GitHubDispatchPersistence._serialize_envelope("dispatch-milestone-11", "#3", '{"milestone":{"number":11}}')
+        ),
+    }
     artifact_provider = MagicMock(spec=_RemoteArtifactProviderFakeSpec)
     artifact_provider.store_artifact_content.side_effect = lambda owner, artifact_type, path, content: (
         remote_content.__setitem__((owner, artifact_type, path), content)
@@ -326,37 +335,7 @@ def test_github_content_provider_round_trips_dispatch_content_without_sam_plan_i
     backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
-    # When: a dispatch plan is created, preserved, reassigned, and unlinked.
-    created = backend.put_content(
-        ContentWrite(reference=reference, content='{"milestone":{"number":10}}', owner_reference="#1")
-    )
-    preserved = backend.put_content(
-        ContentWrite(
-            reference=reference,
-            content='{"milestone":{"number":10},"state":"draft"}',
-            expected_revision=created.revision,
-        )
-    )
-    reassigned = backend.put_content(
-        ContentWrite(
-            reference=reference,
-            content='{"milestone":{"number":10},"state":"ready"}',
-            owner_reference="#2",
-            expected_revision=preserved.revision,
-        )
-    )
-    written = backend.put_content(
-        ContentWrite(
-            reference=reference,
-            content='{"milestone":{"number":10},"state":"final"}',
-            owner_reference="",
-            expected_revision=reassigned.revision,
-        )
-    )
     other_reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-11")
-    other = backend.put_content(
-        ContentWrite(reference=other_reference, content='{"milestone":{"number":11}}', owner_reference="#3")
-    )
     fresh_backend = GitHubBackend(cache=FileCache(tmp_path / "fresh"), artifact_provider=artifact_provider)
     fresh_backend.try_get_github = MagicMock(return_value=MagicMock())
     dispatch_records = fresh_backend.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
@@ -368,20 +347,13 @@ def test_github_content_provider_round_trips_dispatch_content_without_sam_plan_i
     )
     sam_records = fresh_backend.list_content(ContentQuery(kind=ContentKind.PLAN))
 
-    # Then: dispatch content round-trips independently and SAM discovery stays empty.
-    assert [
-        created.owner_reference,
-        preserved.owner_reference,
-        reassigned.owner_reference,
-        written.owner_reference,
-    ] == ["#1", "#1", "#2", ""]
-    assert written.reference == reference
+    # Then: dispatch discovery stays independent from SAM discovery.
     assert [(record.reference, record.content) for record in dispatch_records] == [
         (reference, '{"milestone":{"number":10},"state":"final"}'),
         (other_reference, '{"milestone":{"number":11}}'),
     ]
-    assert unowned_dispatch_records == [written]
-    assert owned_dispatch_records == [other]
+    assert unowned_dispatch_records == [dispatch_records[0]]
+    assert owned_dispatch_records == [dispatch_records[1]]
     assert sam_records == []
 
 

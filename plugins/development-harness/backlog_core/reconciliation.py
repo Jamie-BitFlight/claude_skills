@@ -91,6 +91,7 @@ def synchronized_fingerprint(item: BacklogItem) -> str:
         "priority": item.metadata.priority,
         "sections": item.sections,
         "status": item.metadata.status,
+        "title": item.title,
     }
     payload = json.dumps(
         projection, default=lambda value: value.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
@@ -102,7 +103,9 @@ def _normalized_body(body: str) -> str:
     return body.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _compose(local: BacklogItem, provider: ProviderItem, body_item: BacklogItem) -> BacklogItem:
+def _compose(
+    local: BacklogItem, provider: ProviderItem, body_item: BacklogItem, *, title: str | None = None
+) -> BacklogItem:
     metadata = local.metadata.model_copy(
         update={
             "added": body_item.metadata.added,
@@ -115,7 +118,7 @@ def _compose(local: BacklogItem, provider: ProviderItem, body_item: BacklogItem)
         }
     )
     return BacklogItem(
-        title=provider.title,
+        title=provider.title if title is None else title,
         reference=local.reference,
         description=body_item.description,
         sections=body_item.sections,
@@ -148,15 +151,15 @@ def _candidate(
     remote = _compose(local, provider, remote_body)
     baseline = local.metadata.sync_fingerprint
     local_changed = not baseline or synchronized_fingerprint(local) != baseline
-    remote_changed = not baseline or synchronized_fingerprint(remote_body) != baseline
+    remote_changed = not baseline or synchronized_fingerprint(remote) != baseline
     if request.force:
         candidate = remote
     elif local_changed and remote_changed:
-        candidate = _compose(local, provider, merge_item(local, remote_body))
+        candidate = _compose(local, provider, merge_item(local, remote_body), title=local.title)
     elif remote_changed:
         candidate = remote
     else:
-        candidate = _compose(local, provider, local)
+        candidate = _compose(local, provider, local, title=local.title)
     rendered = render_issue_body(candidate, original_body=provider.body)
     if _normalized_body(rendered) == _normalized_body(provider.body):
         return candidate, None
@@ -204,6 +207,18 @@ def _plan_item(
         plan.result.changed_references.append(provider.reference)
         return
     candidate, patch = _candidate(local, provider, request)
+    if candidate.title != provider.title:
+        if candidate != local:
+            plan.cache_actions.append(_action(record.key, candidate))
+        if patch is not None:
+            plan.provider_patches.append(patch)
+        plan.result.conflicts += 1
+        plan.result.changed_references.append(provider.reference)
+        if request.include_diff and patch is not None:
+            plan.result.diffs[provider.reference] = (
+                f"{_normalized_body(provider.body)}\n---\n{_normalized_body(patch.body)}"
+            )
+        return
     if patch is None:
         plan.result.no_ops += 1
         checkpointed = _checkpoint(candidate, provider.revision)

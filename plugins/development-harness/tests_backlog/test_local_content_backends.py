@@ -5,6 +5,7 @@ import inspect
 import json
 import sys
 from collections.abc import Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -164,6 +165,40 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
         )
     with pytest.raises(ContentNotFoundError):
         local_provider.get_content(ContentRef(kind=ContentKind.PLAN, name="missing/opaque"))
+
+
+@pytest.mark.unit
+def test_native_content_create_only_when_two_writers_race(local_provider: ContentProvider) -> None:
+    # Given: two concurrent create-only requests for the same identity.
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-race")
+    requests = [ContentWrite(reference=reference, content=f"create-{index}", create_only=True) for index in range(2)]
+
+    # When: both requests reach the native provider write boundary together.
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(local_provider.put_content, request) for request in requests]
+    outcomes = [future.exception() for future in futures]
+
+    # Then: exactly one create persists and the other is a conflict, never a lost update.
+    assert sum(outcome is None for outcome in outcomes) == 1
+    assert sum(isinstance(outcome, ContentConflictError) for outcome in outcomes) == 1
+    assert local_provider.get_content(reference).content in {"create-0", "create-1"}
+
+
+@pytest.mark.unit
+def test_native_content_update_when_observed_revision_is_stale(local_provider: ContentProvider) -> None:
+    # Given: a writer observes the initial revision before another writer updates it.
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-stale")
+    initial = local_provider.put_content(ContentWrite(reference=reference, content="initial"))
+    local_provider.put_content(ContentWrite(reference=reference, content="current", expected_revision=initial.revision))
+
+    # When: the first writer attempts its stale update.
+    with pytest.raises(ContentConflictError):
+        local_provider.put_content(
+            ContentWrite(reference=reference, content="stale", expected_revision=initial.revision)
+        )
+
+    # Then: the latest content remains intact.
+    assert local_provider.get_content(reference).content == "current"
 
 
 @pytest.mark.unit
