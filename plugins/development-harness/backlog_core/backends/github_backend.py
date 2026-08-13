@@ -572,13 +572,15 @@ class GitHubBackend:
             case ReconcileScope.LINKED | ReconcileScope.TARGETED:
                 issues = []
 
-        items_by_identity: dict[tuple[str, str], ProviderItem] = {}
-        for issue in issues:
-            item = self._provider_item_from_issue(repo, owner, repo_name, issue)
-            items_by_identity[item.reference, item.revision] = item
-        listed_references = {item.reference for item in items_by_identity.values()}
+        listed_references = {f"#{issue['number']}" for issue in issues}
         target_references = [reference for reference in request.references if reference not in listed_references]
         targeted = self._fetch_targeted_issues(repo, owner, repo_name, target_references)
+        existing_issues = [*issues, *(issue for issue in targeted.values() if issue is not None)]
+        heads, comments = self._work_item_contexts(repo, existing_issues)
+        items_by_identity: dict[tuple[str, str], ProviderItem] = {}
+        for issue in issues:
+            item = self._provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
+            items_by_identity[item.reference, item.revision] = item
         for reference, issue in targeted.items():
             if issue is None:
                 item = ProviderItem(
@@ -592,7 +594,7 @@ class GitHubBackend:
                     exists=False,
                 )
             else:
-                item = self._provider_item_from_issue(repo, owner, repo_name, issue)
+                item = self._provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
             items_by_identity[item.reference, item.revision] = item
         return ProviderSnapshot(
             items=list(items_by_identity.values()), sync_started_at=sync_started_at, pages_fetched=1
@@ -667,10 +669,10 @@ class GitHubBackend:
                     )
                 )
                 continue
-            comment_id = self._add_comment_graphql(
-                repo, issue["id"], render_work_item_comment(current.revision, patch.body)
-            )
             try:
+                comment_id = self._add_comment_graphql(
+                    repo, issue["id"], render_work_item_comment(current.revision, patch.body)
+                )
                 head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, comment_id)
                 written = self._contents.put(
                     ContentWrite(
@@ -704,8 +706,16 @@ class GitHubBackend:
             )
         return results
 
-    def _provider_item_from_issue(self, repo: Repository, owner: str, repo_name: str, issue: IssueNode) -> ProviderItem:
-        version, _head_record, _root = self._work_item_version(repo, owner, repo_name, issue)
+    def _provider_item_from_issue(
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        issue: IssueNode,
+        heads: dict[str, ContentRecord] | None = None,
+        comments: dict[str, IssueCommentNode] | None = None,
+    ) -> ProviderItem:
+        version, _head_record, _root = self._work_item_version(repo, owner, repo_name, issue, heads, comments)
         return ProviderItem(
             provider_id=issue["id"],
             reference=f"#{issue['number']}",
@@ -717,23 +727,79 @@ class GitHubBackend:
         )
 
     def _work_item_version(
-        self, repo: Repository, owner: str, repo_name: str, issue: IssueNode
+        self,
+        repo: Repository,
+        owner: str,
+        repo_name: str,
+        issue: IssueNode,
+        heads: dict[str, ContentRecord] | None = None,
+        comments: dict[str, IssueCommentNode] | None = None,
     ) -> tuple[WorkItemVersion, ContentRecord | None, str]:
         reference = f"#{issue['number']}"
         root = root_revision(reference, issue["id"], issue["body"])
-        try:
-            head_record = self._contents.get(work_item_head_ref(reference))
-        except ContentNotFoundError:
-            return WorkItemVersion(revision=root, body=issue["body"]), None, root
+        if heads is None:
+            try:
+                head_record = self._contents.get(work_item_head_ref(reference))
+            except ContentNotFoundError:
+                return WorkItemVersion(revision=root, body=issue["body"]), None, root
+        else:
+            head_record = heads.get(reference)
+            if head_record is None:
+                return WorkItemVersion(revision=root, body=issue["body"]), None, root
         head = parse_work_item_head(head_record.content)
         if head.issue_reference != reference or head.root_revision != root:
             return WorkItemVersion(revision=root, body=issue["body"]), head_record, root
-        comment = self._fetch_comment_by_id_graphql(repo, head.comment_id)
+        comment = (
+            comments.get(head.comment_id)
+            if comments is not None
+            else self._fetch_comment_by_id_graphql(repo, head.comment_id)
+        )
         return (
             WorkItemVersion(revision=head_record.revision, body=parse_work_item_comment(head, comment)),
             head_record,
             root,
         )
+
+    def _work_item_contexts(
+        self, repo: Repository, issues: list[IssueNode]
+    ) -> tuple[dict[str, ContentRecord], dict[str, IssueCommentNode]]:
+        namespaces = {f"#{issue['number']}" for issue in issues}
+        records = self._list_all_content(
+            self._contents,
+            ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, search="head", limit=self._CONTENT_PAGE_SIZE),
+        )
+        heads = {
+            record.reference.namespace: record
+            for record in records
+            if record.reference.namespace in namespaces
+            and record.reference.artifact_type == "_dh-work-item-head-v1"
+            and record.reference.name == "head"
+        }
+        issue_by_reference = {f"#{issue['number']}": issue for issue in issues}
+        comment_ids = [
+            head.comment_id
+            for reference, record in heads.items()
+            if (head := parse_work_item_head(record.content)).root_revision
+            == root_revision(reference, issue_by_reference[reference]["id"], issue_by_reference[reference]["body"])
+        ]
+        comments: dict[str, IssueCommentNode] = {}
+        for offset in range(0, len(comment_ids), self._TARGET_BATCH_SIZE):
+            ids = comment_ids[offset : offset + self._TARGET_BATCH_SIZE]
+            response = self._graphql_request(
+                repo,
+                "query AuditComments($ids: [ID!]!) { nodes(ids: $ids) { "
+                "... on IssueComment { id body url author { login } createdAt updatedAt } } }",
+                {"ids": ids},
+            )
+            nodes = response.get("nodes")
+            if not isinstance(nodes, list) or len(nodes) != len(ids):
+                raise ContentUnavailableError("GitHub work-item audit comment response was invalid")
+            for node in nodes:
+                if not isinstance(node, dict):
+                    raise ContentUnavailableError("GitHub work-item audit comment response was invalid")
+                comment = gh_client._parse_comment_node(node)
+                comments[comment["id"]] = comment
+        return heads, comments
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.

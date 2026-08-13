@@ -141,8 +141,15 @@ class _ContentsFake:
             raise ContentNotFoundError("head missing") from exc
 
     def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
-        del query
-        return []
+        records = [
+            record
+            for record in self._records.values()
+            if record.reference.kind == query.kind
+            and query.search.casefold() in record.reference.name.casefold()
+            and (query.owner_reference is None or record.owner_reference == query.owner_reference)
+        ]
+        records.sort(key=lambda record: record.reference.model_dump_json())
+        return records[query.offset : query.offset + query.limit]
 
     def put(self, request: ContentWrite) -> ContentRecord:
         if request.create_only and self._barrier is not None:
@@ -256,6 +263,46 @@ def test_github_work_item_backend_human_body_change_invalidates_prior_head() -> 
     # Then: the stale head is replaced through its old Contents SHA and binds the new root
     stored = parse_work_item_head(contents.get(work_item_head_ref("#42")).content)
     assert (patched.status, stored.root_revision, stored.body) == ("applied", item.revision, "new rendered")
+
+
+def test_github_work_item_snapshot_batches_heads_and_audit_comments() -> None:
+    contents = _ContentsFake()
+    issues = [_issue(), {**_issue(), "id": "issue-node-43", "number": 43}]
+    first_root = root_revision("#42", "issue-node", "Human-owned body")
+    second_root = root_revision("#43", "issue-node-43", "Human-owned body")
+    heads = [
+        WorkItemHead.create("#42", first_root, first_root, "first", "comment-1"),
+        WorkItemHead.create("#43", second_root, second_root, "second", "comment-2"),
+    ]
+    for reference, head in zip(("#42", "#43"), heads, strict=True):
+        contents.put(
+            ContentWrite(reference=work_item_head_ref(reference), content=head.model_dump_json(), create_only=True)
+        )
+    backend = _backend(contents, {})
+    backend._contents = MagicMock(wraps=contents)
+    backend._fetch_issues_graphql = MagicMock(return_value=issues)
+    backend._graphql_request = MagicMock(
+        return_value={
+            "nodes": [
+                {
+                    "id": f"comment-{index}",
+                    "body": render_work_item_comment(head.parent_revision, head.body),
+                    "url": f"https://example.test/comments/{index}",
+                    "author": {"login": "agent"},
+                    "createdAt": "2026-08-12T00:00:00Z",
+                    "updatedAt": "2026-08-12T00:00:00Z",
+                }
+                for index, head in enumerate(heads, 1)
+            ]
+        }
+    )
+
+    snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    assert [(item.reference, item.body) for item in snapshot.items] == [("#42", "first"), ("#43", "second")]
+    backend._contents.get.assert_not_called()
+    backend._contents.list.assert_called_once()
+    backend._graphql_request.assert_called_once()
 
 
 def test_github_work_item_backend_concurrent_initial_cas_has_one_winner_and_two_audit_comments() -> None:

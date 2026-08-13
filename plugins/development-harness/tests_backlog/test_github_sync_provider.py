@@ -210,6 +210,23 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
     backend._fetch_issues_graphql.assert_not_called()
 
 
+def test_github_sync_provider_continues_after_audit_comment_failure() -> None:
+    backend = GitHubBackend(contents=_InMemoryContents())
+    repository = MagicMock(full_name="owner/repo")
+    backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_targeted_issues = MagicMock(return_value={"#1": _issue(1), "#2": _issue(2)})
+    backend._add_comment_graphql = MagicMock(side_effect=[BacklogError("comment unavailable"), "comment-2"])
+    root_one = root_revision("#1", "node-1", "body")
+    root_two = root_revision("#2", "node-2", "body")
+
+    results = backend._apply_patches([
+        ProviderPatch(provider_id="node-1", reference="#1", expected_revision=root_one, body="first"),
+        ProviderPatch(provider_id="node-2", reference="#2", expected_revision=root_two, body="second"),
+    ])
+
+    assert [(result.reference, result.status) for result in results] == [("#1", "error"), ("#2", "applied")]
+
+
 def test_github_sync_provider_omits_matching_patch_body() -> None:
     # Given: a patch body that already matches the revision-preflight body
     backend = GitHubBackend()
