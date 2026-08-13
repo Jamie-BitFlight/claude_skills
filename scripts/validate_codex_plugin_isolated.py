@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Validate Codex plugin installation and runtime behavior in isolation."""
 
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+import git
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_ROOT = REPO_ROOT / "plugins"
@@ -47,8 +49,11 @@ class ValidationWorkspace:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser."""
+    """Build the command-line parser.
 
+    Returns:
+        The configured argument parser.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Build an isolated temp marketplace tree for exactly one Codex plugin, then "
@@ -68,26 +73,17 @@ def create_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PLUGIN,
         help="Plugin directory name under plugins/ to validate (default: xdg-base-directory).",
     )
-    parser.add_argument(
-        "--prompt",
-        default=DEFAULT_PROMPT,
-        help="Smoke prompt to send to codex exec.",
-    )
+    parser.add_argument("--prompt", default=DEFAULT_PROMPT, help="Smoke prompt to send to codex exec.")
     parser.add_argument(
         "--output-file",
         type=Path,
         default=None,
-        help=(
-            "Path for codex exec's -o output file. Defaults to <cwd>/<plugin>.codex-smoke.txt."
-        ),
+        help=("Path for codex exec's -o output file. Defaults to <cwd>/<plugin>.codex-smoke.txt."),
     )
     parser.add_argument(
         "--path-prefix",
         default=DEFAULT_PATH_PREFIX,
-        help=(
-            "PATH prefix to prepend before invoking Codex. "
-            "Defaults to ~/.local/bin:~/.volta/bin."
-        ),
+        help=("PATH prefix to prepend before invoking Codex. Defaults to ~/.local/bin:~/.volta/bin."),
     )
     parser.add_argument(
         "--distribution-mode",
@@ -136,31 +132,38 @@ def create_parser() -> argparse.ArgumentParser:
             "--copy-auth-from-current-home unless you intend to keep a temp copy of auth.json."
         ),
     )
+    parser.add_argument(
+        "--git-project",
+        action="store_true",
+        help="Initialize the isolated project directory as a Git repository before running Codex.",
+    )
     return parser
 
 
 def title_case_from_kebab(name: str) -> str:
     """Return a simple title-cased label for a kebab-case identifier."""
-
     return " ".join(part.capitalize() for part in name.split("-") if part)
 
 
 def resolve_plugin_dir(plugin_name: str) -> Path:
-    """Resolve the source plugin directory from the repository."""
+    """Resolve the source plugin directory from the repository.
 
+    Returns:
+        The plugin directory path.
+    """
     plugin_dir = PLUGINS_ROOT / plugin_name
     if not plugin_dir.is_dir():
         available = ", ".join(sorted(entry.name for entry in PLUGINS_ROOT.iterdir() if entry.is_dir()))
-        raise HarnessError(
-            f"Plugin '{plugin_name}' was not found under {PLUGINS_ROOT}. "
-            f"Available plugins: {available}"
-        )
+        raise HarnessError(f"Plugin '{plugin_name}' was not found under {PLUGINS_ROOT}. Available plugins: {available}")
     return plugin_dir
 
 
 def load_plugin_id(plugin_dir: Path) -> str:
-    """Read and validate the Codex plugin ID from a plugin manifest."""
+    """Read and validate the Codex plugin ID from a plugin manifest.
 
+    Returns:
+        The plugin identifier.
+    """
     manifest_path = plugin_dir / ".codex-plugin" / "plugin.json"
     if not manifest_path.is_file():
         raise HarnessError(f"Plugin manifest is missing: {manifest_path}")
@@ -174,15 +177,21 @@ def load_plugin_id(plugin_dir: Path) -> str:
 
 
 def expand_path_prefix(path_prefix: str) -> str:
-    """Expand a PATH prefix string without mutating the user's shell environment."""
+    """Expand a PATH prefix string without mutating the user's shell environment.
 
-    parts = [os.path.expanduser(part) for part in path_prefix.split(os.pathsep) if part]
+    Returns:
+        The expanded, path-separated prefix.
+    """
+    parts = [str(Path(part).expanduser()) for part in path_prefix.split(os.pathsep) if part]
     return os.pathsep.join(parts)
 
 
 def create_temp_workspace(plugin_name: str) -> ValidationWorkspace:
-    """Create an isolated temp tree that owns its copied plugin and marketplace metadata."""
+    """Create an isolated temp tree that owns its copied plugin and marketplace metadata.
 
+    Returns:
+        The isolated validation workspace.
+    """
     root = Path(tempfile.mkdtemp(prefix=f"codex-plugin-{plugin_name}-"))
     plugins_root = root / "plugins"
     plugins_root.mkdir(parents=True, exist_ok=True)
@@ -217,8 +226,11 @@ def create_temp_workspace(plugin_name: str) -> ValidationWorkspace:
 
 
 def load_repo_marketplace_name() -> str:
-    """Read the repository marketplace name from .agents/plugins/marketplace.json."""
+    """Read the repository marketplace name from .agents/plugins/marketplace.json.
 
+    Returns:
+        The marketplace identifier.
+    """
     marketplace_path = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
     if not marketplace_path.is_file():
         raise HarnessError(f"Repository marketplace file is missing: {marketplace_path}")
@@ -230,8 +242,11 @@ def load_repo_marketplace_name() -> str:
 
 
 def create_repo_workspace(plugin_name: str) -> ValidationWorkspace:
-    """Create an isolated temp Codex home that installs from the repository marketplace root."""
+    """Create an isolated temp Codex home that installs from the repository marketplace root.
 
+    Returns:
+        The isolated validation workspace.
+    """
     root = Path(tempfile.mkdtemp(prefix=f"codex-plugin-{plugin_name}-"))
     project_dir = root / "project"
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -254,25 +269,20 @@ def create_repo_workspace(plugin_name: str) -> ValidationWorkspace:
     )
 
 
+def _initialize_git_project(workspace: ValidationWorkspace) -> None:
+    git.Repo.init(workspace.project_dir)
+
+
 def write_marketplace_json(marketplace_path: Path, plugin_id: str, plugin_name: str) -> None:
     """Write the smallest marketplace file needed to expose one isolated plugin."""
-
     marketplace = {
         "name": MARKETPLACE_NAME,
-        "interface": {
-            "displayName": "Isolated Codex Plugin Validation",
-        },
+        "interface": {"displayName": "Isolated Codex Plugin Validation"},
         "plugins": [
             {
                 "name": plugin_id,
-                "source": {
-                    "source": "local",
-                    "path": f"./plugins/{plugin_name}",
-                },
-                "policy": {
-                    "installation": "AVAILABLE",
-                    "authentication": "ON_INSTALL",
-                },
+                "source": {"source": "local", "path": f"./plugins/{plugin_name}"},
+                "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
                 "category": "Developer Tools",
             }
         ],
@@ -281,8 +291,11 @@ def write_marketplace_json(marketplace_path: Path, plugin_id: str, plugin_name: 
 
 
 def maybe_zip_unzip_plugin(workspace: ValidationWorkspace, plugin_name: str) -> Path:
-    """Round-trip the copied plugin through zip/unzip inside the temp tree."""
+    """Round-trip the copied plugin through zip/unzip inside the temp tree.
 
+    Returns:
+        The temporary archive path.
+    """
     plugin_dir = workspace.plugin_dir
     archive_path = workspace.root / f"{plugin_name}.zip"
 
@@ -301,20 +314,25 @@ def maybe_zip_unzip_plugin(workspace: ValidationWorkspace, plugin_name: str) -> 
 
 
 def default_output_file(plugin_name: str) -> Path:
-    """Choose a stable output file path outside the temp workspace."""
+    """Choose a stable output file path outside the temp workspace.
 
+    Returns:
+        The default smoke output path.
+    """
     return Path.cwd() / f"{plugin_name}.codex-smoke.txt"
 
 
 def current_codex_home() -> Path:
     """Return the active Codex home outside the temp validation workspace."""
-
     return Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
 
 
 def copy_auth_from_current_home(workspace: ValidationWorkspace) -> Path:
-    """Copy file-backed Codex auth into the temp CODEX_HOME when explicitly requested."""
+    """Copy file-backed Codex auth into the temp CODEX_HOME when explicitly requested.
 
+    Returns:
+        The copied authentication file path.
+    """
     source_auth = current_codex_home() / "auth.json"
     if not source_auth.is_file():
         raise HarnessError(
@@ -329,62 +347,42 @@ def copy_auth_from_current_home(workspace: ValidationWorkspace) -> Path:
 
 
 def build_command_strings(
-    workspace: ValidationWorkspace,
-    prompt: str,
-    output_file: Path,
-    path_prefix: str,
+    workspace: ValidationWorkspace, prompt: str, output_file: Path, path_prefix: str
 ) -> list[str]:
     """Return shell-readable command strings for the isolated validation flow."""
-
     expanded_prefix = expand_path_prefix(path_prefix)
     env_parts = [f"CODEX_HOME={shlex.quote(str(workspace.codex_home))}"]
     if expanded_prefix:
         env_parts.append(f"PATH={shlex.quote(expanded_prefix)}:$PATH")
     env_prefix = " ".join(env_parts)
-    marketplace_cmd = (
-        f"{env_prefix} codex plugin marketplace add {shlex.quote(str(workspace.marketplace_source))}"
-    )
-    install_cmd = (
-        f"{env_prefix} codex plugin add {shlex.quote(f'{workspace.plugin_id}@{workspace.marketplace_name}')}"
-    )
-    exec_cmd = (
-        f"{env_prefix} codex exec --skip-git-repo-check -o {shlex.quote(str(output_file))} "
-        f"{shlex.quote(prompt)}"
-    )
+    marketplace_cmd = f"{env_prefix} codex plugin marketplace add {shlex.quote(str(workspace.marketplace_source))}"
+    install_cmd = f"{env_prefix} codex plugin add {shlex.quote(f'{workspace.plugin_id}@{workspace.marketplace_name}')}"
+    exec_cmd = f"{env_prefix} codex exec --skip-git-repo-check -o {shlex.quote(str(output_file))} {shlex.quote(prompt)}"
     return [marketplace_cmd, install_cmd, exec_cmd]
 
 
 def build_env(path_prefix: str, codex_home: Path) -> dict[str, str]:
-    """Prepare the subprocess environment for Codex commands."""
+    """Prepare the subprocess environment for Codex commands.
 
+    Returns:
+        The environment mapping for subprocess execution.
+    """
     env = os.environ.copy()
     expanded_prefix = expand_path_prefix(path_prefix)
     if expanded_prefix:
-        env["PATH"] = (
-            f"{expanded_prefix}{os.pathsep}{env.get('PATH', '')}" if env.get("PATH") else expanded_prefix
-        )
+        env["PATH"] = f"{expanded_prefix}{os.pathsep}{env.get('PATH', '')}" if env.get("PATH") else expanded_prefix
     env["CODEX_HOME"] = str(codex_home)
     return env
 
 
-def run_command(
-    argv: list[str],
-    *,
-    cwd: Path,
-    env: dict[str, str],
-    label: str,
-) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess and echo its output in a readable form."""
+def run_command(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess and echo its output in a readable form.
 
+    Returns:
+        The completed subprocess result.
+    """
     print(f"[{label}] {' '.join(shlex.quote(part) for part in argv)}")
-    completed = subprocess.run(
-        argv,
-        cwd=cwd,
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    completed = subprocess.run(argv, cwd=cwd, env=env, text=True, capture_output=True, check=False)
     if completed.stdout:
         print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
     if completed.stderr:
@@ -395,14 +393,9 @@ def run_command(
 
 
 def print_plan(
-    workspace: ValidationWorkspace,
-    prompt: str,
-    output_file: Path,
-    path_prefix: str,
-    zip_archive: Path | None,
+    workspace: ValidationWorkspace, prompt: str, output_file: Path, path_prefix: str, zip_archive: Path | None
 ) -> None:
     """Print the dry-run plan and commands."""
-
     print("Isolated Codex plugin validation plan")
     print(f"  distribution:   {workspace.mode}")
     print(f"  temp workspace: {workspace.root}")
@@ -425,48 +418,44 @@ def print_plan(
 
 def cleanup_workspace(workspace: ValidationWorkspace) -> None:
     """Remove the temp tree only when it is safe to do so."""
-
     if workspace.root.is_dir() and workspace.root.name.startswith("codex-plugin-"):
         shutil.rmtree(workspace.root)
 
 
 def validate_args(args: argparse.Namespace) -> None:
     """Reject combinations that cannot produce a valid isolated run."""
-
     if args.package_only and not args.run:
         raise HarnessError("--package-only requires --run")
     if args.package_only and args.copy_auth_from_current_home:
         raise HarnessError("--package-only cannot be combined with --copy-auth-from-current-home")
+    if args.zip_unzip and args.distribution_mode != "copy":
+        raise HarnessError("--zip-unzip requires --distribution-mode copy")
 
 
 def main() -> int:
-    """Run the isolated Codex plugin validation harness."""
+    """Run the isolated Codex plugin validation harness.
 
+    Returns:
+        Zero on success, otherwise one.
+    """
     parser = create_parser()
     args = parser.parse_args()
     workspace: ValidationWorkspace | None = None
 
     try:
         validate_args(args)
-        if args.zip_unzip and args.distribution_mode != "copy":
-            raise HarnessError("--zip-unzip requires --distribution-mode copy")
-
         workspace = (
             create_repo_workspace(args.plugin)
             if args.distribution_mode == "repo"
             else create_temp_workspace(args.plugin)
         )
+        if args.git_project:
+            _initialize_git_project(workspace)
         zip_archive = maybe_zip_unzip_plugin(workspace, args.plugin) if args.zip_unzip else None
         output_file = args.output_file or default_output_file(args.plugin)
 
         if not args.run:
-            print_plan(
-                workspace,
-                args.prompt,
-                output_file,
-                args.path_prefix,
-                zip_archive,
-            )
+            print_plan(workspace, args.prompt, output_file, args.path_prefix, zip_archive)
             print()
             print("Dry run only: temp workspace preserved so the printed commands remain usable.")
             if args.copy_auth_from_current_home:
@@ -486,24 +475,13 @@ def main() -> int:
             print(f"Distribution archive: {zip_archive}")
 
         run_command(
-            [
-                "codex",
-                "plugin",
-                "marketplace",
-                "add",
-                str(workspace.marketplace_source),
-            ],
+            ["codex", "plugin", "marketplace", "add", str(workspace.marketplace_source)],
             cwd=workspace.project_dir,
             env=env,
             label="marketplace",
         )
         run_command(
-            [
-                "codex",
-                "plugin",
-                "add",
-                f"{workspace.plugin_id}@{workspace.marketplace_name}",
-            ],
+            ["codex", "plugin", "add", f"{workspace.plugin_id}@{workspace.marketplace_name}"],
             cwd=workspace.project_dir,
             env=env,
             label="install",
@@ -513,23 +491,17 @@ def main() -> int:
             return 0
 
         run_command(
-            [
-                "codex",
-                "exec",
-                "--skip-git-repo-check",
-                "-o",
-                str(output_file),
-                args.prompt,
-            ],
+            ["codex", "exec", "--skip-git-repo-check", "-o", str(output_file), args.prompt],
             cwd=workspace.project_dir,
             env=env,
             label="exec",
         )
-        print(f"Smoke output written to: {output_file}")
-        return 0
     except (HarnessError, OSError, subprocess.SubprocessError) as err:
         print(f"error: {err}", file=sys.stderr)
         return 1
+    else:
+        print(f"Smoke output written to: {output_file}")
+        return 0
     finally:
         if workspace is not None and args.run and not args.keep_tempdir:
             cleanup_workspace(workspace)
