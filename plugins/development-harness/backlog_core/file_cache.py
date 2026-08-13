@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import os
+import tempfile
 import warnings
 from io import StringIO
 from pathlib import Path
@@ -272,13 +274,19 @@ class FileCache:
     def _save_item_snapshot(self, item: BacklogItem, relative_path: Path) -> None:
         destination = self._snapshot_path(relative_path)
         destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        temporary = destination.with_name(f".{destination.name}.tmp.yaml")
+        temporary: Path | None = None
         try:
+            fd, temporary_name = tempfile.mkstemp(
+                dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp.yaml"
+            )
+            temporary = Path(temporary_name)
+            os.close(fd)
             save_item(item.model_copy(deep=True), temporary)
             Path(temporary).replace(destination)
         finally:
-            with contextlib.suppress(FileNotFoundError):
-                temporary.unlink()
+            if temporary is not None:
+                with contextlib.suppress(FileNotFoundError):
+                    temporary.unlink()
 
     def _snapshot_path(self, relative_path: Path) -> Path:
         destination = (self._root / "items" / relative_path).resolve()

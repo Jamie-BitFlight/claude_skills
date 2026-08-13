@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import get_context
 from multiprocessing.synchronize import Barrier as ProcessBarrier
 from pathlib import Path
 from threading import Barrier, Thread
 
 import pytest
+from backlog_core import file_cache
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.models import (
     BacklogItem,
@@ -111,6 +113,36 @@ def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path)
 
     # Then: the opaque key is discoverable and the item's reference survives
     assert [(key, snapshot.reference) for key, snapshot in snapshots] == [("ece.37.yaml", "ece.37")]
+
+
+def test_file_cache_concurrent_snapshot_writes_keep_unique_temps_and_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given: two writers forced to finish serialisation before either replaces one destination
+    caches = [FileCache(tmp_path), FileCache(tmp_path)]
+    save_barrier = Barrier(2)
+    original_save_item = file_cache.save_item
+
+    def synchronized_save_item(item: BacklogItem, path: Path) -> None:
+        original_save_item(item, path)
+        save_barrier.wait(timeout=5)
+
+    monkeypatch.setattr(file_cache, "save_item", synchronized_save_item)
+
+    # When: both cache instances persist the same logical snapshot concurrently
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(cache._save_work_item_snapshot, "issues/12.yaml", BacklogItem(title=title))
+            for cache, title in zip(caches, ("first", "second"), strict=True)
+        ]
+        for future in futures:
+            future.result()
+
+    # Then: the destination is one complete valid snapshot, with last-writer-wins semantics
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+    assert len(snapshots) == 1
+    assert snapshots[0][0] == "issues/12.yaml"
+    assert snapshots[0][1].title in {"first", "second"}
 
 
 def test_file_cache_distinguishes_stale_hit_from_unavailable_miss(tmp_path: Path) -> None:

@@ -33,8 +33,9 @@ from backlog_core.models import (
     ContentUnavailableError,
     ContentWrite,
     DispatchItemRecord,
+    UnsupportedCapabilityError,
 )
-from backlog_core.server import mcp
+from backlog_core.server import dispatch_create_plan, mcp
 from dispatch_schema.core.models import DispatchPlan
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
@@ -1263,6 +1264,31 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" in data
         assert "provider rejected write" in data["error"]
+
+    async def test_create_plan_unsupported_write_returns_structured_error(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        put_content = mocker.patch.object(
+            patch_create_plan_path,
+            "put_content",
+            side_effect=UnsupportedCapabilityError("GitHub dispatch writes are not supported"),
+        )
+
+        async with Client(mcp) as client:
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
+
+        assert "error" in result.data
+        assert "dispatch writes are not supported" in result.data["error"]
+        put_content.assert_called_once()
+        assert not _has_dispatch_plan(patch_create_plan_path)
+
+    async def test_create_plan_unrelated_write_error_propagates(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=RuntimeError("unexpected failure"))
+
+        with pytest.raises(RuntimeError, match="unexpected failure"):
+            await dispatch_create_plan(10, DispatchPlan.model_validate(valid_plan_dict))
 
     # ------------------------------------------------------------------
     # Validation-integration tests

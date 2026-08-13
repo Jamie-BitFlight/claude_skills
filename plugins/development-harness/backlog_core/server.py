@@ -4145,7 +4145,7 @@ async def dispatch_create_plan(
     dispatch_content = write.content
     try:
         await asyncio.to_thread(_get_artifact_provider().put_content, write)
-    except (BacklogError, ContentConflictError) as exc:
+    except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
 
     out.info(f"Stored dispatch plan {milestone_number}")

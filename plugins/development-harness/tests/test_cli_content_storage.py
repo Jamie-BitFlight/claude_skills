@@ -74,6 +74,27 @@ class _FailingArtifactContentWriter(InMemoryBackend):
         return super().put_content(request)
 
 
+class _DispatchRaceBackend(InMemoryBackend):
+    def __init__(self) -> None:
+        super().__init__()
+        self.writes: list[ContentWrite] = []
+        self.race: str | None = None
+
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        self.writes.append(request)
+        if self.race == "create" and request.create_only:
+            self.race = None
+            super().put_content(ContentWrite(reference=request.reference, content="concurrent", create_only=True))
+        elif self.race == "overwrite" and request.expected_revision:
+            self.race = None
+            super().put_content(
+                ContentWrite(
+                    reference=request.reference, content="concurrent", expected_revision=request.expected_revision
+                )
+            )
+        return super().put_content(request)
+
+
 def test_issue_less_plan_uses_configured_content_without_local_warning(content_provider: InMemoryBackend) -> None:
     result = operations.create_plan(
         ContentTaskProvider(content_provider),
@@ -242,6 +263,28 @@ def test_dispatch_operations_use_dedicated_configured_content(content_provider: 
     records = content_provider.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
     assert len(records) == 1
     assert json.loads(records[0].content)["milestone"]["number"] == 10
+
+
+def test_dispatch_create_uses_observed_write_conditions_and_rejects_races() -> None:
+    provider = _DispatchRaceBackend()
+    set_config(BacklogConfig(backend=provider))
+
+    provider.race = "create"
+    created = operations.dispatch_create_plan(10, _dispatch_plan())
+
+    assert created["error"] == "Content already exists"
+    assert provider.get_content(operations._dispatch_reference(10)).content == "concurrent"
+    assert provider.writes[0].create_only is True
+
+    provider.writes.clear()
+    current = provider.get_content(operations._dispatch_reference(10))
+    provider.race = "overwrite"
+    replaced = operations.dispatch_create_plan(10, _dispatch_plan(), overwrite=True)
+
+    assert replaced["error"] == "Content revision no longer matches"
+    assert provider.get_content(operations._dispatch_reference(10)).content == "concurrent"
+    assert provider.writes[0].expected_revision == current.revision
+    assert provider.writes[0].create_only is False
 
 
 def test_dispatch_create_does_not_overwrite_when_existing_plan_is_unavailable() -> None:

@@ -49,6 +49,7 @@ from backlog_core.models import (
     ArtifactStatus,
     ArtifactType,
     BacklogError,
+    ContentConflictError,
     ContentKind,
     ContentNotFoundError,
     ContentRef,
@@ -1273,21 +1274,23 @@ def dispatch_create_plan(
 
     provider = _get_content_provider()
     reference = _dispatch_reference(milestone_number)
-    if not overwrite:
-        plan_exists = True
-        try:
-            provider.get_content(reference)
-        except ContentNotFoundError:
-            plan_exists = False
-        if plan_exists:
+    try:
+        current = provider.get_content(reference)
+    except ContentNotFoundError:
+        write = ContentWrite(reference=reference, content=plan_model.model_dump_json(), create_only=True)
+    else:
+        if not overwrite:
             return {
                 "error": "Dispatch plan already exists. Pass overwrite=True to replace it.",
                 "milestone_number": milestone_number,
             }
+        write = ContentWrite(
+            reference=reference, content=plan_model.model_dump_json(), expected_revision=current.revision
+        )
 
     try:
-        provider.put_content(ContentWrite(reference=reference, content=plan_model.model_dump_json()))
-    except BacklogError as exc:
+        provider.put_content(write)
+    except (BacklogError, ContentConflictError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
 
     is_valid: bool | None = None
