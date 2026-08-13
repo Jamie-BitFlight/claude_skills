@@ -400,7 +400,9 @@ def test_backend_prefers_v1_content_and_falls_back_to_legacy(tmp_path: Path, sto
 def test_backend_migrates_validated_legacy_revision_on_first_write(tmp_path: Path, store: _GitHubContentsStore) -> None:
     reference = ContentRef(kind=ContentKind.PLAN, name="P1")
     legacy = MagicMock()
-    legacy.get.return_value = ContentRecord(reference=reference, content="legacy", revision="legacy-revision")
+    legacy.get.return_value = ContentRecord(
+        reference=reference, owner_reference="#7", content="legacy", revision="legacy-revision"
+    )
     backend = GitHubBackend(cache=FileCache(tmp_path), plan_persistence=legacy, contents=store)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
@@ -408,7 +410,7 @@ def test_backend_migrates_validated_legacy_revision_on_first_write(tmp_path: Pat
         ContentWrite(reference=reference, content="native", expected_revision="legacy-revision")
     )
 
-    assert (migrated.content, store.get(reference).content) == ("native", "native")
+    assert (migrated.content, migrated.owner_reference, store.get(reference).content) == ("native", "#7", "native")
 
     missing = ContentRef(kind=ContentKind.PLAN, name="P2")
     legacy.get.return_value = ContentRecord(reference=missing, content="legacy", revision="current")
