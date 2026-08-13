@@ -2,6 +2,7 @@ raw/
 
 # Scratch space for agent output and temporary reports (not committed)
 .tmp/
+.omo/
 .cache*/
 .*_cache/
 .DS_Store
