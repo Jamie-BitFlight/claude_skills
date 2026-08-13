@@ -146,7 +146,10 @@ class InMemoryBackend:
     def put_work_item(self, item: BacklogItem) -> None:
         """Upsert a work item under its stable reference."""
         item.reference = item.reference or item.issue or uuid.uuid4().hex
-        self._work_items[item.reference] = item
+        canonical = BacklogItem.model_validate(item.model_dump())
+        canonical.file_path = item.file_path
+        canonical.skip = item.skip
+        self._work_items[item.reference] = canonical
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return the requested bounded page from in-memory content."""

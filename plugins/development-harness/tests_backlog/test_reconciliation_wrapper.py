@@ -24,6 +24,7 @@ from backlog_core.models import (
 from backlog_core.operations import (
     _handle_batch_groomed,
     _handle_update_groomed,
+    list_items,
     pull_by_selector,
     pull_items,
     refresh_local_cache_from_github,
@@ -63,16 +64,29 @@ def sync_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _SyncProvi
     return provider
 
 
-def test_refresh_wrapper_maps_reconciliation_results(sync_provider, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Given: a SyncProvider and completed reconciliation outcomes
-    sync_provider.result = ReconcileResult(local_updates=2, deleted_provider_items=1)
+@pytest.mark.parametrize(("fetched_items", "expected_progress"), [(3, [(3, 3)]), (0, [(0, 0)])])
+def test_refresh_wrapper_maps_label_and_progress(
+    sync_provider, monkeypatch: pytest.MonkeyPatch, fetched_items: int, expected_progress: list[tuple[int, int | None]]
+) -> None:
+    sync_provider.result = ReconcileResult(fetched_items=fetched_items, local_updates=2, deleted_provider_items=1)
+    progress: list[tuple[int, int | None]] = []
 
-    # When: the startup-compatible refresh wrapper runs
-    result = refresh_local_cache_from_github()
+    result = refresh_local_cache_from_github(
+        label="review", progress_callback=lambda done, total: progress.append((done, total))
+    )
 
-    # Then: it maps the new result into its stable public keys
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="review")]
+    assert progress == expected_progress
     assert result["refreshed"] == 2
     assert result["reconciled"] == 1
+
+
+def test_list_wrapper_forwards_label_to_reconciliation(sync_provider) -> None:
+    # Given: a GitHub-backed list restricted to one label
+    list_items(from_github=True, label="review")
+
+    # Then: its refresh uses the same typed snapshot filter
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="review")]
 
 
 def _linked_item(reference: str = "#7") -> BacklogItem:

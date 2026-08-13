@@ -7,6 +7,7 @@ from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import BacklogItem
+from backlog_core.operations import _filter_closed_items
 
 
 def test_reference_survives_model_round_trip() -> None:
@@ -26,6 +27,24 @@ def test_memory_assigns_stable_unlinked_reference() -> None:
 
     assert assigned
     assert backend.get_work_item(assigned).title == "Renamed"
+    assert len(backend.list_work_items()) == 1
+
+
+def test_memory_revalidates_metadata_mutations_before_persisting() -> None:
+    backend = InMemoryBackend()
+    item = BacklogItem(title="Lifecycle", issue="#7")
+
+    backend.put_work_item(item)
+    reference = item.reference
+    item.metadata.status = "closed"
+    item.metadata.priority = "completed"
+    backend.put_work_item(item)
+
+    stored = backend.get_work_item(reference)
+    assert stored.reference == reference
+    assert stored.status == stored.metadata.status == "closed"
+    assert stored.priority == stored.metadata.priority == "completed"
+    assert _filter_closed_items([stored], include_closed=False) == []
     assert len(backend.list_work_items()) == 1
 
 

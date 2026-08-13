@@ -357,7 +357,6 @@ class GitHubBackend:
     supports_branches: bool = True
 
     _TARGET_BATCH_SIZE = 100
-    _PATCH_BATCH_SIZE = 25
 
     def __init__(
         self,
@@ -563,13 +562,7 @@ class GitHubBackend:
 
     def _preflight_patches(
         self, patches: list[ProviderPatch], current_by_reference: dict[str, IssueNode | None]
-    ) -> tuple[list[ProviderPatch], dict[str, PatchResult]]:
-        """Classify body patches using the targeted revision preflight.
-
-        Returns:
-            Patches requiring mutation and completed no-op, conflict, or error results.
-        """
-        applicable: list[ProviderPatch] = []
+    ) -> dict[str, PatchResult]:
         results_by_reference: dict[str, PatchResult] = {}
         for patch in patches:
             issue = current_by_reference.get(patch.reference)
@@ -594,47 +587,10 @@ class GitHubBackend:
                     revision=issue["updatedAt"],
                 )
                 continue
-            applicable.append(patch)
-        return applicable, results_by_reference
-
-    def _apply_patch_batch(
-        self, repo: Repository, owner: str, repo_name: str, patches: list[ProviderPatch]
-    ) -> dict[str, PatchResult]:
-        """Mutate one bounded patch batch and report the observed resulting revisions.
-
-        Returns:
-            Results keyed by patch reference, including post-mutation revisions.
-        """
-        try:
-            self._update_issues_graphql_batch(repo, [(patch.provider_id, patch.body) for patch in patches])
-            updated_by_reference = self._fetch_targeted_issues(
-                repo, owner, repo_name, [patch.reference for patch in patches]
+            results_by_reference[patch.reference] = PatchResult(
+                provider_id=patch.provider_id, reference=patch.reference, status="conflict", revision=issue["updatedAt"]
             )
-        except BacklogError as exc:
-            return {
-                patch.reference: PatchResult(
-                    provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
-                )
-                for patch in patches
-            }
-        results: dict[str, PatchResult] = {}
-        for patch in patches:
-            issue = updated_by_reference[patch.reference]
-            if issue is None:
-                results[patch.reference] = PatchResult(
-                    provider_id=patch.provider_id,
-                    reference=patch.reference,
-                    status="error",
-                    message="Issue disappeared",
-                )
-            else:
-                results[patch.reference] = PatchResult(
-                    provider_id=patch.provider_id,
-                    reference=patch.reference,
-                    status="applied",
-                    revision=issue["updatedAt"],
-                )
-        return results
+        return results_by_reference
 
     def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
         """Fetch one normalized bounded GitHub snapshot for reconciliation.
@@ -645,12 +601,13 @@ class GitHubBackend:
         sync_started_at = datetime.now(UTC).isoformat()
         repo = self.get_github()
         owner, repo_name = repo.full_name.split("/", 1)
+        labels = [request.label] if request.label else None
         match request.scope:
             case ReconcileScope.INITIAL:
-                issues = self._fetch_issues_graphql(repo, owner, repo_name, state="OPEN", first=100)
+                issues = self._fetch_issues_graphql(repo, owner, repo_name, state="OPEN", labels=labels, first=100)
             case ReconcileScope.INCREMENTAL:
                 issues = self._fetch_issues_graphql(
-                    repo, owner, repo_name, state="OPEN,CLOSED", first=100, since=request.since or None
+                    repo, owner, repo_name, state="OPEN,CLOSED", labels=labels, first=100, since=request.since or None
                 )
             case ReconcileScope.LINKED | ReconcileScope.TARGETED:
                 issues = []
@@ -717,10 +674,7 @@ class GitHubBackend:
                 for patch in patches
             ]
 
-        applicable, results_by_reference = self._preflight_patches(patches, current_by_reference)
-        for offset in range(0, len(applicable), self._PATCH_BATCH_SIZE):
-            chunk = applicable[offset : offset + self._PATCH_BATCH_SIZE]
-            results_by_reference.update(self._apply_patch_batch(repo, owner, repo_name, chunk))
+        results_by_reference = self._preflight_patches(patches, current_by_reference)
         return [results_by_reference[patch.reference] for patch in patches]
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:

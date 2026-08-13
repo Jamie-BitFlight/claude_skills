@@ -67,6 +67,20 @@ def test_github_sync_provider_normalizes_bounded_snapshot() -> None:
     assert backend._fetch_issues_graphql.call_args.kwargs["first"] == 100
 
 
+def test_github_sync_provider_forwards_label_scope_to_snapshot_query() -> None:
+    # Given: an initial reconciliation restricted to one label
+    backend = GitHubBackend()
+    repository = MagicMock(full_name="owner/repo")
+    backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_issues_graphql = MagicMock(return_value=[_issue(1)])
+
+    # When: the adapter fetches the provider snapshot
+    backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL, label="review"))
+
+    # Then: the existing GraphQL query receives only the requested label
+    assert backend._fetch_issues_graphql.call_args.kwargs["labels"] == ["review"]
+
+
 def test_github_sync_provider_reports_conflict_without_mutation() -> None:
     # Given: a preflight revision that differs from the patch expectation
     backend = GitHubBackend()
@@ -126,28 +140,24 @@ def test_github_sync_provider_bounds_targeted_aliases_to_one_hundred() -> None:
     ] == [100, 1]
 
 
-def test_github_sync_provider_batches_preflight_and_mutations_without_per_item_fetches() -> None:
-    # Given: 26 body patches whose current provider revisions match
+def test_github_sync_provider_rejects_body_change_without_mutation() -> None:
+    # Given: a body patch whose current provider revision matches
     backend = GitHubBackend()
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
     backend._fetch_issue_graphql = MagicMock()
     backend._fetch_issues_graphql = MagicMock()
-    backend._graphql_request = MagicMock(
-        return_value={"repository": {f"i{index}": _issue(index + 1) for index in range(26)}}
-    )
+    backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1)}})
     backend._update_issues_graphql_batch = MagicMock()
-    patches = [
-        ProviderPatch(provider_id=f"node-{number}", reference=f"#{number}", expected_revision="rev-1", body="updated")
-        for number in range(1, 27)
-    ]
+    patch = ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="updated")
 
-    # When: the adapter preflights then applies every patch
-    results = backend._apply_patches(patches)
+    # When: the adapter classifies the unsafe body change
+    results = backend._apply_patches([patch])
 
-    # Then: targeted aliases avoid N+1 reads and body mutations never exceed GitHub's 25-item batch limit
-    assert [result.status for result in results] == ["applied"] * 26
-    assert [len(call.args[1]) for call in backend._update_issues_graphql_batch.call_args_list] == [25, 1]
+    # Then: no conditional GitHub mutation exists, so the observed revision is a conflict
+    assert results[0].status == "conflict"
+    assert results[0].revision == "rev-1"
+    backend._update_issues_graphql_batch.assert_not_called()
     backend._fetch_issue_graphql.assert_not_called()
     backend._fetch_issues_graphql.assert_not_called()
 

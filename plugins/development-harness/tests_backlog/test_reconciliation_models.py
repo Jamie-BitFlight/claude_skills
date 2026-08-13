@@ -100,6 +100,17 @@ def test_reconcile_request_rejects_unknown_scope() -> None:
         ReconcileRequest(scope="all")
 
 
+def test_reconcile_request_preserves_label_scope() -> None:
+    # Given: a label-restricted public refresh
+    request = ReconcileRequest(scope=ReconcileScope.INITIAL, label="review")
+
+    # When: it crosses the typed reconciliation boundary
+    serialized = request.model_dump()
+
+    # Then: the exact provider label is retained for snapshot filtering
+    assert serialized["label"] == "review"
+
+
 def test_patch_result_rejects_unknown_status() -> None:
     # Given: a provider patch result outside the defined outcome set
     # When / Then: Pydantic rejects it at the boundary

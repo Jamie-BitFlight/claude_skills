@@ -1464,7 +1464,9 @@ def refresh_local_cache_from_github(
         return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
     references = [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
     scope = ReconcileScope.INITIAL if full_refresh else ReconcileScope.INCREMENTAL
-    result = backend.reconcile(ReconcileRequest(scope=scope, references=references))
+    result = backend.reconcile(ReconcileRequest(scope=scope, label=label or "", references=references))
+    if progress_callback is not None:
+        progress_callback(result.fetched_items, result.fetched_items)
     out.info(
         f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
         f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures."

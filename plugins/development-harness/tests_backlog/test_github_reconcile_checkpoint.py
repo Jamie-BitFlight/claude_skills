@@ -163,15 +163,30 @@ def test_github_reconcile_conflict_preserves_snapshot_checkpoint(tmp_path: Path)
             pages_fetched=1,
         )
     )
-    backend._apply_patches = MagicMock(
-        return_value=[PatchResult(provider_id="node-1", reference="#1", status="conflict", message="stale")]
-    )
+    repository = MagicMock(full_name="owner/repo")
+    observed_issue: dict[str, object] = {
+        "id": "node-1",
+        "number": 1,
+        "title": "Issue 1",
+        "body": backend.render_issue_body(baseline),
+        "state": "OPEN",
+        "labels": [{"id": "label-1", "name": "feature"}],
+        "updatedAt": "rev-1",
+        "createdAt": "2026-08-12T00:00:00Z",
+        "milestone": None,
+        "assignees": [],
+    }
+    backend.get_github = MagicMock(return_value=repository)
+    backend._graphql_request = MagicMock(return_value={"repository": {"i0": observed_issue}})
+    backend._update_issues_graphql_batch = MagicMock()
 
     # When: the provider reports the patch conflict
     result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
 
-    # Then: the conflict is reported and the prior global watermark remains durable
+    # Then: the body remains unwritten, the conflict is reported, and the prior global watermark remains durable
     assert result.conflicts == 1
+    assert result.patch_results[0].revision == "rev-1"
+    backend._update_issues_graphql_batch.assert_not_called()
     assert FileCache(tmp_path)._get_snapshot_checkpoint() == old_checkpoint
 
 
