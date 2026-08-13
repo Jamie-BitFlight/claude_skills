@@ -1,8 +1,7 @@
 """Business logic for the artifact manifest registry.
 
 This module is purely stateless — all methods accept and return
-``ArtifactManifest`` objects without internal state.  No I/O is performed
-here; all GitHub interaction is in :mod:`backlog_core.artifact_provider`.
+``ArtifactManifest`` objects without internal state. No I/O is performed here.
 
 Manifest section format stored in GitHub Issue bodies::
 

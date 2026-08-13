@@ -24,7 +24,7 @@ from backlog_core.artifact_provider import ArtifactBackend, create_artifact_prov
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType, BacklogError
 
-from .exceptions import ArtifactWriteError
+from .exceptions import ArtifactWriteError, PlanIndexError
 
 _log = logging.getLogger(__name__)
 
@@ -43,6 +43,17 @@ _PLAN_INDEX_TYPE = "plan-index"
 _PLAN_INDEX_PATH = "sam-plan/plan-index.yaml"
 
 _artifact_registry = ArtifactRegistry()
+
+
+class PlanIndexUnavailableError(PlanIndexError):
+    """Raised when the authoritative plan index cannot be read."""
+
+    def __init__(self, sentinel_issue: int, reason: str) -> None:
+        """Initialize the unavailable index read details."""
+        self.sentinel_issue = sentinel_issue
+        super().__init__(
+            plan_id="<plan-index>", reason=f"Gist read unavailable for sentinel issue #{sentinel_issue}: {reason}"
+        )
 
 
 def _get_provider() -> ArtifactBackend:
@@ -264,6 +275,9 @@ class ArtifactRegistryClient:
 
         Returns:
             Plan-index YAML string when found, or ``None`` when absent.
+
+        Raises:
+            PlanIndexUnavailableError: When the configured provider cannot be read.
         """
         try:
             provider = self._provider_instance()
@@ -271,7 +285,7 @@ class ArtifactRegistryClient:
             _log.warning(
                 "ArtifactRegistryClient.read_index: provider unavailable for sentinel #%d: %s", sentinel_issue, exc
             )
-            return None
+            raise PlanIndexUnavailableError(sentinel_issue, str(exc)) from exc
 
         try:
             remote_content = provider.read_artifact_content_from_remote(
@@ -283,5 +297,6 @@ class ArtifactRegistryClient:
             _log.warning(
                 "ArtifactRegistryClient.read_index: Gist read failed for sentinel #%d: %s", sentinel_issue, exc
             )
+            raise PlanIndexUnavailableError(sentinel_issue, str(exc)) from exc
 
         return None

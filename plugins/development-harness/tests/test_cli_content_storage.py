@@ -7,10 +7,21 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import set_config
 from backlog_core.backend_types import BacklogConfig, ContentProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ContentKind, ContentQuery, ContentRef, ContentUnavailableError
+from backlog_core.models import (
+    ArtifactEntry,
+    ArtifactManifest,
+    ArtifactType,
+    ContentKind,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+)
 from dh_core import operations
 from sam_schema.core.backends.content import ContentTaskProvider
 
@@ -27,6 +38,30 @@ def _dispatch_plan(milestone: int = 10) -> dict[str, Any]:
         "milestone": {"number": milestone, "title": "Provider plan", "integration-branch": "main"},
         "waves": [{"wave": 1, "items": [{"title": "Issue", "issue": 101, "priority": "P1"}]}],
     }
+
+
+class _ConcurrentManifestWriter(InMemoryBackend):
+    def __init__(self) -> None:
+        super().__init__()
+        self.inject_conflict = False
+        self.concurrent_write: ContentRecord | None = None
+
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        if self.inject_conflict and request.reference.kind == ContentKind.ARTIFACT_MANIFEST:
+            self.inject_conflict = False
+            record = self.get_content(request.reference)
+            manifest = ArtifactManifest.model_validate_json(record.content)
+            competing_manifest = ArtifactRegistry().register(
+                manifest, ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="concurrent.md")
+            )
+            self.concurrent_write = super().put_content(
+                ContentWrite(
+                    reference=request.reference,
+                    content=competing_manifest.model_dump_json(),
+                    expected_revision=record.revision,
+                )
+            )
+        return super().put_content(request)
 
 
 def test_issue_less_plan_uses_configured_content_without_local_warning(content_provider: InMemoryBackend) -> None:
@@ -66,6 +101,24 @@ def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
         operations.artifact_register(42, "research", "report")
 
     provider.put_content.assert_not_called()
+
+
+def test_artifact_register_retries_conflicting_manifest_write() -> None:
+    provider = _ConcurrentManifestWriter()
+    set_config(BacklogConfig(backend=provider))
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest")
+    provider.put_content(ContentWrite(reference=reference, content=ArtifactManifest(issue_number=42).model_dump_json()))
+    provider.inject_conflict = True
+
+    result = operations.artifact_register(42, "architect", "primary.md")
+
+    manifest = ArtifactManifest.model_validate_json(provider.get_content(reference).content)
+    assert result["registered"] is True
+    assert provider.concurrent_write is not None
+    assert {(entry.artifact_type, entry.artifact_id) for entry in manifest.artifacts} == {
+        (ArtifactType.ARCHITECT, "primary.md"),
+        (ArtifactType.RESEARCH, "concurrent.md"),
+    }
 
 
 def test_dispatch_operations_use_dedicated_configured_content(content_provider: InMemoryBackend) -> None:

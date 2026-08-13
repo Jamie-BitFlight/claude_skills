@@ -21,7 +21,7 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileScope,
 )
-from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
+from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
 
 
@@ -369,6 +369,20 @@ def test_artifact_registry_client_index_read_never_uses_local_artifact_storage()
     provider.read_local_artifact_content.assert_not_called()
 
 
+def test_artifact_registry_client_index_read_raises_when_remote_is_unavailable() -> None:
+    # Given: the configured remote provider cannot read the index
+    provider = MagicMock()
+    provider.read_artifact_content_from_remote.side_effect = BacklogError("offline")
+    client = ArtifactRegistryClient(provider)
+
+    # When: the plan index is read
+    with pytest.raises(PlanIndexUnavailableError):
+        client.read_index(2531)
+
+    # Then: the failure remains distinct from a confirmed missing index
+    provider.read_local_artifact_content.assert_not_called()
+
+
 def test_github_content_provider_reads_cached_plan_while_github_is_offline(tmp_path: Path) -> None:
     # Given: a cached plan and an unreachable GitHub provider
     cache = FileCache(tmp_path)
@@ -386,6 +400,62 @@ def test_github_content_provider_reads_cached_plan_while_github_is_offline(tmp_p
     # Then: the provider-owned FileCache serves an explicitly stale copy without any artifact filesystem access
     assert (cached.content, cached.stale) == ("cached plan", True)
     artifact_provider.read_local_artifact_content.assert_not_called()
+
+
+def test_github_plan_list_uses_stale_cache_when_index_is_unavailable(tmp_path: Path) -> None:
+    # Given: cached plan content and an online GitHub API with an unavailable plan index
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="Pcached")
+    cache.cache_content(ContentRecord(reference=reference, owner_reference="#42", content="cached plan"))
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.side_effect = BacklogError("offline index")
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: plan discovery cannot read its authoritative index
+    records = backend.list_content(ContentQuery(kind=ContentKind.PLAN))
+
+    # Then: the existing cache is returned as stale and no empty index is stored
+    assert [(record.reference, record.content, record.stale) for record in records] == [
+        (reference, "cached plan", True)
+    ]
+    artifact_provider.store_artifact_content.assert_not_called()
+
+
+def test_github_plan_get_uses_stale_cache_when_index_is_unavailable(tmp_path: Path) -> None:
+    # Given: cached plan content and an online GitHub API with an unavailable plan index
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="Pcached")
+    cache.cache_content(ContentRecord(reference=reference, owner_reference="#42", content="cached plan"))
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.side_effect = BacklogError("offline index")
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: a plan read cannot read its authoritative index
+    record = backend.get_content(reference)
+
+    # Then: the existing cache is returned as stale and no empty index is stored
+    assert (record.reference, record.content, record.stale) == (reference, "cached plan", True)
+    artifact_provider.store_artifact_content.assert_not_called()
+
+
+def test_github_plan_put_queues_when_index_is_unavailable(tmp_path: Path) -> None:
+    # Given: an online GitHub API with an unavailable authoritative plan index
+    cache = FileCache(tmp_path)
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.side_effect = BacklogError("offline index")
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    request = ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="Pnew"), content="new plan")
+
+    # When: a plan write cannot read its authoritative index
+    record = backend.put_content(request)
+
+    # Then: the mutation is queued without storing a replacement empty index
+    assert record.pending is True
+    assert len(cache.pending_mutations()) == 1
+    artifact_provider.store_artifact_content.assert_not_called()
 
 
 def test_github_content_provider_distinguishes_online_not_found_from_offline_cache_miss(tmp_path: Path) -> None:

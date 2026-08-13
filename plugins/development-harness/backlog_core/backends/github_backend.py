@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import dh_paths as _dh_paths
-from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
+from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.exceptions import ArtifactWriteError, PlanIndexError
 from sam_schema.core.plan_id_index import PlanIndexEntry, create_plan_id_index
 
@@ -137,6 +137,8 @@ class _GitHubPlanPersistence:
     def _entries(self) -> Sequence[PlanIndexEntry]:
         try:
             return self._index.list_all()
+        except PlanIndexUnavailableError as exc:
+            raise BacklogError(str(exc)) from exc
         except (ArtifactWriteError, PlanIndexError) as exc:
             raise BacklogError(str(exc)) from exc
 
@@ -758,10 +760,14 @@ class GitHubBackend:
         if online:
             self._replay_pending_content()
             if query.kind == ContentKind.PLAN:
-                records = list(self._plan_persistence.list(query))
-                for record in records:
-                    self._cache.cache_content(record)
-                return records
+                try:
+                    records = list(self._plan_persistence.list(query))
+                except BacklogError:
+                    online = False
+                else:
+                    for record in records:
+                        self._cache.cache_content(record)
+                    return records
             if query.kind == ContentKind.DISPATCH_PLAN:
                 records = list(self._dispatch_persistence.list(query))
                 for record in records:

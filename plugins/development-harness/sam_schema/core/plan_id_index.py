@@ -297,6 +297,9 @@ class PlanIdIndex:
 
         Returns:
             List of :class:`PlanIndexEntry` from the current Gist blob.
+
+        Raises:
+            PlanIndexUnavailableError: When the authoritative Gist index cannot be read.
         """
         if self._entries_cache is not None:
             return self._entries_cache

@@ -22,7 +22,7 @@ from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
 
 from . import models as _models
-from .artifact_registry import ArtifactRegistry
+from .artifact_manifest_store import register_manifest_entry
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
 from .entry_blocks import ENTRY_RE, _render_entry_raw, parse_entries
@@ -41,7 +41,6 @@ from .models import (
     ContentQuery,
     ContentRef,
     ContentUnavailableError,
-    ContentWrite,
     DuplicateItemError,
     Entry,
     GroomedData,
@@ -815,17 +814,10 @@ def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", o
         provider = get_config().backend
         if not isinstance(provider, ContentProvider):
             raise ContentUnavailableError("Active backend does not support artifact content")
-        registry = ArtifactRegistry()
         owner = f"#{issue_number}"
         reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=owner, name="manifest")
-        try:
-            record = provider.get_content(reference)
-            manifest = _models.ArtifactManifest.model_validate_json(record.content)
-        except _models.ContentNotFoundError:
-            manifest = _models.ArtifactManifest(issue_number=issue_number)
         entry = ArtifactEntry(artifact_type=ArtifactType.TASK_PLAN, artifact_id=plan)
-        updated_manifest = registry.register(manifest, entry)
-        provider.put_content(ContentWrite(reference=reference, content=updated_manifest.model_dump_json()))
+        register_manifest_entry(provider, reference, issue_number, entry)
         out.info(f"  Artifact registered: task-plan {plan} on issue #{issue_number}")
     except (BacklogError, GithubException, OSError, RuntimeError) as exc:
         out.warn(f"  WARNING: Artifact registration failed for {plan} on issue #{issue_number}: {exc}")

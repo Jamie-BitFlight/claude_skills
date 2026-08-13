@@ -30,6 +30,7 @@ from pydantic import Field
 from ruamel.yaml import YAML as _YAML
 
 from . import models as _models, sync_engine as _sync_engine
+from .artifact_manifest_store import load_manifest as _load_manifest_record, register_manifest_entry
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueNode as _IssueNode, SyncProvider
@@ -3282,16 +3283,7 @@ def _manifest_reference(item_id: ItemId) -> ContentRef:
 
 
 def _load_manifest(provider: ContentProvider, item_id: ItemId) -> ArtifactManifest:
-    try:
-        return ArtifactManifest.model_validate_json(provider.get_content(_manifest_reference(item_id)).content)
-    except ContentNotFoundError:
-        return ArtifactManifest(issue_number=item_id)
-
-
-def _save_manifest(provider: ContentProvider, manifest: ArtifactManifest) -> None:
-    provider.put_content(
-        ContentWrite(reference=_manifest_reference(manifest.issue_number), content=manifest.model_dump_json())
-    )
+    return _load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
 
 
 @mcp.tool(
@@ -3366,13 +3358,7 @@ async def artifact_register(
         )
 
         def _run() -> RegisterResult:
-            manifest = _load_manifest(provider, item_id)
-            updated_manifest = _artifact_registry.register(manifest, entry)
-            _save_manifest(provider, updated_manifest)
-            # Determine action: "updated" if entry pre-existed, "added" otherwise.
-            existed = any(
-                e.artifact_type == artifact_type_enum and e.artifact_id == artifact_id for e in manifest.artifacts
-            )
+            updated_manifest, existed = register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
             action = "updated" if existed else "added"
 
             content_stored = content is not None
@@ -3951,9 +3937,7 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str) -> N
             status=ArtifactStatus.CURRENT,
             agent="dispatch_create_plan",
         )
-        manifest = _load_manifest(provider, item_id)
-        updated_manifest = _artifact_registry.register(manifest, entry)
-        _save_manifest(provider, updated_manifest)
+        register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
         log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", artifact_id, item_id)
     except (BacklogError, ContentUnavailableError, _GithubException) as exc:
         log.warning(

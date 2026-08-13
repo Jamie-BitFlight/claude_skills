@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import dispatch_schema as _ds
+from backlog_core.artifact_manifest_store import load_manifest as _load_manifest_record, register_manifest_entry
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import get_config
 from backlog_core.backend_types import ContentProvider, GitHubExtras
@@ -1865,16 +1866,7 @@ def _manifest_reference(item_id: int | str) -> ContentRef:
 
 
 def _load_manifest(provider: ContentProvider, item_id: int | str) -> ArtifactManifest:
-    try:
-        return ArtifactManifest.model_validate_json(provider.get_content(_manifest_reference(item_id)).content)
-    except ContentNotFoundError:
-        return ArtifactManifest(issue_number=item_id)
-
-
-def _save_manifest(provider: ContentProvider, manifest: ArtifactManifest) -> None:
-    provider.put_content(
-        ContentWrite(reference=_manifest_reference(manifest.issue_number), content=manifest.model_dump_json())
-    )
+    return _load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
 
 
 def artifact_register(
@@ -1904,12 +1896,7 @@ def artifact_register(
             agent=agent,
         )
 
-        manifest = _load_manifest(provider, item_id)
-        existed = any(
-            e.artifact_type == artifact_type_enum and e.artifact_id == artifact_id for e in manifest.artifacts
-        )
-        updated_manifest = _artifact_registry.register(manifest, entry)
-        _save_manifest(provider, updated_manifest)
+        updated_manifest, existed = register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
         action = "updated" if existed else "added"
 
         content_stored = content is not None
