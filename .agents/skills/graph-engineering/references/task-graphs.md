@@ -6,6 +6,7 @@
 - [Fake edges](#fake-edges)
 - [The diamond pattern](#the-diamond-pattern)
 - [The stop rule](#the-stop-rule)
+- [Execution handoff](#execution-handoff)
 - [The human gate](#the-human-gate)
 - [Guardrails](#guardrails)
 
@@ -57,6 +58,47 @@ The decision procedure:
 3. Never let findings merge without one owner of the merge.
 
 More agents is not a strategy. The shape of the work decides.
+
+## Execution handoff
+
+Design the topology once, then hand each ready component to the smallest runtime that fits it.
+Graph engineering owns the nodes, real dependencies, verification joins, and human gates.
+The runtime MUST consume that graph without adding dependencies or redesigning the split.
+
+| Ready component | Runtime |
+|---|---|
+| Serial chain | Keep it with the leader or one worker |
+| Parallel nodes that never exchange results | Use plain subagents |
+| Independent parallel nodes that need non-blocking coordination at a shared boundary | Use teammode |
+| Fan-in verification | Start a fresh verifier only after every incoming node finishes |
+| Irreversible action | Stop at the human gate |
+
+If one node needs another node's finding, draw an edge and start the consumer in a later wave.
+
+Initialize teammode only when the first coordination-connected parallel component becomes ready.
+For the installed Codex `omo:teammode` v4.19.4 controller, map graph facts into its supported
+`add-member` inputs:
+
+- node scope and file ownership become `--focus`;
+- node acceptance criteria and QA become `--deliverable`;
+- graph dependencies determine which members may start in the current wave;
+- overlapping file ownership means the nodes cannot share a wave: repartition ownership or
+  serialize them;
+- the merge owner remains the leader, never another implicit member.
+
+With another runtime, put the same scope and acceptance criteria in its supported task description
+or spawn prompt instead of inventing `focus` or `deliverable` state fields.
+
+Disband the team when that component and its verification join finish. Do not keep team state for
+serial work, isolated subagents, later human gates, or hypothetical future waves. When teammode is
+unavailable, preserve the topology and use the available serial or plain-subagent runtime instead.
+This boundary avoids a second planner, a graph-to-team compiler, and duplicate orchestration state.
+
+Runtime basis: OpenAI, [Subagents](https://developers.openai.com/codex/subagents), and LazyCodex's
+version-pinned [`teammode` wave mapping](https://github.com/code-yeongyu/lazycodex/blob/10f95587d3aeacf208cc1fee88a91315962d31e8/plugins/omo/components/teammode/skills/teammode/SKILL.md#L248-L261)
+and [`team.mjs` member inputs](https://github.com/code-yeongyu/lazycodex/blob/10f95587d3aeacf208cc1fee88a91315962d31e8/plugins/omo/components/teammode/skills/teammode/scripts/team.mjs#L7-L14)
+(all accessed 2026-08-13). This repository's one-writer rule intentionally tightens the upstream
+worktree guidance for overlapping files.
 
 ## The human gate
 

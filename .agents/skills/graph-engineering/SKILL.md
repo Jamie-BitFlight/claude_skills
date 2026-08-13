@@ -15,8 +15,10 @@ prompts. It has two halves:
    and adapted for LLM-era agents.
 2. **Task graphs** — how agents work. Nodes are jobs, edges are execution dependencies:
    parallel fan-out, separate verifier contexts, the stop rule, the human gate.
-   Read [references/task-graphs.md](references/task-graphs.md) when the request is about
-   orchestrating agents rather than building memory.
+   Read [references/task-graphs.md](./references/task-graphs.md) when the request is about
+   orchestrating agents rather than building memory. The task graph decides the execution
+   shape once; use teammode only for a ready parallel component whose members must coordinate.
+   Keep serial chains with one agent and perfectly isolated parallel nodes as plain subagents.
 
 Core mental model: a knowledge graph is a **product with a schema**, not a pile of triples.
 Quality comes from the pipeline order — model the domain BEFORE extracting, fuse BEFORE storing,
@@ -58,7 +60,7 @@ skip stages 3 (ontology) or 8 (fusion) — they are where real-world graphs fail
    attributes BEFORE extraction. Start minimal: 5-15 entity types, 10-30 relation types.
    Two rules from the course: every relation gets a precise verb name (`ACQUIRED`, not
    `RELATED_TO`), and if two types are always queried together, merge them.
-   Details and worked examples: [references/modeling.md](references/modeling.md)
+   Details and worked examples: [references/modeling.md](./references/modeling.md)
 
 4. **Entity extraction (NER)** — Extract typed entities from sources. Method ladder: exact
    rules/dictionaries for closed vocabularies → LLM extraction with the ontology in the prompt
@@ -71,7 +73,7 @@ skip stages 3 (ontology) or 8 (fusion) — they are where real-world graphs fail
 6. **Event extraction** — For dynamic domains (news, logs, transactions), extract events as
    first-class nodes (trigger + typed arguments + time), not just static edges.
    Extraction methods, prompt patterns, and failure modes for stages 4-6:
-   [references/extraction.md](references/extraction.md)
+   [references/extraction.md](./references/extraction.md)
 
 7. **Quality gate** — Before fusion, sample and score: entity precision (are extracted
    entities real and correctly typed?), relation precision (does the source sentence actually
@@ -82,12 +84,12 @@ skip stages 3 (ontology) or 8 (fusion) — they are where real-world graphs fail
 8. **Knowledge fusion** — Merge duplicates within and across sources: same real-world entity,
    different surface forms ("SEU" = "Southeast University" = "东南大学"). Blocking + matching +
    merge policy. Skipping this is the #1 cause of useless graphs.
-   Matching strategies: [references/fusion-and-llm.md](references/fusion-and-llm.md)
+   Matching strategies: [references/fusion-and-llm.md](./references/fusion-and-llm.md)
 
 9. **Serve to LLMs (KG × LLM)** — Make the graph useful to agents: GraphRAG retrieval
    (subgraph → context), graph-as-memory (agent writes facts back through stages 4-8), and
    LLM-as-reasoner over paths. Patterns and pitfalls:
-   [references/fusion-and-llm.md](references/fusion-and-llm.md)
+   [references/fusion-and-llm.md](./references/fusion-and-llm.md)
 
 ## Working Rules
 
@@ -103,14 +105,14 @@ skip stages 3 (ontology) or 8 (fusion) — they are where real-world graphs fail
 
 ## Reference Files
 
-- [references/curriculum.md](references/curriculum.md) — Full translated curriculum of the
+- [references/curriculum.md](./references/curriculum.md) — Full translated curriculum of the
   source course with per-lecture summaries and links to the original Chinese slide decks.
   Read when the user wants theory depth, the academic grounding, or the original materials.
-- [references/modeling.md](references/modeling.md) — Knowledge representation & ontology
+- [references/modeling.md](./references/modeling.md) — Knowledge representation & ontology
   engineering (course lectures 2-3). Read during stages 2-3.
-- [references/extraction.md](references/extraction.md) — Entity, relation, and event
+- [references/extraction.md](./references/extraction.md) — Entity, relation, and event
   extraction from rules to LLM prompting (lectures 4-7). Read during stages 4-7.
-- [references/fusion-and-llm.md](references/fusion-and-llm.md) — Knowledge fusion and
+- [references/fusion-and-llm.md](./references/fusion-and-llm.md) — Knowledge fusion and
   KG × LLM integration (lectures 8-9). Read during stages 8-9.
 
 ## Credits
