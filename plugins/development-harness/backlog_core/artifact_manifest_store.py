@@ -50,7 +50,12 @@ def register_manifest_entry(
         manifest = registry.register(manifest, entry)
         try:
             provider.put_content(
-                ContentWrite(reference=reference, content=manifest.model_dump_json(), expected_revision=revision)
+                ContentWrite(
+                    reference=reference,
+                    content=manifest.model_dump_json(),
+                    expected_revision=revision,
+                    create_only=not revision,
+                )
             )
         except ContentConflictError:
             if attempt + 1 == _MANIFEST_WRITE_ATTEMPTS:
