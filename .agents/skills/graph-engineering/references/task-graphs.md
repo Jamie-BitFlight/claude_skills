@@ -69,9 +69,11 @@ The runtime MUST consume that graph without adding dependencies or redesigning t
 |---|---|
 | Serial chain | Keep it with the leader or one worker |
 | Parallel nodes that never exchange results | Use plain subagents |
-| Parallel nodes that must exchange findings or coordinate a shared boundary | Use teammode |
+| Independent parallel nodes that need non-blocking coordination at a shared boundary | Use teammode |
 | Fan-in verification | Start a fresh verifier only after every incoming node finishes |
 | Irreversible action | Stop at the human gate |
+
+If one node needs another node's finding, draw an edge and start the consumer in a later wave.
 
 Initialize teammode only when the first coordination-connected parallel component becomes ready.
 For the installed Codex `omo:teammode` v4.19.4 controller, map graph facts into its supported
