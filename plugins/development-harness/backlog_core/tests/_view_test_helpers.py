@@ -61,7 +61,7 @@ def _configure_memory_view(
     backend = InMemoryBackend()
     if item is not None:
         if issue_num is not None:
-            item.issue = f"#{issue_num}"
+            item = BacklogItem.model_validate({**item.model_dump(), "issue": f"#{issue_num}"})
         backend.put_work_item(item)
 
     def _enrich(result: ViewItemResult, issue: str, repo: str = "") -> bool:
