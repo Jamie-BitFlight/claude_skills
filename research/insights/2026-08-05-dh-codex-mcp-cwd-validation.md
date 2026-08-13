@@ -27,25 +27,22 @@ allows its PEP 723 servers to load from an isolated Codex marketplace installati
   plugins use `parse_plugin_mcp_config` through the host loader. A relative
   `cwd` is resolved against the plugin root; an omitted `cwd` is left unset.
 
+## Follow-up validation
+
+- 2026-08-13: a copied-and-zipped `development-harness` plugin installed in an isolated
+  `CODEX_HOME` and ran from an isolated Git repository.
+- Codex invoked `sam_active_task` with `{"action":"get"}` and received
+  `{"active_task": null}`.
+
 ## Decision
 
-Do not commit the `cwd` removal or an empty `hooks` object. Both edits are reverted
-to the existing branch baseline because neither tested configuration produces a usable
-DH MCP server.
+Keep `cwd: "."` and forward `PWD` plus `CODEX_THREAD_ID`. The packaged server needs
+the plugin-root working directory for its relative launcher path, while the forwarded
+Codex project directory supplies the Git-aware project root. The follow-up validation
+proves this two-root configuration for the SAM MCP startup and basic tool call.
 
-## Open Design Problem
-
-The standard host-loaded Codex MCP configuration needs both:
-
-1. A plugin-resolved path to the PEP 723 server script.
-2. The agent project directory as the MCP process working directory, so DH can resolve
-   the active project Git root.
-
-The tested standard `mcpServers` parser resolves relative `cwd` values, but does not
-expand relative script arguments against the plugin root when `cwd` is omitted.
-Determine the supported Codex mechanism for this two-root requirement before another
-configuration change. The next experiment must use a plugin-root-resolved launcher path
-while preserving the agent project directory for DH root discovery.
+Hook execution and a complete Development Harness workflow remain separate validation
+work; they are not implied by this MCP result.
 
 ## References
 

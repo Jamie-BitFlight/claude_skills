@@ -129,8 +129,8 @@ converting. It does not invent structure.
 
 The plugin registers a Mermaid diagram validation MCP server (defined in `.mcp.json`) that
 provides real-time syntax checking during conversion. This prevents incomplete or malformed
-Mermaid syntax from entering the codebase. The server runs automatically — no configuration
-needed.
+Mermaid syntax from entering the codebase. The server runs automatically after Bun is
+installed; no additional MCP configuration is needed.
 
 ## Quality Gate — The Triage Protocol
 
@@ -168,7 +168,10 @@ flowchart TD
 ## Requirements
 
 - Claude Code v2.0+
-- Node.js (for the bundled `mcp-mermaid` MCP server, installed via `npx` on first use)
+- Bun (for the bundled `mcp-mermaid` MCP server, launched with `bunx` on first use)
+
+Install Bun using the [official installation instructions](https://bun.sh/docs/installation),
+then verify it is available with `bun --version` before invoking the MCP-backed conversion.
 
 ---
 

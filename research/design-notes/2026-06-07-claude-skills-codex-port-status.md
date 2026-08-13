@@ -29,10 +29,10 @@ Important QA correction:
 | `commitlint` | skills | skill-only | yes | no | low | |
 | `conventional-commits` | skills | skill-only | yes | no | low | |
 | `dasel` | skills, agents, hooks | hook-heavy | yes | no | high | |
-| `development-harness` | skills, agents, hooks | hook-heavy | yes | no | high | |
+| `development-harness` | skills, agents, hooks | hook-heavy | yes | no | high | copied/zipped isolated install and `sam_active_task(get)` MCP invocation pass from a Git-backed project; hooks and full workflow remain unvalidated |
 | `dot-dash` | skills, hooks | hook-heavy | yes | no | high | |
 | `fastmcp-creator` | skills | skill-only | yes | no | low | |
-| `frustration-analyzer` | skills, agents, mcp | mcp-heavy | yes | no | high | named-skill injection observed, but MCP tool namespace was absent and Codex fell back to manual file reads; source `.mcp.json` is now rewritten to relative path + `cwd`, but no-workaround runtime revalidation is still pending |
+| `frustration-analyzer` | skills, agents, mcp | mcp-heavy | yes | yes | high | copied/zipped isolated install and native `frustration-analyzer/list_sessions` MCP invocation pass; full `rtfp` workflow and agent delegation remain unvalidated |
 | `gitlab-skill` | skills, commands | command-heavy | yes | yes | medium | plugin visible and selectable in Codex CLI validation |
 | `holistic-linting` | skills, commands, agents | command-heavy | yes | no | medium | |
 | `litellm` | skills | skill-only | yes | no | low | |
@@ -40,11 +40,11 @@ Important QA correction:
 | `orchestrator-discipline` | skills, hooks | hook-heavy | yes | no | high | packaging passes without manifest `hooks`, but isolated Codex `exec` still did not fire plugin-bundled hooks, even with `--enable plugin_hooks` |
 | `perl-development` | skills, agents | skills+agents | yes | no | medium | |
 | `plugin-creator` | skills, agents | skills+agents | yes | no | medium | |
-| `process-siren` | skills, agents, mcp | mcp-heavy | yes | no | high | plugin visible in Codex, but plugin-scoped MCP namespace still not exposed in-session |
+| `process-siren` | skills, agents, mcp | mcp-heavy | yes | no | high | `bunx --yes mcp-mermaid@latest` initializes and exposes `generate_mermaid_diagram`; the rendering call was cancelled before a result, so end-to-end MCP validation remains incomplete |
 | `python-engineering` | skills, agents | skills+agents | yes | yes | medium | plugin visible and selectable in Codex CLI validation |
 | `python3-development` | skills, agents | skills+agents | yes | no | medium | |
 | `rtfp` | skills, agents | skills+agents | yes | no | medium | |
-| `scientific-method` | skills, agents, hooks, mcp | complex | yes | no | high | plugin visible in Codex, but plugin-scoped MCP namespace still not exposed in-session |
+| `scientific-method` | skills, agents, hooks, mcp | complex | yes | no | high | copied/zipped isolated install and `experiment-registry/list_experiment_types` MCP invocation pass; skills and hooks remain unvalidated |
 | `summarizer` | skills, agents, hooks | hook-heavy | yes | no | high | |
 | `the-rewrite-room` | skills, commands, agents, hooks | complex | yes | no | high | |
 | `twelve-factor-app` | skills | skill-only | yes | no | low | |
@@ -55,6 +55,25 @@ Important QA correction:
 ## Validation Evidence
 
 ### Completed runtime validation
+
+- `development-harness`
+  - copied/zipped isolated marketplace install: pass
+  - isolated project initialized as a Git repository before Codex execution: pass
+  - Codex invoked `sam_active_task` with `{"action":"get"}`: pass
+  - response: `{"active_task": null}`
+  - conclusion: the packaged MCP configuration can resolve the bundled server and the Git-backed agent project together; hook and full-workflow validation remain separate work
+
+- `scientific-method`
+  - copied/zipped isolated marketplace install: pass
+  - Codex invoked `experiment-registry/list_experiment_types`: pass
+  - response included `count: 3` and type name `ai_agent_testing`
+  - conclusion: the current packaged MCP configuration works; prior placeholder-launch evidence applies only to the removed global installation
+
+- `frustration-analyzer`
+  - copied/zipped isolated marketplace install: pass
+  - native Codex trace: `frustration-analyzer/list_sessions started` and completed
+  - response: `The native frustration_analyzer.list_sessions MCP tool ran successfully for the current project. It returned 49 sessions.`
+  - conclusion: current packaged MCP configuration passes isolated Codex protocol validation; full `rtfp` workflow and agent delegation remain separate work
 
 - `python-engineering`
   - marketplace registration: pass
@@ -116,7 +135,13 @@ Important QA correction:
   - shutdown warnings observed after MCP enable attempt:
     - `failed to initialize MCP client during shutdown: MCP startup failed: timed out handshaking with MCP server after 30s`
     - `failed to initialize MCP client during shutdown: MCP startup failed: handshaking with MCP server failed: connection closed: initialize response`
-  - current runtime state should be treated as failed until a no-workaround named-skill path exists
+  - 2026-08-13 copied/zipped isolated validation reproduced the failure:
+    - Codex reached `mcp-mermaid/list_mcp_resources`
+    - MCP startup failed because the connection closed before the initialize response
+  - 2026-08-13 follow-up changed the packaged launcher to `bunx --yes mcp-mermaid@latest`:
+    - Codex initialized the server and exposed `mcp-mermaid/generate_mermaid_diagram`
+    - the native generation call was cancelled during rendering before returning a result
+  - current runtime state: launcher startup passes; end-to-end rendering remains unvalidated
 
 - `frustration-analyzer`
   - install via Codex CLI: pass

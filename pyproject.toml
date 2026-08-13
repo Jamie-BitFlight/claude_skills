@@ -135,6 +135,7 @@ source = ["**/scripts"]
 
 [tool.ty.environment]
 extra-paths = [
+    "./scripts",
     "./plugins/development-harness",
     "./plugins/development-harness/skills/backlog",
     "./plugins/development-harness/skills/backlog/scripts",
