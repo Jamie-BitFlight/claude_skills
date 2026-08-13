@@ -116,6 +116,16 @@ _ITEM_TYPE_TO_BEADS: dict[str, str] = {
     "milestone": BeadsIssueType.MILESTONE,
 }
 
+_LOGICAL_STATUS_TO_BEADS: Final[dict[str, str]] = {
+    "done": BeadsStatus.CLOSED,
+    "resolved": BeadsStatus.CLOSED,
+    "completed": BeadsStatus.CLOSED,
+    "closed": BeadsStatus.CLOSED,
+    "in-progress": BeadsStatus.IN_PROGRESS,
+    "needs-grooming": BeadsStatus.OPEN,
+    "groomed": BeadsStatus.OPEN,
+}
+
 
 def _beads_type_for_item_type(item_type: str) -> str:
     """Return the bd issue type string for a backlog item_type.
@@ -147,6 +157,10 @@ def _beads_priority_for_item_priority(priority: str) -> str:
     if normalised in {"0", "1", "2", "3", "4"}:
         return normalised
     return "2"
+
+
+def _beads_status_for_item_status(status: str) -> str:
+    return _LOGICAL_STATUS_TO_BEADS.get(status.casefold(), status)
 
 
 _ADR_001_NOTE = (
@@ -244,7 +258,7 @@ class BeadsBackend:
             "--notes",
             item.model_dump_json(),
             "--status",
-            item.status,
+            _beads_status_for_item_status(item.metadata.status),
         ])
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:

@@ -22,8 +22,9 @@ DN-3: ``create_task_issue`` is a GitHubExtras method and is no longer
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -62,6 +63,59 @@ def _make_item(issue: str = "bd-a3f8", title: str = "Fix authentication bug") ->
             source="test", added="2026-01-01", priority="P2", item_type="Task", status="open", issue=issue
         ),
     )
+
+
+class _RecordingBdRunner:
+    def __init__(self, issue: dict[str, Any]) -> None:
+        self.issue = issue
+        self.text_calls: list[list[str]] = []
+
+    def run_json(self, argv: Sequence[str]) -> list[dict[str, Any]]:
+        assert list(argv) == ["list", "--all"]
+        return [self.issue]
+
+    def run_text(self, argv: Sequence[str]) -> str:
+        args = list(argv)
+        self.text_calls.append(args)
+        if args[0:2] != ["update", self.issue["id"]]:
+            raise AssertionError(f"unexpected bd command: {args!r}")
+        for flag in ("--notes", "--status"):
+            value = args[args.index(flag) + 1]
+            self.issue["notes" if flag == "--notes" else "status"] = value
+        return ""
+
+    def is_available(self) -> bool:
+        return True
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("logical_status", "native_status"),
+    [
+        ("done", "closed"),
+        ("resolved", "closed"),
+        ("completed", "closed"),
+        ("closed", "closed"),
+        ("in-progress", "in_progress"),
+        ("needs-grooming", "open"),
+        ("groomed", "open"),
+        ("blocked", "blocked"),
+    ],
+)
+def test_lifecycle_metadata_status_is_persisted_and_mapped(logical_status: str, native_status: str, mocker) -> None:
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _apply_updates_to_item
+
+    issue = dict(_BD_SHOW_FIXTURE)
+    runner = _RecordingBdRunner(issue)
+    backend = BeadsBackend(runner=runner)
+    mocker.patch("backlog_core.operations.get_config", return_value=BacklogConfig(backend=backend))
+
+    _apply_updates_to_item("bd-a3f8", {"metadata": {"status": logical_status}}, set_synced=False)
+
+    update = runner.text_calls[-1]
+    assert update[update.index("--status") + 1] == native_status
+    assert json.loads(update[update.index("--notes") + 1])["metadata"]["status"] == logical_status
 
 
 # ---------------------------------------------------------------------------
