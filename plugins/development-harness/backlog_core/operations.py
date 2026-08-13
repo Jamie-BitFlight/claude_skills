@@ -1464,8 +1464,12 @@ def refresh_local_cache_from_github(
     if not isinstance(backend, SyncProvider):
         out.info("Active backend does not support reconciliation.")
         return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
-    references = [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
     scope = ReconcileScope.INITIAL if full_refresh else ReconcileScope.INCREMENTAL
+    references = (
+        []
+        if label and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
+        else [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
+    )
     result = backend.reconcile(ReconcileRequest(scope=scope, label=label or "", references=references))
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)

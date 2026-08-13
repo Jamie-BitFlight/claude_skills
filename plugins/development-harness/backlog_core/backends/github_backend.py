@@ -911,7 +911,9 @@ class GitHubBackend:
             cached = self._cached_content(mutation.write.reference)
             try:
                 record = self._write_online_content(mutation.write, cached)
-            except (BacklogError, ContentConflictError, ContentUnavailableError, OSError):
+            except ContentConflictError:
+                continue
+            except (BacklogError, ContentUnavailableError, OSError):
                 break
             acknowledgements.append(
                 ReplayAcknowledgement(

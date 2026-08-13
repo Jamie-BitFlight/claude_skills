@@ -81,6 +81,31 @@ def test_refresh_wrapper_maps_label_and_progress(
     assert result["reconciled"] == 1
 
 
+@pytest.mark.parametrize(
+    ("full_refresh", "scope"), [(False, ReconcileScope.INCREMENTAL), (True, ReconcileScope.INITIAL)]
+)
+def test_label_refresh_does_not_forward_unfiltered_cached_references(sync_provider, full_refresh, scope) -> None:
+    # Given: a cached issue that may not carry the requested label
+    sync_provider.put_work_item(_linked_item("#11"))
+
+    # When: a label-scoped refresh is requested
+    refresh_local_cache_from_github(label="review", full_refresh=full_refresh)
+
+    # Then: the provider receives the label query without targeted fallbacks
+    assert sync_provider.requests == [ReconcileRequest(scope=scope, label="review")]
+
+
+def test_unscoped_refresh_forwards_cached_references(sync_provider) -> None:
+    # Given: a cached issue available for an unscoped refresh
+    sync_provider.put_work_item(_linked_item("#11"))
+
+    # When: an unscoped refresh is requested
+    refresh_local_cache_from_github()
+
+    # Then: existing targeted fallback behavior remains intact
+    assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#11"])]
+
+
 def test_list_wrapper_forwards_label_to_reconciliation(sync_provider) -> None:
     # Given: a GitHub-backed list restricted to one label
     list_items(from_github=True, label="review")

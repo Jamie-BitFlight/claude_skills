@@ -169,3 +169,45 @@ def test_replay_conflict_keeps_pending_mutation(tmp_path: Path, monkeypatch: pyt
     backend._replay_pending_content()
 
     assert len(backend._cache.pending_mutations()) == 1
+
+
+def test_replay_conflict_continues_to_later_mutation_and_acknowledges_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first_reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    later_reference = ContentRef(kind=ContentKind.PLAN, name="P456")
+    cache = FileCache(tmp_path / "github-cache")
+    for reference in (first_reference, later_reference):
+        cached = ContentRecord(reference=reference, content="cached", revision="current")
+        cache.cache_content(cached)
+        cache.queue_write(cached, ContentWrite(reference=reference, content="pending", expected_revision="current"))
+    backend = GitHubBackend(cache=cache, plan_persistence=_UnavailablePlanPersistence())
+    monkeypatch.setattr(backend, "try_get_github", MagicMock)
+    writes = MagicMock()
+
+    def write(request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        if request.reference == first_reference:
+            raise ContentConflictError("conflict")
+        return ContentRecord(
+            reference=request.reference,
+            content=request.content,
+            revision=GitHubBackend._content_revision(request.content),
+        )
+
+    writes.side_effect = write
+    monkeypatch.setattr(backend, "_write_online_content", writes)
+    acknowledge = MagicMock(side_effect=cache.acknowledge_replay)
+    monkeypatch.setattr(cache, "acknowledge_replay", acknowledge)
+
+    backend._replay_pending_content()
+    backend._replay_pending_content()
+
+    assert [mutation.write.reference for mutation in cache.pending_mutations()] == [first_reference]
+    assert [call.args[0].reference for call in writes.call_args_list] == [
+        first_reference,
+        later_reference,
+        first_reference,
+    ]
+    assert acknowledge.call_count == 1
+    assert [entry.record.reference for entry in acknowledge.call_args.args[0]] == [later_reference]
+    assert cache.get_content(later_reference).pending is False
