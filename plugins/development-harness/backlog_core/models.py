@@ -1575,6 +1575,13 @@ class ArtifactEntry(BaseModel):
     agent: str = Field(default="")
     """Name of the agent that produced the artifact, e.g. ``feature-researcher``."""
 
+    content_revision: str = Field(
+        default="",
+        validation_alias=AliasChoices("content_revision", "content-revision"),
+        serialization_alias="content-revision",
+    )
+    """Content-addressed revision published with this manifest entry."""
+
     storage_tier: Literal["local", "remote"] = Field(
         default="remote",
         validation_alias=AliasChoices("storage_tier", "storage-tier"),

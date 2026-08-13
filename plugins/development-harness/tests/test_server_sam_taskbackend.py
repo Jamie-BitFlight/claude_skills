@@ -5,9 +5,12 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.models import ContentKind, ContentRecord, ContentRef, ContentWrite
 from dh_core.operations import _validated_task_patch
 from fastmcp.exceptions import ToolError
 from pytest_mock import MockerFixture  # ruff: ignore[unused-import] — available for future use
+from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
 from sam_schema.server import _get_backend, _sam_plan_read, mcp
 
@@ -327,6 +330,37 @@ async def test_sam_create_routes_through_backend_create_plan(backend_mock: Magic
     if slug_value is None and call_args.args:
         slug_value = call_args.args[0]
     assert slug_value == "test-slug"
+
+
+async def test_sam_create_persists_opaque_owner_in_one_content_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an empty provider-backed MCP server whose writes are observable.
+    provider = InMemoryBackend()
+    writes: list[ContentWrite] = []
+    original_put = provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(provider, "put_content", record_write)
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: ContentTaskProvider(provider))
+
+    # When: the MCP create action receives an opaque owner reference.
+    result = await _call(
+        "sam_plan",
+        {
+            "config": {
+                "action": "create",
+                "slug": "owned-plan",
+                "goal": "Persist ownership",
+                "owner_reference": "bd-a1b2",
+            }
+        },
+    )
+
+    # Then: exactly one content write creates the owned plan.
+    assert [write.owner_reference for write in writes] == ["bd-a1b2"]
+    assert provider.get_content(ContentRef(kind=ContentKind.PLAN, name=result["plan_id"])).owner_reference == "bd-a1b2"
 
 
 async def test_sam_update_plan_fields_routes_through_backend_update_plan_fields(backend_mock: MagicMock) -> None:

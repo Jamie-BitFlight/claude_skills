@@ -215,6 +215,7 @@ class GistTaskLayer:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
         acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
@@ -241,6 +242,7 @@ class GistTaskLayer:
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number.  When provided, enables
                 Gist write-through.  When ``None``, plan is local-only.
+            owner_reference: Optional opaque owner reference passed to the local backend.
             acceptance_criteria: Optional plan-level acceptance criteria.
             acceptance_criteria_structured: Optional executable acceptance criteria.
 
@@ -264,6 +266,7 @@ class GistTaskLayer:
             tasks=tasks,
             context=context,
             issue=issue,
+            owner_reference=owner_reference,
             acceptance_criteria=acceptance_criteria,
             acceptance_criteria_structured=acceptance_criteria_structured,
         )

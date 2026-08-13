@@ -37,7 +37,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import dispatch_schema as _ds
-from backlog_core.artifact_manifest_store import load_manifest as _load_manifest_record, register_manifest_entry
+from backlog_core.artifact_manifest_store import (
+    artifact_content_reference,
+    load_manifest as _load_manifest_record,
+    publish_artifact,
+)
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import get_config
 from backlog_core.backend_types import ContentProvider, GitHubExtras
@@ -203,6 +207,7 @@ def create_plan(
     tasks: list[dict[str, Any]] | list[Any],
     context: str | None = None,
     issue: int | None = None,
+    owner_reference: str | None = None,
     acceptance_criteria_structured: list[AcceptanceCriterion] | None = None,
 ) -> CreatePlanResult:
     """Create a new plan with the given slug, goal, and task definitions.
@@ -218,6 +223,7 @@ def create_plan(
         tasks: List of task definitions (dicts or Task models).
         context: Optional plan-level context narrative (markdown).
         issue: Optional GitHub issue number to associate with the plan.
+        owner_reference: Optional opaque provider-native owner reference.
         acceptance_criteria_structured: Optional executable acceptance criteria.
 
     Returns:
@@ -251,6 +257,7 @@ def create_plan(
         tasks=normalized_tasks,
         context=context,
         issue=issue,
+        owner_reference=owner_reference,
         acceptance_criteria_structured=acceptance_criteria_structured,
     )
 
@@ -1901,18 +1908,7 @@ def artifact_register(
             agent=agent,
         )
 
-        provider.put_content(
-            ContentWrite(
-                reference=ContentRef(
-                    kind=ContentKind.ARTIFACT_CONTENT,
-                    namespace=str(item_id),
-                    artifact_type=artifact_type,
-                    name=artifact_id,
-                ),
-                content=content,
-            )
-        )
-        updated_manifest, existed = register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
+        updated_manifest, existed = publish_artifact(provider, _manifest_reference(item_id), item_id, entry, content)
         action = "updated" if existed else "added"
 
         return {
@@ -2004,14 +2000,7 @@ def artifact_read(item_id: int | str, artifact_type: str, artifact_id: str | Non
                 f"returning most recent ({entry.artifact_id!r}). Skipped: {skipped}"
             )
 
-        content = provider.get_content(
-            ContentRef(
-                kind=ContentKind.ARTIFACT_CONTENT,
-                namespace=str(item_id),
-                artifact_type=artifact_type,
-                name=entry.artifact_id,
-            )
-        ).content
+        content = provider.get_content(artifact_content_reference(item_id, entry)).content
         result = ArtifactContent(
             artifact_type=entry.artifact_type, path=entry.artifact_id, content=content, status=entry.status
         )

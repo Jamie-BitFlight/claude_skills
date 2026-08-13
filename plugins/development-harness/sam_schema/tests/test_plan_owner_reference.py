@@ -73,6 +73,44 @@ def test_content_task_provider_hydrates_owned_plan_after_fresh_provider() -> Non
     assert persisted.owner_reference == "bd-a1b2"
 
 
+def test_content_task_provider_persists_create_owner_in_one_write_and_hydrates(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an empty content provider whose writes are observable.
+    content_provider = InMemoryBackend()
+    writes: list[ContentWrite] = []
+    original_put = content_provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(content_provider, "put_content", record_write)
+    first_provider = ContentTaskProvider(content_provider)
+
+    # When: a plan is created with an opaque owner reference.
+    plan = first_provider.create_plan("atomic-owner", "persist the owner", [], owner_reference="bd-a1b2")
+
+    # Then: the sole write includes the owner and a fresh provider hydrates it.
+    assert [write.owner_reference for write in writes] == ["bd-a1b2"]
+    assert ContentTaskProvider(content_provider).read_plan(plan["plan_id"])["feature"] == "atomic-owner"
+    assert (
+        content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference
+        == "bd-a1b2"
+    )
+
+
+def test_content_task_provider_keeps_legacy_issue_owner_alias() -> None:
+    # Given: a provider-backed plan created with the legacy numeric issue alias.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+
+    # When: the plan is persisted.
+    plan = provider.create_plan("legacy-owner", "preserve the numeric alias", [], issue=7)
+
+    # Then: plan metadata and content ownership both retain the legacy representation.
+    assert plan["issue"] == "7"
+    assert content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference == "#7"
+
+
 def test_content_task_provider_ignores_dispatch_plan_when_hydrating_sam_plans() -> None:
     # Given: a provider that contains both a SAM plan and a dispatch plan.
     content_provider = InMemoryBackend()
@@ -135,9 +173,11 @@ def test_content_task_provider_removes_failed_create_from_local_state(mocker: Mo
 
     # When: persistence fails after the in-memory plan has been created.
     with pytest.raises(UnsupportedCapabilityError, match="create rejected"):
-        provider.create_plan("no-ghost", "must not remain locally", [])
+        provider.create_plan("no-ghost", "must not remain locally", [], owner_reference="bd-a1b2")
 
     # Then: same-process reads cannot observe a plan the provider never accepted.
+    assert [write.owner_reference for write in writes] == ["bd-a1b2"]
+    assert content_provider.list_content(ContentQuery(kind=ContentKind.PLAN)) == []
     assert provider.list_plans() == []
     with pytest.raises(PlanNotFoundError):
         provider.read_plan(writes[0].reference.name)

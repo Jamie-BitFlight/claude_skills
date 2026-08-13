@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.artifact_manifest_store import artifact_content_reference
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import set_config
 from backlog_core.backend_types import BacklogConfig, ContentProvider
@@ -182,12 +183,12 @@ def test_artifact_operations_use_configured_content_provider(content_provider: I
     assert registered["content_stored"] is True
     assert listed["count"] == 1
     assert read["content"] == "# Report"
-    assert (
+    manifest = ArtifactManifest.model_validate_json(
         content_provider.get_content(
-            ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="report")
+            ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest")
         ).content
-        == "# Report"
     )
+    assert content_provider.get_content(artifact_content_reference(42, manifest.artifacts[0])).content == "# Report"
 
 
 def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
@@ -198,9 +199,12 @@ def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
     with pytest.raises(ContentUnavailableError, match="offline cache miss"):
         operations.artifact_register(42, "research", "report", content="# Report")
 
-    assert provider.put_content.call_args.args[0].reference == ContentRef(
-        kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="report"
-    )
+    content_write = provider.put_content.call_args.args[0]
+    assert content_write.create_only is True
+    assert content_write.reference.kind == ContentKind.ARTIFACT_CONTENT
+    assert content_write.reference.namespace == "42"
+    assert content_write.reference.artifact_type == "research"
+    assert content_write.reference.name.startswith("report@sha256:")
 
 
 def test_artifact_register_rejects_empty_content_before_provider_mutation() -> None:

@@ -128,6 +128,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
         acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
@@ -144,12 +145,20 @@ class ContentTaskProvider(InMemoryTaskProvider):
                 tasks,
                 context=context,
                 issue=issue,
+                owner_reference=owner_reference,
                 acceptance_criteria=acceptance_criteria,
                 acceptance_criteria_structured=acceptance_criteria_structured,
             )
             return plan["plan_id"], plan
 
-        return self._mutate(create, owner_reference=f"#{issue}" if issue is not None else "")
+        return self._mutate(
+            create,
+            owner_reference=owner_reference
+            if owner_reference is not None
+            else f"#{issue}"
+            if issue is not None
+            else "",
+        )
 
     def set_owner(self, plan_id: str, owner_reference: str) -> None:
         """Atomically reassign plan ownership."""

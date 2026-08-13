@@ -288,13 +288,11 @@ def create(
             "owner_reference": owner_reference,
         })
         backend = _backend()
-        result = operations.create_plan(backend, **action_config.model_dump(exclude={"action", "owner_reference"}))
+        result = operations.create_plan(backend, **action_config.model_dump(exclude={"action"}))
     except (ValidationError, ValueError, OSError) as exc:
         _error(str(exc))
     if isinstance(result, CreatePlanError):
         _error(result.error, 2)
-    if action_config.owner_reference is not None:
-        backend.set_owner(result.plan_id, action_config.owner_reference)
     _emit(result)
 
 

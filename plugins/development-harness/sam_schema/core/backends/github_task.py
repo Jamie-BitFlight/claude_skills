@@ -290,6 +290,7 @@ class GitHubTaskProvider:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
         acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:

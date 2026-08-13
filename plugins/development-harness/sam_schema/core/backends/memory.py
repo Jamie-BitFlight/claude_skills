@@ -212,6 +212,7 @@ class InMemoryTaskProvider:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
         acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
@@ -224,6 +225,7 @@ class InMemoryTaskProvider:
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number. When provided, the plan_id
                 is ``P{issue}``; otherwise an auto-incremented ID is used.
+            owner_reference: Optional opaque owner reference, ignored by this backend.
             acceptance_criteria: Optional plan-level acceptance criteria markdown.
             acceptance_criteria_structured: Optional executable acceptance criteria.
 

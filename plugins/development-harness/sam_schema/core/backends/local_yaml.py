@@ -303,6 +303,7 @@ class LocalYamlTaskProvider:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
         acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
@@ -317,6 +318,7 @@ class LocalYamlTaskProvider:
             tasks: Ordered list of validated Task models.
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number.
+            owner_reference: Optional opaque owner reference, ignored by this backend.
             acceptance_criteria: Optional plan-level acceptance criteria.
             acceptance_criteria_structured: Optional executable acceptance criteria.
 

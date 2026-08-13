@@ -236,12 +236,11 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResul
         tasks=config.tasks,
         context=config.context,
         issue=config.issue,
+        owner_reference=config.owner_reference,
         acceptance_criteria_structured=config.acceptance_criteria_structured,
     )
     if isinstance(result, CreatePlanError):
         raise ToolError(f"{result.error}: {result.reason} (hint: {result.hint})")
-    if config.owner_reference is not None:
-        backend.set_owner(result.plan_id, config.owner_reference)
     return result
 
 

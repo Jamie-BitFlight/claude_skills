@@ -191,6 +191,31 @@ class TestCreateSamTask:
 
 
 class TestGetSamTasks:
+    def test_get_sam_tasks_and_readiness_include_owner_plan_on_page_two(self) -> None:
+        provider = InMemoryBackend()
+        task_provider = ContentTaskProvider(provider)
+        for index in range(101):
+            task_provider.create_plan(
+                f"feature-{index}",
+                "Do the work",
+                [Task(id=f"T{index}", title=f"Task {index}", status=TaskStatus.NOT_STARTED)],
+                issue=480,
+            )
+        set_config(BacklogConfig(backend=provider))
+
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+            ready = get_ready_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
+
+        assert result["count"] == 101
+        tasks = cast("list[dict[str, object]]", result["tasks"])
+        ready_tasks = cast("list[dict[str, object]]", ready["ready_tasks"])
+        assert any(task["feature"] == "feature-100" for task in tasks)
+        assert ready["count"] == 101
+        assert any(task["id"] == "T100" for task in ready_tasks)
+
     def test_get_sam_tasks_normalizes_legacy_yaml_plan_content(self) -> None:
         provider = InMemoryBackend()
         provider.put_content(

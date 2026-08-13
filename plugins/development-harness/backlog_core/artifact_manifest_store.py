@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Final
 
 from .artifact_registry import ArtifactRegistry
@@ -63,3 +64,31 @@ def register_manifest_entry(
         else:
             return manifest, existed
     raise ContentConflictError("Content revision no longer matches")
+
+
+def artifact_content_reference(item_id: int | str, entry: ArtifactEntry) -> ContentRef:
+    """Return the immutable content identity referenced by an artifact entry."""
+    name = entry.artifact_id
+    if entry.content_revision:
+        name = f"{name}@sha256:{entry.content_revision}"
+    return ContentRef(
+        kind="artifact_content", namespace=str(item_id), artifact_type=entry.artifact_type.value, name=name
+    )
+
+
+def publish_artifact(
+    provider: ContentProvider, manifest_reference: ContentRef, item_id: int | str, entry: ArtifactEntry, content: str
+) -> tuple[ArtifactManifest, bool]:
+    """Publish immutable content before atomically advancing its manifest entry.
+
+    Returns:
+        The persisted manifest and whether the logical artifact previously existed.
+    """
+    published_entry = entry.model_copy(update={"content_revision": hashlib.sha256(content.encode()).hexdigest()})
+    content_reference = artifact_content_reference(item_id, published_entry)
+    try:
+        provider.put_content(ContentWrite(reference=content_reference, content=content, create_only=True))
+    except ContentConflictError:
+        if provider.get_content(content_reference).content != content:
+            raise
+    return register_manifest_entry(provider, manifest_reference, item_id, published_entry)

@@ -30,7 +30,11 @@ from pydantic import Field
 from ruamel.yaml import YAML as _YAML
 
 from . import models as _models, sync_engine as _sync_engine
-from .artifact_manifest_store import load_manifest as _load_manifest_record, register_manifest_entry
+from .artifact_manifest_store import (
+    artifact_content_reference,
+    load_manifest as _load_manifest_record,
+    publish_artifact,
+)
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueNode as _IssueNode, SyncProvider
@@ -3359,18 +3363,9 @@ async def artifact_register(
         )
 
         def _run() -> RegisterResult:
-            provider.put_content(
-                ContentWrite(
-                    reference=ContentRef(
-                        kind=ContentKind.ARTIFACT_CONTENT,
-                        namespace=str(item_id),
-                        artifact_type=artifact_type,
-                        name=artifact_id,
-                    ),
-                    content=content,
-                )
+            updated_manifest, existed = publish_artifact(
+                provider, _manifest_reference(item_id), item_id, entry, content
             )
-            updated_manifest, existed = register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
             action = "updated" if existed else "added"
 
             return RegisterResult(
@@ -3517,14 +3512,7 @@ async def artifact_read(
                     f"returning most recent ({entry.artifact_id!r}). Skipped: {skipped}"
                 )
 
-            content = provider.get_content(
-                ContentRef(
-                    kind=ContentKind.ARTIFACT_CONTENT,
-                    namespace=str(item_id),
-                    artifact_type=artifact_type,
-                    name=entry.artifact_id,
-                )
-            ).content
+            content = provider.get_content(artifact_content_reference(item_id, entry)).content
             return ArtifactContent(
                 artifact_type=entry.artifact_type, path=entry.artifact_id, content=content, status=entry.status
             )
@@ -3922,18 +3910,7 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
             status=ArtifactStatus.CURRENT,
             agent="dispatch_create_plan",
         )
-        provider.put_content(
-            ContentWrite(
-                reference=ContentRef(
-                    kind=ContentKind.ARTIFACT_CONTENT,
-                    namespace=str(item_id),
-                    artifact_type=ArtifactType.DISPATCH_PLAN.value,
-                    name=artifact_id,
-                ),
-                content=content,
-            )
-        )
-        register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
+        publish_artifact(provider, _manifest_reference(item_id), item_id, entry, content)
         log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", artifact_id, item_id)
     except (
         BacklogError,

@@ -4,7 +4,7 @@ import json
 
 import pytest
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ContentKind, ContentQuery, ContentRef, ContentWrite
+from backlog_core.models import ContentKind, ContentQuery, ContentRecord, ContentRef, ContentWrite
 from sam_schema import sam_plan
 from sam_schema.cli import app
 from sam_schema.core.backends.content import ContentTaskProvider
@@ -62,6 +62,14 @@ def test_read_resolves_provider_plan_addresses(
 def test_create_persists_opaque_owner_reference(monkeypatch: pytest.MonkeyPatch) -> None:
     # Given: an empty provider-backed SAM CLI.
     provider = InMemoryBackend()
+    writes: list[ContentWrite] = []
+    original_put = provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(provider, "put_content", record_write)
     monkeypatch.setattr(sam_plan, "_backend", lambda: ContentTaskProvider(provider))
 
     # When: an agent creates a plan owned by an opaque work-item reference.
@@ -72,6 +80,7 @@ def test_create_persists_opaque_owner_reference(monkeypatch: pytest.MonkeyPatch)
     # Then: the provider persists the plan under that owner.
     assert result.exit_code == 0, result.stderr
     plan_id = json.loads(result.stdout)["plan_id"]
+    assert [write.owner_reference for write in writes] == ["bd-a1b2"]
     records = provider.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference="bd-a1b2"))
     assert [record.reference.name for record in records] == [plan_id]
 

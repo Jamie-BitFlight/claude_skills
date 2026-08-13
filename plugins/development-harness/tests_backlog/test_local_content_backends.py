@@ -7,9 +7,11 @@ import sys
 from collections.abc import Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 
 import pytest
-from backlog_core.backend_types import ContentProvider
+from backlog_core.backend_protocol import set_config
+from backlog_core.backend_types import BacklogConfig, ContentProvider
 from backlog_core.backends.bd_runner import BdInvocationError, JsonValue
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
@@ -19,10 +21,12 @@ from backlog_core.models import (
     ContentKind,
     ContentNotFoundError,
     ContentQuery,
+    ContentRecord,
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
 )
+from dh_core import operations
 
 
 class _BeadsKvRunner:
@@ -186,6 +190,45 @@ def test_native_content_create_only_when_two_writers_race(local_provider: Conten
     assert sum(outcome is None for outcome in outcomes) == 1
     assert sum(isinstance(outcome, ContentConflictError) for outcome in outcomes) == 1
     assert local_provider.get_content(reference).content in {"create-0", "create-1"}
+
+
+@pytest.mark.unit
+def test_artifact_registration_publishes_matching_metadata_and_body(
+    local_provider: InMemoryBackend | SQLiteBackend | BeadsBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given: registration A pauses after its body write until registration B publishes its manifest.
+    registration_b_published = Event()
+    put_content = local_provider.put_content
+
+    def put_content_in_registration_order(request: ContentWrite) -> ContentRecord:
+        record = put_content(request)
+        if (
+            request.reference.kind == ContentKind.ARTIFACT_CONTENT
+            and request.content == "body-a"
+            and not registration_b_published.wait(timeout=5)
+        ):
+            raise AssertionError("registration B did not publish")
+        if request.reference.kind == ContentKind.ARTIFACT_MANIFEST and '"agent":"registration-b"' in request.content:
+            registration_b_published.set()
+        return record
+
+    monkeypatch.setattr(local_provider, "put_content", put_content_in_registration_order)
+    set_config(BacklogConfig(backend=local_provider))
+
+    # When: both registrations target the same public artifact identity.
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        registration_a = executor.submit(
+            operations.artifact_register, "item-1", "research", "report", "body-a", "draft", "registration-a"
+        )
+        registration_b = executor.submit(
+            operations.artifact_register, "item-1", "research", "report", "body-b", "current", "registration-b"
+        )
+        results = [registration_a.result(), registration_b.result()]
+
+    # Then: the final manifest metadata resolves the body from the same registration.
+    assert all(result["registered"] is True for result in results)
+    read = operations.artifact_read("item-1", "research", "report")
+    assert (read["status"], read["content"]) == ("draft", "body-a")
 
 
 @pytest.mark.unit

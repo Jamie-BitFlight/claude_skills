@@ -537,6 +537,7 @@ class BeadsTaskProvider:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
         acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
@@ -552,6 +553,7 @@ class BeadsTaskProvider:
             tasks: Ordered validated Task models to create as child issues.
             context: Optional context narrative appended to epic description.
             issue: Optional GitHub issue number stored in plan metadata only.
+            owner_reference: Optional opaque owner reference, ignored by this backend.
             acceptance_criteria: Optional plan-level acceptance criteria text.
             acceptance_criteria_structured: Optional executable acceptance criteria.
 

@@ -256,7 +256,12 @@ class ArtifactRegistry:
                 # Exact match — update in-place.
                 updated.append(
                     existing.model_copy(
-                        update={"status": entry.status, "agent": entry.agent, "created_at": entry.created_at}
+                        update={
+                            "status": entry.status,
+                            "agent": entry.agent,
+                            "created_at": entry.created_at,
+                            "content_revision": entry.content_revision,
+                        }
                     )
                 )
                 upserted = True

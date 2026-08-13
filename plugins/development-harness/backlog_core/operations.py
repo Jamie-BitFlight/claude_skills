@@ -12,7 +12,7 @@ import re
 from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NotRequired, TypeGuard
+from typing import TYPE_CHECKING, Any, Final, NotRequired, TypeGuard
 
 from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
@@ -75,6 +75,7 @@ from .parsing import (
 from .rendering import SECTION_HEADING
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
+_SAM_PLAN_PAGE_SIZE: Final = 100
 
 
 class _SamTaskRow(TypedDict):
@@ -3793,8 +3794,18 @@ def get_sam_tasks(
     records = {}
     try:
         for owner_reference in owner_references:
-            for record in backend.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference=owner_reference)):
-                records[record.reference.name] = record
+            offset = 0
+            while True:
+                page = backend.list_content(
+                    ContentQuery(
+                        kind=ContentKind.PLAN, owner_reference=owner_reference, offset=offset, limit=_SAM_PLAN_PAGE_SIZE
+                    )
+                )
+                for record in page:
+                    records[record.reference.name] = record
+                if len(page) < _SAM_PLAN_PAGE_SIZE:
+                    break
+                offset += len(page)
     except ContentUnavailableError as exc:
         out.error(str(exc))
         return {
