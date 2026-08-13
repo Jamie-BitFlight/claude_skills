@@ -112,7 +112,10 @@ class _BdRunnerLike(Protocol):
 
 
 def _beads_workspace_path(runner: _BdRunnerLike) -> Path:
-    workspace = runner.run_json(["where"])
+    try:
+        workspace = runner.run_json(["where"])
+    except (BdInvocationError, BdJsonDecodeError, BdNotInstalledError) as exc:
+        raise ContentUnavailableError("Beads content store is unavailable") from exc
     if not isinstance(workspace, dict) or not isinstance(path := workspace.get("path"), str) or not path:
         raise ContentUnavailableError("Beads workspace could not be resolved")
     return Path(path).resolve()

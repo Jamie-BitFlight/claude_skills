@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from backlog_core.backends.bd_runner import BdInvocationError
+from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import (
@@ -210,6 +212,46 @@ def test_content_task_provider_restores_task_when_write_and_refresh_are_unavaila
     persisted = ContentTaskProvider(content_provider).read_plan(plan_id)
     assert persisted["tasks"][0]["title"] == "Original"
     assert persisted["tasks"][0]["status"] == "in-progress"
+
+
+def test_content_task_provider_restores_plan_when_beads_workspace_is_unavailable(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    values: dict[str, str] = {}
+    workspace_available = True
+    runner = mocker.MagicMock()
+    tmp_path.joinpath(".beads").mkdir()
+
+    def run_json(argv: list[str]) -> object:
+        if argv == ["where"]:
+            if not workspace_available:
+                raise BdInvocationError("where failed", argv=["bd", "where"], returncode=1, stdout="", stderr="")
+            return {"path": str(tmp_path / ".beads")}
+        if argv == ["kv", "list"]:
+            return values
+        if argv[:2] == ["kv", "get"]:
+            if (value := values.get(argv[2])) is not None:
+                return {"found": True, "value": value}
+            raise BdInvocationError(
+                "missing", argv=["bd", *argv], returncode=1, stdout='{"found":false,"value":""}', stderr=""
+            )
+        raise AssertionError(argv)
+
+    def run_text(argv: list[str]) -> str:
+        values[argv[2]] = argv[3]
+        return ""
+
+    runner.run_json.side_effect = run_json
+    runner.run_text.side_effect = run_text
+    provider = ContentTaskProvider(BeadsBackend(runner))
+    plan = provider.create_plan("beads-outage", "rollback rejected state", [])
+    snapshot = provider.read_plan(plan["plan_id"])
+    workspace_available = False
+
+    with pytest.raises(ContentUnavailableError):
+        provider.update_plan_fields(plan["plan_id"], context="rejected context")
+
+    assert provider.read_plan(plan["plan_id"]) == snapshot
 
 
 def test_content_task_provider_refreshes_plan_after_stale_write_and_recovers() -> None:
