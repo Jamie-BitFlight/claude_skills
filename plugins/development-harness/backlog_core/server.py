@@ -3955,7 +3955,7 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str) -> N
         updated_manifest = _artifact_registry.register(manifest, entry)
         _save_manifest(provider, updated_manifest)
         log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", artifact_id, item_id)
-    except (BacklogError, _GithubException) as exc:
+    except (BacklogError, ContentUnavailableError, _GithubException) as exc:
         log.warning(
             "dispatch_create_plan: artifact registration failed for item %s (artifact=%s): %s",
             item_id,

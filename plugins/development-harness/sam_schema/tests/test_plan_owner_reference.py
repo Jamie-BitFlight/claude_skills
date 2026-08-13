@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from sam_schema.core.action_models import CreatePlanConfig, UpdatePlanConfig
 from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.models import Task, TaskStatus
 
 
 def test_create_accepts_opaque_owner_reference() -> None:
@@ -48,11 +49,7 @@ def test_content_task_provider_hydrates_owned_plan_after_fresh_provider() -> Non
     # Then: the owned plan is discoverable and its update persists through the content provider.
     assert len(fresh_provider.list_plans()) == len(plans)
     assert fresh_provider.read_plan(plan_id)["context"] == "updated after hydration"
-    persisted = next(
-        record
-        for record in content_provider.list_content(ContentQuery(kind=ContentKind.PLAN))
-        if record.reference.name == plan_id
-    )
+    persisted = content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id))
     assert persisted.owner_reference == "bd-a1b2"
 
 
@@ -76,3 +73,29 @@ def test_content_task_provider_ignores_dispatch_plan_when_hydrating_sam_plans() 
     assert [
         record.reference.name for record in content_provider.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
     ] == ["dispatch-milestone-10"]
+
+
+def test_content_task_provider_claim_uses_loaded_revision() -> None:
+    # Given: two providers hydrated from the same persisted not-started task.
+    content_provider = InMemoryBackend()
+    creator = ContentTaskProvider(content_provider)
+    plan = creator.create_plan(
+        "atomic-claim", "claim once", [Task(id="T01", title="Claim once", status=TaskStatus.NOT_STARTED)]
+    )
+    plan_id = plan["plan_id"]
+    creator.set_owner(plan_id, "bd-a1b2")
+    first_provider = ContentTaskProvider(content_provider)
+    second_provider = ContentTaskProvider(content_provider)
+
+    # When: both stale snapshots attempt the same claim.
+    assert first_provider.claim_task(plan_id, "T01") is True
+    assert second_provider.claim_task(plan_id, "T01") is False
+
+    # Then: the losing snapshot refreshes and the persisted plan has one claim.
+    fresh_provider = ContentTaskProvider(content_provider)
+    fresh_task = fresh_provider.read_task(plan_id, "T01")
+    assert second_provider.read_task(plan_id, "T01") == fresh_task
+    assert [task["status"] for task in fresh_provider.read_plan(plan_id)["tasks"]] == ["in-progress"]
+    assert fresh_task["status"] == "in-progress"
+    assert fresh_task["started"] is not None
+    assert content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id)).owner_reference == "bd-a1b2"

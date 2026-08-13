@@ -127,6 +127,64 @@ async def test_mcp_sam_read_plan_only_returns_plan_fields(plan_dir: Path) -> Non
     assert not hasattr(data, "task")
 
 
+@pytest.fixture
+def provider_only_plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
+    seed_plan(content_backend, "P1", Plan(feature="legacy-id", version="1.0", tasks=[make_task("T1")]))
+    seed_plan(content_backend, "Pa1b2c3d4", Plan(feature="uuid-id", version="1.0", tasks=[make_task("T1")]))
+    seed_plan(content_backend, "P2", Plan(feature="unique-slug", version="1.0", tasks=[make_task("T1")]))
+    return tmp_path / "provider-only"
+
+
+@pytest.mark.parametrize(
+    ("address", "expected_feature"), [("p1", "legacy-id"), ("pA1B2C3D4", "uuid-id"), ("unique-slug", "unique-slug")]
+)
+async def test_mcp_sam_plan_resolves_provider_logical_addresses(
+    provider_only_plan_dir: Path, address: str, expected_feature: str
+) -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "sam_plan", {"config": {"action": "read"}, "plan": address, "plan_dir": str(provider_only_plan_dir)}
+        )
+
+    assert result.data.plan.feature == expected_feature
+
+
+@pytest.mark.parametrize(
+    ("address", "expected_plan_id"), [("p1", "P1"), ("pA1B2C3D4", "Pa1b2c3d4"), ("unique-slug", "P2")]
+)
+async def test_mcp_sam_task_resolves_provider_logical_addresses(
+    provider_only_plan_dir: Path, address: str, expected_plan_id: str
+) -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "sam_task",
+            {"plan": address, "task": "T1", "config": {"action": "read"}, "plan_dir": str(provider_only_plan_dir)},
+        )
+
+    assert result.data.plan_number == expected_plan_id
+
+
+@pytest.mark.parametrize("tool_name", ["sam_plan", "sam_task"])
+async def test_mcp_provider_address_rejects_ambiguous_feature_slug(
+    tmp_path: Path, content_backend: ContentTaskProvider, tool_name: str
+) -> None:
+    seed_plan(content_backend, "P1", Plan(feature="duplicate-slug", version="1.0", tasks=[make_task("T1")]))
+    seed_plan(content_backend, "P2", Plan(feature="duplicate-slug", version="1.0", tasks=[make_task("T1")]))
+    arguments = {
+        "sam_plan": {"config": {"action": "read"}, "plan": "duplicate-slug", "plan_dir": str(tmp_path / "absent")},
+        "sam_task": {
+            "plan": "duplicate-slug",
+            "task": "T1",
+            "config": {"action": "read"},
+            "plan_dir": str(tmp_path / "absent"),
+        },
+    }
+
+    with pytest.raises(ToolError, match="matches multiple provider plans"):
+        async with Client(mcp) as client:
+            await client.call_tool(tool_name, arguments[tool_name])
+
+
 async def test_mcp_sam_read_missing_task_returns_error_dict(plan_dir: Path) -> None:
     """sam_task read raises ToolError for a non-existent task via MCP protocol.
 

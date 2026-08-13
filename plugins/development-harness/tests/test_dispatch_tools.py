@@ -14,6 +14,7 @@ Strategy:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
@@ -25,6 +26,7 @@ from backlog_core.models import (
     BacklogError,
     ContentKind,
     ContentQuery,
+    ContentRecord,
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
@@ -925,6 +927,48 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         register_mock.assert_called_once_with(42, "dispatch-milestone-10")
+
+    async def test_create_plan_issue_manifest_unavailable_is_best_effort(
+        self, valid_plan_dict: dict, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        unavailable_backend = InMemoryBackend()
+        original_get_content = unavailable_backend.get_content
+
+        def unavailable_manifest(reference: ContentRef) -> ContentRecord:
+            if reference.kind == ContentKind.ARTIFACT_MANIFEST:
+                raise ContentUnavailableError("manifest provider unavailable")
+            return original_get_content(reference)
+
+        mocker.patch.object(unavailable_backend, "get_content", side_effect=unavailable_manifest)
+        put_spy = mocker.spy(unavailable_backend, "put_content")
+        active_backend = unavailable_backend
+        mocker.patch("backlog_core.server._get_artifact_provider", side_effect=lambda: active_backend)
+
+        with caplog.at_level(logging.WARNING, logger="backlog_core.server"):
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+                )
+
+        data: dict[str, Any] = result.data
+        assert "error" not in data, f"Unexpected error: {data.get('error')}"
+        assert _has_dispatch_plan(unavailable_backend)
+        assert all(call.args[0].reference.kind == ContentKind.DISPATCH_PLAN for call in put_spy.call_args_list)
+        assert any("manifest provider unavailable" in record.message for record in caplog.records)
+
+        confirmed_missing_backend = InMemoryBackend()
+        active_backend = confirmed_missing_backend
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan",
+                {"milestone_number": 11, "plan": _make_valid_plan_dict(milestone=11), "issue": 42},
+            )
+
+        data = result.data
+        assert "error" not in data, f"Unexpected error: {data.get('error')}"
+        manifests = confirmed_missing_backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST))
+        assert len(manifests) == 1
+        assert "dispatch-milestone-11" in manifests[0].content
 
     # ------------------------------------------------------------------
     # Error-case tests

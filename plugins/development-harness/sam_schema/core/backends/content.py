@@ -6,7 +6,7 @@ import json
 from collections.abc import Sequence
 
 from backlog_core.backend_types import ContentProvider
-from backlog_core.models import ContentKind, ContentQuery, ContentRef, ContentWrite
+from backlog_core.models import ContentConflictError, ContentKind, ContentQuery, ContentRef, ContentWrite
 from pydantic import TypeAdapter
 
 from sam_schema.core.backends.memory import InMemoryTaskProvider
@@ -25,6 +25,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
         """Load current logical plans from the configured provider."""
         super().__init__()
         self._provider = provider
+        self._revisions: dict[str, str] = {}
         offset = 0
         while True:
             records = provider.list_content(
@@ -33,18 +34,26 @@ class ContentTaskProvider(InMemoryTaskProvider):
             for record in records:
                 plan = _PLAN_DATA_ADAPTER.validate_json(record.content)
                 self._plans[plan["plan_id"]] = plan
+                self._revisions[plan["plan_id"]] = record.revision
             if len(records) < _CONTENT_PAGE_SIZE:
                 break
             offset += len(records)
 
     def _flush(self, plan_id: str, owner_reference: str | None = None) -> None:
-        self._provider.put_content(
+        record = self._provider.put_content(
             ContentWrite(
                 reference=ContentRef(kind=ContentKind.PLAN, name=plan_id),
                 content=json.dumps(self._plans[plan_id], separators=(",", ":"), default=str),
                 owner_reference=owner_reference,
+                expected_revision=self._revisions.get(plan_id, ""),
             )
         )
+        self._revisions[plan_id] = record.revision
+
+    def _refresh(self, plan_id: str) -> None:
+        record = self._provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id))
+        self._plans[plan_id] = _PLAN_DATA_ADAPTER.validate_json(record.content)
+        self._revisions[plan_id] = record.revision
 
     def create_plan(
         self,
@@ -93,7 +102,11 @@ class ContentTaskProvider(InMemoryTaskProvider):
         """
         claimed = super().claim_task(plan_id, task_id)
         if claimed:
-            self._flush(plan_id)
+            try:
+                self._flush(plan_id)
+            except ContentConflictError:
+                self._refresh(plan_id)
+                return False
         return claimed
 
     def update_task_status(self, plan_id: str, task_id: str, status: str) -> None:

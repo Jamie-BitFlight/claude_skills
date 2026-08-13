@@ -39,6 +39,7 @@ from sam_schema.core.action_models import (
     UpdatePlanConfig,
     UpdateTaskConfig,
 )
+from sam_schema.core.addressing import resolve_provider_plan_address
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.models import (
@@ -206,6 +207,7 @@ def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     are added at the top level when present.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.read_plan(backend, plan)
 
 
@@ -273,6 +275,7 @@ def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus:
     model carries ``state`` so callers can detect drafting plans.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.get_plan_status(backend, plan)
 
 
@@ -291,6 +294,7 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyT
         ``ready_tasks`` is empty.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.get_ready_tasks(backend, plan)
 
 
@@ -306,6 +310,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> Upda
         (bool) and ``address`` (plan identifier) fields.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
     result = operations.update_plan_fields(
         backend,
         plan,
@@ -343,6 +348,7 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         TaskValidationError: When the task definition fails model validation.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.append_task(backend, plan, config.task)
 
 
@@ -363,6 +369,7 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
         ``finalized=True``, ``state="ready"``.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.finalize_plan(backend, plan)
 
 
@@ -504,6 +511,7 @@ def sam_task(
         Action-specific Pydantic model. See individual action descriptions.
     """
     backend = _get_backend(plan_dir)
+    plan, _ = resolve_provider_plan_address(plan, backend)
 
     match config.action:
         case "read":

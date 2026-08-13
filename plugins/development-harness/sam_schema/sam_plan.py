@@ -29,7 +29,12 @@ from sam_schema.cli_inputs import (
     TaskUpdateInput,
 )
 from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition, UpdatePlanConfig
-from sam_schema.core.addressing import AddressingError, parse_address, resolve_plan_address
+from sam_schema.core.addressing import (
+    AddressingError,
+    parse_address,
+    resolve_plan_address,
+    resolve_provider_plan_address,
+)
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.backends.local_yaml import plan_id_from_path
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
@@ -75,27 +80,14 @@ def _emit(value: object) -> None:
 
 def _address(value: str, backend: ContentTaskProvider | None = None) -> tuple[str, str | None]:
     try:
+        if backend is not None:
+            return resolve_provider_plan_address(value, backend)
         plan_ref, task_ref = parse_address(value)
-    except ValueError as exc:
+    except (AddressingError, ValueError) as exc:
         _error(str(exc))
         raise AssertionError from exc
     raw_plan, _, _ = value.partition("/")
     raw_plan = raw_plan.strip()
-    if backend is not None:
-        summaries = backend.list_plans()
-        id_matches = [
-            summary["plan_id"] for summary in summaries if summary["plan_id"].casefold() == raw_plan.casefold()
-        ]
-        if id_matches:
-            return id_matches[0], task_ref
-        slug_matches = [
-            summary["plan_id"] for summary in summaries if summary["feature"].casefold() == raw_plan.casefold()
-        ]
-        if len(slug_matches) == 1:
-            return slug_matches[0], task_ref
-        if len(slug_matches) > 1:
-            _error(f"Plan slug '{raw_plan}' matches multiple provider plans")
-        return raw_plan, task_ref
     if re.fullmatch(r"P[0-9a-f]{8}", raw_plan, re.IGNORECASE):
         return raw_plan, task_ref
     return plan_ref, task_ref

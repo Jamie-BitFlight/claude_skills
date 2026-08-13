@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from sam_schema.core.task_backend import TaskBackend
+
 # Pattern: P{NNN}-{slug}.yaml or P{hex8}-{slug}.yaml (UUID-derived IDs).
 # Matches both legacy zero-padded numeric IDs (P001, P042) and the new
 # UUID-derived hex IDs (Pa1b2c3d4). Captured group is the ID suffix (digits or hex).
@@ -85,11 +87,15 @@ class AddressingError(Exception):
         message: Optional override message (e.g., collision disambiguation details).
     """
 
-    def __init__(self, address: str, plan_dir: Path, message: str | None = None) -> None:
+    def __init__(self, address: str, plan_dir: Path | None, message: str | None = None) -> None:
         """Initialize AddressingError with the unresolvable address and search directory."""
         self.address = address
         self.plan_dir = plan_dir
-        default = f"Cannot resolve address '{address}' in plan directory '{plan_dir}'."
+        default = (
+            f"Cannot resolve address '{address}' in plan directory '{plan_dir}'."
+            if plan_dir is not None
+            else f"Cannot resolve provider plan address '{address}'."
+        )
         super().__init__(message or default)
 
 
@@ -220,6 +226,31 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
         # No prefix-pattern slug match — fall through to AddressingError below.
 
     raise AddressingError(address, plan_dir)
+
+
+def resolve_provider_plan_address(address: str, backend: TaskBackend) -> tuple[str, str | None]:
+    """Resolve a logical plan address against a provider-backed task backend.
+
+    Exact logical plan IDs take precedence over exact feature slugs. Missing
+    addresses are returned unchanged so the backend preserves its usual
+    ``PlanNotFoundError`` contract.
+
+    Returns:
+        Canonical provider plan ID and optional task reference.
+    """
+    plan_ref, task_ref = parse_address(address)
+    raw_plan, _, _ = address.partition("/")
+    raw_plan = raw_plan.strip()
+    summaries = backend.list_plans()
+    id_matches = [summary["plan_id"] for summary in summaries if summary["plan_id"].casefold() == raw_plan.casefold()]
+    if id_matches:
+        return id_matches[0], task_ref
+    slug_matches = [summary["plan_id"] for summary in summaries if summary["feature"].casefold() == raw_plan.casefold()]
+    if len(slug_matches) == 1:
+        return slug_matches[0], task_ref
+    if len(slug_matches) > 1:
+        raise AddressingError(raw_plan, None, f"Plan slug '{raw_plan}' matches multiple provider plans")
+    return raw_plan or plan_ref, task_ref
 
 
 def parse_address(address: str) -> tuple[str, str | None]:
