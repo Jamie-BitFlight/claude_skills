@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 from pathlib import Path
 
@@ -39,3 +40,18 @@ def test_frustration_analyzer_declares_python_312_through_314_support() -> None:
     metadata = read_pep_723_metadata(PLUGIN / "mcp" / "server.py")
 
     assert metadata["requires-python"] == ">=3.11,<3.15"
+
+
+def test_codex_mcp_launcher_defers_interpreter_selection_to_pep_723() -> None:
+    """Codex must use the script's tested interpreter contract, not a forced minor."""
+    config = json.loads((PLUGIN / ".mcp.json").read_text(encoding="utf-8"))
+    server = config["mcpServers"]["frustration-analyzer"]
+
+    assert server["args"] == ["run", "--script", "mcp/server.py"]
+    assert server["env"] == {"UV_NO_BUILD": "1"}
+
+
+def test_codex_manifest_uses_canonical_mcp_config() -> None:
+    manifest = json.loads((PLUGIN / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+
+    assert manifest["mcpServers"] == "./.mcp.json"

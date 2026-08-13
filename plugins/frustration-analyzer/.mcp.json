@@ -2,12 +2,11 @@
   "mcpServers": {
     "frustration-analyzer": {
       "command": "uv",
-      "args": [
-        "run",
-        "--script",
-        "mcp/server.py"
-      ],
-      "cwd": "."
+      "args": ["run", "--script", "mcp/server.py"],
+      "cwd": ".",
+      "env": {
+        "UV_NO_BUILD": "1"
+      }
     }
   }
 }
