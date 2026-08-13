@@ -6,7 +6,7 @@ The SAM 7-stage pipeline with ARL touchpoint gates. This is the default flow use
 
 ## Design Principles
 
-- Each stage produces a file-based artifact — no stage relies on conversation memory.
+- Each stage produces a provider-owned artifact — no stage relies on conversation memory.
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints.
 - Artifact handoffs are stateless: any stage can be re-entered from its input artifact without replaying prior stages.
 
@@ -42,7 +42,7 @@ flowchart TD
 User Request → DISCOVERY → PLAN → PLAN (contextualized) → TASK(s) → EXECUTION(s) → REVIEW(s) → VERIFICATION
 ```
 
-Each arrow represents a file-based artifact handoff. No stage reads from conversation state.
+Each arrow represents a provider-owned artifact handoff. No stage reads from conversation state.
 
 ---
 
@@ -119,7 +119,7 @@ Each arrow represents a file-based artifact handoff. No stage reads from convers
 
 ### S4 — Task Decomposition
 
-**Purpose:** Break the plan into individually executable task files.
+**Purpose:** Break the plan into individually executable task records.
 
 **Inputs:**
 
@@ -128,11 +128,14 @@ Each arrow represents a file-based artifact handoff. No stage reads from convers
 **Activities:**
 
 - Decompose plan into discrete tasks, each with clear scope
-- Write each task as a standalone file with inputs, acceptance criteria, and agent assignment
+- Write each task as a standalone record with inputs, acceptance criteria, and agent assignment
 - Map task dependencies and identify parallelization opportunities
 - Assign each task to the appropriate specialist agent (from manifest or fallback)
 
-**Output:** `ARTIFACT:TASK({task-id})` per task — Task plan registered via `sam_plan(action='create')`; access via `sam_task(action='read')` / `sam_plan(action='list')`.
+**Output:** `ARTIFACT:TASK({task-id})` per task — create the task plan with
+`sam_plan(config={"action": "create", ...})`. Keep the returned `plan_ref`; discover plans with
+`sam_plan(config={"action": "list"})` and read a task with
+`sam_task(plan=plan_ref, task=task_id, config={"action": "read"})`.
 
 **Skill:** `/dh:task-decomposition`
 
@@ -254,7 +257,8 @@ If any item is unconfirmed, emits `COMPLETION BLOCKED — Migration Fidelity Gat
 
 If no migration signals are detected, the gate is skipped entirely.
 
-**Pre-Phase: Artifact Discovery** — queries the artifact manifest for all plan artifacts linked to the issue, enabling worktree-isolated agents to access plan files via `artifact_read` instead of filesystem paths.
+**Pre-Phase: Artifact Discovery** — queries the artifact manifest for all plan artifacts linked to
+the issue, enabling worktree-isolated agents to read provider-owned content through `artifact_read`.
 
 **Pre-Phase 1b: Process Accumulated Concerns** — checks the backlog item for a `## Concerns` section accumulated during `/implement-feature` and routes unresolved concerns to the QG plan.
 
@@ -264,7 +268,7 @@ For the full pre-phase logic, see the `complete-implementation` skill: `/dh:comp
 
 ---
 
-## Artifact Naming Conventions
+## Artifact Logical Identifier Conventions
 
 **Pattern:** `{stage-prefix}-{scope-or-id}.md`
 

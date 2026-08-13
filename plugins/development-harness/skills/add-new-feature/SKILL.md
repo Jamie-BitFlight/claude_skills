@@ -2,7 +2,7 @@
 name: add-new-feature
 argument-hint: <feature description or existing doc path>
 user-invocable: true
-description: SAM-style feature initiation workflow — discovery through codebase analysis, architecture spec, task decomposition, validation, and context manifest. Use when a user asks to add a feature, plan a feature, or convert an idea into executable task files.
+description: SAM-style feature initiation workflow — discovery through codebase analysis, architecture spec, task decomposition, validation, and context manifest. Use when a user asks to add a feature, plan a feature, or convert an idea into an executable SAM plan.
 compatibility: Python 3.11+
 metadata:
   version: 1.0.0
@@ -11,12 +11,12 @@ metadata:
 
 # Add New Feature (SAM Workflow)
 
-You MUST convert the user's request into **durable SAM artifacts** registered via the structured artifact and SAM interfaces (MCP or DH CLI adapter):
+You MUST convert the user's request into durable planning content through the structured artifact and SAM interfaces:
 
 - `feature-context-{slug}.md` (discovery)
 - `codebase/{FOCUS}.md` (optional, analysis)
 - `architect-{slug}.md` (architecture/design spec)
-- `P{id}-{slug}.yaml` (executable task plan with Agents, deps, and verification)
+- an executable SAM plan whose opaque `plan_ref` is returned by `sam_plan`
 
 <feature_request>
 $ARGUMENTS
@@ -424,7 +424,7 @@ is that agents own their artifact storage.
 
 Delegate to `@dh:swarm-task-planner` to:
 
-- create the structured plan via `plan create` (or MCP `sam_plan`); use the returned plan address
+- create the structured plan via `plan create` or MCP `sam_plan`; preserve the returned `plan_ref` unchanged
 - ensure every task has:
   - **Status**, **Dependencies**, **Priority**, **Complexity**, **Agent**
   - Acceptance Criteria (3+)
@@ -470,30 +470,19 @@ self-report such as "linked to issue #N" is not evidence the link exists. Confir
 reading state, not by trusting a report:
 
 ```bash
-# 1. Read current state — plan_address is null until the link is written
+# 1. Read current state — plan is null until the link is written
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue}"
 
-# 2. If plan_address is null, write the link
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --plan "P{id}"
+# 2. If plan is null, write the link using the exact value returned by sam_plan
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --plan "{plan_ref}"
 
-# 3. Re-read and confirm plan_address is non-null before proceeding to Phase 5
+# 3. Re-read and confirm plan equals plan_ref before proceeding to Phase 5
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue}"
 ```
 
-Note: the CLI's `backlog view` has no `--summary` flag — its JSON output is always the flatter,
-full-detail shape and surfaces the plan reference as `plan`, not `plan_address` (that name is
-produced only by the MCP summary-mode response — see below). Check `plan` instead when reading
-CLI output.
-
-Note: `sam_plan(action='create', issue={issue})` already auto-registers the `task-plan`
-artifact. Do NOT call `artifact_register` for the `task-plan` type — it is redundant and
-would create a duplicate entry.
-
-The `backlog_update(plan=...)` call writes the plan address into the backlog item's `metadata.plan`
-field, surfaced by `backlog_view(summary=True)` as `plan_address`. This is a backend signal — it
-records that a plan exists and its address, not a filesystem path. `work-backlog-item` reads
-`plan_address` to route directly to `implement-feature` on subsequent invocations. The SAM MCP
-resolves `P{id}` to the full plan without filesystem access.
+The `backlog_update(plan=...)` call writes the opaque `plan_ref` into the backlog item's `metadata.plan`
+field. This records the logical address, not a filesystem path. `work-backlog-item` uses the linked
+reference to route directly to `implement-feature`, and SAM reads the plan through the configured provider.
 
 ---
 
@@ -507,7 +496,7 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 
 {quality_vigilance}
 
-Validate plan P{N} for #{issue}: "{title}".
+Validate plan {plan_ref} for #{issue}: "{title}".
 Check: AC coverage, dependency DAG, agent assignments, verification steps,
 impact radius coverage.
 Return READY or BLOCKED with specific gaps.
@@ -527,8 +516,10 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 
 {quality_vigilance}
 
-Add context manifest to plan P{N} for #{issue}: "{title}".
-Read the plan via sam_plan. Write the context manifest via sam_plan.
+Add context manifest to plan {plan_ref} for #{issue}: "{title}".
+Read the plan via mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="{plan_ref}").
+Write the context manifest via
+mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "<context manifest>"}, plan="{plan_ref}").
 ```
 
 ---
@@ -547,7 +538,7 @@ Fill these values before constructing each delegation prompt. All values come fr
 | `{feature_name}` | Human-readable feature name from the issue title |
 | `{focus_area}` | One of: `patterns`, `architecture`, `testing`, `conventions` (Phase 2 only) |
 | `{domain_skills}` | Pre-formatted YAML list lines (e.g., `- plugin-creator:hook-creator`) collected by the Phase 3 domain signal scan; empty string if no signals matched; passed verbatim into Phase 4 delegation prompt |
-| `{N}` | SAM plan number returned by `sam_plan` after Phase 4 completes |
+| `{plan_ref}` | Opaque logical plan reference returned by `sam_plan` create; pass it unchanged |
 | `{quality_vigilance}` | Full `<quality_vigilance>...</quality_vigilance>` block — canonical text defined in §Shared Delegation Preamble above; substitute verbatim when constructing delegation prompts |
 
 ---
@@ -557,8 +548,8 @@ Fill these values before constructing each delegation prompt. All values come fr
 When all phases complete, provide the user:
 
 - the feature slug
-- the task file path
-- next step: run the `implement-feature` skill with the slug or task file path
+- the returned `plan_ref`
+- next step: run the `implement-feature` skill with that exact `plan_ref`
 
 ---
 
@@ -566,8 +557,6 @@ When all phases complete, provide the user:
 
 [Date: 2026-05-23 / Session: issue #1527]
 
-**Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. The problem with the pre-#1527 pattern was that the orchestrator received the content inline in the agent response — the JSONL session output grew to 300KB or more, which the orchestrator cannot process. The fix is for the architect agent to call `artifact_register(content=...)` directly: the content stays within the agent's context window and is uploaded to the artifact backend (GitHub Gist); the orchestrator receives only `STATUS: DONE`. No Write tool step is needed or correct.
+**Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. The problem with the pre-#1527 pattern was that the orchestrator received the content inline in the agent response — the JSONL session output grew to 300KB or more, which the orchestrator cannot process. The architect agent therefore calls `artifact_register(content=...)` directly, the selected provider stores the body, and the orchestrator receives only `STATUS: DONE`.
 
-**`artifact_register` without `content=` is a prohibited pattern.** Calling `artifact_register` with a path but no `content=` stores only a pointer to a local file. That file is unreachable from worktree-isolated agents, CI environments, and any other machine. Always pass `content=` explicitly. Source: `plugins/development-harness/CLAUDE.md` — "Prohibited patterns" section.
-
-**Phase 4 (`sam_plan(action='create')`) auto-registers the `task-plan` artifact** — no separate `artifact_register` call is needed or valid for that type.
+**This workflow requires `content=` on every `artifact_register` call** so later phases receive the body from `artifact_read`. A registration without content does not satisfy the phase handoff.

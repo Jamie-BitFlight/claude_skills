@@ -40,7 +40,7 @@ flowchart TD
         M2["backlog_list"]
         M3["backlog_view"]
         M4["backlog_update(selector, plan)"]
-        C1["sam_plan(config={action:'create',...})"]
+        C1["sam_plan create action"]
         S1 --> A1
         S1 --> A2
         A1 --> A3
@@ -80,7 +80,7 @@ flowchart TD
 
     subgraph QualityGates [Phase 3 — Quality Gates]
         S4["/complete-implementation"]
-        QGC["build_quality_gate_plan<br>sam_plan(config={action:'create',...})"]
+        QGC["build_quality_gate_plan<br>sam_plan create action"]
         QGF["opaque qg_plan_address plan record"]
         QGL["SAM dispatch loop<br>sam_plan ready / sam_task claim / start-task"]
         A9["T1 code-reviewer"]
@@ -290,10 +290,10 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `feature-context` artifact | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
 | `codebase-analysis` artifact | `codebase-analyzer` | `swarm-task-planner` |
 | `architect` artifact | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
-| `{plan_address}` plan record | `swarm-task-planner` via `sam_plan(config={"action":"create", ...})` (monolithic) or the same action followed by `append_task` × N → `finalize` (incremental) | `/implement-feature`, `sam_plan` ready/status actions, all execution agents |
+| `{plan_address}` plan record | `swarm-task-planner` via the `sam_plan` create action (monolithic) or the same action followed by `append_task` × N → `finalize` (incremental) | `/implement-feature`, `sam_plan` ready/status actions, all execution agents |
 | `T0-baseline` artifact | `t0-baseline-capture` | `tn-verification-gate` |
 | `TN-verification` artifact | `tn-verification-gate` | `/complete-implementation` Pre-Phase 1 check |
-| `{qg_plan_address}` plan record | `/complete-implementation` via `build_quality_gate_plan` + `sam_plan(config={"action":"create", ...})` | SAM dispatch loop (T1–T6 quality gate tasks) |
+| `{qg_plan_address}` plan record | `/complete-implementation` via `build_quality_gate_plan` + the `sam_plan` create action | SAM dispatch loop (T1–T6 quality gate tasks) |
 | session active-task context | `/start-task` skill | `task_status_hook.py` PostToolUse handler |
 | `last-activity` field in task | `task_status_hook.py` PostToolUse handler | progress reporting |
 | `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | ``plan ready` readiness evaluation |
@@ -333,7 +333,7 @@ plans from being dispatched.
 
 ```mermaid
 flowchart TD
-    Start([Planner needs large plan]) --> Create["sam_plan(config={action:'create',<br>tasks:[]})"]
+    Start([Planner needs large plan]) --> Create["sam_plan(config={action:'create',<br>slug:'{slug}', goal:'{goal}', tasks:[]})"]
     Create --> Drafting["Plan state = drafting<br>Opaque plan address assigned"]
     Drafting --> AppendLoop["sam_plan(plan='{plan_address}',<br>config={action:'append_task',<br>task:single_task_dict}) × N<br>Single-writer: no concurrent appends<br>state remains drafting throughout"]
     AppendLoop --> AppendLoop
@@ -481,7 +481,7 @@ Only T5 (Documentation Update) may have `status: skipped`. Skipping is triggered
 
 ### QG Plan File Location
 
-The quality-gate plan record is created by `sam_plan(config={"action":"create", ...})` through the configured backend. The
+The quality-gate plan record is created by the `sam_plan` create action through the configured backend. The
 returned opaque `{qg_plan_address}` is passed to all subsequent `sam_plan` and `sam_task` calls:
 `sam_plan(plan="{qg_plan_address}", config={"action":"ready"})`,
 `sam_task(plan="{qg_plan_address}", task="{task_address}", config={"action":"claim"})`,

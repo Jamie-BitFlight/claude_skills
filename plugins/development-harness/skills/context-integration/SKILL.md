@@ -73,12 +73,12 @@ Map each plan component to the concrete resources it will use.
 Re-register the updated plan via MCP:
 
 ```text
-artifact_register(
+mcp__plugin_dh_backlog__artifact_register(
   item_id={issue},
   artifact_type="architect",
-  path="plan/architect-{slug}.md",
+  artifact_id="plan/architect-{slug}.md",
+  content="{full_updated_plan_markdown}",
   agent="context-integration",
-  content="{full_updated_plan_markdown}"
 )
 ```
 
@@ -92,7 +92,7 @@ Add the Contextualization section and mark the status checkbox as complete.
 
 ## Output
 
-Updated `ARTIFACT:PLAN` re-registered via `artifact_register(item_id={issue}, artifact_type="architect", path="plan/architect-{slug}.md", agent="context-integration", content="{full_updated_plan_markdown}")` with the following section appended:
+Updated `ARTIFACT:PLAN` with the following section appended:
 
 ```markdown
 ## Contextualization

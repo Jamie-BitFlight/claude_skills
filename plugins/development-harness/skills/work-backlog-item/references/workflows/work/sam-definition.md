@@ -4,7 +4,9 @@
 
 **SAM (Stateless Agent Methodology)** is a constraint-driven development framework that compensates for LLM limitations through architectural structure rather than behavioral instructions. It treats Claude as a **stateless computation engine**—not a knowledge worker—that receives complete context and returns verified artifacts.
 
-**Core insight**: Claude is a pure function. Input: complete context (task file with all answers). Output: verified result. No side effects: fresh context each time. No memory: everything externalized to artifact files.
+**Core insight**: Claude is a pure function. Input: complete context (task record with all answers).
+Output: verified result. No side effects: fresh context each time. No memory: everything is
+externalized to provider-owned artifacts.
 
 The **canonical SAM specification** lives in the [bitflight-devops/stateless-agent-methodology](https://github.com/bitflight-devops/stateless-agent-methodology) repository. The `work-backlog-item` skill and `development-harness` plugin in claude_skills implement SAM patterns for backlog-driven feature work. This file is the self-contained SAM definition for use within this repo. Flow experiments and learnings live in [sam-flow-experiments](https://github.com/Jamie-BitFlight/sam-flow-experiments).
 
@@ -15,13 +17,13 @@ The **canonical SAM specification** lives in the [bitflight-devops/stateless-age
 (Canonical spec: <https://github.com/bitflight-devops/stateless-agent-methodology> — stateless-software-engineering-framework.md Part 2.)
 
 - **Stateless agents** — Each agent gets fresh context with exactly what it needs. Eliminates context pressure and accumulated errors.
-- **Externalized memory** — All state lives in artifact files, not in conversation. Survives session resets, enables verification.
+- **Externalized memory** — All state lives in provider-owned artifacts, not in conversation. Survives session resets, enables verification.
 - **Single responsibility** — Each agent does exactly one thing. Reduces complexity, enables specialization.
 - **Message passing** — Agents communicate via artifacts, not shared context. Decouples stages, creates audit trail.
 - **Verification at boundaries** — Every stage validates the previous stage's output. Catches errors before they propagate.
 - **Deterministic backpressure** — Gate progress on deterministic checks (build/tests/lint/security scans) executed by tools, not "advice" in prompts. Converts non-deterministic generation into a measurable loop.
 - **Embedded methodology** — The process IS the prompt, not instructions to follow. Cannot skip what structures the task.
-- **No recall required** — Task files contain all answers needed for the task. Reduces reliance on unverified recall; verification still required for synthesis/logic.
+- **No recall required** — Task records contain all answers needed for the task. Reduces reliance on unverified recall; verification still required for synthesis/logic.
 - **RT-ICA gate** — Reverse Thinking - Information Completeness Assessment runs before planning. Prerequisites marked AVAILABLE | DERIVABLE | MISSING; BLOCK if any MISSING.
 - **Semantic artifact tokens** — Storage-agnostic pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})` for DISCOVERY, PLAN, TASK, EXECUTION, REVIEW, VERIFICATION.
 - **Structure over instruction** — Behavioral instructions cannot override architectural limitations. The pipeline structure enforces behavior.
@@ -39,7 +41,7 @@ The **canonical SAM specification** lives in the [bitflight-devops/stateless-age
 | S2 | Planning | Discovery artifacts | ARTIFACT:PLAN(SCOPE:...) | Planning Agent (with RT-ICA) |
 | S3 | Context Integration | Plan + codebase | ARTIFACT:PLAN(SCOPE:...) contextualized | Context Integration Agent |
 | S4 | Task Decomposition | Contextualized plan | ARTIFACT:TASK(TASK:...) per task | Task Decomposition Agent |
-| S5 | Execution | Single task file (complete prompt) | ARTIFACT:EXECUTION(TASK:...) | Execution Agent (fresh session) |
+| S5 | Execution | Single task record (complete prompt) | ARTIFACT:EXECUTION(TASK:...) | Execution Agent (fresh session) |
 | S6 | Forensic Review | Execution + task + plan | ARTIFACT:REVIEW(TASK:...) — COMPLETE / NEEDS_WORK | Forensic Review Agent |
 | S7 | Final Verification | All completed tasks + original goals | ARTIFACT:VERIFICATION(SCOPE:...) — CERTIFIED / NOT_CERTIFIED | Final Verification Agent |
 
@@ -53,7 +55,9 @@ The **canonical SAM specification** lives in the [bitflight-devops/stateless-age
 User Request → DISCOVERY → PLAN → PLAN (contextualized) → TASK(s) → EXECUTION(s) → REVIEW(s) → VERIFICATION
 ```
 
-Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Storage is implementation-dependent (filesystem, SQL, etc.); the framework document gives example mappings (e.g. `.sam/artifacts/`).
+Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Storage is
+implementation-dependent. In claude_skills, the configured provider owns artifact content and
+callers retain logical identifiers rather than storage paths.
 
 ---
 
@@ -68,37 +72,41 @@ Each artifact type uses the token pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})`. Stor
 
 2. **Produce artifacts at every stage**
    - Use `ARTIFACT:{TYPE}({ID})` tokens in artifact headers; cross-reference predecessor/successor.
-   - In claude_skills: Register via MCP — `artifact_register(item_id, artifact_type, path, agent, content)` for discovery and plan artifacts. For task plans, choose a creation path based on plan size:
+   - In claude_skills: Register discovery and plan artifacts with
+     `artifact_register(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id, agent=agent, content=content)`.
+     Retain the logical `artifact_id`; it is not a filesystem path. For task plans, choose a
+     creation path based on plan size and retain the returned `plan_ref`:
 
-     **Monolithic path** (fewer than 16 tasks):
+     **Monolithic mode** (fewer than 16 tasks):
 
      ```text
-     sam_plan(action='create', slug, goal, tasks=[{task_dict}, ...], issue)
+     sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": [task_dict, ...], "issue": issue_number})
      ```
 
      `tasks` is a list of task definition objects. Required fields: `id`, `title`. Optional: `status`, `agent`, `dependencies`, `priority`, `complexity`.
 
-     **Incremental path** (16+ tasks — preferred for large plans):
+     **Incremental mode** (16+ tasks — preferred for large plans):
 
      1. Create a drafting plan — passing an empty task list enters `state="drafting"`:
 
         ```text
-        sam_plan(action='create', slug, goal, tasks=[], issue)
+        sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": [], "issue": issue_number})
         ```
 
-        While `state="drafting"`, `sam_plan status` and `sam_plan ready` return a drafting
+        While `state="drafting"`, `sam_plan(plan=plan_ref, config={"action": "status"})` and
+        `sam_plan(plan=plan_ref, config={"action": "ready"})` return a drafting
         marker rather than task counts; the plan is not visible to the dispatch loop.
 
      2. Append tasks one at a time:
 
         ```text
-        sam_plan(plan='P{N}', action='append_task', task={single_task_dict})
+        sam_plan(plan=plan_ref, config={"action": "append_task", "task": {single_task_dict}})
         ```
 
      3. Finalize — clears `state="drafting"` → `state="ready"`:
 
         ```text
-        sam_plan(plan='P{N}', action='finalize')
+        sam_plan(plan=plan_ref, config={"action": "finalize"})
         ```
 
      `append_task` is single-writer only — do not call it concurrently for the same plan.

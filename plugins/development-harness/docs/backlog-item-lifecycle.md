@@ -356,17 +356,18 @@ flowchart TD
 
 **Agent selection for architecture**: The skill does NOT hardcode `@python3-development:python-cli-design-spec`. It resolves the `design-spec` role from the language manifest at runtime based on project detection markers (`pyproject.toml` → Python, `package.json` → TypeScript, `Cargo.toml` → Rust, none → dh:task-worker fallback).
 
-**Artifact registration**: Each phase calls `artifact_register` with the opaque owner reference,
-`artifact_type`, logical artifact identifier, and `agent` fields. The configured backend owns
-content persistence.
+**Artifact registration**: Each document-artifact phase calls `artifact_register` with the opaque
+owner reference, `artifact_type`, logical artifact identifier, and `agent` fields. The configured
+backend owns content persistence. Plans are created and read only through `sam_plan`.
 
 **Storage**: Feature context and architecture specs are registered as logical artifacts through the
 configured backend. Remote providers may cache them privately; local providers keep them in native
 storage.
 
-**Artifact access is MCP-first**: Consumers retrieve artifacts via `artifact_read(item_id,
-artifact_type)` and register them via `artifact_register(item_id, artifact_type, artifact_id,
-agent, content)`. Task plans are accessed via `sam_task` and `sam_plan`. The
+**Artifact access is MCP-first**: Consumers retrieve artifacts via
+`artifact_read(item_id=<owner-reference>, artifact_type=<type>)` and register them via
+`artifact_register(item_id=<owner-reference>, artifact_type=<type>, artifact_id=<logical-id>,
+agent=<producer>, content=<body>)`. Task plans are accessed via `sam_task` and `sam_plan`. The
 configured backend resolves storage internally — consumers use logical addresses, never provider
 or filesystem paths.
 
@@ -376,7 +377,9 @@ or filesystem paths.
 
 ## Phase 4: Planning
 
-**Entry precondition**: Architecture document (`plan/architect-{slug}.md`) exists. Still inside `/dh:add-new-feature` (Phases 4-6 of 6 internal phases).
+**Entry precondition**: The `architect` artifact exists for the logical owner and is retrievable with
+`artifact_read(item_id=<owner-reference>, artifact_type="architect")`. Still inside
+`/dh:add-new-feature` (Phases 4-6 of 6 internal phases).
 
 **Skill**: `/dh:add-new-feature` (Phases 4-6)
 
@@ -386,16 +389,16 @@ The following diagram is the authoritative procedure for Phase 4 — Planning (/
 
 ```mermaid
 flowchart TD
-    P4_DECOMPOSE["Phase 4: Task Decomposition<br>Agent: @dh:swarm-task-planner<br>Input: architect artifact + feature-context<br>Output: logical plan via sam_plan(config={\"action\":\"create\"})<br>Every task has: status, dependencies,<br>priority, complexity, agent, AC (3+),<br>verification steps (3+)"]
+    P4_DECOMPOSE["Phase 4: Task Decomposition<br>Agent: @dh:swarm-task-planner<br>Input: architect artifact + feature-context<br>Output: logical plan via the sam_plan create action<br>Every task has: status, dependencies,<br>priority, complexity, agent, AC (3+),<br>verification steps (3+)"]
 
     P4_DECOMPOSE --> P4_BOOKEND{"acceptance-criteria-structured<br>non-empty?"}
     P4_BOOKEND -->|"Non-empty — generate bookends"| P4_BOOKEND_GEN["swarm-task-planner generates<br>T0 (baseline) + TN (verification)<br>bookend tasks inside the plan<br>T0: priority 1, deps []<br>TN: deps = all non-bookend task IDs"]
     P4_BOOKEND -->|"Empty — skip bookends"| P4_NO_BOOKEND["No bookend tasks generated"]
-    P4_BOOKEND_GEN --> P4_REGISTER
-    P4_NO_BOOKEND --> P4_REGISTER
+    P4_BOOKEND_GEN --> P4_CREATED
+    P4_NO_BOOKEND --> P4_CREATED
 
-    P4_REGISTER["Artifact registered: task-plan<br>(explicit artifact_register call)"]
-    P4_REGISTER --> P4_VALIDATE
+    P4_CREATED["Logical plan created through sam_plan<br>Plan address returned to the workflow"]
+    P4_CREATED --> P4_VALIDATE
 
     P4_VALIDATE["Phase 5: Plan Validation<br>Agent: @dh:plan-validator<br>Checks: AC coverage, dependency DAG,<br>agent assignments, verification steps,<br>impact radius coverage"]
     P4_VALIDATE --> P4_VAL_RESULT{Validator returns?}
@@ -405,7 +408,7 @@ flowchart TD
 
     P4_CONTEXT["Phase 6: Context Manifest<br>Agent: @dh:dh-context-gathering<br>Writes context manifest INTO the plan<br>via sam_plan (not a separate provider)<br>Maps each task to files, artifacts,<br>external context it needs"]
 
-    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='P{id}')<br>Links logical plan to backlog item"]
+    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='{plan_ref}')<br>Links returned opaque plan_ref to backlog item"]
     P4_LINK --> P4_DONE(["add-new-feature complete<br>Report plan address<br>Next: /dh:implement-feature"])
 ```
 
@@ -413,11 +416,11 @@ flowchart TD
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P4_DECOMPOSE | `@dh:swarm-task-planner` | architect and feature-context artifacts | logical plan via `sam_plan(config={"action":"create"})`, tasks with status/deps/priority/complexity/agent/AC/verification | always → P4_BOOKEND |
+| P4_DECOMPOSE | `@dh:swarm-task-planner` | architect and feature-context artifacts | logical plan via the `sam_plan` create action, tasks with status/deps/priority/complexity/agent/AC/verification | always → P4_BOOKEND |
 | P4_BOOKEND | orchestrator | `acceptance-criteria-structured` field | bookend decision | non-empty → P4_BOOKEND_GEN, empty → P4_NO_BOOKEND |
-| P4_BOOKEND_GEN | `@dh:swarm-task-planner` | structured acceptance criteria | T0 task (priority 1, deps=[]) + TN task (deps=all non-bookend IDs) inside plan | always → P4_REGISTER |
-| P4_NO_BOOKEND | orchestrator | — | no bookend tasks | always → P4_REGISTER |
-| P4_REGISTER | `artifact_register` MCP | owner reference, `artifact_type='task-plan'`, logical `artifact_id`, and plan content | registered task-plan artifact | always → P4_VALIDATE |
+| P4_BOOKEND_GEN | `@dh:swarm-task-planner` | structured acceptance criteria | T0 task (priority 1, deps=[]) + TN task (deps=all non-bookend IDs) inside plan | always → P4_CREATED |
+| P4_NO_BOOKEND | orchestrator | — | no bookend tasks | always → P4_CREATED |
+| P4_CREATED | `sam_plan` MCP | slug, goal, tasks, owner reference | logical plan address; plan content remains on the SAM capability | always → P4_VALIDATE |
 | P4_VALIDATE | `@dh:plan-validator` | logical plan record | READY or BLOCKED with specific gap list | always → P4_VAL_RESULT |
 | P4_VAL_RESULT | orchestrator | validator output | routing decision | READY → P4_CONTEXT, BLOCKED → P4_FIX |
 | P4_FIX | orchestrator | validator BLOCKED output with gap list | re-invoke `swarm-task-planner` with gap context | loops back to P4_DECOMPOSE |
@@ -432,16 +435,17 @@ flowchart TD
 
 | P4_DONE | orchestrator | slug, logical plan address | completion report, next-step instruction (`/dh:implement-feature`) | terminal |
 
-**Storage**: The SAM plan is created via `sam_plan(config={"action":"create"})` through the configured backend. The same
+**Storage**: The SAM plan is created via the `sam_plan` create action through the configured backend. The same
 backend owns the plan and its task records; no second task provider is selected.
 
 **plan-validator returns READY or BLOCKED** (not PASS/BLOCKED as previously documented). BLOCKED includes specific gaps that must be fixed before retrying.
 
-**T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside `P{id}-{slug}.yaml` with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
+**T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside the logical plan with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
 
 **context-gathering writes into the plan record** via `sam_plan`, not to a separate provider.
 
-**Status advance**: `backlog_update(selector="{title}", plan="P{id}")` links the logical plan to
+**Status advance**: `backlog_update(selector="{title}", plan="{plan_ref}")` links the opaque plan
+reference returned by `sam_plan` to
 the work item through the configured backend. The `status` transition to `in-progress` happens via
 `work-backlog-item` Step 7.
 
@@ -511,7 +515,7 @@ flowchart TD
 **start-task internal procedure** (Actor: specialist agent):
 
 1. `sam_task(plan="P{N}", task="T{M}", config={"action":"read"})` — returns a `TaskAssignment` model
-2. Optionally discovers plan artifacts via `artifact_list` + `artifact_read`
+2. Optionally discovers supporting document artifacts via `artifact_list` + `artifact_read`
 3. Selects task (from `--task` argument or first `not-started` with resolved deps)
 4. Loads task-level skills via `Skill(skill="{skill-name}")` for each name in `task.skills`
 5. `sam_task(plan="P{N}", task="T{M}", config={"action":"claim"})` — if `claimed: false`, STOP (do not implement). The configured backend transitions status to `in-progress`; serialize claims for the same task.
@@ -673,7 +677,11 @@ flowchart TD
 
 **RT-ICA BLOCKED stop**: Guard 2 checks whether the follow-up's linked planner-rt-ica artifact contains `BLOCKED-FOR-PLANNING`. If so, the follow-up is not recursed and the user receives the blocking conditions with a resume instruction: `/dh:work-backlog-item {title}`. Remaining follow-ups continue processing.
 
-**Out-of-scope routing**: A follow-up task file with `## Scope: out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never reaches the recursion gate. This prevents out-of-scope findings from blocking the current implementation cycle.
+**Out-of-scope routing**: A follow-up provider-owned plan or artifact record whose structured scope
+is `out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never
+reaches the recursion gate. The record remains addressable through its opaque `plan_ref` or logical
+artifact identity; no task-file path is involved. This prevents out-of-scope findings from blocking
+the current implementation cycle.
 
 **complete-implementation invokes `backlog_resolve` as its terminal step**. After quality gates pass, it: (1) applies verified status through the configured backend, (2) commits and pushes, (3) calls `backlog_resolve(selector, summary="Implementation complete — AC verified PASS")` to close the work item and transition to resolved. `/work-backlog-item resolve` remains available if `complete-implementation` was interrupted before the resolve step.
 

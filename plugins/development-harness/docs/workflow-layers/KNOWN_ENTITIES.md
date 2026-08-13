@@ -137,11 +137,12 @@ full tool name. An extracted call to any short-form must be resolved to the full
 
 ### Artifact tools
 
+The short forms below are graph-normalization labels, not executable signatures.
+
 | Full name | Short forms seen in prose |
 |---|---|
 | `mcp__plugin_dh_backlog__artifact_get` | `artifact_get()` |
 | `mcp__plugin_dh_backlog__artifact_list` | `artifact_list()` |
-| `mcp__plugin_dh_backlog__artifact_migrate` | `artifact_migrate()` |
 | `mcp__plugin_dh_backlog__artifact_read` | `artifact_read()` |
 | `mcp__plugin_dh_backlog__artifact_register` | `artifact_register()` |
 
@@ -224,12 +225,14 @@ Stored via `artifact_register`, retrieved via `artifact_read`. The `artifact_typ
 is the canonical key. Short-form prose references (e.g. "the architect spec", "the T0
 baseline") must resolve to one of these keys.
 
+SAM plans are not registered artifacts. Create and read their content through `sam_plan`,
+then associate the returned logical plan address with its owner through `backlog_update`.
+
 | artifact_type key | Producer skill/agent | Consumer skill/agent |
 |---|---|---|
 | `feature-context` | `add-new-feature` (feature-researcher) | `add-new-feature` (architect, swarm-task-planner) |
 | `codebase-analysis` | `add-new-feature` (codebase-analyzer) | `add-new-feature`, `complete-implementation` |
 | `architect` | `add-new-feature` (swarm-task-planner) | `implement-feature`, `add-new-feature` |
-| `task-plan` | SAM (`sam_plan create`) — auto-registered | `implement-feature` |
 | `T0-baseline` | `implement-feature` (t0-baseline-capture) | `implement-feature` (TN gate comparison) |
 | `TN-verification` | `implement-feature` (tn-verification-gate) | `complete-implementation` |
 | `codebase-analysis` | `complete-implementation` (code-reviewer) | `complete-implementation` |

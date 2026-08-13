@@ -31,7 +31,7 @@ mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"claim"
     -- Claim task (transition from not-started to in-progress)
 mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"state","status":"complete"})
     -- Transition task status (complete | blocked | deferred | skipped)
-mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","set_fields_json":{"priority":1}})
     -- Patch task fields (JSON object {"field": "value", ...})
 mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","append_section":"Heading","section_content":"..."})
     -- Append a markdown section to the task body
@@ -54,7 +54,7 @@ mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"ready"})
     -- List tasks ready for dispatch (not-started, all deps resolved)
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","context":"..."})
     -- Update plan context field
-mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","set_fields_json":{"goal":"..."}})
     -- Patch plan-level fields
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"append_task","task":<single task dict>})
     -- Append a single task to a plan in state="drafting"; backends do not enforce the drafting precondition
@@ -68,7 +68,7 @@ For large plans (rule of thumb: 16+ tasks), use the three-call incremental workf
 single monolithic `create` call:
 
 ```text
-1. sam_plan(config={"action":"create", "tasks":[]})
+1. sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[]})
    -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2-{slug}").
 
 2. sam_plan(plan='P{id}', config={"action":"append_task", "task":<single task dict>}) × N
@@ -104,7 +104,7 @@ mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{id}","task"
     -- Register active task for current session (replaces direct active-task-{sid}.json writes)
 mcp__plugin_dh_sam__sam_active_task(config={"action":"get"})
     -- Retrieve active task context for current session
-mcp__plugin_dh_sam__sam_active_task(config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_active_task(config={"action":"update","set_fields_json":{"priority":1}})
     -- Update fields on the active task without repeating its address
 mcp__plugin_dh_sam__sam_active_task(config={"action":"clear"})
     -- Clear active task context for current session
@@ -167,7 +167,7 @@ my-slug/T1        -- task T1 in plan matching slug "my-slug"
 ```
 
 `plan read --address Pc7d8e9f0/T3` addresses task `T03` in plan `Pc7d8e9f0` through the configured
-backend. Plans created by `sam_plan(config={"action":"create"})` have UUID-hex IDs (8 hex chars, e.g.
+backend. Plans created by the `sam_plan` create action have UUID-hex IDs (8 hex chars, e.g.
 `Pc7d8e9f0`); legacy numeric IDs (`P1`, `P42`) exist only for unmigrated plans.
 
 ### Legacy Names
@@ -548,8 +548,8 @@ Four MCP tools support artifact registration and discovery:
 ```text
 artifact_register   -- Register a new artifact in the configured-backend manifest
 artifact_list       -- List all registered artifacts for a work item
-artifact_get        -- Get metadata for a specific artifact by path
-artifact_read       -- Read artifact content by path (used by worktree-isolated agents)
+artifact_get        -- Get metadata for a specific artifact type
+artifact_read       -- Read artifact content by owner reference and artifact type
 ```
 
 Each has a full CLI equivalent under `artifact register|list|get|read`; see

@@ -475,8 +475,12 @@
 
 <main>
 
+<div class="callout danger">
+  <strong>Historical architecture audit.</strong> Sections labelled current or target below describe the 2026-06-05 audit snapshot and its proposal, not the active storage contract. Use <a href="./backend-providers.md">Backend Providers</a> and <a href="./plan-artifact-lifecycle.md">Plan and Artifact Lifecycle</a> for current provider-owned storage and logical MCP access.
+</div>
+
 <section id="documents">
-  <h2>Document Types <span class="tag now">current state</span></h2>
+  <h2>Document Types <span class="tag now">2026-06-05 snapshot</span></h2>
   <p>Every entity in the system is a document: structured text with metadata and relationships to other documents. These are currently stored, parsed, and rendered by three separate subsystems with no shared layer.</p>
 
   <div class="grid grid-3">
@@ -558,7 +562,7 @@ graph TD
 </section>
 
 <section id="current-flow">
-  <h2>Current Data Flow <span class="tag now">as-is</span></h2>
+  <h2>Current Data Flow <span class="tag now">2026-06-05 snapshot</span></h2>
   <p>How a BacklogItem travels from GitHub to an AI agent and back. Each arrow is a translation step. Every translation step is a place where format can diverge.</p>
 
   <h3>Read path (GitHub → Agent)</h3>
@@ -1001,7 +1005,7 @@ graph TD
       <tr><td><a href="../sam_schema/core/backends/local_yaml.py"><code>local_yaml.py</code></a></td><td>534</td><td><code>heading = f"## {section_name}"</code></td></tr>
       <tr><td><a href="../sam_schema/core/backends/memory.py"><code>sam memory.py</code></a></td><td>482</td><td><code>heading = f"## {section_name}"</code></td></tr>
       <tr><td><a href="../sam_schema/core/backends/beads.py"><code>sam beads.py</code></a></td><td>911</td><td><code>heading = f"## {section_name}"</code></td></tr>
-      <tr><td><a href="../sam_schema/core/yaml_writer.py"><code>yaml_writer.py</code></a></td><td>603</td><td><code>new_section = f"## {section_name}\n\n{content.rstrip()}\n"</code></td></tr>
+      <tr><td><a href="../sam_schema/writers/yaml_writer.py"><code>yaml_writer.py</code></a></td><td>603</td><td><code>new_section = f"## {section_name}\n\n{content.rstrip()}\n"</code></td></tr>
       <tr><td><a href="../sam_schema/core/quality_gates.py"><code>quality_gates.py</code></a></td><td>113, 122</td><td>Quality gate report section headers</td></tr>
     </tbody>
   </table>
@@ -1068,7 +1072,7 @@ graph TD
   <ul class="friction-list">
     <li>
       <span class="badge warn">WASTE</span>
-      <div class="detail"><strong>Architect spec re-read 2–3× per task</strong> — task-worker via <code>artifact_read()</code>, contract-verification via file path, forensic-review as fallback. The spec never changes within a plan. Could be cached once at plan start and injected into all task dispatches.</div>
+      <div class="detail"><strong>Architect spec re-read 2–3× per task</strong> — task-worker and contract-verification read the provider-owned artifact by owner reference and type; forensic-review may read it again. The spec never changes within a plan. It could be read once at plan start and injected into all task dispatches.</div>
     </li>
     <li>
       <span class="badge warn">WASTE</span>
@@ -1157,19 +1161,19 @@ class SectionParser:
   <ul class="friction-list">
     <li>
       <span class="badge danger">INV</span>
-      <div class="detail"><strong>"The zero-timestamp fallback must be eliminated entirely"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 1</a>. No ADR cited. The constraint is stronger than the evidence: zero IDs cause problems <em>when mixed with real IDs</em>. Segregation or conversion are alternatives to elimination.</div>
+      <div class="detail"><strong>"The zero-timestamp fallback must be eliminated entirely"</strong> — historical design brief, Constraint 1. No ADR cited. The constraint is stronger than the evidence: zero IDs cause problems <em>when mixed with real IDs</em>. Segregation or conversion are alternatives to elimination.</div>
     </li>
     <li>
       <span class="badge danger">INV</span>
-      <div class="detail"><strong>"The GitHub issue createdAt is available on every item"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 2</a>. <a href="../backlog_core/parsing.py"><code>parsing.py:106</code></a> shows <code>added_date = _fm_str(...) or "0000-00-00"</code> — the field is optional and may be absent. The proposed baseline ID strategy breaks when this field is missing.</div>
+      <div class="detail"><strong>"The GitHub issue createdAt is available on every item"</strong> — historical design brief, Constraint 2. <a href="../backlog_core/parsing.py"><code>parsing.py:106</code></a> shows <code>added_date = _fm_str(...) or "0000-00-00"</code> — the field is optional and may be absent. The proposed baseline ID strategy breaks when this field is missing.</div>
     </li>
     <li>
       <span class="badge danger">INV</span>
-      <div class="detail"><strong>"All sections use the same wire format"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 3</a>. Desired future state. No enforcement mechanism described. No ADR. The revised design (two formats, both enforced) is a better-evidenced position.</div>
+      <div class="detail"><strong>"All sections use the same wire format"</strong> — historical design brief, Constraint 3. Desired future state. No enforcement mechanism described. No ADR. The revised design (two formats, both enforced) is a better-evidenced position.</div>
     </li>
     <li>
       <span class="badge danger">INV</span>
-      <div class="detail"><strong>"The YAML cache is downstream, not a source of truth"</strong> — <a href="../../.tmp/scratch/plans/unified-section-layer-brief.md">brief, Constraint 6</a>. Current code at <a href="../backlog_core/operations.py"><code>operations.py:3228</code></a> explicitly uses YAML as source of truth when body headers are a subset of YAML sections. Eliminating it requires a replacement, not just reclassification.</div>
+      <div class="detail"><strong>"The YAML cache is downstream, not a source of truth"</strong> — historical design brief, Constraint 6. The audit snapshot found YAML used as a read source. The active provider contract supersedes that behavior; use the current architecture links at the top of this document.</div>
     </li>
   </ul>
 
@@ -1324,8 +1328,8 @@ flowchart TD
       <tr><td>3.2</td><td>RT-ICA gate</td><td><code>sections['RT-ICA']</code> Date header</td><td>Re-runs <code>dh:rt-ica</code> if stale or absent</td><td>BLOCKS if BLOCKED result</td></tr>
       <tr><td>3.4</td><td>Feasibility assessment (4 criteria)</td><td>Impact Radius count, Priority.Effort, description</td><td>feasibility_result (6-field object, in memory)</td><td>C3: BLOCKS if &gt;20 systems affected</td></tr>
       <tr><td>4.1</td><td>Compose feature request</td><td>Description, Impact Radius, Acceptance Criteria, Issue Classification, RT-ICA derivable, Priority.Effort, Discovery</td><td>feature_request_string (assembled in memory)</td><td>BLOCKS if Impact Radius missing</td></tr>
-      <tr><td>4.2</td><td>Invoke <code>dh:add-new-feature</code></td><td>feature_request_string</td><td>SAM plan YAML + architect artifact</td><td>—</td></tr>
-      <tr><td>4.3</td><td>Link plan to item</td><td><code>sam_plan(action='list', search=slug)</code></td><td><code>backlog_update(plan='P{id}')</code></td><td>—</td></tr>
+      <tr><td>4.2</td><td>Invoke <code>dh:add-new-feature</code></td><td>feature_request_string</td><td>Logical SAM plan + architect artifact</td><td>—</td></tr>
+      <tr><td>4.3</td><td>Link plan to item</td><td><code>sam_plan(config={action:'list', search:slug})</code></td><td><code>backlog_update(plan='P{id}')</code></td><td>—</td></tr>
     </tbody>
   </table>
 
@@ -1334,12 +1338,12 @@ flowchart TD
   <table>
     <thead><tr><th>Stage</th><th>Agent</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Consumed by</th></tr></thead>
     <tbody>
-      <tr><td>Discovery</td><td><code>dh:feature-researcher</code></td><td>feature_request_string, codebase (Grep/Read)</td><td><code>feature-context</code> artifact</td><td>Artifact store via <code>artifact_register(type='feature-context')</code></td><td>swarm-task-planner, context-integration</td></tr>
-      <tr><td>Codebase analysis</td><td><code>dh:codebase-analyzer</code></td><td>Full codebase (Read/Bash/Grep/Glob), git history</td><td><code>codebase-analysis</code> artifacts (patterns, architecture, testing, conventions, concerns)</td><td>Artifact store via <code>artifact_register()</code></td><td>swarm-task-planner, code-reviewer, integration-checker</td></tr>
-      <tr><td>Architecture</td><td><code>dh:swarm-task-planner</code></td><td>feature-context, codebase-analysis</td><td>SAM plan YAML (<code>P{id}-{slug}.yaml</code>) + architect artifact</td><td>Local <code>~/.dh/projects/{slug}/plan/</code> + Gist write-through</td><td>implement-feature, all task-workers, contract-verification</td></tr>
-      <tr><td>Validation</td><td><code>dh:plan-validator</code></td><td><code>sam_plan(action='read')</code></td><td>Validation result (ephemeral — not persisted)</td><td>—</td><td>Gates plan creation; lost after gate</td></tr>
-      <tr><td>Context manifest</td><td><code>dh:dh-context-gathering</code></td><td>Task file (markdown)</td><td>Context Manifest section embedded in each task file</td><td>Task file on disk</td><td>task-worker (reads at execution time)</td></tr>
-      <tr><td>T0 baseline</td><td><code>dh:t0-baseline-capture</code></td><td><code>acceptance_criteria_structured</code> from plan; runs check_commands via Bash</td><td>T0-baseline YAML artifact</td><td>Artifact store via <code>artifact_register(type='T0-baseline')</code></td><td>tn-verification-gate (comparison baseline)</td></tr>
+      <tr><td>Discovery</td><td><code>dh:feature-researcher</code></td><td>feature_request_string, codebase (Grep/Read)</td><td><code>feature-context</code> artifact</td><td>Configured backend, registered with owner reference, type, logical artifact ID, and content</td><td>swarm-task-planner, context-integration</td></tr>
+      <tr><td>Codebase analysis</td><td><code>dh:codebase-analyzer</code></td><td>Full codebase (Read/Bash/Grep/Glob), git history</td><td><code>codebase-analysis</code> artifacts (patterns, architecture, testing, conventions, concerns)</td><td>Configured backend, registered with owner reference, type, logical artifact ID, and content</td><td>swarm-task-planner, code-reviewer, integration-checker</td></tr>
+      <tr><td>Architecture</td><td><code>dh:swarm-task-planner</code></td><td>feature-context, codebase-analysis</td><td>Logical SAM plan + architect artifact</td><td>Configured backend</td><td>implement-feature, all task-workers, contract-verification</td></tr>
+      <tr><td>Validation</td><td><code>dh:plan-validator</code></td><td><code>sam_plan(plan='{plan_address}', config={action:'read'})</code></td><td>Validation result (ephemeral — not persisted)</td><td>—</td><td>Gates plan creation; lost after gate</td></tr>
+      <tr><td>Context manifest</td><td><code>dh:dh-context-gathering</code></td><td>Logical task record</td><td>Context Manifest section embedded in task content</td><td>Configured backend</td><td>task-worker (reads at execution time)</td></tr>
+      <tr><td>T0 baseline</td><td><code>dh:t0-baseline-capture</code></td><td><code>acceptance_criteria_structured</code> from plan; runs check_commands via Bash</td><td>T0-baseline artifact</td><td>Configured backend, registered with owner reference, type, logical artifact ID, and content</td><td>tn-verification-gate (comparison baseline)</td></tr>
     </tbody>
   </table>
 
@@ -1348,12 +1352,12 @@ flowchart TD
   <div class="diagram-wrap">
     <div class="mermaid">
 flowchart TD
-    START["sam_plan(action='ready')\nGet next task batch"]
+    START["sam_plan(plan='{plan_address}', config={action:'ready'})\nGet next task batch"]
     DISPATCH["Dispatch dh:task-worker\nper ready task (parallel)"]
     CLAIM["task-worker claims task\nsam_task(action='claim')"]
-    READ["Reads fresh per task:\n• sam_task(action='read') → plan.context\n• artifact_read(architect)\n• artifact_read(feature-context)\n• Context Manifest from task file"]
+    READ["Reads fresh per task:\n• sam_task read → plan.context\n• architect artifact by owner + type\n• feature-context artifact by owner + type\n• Context Manifest from task record"]
     IMPL["Specialist agent implements\n(loaded via profile_load)"]
-    REVIEW["dh:code-reviewer\n→ artifact_register(type='code-review-{task_id}')"]
+    REVIEW["dh:code-reviewer\n→ registers codebase-analysis content\nwith a stable logical artifact ID"]
     CONTRACT["dh:contract-verification\n→ appends CONTRACT: items\nto Concerns section on issue"]
     COMPLETE["sam_task(action='state', state='complete')"]
     MORE{"More ready tasks?"}
@@ -1385,12 +1389,12 @@ flowchart TD
     <div class="mermaid">
 flowchart TD
     PRE["Pre-gate: Process Concerns section\nbacklog_view → read all unchecked items\nVerify each; create backlog items for real ones\nbacklog_groom(section='Concerns', content=updated)"]
-    TN["dh:tn-verification-gate\nRe-runs same check_commands as T0\nCompares against T0-baseline\n→ artifact_register(type='TN-verification')"]
+    TN["dh:tn-verification-gate\nRe-runs same check_commands as T0\nCompares against T0-baseline\n→ registers TN-verification content\nwith a stable logical artifact ID"]
     TNcheck{"TN verdict?"}
-    FV["dh:feature-verifier\nGoal-backward verification\n→ artifact_register(type='feature-verification')"]
-    DA["dh:doc-drift-auditor\nCompares docs vs implementation\n→ artifact_register(type='audit-report')"]
+    FV["dh:feature-verifier\nGoal-backward verification\n→ records its verdict in a supported report artifact"]
+    DA["dh:doc-drift-auditor\nCompares docs vs implementation\n→ registers audit-report content\nwith a stable logical artifact ID"]
     SM["dh:service-docs-maintainer\nReads audit-report\nUpdates README, docstrings, examples"]
-    CR["dh:context-refinement\nReads architect + feature-context\nAnnotates with post-impl discoveries\n→ sam_plan(action='update', append)"]
+    CR["dh:context-refinement\nReads architect + feature-context\nAnnotates task context with post-impl discoveries\n→ sam_plan(plan='{plan_address}', config={action:'update', ...})"]
     CLOSE["Apply status:verified label\nClose backend item\nbacklog_close(item_ref)"]
     REWORK(["BLOCKED — regressions found\nItem remains open"])
 
@@ -1408,11 +1412,11 @@ flowchart TD
     <thead><tr><th>Gate</th><th>Reads</th><th>Produces</th><th>Stored at</th><th>Blocks if</th></tr></thead>
     <tbody>
       <tr><td>Concerns pre-gate</td><td>backend item Concerns section via <code>backlog_view(section='Concerns')</code></td><td>Updated Concerns checklist; new backlog items for verified concerns</td><td>Backend item body via <code>backlog_groom()</code>; new items via <code>backlog_add()</code></td><td>Never blocks — advisory only</td></tr>
-      <tr><td><code>tn-verification-gate</code></td><td>T0-baseline artifact; re-runs <code>acceptance_criteria_structured</code> check_commands</td><td>TN-verification YAML artifact (PASS/FAIL + criterion diff)</td><td>Artifact store via <code>artifact_register(type='TN-verification')</code></td><td>Any criterion that passed at T0 now fails (regression)</td></tr>
-      <tr><td><code>feature-verifier</code></td><td>feature-context, architect artifacts via <code>artifact_read()</code></td><td>feature-verification artifact (VERIFIED or GAPS_FOUND)</td><td>Artifact store via <code>artifact_register(type='feature-verification')</code></td><td>GAPS_FOUND — creates follow-up tasks</td></tr>
-      <tr><td><code>doc-drift-auditor</code></td><td>Implementation files (Read/Bash), git history</td><td>audit-report artifact (drift findings by severity)</td><td>Artifact store via <code>artifact_register(type='audit-report')</code></td><td>Never blocks — feeds service-docs-maintainer</td></tr>
+      <tr><td><code>tn-verification-gate</code></td><td>T0-baseline artifact; re-runs <code>acceptance_criteria_structured</code> check_commands</td><td>TN-verification artifact (PASS/FAIL + criterion diff)</td><td>Configured backend, registered with owner reference, type, logical artifact ID, and content</td><td>Any criterion that passed at T0 now fails (regression)</td></tr>
+      <tr><td><code>feature-verifier</code></td><td>feature-context and architect artifacts resolved by owner reference and type</td><td>Verification verdict (VERIFIED or GAPS_FOUND)</td><td>Supported report artifact in the configured backend</td><td>GAPS_FOUND — creates follow-up tasks</td></tr>
+      <tr><td><code>doc-drift-auditor</code></td><td>Implementation files (Read/Bash), git history</td><td>audit-report artifact (drift findings by severity)</td><td>Configured backend, registered with owner reference, type, logical artifact ID, and content</td><td>Never blocks — feeds service-docs-maintainer</td></tr>
       <tr><td><code>service-docs-maintainer</code></td><td>audit-report artifact, implementation files</td><td>Updated documentation files (README, docstrings, examples)</td><td>Repository files (Write tool — committed)</td><td>Never blocks</td></tr>
-      <tr><td><code>context-refinement</code></td><td>Task files, architect artifact, feature-context artifact, implementation code</td><td>Post-impl annotations appended to architect + feature-context</td><td>SAM plan artifacts via <code>sam_plan(action='update', append)</code></td><td>BLOCKED if context drift unresolvable</td></tr>
+      <tr><td><code>context-refinement</code></td><td>Task records, architect artifact, feature-context artifact, implementation code</td><td>Post-impl annotations appended to task context</td><td>Configured backend through the <code>sam_plan</code> update action</td><td>BLOCKED if context drift unresolvable</td></tr>
       <tr><td>Closure</td><td>All gate verdicts</td><td>Status label <code>status:closed</code>; backend item closed via <code>backlog_close()</code></td><td>Backlog item metadata (backend-specific)</td><td>Any gate with FAIL verdict</td></tr>
     </tbody>
   </table>

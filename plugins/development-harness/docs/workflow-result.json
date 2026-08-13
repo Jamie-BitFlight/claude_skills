@@ -1,4 +1,6 @@
 {
+  "snapshot_status": "historical-generated-output",
+  "authority": "Non-authoritative extraction evidence. Embedded tool-call text is not a current executable signature.",
   "summary": "Map complete DH backlog item workflow from source files with citation per step. GAP rule: any transition not attested by a fragment is emitted as GAP, never smoothed.",
   "agentCount": 67,
   "logs": [

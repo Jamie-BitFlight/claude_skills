@@ -1,6 +1,6 @@
 # Artifact Conventions
 
-SAM artifact naming, file layout, and cross-referencing conventions for the development harness.
+SAM artifact naming, logical identifiers, and cross-referencing conventions for the development harness.
 
 ---
 
@@ -47,25 +47,30 @@ Artifacts are stored and retrieved via two distinct MCP systems. No stage reads 
 
 Document-level artifacts (discovery, plan, context integration) are managed by the backlog MCP server:
 
-- **Write:** `artifact_register(item_id, artifact_type, path, agent, content)` — registers the artifact and uploads content to a GitHub Issue comment for worktree-isolated access.
-- **Read:** `artifact_read(item_id, artifact_type)` — returns `{type, path, content, status}`. Resolves from GitHub Issue comments first, filesystem fallback second.
-- **List:** `artifact_list(item_id, artifact_type=None)` — enumerates registered artifacts for an issue.
+- **Write:** `artifact_register(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id, agent=agent, content=content)` — registers the logical artifact identifier and writes optional content through the configured provider.
+- **Read:** `artifact_read(item_id=item_id, artifact_type=artifact_type)` — returns `{artifact_type, path, content, status}` from the configured provider. The `path` response field carries the registered logical `artifact_id`.
+- **List:** `artifact_list(item_id=item_id, artifact_type=None)` — enumerates registered artifacts for an issue.
 
 Artifact types used in the S1–S7 pipeline:
 
 - `"feature-context"` — S1 Discovery output
 - `"architect"` — S2 Plan output (updated by S3 Context Integration)
-- `"task-plan"` — S4 Task Decomposition output (auto-registered by `sam_plan(action='create')`)
+
+Task plans are SAM-owned records, not artifact-registry content. Use `sam_plan` and `sam_task` for
+their complete lifecycle; never register or read task-plan content with `artifact_register` or
+`artifact_read`.
 
 ### SAM System
 
 Task plans and task-level state are managed by the SAM MCP server:
 
-- **Create:** `sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": [task_dict, ...], "issue": issue_number})` — creates a task plan and auto-registers it as `artifact_type="task-plan"`. Pass `tasks=[]` to create a drafting plan for incremental append.
-- **Read:** `sam_task(plan, task, config={"action": "read"})` — returns a `TaskAssignment` model with plan-level context and task fields.
-- **Update:** `sam_task(plan, task, config={"action": "update", "append_section": ..., "section_content": ...})` — appends sections to task bodies. Used by S5 Execution, S6 Forensic Review, and S7 Final Verification to store results within the task structure.
+- **Create:** `sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": [task_dict, ...], "owner_reference": item_ref})` — creates a provider-owned plan associated with the backlog item's opaque reference and returns its `plan_ref`. Pass `tasks=[]` to create a drafting plan for incremental append.
+- **Link:** `backlog_update(selector=item_ref, plan=plan_ref)` — stores the returned plan address on the backlog item.
+- **Read plan:** `sam_plan(plan=plan_ref, config={"action": "read"})` — returns the provider-owned plan.
+- **Read task:** `sam_task(plan=plan_ref, task=task_id, config={"action": "read"})` — returns a `TaskAssignment` model with plan-level context and task fields.
+- **Update task:** `sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": ..., "section_content": ...})` — appends sections to task bodies. Used by S5 Execution, S6 Forensic Review, and S7 Final Verification to store results within the task structure.
 
-Task plans are stored in `~/.dh/projects/{project-slug}/plan/` by the SAM MCP server. Access is exclusively via MCP tools — never via direct filesystem paths. The storage format is an implementation detail of the backend; do not assume YAML, JSON, or any specific format.
+Task plans are stored by the configured SAM backend and addressed by the `plan_ref` returned from creation. Access is exclusively via MCP tools. The storage format is an implementation detail of the backend; do not assume YAML, JSON, or any filesystem path.
 
 ### Backlog System
 
@@ -76,7 +81,11 @@ Backlog item metadata and grooming state are accessed via:
 
 ---
 
-## File Naming Conventions
+## Logical Identifier Conventions
+
+The names below are logical artifact identifiers. A provider may map one to a repository-relative
+path, an issue-native record, or another native key; callers must not use the identifier as a
+filesystem path.
 
 ### Feature-Level Artifacts
 
@@ -177,7 +186,7 @@ Backlog item metadata and grooming state are accessed via:
 ### TASK
 
 **Stage:** S4
-**Purpose:** Individual executable task file.
+**Purpose:** Individual executable task record.
 
 **Required sections:**
 
@@ -245,11 +254,10 @@ Each artifact references its immediate predecessor and the tasks it relates to.
 
 ## Artifact Lifecycle
 
-Artifacts persist after feature completion for auditability. The MCP servers manage storage — no manual filesystem cleanup is required.
-
-- **GitHub Issue artifacts** (registered via `artifact_register` with `content`) are stored as Issue comments and persist with the issue.
-- **SAM task plans** (in `~/.dh/projects/{slug}/plan/`) persist until explicitly removed via SAM tools or manual deletion of the state directory.
-- **Backlog item cache** (in `~/.dh/projects/{slug}/backlog/`) is synced from GitHub Issues and can be refreshed via `backlog_sync`.
+Artifacts persist after feature completion for auditability. The configured providers own storage
+and lifecycle; callers retain only the artifact `artifact_id` and SAM `plan_ref` logical addresses.
+Remote-capable providers may maintain an offline file cache internally. Local memory, SQLite, and
+Beads providers store their native records directly and do not require that cache.
 
 ---
 

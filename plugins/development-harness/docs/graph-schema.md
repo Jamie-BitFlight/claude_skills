@@ -149,7 +149,7 @@ A single tool exposed by an MCP server. Not a call — the capability itself.
 ### artifact
 
 A document or data object produced and consumed across stages.
-Includes backlog item sections, SAM plan YAML, registered artifacts, and ephemeral in-memory objects.
+Includes backlog item sections, SAM plans, provider-owned registered artifacts, and ephemeral in-memory objects.
 
 ```json
 {
@@ -162,7 +162,7 @@ Includes backlog item sections, SAM plan YAML, registered artifacts, and ephemer
   "metadata": {
     "artifact_type": "backlog_section",
     "section_name": "Impact Radius",
-    "storage": "GitHub Issue body via backlog_groom()",
+    "storage": "selected provider via backlog_groom()",
     "persistent": true,
     "consumed_by_phases": [3, 4]
   }
@@ -178,12 +178,12 @@ it's what the MCP server routes to. Shown on the MCP tools overlay.
 {
   "id": "backend.github",
   "type": "backend",
-  "label": "GitHub (Issues + Gist)",
+  "label": "GitHub provider",
   "source_file": "backlog_core/backends/github_backend.py",
   "source_heading": "class GitHubBackend",
   "verified": true,
   "metadata": {
-    "handles": ["backlog items", "artifact manifests", "gist content"],
+    "handles": ["backlog items", "artifact manifests", "artifact content", "plans"],
     "config_key": "BACKLOG_BACKEND=github",
     "alternatives": ["beads", "sqlite", "memory"]
   }
@@ -394,7 +394,7 @@ nodes and which edge types to show/hide when active.
       "palette": {
         "backlog_section": "#6c8ef5",
         "sam_plan": "#7dd3a8",
-        "gist_artifact": "#f5a623",
+        "provider_artifact": "#f5a623",
         "ephemeral": "#c8ccd8"
       }
     }

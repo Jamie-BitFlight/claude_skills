@@ -207,8 +207,8 @@
       "failure_condition": "Crashed — session ended abruptly after sam_task(action=claim) with no further turns",
       "detected_at": "Progress Loop > Agent Health Check",
       "response": "bounce",
-      "bounce_target": "Progress Loop — Re-spawn agent with same task file path and task ID",
-      "bounce_source": "Confirm task state via mcp__plugin_dh_sam__sam_task(plan, task, config={action:read}). Verify task is still CLAIMED. Re-spawn agent with same task file path and task ID."
+      "bounce_target": "Progress Loop — re-spawn agent with the same opaque plan_ref and task_id",
+      "bounce_source": "Confirm task state via mcp__plugin_dh_sam__sam_task(plan=plan_ref, task=task_id, config={action:read}). Verify task is still CLAIMED. Re-spawn the agent with the same opaque plan_ref and task_id."
     },
     {
       "id": "G1.implement-feature.per-task-gate-declined",

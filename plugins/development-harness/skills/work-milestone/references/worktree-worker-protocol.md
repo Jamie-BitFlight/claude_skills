@@ -10,11 +10,11 @@ Each worktree worker is spawned by the milestone orchestrator as an isolated `Ag
 flowchart TD
     Start(["Worktree worker spawned<br>in isolated worktree on integration branch"]) --> M1["M1: Setup<br>Verify worktree is on integration branch.<br>Enable constant commits."]
 
-    M1 --> M2["M2: Self-Discovery<br>backlog_view(selector='#{issue}') — description + AC.<br>sam_plan(action=list) or sam_plan(action=status) — find SAM plan if exists.<br>If plan found: sam_task(action=read) — task list, skills, architect spec.<br>Load each skill: Skill(skill='{name}'). Warn and continue on failure."]
+    M1 --> M2["M2: Self-Discovery<br>backlog_view(selector='#{issue}') — description + AC.<br>sam_plan(config={'action': 'list'}) — find the plan_ref.<br>sam_plan(plan=plan_ref, config={'action': 'status'}) — inspect progress.<br>sam_task(plan=plan_ref, task=task_id, config={'action': 'read'}) — task, skills, architect spec.<br>Load each skill: Skill(skill='{name}'). Warn and continue on failure."]
 
     M2 --> SkillLoad["Skill Loading complete.<br>Task list and AC in context."]
 
-    SkillLoad --> M4["M4: Execute Work<br>Execute each task sequentially:<br>1. Read task acceptance criteria<br>2. Implement required changes<br>3. Run task verification commands<br>4. Commit changes<br>Update SAM status via MCP:<br>sam_task(plan, task, config={action:claim}) before starting each task.<br>sam_task(plan, task, config={action:state, status:complete}) after."]
+    SkillLoad --> M4["M4: Execute Work<br>Execute each task sequentially:<br>1. Read task acceptance criteria<br>2. Implement required changes<br>3. Run task verification commands<br>4. Commit changes<br>Update SAM status via MCP:<br>sam_task(plan=plan_ref, task=task_id, config={'action': 'claim'}) before starting each task.<br>sam_task(plan=plan_ref, task=task_id, config={'action': 'state', 'status': 'complete'}) after."]
 
     M4 --> M8{"M8: Item Complete?<br>All tasks in task list done?"}
 

@@ -50,7 +50,7 @@ stateDiagram-v2
 | `groomed` | All required sections present (defined in finalize.md), RT-ICA APPROVED | `status:groomed` |
 | `blocked` | RT-ICA BLOCKED — missing information prevents grooming or work | `status:blocked` |
 | `in-milestone` | Assigned to a GitHub milestone, awaiting work | `status:in-milestone` |
-| `in-progress` | Work started, plan file created, implementation underway | `status:in-progress` |
+| `in-progress` | Work started, SAM plan created, implementation underway | `status:in-progress` |
 | `done` | Implementation complete, AC verified PASS, checklist 100% | `status:done` |
 | `resolved` | Item closed without full implementation (obsolete, invalid, superseded) | `status:resolved` |
 | `closed` | Terminal state — milestone archived, item no longer active | `status:closed` |
@@ -73,7 +73,7 @@ Action:     backlog script sets metadata.groomed = today's date
 ```
 Trigger:    /groom-backlog-item Step 5 — RT-ICA Decision is BLOCKED
 Precondition: One or more MISSING conditions that cannot be resolved without user input
-Action:     RT-ICA section written to item file (Step 5b — must happen before blocker reported)
+Action:     RT-ICA section written to the backlog item (Step 5b — must happen before blocker reported)
              GitHub label: remove status:needs-grooming, add status:blocked
              Report BLOCKED items in completion output
 ```
@@ -100,10 +100,10 @@ Action:     metadata.milestone set to milestone number
 ### `in-milestone` → `in-progress`
 
 ```
-Trigger:    /work-backlog-item — RT-ICA gate APPROVED and SAM plan file created
+Trigger:    /work-backlog-item — RT-ICA gate APPROVED and SAM plan created
 Precondition: RT-ICA Decision APPROVED (re-assessed if item state has changed since grooming)
-              plan file written to plan/ directory
-Action:     metadata.plan set to plan file path
+              sam_plan(config={"action": "create", ...}) returned a plan_ref
+Action:     metadata.plan set to plan_ref
              metadata.status = in-progress
              GitHub label: remove status:in-milestone, add status:in-progress
              NOTE: status:in-progress label MUST NOT be set before this point
@@ -117,7 +117,7 @@ Trigger:    /work-backlog-item --quick — after backlog_update links quick-{slu
 Precondition: Item status is `groomed` OR `needs-grooming` (newly created inline by quick/start.md
               Step 2 when no prior item exists — gate classification substitutes for grooming)
               Proactive Fix Gate completed (domain skill loaded, alignment stated, trivial classification)
-              quick-{slug} SAM plan created by sam_plan(action='create')
+              quick-{slug} SAM plan created by sam_plan(config={"action": "create", ...})
 Action:     metadata.plan set to quick-{slug}
              metadata.status = in-progress
              GitHub label: remove status:groomed (or status:needs-grooming), add status:in-progress
@@ -135,7 +135,7 @@ Precondition: Plan checklist is 100% complete
 Action:     metadata.status = done
              GitHub label: remove status:in-progress, add status:done
              GitHub issue closed
-             Per-item file status updated to done
+             Backlog item status updated to done
 ```
 
 ### `in-progress` → `resolved`
@@ -146,7 +146,7 @@ Precondition: Explicit reason provided
 Action:     metadata.status = resolved
              GitHub label: remove status:in-progress, add status:resolved
              GitHub issue closed with resolution comment
-             Per-item file status updated to resolved
+             Backlog item status updated to resolved
 ```
 
 ### Any state → `resolved`
@@ -166,7 +166,7 @@ Trigger:    /complete-milestone archives the milestone
 Precondition: Item status is done or resolved; milestone is being archived
 Action:     metadata.status = closed
              GitHub label: current label removed, add status:closed
-             Per-item file status updated to closed
+             Backlog item status updated to closed
              Completion archive written to .claude/milestones/v{N}-completion.md
 ```
 
@@ -208,9 +208,10 @@ priority:Ideas
 
 ## Critical State Constraints
 
-**`status:in-progress` timing**: The in-progress label MUST be set only after the RT-ICA gate returns APPROVED and the SAM plan file is created. Setting it during "checking RT-ICA" or "starting grooming" is incorrect and produces misleading state.
+**`status:in-progress` timing**: The in-progress label MUST be set only after the RT-ICA gate returns APPROVED and SAM plan creation returns a `plan_ref`. Setting it during "checking RT-ICA" or "starting grooming" is incorrect and produces misleading state.
 
-**`metadata.groomed` timing**: Only set when ALL required sections are present in the item file (defined in finalize.md; see [./item-schema.md](./item-schema.md)). Partial grooming is not groomed.
+**`metadata.groomed` timing**: Only set when ALL required sections are present in the backlog item
+(defined in finalize.md; see [./item-schema.md](./item-schema.md)). Partial grooming is not groomed.
 
 **`blocked` and `in-progress` are exclusive**: An item cannot be both blocked and in-progress. If AC verification fails during close, revert to `blocked`, do not close.
 

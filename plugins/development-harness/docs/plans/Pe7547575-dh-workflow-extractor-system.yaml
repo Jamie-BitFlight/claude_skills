@@ -1,7 +1,7 @@
 plan-id: Pe7547575
 feature: dh-workflow-extractor-system
 version: '1.0'
-description: ''
+description: Historical implementation-plan snapshot. Embedded tool-call forms are extraction evidence, not current executable signatures.
 state: ready
 goal: |-
   Implement the DH Workflow Extractor System: deterministic scope enumeration + per-file haiku/sonnet ensemble extraction producing a verified actor-step graph, with idempotent fragment ETL, SessionStart staleness detection, an agent-facing query skill, and aligned documentation/config. Source: architect spec plan/architect-dh-workflow-extractor-system.md (#2646).

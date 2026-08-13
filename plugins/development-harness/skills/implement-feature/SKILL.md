@@ -1,7 +1,7 @@
 ---
 name: implement-feature
-description: Executes the SAM implementation loop when a task plan exists — dispatches ready tasks to specialist agents in parallel, manages bookend tasks (T0 baseline capture and TN verification), tracks concerns and contract violations per task, and relies on hooks to update task status. Use when a plan address (P{id}) or feature slug is provided after add-new-feature planning is complete. Manages task batches via sam_plan and sam_task MCP tools.
-argument-hint: "<task-file-path or feature-slug>"
+description: Executes the SAM implementation loop when a task plan exists — dispatches ready tasks to specialist agents in parallel, manages bookend tasks (T0 baseline capture and TN verification), tracks concerns and contract violations per task, and relies on hooks to update task status. Use when the plan_ref returned by add-new-feature is provided. Manages task batches via sam_plan and sam_task MCP tools.
+argument-hint: "<plan_ref>"
 user-invocable: true
 ---
 
@@ -9,23 +9,22 @@ user-invocable: true
 
 As you review code, update your agent memory with patterns, conventions, and recurring issues you discover.
 
-This workflow continues from `add-new-feature`. It executes tasks from a SAM task file until complete (or blocked).
+This workflow continues from `add-new-feature`. It executes tasks from the selected provider until complete or blocked.
 
-<feature_input>$ARGUMENTS</feature_input>
+<plan_ref>$ARGUMENTS</plan_ref>
 
 ---
 
 **MCP server availability**: This skill uses both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools. Both servers initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 
-## Resolve Task File
+## Resolve Plan
 
-Rules:
+Treat the value from the `plan_ref` key as the opaque reference returned by `sam_plan` create. Pass it unchanged to every SAM operation and delegation prompt.
 
-- If `<feature_input/>` ends with `.md`, treat it as the task file path and extract the plan address `P{N}` from the filename (e.g., `plan/tasks-3-integrate-sam-schema.md` → `P3`).
-- Otherwise, treat it as a feature slug (or partial slug) and resolve plan address via `sam_plan`:
+Confirm the plan exists:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "<feature_input/>"
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
 ```
 
 ---
@@ -35,7 +34,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "<fe
 1. Query status:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
 ```
 
 After receiving the status response, extract and store the autonomy mode:
@@ -54,21 +53,21 @@ If parent story identifier is known and structured SAM readiness is required (`s
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan sam-ready-tasks --parent-issue-number N
 ```
 
-Output shape: `{"feature": "...", "ready_tasks": [...], "count": N}`. Falls back to local cache if
-GitHub unavailable.
+Output shape: `{"feature": "...", "ready_tasks": [...], "count": N}`. The selected provider owns
+availability handling and any private cache it requires.
 
 If parent issue number is unknown, use the SAM CLI:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P{N}
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{plan_ref}"
 ```
 
-> **Call `sam_plan(action='ready')` (or `backlog_get_ready_sam_tasks`) ONCE per batch.** Store the returned
-> task list. Loop over the stored list — do NOT call `sam_plan(action='ready')` again within the loop.
+> **Call `mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="{plan_ref}")` (or
+> `backlog_get_ready_sam_tasks`) ONCE per batch.** Store the returned task list. Loop over the stored list
+> without fetching ready tasks again.
 > After all tasks in the current batch are dispatched and completed, use
-> `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}` to check whether more tasks remain.
-> Only call `sam_plan(action='ready')` again when the previous batch is fully dispatched and you need the
-> next batch of ready tasks.
+> `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` to check whether more tasks remain.
+> Fetch the next ready batch only after the previous batch is fully dispatched.
 
 3. Dispatch based on `autonomy_mode`:
 
@@ -88,15 +87,15 @@ When multiple tasks are simultaneously ready (non-zero `count` with 2+ tasks in 
 TeamCreate(team_name: "impl-{slug}")
 ```
 
-The team name follows the pattern `impl-{slug}` where `{slug}` is the feature slug derived
-from the task file path. This team name is reused by `complete-implementation` for QG agent
+The team name follows the pattern `impl-{slug}` where `{slug}` is derived from the status response's
+`feature` value. This team name is reused by `complete-implementation` for QG agent
 dispatch and is shut down in the Final Step of that skill.
 
 Spawn one teammate per ready task. When only one task is ready, a single Agent call is acceptable. `TeamCreate` is the standard parallel dispatch mechanism — use it whenever 2+ tasks are ready at the same time.
 
 For each task being dispatched:
 
-- Always dispatch `dh:task-worker` as the `subagent_type`. The `agent:` field in the task YAML is NOT a routing directive for the orchestrator — it is read internally by `task-worker` via the SAM MCP (`sam_task` action) and passed to `profile_load` to specialize `task-worker`'s behavior. The orchestrator passes only the task reference (plan address + task ID).
+- Always dispatch `dh:task-worker` as the `subagent_type`. The task definition's `agent` field is not a routing directive for the orchestrator — it is read internally by `task-worker` via the SAM MCP (`sam_task` action) and passed to `profile_load` to specialize `task-worker`'s behavior. The orchestrator passes only the task reference (`plan_ref` + task ID).
 - Check the task's `skills` list from the ready-tasks JSON output.
 - If `skills` is non-empty, include skill-loading instructions in the delegation prompt:
 
@@ -109,7 +108,7 @@ For each skill, call: Skill(skill="{skill-name}")
 - Launch `dh:task-worker` with a prompt that invokes `start-task`:
 
 ```text
-Skill(skill="start-task", args="{plan_address} --task {task_id}")
+Skill(skill="start-task", args="{plan_ref} --task {task_id}")
 ```
 
 > **Note**: Task-level skills are additive to agent-level skills. If the agent definition
@@ -134,8 +133,8 @@ flowchart TD
     Spawn["Task is session health summary<br>subagent_type='agentskill-kaizen:transcript-analyst'<br>Context: agent name or teammate ID to check,<br>JSONL dir ~/.claude/projects/{project-slug}/*.jsonl<br>Report: last turn timestamp, last tool call,<br>verdict of crashed / idle / active"]
     Spawn --> Verdict{Analyst verdict}
     Verdict -->|"Crashed — session ended abruptly<br>after sam_task(action=claim) with no further turns"| Confirm
-    Confirm["Confirm task state via<br>uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan}/{task}<br>Verify task is still CLAIMED"] --> Respawn
-    Respawn["Re-spawn agent with same task file path and task ID<br>SubagentStop hook updates status on completion"]
+    Confirm["Confirm task state via sam_task read<br>using plan_ref + task_id<br>Verify task is still CLAIMED"] --> Respawn
+    Respawn["Re-spawn agent with the same plan_ref and task ID<br>SubagentStop hook updates status on completion"]
     Verdict -->|"Idle — no tool calls for 5+ min<br>agent appears stuck mid-task"| TeamCheck{Agent is a teammate<br>in an active team?}
     TeamCheck -->|Yes| SendMsg["SendMessage to teammate<br>'Are you blocked? What is your current status?'<br>Wait 2 minutes for response"]
     TeamCheck -->|"No — spawned via single Agent call"| Respawn
@@ -185,7 +184,7 @@ Agent(
 Verify the just-completed task against the architect spec.
 
 Task ID: {task_id}
-Plan: {plan_address}
+Plan: {plan_ref}
 Architect spec: {architect_spec_content_or_path}
 Modified files:
 {modified_files_list}
@@ -244,7 +243,7 @@ Commit responsibility depends on which execution mode is active.
 
   ```bash
   git add -A
-  git commit -m "<type>(task-batch): {plan_address} — {task_ids}"
+  git commit -m "<type>(task-batch): {plan_ref} — {task_ids}"
   ```
 
 In both cases, choose `<type>` to match the dominant change in the committed work (`feat`, `fix`, `docs`, `refactor`, etc.). Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
@@ -269,18 +268,17 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 3. Await explicit user confirmation before proceeding.
    - If confirmed: dispatch the next task from the stored batch (or query the next batch if the batch is exhausted).
    - If declined or cancelled: stop the Progress Loop. Report the current plan state via
-     `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}` and exit.
+     `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` and exit.
 
 Skip this gate when `autonomy_mode` is `"full_auto"` or `"checkpoint"`.
 
-5. After all tasks in the current batch complete, call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}` to
+5. After all tasks in the current batch complete, call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` to
    check plan progress. If tasks remain, return to step 2 to fetch the next batch of ready
-   tasks. Do NOT call `sam_plan(action='ready')` again until the previous batch is fully dispatched.
+   tasks. Do not fetch another ready batch until the previous batch is fully dispatched.
 
 **5a. Wave-Completion Confirmation Gate** (active when `autonomy_mode == "checkpoint"` only):
 
-After all tasks in the current batch complete and `sam_plan(action='status')` confirms that
-tasks remain (step 5 result: tasks remaining > 0):
+After all tasks in the current batch complete and the status response from step 5 confirms that tasks remain:
 
 1. Display a compact wave-completion summary:
    - Number of tasks completed in this wave
@@ -291,7 +289,7 @@ tasks remain (step 5 result: tasks remaining > 0):
 2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
    examples include "Wave complete. Proceed with the next wave? (yes/no)".
 
-3. Await explicit user confirmation before calling `sam_plan(action='ready')` again.
+3. Await explicit user confirmation before fetching another ready batch.
    - If confirmed: proceed to step 2 to fetch the next batch.
    - If declined or cancelled: stop the Progress Loop. Report the current plan state
      and exit. The plan remains in its current state and can be resumed later.
@@ -326,22 +324,15 @@ When the parent story issue number is known (`str | int` — GitHub integer ID o
 
 ```text
 Register the baseline content directly via MCP (no file write):
-  mcp__plugin_dh_backlog__artifact_register(item_id=N, artifact_type="T0-baseline", content=<baseline yaml string>, agent="t0-baseline-capture")
+  mcp__plugin_dh_backlog__artifact_register(item_id=N, artifact_type="T0-baseline", artifact_id="T0-baseline-{slug}", content=<baseline yaml string>, agent="t0-baseline-capture")
 ```
-
-Note: the CLI's `artifact register` command requires `--artifact-id` (per the MCP↔CLI mapping,
-verified 2026-08-05) which this call does not supply — whether it defaults from `--artifact-type`
-is unconfirmed. Use the MCP tool for this call until the gap is resolved.
 
 **TN delegation prompt addition:**
 
 ```text
 Register the verification content directly via MCP (no file write):
-  mcp__plugin_dh_backlog__artifact_register(item_id=N, artifact_type="TN-verification", content=<verification yaml string>, agent="tn-verification-gate")
+  mcp__plugin_dh_backlog__artifact_register(item_id=N, artifact_type="TN-verification", artifact_id="TN-verification-{slug}", content=<verification yaml string>, agent="tn-verification-gate")
 ```
-
-Note: same CLI `--artifact-id` gap as the T0 registration call above — use the MCP tool for this
-call.
 
 If the issue number is not known, skip registration.
 
@@ -358,5 +349,5 @@ If the issue number is not known, skip registration.
 When all tasks show `COMPLETE`, invoke:
 
 ```text
-Skill(skill="complete-implementation", args="{task_file_path}")
+Skill(skill="complete-implementation", args="{plan_ref}")
 ```

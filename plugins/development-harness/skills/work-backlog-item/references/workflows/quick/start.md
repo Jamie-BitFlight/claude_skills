@@ -45,9 +45,9 @@ or issue reference is passed as `item_ref`.
 
    ```text
    mcp__plugin_dh_sam__sam_plan(
+     plan="{active_plan_id}",
      config={
        "action": "append_task",
-       "plan": "{active_plan_id}",
        "task": {
          "id": "T{next_available_id}",
          "title": "{title}",

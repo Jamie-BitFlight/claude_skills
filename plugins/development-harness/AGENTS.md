@@ -15,7 +15,7 @@ Language-agnostic development process harness that orchestrates feature developm
 **Design Principles:**
 
 - The harness owns the *process*; language plugins own the *specialists*
-- Every stage produces an MCP-registered artifact (stateless handoff) — stored via `artifact_register` and retrieved via `artifact_read`, never via direct filesystem paths
+- Every stage produces a logical handoff. Document artifacts use `artifact_register` and `artifact_read`; plans and task state use `sam_plan` and `sam_task`. Neither surface exposes direct filesystem paths.
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints
 - Without a language manifest, the harness falls back to `dh:task-worker` (specialist profile not loaded — task-worker executes directly)
 - Task complexity is context-fit under uncertainty — see [Context-Fit Complexity Model](./docs/sdlc-layers/layer-0/context-fit-complexity.md)
@@ -98,10 +98,10 @@ Full conventions in [./skills/development-harness/references/artifact-convention
 **Gotcha — Large plans must use the incremental append workflow:**
 
 For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
-`sam_plan(config={"action":"create"})`:
+the `sam_plan` create action:
 
-1. `sam_plan(config={"action":"create", "owner_reference":<work_item_reference>, ...})` — creates a drafting plan and returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
-2. `sam_plan(plan='Pa1b2c3d4', config={"action":"append_task", ...})` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
+1. `sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[], "owner_reference":<work_item_reference>})` — creates a drafting plan and returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
+2. `sam_plan(plan='Pa1b2c3d4', config={"action":"append_task", "task":<single_task_object>})` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
 3. `sam_plan(plan='Pa1b2c3d4', config={"action":"finalize"})` — clears drafting state and makes the plan ready
 
 While a plan is in `state="drafting"`, `sam_plan(plan='<returned-plan-id>', config={"action":"ready"})`
@@ -128,7 +128,7 @@ the configured backend; access them through `sam_*` and `artifact_*` operations.
 
 ## Artifact Manifest System
 
-Plan artifacts are registered in a structured manifest owned by the configured backend. The
+Document artifacts are registered in a structured manifest owned by the configured backend. The
 manifest is the discovery mechanism — consumers query it via MCP to find artifacts for a work item.
 
 **MCP tools (on backlog server) — Artifact Management:**
@@ -148,25 +148,30 @@ authoritative flag mapping.
 |---|---|---|
 | `feature-context` | `@dh:feature-researcher` | S1 discovery output |
 | `architect` | `@dh:swarm-task-planner` | S2 architecture output |
-| `task-plan` | SAM (`sam_plan(config={"action":"create"})`) | Register explicitly with `artifact_register` |
 | `codebase-analysis` | **`@dh:code-reviewer`** | Code review verdict; read by `complete-implementation` Phase T1 |
 | `T0-baseline` | `@dh:t0-baseline-capture` | Pre-implementation baseline |
 | `TN-verification` | `@dh:tn-verification-gate` | Post-implementation verification |
 | `dispatch-plan` | `dispatch_create_plan` | Milestone dispatch plan |
 | `audit-report` | **`@dh:doc-drift-auditor`** | Documentation drift audit; NOT used by `@dh:code-reviewer` |
 
-**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
+Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
+associate the returned logical address with the owning work item through `backlog_update`.
 
-**Registration:** Producers call `artifact_register` after creating content. The configured backend
-does not imply registration from a plan or backlog update call.
+**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id=<owner>, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
+
+**Registration:** Producers call `artifact_register` after creating document-artifact content.
+Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores
+only the logical plan association on the owning work item. Never duplicate plan content through
+`artifact_register`.
 
 **Consumer discovery:** Consumers (including worktree-isolated agents) call `artifact_list` then
-`artifact_read` instead of filesystem access. The configured backend resolves content for every
-worktree.
+`artifact_read` for document artifacts and `sam_plan` for plans instead of using filesystem access.
+The configured backend resolves content for every worktree.
 
-**MCP-native rule for agents:** Agents store system artifacts exclusively via `artifact_register` with
-`content=`. The configured backend owns persistence and retrieval. The `Write` tool is permitted
-only for repo-relative deliverables (source code, tests, documentation files committed to the repo).
+**MCP-native rule for agents:** Agents store document artifacts via `artifact_register` with
+`content=` and store plans through `sam_plan`. The configured backend owns persistence and retrieval.
+The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation
+files committed to the repo).
 
 **Prohibited patterns — do not write these in agent instructions or tool calls:**
 
