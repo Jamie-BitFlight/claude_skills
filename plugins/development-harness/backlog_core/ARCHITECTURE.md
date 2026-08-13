@@ -591,6 +591,42 @@ The existing independent `create_artifact_provider()` calls in `operations.py` a
 including the server's `LocalFilesystemArtifactProvider` fallback, are migration debt. They must be
 replaced by artifact capabilities obtained from the configured backend.
 
+### GitHub writable records
+
+GitHub uses two provider-native, lossless write representations because its APIs expose different
+concurrency guarantees:
+
+- Plans, artifact manifests, artifact content, dispatch plans, and work-item heads are deterministic
+  files beneath `.dh/content/v1/` on the repository's resolved default branch. Every GitHub request
+  names that branch. Each file stores a compact versioned envelope containing its complete logical identity,
+  owner metadata, and content. Identity fields use one injective URL-safe encoding; the decoded
+  envelope must match its path. Malformed, duplicate, oversized, or mismatched records fail closed.
+  The GitHub Contents API blob SHA is the opaque revision: updates send the observed SHA and creates
+  omit SHA. On `409` or `422`, the provider re-reads the target. A path that appeared, disappeared,
+  or changed SHA is `ContentConflictError`; an unchanged target permits only a bounded retry for an
+  unrelated branch-head race. `403` and protected-branch failures are unavailable, not conflicts.
+  Discovery resolves one branch tree, rejects truncated results, validates every envelope, sorts by
+  logical identity, then applies `ContentQuery` filtering and bounds. Native records take precedence
+  over read-only Gist/index migration records; a malformed native record never falls back.
+- Work-item issue bodies remain human-owned GitHub content and are never overwritten after a
+  preflight-only revision check. The authoritative agent-managed head is a Contents record bound to
+  the issue identity. Its root revision is the digest of the canonical Issue body plus Issue node
+  identity, so unrelated labels or comments do not move it and a human body change does. Each update
+  names the previous head/root revision and advances the head with Contents SHA compare-and-swap.
+  A tagged Issue comment is an append-only-by-agent-convention audit and human projection record;
+  its metadata names the head revision and content digest. The provider accepts a patch only after
+  one head CAS succeeds and the referenced comment/digest validates. Concurrent writers may leave
+  both audit comments, but exactly one head advances and only that writer is checkpointed. Edited,
+  deleted, malformed, forged, or digest-mismatched projection comments fail closed.
+
+GitHub deployments require repository Contents read/write and Issues read/write permissions. The
+provider rejects an encoded envelope above 1 MiB before network I/O; larger artifacts require a
+future provider representation rather than silently crossing GitHub's normal Contents API mode.
+
+Neither representation uses cooperative locks, Gist read-modify-write, unconditional Issue-body
+updates, or a second caller-selected provider. Offline writes continue through the owning
+`GitHubBackend` FileCache queue and replay against the same remote revision boundary.
+
 ---
 
 ## Module: operations.py

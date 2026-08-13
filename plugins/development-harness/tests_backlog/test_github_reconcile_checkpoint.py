@@ -4,12 +4,14 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.backends._github_work_item_versions import root_revision
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
 from backlog_core.file_cache import FileCache, _ProviderSnapshotCheckpoint
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
@@ -178,6 +180,8 @@ def test_github_reconcile_conflict_preserves_snapshot_checkpoint(tmp_path: Path)
         "assignees": [],
     }
     backend.get_github = MagicMock(return_value=repository)
+    backend._contents = MagicMock()
+    backend._contents.get.side_effect = ContentNotFoundError("head missing")
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": observed_issue}})
     backend._update_issues_graphql_batch = MagicMock()
 
@@ -186,7 +190,7 @@ def test_github_reconcile_conflict_preserves_snapshot_checkpoint(tmp_path: Path)
 
     # Then: the body remains unwritten, the conflict is reported, and the prior global watermark remains durable
     assert result.conflicts == 1
-    assert result.patch_results[0].revision == "rev-1"
+    assert result.patch_results[0].revision == root_revision("#1", "node-1", str(observed_issue["body"]))
     backend._update_issues_graphql_batch.assert_not_called()
     assert FileCache(tmp_path)._get_snapshot_checkpoint() == old_checkpoint
 

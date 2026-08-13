@@ -94,34 +94,36 @@ def test_revisionless_plan_update_fails_closed_without_gist_mutation() -> None:
     index.register.assert_not_called()
 
 
-def test_online_artifact_content_update_fails_closed_before_gist_store(tmp_path: Path) -> None:
+def test_online_artifact_content_write_routes_to_contents_before_gist_store(tmp_path: Path) -> None:
     reference = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="research", name="note")
     provider = MagicMock()
-    provider.read_artifact_content_from_remote.return_value = "before"
-    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider)
+    contents = MagicMock()
+    contents.put.return_value = ContentRecord(reference=reference, content="after", revision="sha")
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider, contents=contents)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
-    with pytest.raises(UnsupportedCapabilityError, match="compare-and-swap"):
-        backend.put_content(ContentWrite(reference=reference, content="after"))
+    assert backend.put_content(ContentWrite(reference=reference, content="after")).revision == "sha"
 
+    contents.put.assert_called_once()
     provider.store_artifact_content.assert_not_called()
     provider.set_manifest.assert_not_called()
 
 
-def test_online_artifact_manifest_update_fails_closed_before_gist_store(tmp_path: Path) -> None:
+def test_online_artifact_manifest_write_routes_to_contents_before_gist_store(tmp_path: Path) -> None:
     reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="#1", name="manifest")
     provider = MagicMock()
-    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
-    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider)
+    contents = MagicMock()
+    contents.put.return_value = ContentRecord(reference=reference, content="{}", revision="sha")
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider, contents=contents)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
-    with pytest.raises(UnsupportedCapabilityError, match="compare-and-swap"):
-        backend.put_content(
-            ContentWrite(
-                reference=reference, content=ArtifactManifest(issue_number=1, last_updated="new").model_dump_json()
-            )
+    backend.put_content(
+        ContentWrite(
+            reference=reference, content=ArtifactManifest(issue_number=1, last_updated="new").model_dump_json()
         )
+    )
 
+    contents.put.assert_called_once()
     provider.store_artifact_content.assert_not_called()
     provider.set_manifest.assert_not_called()
 
@@ -129,13 +131,15 @@ def test_online_artifact_manifest_update_fails_closed_before_gist_store(tmp_path
 def test_online_artifact_read_remains_available(tmp_path: Path) -> None:
     reference = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="research", name="note")
     provider = MagicMock()
-    provider.read_artifact_content_from_remote.return_value = "stored"
-    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider)
+    contents = MagicMock()
+    contents.get.return_value = ContentRecord(reference=reference, content="stored", revision="sha")
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider, contents=contents)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
     record = backend.get_content(reference)
 
     assert (record.content, record.pending, record.stale) == ("stored", False, False)
+    contents.get.assert_called_once_with(reference)
     provider.store_artifact_content.assert_not_called()
 
 
@@ -158,7 +162,9 @@ def _offline_backend(
     cache = FileCache(tmp_path / "github-cache")
     cache.cache_content(cached)
     cache.queue_write(cached, ContentWrite(reference=reference, content="pending", expected_revision="current"))
-    backend = GitHubBackend(cache=cache, plan_persistence=_UnavailablePlanPersistence())
+    backend = GitHubBackend(
+        cache=cache, plan_persistence=_UnavailablePlanPersistence(), contents=_UnavailablePlanPersistence()
+    )
     monkeypatch.setattr(backend, "try_get_github", MagicMock)
     return backend, reference, cached
 
