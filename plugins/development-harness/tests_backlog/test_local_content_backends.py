@@ -26,14 +26,18 @@ from backlog_core.models import (
 
 
 class _BeadsKvRunner:
-    def __init__(self, *, fail_sets: bool = False) -> None:
+    def __init__(self, workspace: Path, *, fail_sets: bool = False) -> None:
         self.values: dict[str, str] = {}
         self.calls: list[tuple[str, ...]] = []
         self.fail_sets = fail_sets
+        self.workspace = workspace
+        workspace.mkdir(parents=True)
 
     def run_json(self, argv: Sequence[str]) -> JsonValue:
         self.calls.append(tuple(argv))
         match list(argv):
+            case ["where"]:
+                return {"path": str(self.workspace)}
             case ["kv", "list"]:
                 return {**self.values, "schema_version": 1}
             case ["kv", "get", key]:
@@ -78,7 +82,7 @@ def local_provider(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[C
             yield backend
             backend._conn.close()
         case "beads":
-            yield BeadsBackend(_BeadsKvRunner())
+            yield BeadsBackend(_BeadsKvRunner(tmp_path / ".beads"))
         case unreachable:
             raise AssertionError(f"unexpected backend: {unreachable!r}")
 
@@ -232,9 +236,9 @@ def test_native_content_discovery_when_owner_filter_is_omitted_or_empty(local_pr
 
 
 @pytest.mark.unit
-def test_beads_content_when_native_kv_write_fails() -> None:
+def test_beads_content_when_native_kv_write_fails(tmp_path: Path) -> None:
     # Given: a Beads runner whose native KV write fails.
-    runner = _BeadsKvRunner(fail_sets=True)
+    runner = _BeadsKvRunner(tmp_path / ".beads", fail_sets=True)
     backend = BeadsBackend(runner)
     reference = ContentRef(kind=ContentKind.PLAN, name="native-kv-only")
 
@@ -244,7 +248,7 @@ def test_beads_content_when_native_kv_write_fails() -> None:
 
     # Then: the backend surfaces unavailability and invoked only native KV commands.
     assert runner.calls
-    assert all(command[:2] in {("kv", "get"), ("kv", "set")} for command in runner.calls)
+    assert all(command == ("where",) or command[:2] in {("kv", "get"), ("kv", "set")} for command in runner.calls)
 
 
 @pytest.mark.unit

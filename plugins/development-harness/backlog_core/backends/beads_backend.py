@@ -111,18 +111,16 @@ class _BdRunnerLike(Protocol):
     def is_available(self) -> bool: ...
 
 
-def _beads_workspace_path() -> Path:
-    current = Path.cwd().resolve()
-    for ancestor in (current, *current.parents):
-        workspace = ancestor / ".beads"
-        if workspace.is_dir():
-            return workspace
-    return current / ".beads"
+def _beads_workspace_path(runner: _BdRunnerLike) -> Path:
+    workspace = runner.run_json(["where"])
+    if not isinstance(workspace, dict) or not isinstance(path := workspace.get("path"), str) or not path:
+        raise ContentUnavailableError("Beads workspace could not be resolved")
+    return Path(path).resolve()
 
 
 @contextlib.contextmanager
-def _beads_content_lock() -> Iterator[None]:
-    lock_path = _beads_workspace_path() / _CONTENT_LOCK_FILE
+def _beads_content_lock(runner: _BdRunnerLike) -> Iterator[None]:
+    lock_path = _beads_workspace_path(runner) / _CONTENT_LOCK_FILE
     with _THREAD_LOCKS_GUARD:
         thread_lock = _THREAD_LOCKS.setdefault(lock_path, Lock())
     with thread_lock:
@@ -359,7 +357,7 @@ class BeadsBackend:
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Create or replace one record in the native Beads KV store."""
-        with _beads_content_lock():
+        with _beads_content_lock(self._runner):
             current = self._find_content(request.reference)
             current_revision = current.revision if current is not None else ""
             if request.create_only and current is not None:

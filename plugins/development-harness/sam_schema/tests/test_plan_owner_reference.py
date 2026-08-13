@@ -13,6 +13,7 @@ from backlog_core.models import (
     ContentQuery,
     ContentRecord,
     ContentRef,
+    ContentUnavailableError,
     ContentWrite,
     UnsupportedCapabilityError,
 )
@@ -138,6 +139,77 @@ def test_content_task_provider_removes_failed_create_from_local_state(mocker: Mo
     assert provider.list_plans() == []
     with pytest.raises(PlanNotFoundError):
         provider.read_plan(writes[0].reference.name)
+
+
+def test_content_task_provider_restores_plan_when_write_and_refresh_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: a persisted plan and an outage that rejects both its write and refresh.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+    plan = provider.create_plan("restore-plan", "keep local state coherent", [])
+    plan_id = plan["plan_id"]
+    snapshot = provider.read_plan(plan_id)
+    revision = provider._revisions[plan_id]
+
+    def unavailable_write(_: ContentWrite) -> ContentRecord:
+        raise ContentUnavailableError("write unavailable")
+
+    def unavailable_refresh(_: ContentRef) -> ContentRecord:
+        raise ContentUnavailableError("refresh unavailable")
+
+    # When: a plan mutation cannot be persisted or authoritatively refreshed.
+    with monkeypatch.context() as outage:
+        outage.setattr(content_provider, "put_content", unavailable_write)
+        outage.setattr(content_provider, "get_content", unavailable_refresh)
+        with pytest.raises(ContentUnavailableError):
+            provider.update_plan_fields(plan_id, context="rejected context")
+
+    # Then: the rejected field and revision cannot leak into a later successful write.
+    assert provider.read_plan(plan_id) == snapshot
+    assert provider._revisions[plan_id] == revision
+    provider.update_plan_fields(plan_id, set_fields={"description": "accepted description"})
+    persisted = content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id))
+    assert ContentTaskProvider(content_provider).read_plan(plan_id) == {
+        **snapshot,
+        "description": "accepted description",
+    }
+    assert persisted.revision != revision
+
+
+def test_content_task_provider_restores_task_when_write_and_refresh_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: a persisted task and an outage that rejects both its write and refresh.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+    plan = provider.create_plan(
+        "restore-task", "keep local task coherent", [Task(id="T01", title="Original", status=TaskStatus.NOT_STARTED)]
+    )
+    plan_id = plan["plan_id"]
+    snapshot = provider.read_plan(plan_id)
+    revision = provider._revisions[plan_id]
+
+    def unavailable_write(_: ContentWrite) -> ContentRecord:
+        raise ContentUnavailableError("write unavailable")
+
+    def unavailable_refresh(_: ContentRef) -> ContentRecord:
+        raise ContentUnavailableError("refresh unavailable")
+
+    # When: a task mutation cannot be persisted or authoritatively refreshed.
+    with monkeypatch.context() as outage:
+        outage.setattr(content_provider, "put_content", unavailable_write)
+        outage.setattr(content_provider, "get_content", unavailable_refresh)
+        with pytest.raises(ContentUnavailableError):
+            provider.update_task_fields(plan_id, "T01", {"title": "Rejected"})
+
+    # Then: the rejected task field and revision cannot leak into a later successful write.
+    assert provider.read_plan(plan_id) == snapshot
+    assert provider._revisions[plan_id] == revision
+    provider.update_task_status(plan_id, "T01", "in-progress")
+    persisted = ContentTaskProvider(content_provider).read_plan(plan_id)
+    assert persisted["tasks"][0]["title"] == "Original"
+    assert persisted["tasks"][0]["status"] == "in-progress"
 
 
 def test_content_task_provider_refreshes_plan_after_stale_write_and_recovers() -> None:

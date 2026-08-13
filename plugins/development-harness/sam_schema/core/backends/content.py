@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import TypeVar
 
 from backlog_core.backend_types import ContentProvider
 from backlog_core.models import (
@@ -29,6 +31,7 @@ _PLAN_DATA_ADAPTER = TypeAdapter(PlanData)
 _PLAN_DATA_ADAPTER.rebuild(_types_namespace={"PlanState": PlanState})
 _CONTENT_PAGE_SIZE = 100
 _LEGACY_PLAN_YAML = YAML(typ="safe")
+_MutationResult = TypeVar("_MutationResult")
 
 
 def parse_plan_content(content: str, record_name: str) -> PlanData:
@@ -80,23 +83,37 @@ class ContentTaskProvider(InMemoryTaskProvider):
             offset += len(records)
 
     def _flush(self, plan_id: str, owner_reference: str | None = None) -> None:
-        try:
-            record = self._provider.put_content(
-                ContentWrite(
-                    reference=ContentRef(kind=ContentKind.PLAN, name=plan_id),
-                    content=json.dumps(self._plans[plan_id], separators=(",", ":"), default=str),
-                    owner_reference=owner_reference,
-                    expected_revision=self._revisions.get(plan_id, ""),
-                )
+        record = self._provider.put_content(
+            ContentWrite(
+                reference=ContentRef(kind=ContentKind.PLAN, name=plan_id),
+                content=json.dumps(self._plans[plan_id], separators=(",", ":"), default=str),
+                owner_reference=owner_reference,
+                expected_revision=self._revisions.get(plan_id, ""),
             )
+        )
+        self._revisions[plan_id] = record.revision
+
+    def _mutate(
+        self, mutation: Callable[[], tuple[str | None, _MutationResult]], *, owner_reference: str | None = None
+    ) -> _MutationResult:
+        plans_before = copy.deepcopy(self._plans)
+        revisions_before = self._revisions.copy()
+        plan_id, result = mutation()
+        if plan_id is None:
+            return result
+        try:
+            self._flush(plan_id, owner_reference)
         except ContentProviderError:
             try:
                 self._refresh(plan_id)
             except ContentNotFoundError:
                 self._plans.pop(plan_id, None)
                 self._revisions.pop(plan_id, None)
+            except ContentProviderError:
+                self._plans = plans_before
+                self._revisions = revisions_before
             raise
-        self._revisions[plan_id] = record.revision
+        return result
 
     def _refresh(self, plan_id: str) -> None:
         record = self._provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id))
@@ -119,28 +136,35 @@ class ContentTaskProvider(InMemoryTaskProvider):
         Returns:
             The created plan.
         """
-        plan = super().create_plan(
-            slug,
-            goal,
-            tasks,
-            context=context,
-            issue=issue,
-            acceptance_criteria=acceptance_criteria,
-            acceptance_criteria_structured=acceptance_criteria_structured,
-        )
-        self._flush(plan["plan_id"], f"#{issue}" if issue is not None else "")
-        return plan
+
+        def create() -> tuple[str, PlanData]:
+            plan = super(ContentTaskProvider, self).create_plan(
+                slug,
+                goal,
+                tasks,
+                context=context,
+                issue=issue,
+                acceptance_criteria=acceptance_criteria,
+                acceptance_criteria_structured=acceptance_criteria_structured,
+            )
+            return plan["plan_id"], plan
+
+        return self._mutate(create, owner_reference=f"#{issue}" if issue is not None else "")
 
     def set_owner(self, plan_id: str, owner_reference: str) -> None:
         """Atomically reassign plan ownership."""
-        self._flush(plan_id, owner_reference)
+        self._mutate(lambda: (plan_id, None), owner_reference=owner_reference)
 
     def update_plan_fields(
         self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
     ) -> None:
         """Update and persist plan fields."""
-        super().update_plan_fields(plan_id, context=context, set_fields=set_fields)
-        self._flush(plan_id)
+        self._mutate(
+            lambda: (
+                plan_id,
+                super(ContentTaskProvider, self).update_plan_fields(plan_id, context=context, set_fields=set_fields),
+            )
+        )
 
     def claim_task(self, plan_id: str, task_id: str) -> bool:
         """Claim and persist a task.
@@ -148,33 +172,36 @@ class ContentTaskProvider(InMemoryTaskProvider):
         Returns:
             Whether the task was claimed.
         """
-        claimed = super().claim_task(plan_id, task_id)
-        if claimed:
-            try:
-                self._flush(plan_id)
-            except ContentConflictError:
-                return False
-        return claimed
+        try:
+            return self._mutate(
+                lambda: (
+                    plan_id if (claimed := super(ContentTaskProvider, self).claim_task(plan_id, task_id)) else None,
+                    claimed,
+                )
+            )
+        except ContentConflictError:
+            return False
 
     def update_task_status(self, plan_id: str, task_id: str, status: str) -> None:
         """Update and persist task status."""
-        super().update_task_status(plan_id, task_id, status)
-        self._flush(plan_id)
+        self._mutate(lambda: (plan_id, super(ContentTaskProvider, self).update_task_status(plan_id, task_id, status)))
 
     def update_task_fields(self, plan_id: str, task_id: str, fields: dict[str, str | int | list[str]]) -> None:
         """Update and persist task fields."""
-        super().update_task_fields(plan_id, task_id, fields)
-        self._flush(plan_id)
+        self._mutate(lambda: (plan_id, super(ContentTaskProvider, self).update_task_fields(plan_id, task_id, fields)))
 
     def update_task(self, plan_id: str, task: Task) -> None:
         """Replace and persist a task."""
-        super().update_task(plan_id, task)
-        self._flush(plan_id)
+        self._mutate(lambda: (plan_id, super(ContentTaskProvider, self).update_task(plan_id, task)))
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append and persist a task section."""
-        super().append_task_section(plan_id, task_id, section_name, content)
-        self._flush(plan_id)
+        self._mutate(
+            lambda: (
+                plan_id,
+                super(ContentTaskProvider, self).append_task_section(plan_id, task_id, section_name, content),
+            )
+        )
 
     def append_task(self, plan_id: str, task: Task) -> dict[str, object]:
         """Append and persist a task.
@@ -182,9 +209,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
         Returns:
             The append operation result.
         """
-        result = super().append_task(plan_id, task)
-        self._flush(plan_id)
-        return result
+        return self._mutate(lambda: (plan_id, super(ContentTaskProvider, self).append_task(plan_id, task)))
 
     def finalize_plan(self, plan_id: str) -> dict[str, object]:
         """Finalize and persist a plan.
@@ -192,6 +217,4 @@ class ContentTaskProvider(InMemoryTaskProvider):
         Returns:
             The finalization result.
         """
-        result = super().finalize_plan(plan_id)
-        self._flush(plan_id)
-        return result
+        return self._mutate(lambda: (plan_id, super(ContentTaskProvider, self).finalize_plan(plan_id)))

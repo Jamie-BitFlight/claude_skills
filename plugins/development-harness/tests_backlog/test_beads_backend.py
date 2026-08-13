@@ -35,7 +35,7 @@ from unittest.mock import MagicMock
 import pytest
 from backlog_core.backend_types import WorkItemBackend
 from backlog_core.backends.bd_runner import BdRunner
-from backlog_core.backends.beads_backend import BeadsBackend
+from backlog_core.backends.beads_backend import BeadsBackend, _beads_workspace_path
 from backlog_core.models import (
     BackendAvailability,
     BacklogItem,
@@ -80,12 +80,23 @@ def _make_item(issue: str = "bd-a3f8", title: str = "Fix authentication bug") ->
     )
 
 
+@pytest.mark.unit
+def test_beads_workspace_path_uses_native_workspace_resolution(tmp_path: Path) -> None:
+    runner = MagicMock()
+    runner.run_json.return_value = {"path": str(tmp_path / ".beads")}
+
+    assert _beads_workspace_path(runner) == (tmp_path / ".beads").resolve()
+    runner.run_json.assert_called_once_with(["where"])
+
+
 class _ProcessKvRunner:
     def __init__(self, state_path: Path, write_barrier: ProcessBarrier) -> None:
         self._state_path = state_path
         self._write_barrier = write_barrier
 
     def run_json(self, argv: Sequence[str]) -> dict[str, bool | str]:
+        if list(argv) == ["where"]:
+            return {"path": str(self._state_path.parent)}
         assert list(argv[:2]) == ["kv", "get"]
         if not self._state_path.exists():
             return {"found": False}
