@@ -26,6 +26,16 @@ from sam_schema.core.plan_id_index import PlanIndexEntry, create_plan_id_index
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
+from backlog_core.backends._github_work_item_versions import (
+    WorkItemHead,
+    WorkItemVersion,
+    parse_work_item_comment,
+    parse_work_item_head,
+    render_work_item_comment,
+    root_revision,
+    work_item_head_ref,
+)
+from backlog_core.backends.github_contents import _GitHubContentsStore
 from backlog_core.file_cache import FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.models import (
     BacklogError,
@@ -81,6 +91,12 @@ __all__ = ["GitHubBackend"]
 
 
 class _PlanPersistence(Protocol):
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]: ...
+    def get(self, reference: ContentRef) -> ContentRecord: ...
+    def put(self, request: ContentWrite) -> ContentRecord: ...
+
+
+class _ContentPersistence(Protocol):
     def list(self, query: ContentQuery) -> Sequence[ContentRecord]: ...
     def get(self, reference: ContentRef) -> ContentRecord: ...
     def put(self, request: ContentWrite) -> ContentRecord: ...
@@ -329,6 +345,7 @@ class GitHubBackend:
     supports_branches: bool = True
 
     _TARGET_BATCH_SIZE = 100
+    _CONTENT_PAGE_SIZE = 100
 
     def __init__(
         self,
@@ -337,6 +354,7 @@ class GitHubBackend:
         cache: FileCache | None = None,
         artifact_provider: ArtifactBackend | None = None,
         plan_persistence: _PlanPersistence | None = None,
+        contents: _ContentPersistence | None = None,
     ) -> None:
         """Initialise with an optional default repo string.
 
@@ -345,12 +363,14 @@ class GitHubBackend:
             cache: Provider-private durable cache, injectable for isolated callers.
             artifact_provider: Existing GitHub Gist persistence adapter.
             plan_persistence: Existing GitHub plan-index and Gist composition.
+            contents: GitHub Contents persistence, injectable for isolated callers.
         """
         self._repo = repo
         self._cache = cache or FileCache(_dh_paths.state_root() / "github-cache")
         self._artifact_provider = artifact_provider or GitHubGistArtifactProvider(repo=repo)
         self._plan_persistence = plan_persistence or _GitHubPlanPersistence(self._artifact_provider)
         self._dispatch_persistence = _GitHubDispatchPersistence(self._artifact_provider)
+        self._contents = contents or _GitHubContentsStore(self.get_github)
 
     # ------------------------------------------------------------------
     # Repository access
@@ -532,38 +552,6 @@ class GitHubBackend:
                     raise BacklogError(f"GraphQL targeted issue response was invalid for {reference}")
         return resolved
 
-    def _preflight_patches(
-        self, patches: list[ProviderPatch], current_by_reference: dict[str, IssueNode | None]
-    ) -> dict[str, PatchResult]:
-        results_by_reference: dict[str, PatchResult] = {}
-        for patch in patches:
-            issue = current_by_reference.get(patch.reference)
-            if issue is None:
-                results_by_reference[patch.reference] = PatchResult(
-                    provider_id=patch.provider_id, reference=patch.reference, status="error", message="Issue not found"
-                )
-                continue
-            if issue["updatedAt"] != patch.expected_revision:
-                results_by_reference[patch.reference] = PatchResult(
-                    provider_id=patch.provider_id,
-                    reference=patch.reference,
-                    status="conflict",
-                    revision=issue["updatedAt"],
-                )
-                continue
-            if issue["body"].replace("\r\n", "\n") == patch.body.replace("\r\n", "\n"):
-                results_by_reference[patch.reference] = PatchResult(
-                    provider_id=patch.provider_id,
-                    reference=patch.reference,
-                    status="applied",
-                    revision=issue["updatedAt"],
-                )
-                continue
-            results_by_reference[patch.reference] = PatchResult(
-                provider_id=patch.provider_id, reference=patch.reference, status="conflict", revision=issue["updatedAt"]
-            )
-        return results_by_reference
-
     def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
         """Fetch one normalized bounded GitHub snapshot for reconciliation.
 
@@ -584,18 +572,10 @@ class GitHubBackend:
             case ReconcileScope.LINKED | ReconcileScope.TARGETED:
                 issues = []
 
-        items_by_identity = {
-            (f"#{issue['number']}", issue["updatedAt"]): ProviderItem(
-                provider_id=issue["id"],
-                reference=f"#{issue['number']}",
-                title=issue["title"],
-                body=issue["body"],
-                state=issue["state"],
-                labels=[label["name"] for label in issue["labels"]],
-                revision=issue["updatedAt"],
-            )
-            for issue in issues
-        }
+        items_by_identity: dict[tuple[str, str], ProviderItem] = {}
+        for issue in issues:
+            item = self._provider_item_from_issue(repo, owner, repo_name, issue)
+            items_by_identity[item.reference, item.revision] = item
         listed_references = {item.reference for item in items_by_identity.values()}
         target_references = [reference for reference in request.references if reference not in listed_references]
         targeted = self._fetch_targeted_issues(repo, owner, repo_name, target_references)
@@ -612,15 +592,7 @@ class GitHubBackend:
                     exists=False,
                 )
             else:
-                item = ProviderItem(
-                    provider_id=issue["id"],
-                    reference=f"#{issue['number']}",
-                    title=issue["title"],
-                    body=issue["body"],
-                    state=issue["state"],
-                    labels=[label["name"] for label in issue["labels"]],
-                    revision=issue["updatedAt"],
-                )
+                item = self._provider_item_from_issue(repo, owner, repo_name, issue)
             items_by_identity[item.reference, item.revision] = item
         return ProviderSnapshot(
             items=list(items_by_identity.values()), sync_started_at=sync_started_at, pages_fetched=1
@@ -646,8 +618,122 @@ class GitHubBackend:
                 for patch in patches
             ]
 
-        results_by_reference = self._preflight_patches(patches, current_by_reference)
-        return [results_by_reference[patch.reference] for patch in patches]
+        results: list[PatchResult] = []
+        for patch in patches:
+            issue = current_by_reference.get(patch.reference)
+            if issue is None:
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id,
+                        reference=patch.reference,
+                        status="error",
+                        message="Issue not found",
+                    )
+                )
+                continue
+            try:
+                current, head_record, root = self._work_item_version(repo, owner, repo_name, issue)
+            except ContentConflictError as exc:
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id, reference=patch.reference, status="conflict", message=str(exc)
+                    )
+                )
+                continue
+            except (BacklogError, ContentUnavailableError) as exc:
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
+                    )
+                )
+                continue
+            if current.revision != patch.expected_revision:
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id,
+                        reference=patch.reference,
+                        status="conflict",
+                        revision=current.revision,
+                    )
+                )
+                continue
+            if current.body.replace("\r\n", "\n") == patch.body.replace("\r\n", "\n"):
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id,
+                        reference=patch.reference,
+                        status="applied",
+                        revision=current.revision,
+                    )
+                )
+                continue
+            comment_id = self._add_comment_graphql(
+                repo, issue["id"], render_work_item_comment(current.revision, patch.body)
+            )
+            try:
+                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, comment_id)
+                written = self._contents.put(
+                    ContentWrite(
+                        reference=work_item_head_ref(patch.reference),
+                        content=head.model_dump_json(),
+                        expected_revision=head_record.revision if head_record is not None else "",
+                        create_only=head_record is None,
+                    )
+                )
+            except ContentConflictError as exc:
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id, reference=patch.reference, status="conflict", message=str(exc)
+                    )
+                )
+                continue
+            except (BacklogError, ContentUnavailableError) as exc:
+                results.append(
+                    PatchResult(
+                        provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
+                    )
+                )
+                continue
+            results.append(
+                PatchResult(
+                    provider_id=patch.provider_id,
+                    reference=patch.reference,
+                    status="applied",
+                    revision=written.revision,
+                )
+            )
+        return results
+
+    def _provider_item_from_issue(self, repo: Repository, owner: str, repo_name: str, issue: IssueNode) -> ProviderItem:
+        version, _head_record, _root = self._work_item_version(repo, owner, repo_name, issue)
+        return ProviderItem(
+            provider_id=issue["id"],
+            reference=f"#{issue['number']}",
+            title=issue["title"],
+            body=version.body,
+            state=issue["state"],
+            labels=[label["name"] for label in issue["labels"]],
+            revision=version.revision,
+        )
+
+    def _work_item_version(
+        self, repo: Repository, owner: str, repo_name: str, issue: IssueNode
+    ) -> tuple[WorkItemVersion, ContentRecord | None, str]:
+        reference = f"#{issue['number']}"
+        root = root_revision(reference, issue["id"], issue["body"])
+        try:
+            head_record = self._contents.get(work_item_head_ref(reference))
+        except ContentNotFoundError:
+            return WorkItemVersion(revision=root, body=issue["body"]), None, root
+        head = parse_work_item_head(head_record.content)
+        if head.issue_reference != reference or head.root_revision != root:
+            return WorkItemVersion(revision=root, body=issue["body"]), head_record, root
+        comment = self._fetch_comment_by_id_graphql(repo, head.comment_id)
+        return (
+            WorkItemVersion(revision=head_record.revision, body=parse_work_item_comment(head, comment)),
+            head_record,
+            root,
+        )
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
@@ -750,28 +836,15 @@ class GitHubBackend:
         online = self.try_get_github() is not None
         if online:
             self._replay_pending_content()
-            if query.kind == ContentKind.PLAN:
-                try:
-                    records = list(self._plan_persistence.list(query))
-                except ContentNotFoundError:
-                    raise
-                except (BacklogError, ContentUnavailableError, OSError):
-                    online = False
-                else:
-                    for record in records:
-                        self._cache.cache_content(record)
-                    return records
-            if query.kind == ContentKind.DISPATCH_PLAN:
-                try:
-                    records = list(self._dispatch_persistence.list(query))
-                except ContentNotFoundError:
-                    raise
-                except (BacklogError, ContentUnavailableError, OSError):
-                    online = False
-                else:
-                    for record in records:
-                        self._cache.cache_content(record)
-                    return records
+            try:
+                records = self._list_all_content(self._contents, query)
+                records = self._with_legacy_content(query, records)
+            except (BacklogError, ContentUnavailableError, OSError):
+                online = False
+            else:
+                for record in records:
+                    self._cache.cache_content(record)
+                return records[query.offset : query.offset + query.limit]
         records = [
             record.model_copy(update={"stale": not online})
             for record in self._cache._load_state().records
@@ -848,7 +921,10 @@ class GitHubBackend:
             return None
 
     def _read_online_content(self, reference: ContentRef, cached: ContentRecord | None) -> ContentRecord:
-        owner_reference = reference.namespace
+        try:
+            return self._contents.get(reference)
+        except ContentNotFoundError:
+            pass
         match reference.kind:
             case ContentKind.PLAN:
                 return self._plan_persistence.get(reference)
@@ -867,21 +943,51 @@ class GitHubBackend:
             raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return ContentRecord(
             reference=reference,
-            owner_reference=owner_reference,
+            owner_reference=reference.namespace,
             content=content,
             revision=self._content_revision(content),
         )
 
     def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
-        match request.reference.kind:
-            case ContentKind.PLAN:
-                return self._plan_persistence.put(request)
-            case ContentKind.DISPATCH_PLAN:
-                return self._dispatch_persistence.put(request)
-            case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
-                raise UnsupportedCapabilityError("GitHub artifact writes require compare-and-swap support")
-            case unreachable:
-                assert_never(unreachable)
+        return self._contents.put(request)
+
+    def _with_legacy_content(self, query: ContentQuery, current: list[ContentRecord]) -> list[ContentRecord]:
+        try:
+            match query.kind:
+                case ContentKind.PLAN:
+                    legacy = self._list_all_content(self._plan_persistence, query)
+                case ContentKind.DISPATCH_PLAN:
+                    legacy = self._list_all_content(self._dispatch_persistence, query)
+                case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
+                    legacy = []
+                case unreachable:
+                    assert_never(unreachable)
+        except (BacklogError, ContentUnavailableError, OSError):
+            if current:
+                return current
+            raise
+        current_references = {record.reference.model_dump_json() for record in current}
+        records = [
+            *current,
+            *(record for record in legacy if record.reference.model_dump_json() not in current_references),
+        ]
+        records.sort(
+            key=lambda record: (record.reference.namespace, record.reference.artifact_type, record.reference.name)
+        )
+        return records
+
+    @staticmethod
+    def _list_all_content(persistence: _ContentPersistence, query: ContentQuery) -> list[ContentRecord]:
+        records: list[ContentRecord] = []
+        offset = 0
+        while True:
+            page = list(
+                persistence.list(query.model_copy(update={"offset": offset, "limit": GitHubBackend._CONTENT_PAGE_SIZE}))
+            )
+            records.extend(page)
+            if len(page) < GitHubBackend._CONTENT_PAGE_SIZE:
+                return records
+            offset += len(page)
 
     def _replay_pending_content(self) -> None:
         acknowledgements: list[ReplayAcknowledgement] = []

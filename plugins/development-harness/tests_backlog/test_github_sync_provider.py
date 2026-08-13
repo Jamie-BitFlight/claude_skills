@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 from unittest.mock import MagicMock
 
+import backlog_core.backends.github_backend as github_backend_module
 import pytest
+from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactManifest,
@@ -22,7 +26,6 @@ from backlog_core.models import (
     ProviderPatch,
     ReconcileRequest,
     ReconcileScope,
-    UnsupportedCapabilityError,
 )
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
@@ -34,6 +37,25 @@ class _RemoteArtifactProviderFakeSpec(Protocol):
     def read_artifact_content_from_remote(self, owner: int, artifact_type: str, path: str) -> str | None: ...
 
     def list_artifact_content_from_remote(self, owner: int, artifact_type: str, path_prefix: str) -> dict[str, str]: ...
+
+
+class _InMemoryContents:
+    def __init__(self) -> None:
+        self._backend = InMemoryBackend()
+
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+        return self._backend.list_content(query)
+
+    def get(self, reference: ContentRef) -> ContentRecord:
+        return self._backend.get_content(reference)
+
+    def put(self, request: ContentWrite) -> ContentRecord:
+        return self._backend.put_content(request)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_contents_store(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(github_backend_module, "_GitHubContentsStore", lambda _repository: _InMemoryContents())
 
 
 def _issue(number: int, revision: str = "rev-1") -> dict[str, object]:
@@ -57,6 +79,7 @@ def test_github_sync_provider_normalizes_bounded_snapshot() -> None:
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
     backend._fetch_issues_graphql = MagicMock(return_value=[_issue(1)])
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: reconciliation fetches an initial snapshot
     snapshot = backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL))
@@ -64,7 +87,7 @@ def test_github_sync_provider_normalizes_bounded_snapshot() -> None:
     # Then: the normalized provider item retains body, labels, and revision
     assert snapshot.items[0].reference == "#1"
     assert snapshot.items[0].labels == ["feature"]
-    assert snapshot.items[0].revision == "rev-1"
+    assert snapshot.items[0].revision == root_revision("#1", "node-1", "body")
     assert backend._fetch_issues_graphql.call_args.kwargs["first"] == 100
 
 
@@ -74,6 +97,7 @@ def test_github_sync_provider_forwards_label_scope_to_snapshot_query() -> None:
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
     backend._fetch_issues_graphql = MagicMock(return_value=[_issue(1)])
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: the adapter fetches the provider snapshot
     backend._fetch_snapshot(ReconcileRequest(scope=ReconcileScope.INITIAL, label="review"))
@@ -88,6 +112,7 @@ def test_github_sync_provider_reports_conflict_without_mutation() -> None:
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1, revision="rev-2")}})
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
     backend._update_issues_graphql_batch = MagicMock()
     patch = ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="updated")
 
@@ -106,6 +131,7 @@ def test_github_sync_provider_targeted_fetch_uses_alias_batch_and_emits_tombston
     backend.get_github = MagicMock(return_value=repository)
     backend._fetch_issue_graphql = MagicMock()
     backend._fetch_issues_graphql = MagicMock()
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1), "i1": None}})
 
     # When: reconciliation asks only for those linked references
@@ -141,7 +167,7 @@ def test_github_sync_provider_bounds_targeted_aliases_to_one_hundred() -> None:
     ] == [100, 1]
 
 
-def test_github_sync_provider_rejects_body_change_without_mutation() -> None:
+def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
     # Given: a body patch whose current provider revision matches
     backend = GitHubBackend()
     repository = MagicMock(full_name="owner/repo")
@@ -150,14 +176,35 @@ def test_github_sync_provider_rejects_body_change_without_mutation() -> None:
     backend._fetch_issues_graphql = MagicMock()
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1)}})
     backend._update_issues_graphql_batch = MagicMock()
-    patch = ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="updated")
+    root = root_revision("#1", "node-1", "body")
+    backend._contents = MagicMock()
+    backend._contents.get.side_effect = ContentNotFoundError("head missing")
+    backend._contents.put.return_value = ContentRecord(
+        reference=work_item_head_ref("#1"), content="", revision="head-1"
+    )
+    comments: list[dict[str, str]] = []
+    backend._fetch_issue_comments_graphql = MagicMock(side_effect=lambda *_args: list(comments))
 
-    # When: the adapter classifies the unsafe body change
+    def add_comment(_repo: object, _issue_id: str, body: str) -> str:
+        comments.append({
+            "id": "comment-1",
+            "body": body,
+            "url": "https://example.test/comments/comment-1",
+            "author": "agent",
+            "created_at": "2026-08-12T00:00:00Z",
+            "updated_at": "2026-08-12T00:00:00Z",
+        })
+        return "comment-1"
+
+    backend._add_comment_graphql = MagicMock(side_effect=add_comment)
+    patch = ProviderPatch(provider_id="node-1", reference="#1", expected_revision=root, body="updated")
+
+    # When: the adapter publishes the rendered body
     results = backend._apply_patches([patch])
 
-    # Then: no conditional GitHub mutation exists, so the observed revision is a conflict
-    assert results[0].status == "conflict"
-    assert results[0].revision == "rev-1"
+    # Then: the Issue body is untouched and the validated audit comment projects the revision
+    assert (results[0].status, results[0].revision) == ("applied", "head-1")
+    assert comments[0]["body"] == render_work_item_comment(root, "updated")
     backend._update_issues_graphql_batch.assert_not_called()
     backend._fetch_issue_graphql.assert_not_called()
     backend._fetch_issues_graphql.assert_not_called()
@@ -170,14 +217,17 @@ def test_github_sync_provider_omits_matching_patch_body() -> None:
     backend.get_github = MagicMock(return_value=repository)
     backend._graphql_request = MagicMock(return_value={"repository": {"i0": _issue(1)}})
     backend._update_issues_graphql_batch = MagicMock()
-    patch = ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="body")
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
+    patch = ProviderPatch(
+        provider_id="node-1", reference="#1", expected_revision=root_revision("#1", "node-1", "body"), body="body"
+    )
 
     # When: patch application reaches the preflight equality check
     results = backend._apply_patches([patch])
 
     # Then: no mutation is sent and the existing revision is returned as applied
     assert results[0].status == "applied"
-    assert results[0].revision == "rev-1"
+    assert results[0].revision == root_revision("#1", "node-1", "body")
     backend._update_issues_graphql_batch.assert_not_called()
 
 
@@ -190,6 +240,7 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     remote_issue = _issue(1)
     remote_issue["body"] = backend.render_issue_body(BacklogItem())
     backend._fetch_issues_graphql = MagicMock(return_value=[remote_issue])
+    backend._fetch_issue_comments_graphql = MagicMock(return_value=[])
 
     # When: callers invoke the backend's one reconciliation capability
     result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
@@ -203,7 +254,7 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     assert cache._work_item_snapshots()[0][1].metadata.sync_fingerprint
 
 
-def test_github_content_provider_fails_closed_on_plan_creation(tmp_path: Path) -> None:
+def test_github_content_provider_creates_plan_in_native_contents(tmp_path: Path) -> None:
     # Given: a reachable provider and a new logical plan identity
     artifact_provider = MagicMock()
     remote_content: dict[tuple[int, str, str], str] = {}
@@ -219,11 +270,11 @@ def test_github_content_provider_fails_closed_on_plan_creation(tmp_path: Path) -
     backend.try_get_github = MagicMock(return_value=MagicMock())
     reference = ContentRef(kind=ContentKind.PLAN, name="P1")
 
-    # When: a new plan is requested without a provider CAS revision
-    with pytest.raises(UnsupportedCapabilityError):
-        backend.put_content(ContentWrite(reference=reference, content="v1", owner_reference="#1"))
+    # When: a new plan is written through the provider-native Contents store
+    record = backend.put_content(ContentWrite(reference=reference, content="v1", owner_reference="#1"))
 
-    # Then: no Gist content or index mutation is reported or performed
+    # Then: the write succeeds without mutating the read-only Gist migration layer
+    assert (record.reference, record.content, record.owner_reference, record.pending) == (reference, "v1", "#1", False)
     assert remote_content == {}
 
 
@@ -479,7 +530,7 @@ def test_github_plan_get_uses_stale_cache_when_index_is_unavailable(tmp_path: Pa
     artifact_provider.store_artifact_content.assert_not_called()
 
 
-def test_github_plan_put_queues_when_index_is_unavailable(tmp_path: Path) -> None:
+def test_github_plan_put_uses_native_store_when_legacy_index_is_unavailable(tmp_path: Path) -> None:
     # Given: an online GitHub API with an unavailable authoritative plan index
     cache = FileCache(tmp_path)
     artifact_provider = MagicMock()
@@ -488,12 +539,12 @@ def test_github_plan_put_queues_when_index_is_unavailable(tmp_path: Path) -> Non
     backend.try_get_github = MagicMock(return_value=MagicMock())
     request = ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="Pnew"), content="new plan")
 
-    # When: a plan write cannot read its authoritative index
+    # When: a plan write bypasses the read-only migration index
     record = backend.put_content(request)
 
-    # Then: the mutation is queued without storing a replacement empty index
-    assert record.pending is True
-    assert len(cache.pending_mutations()) == 1
+    # Then: the native write succeeds without storing a replacement legacy index
+    assert record.pending is False
+    assert cache.pending_mutations() == []
     artifact_provider.store_artifact_content.assert_not_called()
 
 
@@ -527,8 +578,8 @@ def test_github_plan_content_outage_uses_provider_cache(tmp_path: Path, operatio
             assert (result.content, result.stale) == ("cached plan", True)
         case "put":
             result = backend.put_content(ContentWrite(reference=reference, content="queued plan"))
-            assert result.pending is True
-            assert len(cache.pending_mutations()) == 1
+            assert (result.content, result.pending) == ("queued plan", False)
+            assert cache.pending_mutations() == []
         case unreachable:
             pytest.fail(f"unexpected operation: {unreachable}")
 
@@ -560,8 +611,8 @@ def test_github_dispatch_content_outage_uses_provider_cache(tmp_path: Path, oper
             assert (result.content, result.stale) == ('{"state":"cached"}', True)
         case "put":
             result = backend.put_content(ContentWrite(reference=reference, content='{"state":"queued"}'))
-            assert result.pending is True
-            assert len(cache.pending_mutations()) == 1
+            assert (result.content, result.pending) == ('{"state":"queued"}', False)
+            assert cache.pending_mutations() == []
         case unreachable:
             pytest.fail(f"unexpected operation: {unreachable}")
 
@@ -612,7 +663,7 @@ def test_github_content_provider_keeps_complete_artifact_identity(tmp_path: Path
     ]
     backend.try_get_github = MagicMock(return_value=None)
 
-    # When: reconnect discovery sees every queued artifact mutation as unsupported
+    # When: reconnect discovery replays every queued artifact mutation
     for index, reference in enumerate(references):
         backend.put_content(ContentWrite(reference=reference, content=f"content-{index}"))
     backend.try_get_github = MagicMock(return_value=MagicMock())
@@ -620,12 +671,12 @@ def test_github_content_provider_keeps_complete_artifact_identity(tmp_path: Path
 
     # Then: owner, type, and ID remain distinct without any Gist mutation
     assert [record.reference for record in listed] == [references[0], references[2]]
-    assert [mutation.write.reference for mutation in backend._cache.pending_mutations()] == references
+    assert backend._cache.pending_mutations() == []
     artifact_provider.store_artifact_content.assert_not_called()
 
 
-def test_github_content_provider_replay_retains_unsupported_artifact_writes(tmp_path: Path) -> None:
-    # Given: two durable offline writes that GitHub cannot atomically publish
+def test_github_content_provider_replays_native_artifact_writes(tmp_path: Path) -> None:
+    # Given: two durable offline writes waiting for native publication
     cache = FileCache(tmp_path)
     artifact_provider = MagicMock()
     backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
@@ -641,9 +692,9 @@ def test_github_content_provider_replay_retains_unsupported_artifact_writes(tmp_
     # When: reconnect discovery attempts replay
     backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
 
-    # Then: unsupported writes remain durable and no Gist mutation is attempted
-    assert [mutation.write.reference for mutation in cache.pending_mutations()] == references
-    assert all(cache.get_content(reference).pending for reference in references)
+    # Then: both writes publish and leave the durable queue
+    assert cache.pending_mutations() == []
+    assert all(not cache.get_content(reference).pending for reference in references)
     artifact_provider.store_artifact_content.assert_not_called()
 
 
@@ -698,7 +749,7 @@ def test_github_plan_replay_coalesces_sequential_offline_writes(tmp_path: Path) 
     plan_persistence = MagicMock()
     plan_persistence.put.side_effect = put
     plan_persistence.get.side_effect = lambda _reference: remote
-    backend = GitHubBackend(cache=cache, plan_persistence=plan_persistence)
+    backend = GitHubBackend(cache=cache, plan_persistence=plan_persistence, contents=plan_persistence)
     backend.try_get_github = MagicMock(return_value=None)
     backend.put_content(ContentWrite(reference=reference, content="first", expected_revision="rev-1"))
     backend.put_content(ContentWrite(reference=reference, content="latest", expected_revision="rev-1"))
