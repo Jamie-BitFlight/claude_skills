@@ -709,6 +709,8 @@ def _update_from_base_ref(
     current_version: str,
     base_ref: str,
     changes: ComponentChanges,
+    *,
+    sync_components: bool,
 ) -> tuple[bool, str] | None:
     """Attempt to update plugin.json using a resolved base ref.
 
@@ -723,6 +725,7 @@ def _update_from_base_ref(
         current_version: Version string read from the working copy.
         base_ref: Resolved git ref (e.g. ``"origin/main"`` or ``"main"``).
         changes: Component changes for this plugin.
+        sync_components: Whether to update Claude component arrays in the manifest.
 
     Returns:
         ``(updated, version)`` when the base ref path was authoritative,
@@ -738,14 +741,19 @@ def _update_from_base_ref(
     if ahead:
         return False, current_version
 
-    modified = _update_component_arrays(data, changes)
-    if modified or changes["modified"]:
+    modified = _update_component_arrays(data, changes) if sync_components else False
+    if modified or any(changes.values()):
         return _write_plugin_version(plugin_json_path, data, base_ver, _determine_bump_type(changes), current_version)
     return False, current_version
 
 
 def _update_from_head(
-    plugin_json_path: Path, data: dict[str, list[str] | str], current_version: str, changes: ComponentChanges
+    plugin_json_path: Path,
+    data: dict[str, list[str] | str],
+    current_version: str,
+    changes: ComponentChanges,
+    *,
+    sync_components: bool,
 ) -> tuple[bool, str]:
     """Update plugin.json using HEAD as the comparison base (fallback path).
 
@@ -758,6 +766,7 @@ def _update_from_head(
         data: Parsed plugin.json dict — mutated in place on write.
         current_version: Version string read from the working copy.
         changes: Component changes for this plugin.
+        sync_components: Whether to update Claude component arrays in the manifest.
 
     Returns:
         ``(updated, version)``
@@ -765,12 +774,42 @@ def _update_from_head(
     if _version_already_bumped(str(plugin_json_path), ["version"]):
         return False, current_version
 
-    modified = _update_component_arrays(data, changes)
-    if modified or changes["modified"]:
+    modified = _update_component_arrays(data, changes) if sync_components else False
+    if modified or any(changes.values()):
         return _write_plugin_version(
             plugin_json_path, data, current_version, _determine_bump_type(changes), current_version
         )
     return False, current_version
+
+
+def _plugin_manifest_paths(plugin_name: str) -> list[tuple[Path, bool]]:
+    plugin_root = Path("plugins") / plugin_name
+    return [
+        (path, path.parent.name == ".claude-plugin")
+        for path in sorted(plugin_root.glob(".*-plugin/plugin.json"))
+        if path.is_file()
+    ]
+
+
+def _update_plugin_manifest(
+    plugin_json_path: Path, changes: ComponentChanges, *, sync_components: bool
+) -> tuple[bool, str]:
+
+    with plugin_json_path.open(encoding="utf-8") as f:
+        data: dict[str, list[str] | str] = json.load(f)
+
+    raw_ver = data.get("version", "0.0.0")
+    current_version = raw_ver if isinstance(raw_ver, str) else "0.0.0"
+
+    base_ref = resolve_base()
+    if base_ref is not None:
+        result = _update_from_base_ref(
+            plugin_json_path, data, current_version, base_ref, changes, sync_components=sync_components
+        )
+        if result is not None:
+            return result
+
+    return _update_from_head(plugin_json_path, data, current_version, changes, sync_components=sync_components)
 
 
 def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[bool, str]:
@@ -790,24 +829,18 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
         ``(updated, version)`` — updated is True when the file was written;
         version is the new version on update or the unchanged version otherwise.
     """
-    plugin_json_path = Path(f"plugins/{plugin_name}/.claude-plugin/plugin.json")
-
-    if not plugin_json_path.exists():
-        return False, "0.0.0"
-
-    with plugin_json_path.open(encoding="utf-8") as f:
-        data: dict[str, list[str] | str] = json.load(f)
-
-    raw_ver = data.get("version", "0.0.0")
-    current_version = raw_ver if isinstance(raw_ver, str) else "0.0.0"
-
-    base_ref = resolve_base()
-    if base_ref is not None:
-        result = _update_from_base_ref(plugin_json_path, data, current_version, base_ref, changes)
-        if result is not None:
-            return result
-
-    return _update_from_head(plugin_json_path, data, current_version, changes)
+    updated = False
+    version = "0.0.0"
+    version_set = False
+    for manifest_path, sync_components in _plugin_manifest_paths(plugin_name):
+        manifest_updated, manifest_version = _update_plugin_manifest(
+            manifest_path, changes, sync_components=sync_components
+        )
+        updated |= manifest_updated
+        if sync_components or not version_set:
+            version = manifest_version
+            version_set = True
+    return updated, version
 
 
 def _read_plugin_name(plugin_dir_name: str) -> str:
@@ -1669,8 +1702,8 @@ def _precommit_sync() -> int:
 
         if updated:
             plugins_updated = True
-            plugin_json_path = f"plugins/{plugin_name}/.claude-plugin/plugin.json"
-            _git_stage_file(plugin_json_path)
+            for manifest_path, _sync_components in _plugin_manifest_paths(plugin_name):
+                _git_stage_file(str(manifest_path))
             marketplace_changes["modified"].append((plugin_name, new_version))
             _report_plugin_update(plugin_name, new_version, changes)
 
