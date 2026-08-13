@@ -105,6 +105,26 @@ The same rule applies to remote work-item reconciliation: provider snapshots
 and local item files are private cache records, while the remote provider owns
 the accepted state.
 
+### GitHub contract
+
+GitHub stores plans, artifact manifests, artifact content, and dispatch plans as
+versioned repository content. Treat each returned revision as opaque: pass it
+unchanged on updates so GitHub can reject stale writes. Repository permissions
+must allow Contents reads and writes; work-item reconciliation also requires
+Issue and comment reads and writes.
+
+The Issue body remains the human-owned work-item root. Reconciliation versions
+agent-rendered bodies through a provider-private head plus validated audit
+comments. These private records are not available through public content list,
+get, or put operations.
+
+Legacy Gist and index records are read-only migration sources. Their first
+successful update validates the legacy revision, preserves its owner reference,
+and creates the native record atomically. Native records take precedence after
+creation. A malformed or truncated native record is an integrity failure; stop
+instead of selecting legacy or cached content. A transport outage may return an
+explicitly stale private-cache record under the remote-provider rules above.
+
 </provider_contract>
 
 <consumer_workflow>

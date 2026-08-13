@@ -1062,7 +1062,17 @@ class GitHubBackend:
                 raise ContentConflictError("Content already exists") from exc
             if legacy.revision != request.expected_revision:
                 raise ContentConflictError("Content revision no longer matches") from exc
-            return self._contents.put(request.model_copy(update={"expected_revision": "", "create_only": True}))
+            return self._contents.put(
+                request.model_copy(
+                    update={
+                        "owner_reference": (
+                            request.owner_reference if request.owner_reference is not None else legacy.owner_reference
+                        ),
+                        "expected_revision": "",
+                        "create_only": True,
+                    }
+                )
+            )
         return self._contents.put(request)
 
     def _with_legacy_content(self, query: ContentQuery, current: list[ContentRecord]) -> list[ContentRecord]:
