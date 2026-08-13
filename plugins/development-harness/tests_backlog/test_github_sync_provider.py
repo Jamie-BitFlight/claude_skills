@@ -227,6 +227,23 @@ def test_github_sync_provider_continues_after_audit_comment_failure() -> None:
     assert [(result.reference, result.status) for result in results] == [("#1", "error"), ("#2", "applied")]
 
 
+def test_github_sync_provider_rejects_empty_audit_comment_identity() -> None:
+    contents = _InMemoryContents()
+    backend = GitHubBackend(contents=contents)
+    repository = MagicMock(full_name="owner/repo")
+    backend.get_github = MagicMock(return_value=repository)
+    backend._fetch_targeted_issues = MagicMock(return_value={"#1": _issue(1)})
+    backend._add_comment_graphql = MagicMock(return_value="")
+    root = root_revision("#1", "node-1", "body")
+
+    [result] = backend._apply_patches([
+        ProviderPatch(provider_id="node-1", reference="#1", expected_revision=root, body="updated")
+    ])
+
+    assert (result.status, result.message) == ("error", "GitHub work-item audit comment response was invalid")
+    assert contents.list(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT)) == []
+
+
 def test_github_sync_provider_omits_matching_patch_body() -> None:
     # Given: a patch body that already matches the revision-preflight body
     backend = GitHubBackend()

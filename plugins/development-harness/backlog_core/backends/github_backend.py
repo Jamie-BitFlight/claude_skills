@@ -29,13 +29,14 @@ from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactPr
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     WorkItemVersion,
+    is_work_item_head_ref,
     parse_work_item_comment,
     parse_work_item_head,
     render_work_item_comment,
     root_revision,
     work_item_head_ref,
 )
-from backlog_core.backends.github_contents import _GitHubContentsStore
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError, _GitHubContentsStore
 from backlog_core.file_cache import FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.models import (
     BacklogError,
@@ -673,6 +674,16 @@ class GitHubBackend:
                 comment_id = self._add_comment_graphql(
                     repo, issue["id"], render_work_item_comment(current.revision, patch.body)
                 )
+                if not comment_id:
+                    results.append(
+                        PatchResult(
+                            provider_id=patch.provider_id,
+                            reference=patch.reference,
+                            status="error",
+                            message="GitHub work-item audit comment response was invalid",
+                        )
+                    )
+                    continue
                 head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, comment_id)
                 written = self._contents.put(
                     ContentWrite(
@@ -771,9 +782,7 @@ class GitHubBackend:
         heads = {
             record.reference.namespace: record
             for record in records
-            if record.reference.namespace in namespaces
-            and record.reference.artifact_type == "_dh-work-item-head-v1"
-            and record.reference.name == "head"
+            if record.reference.namespace in namespaces and is_work_item_head_ref(record.reference)
         }
         issue_by_reference = {f"#{issue['number']}": issue for issue in issues}
         comment_ids = [
@@ -904,7 +913,10 @@ class GitHubBackend:
             self._replay_pending_content()
             try:
                 records = self._list_all_content(self._contents, query)
+                records = [record for record in records if not is_work_item_head_ref(record.reference)]
                 records = self._with_legacy_content(query, records)
+            except _GitHubContentIntegrityError:
+                raise
             except (BacklogError, ContentUnavailableError, OSError):
                 online = False
             else:
@@ -937,6 +949,8 @@ class GitHubBackend:
             record = self._read_online_content(reference, cached)
         except ContentNotFoundError:
             raise
+        except _GitHubContentIntegrityError:
+            raise
         except (BacklogError, ContentUnavailableError, OSError):
             return self._cache.get_content(reference, stale=True)
         self._cache.cache_content(record)
@@ -967,6 +981,8 @@ class GitHubBackend:
         try:
             record = self._write_online_content(request, cached)
         except ContentNotFoundError:
+            raise
+        except _GitHubContentIntegrityError:
             raise
         except (BacklogError, ContentUnavailableError, OSError):
             base = cached or ContentRecord(

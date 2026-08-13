@@ -247,9 +247,9 @@ def test_malformed_native_content_does_not_fall_back_to_legacy(
     reference = ContentRef(kind=ContentKind.PLAN, name="P1")
     repository.files[store._path(reference)] = _File(content="not-json", sha="sha-malformed")
     legacy = MagicMock()
-    backend = GitHubBackend(
-        cache=FileCache(tmp_path), artifact_provider=MagicMock(), plan_persistence=legacy, contents=store
-    )
+    cache = FileCache(tmp_path)
+    cache.cache_content(ContentRecord(reference=reference, content="cached"))
+    backend = GitHubBackend(cache=cache, artifact_provider=MagicMock(), plan_persistence=legacy, contents=store)
     backend._cache.cache_content = MagicMock()
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
@@ -257,7 +257,34 @@ def test_malformed_native_content_does_not_fall_back_to_legacy(
         store.get(reference)
     with pytest.raises(ContentUnavailableError):
         backend.get_content(reference)
+    with pytest.raises(ContentUnavailableError):
+        backend.list_content(ContentQuery(kind=ContentKind.PLAN))
     legacy.get.assert_not_called()
+
+
+def test_malformed_native_blob_fails_closed(store: _GitHubContentsStore, repository: _Repository) -> None:
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+    repository.get_git_blob = MagicMock(return_value=SimpleNamespace(content="not-base64!"))
+
+    with pytest.raises(ContentUnavailableError, match="envelope"):
+        store.list(ContentQuery(kind=ContentKind.PLAN))
+
+
+def test_backend_hides_private_work_item_heads_from_artifact_listing(
+    tmp_path: Path, store: _GitHubContentsStore
+) -> None:
+    head = ContentRef(
+        kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="_dh-work-item-head-v1", name="head"
+    )
+    artifact = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="test", name="report")
+    store.put(ContentWrite(reference=head, content="private"))
+    store.put(ContentWrite(reference=artifact, content="public"))
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=MagicMock(), contents=store)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    records = backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
+
+    assert [(record.reference, record.content) for record in records] == [(artifact, "public")]
 
 
 def test_two_plans_for_one_owner_remain_distinct(store: _GitHubContentsStore) -> None:

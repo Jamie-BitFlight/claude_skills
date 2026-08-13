@@ -87,6 +87,14 @@ def work_item_head_ref(issue_reference: str) -> ContentRef:
     )
 
 
+def is_work_item_head_ref(reference: ContentRef) -> bool:
+    return (
+        reference.kind == ContentKind.ARTIFACT_CONTENT
+        and reference.artifact_type == "_dh-work-item-head-v1"
+        and reference.name == "head"
+    )
+
+
 def render_work_item_comment(parent_revision: str, body: str) -> str:
     """Return the validated audit comment for a prospective Contents head."""
     metadata = _CommentMetadata(version=1, parent_revision=parent_revision, digest=_body_digest(body))

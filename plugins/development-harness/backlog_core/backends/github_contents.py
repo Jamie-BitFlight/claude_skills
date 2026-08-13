@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from base64 import b64decode
+from binascii import Error as Base64Error
 from collections.abc import Callable, Mapping, Sequence as SequenceABC, Sequence as SequenceType
 from typing import Protocol, TypeAlias, runtime_checkable
 from urllib.parse import quote
@@ -27,6 +28,10 @@ _CONFLICT_STATUSES = frozenset({409, 422})
 _MAX_CONTENT_BYTES = 1_000_000
 _WRITE_ATTEMPTS = 3
 ContentRecords: TypeAlias = list[ContentRecord]
+
+
+class _GitHubContentIntegrityError(ContentUnavailableError):
+    pass
 
 
 @runtime_checkable
@@ -84,7 +89,7 @@ class _GitHubContentsStore:
         except GithubException as exc:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
         if tree.truncated:
-            raise ContentUnavailableError("GitHub content discovery tree was truncated")
+            raise _GitHubContentIntegrityError("GitHub content discovery tree was truncated")
         records = [
             self._from_blob(repository, entry.path, entry.sha)
             for entry in tree.tree
@@ -192,14 +197,18 @@ class _GitHubContentsStore:
                 raise ContentNotFoundError(f"Content was not found: {path}") from exc
             raise ContentUnavailableError(f"GitHub content read failed: {exc}") from exc
         if isinstance(file, SequenceABC):
-            raise ContentUnavailableError(f"GitHub content path is not a file: {path}")
+            raise _GitHubContentIntegrityError(f"GitHub content path is not a file: {path}")
         return self._parse(path, file.decoded_content, file.sha)
 
     def _from_blob(self, repository: _ContentsRepository, path: str, sha: str) -> ContentRecord:
         try:
-            content = b64decode(repository.get_git_blob(sha).content)
-        except (GithubException, ValueError) as exc:
+            encoded = repository.get_git_blob(sha).content
+        except GithubException as exc:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
+        try:
+            content = b64decode(encoded, validate=True)
+        except (Base64Error, ValueError) as exc:
+            raise _GitHubContentIntegrityError(f"GitHub content envelope is invalid: {path}") from exc
         return self._parse(path, content, sha)
 
     def _parse(self, path: str, content: bytes, revision: str) -> ContentRecord:
@@ -207,9 +216,9 @@ class _GitHubContentsStore:
             data = json.loads(content.decode())
             record = ContentRecord.model_validate(data)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-            raise ContentUnavailableError(f"GitHub content envelope is invalid: {path}") from exc
+            raise _GitHubContentIntegrityError(f"GitHub content envelope is invalid: {path}") from exc
         if data.get("version") != _VERSION or self._path(record.reference) != path:
-            raise ContentUnavailableError(f"GitHub content envelope is invalid: {path}")
+            raise _GitHubContentIntegrityError(f"GitHub content envelope is invalid: {path}")
         return record.model_copy(update={"revision": revision})
 
     @staticmethod
