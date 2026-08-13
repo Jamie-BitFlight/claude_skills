@@ -527,6 +527,7 @@ def update_plan_fields(
     *,
     context: str | None = None,
     set_fields: dict[str, Any] | None = None,
+    owner_reference: str | None = None,
     task_id: str | None = None,
     append_section_name: str | None = None,
     section_content: str | None = None,
@@ -563,6 +564,8 @@ def update_plan_fields(
             the backend. When ``None``, no fields are modified.
         task_id: Task ID to target for task-level operations. ``None`` means
             plan-level operations only.
+        owner_reference: Optional opaque backend owner reference. When set,
+            it is persisted with the plan-level write.
         append_section_name: Section heading to append. Requires
             ``section_content`` and ``task_id``.
         section_content: Body text for the appended section.
@@ -600,8 +603,11 @@ def update_plan_fields(
     # Only call the plan-level update when there is something to write at the
     # plan level (context narrative or validated plan-level fields). Task-only
     # writes should not trigger a no-op plan update.
-    if context is not None or plan_fields is not None:
-        backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+    if context is not None or plan_fields is not None or owner_reference is not None:
+        if owner_reference is None:
+            backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+        else:
+            backend.update_plan_fields(plan, context=context, set_fields=plan_fields, owner_reference=owner_reference)
 
     if set_fields is not None and task_id is not None:
         backend.update_task_fields(plan, task_id, set_fields)

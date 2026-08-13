@@ -15,6 +15,7 @@ All GitHub API calls are mocked at the ``_graphql_request`` boundary
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -27,6 +28,7 @@ _tests_dir = Path(__file__).parent
 if str(_tests_dir) not in sys.path:
     sys.path.insert(0, str(_tests_dir))
 
+from backlog_core.artifact_manifest_store import artifact_content_reference
 from backlog_core.artifact_provider import (
     _GITHUB_COMMENT_MAX_CHARS,
     GitHubArtifactProvider,
@@ -527,8 +529,13 @@ async def test_artifact_register_does_not_replace_unavailable_manifest() -> None
             {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": "# Research"},
         )
 
-    assert mock_provider.put_content.call_args.args[0].reference == ContentRef(
-        kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="plan/r.md"
+    assert mock_provider.put_content.call_args.args[0].reference == artifact_content_reference(
+        42,
+        ArtifactEntry(
+            artifact_type=ArtifactType.RESEARCH,
+            artifact_id="plan/r.md",
+            content_revision=hashlib.sha256(b"# Research").hexdigest(),
+        ),
     )
 
 
@@ -549,8 +556,11 @@ async def test_artifact_register_with_content_writes_to_configured_provider() ->
     assert result["registered"] is True
     assert result["content_stored"] is True
     assert mock_provider.put_content.call_count == 2
-    assert mock_provider.put_content.call_args_list[0].args[0].reference == ContentRef(
-        kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="plan/r.md"
+    published_manifest = ArtifactManifest.model_validate_json(
+        mock_provider.put_content.call_args_list[1].args[0].content
+    )
+    assert mock_provider.put_content.call_args_list[0].args[0].reference == artifact_content_reference(
+        42, published_manifest.artifacts[0]
     )
     assert mock_provider.put_content.call_args_list[0].args[0].content == "# Research content"
     assert mock_provider.put_content.call_args_list[1].args[0].reference == ContentRef(

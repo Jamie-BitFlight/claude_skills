@@ -747,7 +747,12 @@ class BeadsTaskProvider:
         return paginated
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level fields on the beads epic for a plan.
 
@@ -758,6 +763,7 @@ class BeadsTaskProvider:
             plan_id: SAM plan identifier.
             context: When provided, appended to the epic notes as context.
             set_fields: Optional field map with new values.
+            owner_reference: Optional opaque backend owner reference.
 
         Raises:
             PlanNotFoundError: When plan_id has no registered epic.

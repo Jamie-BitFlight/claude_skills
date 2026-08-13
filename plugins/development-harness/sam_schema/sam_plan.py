@@ -428,14 +428,13 @@ def update(
             plan_ref,
             context=action_config.context,
             set_fields=action_config.set_fields_json,
+            owner_reference=action_config.owner_reference,
             task_id=action_config.task_id,
             append_section_name=action_config.append_section_name,
             section_content=action_config.section_content,
         )
     except (ValidationError, ValueError, KeyError, FileNotFoundError, PlanNotFoundError, FormatDetectionError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
-    if action_config.owner_reference is not None:
-        backend.set_owner(plan_ref, action_config.owner_reference)
     _emit(result)
 
 

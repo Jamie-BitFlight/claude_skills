@@ -379,6 +379,38 @@ async def test_sam_update_plan_fields_routes_through_backend_update_plan_fields(
     backend_mock.update_plan_fields.assert_called_once()
 
 
+async def test_sam_update_persists_fields_and_owner_in_one_content_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an existing provider-backed plan and observable writes after creation.
+    provider = InMemoryBackend()
+    task_provider = ContentTaskProvider(provider)
+    plan = task_provider.create_plan("owned-update", "persist atomically", [], owner_reference="bd-old")
+    writes: list[ContentWrite] = []
+    original_put = provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(provider, "put_content", record_write)
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: ContentTaskProvider(provider))
+
+    # When: the MCP update action changes context and ownership.
+    result = await _call(
+        "sam_plan",
+        {
+            "plan": plan["plan_id"],
+            "config": {"action": "update", "context": "updated by MCP", "owner_reference": "bd-new"},
+        },
+    )
+
+    # Then: one write carries both changes and fresh hydration observes them.
+    assert result["updated"] is True
+    assert [write.owner_reference for write in writes] == ["bd-new"]
+    fresh_provider = ContentTaskProvider(provider)
+    assert fresh_provider.read_plan(plan["plan_id"])["context"] == "updated by MCP"
+    assert provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference == "bd-new"
+
+
 async def test_sam_update_task_fields_routes_through_backend_update_task(backend_mock: MagicMock) -> None:
     """sam_task action=update with set_fields_json calls backend.update_task.
 

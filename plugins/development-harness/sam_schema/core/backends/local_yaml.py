@@ -453,7 +453,12 @@ class LocalYamlTaskProvider:
         return paginated
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level fields on a plan.
 
@@ -461,6 +466,7 @@ class LocalYamlTaskProvider:
             plan_id: Backend-assigned plan identifier.
             context: When provided, replaces the plan context narrative.
             set_fields: Optional mapping of field names to new values.
+            owner_reference: Optional opaque backend owner reference.
 
         Raises:
             PlanNotFoundError: When plan_id cannot be resolved.

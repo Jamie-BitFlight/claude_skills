@@ -403,7 +403,12 @@ class GitHubTaskProvider:
         return summaries[offset:end]
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level fields on a plan issue body."""
         node = self._fetch_plan_node(plan_id)

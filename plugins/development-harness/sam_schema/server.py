@@ -310,18 +310,16 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> Upda
     """
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
-    result = operations.update_plan_fields(
+    return operations.update_plan_fields(
         backend,
         plan,
         context=config.context,
         set_fields=config.set_fields_json,
+        owner_reference=config.owner_reference,
         task_id=config.task_id,
         append_section_name=config.append_section_name,
         section_content=config.section_content,
     )
-    if config.owner_reference is not None:
-        backend.set_owner(plan, config.owner_reference)
-    return result
 
 
 def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> AppendTaskResult:

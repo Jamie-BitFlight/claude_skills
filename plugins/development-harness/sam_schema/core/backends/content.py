@@ -165,14 +165,20 @@ class ContentTaskProvider(InMemoryTaskProvider):
         self._mutate(lambda: (plan_id, None), owner_reference=owner_reference)
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update and persist plan fields."""
         self._mutate(
             lambda: (
                 plan_id,
                 super(ContentTaskProvider, self).update_plan_fields(plan_id, context=context, set_fields=set_fields),
-            )
+            ),
+            owner_reference=owner_reference,
         )
 
     def claim_task(self, plan_id: str, task_id: str) -> bool:

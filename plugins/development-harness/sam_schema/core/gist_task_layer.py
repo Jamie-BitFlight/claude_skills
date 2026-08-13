@@ -790,7 +790,12 @@ class GistTaskLayer:
         self._write_hash_sidecar(hash_sidecar, content_hash, plan_id)
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level plan fields with mandatory Gist write-through (ADR-2509-5).
 
@@ -807,13 +812,14 @@ class GistTaskLayer:
             plan_id: Backend-assigned plan identifier.
             context: When provided, replaces the plan context narrative.
             set_fields: Optional mapping of field names to new values.
+            owner_reference: Optional opaque backend owner reference.
 
         Raises:
             ArtifactWriteError: When Gist write fails and plan has an issue.
             PlanNotFoundError: Propagated from ``local_backend``.
         """
         # Step 1: apply mutation locally first.
-        self._local.update_plan_fields(plan_id, context=context, set_fields=set_fields)
+        self._local.update_plan_fields(plan_id, context=context, set_fields=set_fields, owner_reference=owner_reference)
 
         # Steps 2-4: Gist write-through when issue is known.
         issue = self._resolve_issue(plan_id)

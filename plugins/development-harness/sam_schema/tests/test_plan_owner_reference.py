@@ -98,6 +98,90 @@ def test_content_task_provider_persists_create_owner_in_one_write_and_hydrates(m
     )
 
 
+def test_content_task_provider_updates_fields_and_owner_in_one_write_and_hydrates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: a persisted plan and observable provider writes.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+    plan = provider.create_plan("atomic-update", "persist fields and owner", [], owner_reference="bd-old")
+    writes: list[ContentWrite] = []
+    original_put = content_provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(content_provider, "put_content", record_write)
+
+    # When: plan content and ownership change together.
+    provider.update_plan_fields(plan["plan_id"], context="updated atomically", owner_reference="bd-new")
+
+    # Then: one write persists both values and a fresh provider hydrates the content.
+    assert [write.owner_reference for write in writes] == ["bd-new"]
+    fresh_provider = ContentTaskProvider(content_provider)
+    assert fresh_provider.read_plan(plan["plan_id"])["context"] == "updated atomically"
+    assert (
+        content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference
+        == "bd-new"
+    )
+
+
+def test_content_task_provider_updates_owner_only_in_one_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a persisted plan and observable provider writes.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+    plan = provider.create_plan("owner-only", "persist ownership", [])
+    writes: list[ContentWrite] = []
+    original_put = content_provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(content_provider, "put_content", record_write)
+
+    # When: only the opaque owner reference changes.
+    provider.update_plan_fields(plan["plan_id"], owner_reference="bd-a1b2")
+
+    # Then: the owner is persisted through one write.
+    assert [write.owner_reference for write in writes] == ["bd-a1b2"]
+    assert (
+        content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference
+        == "bd-a1b2"
+    )
+
+
+def test_content_task_provider_rejects_combined_update_without_changing_content_or_owner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: an owned persisted plan and a write outage.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+    plan = provider.create_plan(
+        "rollback-owner", "retain prior values", [], context="original", owner_reference="bd-old"
+    )
+    snapshot = provider.read_plan(plan["plan_id"])
+
+    def unavailable_write(_: ContentWrite) -> ContentRecord:
+        raise ContentUnavailableError("write unavailable")
+
+    monkeypatch.setattr(content_provider, "put_content", unavailable_write)
+
+    # When: a combined content and owner update fails.
+    with pytest.raises(ContentUnavailableError, match="write unavailable"):
+        provider.update_plan_fields(plan["plan_id"], context="rejected", owner_reference="bd-new")
+
+    # Then: both the local view and a fresh hydration retain prior state.
+    assert provider.read_plan(plan["plan_id"]) == snapshot
+    fresh_provider = ContentTaskProvider(content_provider)
+    assert fresh_provider.read_plan(plan["plan_id"]) == snapshot
+    assert (
+        content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference
+        == "bd-old"
+    )
+
+
 def test_content_task_provider_keeps_legacy_issue_owner_alias() -> None:
     # Given: a provider-backed plan created with the legacy numeric issue alias.
     content_provider = InMemoryBackend()

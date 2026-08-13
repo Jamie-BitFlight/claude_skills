@@ -12,6 +12,7 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
+from backlog_core.models import ContentKind, ContentRecord, ContentRef, ContentWrite
 from sam_schema.cli import app
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.models import Task
@@ -140,6 +141,45 @@ class TestSamUpdateContext:
         assert plan_data["feature"] == "update-test"
         assert plan_data["goal"] == "Test update functionality"
         assert len(plan_data["tasks"]) == 2
+
+    def test_update_context_and_owner_uses_one_content_write(
+        self, monkeypatch: pytest.MonkeyPatch, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
+        # Given: an existing plan and observable provider writes after setup.
+        writes: list[ContentWrite] = []
+        provider = content_backend._provider
+        original_put = provider.put_content
+
+        def record_write(request: ContentWrite) -> ContentRecord:
+            writes.append(request)
+            return original_put(request)
+
+        monkeypatch.setattr(provider, "put_content", record_write)
+
+        # When: the CLI updates context and an opaque owner reference together.
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                plan_dir.name,
+                "--context",
+                "updated by CLI",
+                "--owner-reference",
+                "bd-new",
+                "--plan-dir",
+                str(plan_dir),
+            ],
+            env={"NO_COLOR": "1"},
+        )
+
+        # Then: the sole write contains the owner and fresh hydration retains both values.
+        assert result.exit_code == 0, result.stdout
+        assert [write.owner_reference for write in writes] == ["bd-new"]
+        fresh_provider = ContentTaskProvider(provider)
+        assert fresh_provider.read_plan(plan_dir.name)["context"] == "updated by CLI"
+        assert provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_dir.name)).owner_reference == "bd-new"
 
     def test_update_returns_json_confirmation(self, plan_dir: Path) -> None:
         """Update returns JSON with ``updated: true`` and the address.
