@@ -3,21 +3,29 @@
 > **Audience: contributor/developer.** This is the implementation decision record; consumer
 > setup, usage, and recovery guidance belong in plugin documentation.
 
-**Tracking:** `claude_skills-7t0`
+**Bead parent trackers:** `claude_skills-7t0` (decision), `claude_skills-vu8` (initial
+implementation), `claude_skills-ece` (review hardening and provider-native CAS)
 
 **Date:** 2026-08-12
 
-**Status:** ACCEPTED
+**Last updated:** 2026-08-13
+
+**Status:** IMPLEMENTED — remaining maintainability and runtime-lifecycle follow-ups are tracked
+separately in section 1.2
 
 **Supersedes:** [Offline-First with Per-Item Watermarks](./architect-redesign-backlog-github-sync-offline-first.md)
 
 **Evidence:** [Backlog Sync and Pull Trace](./backlog-sync-pull-trace-2026-08-12.md)
 
+**Delivery:** [PR #2882](https://github.com/Jamie-BitFlight/claude_skills/pull/2882),
+[PR #2884](https://github.com/Jamie-BitFlight/claude_skills/pull/2884), and
+[PR #2885](https://github.com/Jamie-BitFlight/claude_skills/pull/2885)
+
 ## 1. Decision
 
 Replace the separate startup refresh, groomed-content push, and bulk-pull implementations with one
-provider-neutral reconciliation capability on remote-capable backends. This document remains target
-state until its migration gates close:
+provider-neutral reconciliation capability on remote-capable backends. The migration gates closed
+in PR #2882; sections 1.1 and 12 record the additional correctness scope discovered during review:
 
 ```python
 class SyncProvider(Protocol):
@@ -37,6 +45,83 @@ offline writes; reconciliation owns no persistence or queue. Cache-record update
 are atomic, queued mutations are idempotent, and partial replay retains every unapplied or conflicted
 mutation. Local edits remain protected by a persisted content fingerprint and the existing entry-aware
 merge.
+
+### 1.1 Delivered scope expansion
+
+The original reconciliation seam exposed dependencies that the nine-node implementation plan did
+not model deeply enough. They were required for one configured provider to remain authoritative
+under offline operation and concurrent writes, so the implementation expanded into these product
+boundaries:
+
+1. **One configured content provider.** Work items, grooming, SAM plans and tasks, dispatch plans,
+   artifact manifests, and artifact content route through the selected backend. Memory, SQLite, and
+   Beads persist them natively without YAML cache overhead. Remote backends privately compose
+   `FileCache`; high-level callers never select a second filesystem, task, artifact, or cache
+   provider.
+2. **Provider-neutral content identity.** Typed content records distinguish plans, dispatch plans,
+   artifact manifests, and artifact bodies. Opaque owner references, stable reassignment identity,
+   ownerless discovery, unavailable versus confirmed-not-found reads, stale cache records, and
+   durable pending mutations are part of the public provider contract.
+3. **Atomic write conditions.** `create_only` and `expected_revision` reach the provider boundary.
+   Memory serializes compare-and-write in process; SQLite uses a write transaction; Beads uses a
+   workspace-scoped advisory lock; GitHub uses provider-native blob SHA compare-and-swap. Manifest
+   publication occurs only after its referenced content is durably readable.
+4. **Provider-native GitHub records.** Plans, dispatch plans, artifact manifests, artifact content,
+   and work-item heads use compact versioned envelopes beneath `.dh/content/v1/` on the resolved
+   default branch. Native records are authoritative; Gist and shared-index data remain read-only
+   migration inputs. Discovery is branch-pinned, paginated once, identity-validated, size-bounded,
+   traversal-safe, and fail-closed.
+5. **Lossless work-item revisions.** Human Issue bodies remain human-owned. Agent-managed bodies use
+   validated append-only audit comments plus an issue-bound Contents head. The head SHA is the
+   optimistic revision, so concurrent writers may leave audit evidence but exactly one advances and
+   only that mutation is checkpointed.
+6. **Durable concurrency and replay.** `FileCache` serializes state transactions across threads and
+   processes, coalesces pending writes without discarding their base revision, overlays queued work
+   items by stable reference, acknowledges exact idempotency keys, retains conflicts and partial
+   replay tails, and validates reconnect writes against authoritative provider revisions.
+7. **Surface and delivery integrity.** MCP, CLI, startup, scenario, parity, and provider tests moved
+   from direct YAML or removed transport helpers to configured-provider behavior. Documentation and
+   generated workflow graphs were aligned with logical provider addresses. The branch-transfer
+   audit was strengthened so selectively moved work cannot silently lose deleted paths or Git tree
+   modes.
+
+The complete live module contract is in
+[backlog_core/ARCHITECTURE.md](../plugins/development-harness/backlog_core/ARCHITECTURE.md). This
+document owns the decision history, delivered dependency graph, and recovery pointers rather than
+duplicating every module detail.
+
+### 1.2 Bead recovery index
+
+These are epic-level parent trackers in the work graph, although their stored Bead types are
+`decision`, `feature`, and `task`:
+
+| Tracker | Role | Current state |
+| --- | --- | --- |
+| `claude_skills-7t0` | Architecture decision and original plan | Closed |
+| `claude_skills-vu8` | Initial configured-provider implementation graph | Closed |
+| `claude_skills-ece` | Review hardening, atomicity, and provider-native CAS graph | Closed |
+
+Resume from live Bead state rather than this status snapshot:
+
+```bash
+bd show claude_skills-7t0
+bd show claude_skills-vu8
+bd list --all --parent claude_skills-vu8 --limit 0 --no-pager --flat
+bd show claude_skills-ece
+bd list --all --parent claude_skills-ece --limit 0 --no-pager --flat
+```
+
+Two open follow-ups remain under `claude_skills-ece`:
+
+- `claude_skills-ece.66` — extract the existing GitHub orchestration boundaries after native CAS;
+- `claude_skills-ece.4` — make Codex subagent MCP sidecar ownership observable and safely reapable.
+
+Inspect only the unfinished frontier with:
+
+```bash
+bd list --all --parent claude_skills-ece \
+  --status open,in_progress,blocked,deferred --limit 0 --no-pager --flat
+```
 
 ## 2. Goals and non-goals
 
@@ -59,7 +144,8 @@ merge.
 - Synchronising comments, milestones, projects, branches, or pull requests.
 - Migrating every existing local item before first use.
 - Adding a generic pagination or GraphQL abstraction outside the provider adapter.
-- Implementing this architecture in this documentation task. Section 12 is the subsequent implementation plan.
+- Implementing the architecture inside the original decision task. That task deferred delivery to
+  `claude_skills-vu8`; section 12 now records the delivered graph and its review expansion.
 
 ## 3. Current constraints
 
@@ -327,17 +413,22 @@ knowledge.
 
 ### 8.2 GitHub provider API patch application
 
-The private GitHub patch adapter:
+The delivered GitHub adapter does not treat `updateIssue` preflight as an atomic revision boundary.
+Human Issue bodies remain the root projection; agent-managed versions use a Contents-CAS head plus
+validated audit comments:
 
-1. Resolves current revisions for the patch references through targeted alias batches.
-2. Returns `conflict` without mutation when a current revision differs from `expected_revision`.
-3. Sends only precondition-matching, changed bodies through aliased `updateIssue` batches of at most 25.
-4. Returns one `PatchResult` per input patch, including the resulting provider revision for successful mutations.
-5. Isolates batch errors into per-item `error` results; it does not report a failed patch as applied.
+1. Resolve the current Issue identity, canonical human body root, and agent-managed head.
+2. Reject a patch whose `expected_revision` differs from the authoritative head/root revision.
+3. Append a tagged audit comment naming the previous revision and intended content digest.
+4. Advance the issue-bound Contents head with the observed blob SHA as the compare-and-swap
+   precondition.
+5. Re-fetch and validate the winning head/comment/digest; return `applied` only for the writer whose
+   head CAS advanced.
+6. Preserve losing comments as audit evidence, return `conflict`, and leave that mutation queued and
+   uncheckpointed.
 
-GitHub does not provide an atomic compare-and-swap argument on `updateIssue`; the revision preflight is therefore a
-best-effort optimistic guard. The adapter must keep the preflight and mutation adjacent, and a later reconciliation
-will detect any race through revision and fingerprint mismatch.
+This gives work-item content the same provider-native optimistic concurrency boundary as other
+GitHub content without overwriting a human Issue body after a non-atomic preflight.
 
 ## 9. Cache, queue, and failure rules (remote backend responsibility)
 
@@ -414,10 +505,10 @@ the fetched item count is bounded by fixture-linked items, and failures are zero
 targeted alias batching, and mutation batch size directly; the live test does not infer transport behaviour from time
 alone.
 
-## 12. Subsequent implementation plan
+## 12. Delivered implementation graph
 
-Execute this dependency graph. Tasks on the same row may run in parallel; every edge represents a
-real output dependency.
+The original implementation used this dependency graph. Tasks on the same row ran in parallel; every
+edge represented a real output dependency.
 
 ```text
 1 contracts
@@ -490,6 +581,30 @@ real output dependency.
      scope and bounded fetched counts.
    - Run targeted tests, Ruff, ty, affected prek hooks, live lifecycle, and independent verification.
 
+Review made the missing atomicity and provider-representation dependencies visible. Delivery
+therefore continued through this second graph rather than declaring task 9 sufficient:
+
+```text
+9 initial acceptance
+└─→ A provider contract review
+    ├─→ B local-backend CAS and FileCache transactions ─┐
+    ├─→ C content identity/publication ordering ─────────┼─→ E provider-native GitHub CAS
+    ├─→ D CLI/MCP/test/document migration ───────────────┘             |
+    └─→ F branch-transfer and execution-safety findings ───────────────┤
+                                                                      v
+                                                       G post-merge acceptance
+                                                                      |
+                                              ┌───────────────────────┴───────────────────────┐
+                                              v                                               v
+                                   ece.66 maintainability                          ece.4 runtime lifecycle
+```
+
+`A` through `G` are the child work recorded under `claude_skills-ece`. The graph expansion was a
+correctness dependency: reconciliation could not claim durable provider authority while writes were
+non-atomic, publications could point at missing content, or remote identity/revision semantics were
+lossy. The two open leaves do not reopen the delivered provider contract: `ece.66` is a behavior-
+preserving extraction and `ece.4` belongs to Codex process ownership rather than backlog storage.
+
 ## 13. Acceptance criteria
 
 - Reconciler interface tests cover unchanged, local-only, remote-only, concurrent, bootstrap, force, provider deletion,
@@ -509,6 +624,14 @@ real output dependency.
   grooming, plans, and artifacts only through native backend capabilities.
 - Offline remote reads return cached data marked stale; missing cache records return unavailable;
   offline writes queue durably and idempotently; conflicts and partial replay retain unapplied work.
+- Every provider enforces `create_only` and `expected_revision` atomically at its native write
+  boundary; an observed stale revision never overwrites authoritative content.
+- GitHub native records use complete, injective logical identity and blob-SHA CAS; branch-pinned
+  discovery rejects truncated, malformed, duplicate, oversized, or path/envelope-mismatched data.
+- Artifact manifests become visible only after their referenced content is readable, and concurrent
+  initial publication produces one winner rather than two acknowledged writers.
+- Work-item reconciliation checkpoints only the writer whose issue-bound Contents head advances;
+  losing audit comments do not acknowledge or remove its queued mutation.
 - Import-boundary tests reject direct runtime YAML/cache access outside `FileCache` and migration tooling.
 - Existing wrapper-level tests pass without changes to existing MCP parameter semantics or existing
   result-key meanings; tests also cover opaque plan owners, owner reassignment, and additive
@@ -521,7 +644,9 @@ real output dependency.
 
 | Risk | Decision |
 | --- | --- |
-| GitHub mutation preconditions are not atomic | Use adjacent revision preflight, return conflicts, and rely on the next fingerprint comparison to detect races. |
+| GitHub `updateIssue` preconditions are not atomic | Keep human Issue bodies as root projections; advance agent-managed bodies through an issue-bound Contents head with blob-SHA CAS and validated audit comments. |
+| Repository branch movement races with a content update | Re-read the target after `409` or `422`; return conflict when target identity/revision changed and retry only a bounded unrelated-head race. |
+| Native GitHub representation exceeds Contents limits | Reject envelopes above 1 MiB before network I/O; add a new provider representation only when a real larger-content requirement exists. |
 | One failed patch could repeat an inclusive incremental page | Do not advance `.last_sync` on failures; correctness wins, while deduplication and bounded pages cap duplicate processing. |
 | Missing fingerprints make first sync ambiguous | Bootstrap through merge, never overwrite, then establish a checkpoint. |
 | Remote closed items have local body edits | Keep remote state closed, merge body, and patch body only. |
