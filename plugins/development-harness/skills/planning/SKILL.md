@@ -89,7 +89,7 @@ Artifact registered via MCP:
 artifact_register(
     item_id={issue},
     artifact_type="architect",
-    path="plan/architect-{slug}.md",
+    artifact_id="plan/architect-{slug}.md",
     agent="planning",
     content="{full PLAN markdown below}"
 )

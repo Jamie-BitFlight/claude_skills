@@ -69,11 +69,11 @@ class _EmptyArtifactRegistryClient(ArtifactRegistryClient):
         super().__init__()
         self._store = store
 
-    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan", plan_id: str | None = None) -> None:
         """Delegate to the in-memory store."""
         self._store.store(issue, content, artifact_type=artifact_type)
 
-    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+    def read(self, issue: int, artifact_type: str = "task-plan", *, plan_id: str | None = None) -> str | None:
         """Delegate to the in-memory store."""
         return self._store.read(issue, artifact_type)
 

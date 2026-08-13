@@ -639,6 +639,39 @@ class GitHubGistArtifactProvider:
             return None
         return gist_file.content
 
+    def list_artifact_content_from_remote(
+        self, item_id: ItemId, artifact_type: str, path_prefix: str
+    ) -> dict[str, str]:
+        """List linked-Gist files whose sanitised names start with ``path_prefix``.
+
+        This provider-private capability is for GitHub-backed discovery where
+        each logical record has its own Gist file.  It deliberately returns
+        Gist filenames, not reconstructed paths: slash sanitisation is lossy.
+
+        Args:
+            item_id: GitHub Issue number whose linked Gist is searched.
+            artifact_type: Reserved for provider-private callers.
+            path_prefix: Logical path prefix, such as ``"dispatch-plan/"``.
+
+        Returns:
+            Mapping of matching Gist filenames to their string content.  An
+            empty mapping confirms that no matching files exist.
+        """
+        item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
+        repo = get_github(self._repo)
+        owner, repo_name = self._repo.split("/", 1)
+        issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
+        gist = self._get_gist(item_id, issue.get("body") or "")
+        if gist is None:
+            return {}
+
+        filename_prefix = _sanitize_gist_filename(path_prefix)
+        return {
+            filename: gist_file.content
+            for filename, gist_file in gist.files.items()
+            if filename.startswith(filename_prefix)
+        }
+
     def read_local_artifact_content(self, path: str) -> str | None:
         """Read artifact file content from the local filesystem.
 

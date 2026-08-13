@@ -13,7 +13,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 import dh_paths as _dh_paths
 from sam_schema.core.artifact_registry_client import (
@@ -83,6 +83,13 @@ class _PlanPersistence(Protocol):
     def list(self, query: ContentQuery) -> Sequence[ContentRecord]: ...
     def get(self, reference: ContentRef) -> ContentRecord: ...
     def put(self, request: ContentWrite) -> ContentRecord: ...
+
+
+@runtime_checkable
+class _RemoteArtifactContentLister(Protocol):
+    def list_artifact_content_from_remote(
+        self, item_id: int, artifact_type: str, path_prefix: str
+    ) -> dict[str, str]: ...
 
 
 class _GitHubPlanPersistence:
@@ -180,6 +187,7 @@ class _GitHubDispatchPersistence:
     _CONTENT_TYPE = "dispatch-plan"
     _INDEX_TYPE = "dispatch-plan-index"
     _INDEX_PATH = "dispatch-plan/index.json"
+    _ENVELOPE_VERSION_KEY = "dispatch-content-version"
 
     def __init__(self, provider: ArtifactBackend) -> None:
         self._provider = provider
@@ -215,13 +223,11 @@ class _GitHubDispatchPersistence:
             else ""
         )
         self._provider.store_artifact_content(
-            self._sentinel_issue, self._CONTENT_TYPE, self._content_path(request.reference.name), request.content
+            self._sentinel_issue,
+            self._CONTENT_TYPE,
+            self._content_path(request.reference.name),
+            self._serialize_envelope(request.reference.name, owner_reference, request.content),
         )
-        if entry is None or entry.owner_reference != owner_reference:
-            self._store_entries([
-                *[candidate for candidate in entries if candidate.name != request.reference.name],
-                _DispatchIndexEntry(name=request.reference.name, owner_reference=owner_reference),
-            ])
         return ContentRecord(
             reference=request.reference,
             owner_reference=owner_reference,
@@ -230,12 +236,19 @@ class _GitHubDispatchPersistence:
         )
 
     def _record(self, entry: _DispatchIndexEntry) -> ContentRecord:
-        content = self._provider.read_artifact_content_from_remote(
+        stored_content = self._provider.read_artifact_content_from_remote(
             self._sentinel_issue, self._CONTENT_TYPE, self._content_path(entry.name)
         )
-        if content is None:
+        if stored_content is None:
             reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name)
             raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
+        envelope = self._parse_envelope(stored_content)
+        if entry.legacy:
+            content = stored_content
+        else:
+            if envelope is None:
+                raise ContentUnavailableError("Dispatch content envelope is invalid")
+            content = envelope[2]
         return ContentRecord(
             reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name),
             owner_reference=entry.owner_reference,
@@ -244,6 +257,21 @@ class _GitHubDispatchPersistence:
         )
 
     def _entries(self) -> Sequence[_DispatchIndexEntry]:
+        provider = self._provider
+        if not isinstance(provider, _RemoteArtifactContentLister):
+            raise ContentUnavailableError("GitHub artifact provider cannot enumerate dispatch plans")
+        current_entries: list[_DispatchIndexEntry] = []
+        for stored_content in provider.list_artifact_content_from_remote(
+            self._sentinel_issue, self._CONTENT_TYPE, "dispatch-plan/"
+        ).values():
+            envelope = self._parse_envelope(stored_content)
+            if envelope is not None:
+                current_entries.append(_DispatchIndexEntry(name=envelope[0], owner_reference=envelope[1]))
+
+        current_names = {entry.name for entry in current_entries}
+        return [*current_entries, *(entry for entry in self._legacy_entries() if entry.name not in current_names)]
+
+    def _legacy_entries(self) -> Sequence[_DispatchIndexEntry]:
         content = self._provider.read_artifact_content_from_remote(
             self._sentinel_issue, self._INDEX_TYPE, self._INDEX_PATH
         )
@@ -254,7 +282,7 @@ class _GitHubDispatchPersistence:
         except json.JSONDecodeError as exc:
             raise ContentUnavailableError("Dispatch content index is invalid") from exc
         if isinstance(data, list) and all(isinstance(name, str) for name in data):
-            return [_DispatchIndexEntry(name=name, owner_reference="") for name in data]
+            return [_DispatchIndexEntry(name=name, owner_reference="", legacy=True) for name in data]
         if not isinstance(data, dict) or data.get("version") != 1:
             raise ContentUnavailableError("Dispatch content index is invalid")
         raw_entries = data.get("entries")
@@ -268,22 +296,32 @@ class _GitHubDispatchPersistence:
             owner_reference = raw_entry.get("owner_reference")
             if not isinstance(name, str) or not isinstance(owner_reference, str):
                 raise ContentUnavailableError("Dispatch content index is invalid")
-            entries.append(_DispatchIndexEntry(name=name, owner_reference=owner_reference))
+            entries.append(_DispatchIndexEntry(name=name, owner_reference=owner_reference, legacy=True))
         return entries
 
-    def _store_entries(self, entries: Sequence[_DispatchIndexEntry]) -> None:
-        self._provider.store_artifact_content(
-            self._sentinel_issue,
-            self._INDEX_TYPE,
-            self._INDEX_PATH,
-            json.dumps(
-                {
-                    "version": 1,
-                    "entries": [{"name": entry.name, "owner_reference": entry.owner_reference} for entry in entries],
-                },
-                separators=(",", ":"),
-            ),
+    @classmethod
+    def _serialize_envelope(cls, name: str, owner_reference: str, content: str) -> str:
+        return json.dumps(
+            {cls._ENVELOPE_VERSION_KEY: 1, "name": name, "owner_reference": owner_reference, "content": content},
+            separators=(",", ":"),
         )
+
+    @classmethod
+    def _parse_envelope(cls, stored_content: str) -> tuple[str, str, str] | None:
+        try:
+            data = json.loads(stored_content)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict) or cls._ENVELOPE_VERSION_KEY not in data:
+            return None
+        if data[cls._ENVELOPE_VERSION_KEY] != 1:
+            raise ContentUnavailableError("Dispatch content envelope is invalid")
+        name = data.get("name")
+        owner_reference = data.get("owner_reference")
+        content = data.get("content")
+        if not isinstance(name, str) or not isinstance(owner_reference, str) or not isinstance(content, str):
+            raise ContentUnavailableError("Dispatch content envelope is invalid")
+        return name, owner_reference, content
 
     @staticmethod
     def _content_path(name: str) -> str:
@@ -294,6 +332,7 @@ class _GitHubDispatchPersistence:
 class _DispatchIndexEntry:
     name: str
     owner_reference: str
+    legacy: bool = False
 
 
 class GitHubBackend:

@@ -1553,9 +1553,8 @@ class ArtifactEntry(BaseModel):
     artifact_id: str = Field(
         ...,
         description=(
-            "Logical identifier for the artifact. When content is stored via artifact_register(content=...), "
-            "this is a logical id such as 'T0-baseline-{slug}'. When the artifact is a repo file, "
-            "this is the repo-relative path, e.g. plan/architect-foo.md."
+            "Logical identifier for provider-owned content stored by artifact_register, such as "
+            "'T0-baseline-{slug}' or 'plan/architect-foo.md'."
         ),
         validation_alias=AliasChoices("artifact_id", "path"),
     )

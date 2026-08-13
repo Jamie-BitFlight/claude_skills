@@ -3317,17 +3317,15 @@ async def artifact_register(
             )
         ),
     ],
+    content: Annotated[
+        str,
+        Field(
+            min_length=1,
+            description="Artifact body written through the selected content provider before its manifest registration.",
+        ),
+    ],
     status: Annotated[str, Field(description="Lifecycle status: draft, current, superseded, archived")] = "current",
     agent: Annotated[str, Field(description="Name of the producing agent")] = "",
-    content: Annotated[
-        str | None,
-        Field(
-            description=(
-                "Optional artifact body written through the selected content provider. "
-                "When omitted only the manifest entry is registered."
-            )
-        ),
-    ] = None,
 ) -> dict:
     """Upsert an artifact entry in provider-owned logical content.
 
@@ -3335,9 +3333,8 @@ async def artifact_register(
     artifact_id already exists it is updated in-place (status, agent, timestamp).
     If only the type matches but the artifact_id differs, a new row is added.
 
-    When *content* is provided, it is written under the selected backend's
-    logical artifact-content reference. When it is omitted, only the manifest
-    entry is registered.
+    Content is written under the selected backend's logical artifact-content
+    reference before its revision-safe manifest entry is registered.
 
     Returns:
         Dict with registered (bool), artifact_count (int), action (str),
@@ -3346,6 +3343,8 @@ async def artifact_register(
     """
     out = Output()
     try:
+        if not content:
+            return {"error": "Artifact content must not be empty.", **out.to_dict()}
         provider = _get_artifact_provider()
         artifact_type_enum = ArtifactType(artifact_type)
         status_enum = ArtifactStatus(status)
@@ -3358,28 +3357,22 @@ async def artifact_register(
         )
 
         def _run() -> RegisterResult:
+            provider.put_content(
+                ContentWrite(
+                    reference=ContentRef(
+                        kind=ContentKind.ARTIFACT_CONTENT,
+                        namespace=str(item_id),
+                        artifact_type=artifact_type,
+                        name=artifact_id,
+                    ),
+                    content=content,
+                )
+            )
             updated_manifest, existed = register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
             action = "updated" if existed else "added"
 
-            content_stored = content is not None
-            if content is not None:
-                provider.put_content(
-                    ContentWrite(
-                        reference=ContentRef(
-                            kind=ContentKind.ARTIFACT_CONTENT,
-                            namespace=str(item_id),
-                            artifact_type=artifact_type,
-                            name=artifact_id,
-                        ),
-                        content=content,
-                    )
-                )
-
             return RegisterResult(
-                registered=True,
-                artifact_count=len(updated_manifest.artifacts),
-                action=action,
-                content_stored=content_stored,
+                registered=True, artifact_count=len(updated_manifest.artifacts), action=action, content_stored=True
             )
 
         result = await asyncio.to_thread(_run)

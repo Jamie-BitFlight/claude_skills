@@ -67,6 +67,13 @@ class _ConcurrentManifestWriter(InMemoryBackend):
         return super().put_content(request)
 
 
+class _FailingArtifactContentWriter(InMemoryBackend):
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        if request.reference.kind == ContentKind.ARTIFACT_CONTENT:
+            raise ContentUnavailableError("artifact content storage unavailable")
+        return super().put_content(request)
+
+
 def test_issue_less_plan_uses_configured_content_without_local_warning(content_provider: InMemoryBackend) -> None:
     result = operations.create_plan(
         ContentTaskProvider(content_provider),
@@ -165,8 +172,21 @@ def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
     set_config(BacklogConfig(backend=provider))
 
     with pytest.raises(ContentUnavailableError, match="offline cache miss"):
-        operations.artifact_register(42, "research", "report")
+        operations.artifact_register(42, "research", "report", content="# Report")
 
+    assert provider.put_content.call_args.args[0].reference == ContentRef(
+        kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="report"
+    )
+
+
+def test_artifact_register_rejects_empty_content_before_provider_mutation() -> None:
+    provider = MagicMock(spec=ContentProvider)
+    set_config(BacklogConfig(backend=provider))
+
+    result = operations.artifact_register(42, "research", "report", content="")
+
+    assert result["error"] == "Artifact content must not be empty."
+    provider.get_content.assert_not_called()
     provider.put_content.assert_not_called()
 
 
@@ -177,7 +197,7 @@ def test_artifact_register_retries_conflicting_manifest_write() -> None:
     provider.put_content(ContentWrite(reference=reference, content=ArtifactManifest(issue_number=42).model_dump_json()))
     provider.inject_conflict = True
 
-    result = operations.artifact_register(42, "architect", "primary.md")
+    result = operations.artifact_register(42, "architect", "primary.md", content="# Primary")
 
     manifest = ArtifactManifest.model_validate_json(provider.get_content(reference).content)
     assert result["registered"] is True
@@ -186,6 +206,29 @@ def test_artifact_register_retries_conflicting_manifest_write() -> None:
         (ArtifactType.ARCHITECT, "primary.md"),
         (ArtifactType.RESEARCH, "concurrent.md"),
     }
+
+
+def test_artifact_register_content_failure_preserves_prior_readable_artifact() -> None:
+    provider = _FailingArtifactContentWriter()
+    set_config(BacklogConfig(backend=provider))
+    manifest_ref = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest")
+    provider.put_content(
+        ContentWrite(
+            reference=manifest_ref,
+            content=ArtifactManifest(
+                issue_number=42, artifacts=[ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="prior.md")]
+            ).model_dump_json(),
+        )
+    )
+    prior_ref = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="prior.md")
+    InMemoryBackend.put_content(provider, ContentWrite(reference=prior_ref, content="# Prior"))
+
+    with pytest.raises(ContentUnavailableError, match="artifact content storage unavailable"):
+        operations.artifact_register(42, "research", "next.md", content="# Next")
+
+    manifest = ArtifactManifest.model_validate_json(provider.get_content(manifest_ref).content)
+    assert [entry.artifact_id for entry in manifest.artifacts] == ["prior.md"]
+    assert operations.artifact_read(42, "research")["content"] == "# Prior"
 
 
 def test_dispatch_operations_use_dedicated_configured_content(content_provider: InMemoryBackend) -> None:

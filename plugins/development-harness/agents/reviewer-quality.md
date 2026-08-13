@@ -125,6 +125,7 @@ Register the verdict as a `codebase-analysis` artifact via MCP. Use `issue_numbe
 mcp__plugin_dh_backlog__artifact_register(
   item_id={issue_number},
   artifact_type="codebase-analysis",
+  artifact_id="code-review-quality-{issue_number}",
   content={verdict_block_json},
   status="complete",
   agent="reviewer-quality"

@@ -1361,14 +1361,23 @@ def test_artifact_cli_forwards_named_options(
         (
             "register",
             "artifact_register",
-            ["--item-id", "bd-a3f8", "--artifact-type", "research", "--artifact-id", "plan/research.md"],
+            [
+                "--item-id",
+                "bd-a3f8",
+                "--artifact-type",
+                "research",
+                "--artifact-id",
+                "plan/research.md",
+                "--content",
+                "# Research",
+            ],
             {
                 "item_id": "bd-a3f8",
                 "artifact_type": "research",
                 "artifact_id": "plan/research.md",
                 "status": "current",
                 "agent": "",
-                "content": None,
+                "content": "# Research",
             },
             {"registered": True},
         ),
@@ -1414,6 +1423,18 @@ def test_artifact_cli_preserves_nonnumeric_item_id(
     result = _runner.invoke(app, ["artifact", command, *args])
     _assert_compact_result(result, payload)
     mock_operation.assert_called_once_with(**kwargs)
+
+
+def test_artifact_cli_requires_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_operation = Mock(return_value={"registered": True})
+    monkeypatch.setattr(artifacts.operations, "artifact_register", mock_operation)
+
+    result = _runner.invoke(
+        app, ["artifact", "register", "--item-id", "42", "--artifact-type", "research", "--artifact-id", "plan/r.md"]
+    )
+
+    assert result.exit_code != 0
+    mock_operation.assert_not_called()
 
 
 def test_artifact_cli_has_no_migrate_command() -> None:

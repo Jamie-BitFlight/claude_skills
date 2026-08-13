@@ -19,9 +19,9 @@ def register(
     item_id: Annotated[str, typer.Option("--item-id")],
     artifact_type: Annotated[ArtifactType, typer.Option("--artifact-type")],
     artifact_id: Annotated[str, typer.Option("--artifact-id")],
+    content: Annotated[str, typer.Option("--content")],
     status: Annotated[ArtifactStatus, typer.Option("--status")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, typer.Option("--agent")] = "",
-    content: Annotated[str | None, typer.Option("--content")] = None,
 ) -> None:
     """Register or update an artifact."""
     emit_result(

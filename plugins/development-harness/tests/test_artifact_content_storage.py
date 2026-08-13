@@ -501,32 +501,17 @@ def test_read_artifact_content_from_remote_ignores_wrong_type(tmp_path: Path) ->
 # ---------------------------------------------------------------------------
 
 
-async def test_artifact_register_without_content_writes_only_manifest() -> None:
+async def test_artifact_register_rejects_missing_content_before_provider_mutation() -> None:
     # Arrange
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
     mock_provider = MagicMock(spec=ContentProvider)
     mock_provider.get_content.return_value = _manifest_record(mock_manifest)
 
-    with (
-        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
-    ):
-        mock_registry.register.return_value = mock_manifest.model_copy(
-            update={"artifacts": [ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md")]}
-        )
-        # Act
-        result = await _call(
-            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
-        )
+    with patch("backlog_core.server._get_artifact_provider", return_value=mock_provider), pytest.raises(ToolError):
+        await _call("artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"})
 
-    # Assert
-    assert result.get("error") is None
-    assert result["registered"] is True
-    assert result["content_stored"] is False
-    assert mock_provider.put_content.call_count == 1
-    assert mock_provider.put_content.call_args.args[0].reference == ContentRef(
-        kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest"
-    )
+    mock_provider.get_content.assert_not_called()
+    mock_provider.put_content.assert_not_called()
 
 
 async def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
@@ -537,9 +522,14 @@ async def test_artifact_register_does_not_replace_unavailable_manifest() -> None
         patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
         pytest.raises(ToolError, match="offline cache miss"),
     ):
-        await _call("artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"})
+        await _call(
+            "artifact_register",
+            {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": "# Research"},
+        )
 
-    mock_provider.put_content.assert_not_called()
+    assert mock_provider.put_content.call_args.args[0].reference == ContentRef(
+        kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="plan/r.md"
+    )
 
 
 async def test_artifact_register_with_content_writes_to_configured_provider() -> None:
@@ -548,14 +538,7 @@ async def test_artifact_register_with_content_writes_to_configured_provider() ->
     mock_provider = MagicMock(spec=ContentProvider)
     mock_provider.get_content.return_value = _manifest_record(mock_manifest)
 
-    with (
-        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
-    ):
-        mock_registry.register.return_value = mock_manifest.model_copy(
-            update={"artifacts": [ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md")]}
-        )
-        # Act
+    with patch("backlog_core.server._get_artifact_provider", return_value=mock_provider):
         result = await _call(
             "artifact_register",
             {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": "# Research content"},
@@ -566,35 +549,28 @@ async def test_artifact_register_with_content_writes_to_configured_provider() ->
     assert result["registered"] is True
     assert result["content_stored"] is True
     assert mock_provider.put_content.call_count == 2
-    assert mock_provider.put_content.call_args_list[1].args[0].reference == ContentRef(
+    assert mock_provider.put_content.call_args_list[0].args[0].reference == ContentRef(
         kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="plan/r.md"
     )
-    assert mock_provider.put_content.call_args_list[1].args[0].content == "# Research content"
+    assert mock_provider.put_content.call_args_list[0].args[0].content == "# Research content"
+    assert mock_provider.put_content.call_args_list[1].args[0].reference == ContentRef(
+        kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest"
+    )
 
 
-async def test_artifact_register_without_content_never_requires_filesystem_capability() -> None:
+async def test_artifact_register_rejects_empty_content_before_provider_mutation() -> None:
     # Arrange
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
     mock_provider = MagicMock(spec=ContentProvider)
     mock_provider.get_content.return_value = _manifest_record(mock_manifest)
 
-    with (
-        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
-    ):
-        mock_registry.register.return_value = mock_manifest.model_copy(
-            update={"artifacts": [ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md")]}
-        )
-        # Act
-        result = await _call(
-            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
+    with patch("backlog_core.server._get_artifact_provider", return_value=mock_provider), pytest.raises(ToolError):
+        await _call(
+            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": ""}
         )
 
-    # Assert
-    assert result.get("error") is None
-    assert result["registered"] is True
-    assert result["content_stored"] is False
-    assert mock_provider.put_content.call_count == 1
+    mock_provider.get_content.assert_not_called()
+    mock_provider.put_content.assert_not_called()
 
 
 async def test_artifact_register_with_invalid_type_returns_error() -> None:
@@ -606,7 +582,8 @@ async def test_artifact_register_with_invalid_type_returns_error() -> None:
     """
     # Arrange / Act
     result = await _call(
-        "artifact_register", {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md"}
+        "artifact_register",
+        {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md", "content": "# Content"},
     )
 
     # Assert

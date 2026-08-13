@@ -28,7 +28,7 @@ mcp__plugin_dh_backlog__artifact_register(
     artifact_id=<str>,            # Logical identifier — REQUIRED
     status="current",             # Lifecycle status: draft | current | superseded | archived
     agent=<str>,                  # Name of the producing agent (default: "")
-    content=<str | None>,         # Full artifact content
+    content=<str>,                # Non-empty full artifact content — REQUIRED
 )
 ```
 
@@ -75,8 +75,8 @@ the same type.
 
 ### `content`
 
-Pass the full markdown string. When `content` is omitted, only the manifest entry is registered.
-Producing agents pass `content=` so `artifact_read(item_id, artifact_type)` returns the document.
+Pass a non-empty full markdown string. The current registration contract requires `content=`;
+without it, the call is invalid and `artifact_read(item_id, artifact_type)` cannot return the document.
 
 ## Examples by artifact type
 

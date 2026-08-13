@@ -1302,7 +1302,11 @@ def dispatch_create_plan(
     # Register the dispatch-plan artifact (best-effort) when an issue is provided.
     if issue is not None:
         registration = artifact_register(
-            issue, ArtifactType.DISPATCH_PLAN.value, reference.name, agent="dispatch_create_plan"
+            issue,
+            ArtifactType.DISPATCH_PLAN.value,
+            reference.name,
+            content=plan_model.model_dump_json(),
+            agent="dispatch_create_plan",
         )
         if "error" in registration:
             _log.warning(
@@ -1870,12 +1874,7 @@ def _load_manifest(provider: ContentProvider, item_id: int | str) -> ArtifactMan
 
 
 def artifact_register(
-    item_id: int | str,
-    artifact_type: str,
-    artifact_id: str,
-    status: str = "current",
-    agent: str = "",
-    content: str | None = None,
+    item_id: int | str, artifact_type: str, artifact_id: str, content: str, status: str = "current", agent: str = ""
 ) -> dict[str, Any]:
     """Upsert an artifact entry in the manifest for a backlog item.
 
@@ -1885,6 +1884,8 @@ def artifact_register(
     """
     out = Output()
     try:
+        if not content:
+            return {"error": "Artifact content must not be empty.", **out.to_dict()}
         provider = _get_content_provider()
         artifact_type_enum = ArtifactType(artifact_type)
         status_enum = ArtifactStatus(status)
@@ -1896,28 +1897,25 @@ def artifact_register(
             agent=agent,
         )
 
+        provider.put_content(
+            ContentWrite(
+                reference=ContentRef(
+                    kind=ContentKind.ARTIFACT_CONTENT,
+                    namespace=str(item_id),
+                    artifact_type=artifact_type,
+                    name=artifact_id,
+                ),
+                content=content,
+            )
+        )
         updated_manifest, existed = register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
         action = "updated" if existed else "added"
-
-        content_stored = content is not None
-        if content is not None:
-            provider.put_content(
-                ContentWrite(
-                    reference=ContentRef(
-                        kind=ContentKind.ARTIFACT_CONTENT,
-                        namespace=str(item_id),
-                        artifact_type=artifact_type,
-                        name=artifact_id,
-                    ),
-                    content=content,
-                )
-            )
 
         return {
             "registered": True,
             "artifact_count": len(updated_manifest.artifacts),
             "action": action,
-            "content_stored": content_stored,
+            "content_stored": True,
             **out.to_dict(),
         }
     except (ValueError, KeyError) as exc:

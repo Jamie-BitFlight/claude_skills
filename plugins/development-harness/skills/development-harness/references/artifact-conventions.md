@@ -47,7 +47,7 @@ Artifacts are stored and retrieved via two distinct MCP systems. No stage reads 
 
 Document-level artifacts (discovery, plan, context integration) are managed by the backlog MCP server:
 
-- **Write:** `artifact_register(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id, agent=agent, content=content)` — registers the logical artifact identifier and writes optional content through the configured provider.
+- **Write:** `artifact_register(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id, agent=agent, content=content)` — stores non-empty provider-owned content, then registers its logical identifier through the revision-safe manifest.
 - **Read:** `artifact_read(item_id=item_id, artifact_type=artifact_type)` — returns `{artifact_type, path, content, status}` from the configured provider. The `path` response field carries the registered logical `artifact_id`.
 - **List:** `artifact_list(item_id=item_id, artifact_type=None)` — enumerates registered artifacts for an issue.
 
