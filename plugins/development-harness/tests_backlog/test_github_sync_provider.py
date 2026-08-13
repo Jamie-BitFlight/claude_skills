@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 from unittest.mock import MagicMock
 
 import pytest
@@ -24,6 +25,14 @@ from backlog_core.models import (
 )
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
+
+
+class _RemoteArtifactProviderFakeSpec(Protocol):
+    def store_artifact_content(self, owner: int, artifact_type: str, path: str, content: str) -> None: ...
+
+    def read_artifact_content_from_remote(self, owner: int, artifact_type: str, path: str) -> str | None: ...
+
+    def list_artifact_content_from_remote(self, owner: int, artifact_type: str, path_prefix: str) -> dict[str, str]: ...
 
 
 def _issue(number: int, revision: str = "rev-1") -> dict[str, object]:
@@ -301,13 +310,18 @@ def test_github_content_provider_discovers_remote_plans_with_empty_cache(tmp_pat
 def test_github_content_provider_round_trips_dispatch_content_without_sam_plan_index(tmp_path: Path) -> None:
     # Given: an online provider with no cached content.
     remote_content: dict[tuple[int, str, str], str] = {}
-    artifact_provider = MagicMock()
+    artifact_provider = MagicMock(spec=_RemoteArtifactProviderFakeSpec)
     artifact_provider.store_artifact_content.side_effect = lambda owner, artifact_type, path, content: (
         remote_content.__setitem__((owner, artifact_type, path), content)
     )
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
         remote_content.get((owner, artifact_type, path))
     )
+    artifact_provider.list_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path_prefix: {
+        path: content
+        for (stored_owner, stored_type, path), content in remote_content.items()
+        if (stored_owner, stored_type) == (owner, artifact_type) and path.startswith(path_prefix)
+    }
     reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
     backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
     backend.try_get_github = MagicMock(return_value=MagicMock())
@@ -377,10 +391,11 @@ def test_github_content_provider_reads_legacy_name_only_dispatch_index(tmp_path:
         (2531, "dispatch-plan-index", "dispatch-plan/index.json"): '["dispatch-milestone-10"]',
         (2531, "dispatch-plan", "dispatch-plan/dispatch-milestone-10.json"): "legacy",
     }
-    artifact_provider = MagicMock()
+    artifact_provider = MagicMock(spec=_RemoteArtifactProviderFakeSpec)
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
         remote_content.get((owner, artifact_type, path))
     )
+    artifact_provider.list_artifact_content_from_remote.return_value = {}
     backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
@@ -658,6 +673,37 @@ def test_github_content_provider_partial_replay_acknowledges_only_applied_writes
     assert [mutation.write.reference for mutation in cache.pending_mutations()] == [references[1]]
     assert cache.get_content(references[0]).pending is False
     assert cache.get_content(references[1]).pending is True
+
+
+def test_github_content_provider_replay_preserves_concurrent_remote_revision(tmp_path: Path) -> None:
+    # Given: an offline artifact edit based on a revision that the remote later supersedes
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="test", name="report")
+    remote = {"content": "revision-one"}
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.side_effect = lambda *_args: remote["content"]
+    artifact_provider.store_artifact_content.side_effect = lambda *_args: remote.__setitem__("content", _args[-1])
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    initial = ContentRecord(
+        reference=reference,
+        owner_reference="#1",
+        content=remote["content"],
+        revision=GitHubBackend._content_revision(remote["content"]),
+    )
+    cache.cache_content(initial)
+    backend.try_get_github = MagicMock(return_value=None)
+    backend.put_content(ContentWrite(reference=reference, content="queued", expected_revision=initial.revision))
+    remote["content"] = "revision-two"
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: reconnect reads the authoritative remote content before replay
+    current = backend.get_content(reference)
+
+    # Then: the remote wins and the conflicting queued mutation remains available for retry or diagnosis
+    assert current.content == "revision-two"
+    assert remote["content"] == "revision-two"
+    assert [mutation.write.content for mutation in cache.pending_mutations()] == ["queued"]
+    artifact_provider.store_artifact_content.assert_not_called()
 
 
 def test_github_plan_replay_coalesces_sequential_offline_writes(tmp_path: Path) -> None:

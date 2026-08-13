@@ -932,11 +932,7 @@ class GitHubBackend:
         if request.reference.kind == ContentKind.DISPATCH_PLAN:
             return self._dispatch_persistence.put(request)
         if request.expected_revision:
-            current_revision = (
-                cached.revision
-                if cached is not None and cached.pending
-                else self._read_online_content(request.reference, cached).revision
-            )
+            current_revision = self._read_online_content(request.reference, cached).revision
             if current_revision != request.expected_revision:
                 raise ContentConflictError("Content revision no longer matches")
         if owner_reference:

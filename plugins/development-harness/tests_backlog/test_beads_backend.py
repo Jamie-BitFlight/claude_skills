@@ -90,6 +90,36 @@ class _RecordingBdRunner:
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
+    ("native_status", "notes"),
+    [
+        ("closed", None),
+        (
+            "in_progress",
+            BacklogItem(metadata=BacklogItemMetadata(status="open", groomed="2026-02-01")).model_dump_json(),
+        ),
+    ],
+)
+def test_list_then_put_preserves_native_status_in_canonical_metadata(native_status: str, notes: str | None) -> None:
+    issue = dict(_BD_SHOW_FIXTURE, status=native_status, notes=notes)
+    runner = _RecordingBdRunner(issue)
+    backend = BeadsBackend(runner=runner)
+
+    [item] = backend.list_work_items()
+
+    assert item.metadata.status == native_status
+    assert item.status == native_status
+    if notes is not None:
+        assert item.metadata.groomed == "2026-02-01"
+
+    backend.put_work_item(item)
+
+    update = runner.text_calls[-1]
+    assert update[update.index("--status") + 1] == native_status
+    assert json.loads(update[update.index("--notes") + 1])["metadata"]["status"] == native_status
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
     ("logical_status", "native_status"),
     [
         ("done", "closed"),

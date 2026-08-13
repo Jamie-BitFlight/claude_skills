@@ -224,14 +224,24 @@ class BeadsBackend:
                 item = BacklogItem.model_validate_json(issue.notes or "")
             except (ValidationError, ValueError):
                 item = BacklogItem(title=issue.title)
-            item.title = issue.title
-            item.description = issue.description or item.description
-            item.issue = issue.id
-            item.reference = issue.id
-            item.status = issue.status.value
-            item.priority = f"P{int(issue.priority)}"
-            item.item_type = issue.type.value
-            items.append(item)
+            metadata = item.metadata.model_copy(
+                update={
+                    "issue": issue.id,
+                    "status": issue.status.value,
+                    "priority": f"P{int(issue.priority)}",
+                    "item_type": issue.type.value,
+                    **({"updated_at": issue.updated_at} if issue.updated_at else {}),
+                }
+            )
+            items.append(
+                BacklogItem.model_validate({
+                    **item.model_dump(),
+                    "title": issue.title,
+                    "description": issue.description or item.description,
+                    "reference": issue.id,
+                    "metadata": metadata,
+                })
+            )
         return items
 
     def get_work_item(self, reference: str) -> BacklogItem:
