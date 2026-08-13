@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from multiprocessing import get_context
+from multiprocessing.synchronize import Barrier as ProcessBarrier
 from pathlib import Path
+from threading import Barrier, Thread
 
 import pytest
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
@@ -22,6 +25,16 @@ def _reference(namespace: str, artifact_type: str = "research") -> ContentRef:
 
 def _record(reference: ContentRef, content: str, revision: str = "rev-1") -> ContentRecord:
     return ContentRecord(reference=reference, owner_reference=reference.namespace, content=content, revision=revision)
+
+
+def _queue_write_in_process(root: str, namespace: str, start: ProcessBarrier) -> None:
+    cache = FileCache(Path(root))
+    reference = _reference(namespace)
+    start.wait(timeout=20)
+    cache.queue_write(
+        _record(reference, f"{namespace} content"),
+        ContentWrite(reference=reference, content=f"{namespace} content", expected_revision="rev-1"),
+    )
 
 
 def test_file_cache_round_trips_complete_content_reference_without_collision(tmp_path: Path) -> None:
@@ -112,7 +125,7 @@ def test_queue_write_is_atomic_when_state_replacement_fails(tmp_path: Path, monk
     def fail_replace(source: Path, destination: Path) -> None:
         raise OSError("injected replacement failure")
 
-    monkeypatch.setattr("backlog_core.file_cache.os.replace", fail_replace)
+    monkeypatch.setattr("backlog_core.file_cache_state.os.replace", fail_replace)
 
     # When: an offline write tries to replace the record and append its queue entry
     with pytest.raises(OSError, match="injected replacement failure"):
@@ -173,3 +186,68 @@ def test_partial_replay_checkpoints_applied_entry_and_retains_the_rest(tmp_path:
     assert cache.get_checkpoint(first_ref) == CacheCheckpoint(reference=first_ref, revision="rev-2", fingerprint="fp-2")
     assert cache.get_content(first_ref).pending is False
     assert cache.get_content(second_ref).pending is True
+
+
+def test_file_cache_serializes_concurrent_instances_and_reopens_valid_state(tmp_path: Path) -> None:
+    # Given: two cache instances that begin independent state transactions together
+    first = FileCache(tmp_path)
+    second = FileCache(tmp_path)
+    references = [_reference("#1"), _reference("#2")]
+    start = Barrier(3)
+
+    def update(cache: FileCache, reference: ContentRef, title: str) -> None:
+        start.wait()
+        cache.queue_write(
+            _record(reference, f"{title} content"),
+            ContentWrite(reference=reference, content=f"{title} content", expected_revision="rev-1"),
+        )
+        cache._queue_work_item(reference.namespace, BacklogItem(title=title))
+        cache.set_checkpoint(CacheCheckpoint(reference=reference, revision="rev-2", fingerprint=f"{title}-fp"))
+
+    threads = [
+        Thread(target=update, args=(cache, reference, f"item-{index}"))
+        for index, (cache, reference) in enumerate(zip([first, second], references, strict=True), start=1)
+    ]
+
+    # When: both instances update records, queues, and checkpoints concurrently
+    for thread in threads:
+        thread.start()
+    start.wait()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    # Then: reopening parses the atomic state and retains every independent update
+    assert not any(thread.is_alive() for thread in threads)
+    reopened = FileCache(tmp_path)
+    assert sorted(mutation.write.reference.model_dump_json() for mutation in reopened.pending_mutations()) == sorted(
+        reference.model_dump_json() for reference in references
+    )
+    assert {mutation.key for mutation in reopened._pending_work_item_mutations()} == {"#1", "#2"}
+    assert [reopened.get_checkpoint(reference) for reference in references] == [
+        CacheCheckpoint(reference=references[0], revision="rev-2", fingerprint="item-1-fp"),
+        CacheCheckpoint(reference=references[1], revision="rev-2", fingerprint="item-2-fp"),
+    ]
+
+
+def test_file_cache_serializes_process_writers(tmp_path: Path) -> None:
+    # Given: two separate Python processes with the same cache root
+    context = get_context("spawn")
+    start = context.Barrier(3)
+    namespaces = ["#1", "#2"]
+    processes = [
+        context.Process(target=_queue_write_in_process, args=(str(tmp_path), namespace, start))
+        for namespace in namespaces
+    ]
+
+    # When: both processes cross a barrier before starting their transactions
+    for process in processes:
+        process.start()
+    start.wait(timeout=20)
+    for process in processes:
+        process.join(timeout=20)
+
+    # Then: the cross-process lock retains both durable writes
+    assert [process.exitcode for process in processes] == [0, 0]
+    assert (
+        sorted(mutation.write.reference.namespace for mutation in FileCache(tmp_path).pending_mutations()) == namespaces
+    )

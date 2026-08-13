@@ -23,7 +23,10 @@ from backlog_core.models import (
     ContentWrite,
 )
 from dh_core import operations
+from pydantic import ValidationError
+from ruamel.yaml import YAMLError
 from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.models import Task, TaskStatus
 
 
 @pytest.fixture
@@ -74,6 +77,70 @@ def test_issue_less_plan_uses_configured_content_without_local_warning(content_p
 
     assert result.warnings is None
     assert content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=result.plan_id)).content
+
+
+def test_content_task_provider_hydrates_legacy_yaml_and_rewrites_mutation_as_compact_json() -> None:
+    provider = InMemoryBackend()
+    reference = ContentRef(kind=ContentKind.PLAN, name="Plegacy123")
+    provider.put_content(
+        ContentWrite(
+            reference=reference,
+            content=(
+                "plan-id: Plegacy123\n"
+                "feature: legacy-provider-plan\n"
+                'version: "1.0"\n'
+                "description: Plan created by the prior Gist task layer\n"
+                "goal: Preserve provider-backed plans across upgrades\n"
+                'issue: "2882"\n'
+                "tasks:\n"
+                "  - id: T1\n"
+                "    title: Preserve legacy content\n"
+                "    status: NOT STARTED\n"
+            ),
+        )
+    )
+
+    task_provider = ContentTaskProvider(provider)
+
+    assert [plan["plan_id"] for plan in task_provider.list_plans()] == ["Plegacy123"]
+    assert task_provider.read_plan("Plegacy123")["tasks"][0]["status"] == TaskStatus.NOT_STARTED
+
+    task_provider.update_task_status("Plegacy123", "T1", TaskStatus.IN_PROGRESS)
+
+    persisted = provider.get_content(reference).content
+    assert json.loads(persisted)["tasks"][0]["status"] == TaskStatus.IN_PROGRESS
+    assert "\n" not in persisted
+
+
+def test_content_task_provider_hydrates_existing_json() -> None:
+    provider = InMemoryBackend()
+    created = ContentTaskProvider(provider).create_plan(
+        "json-provider-plan", "Retain JSON hydration", [Task(id="T1", title="Keep JSON", status=TaskStatus.NOT_STARTED)]
+    )
+
+    hydrated = ContentTaskProvider(provider)
+
+    assert hydrated.read_plan(created["plan_id"])["goal"] == "Retain JSON hydration"
+
+
+def test_content_task_provider_rejects_malformed_json_without_yaml_fallback() -> None:
+    provider = InMemoryBackend()
+    provider.put_content(
+        ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="Pmalformed"), content='{"plan_id":"Pmalformed"}')
+    )
+
+    with pytest.raises(ValidationError):
+        ContentTaskProvider(provider)
+
+
+def test_content_task_provider_rejects_malformed_legacy_yaml() -> None:
+    provider = InMemoryBackend()
+    provider.put_content(
+        ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="Pmalformed"), content="plan-id: [")
+    )
+
+    with pytest.raises(YAMLError):
+        ContentTaskProvider(provider)
 
 
 def test_artifact_operations_use_configured_content_provider(content_provider: InMemoryBackend) -> None:

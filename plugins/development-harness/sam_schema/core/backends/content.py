@@ -4,18 +4,45 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from pathlib import Path
 
 from backlog_core.backend_types import ContentProvider
 from backlog_core.models import ContentConflictError, ContentKind, ContentQuery, ContentRef, ContentWrite
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
+from ruamel.yaml import YAML
 
 from sam_schema.core.backends.memory import InMemoryTaskProvider
 from sam_schema.core.models import AcceptanceCriterion, PlanState, Task
 from sam_schema.core.task_backend_types import PlanData, PlanUpdateValue
+from sam_schema.readers.detect import FormatType
+from sam_schema.readers.normalize import normalize_plan
 
 _PLAN_DATA_ADAPTER = TypeAdapter(PlanData)
 _PLAN_DATA_ADAPTER.rebuild(_types_namespace={"PlanState": PlanState})
 _CONTENT_PAGE_SIZE = 100
+_LEGACY_PLAN_YAML = YAML(typ="safe")
+
+
+def _hydrate_plan(content: str, record_name: str) -> PlanData:
+    try:
+        return _PLAN_DATA_ADAPTER.validate_json(content)
+    except ValidationError as exc:
+        if not any(error["type"] == "json_invalid" for error in exc.errors()):
+            raise
+
+    raw_plan = _LEGACY_PLAN_YAML.load(content)
+    if not isinstance(raw_plan, dict) or not isinstance(raw_tasks := raw_plan.get("tasks", []), list):
+        return _PLAN_DATA_ADAPTER.validate_python(raw_plan)
+
+    result = normalize_plan(raw_plan, raw_tasks, FormatType.PURE_YAML, Path(record_name))
+    plan_data = result.plan.model_dump(mode="json")
+    plan_data.update(
+        goal=result.plan.goal or "",
+        context=result.plan.context or "",
+        acceptance_criteria=result.plan.acceptance_criteria or "",
+        source_path=None,
+    )
+    return _PLAN_DATA_ADAPTER.validate_python(plan_data)
 
 
 class ContentTaskProvider(InMemoryTaskProvider):
@@ -32,7 +59,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
                 ContentQuery(kind=ContentKind.PLAN, offset=offset, limit=_CONTENT_PAGE_SIZE)
             )
             for record in records:
-                plan = _PLAN_DATA_ADAPTER.validate_json(record.content)
+                plan = _hydrate_plan(record.content, record.reference.name)
                 self._plans[plan["plan_id"]] = plan
                 self._revisions[plan["plan_id"]] = record.revision
             if len(records) < _CONTENT_PAGE_SIZE:
@@ -52,7 +79,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
 
     def _refresh(self, plan_id: str) -> None:
         record = self._provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id))
-        self._plans[plan_id] = _PLAN_DATA_ADAPTER.validate_json(record.content)
+        self._plans[plan_id] = _hydrate_plan(record.content, record.reference.name)
         self._revisions[plan_id] = record.revision
 
     def create_plan(

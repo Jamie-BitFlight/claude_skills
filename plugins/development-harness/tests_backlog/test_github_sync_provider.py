@@ -10,6 +10,7 @@ from backlog_core.models import (
     ArtifactManifest,
     BacklogError,
     BacklogItem,
+    ContentConflictError,
     ContentKind,
     ContentNotFoundError,
     ContentQuery,
@@ -537,3 +538,38 @@ def test_github_content_provider_partial_replay_acknowledges_only_applied_writes
     assert [mutation.write.reference for mutation in cache.pending_mutations()] == [references[1]]
     assert cache.get_content(references[0]).pending is False
     assert cache.get_content(references[1]).pending is True
+
+
+def test_github_plan_replay_coalesces_sequential_offline_writes(tmp_path: Path) -> None:
+    # Given: an existing plan edited twice while the provider is offline
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P42")
+    initial = ContentRecord(reference=reference, content="original", revision="rev-1")
+    cache.cache_content(initial)
+    remote = initial
+    writes: list[ContentWrite] = []
+
+    def put(request: ContentWrite) -> ContentRecord:
+        nonlocal remote
+        if request.expected_revision != remote.revision:
+            raise ContentConflictError("Content revision no longer matches")
+        writes.append(request)
+        remote = ContentRecord(reference=reference, content=request.content, revision=f"rev-{len(writes) + 1}")
+        return remote
+
+    plan_persistence = MagicMock()
+    plan_persistence.put.side_effect = put
+    plan_persistence.get.side_effect = lambda _reference: remote
+    backend = GitHubBackend(cache=cache, plan_persistence=plan_persistence)
+    backend.try_get_github = MagicMock(return_value=None)
+    backend.put_content(ContentWrite(reference=reference, content="first", expected_revision="rev-1"))
+    backend.put_content(ContentWrite(reference=reference, content="latest", expected_revision="rev-1"))
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: the provider reconnects and replays its durable queue
+    replayed = backend.get_content(reference)
+
+    # Then: the latest edit applies once against the original provider revision
+    assert [write.content for write in writes] == ["latest"]
+    assert replayed.content == "latest"
+    assert cache.pending_mutations() == []

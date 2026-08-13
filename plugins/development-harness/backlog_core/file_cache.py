@@ -5,77 +5,27 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
-import os
-import tempfile
 import warnings
 from io import StringIO
 from pathlib import Path
-from typing import Final
 
-from pydantic import BaseModel, ConfigDict, Field
 from ruamel.yaml import YAML, YAMLError
 
+from .file_cache_state import (
+    CacheCheckpoint,
+    PendingMutation,
+    ReplayAcknowledgement,
+    _CacheState,
+    _CacheStateStore,
+    _PendingWorkItemMutation,
+    _ProviderSnapshotCheckpoint,
+)
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
 from .yaml_io import load_item, load_item_text, save_item
-
-_STATE_FILE: Final = "cache.yaml"
 
 
 class LegacyMigrationError(ValueError):
     """Legacy item cannot be migrated without data loss."""
-
-
-class PendingMutation(BaseModel):
-    """Durable provider mutation awaiting acknowledgement."""
-
-    model_config = ConfigDict(frozen=True)
-
-    idempotency_key: str
-    write: ContentWrite
-
-
-class CacheCheckpoint(BaseModel):
-    """Last provider revision and fingerprint acknowledged for content."""
-
-    model_config = ConfigDict(frozen=True)
-
-    reference: ContentRef
-    revision: str
-    fingerprint: str
-
-
-class _ProviderSnapshotCheckpoint(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    watermark: str = Field(min_length=1)
-
-
-class _PendingWorkItemMutation(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    idempotency_key: str
-    key: str
-    item: BacklogItem
-
-
-class ReplayAcknowledgement(BaseModel):
-    """Applied provider mutation and its resulting checkpoint."""
-
-    model_config = ConfigDict(frozen=True)
-
-    idempotency_key: str
-    record: ContentRecord
-    fingerprint: str
-
-
-class _CacheState(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    records: list[ContentRecord] = Field(default_factory=list)
-    checkpoints: list[CacheCheckpoint] = Field(default_factory=list)
-    pending: list[PendingMutation] = Field(default_factory=list)
-    pending_work_items: list[_PendingWorkItemMutation] = Field(default_factory=list)
-    snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
 
 
 class FileCache:
@@ -84,7 +34,7 @@ class FileCache:
     def __init__(self, root: Path) -> None:
         """Initialize durable cache state beneath the provider-owned root."""
         self._root = root
-        self._state_path = root / _STATE_FILE
+        self._state = _CacheStateStore(root)
 
     def get_content(self, reference: ContentRef, *, stale: bool = False) -> ContentRecord:
         """Return cached content, distinguishing an offline miss from stale data."""
@@ -96,8 +46,9 @@ class FileCache:
 
     def cache_content(self, record: ContentRecord) -> None:
         """Durably replace one provider-observed content record."""
-        state = self._load_state()
-        self._save_state(state.model_copy(update={"records": self._replace_record(state.records, record)}))
+        self._state.transaction(
+            lambda state: (state.model_copy(update={"records": self._replace_record(state.records, record)}), None)
+        )
 
     def queue_write(self, record: ContentRecord, write: ContentWrite) -> PendingMutation:
         """Atomically cache an offline write and append its deduplicated mutation.
@@ -105,28 +56,43 @@ class FileCache:
         Returns:
             The stable pending mutation, whether newly appended or already queued.
         """
-        payload = json.dumps(write.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-        mutation = PendingMutation(idempotency_key=hashlib.sha256(payload.encode()).hexdigest(), write=write)
-        state = self._load_state()
-        pending = (
-            state.pending
-            if mutation.idempotency_key in {entry.idempotency_key for entry in state.pending}
-            else [*state.pending, mutation]
-        )
-        owner_reference = record.owner_reference if write.owner_reference is None else write.owner_reference
-        cached = record.model_copy(
-            update={
-                "reference": write.reference,
-                "owner_reference": owner_reference,
-                "content": write.content,
-                "pending": True,
-                "stale": False,
-            }
-        )
-        self._save_state(
-            state.model_copy(update={"records": self._replace_record(state.records, cached), "pending": pending})
-        )
-        return mutation
+
+        def queue(state: _CacheState) -> tuple[_CacheState, PendingMutation]:
+            prior = next((entry for entry in state.pending if entry.write.reference == write.reference), None)
+            rebased = write.model_copy(
+                update={
+                    "expected_revision": prior.write.expected_revision if prior is not None else write.expected_revision
+                }
+            )
+            payload = json.dumps(rebased.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+            mutation = PendingMutation(idempotency_key=hashlib.sha256(payload.encode()).hexdigest(), write=rebased)
+            pending: list[PendingMutation] = []
+            inserted = False
+            for entry in state.pending:
+                if entry.write.reference == write.reference:
+                    if not inserted:
+                        pending.append(mutation)
+                        inserted = True
+                else:
+                    pending.append(entry)
+            if not inserted:
+                pending.append(mutation)
+            owner_reference = record.owner_reference if write.owner_reference is None else write.owner_reference
+            cached = record.model_copy(
+                update={
+                    "reference": write.reference,
+                    "owner_reference": owner_reference,
+                    "content": write.content,
+                    "pending": True,
+                    "stale": False,
+                }
+            )
+            return (
+                state.model_copy(update={"records": self._replace_record(state.records, cached), "pending": pending}),
+                mutation,
+            )
+
+        return self._state.transaction(queue)
 
     def pending_mutations(self) -> list[PendingMutation]:
         """Return pending mutations in durable insertion order."""
@@ -137,18 +103,34 @@ class FileCache:
         mutation = _PendingWorkItemMutation(
             idempotency_key=hashlib.sha256(f"{key}:{payload}".encode()).hexdigest(), key=key, item=item
         )
-        state = self._load_state()
-        pending = [entry for entry in state.pending_work_items if entry.key != key]
-        self._save_state(state.model_copy(update={"pending_work_items": [*pending, mutation]}))
-        return mutation
+        return self._state.transaction(
+            lambda state: (
+                state.model_copy(
+                    update={
+                        "pending_work_items": [
+                            *(entry for entry in state.pending_work_items if entry.key != key),
+                            mutation,
+                        ]
+                    }
+                ),
+                mutation,
+            )
+        )
 
     def _pending_work_item_mutations(self) -> list[_PendingWorkItemMutation]:
         return list(self._load_state().pending_work_items)
 
     def _acknowledge_work_items(self, keys: set[str]) -> None:
-        state = self._load_state()
-        pending = [entry for entry in state.pending_work_items if entry.key not in keys]
-        self._save_state(state.model_copy(update={"pending_work_items": pending}))
+        self._state.transaction(
+            lambda state: (
+                state.model_copy(
+                    update={
+                        "pending_work_items": [entry for entry in state.pending_work_items if entry.key not in keys]
+                    }
+                ),
+                None,
+            )
+        )
 
     def get_checkpoint(self, reference: ContentRef) -> CacheCheckpoint | None:
         """Return the last acknowledged checkpoint for a logical record."""
@@ -159,41 +141,51 @@ class FileCache:
 
     def set_checkpoint(self, checkpoint: CacheCheckpoint) -> None:
         """Durably replace one provider checkpoint."""
-        state = self._load_state()
-        checkpoints = [entry for entry in state.checkpoints if entry.reference != checkpoint.reference]
-        self._save_state(state.model_copy(update={"checkpoints": [*checkpoints, checkpoint]}))
+        self._state.transaction(
+            lambda state: (
+                state.model_copy(
+                    update={
+                        "checkpoints": [
+                            *(entry for entry in state.checkpoints if entry.reference != checkpoint.reference),
+                            checkpoint,
+                        ]
+                    }
+                ),
+                None,
+            )
+        )
 
     def _get_snapshot_checkpoint(self) -> _ProviderSnapshotCheckpoint | None:
         return self._load_state().snapshot_checkpoint
 
     def _set_snapshot_checkpoint(self, checkpoint: _ProviderSnapshotCheckpoint) -> None:
-        state = self._load_state()
-        self._save_state(state.model_copy(update={"snapshot_checkpoint": checkpoint}))
+        self._state.transaction(lambda state: (state.model_copy(update={"snapshot_checkpoint": checkpoint}), None))
 
     def acknowledge_replay(self, acknowledgements: list[ReplayAcknowledgement]) -> None:
         """Checkpoint only applied mutations while retaining all other queued work."""
-        state = self._load_state()
-        applied = {entry.idempotency_key: entry for entry in acknowledgements}
-        acknowledged_keys = [entry.idempotency_key for entry in state.pending if entry.idempotency_key in applied]
-        remaining = [entry for entry in state.pending if entry.idempotency_key not in acknowledged_keys]
-        records = list(state.records)
-        checkpoints = list(state.checkpoints)
-        for key in acknowledged_keys:
-            acknowledgement = applied[key]
-            checkpoints = [entry for entry in checkpoints if entry.reference != acknowledgement.record.reference]
-            checkpoints.append(
-                CacheCheckpoint(
-                    reference=acknowledgement.record.reference,
-                    revision=acknowledgement.record.revision,
-                    fingerprint=acknowledgement.fingerprint,
+
+        def acknowledge(state: _CacheState) -> tuple[_CacheState, None]:
+            applied = {entry.idempotency_key: entry for entry in acknowledgements}
+            acknowledged_keys = [entry.idempotency_key for entry in state.pending if entry.idempotency_key in applied]
+            remaining = [entry for entry in state.pending if entry.idempotency_key not in acknowledged_keys]
+            records = list(state.records)
+            checkpoints = list(state.checkpoints)
+            for key in acknowledged_keys:
+                acknowledgement = applied[key]
+                checkpoints = [entry for entry in checkpoints if entry.reference != acknowledgement.record.reference]
+                checkpoints.append(
+                    CacheCheckpoint(
+                        reference=acknowledgement.record.reference,
+                        revision=acknowledgement.record.revision,
+                        fingerprint=acknowledgement.fingerprint,
+                    )
                 )
-            )
-            if not any(entry.write.reference == acknowledgement.record.reference for entry in remaining):
-                record = acknowledgement.record.model_copy(update={"pending": False, "stale": False})
-                records = self._replace_record(records, record)
-        self._save_state(
-            state.model_copy(update={"records": records, "checkpoints": checkpoints, "pending": remaining})
-        )
+                if not any(entry.write.reference == acknowledgement.record.reference for entry in remaining):
+                    record = acknowledgement.record.model_copy(update={"pending": False, "stale": False})
+                    records = self._replace_record(records, record)
+            return state.model_copy(update={"records": records, "checkpoints": checkpoints, "pending": remaining}), None
+
+        self._state.transaction(acknowledge)
 
     def verify_legacy_item(self, source: Path) -> tuple[BacklogItem, list[str]]:
         """Parse a legacy item and verify its YAML representation without persisting it.
@@ -292,31 +284,7 @@ class FileCache:
         return destination
 
     def _load_state(self) -> _CacheState:
-        if not self._state_path.exists():
-            return _CacheState()
-        yaml = YAML(typ="safe")
-        with self._state_path.open(encoding="utf-8") as stream:
-            return _CacheState.model_validate(yaml.load(stream))
-
-    def _save_state(self, state: _CacheState) -> None:
-        self._root.mkdir(mode=0o700, parents=True, exist_ok=True)
-        temporary_path: Path | None = None
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=self._root, suffix=".tmp", delete=False
-            ) as stream:
-                temporary_path = Path(stream.name)
-                yaml = YAML(typ="safe")
-                yaml.default_flow_style = False
-                yaml.dump(state.model_dump(mode="json"), stream)
-                stream.flush()
-                os.fsync(stream.fileno())
-            Path(temporary_path).replace(self._state_path)
-            temporary_path = None
-        finally:
-            if temporary_path is not None:
-                with contextlib.suppress(FileNotFoundError):
-                    temporary_path.unlink()
+        return self._state.load()
 
     @staticmethod
     def _replace_record(records: list[ContentRecord], replacement: ContentRecord) -> list[ContentRecord]:
