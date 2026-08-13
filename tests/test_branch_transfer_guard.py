@@ -47,6 +47,26 @@ def create_repository(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     }
 
 
+def create_deletion_repository(tmp_path: Path, *, target_deletes: bool) -> tuple[Path, str, str]:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    git(repository, "init", "--initial-branch=base")
+    git(repository, "config", "user.email", "test@example.com")
+    git(repository, "config", "user.name", "Test User")
+    commit(repository, "deleted.txt", "delete me\n", "base")
+
+    git(repository, "switch", "-c", "source")
+    git(repository, "rm", "deleted.txt")
+    git(repository, "commit", "-m", "delete from source")
+    source_commit = git(repository, "rev-parse", "HEAD")
+
+    git(repository, "switch", "-c", "target", "base")
+    if target_deletes:
+        git(repository, "rm", "deleted.txt")
+        git(repository, "commit", "-m", "delete from target")
+    return repository, source_commit, git(repository, "rev-parse", "HEAD")
+
+
 def run_guard(repository: Path, manifest: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -184,3 +204,63 @@ def test_audit_rejects_a_source_path_mapped_to_an_unrelated_target_path(tmp_path
     # Then
     assert result.returncode == 1
     assert "excluded.txt" in json.loads(result.stdout)["missing"]["paths"]
+
+
+def test_audit_accepts_a_transferred_deletion_absent_from_source_and_target(tmp_path: Path) -> None:
+    # Given
+    repository, source_commit, target_commit = create_deletion_repository(tmp_path, target_deletes=True)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "commits": {source_commit: {"status": "transferred", "target_commit": target_commit}},
+            "paths": {"deleted.txt": {"status": "transferred", "target_paths": ["deleted.txt"]}},
+        }),
+        encoding="utf-8",
+    )
+
+    # When
+    result = run_guard(repository, manifest)
+
+    # Then
+    assert result.returncode == 0
+    assert json.loads(result.stdout) == {"ok": True}
+
+
+def test_audit_rejects_a_transferred_deletion_that_remains_at_target(tmp_path: Path) -> None:
+    # Given
+    repository, source_commit, _ = create_deletion_repository(tmp_path, target_deletes=False)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "commits": {source_commit: {"status": "excluded", "reason": "Testing path accounting only."}},
+            "paths": {"deleted.txt": {"status": "transferred", "target_paths": ["deleted.txt"]}},
+        }),
+        encoding="utf-8",
+    )
+
+    # When
+    result = run_guard(repository, manifest)
+
+    # Then
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["missing"]["paths"] == ["deleted.txt"]
+
+
+def test_audit_rejects_a_transferred_deletion_mapped_to_an_unrelated_absent_path(tmp_path: Path) -> None:
+    # Given
+    repository, source_commit, target_commit = create_deletion_repository(tmp_path, target_deletes=True)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "commits": {source_commit: {"status": "transferred", "target_commit": target_commit}},
+            "paths": {"deleted.txt": {"status": "transferred", "target_paths": ["unrelated.txt"]}},
+        }),
+        encoding="utf-8",
+    )
+
+    # When
+    result = run_guard(repository, manifest)
+
+    # Then
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["missing"]["paths"] == ["deleted.txt"]

@@ -12,7 +12,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, assert_never
 
 Status: TypeAlias = Literal["excluded", "recovery", "transferred"]
 JsonValue: TypeAlias = bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"] | None
@@ -66,8 +66,10 @@ def patch_id(repository: Path, commit: str) -> str:
 def parse_account(raw: JsonValue, key: str) -> Account:
     if not isinstance(raw, dict):
         raise AuditError(f"{key} must be an object")
-    status = raw.get("status")
-    if status not in {"excluded", "recovery", "transferred"}:
+    raw_status = raw.get("status")
+    statuses: tuple[Status, ...] = ("excluded", "recovery", "transferred")
+    status = next((candidate for candidate in statuses if candidate == raw_status), None)
+    if status is None:
         raise AuditError(f"{key}.status must be excluded, recovery, or transferred")
     reason = raw.get("reason")
     recovery_ref = raw.get("recovery_ref")
@@ -88,8 +90,10 @@ def parse_account(raw: JsonValue, key: str) -> Account:
             raise AuditError(f"{key}.recovery_ref must name a ref for recovered work")
         case "transferred" if target_commit is None and not target_paths:
             raise AuditError(f"{key} must name target_commit or target_paths for transferred work")
-        case _:
+        case "excluded" | "recovery" | "transferred":
             pass
+        case unreachable:
+            assert_never(unreachable)
     return Account(
         status=status,
         reason=reason,
@@ -160,9 +164,9 @@ def blob_at_ref(repository: Path, ref: str, path: str) -> str | None:
 
 def matching_target_blob(repository: Path, source: str, path: str, target: str, target_paths: tuple[str, ...]) -> bool:
     source_blob = blob_at_ref(repository, source, path)
-    return source_blob is not None and any(
-        source_blob == blob_at_ref(repository, target, target_path) for target_path in target_paths
-    )
+    if source_blob is None:
+        return path in target_paths and blob_at_ref(repository, target, path) is None
+    return any(source_blob == blob_at_ref(repository, target, target_path) for target_path in target_paths)
 
 
 def require_clean_worktree(repository: Path) -> None:
@@ -189,6 +193,8 @@ def is_accounted(
             )
         case "transferred":
             return matching_target_blob(repository, source, unit, target, account.target_paths)
+        case unreachable:
+            assert_never(unreachable)
 
 
 def audit(repository: Path, source: str, base: str, target: str, manifest: Manifest) -> dict[str, list[str]]:
