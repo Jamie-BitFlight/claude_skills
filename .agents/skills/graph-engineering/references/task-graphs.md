@@ -6,6 +6,7 @@
 - [Fake edges](#fake-edges)
 - [The diamond pattern](#the-diamond-pattern)
 - [The stop rule](#the-stop-rule)
+- [Execution handoff](#execution-handoff)
 - [The human gate](#the-human-gate)
 - [Guardrails](#guardrails)
 
@@ -57,6 +58,34 @@ The decision procedure:
 3. Never let findings merge without one owner of the merge.
 
 More agents is not a strategy. The shape of the work decides.
+
+## Execution handoff
+
+Design the topology once, then hand each ready component to the smallest runtime that fits it.
+Graph engineering owns the nodes, real dependencies, verification joins, and human gates.
+The runtime MUST consume that graph without adding dependencies or redesigning the split.
+
+| Ready component | Runtime |
+|---|---|
+| Serial chain | Keep it with the leader or one worker |
+| Parallel nodes that never exchange results | Use plain subagents |
+| Parallel nodes that must exchange findings or coordinate a shared boundary | Use teammode |
+| Fan-in verification | Start a fresh verifier only after every incoming node finishes |
+| Irreversible action | Stop at the human gate |
+
+Initialize teammode only when the first coordination-connected parallel component becomes ready.
+Map graph facts directly into the existing team fields:
+
+- node scope and file ownership become member `focus`;
+- node acceptance criteria and QA become member `deliverable`;
+- graph dependencies determine which members may start in the current wave;
+- overlapping file ownership requires separate worktrees;
+- the merge owner remains the leader, never another implicit member.
+
+Disband the team when that component and its verification join finish. Do not keep team state for
+serial work, isolated subagents, later human gates, or hypothetical future waves. When teammode is
+unavailable, preserve the topology and use the available serial or plain-subagent runtime instead.
+This boundary avoids a second planner, a graph-to-team compiler, and duplicate orchestration state.
 
 ## The human gate
 
