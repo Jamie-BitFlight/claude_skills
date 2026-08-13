@@ -16,6 +16,7 @@ from typing import Literal, TypeAlias, assert_never
 
 Status: TypeAlias = Literal["excluded", "recovery", "transferred"]
 JsonValue: TypeAlias = bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"] | None
+TreeEntry: TypeAlias = tuple[str, str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,25 +149,36 @@ def ref_contains(repository: Path, ancestor: str, ref: str) -> bool:
     raise AuditError(f"cannot inspect recovery ref {ref}: {message}")
 
 
-def blob_at_ref(repository: Path, ref: str, path: str) -> str | None:
+def tree_entry_at_ref(repository: Path, ref: str, path: str) -> TreeEntry | None:
     result = subprocess.run(
-        [git_executable(), "rev-parse", "--verify", f"{ref}:{path}"],
+        [git_executable(), "ls-tree", "-z", ref, "--", path],
         cwd=repository,
         capture_output=True,
         check=False,
         text=True,
     )
-    if result.returncode in {0, 128}:
-        return result.stdout.strip() or None
+    if result.returncode == 0:
+        output = result.stdout.rstrip("\0")
+        if not output:
+            return None
+        header, separator, _ = output.partition("\t")
+        fields = header.split(" ", maxsplit=2)
+        if separator != "\t":
+            raise AuditError(f"cannot parse tree entry for {path} at {ref}")
+        try:
+            mode, entry_type, object_id = fields
+        except ValueError as error:
+            raise AuditError(f"cannot parse tree entry for {path} at {ref}") from error
+        return mode, entry_type, object_id
     message = result.stderr.strip() or result.stdout.strip()
     raise AuditError(f"cannot inspect {path} at {ref}: {message}")
 
 
-def matching_target_blob(repository: Path, source: str, path: str, target: str, target_paths: tuple[str, ...]) -> bool:
-    source_blob = blob_at_ref(repository, source, path)
-    if source_blob is None:
-        return path in target_paths and blob_at_ref(repository, target, path) is None
-    return any(source_blob == blob_at_ref(repository, target, target_path) for target_path in target_paths)
+def matching_target_entry(repository: Path, source: str, path: str, target: str, target_paths: tuple[str, ...]) -> bool:
+    source_entry = tree_entry_at_ref(repository, source, path)
+    if source_entry is None:
+        return path in target_paths and tree_entry_at_ref(repository, target, path) is None
+    return any(source_entry == tree_entry_at_ref(repository, target, target_path) for target_path in target_paths)
 
 
 def require_clean_worktree(repository: Path) -> None:
@@ -192,7 +204,7 @@ def is_accounted(
                 and patch_id(repository, unit) == patch_id(repository, account.target_commit)
             )
         case "transferred":
-            return matching_target_blob(repository, source, unit, target, account.target_paths)
+            return matching_target_entry(repository, source, unit, target, account.target_paths)
         case unreachable:
             assert_never(unreachable)
 

@@ -67,6 +67,30 @@ def create_deletion_repository(tmp_path: Path, *, target_deletes: bool) -> tuple
     return repository, source_commit, git(repository, "rev-parse", "HEAD")
 
 
+def create_entry_mismatch_repository(tmp_path: Path, *, source_symlink: bool) -> tuple[Path, str]:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    git(repository, "init", "--initial-branch=base")
+    git(repository, "config", "user.email", "test@example.com")
+    git(repository, "config", "user.name", "Test User")
+    entry = repository / "entry.txt"
+    entry.write_text("same bytes\n", encoding="utf-8")
+    git(repository, "add", "entry.txt")
+    git(repository, "commit", "-m", "base")
+
+    git(repository, "switch", "-c", "source")
+    if source_symlink:
+        entry.unlink()
+        Path(entry).symlink_to("same bytes\n")
+    else:
+        entry.chmod(0o755)
+    git(repository, "add", "--all")
+    git(repository, "commit", "-m", "change tree entry")
+    source_commit = git(repository, "rev-parse", "HEAD")
+    git(repository, "switch", "-c", "target", "base")
+    return repository, source_commit
+
+
 def run_guard(repository: Path, manifest: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
@@ -204,6 +228,46 @@ def test_audit_rejects_a_source_path_mapped_to_an_unrelated_target_path(tmp_path
     # Then
     assert result.returncode == 1
     assert "excluded.txt" in json.loads(result.stdout)["missing"]["paths"]
+
+
+def test_audit_rejects_a_same_blob_executable_bit_mismatch(tmp_path: Path) -> None:
+    # Given
+    repository, source_commit = create_entry_mismatch_repository(tmp_path, source_symlink=False)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "commits": {source_commit: {"status": "excluded", "reason": "Testing path accounting only."}},
+            "paths": {"entry.txt": {"status": "transferred", "target_paths": ["entry.txt"]}},
+        }),
+        encoding="utf-8",
+    )
+
+    # When
+    result = run_guard(repository, manifest)
+
+    # Then
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["missing"]["paths"] == ["entry.txt"]
+
+
+def test_audit_rejects_a_same_blob_regular_file_symlink_mismatch(tmp_path: Path) -> None:
+    # Given
+    repository, source_commit = create_entry_mismatch_repository(tmp_path, source_symlink=True)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps({
+            "commits": {source_commit: {"status": "excluded", "reason": "Testing path accounting only."}},
+            "paths": {"entry.txt": {"status": "transferred", "target_paths": ["entry.txt"]}},
+        }),
+        encoding="utf-8",
+    )
+
+    # When
+    result = run_guard(repository, manifest)
+
+    # Then
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["missing"]["paths"] == ["entry.txt"]
 
 
 def test_audit_accepts_a_transferred_deletion_absent_from_source_and_target(tmp_path: Path) -> None:
