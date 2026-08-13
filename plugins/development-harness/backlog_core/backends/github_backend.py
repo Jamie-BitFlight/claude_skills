@@ -1044,6 +1044,15 @@ class GitHubBackend:
         )
 
     def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        if not request.expected_revision:
+            return self._contents.put(request)
+        try:
+            self._contents.get(request.reference)
+        except ContentNotFoundError as exc:
+            legacy = self._read_online_content(request.reference, cached)
+            if legacy.revision != request.expected_revision:
+                raise ContentConflictError("Content revision no longer matches") from exc
+            return self._contents.put(request.model_copy(update={"expected_revision": "", "create_only": True}))
         return self._contents.put(request)
 
     def _with_legacy_content(self, query: ContentQuery, current: list[ContentRecord]) -> list[ContentRecord]:
