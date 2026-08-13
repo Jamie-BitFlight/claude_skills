@@ -21,12 +21,15 @@ from backlog_core.models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
+    UnsupportedCapabilityError,
 )
 from dh_core import operations
 from pydantic import ValidationError
 from ruamel.yaml import YAMLError
+from sam_schema.cli import app
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.models import Task, TaskStatus
+from typer.testing import CliRunner
 
 
 @pytest.fixture
@@ -296,6 +299,36 @@ def test_dispatch_create_does_not_overwrite_when_existing_plan_is_unavailable() 
         operations.dispatch_create_plan(10, _dispatch_plan())
 
     provider.put_content.assert_not_called()
+
+
+def test_dispatch_cli_returns_structured_unsupported_error_without_persisting_plan(
+    content_provider: InMemoryBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        content_provider,
+        "put_content",
+        MagicMock(side_effect=UnsupportedCapabilityError("GitHub dispatch writes are not supported")),
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "dispatch",
+            "create-plan",
+            "--milestone-number",
+            "10",
+            "--milestone-title",
+            "Provider plan",
+            "--integration-branch",
+            "main",
+            "--wave-item",
+            "wave=1;issue=101;title=Issue;priority=P1",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert json.loads(result.stdout) == {"error": "GitHub dispatch writes are not supported", "milestone_number": 10}
+    assert content_provider.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN)) == []
 
 
 def test_dh_core_has_no_legacy_content_storage_reachability() -> None:

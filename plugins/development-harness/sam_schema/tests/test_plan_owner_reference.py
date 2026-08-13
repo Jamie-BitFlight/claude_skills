@@ -2,16 +2,29 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
-from backlog_core.models import ContentConflictError, ContentKind, ContentQuery, ContentRecord, ContentRef, ContentWrite
+from backlog_core.models import (
+    ContentConflictError,
+    ContentKind,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+    UnsupportedCapabilityError,
+)
 from pydantic import ValidationError
 
 from sam_schema.core.action_models import CreatePlanConfig, UpdatePlanConfig
 from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.exceptions import PlanNotFoundError
 from sam_schema.core.models import Task, TaskStatus
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 def test_create_accepts_opaque_owner_reference() -> None:
@@ -103,6 +116,70 @@ def test_content_task_provider_claim_uses_loaded_revision() -> None:
     assert fresh_task["status"] == "in-progress"
     assert fresh_task["started"] is not None
     assert content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id)).owner_reference == "bd-a1b2"
+
+
+def test_content_task_provider_removes_failed_create_from_local_state(mocker: MockerFixture) -> None:
+    # Given: a content provider which rejects an otherwise valid create.
+    content_provider = InMemoryBackend()
+    provider = ContentTaskProvider(content_provider)
+    writes: list[ContentWrite] = []
+
+    def reject_create(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        raise UnsupportedCapabilityError("create rejected")
+
+    mocker.patch.object(content_provider, "put_content", side_effect=reject_create)
+
+    # When: persistence fails after the in-memory plan has been created.
+    with pytest.raises(UnsupportedCapabilityError, match="create rejected"):
+        provider.create_plan("no-ghost", "must not remain locally", [])
+
+    # Then: same-process reads cannot observe a plan the provider never accepted.
+    assert provider.list_plans() == []
+    with pytest.raises(PlanNotFoundError):
+        provider.read_plan(writes[0].reference.name)
+
+
+def test_content_task_provider_refreshes_plan_after_stale_write_and_recovers() -> None:
+    # Given: a stale provider and an authoritative provider over the same plan.
+    content_provider = InMemoryBackend()
+    creator = ContentTaskProvider(content_provider)
+    plan = creator.create_plan("refresh-plan", "restore authoritative plan", [])
+    plan_id = plan["plan_id"]
+    stale_provider = ContentTaskProvider(content_provider)
+    authoritative_provider = ContentTaskProvider(content_provider)
+    authoritative_provider.update_plan_fields(plan_id, context="authoritative context")
+
+    # When: the stale provider's plan mutation conflicts.
+    with pytest.raises(ContentConflictError, match="revision"):
+        stale_provider.update_plan_fields(plan_id, context="stale context")
+
+    # Then: it exposes the authoritative value and can write again with the refreshed revision.
+    assert stale_provider.read_plan(plan_id)["context"] == "authoritative context"
+    stale_provider.update_plan_fields(plan_id, context="recovered context")
+    assert ContentTaskProvider(content_provider).read_plan(plan_id)["context"] == "recovered context"
+
+
+def test_content_task_provider_refreshes_task_after_stale_write_and_recovers() -> None:
+    # Given: a stale provider and an authoritative provider over the same task.
+    content_provider = InMemoryBackend()
+    creator = ContentTaskProvider(content_provider)
+    plan = creator.create_plan(
+        "refresh-task", "restore authoritative task", [Task(id="T01", title="Refresh", status=TaskStatus.NOT_STARTED)]
+    )
+    plan_id = plan["plan_id"]
+    stale_provider = ContentTaskProvider(content_provider)
+    authoritative_provider = ContentTaskProvider(content_provider)
+    authoritative_provider.update_task_status(plan_id, "T01", "in-progress")
+
+    # When: the stale provider's task mutation conflicts.
+    with pytest.raises(ContentConflictError, match="revision"):
+        stale_provider.update_task_status(plan_id, "T01", "complete")
+
+    # Then: it exposes the authoritative task state and can write again with the refreshed revision.
+    assert stale_provider.read_task(plan_id, "T01")["status"] == "in-progress"
+    stale_provider.update_task_status(plan_id, "T01", "complete")
+    assert ContentTaskProvider(content_provider).read_task(plan_id, "T01")["status"] == "complete"
 
 
 def test_sqlite_content_write_allows_only_one_concurrent_stale_revision(tmp_path: Path) -> None:

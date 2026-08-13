@@ -60,6 +60,7 @@ from backlog_core.models import (
     DispatchWaveSummary,
     GitHubUnavailableError,
     Output,
+    UnsupportedCapabilityError,
     get_repo_root,
 )
 from dispatch_schema import Wave
@@ -1290,7 +1291,7 @@ def dispatch_create_plan(
 
     try:
         provider.put_content(write)
-    except (BacklogError, ContentConflictError) as exc:
+    except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
 
     is_valid: bool | None = None

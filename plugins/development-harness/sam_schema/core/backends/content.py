@@ -7,7 +7,15 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from backlog_core.backend_types import ContentProvider
-from backlog_core.models import ContentConflictError, ContentKind, ContentQuery, ContentRef, ContentWrite
+from backlog_core.models import (
+    ContentConflictError,
+    ContentKind,
+    ContentNotFoundError,
+    ContentProviderError,
+    ContentQuery,
+    ContentRef,
+    ContentWrite,
+)
 from pydantic import TypeAdapter, ValidationError
 from ruamel.yaml import YAML
 
@@ -72,14 +80,22 @@ class ContentTaskProvider(InMemoryTaskProvider):
             offset += len(records)
 
     def _flush(self, plan_id: str, owner_reference: str | None = None) -> None:
-        record = self._provider.put_content(
-            ContentWrite(
-                reference=ContentRef(kind=ContentKind.PLAN, name=plan_id),
-                content=json.dumps(self._plans[plan_id], separators=(",", ":"), default=str),
-                owner_reference=owner_reference,
-                expected_revision=self._revisions.get(plan_id, ""),
+        try:
+            record = self._provider.put_content(
+                ContentWrite(
+                    reference=ContentRef(kind=ContentKind.PLAN, name=plan_id),
+                    content=json.dumps(self._plans[plan_id], separators=(",", ":"), default=str),
+                    owner_reference=owner_reference,
+                    expected_revision=self._revisions.get(plan_id, ""),
+                )
             )
-        )
+        except ContentProviderError:
+            try:
+                self._refresh(plan_id)
+            except ContentNotFoundError:
+                self._plans.pop(plan_id, None)
+                self._revisions.pop(plan_id, None)
+            raise
         self._revisions[plan_id] = record.revision
 
     def _refresh(self, plan_id: str) -> None:
@@ -137,7 +153,6 @@ class ContentTaskProvider(InMemoryTaskProvider):
             try:
                 self._flush(plan_id)
             except ContentConflictError:
-                self._refresh(plan_id)
                 return False
         return claimed
 
