@@ -630,29 +630,30 @@ def test_github_content_provider_queues_offline_write_and_returns_stale_cache(tm
 
 
 def test_github_content_provider_keeps_complete_artifact_identity(tmp_path: Path) -> None:
-    # Given: equal artifact IDs under different owners and types
+    # Given: equal artifact IDs under different owners and types queued while GitHub is offline
     artifact_provider = MagicMock()
     backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
-    backend.try_get_github = MagicMock(return_value=MagicMock())
     references = [
         ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="design", name="same/id"),
         ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#2", artifact_type="design", name="same/id"),
         ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="test", name="same/id"),
     ]
+    backend.try_get_github = MagicMock(return_value=None)
 
-    # When: all three records are written and listed through the logical content API
+    # When: reconnect discovery sees every queued artifact mutation as unsupported
     for index, reference in enumerate(references):
         backend.put_content(ContentWrite(reference=reference, content=f"content-{index}"))
+    backend.try_get_github = MagicMock(return_value=MagicMock())
     listed = backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
 
-    # Then: owner, type, and ID remain distinct and discovery is owner-bounded
+    # Then: owner, type, and ID remain distinct without any Gist mutation
     assert [record.reference for record in listed] == [references[0], references[2]]
-    stored_paths = [call.args[2] for call in artifact_provider.store_artifact_content.call_args_list]
-    assert stored_paths == ["design/same/id", "design/same/id", "test/same/id"]
+    assert [mutation.write.reference for mutation in backend._cache.pending_mutations()] == references
+    artifact_provider.store_artifact_content.assert_not_called()
 
 
-def test_github_content_provider_partial_replay_acknowledges_only_applied_writes(tmp_path: Path) -> None:
-    # Given: two durable offline writes and a provider that fails on the second mutation
+def test_github_content_provider_replay_retains_unsupported_artifact_writes(tmp_path: Path) -> None:
+    # Given: two durable offline writes that GitHub cannot atomically publish
     cache = FileCache(tmp_path)
     artifact_provider = MagicMock()
     backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
@@ -663,16 +664,15 @@ def test_github_content_provider_partial_replay_acknowledges_only_applied_writes
     ]
     for reference in references:
         backend.put_content(ContentWrite(reference=reference, content=reference.namespace))
-    artifact_provider.store_artifact_content.side_effect = [None, BacklogError("provider failed")]
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
-    # When: reconnect discovery replays the durable queue
+    # When: reconnect discovery attempts replay
     backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
 
-    # Then: the applied prefix is acknowledged and the failed suffix remains durable
-    assert [mutation.write.reference for mutation in cache.pending_mutations()] == [references[1]]
-    assert cache.get_content(references[0]).pending is False
-    assert cache.get_content(references[1]).pending is True
+    # Then: unsupported writes remain durable and no Gist mutation is attempted
+    assert [mutation.write.reference for mutation in cache.pending_mutations()] == references
+    assert all(cache.get_content(reference).pending for reference in references)
+    artifact_provider.store_artifact_content.assert_not_called()
 
 
 def test_github_content_provider_replay_preserves_concurrent_remote_revision(tmp_path: Path) -> None:

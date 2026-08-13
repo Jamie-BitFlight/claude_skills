@@ -23,7 +23,9 @@ import pytest
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.dispatch_state import DispatchStateManager
 from backlog_core.models import (
+    ArtifactManifest,
     BacklogError,
+    ContentConflictError,
     ContentKind,
     ContentQuery,
     ContentRecord,
@@ -1007,6 +1009,35 @@ class TestDispatchCreatePlan:
         manifests = confirmed_missing_backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST))
         assert len(manifests) == 1
         assert "dispatch-milestone-11" in manifests[0].content
+
+    async def test_create_plan_issue_manifest_conflict_is_best_effort(
+        self, valid_plan_dict: dict, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        backend = InMemoryBackend()
+        manifest_reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest")
+        backend.put_content(
+            ContentWrite(reference=manifest_reference, content=ArtifactManifest(issue_number=42).model_dump_json())
+        )
+        original_put_content = backend.put_content
+
+        def conflict_manifest(request: ContentWrite) -> ContentRecord:
+            if request.reference.kind == ContentKind.ARTIFACT_MANIFEST and request.expected_revision:
+                raise ContentConflictError("manifest revision conflict")
+            return original_put_content(request)
+
+        mocker.patch.object(backend, "put_content", side_effect=conflict_manifest)
+        mocker.patch("backlog_core.server._get_artifact_provider", return_value=backend)
+
+        with caplog.at_level(logging.WARNING, logger="backlog_core.server"):
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+                )
+
+        data: dict[str, Any] = result.data
+        assert "error" not in data, f"Unexpected error: {data.get('error')}"
+        assert _has_dispatch_plan(backend)
+        assert any("manifest revision conflict" in record.message for record in caplog.records)
 
     # ------------------------------------------------------------------
     # Error-case tests

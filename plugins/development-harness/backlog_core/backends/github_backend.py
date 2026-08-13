@@ -13,7 +13,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, assert_never, runtime_checkable
 
 import dh_paths as _dh_paths
 from sam_schema.core.artifact_registry_client import (
@@ -28,7 +28,6 @@ from backlog_core import gh_client, github_branches, github_sync, rendering as _
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
 from backlog_core.file_cache import FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.models import (
-    ArtifactManifest,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -867,43 +866,15 @@ class GitHubBackend:
         )
 
     def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
-        owner_reference = request.reference.namespace
-        if request.reference.kind == ContentKind.PLAN:
-            return self._plan_persistence.put(request)
-        if request.reference.kind == ContentKind.DISPATCH_PLAN:
-            return self._dispatch_persistence.put(request)
-        if request.expected_revision:
-            current_revision = self._read_online_content(request.reference, cached).revision
-            if current_revision != request.expected_revision:
-                raise ContentConflictError("Content revision no longer matches")
-        if owner_reference:
-            owner_number = self._owner_number(owner_reference)
-            match request.reference.kind:
-                case ContentKind.PLAN:
-                    self._artifact_provider.store_artifact_content(
-                        owner_number, "plan", f"plans/{request.reference.name}", request.content
-                    )
-                case ContentKind.ARTIFACT_MANIFEST:
-                    manifest = ArtifactManifest.model_validate_json(request.content)
-                    self._artifact_provider.set_manifest(owner_number, manifest)
-                    request = request.model_copy(
-                        update={
-                            "content": self._artifact_provider.get_manifest(owner_number).model_dump_json(by_alias=True)
-                        }
-                    )
-                case ContentKind.ARTIFACT_CONTENT:
-                    self._artifact_provider.store_artifact_content(
-                        owner_number,
-                        request.reference.artifact_type,
-                        f"{request.reference.artifact_type}/{request.reference.name}",
-                        request.content,
-                    )
-        return ContentRecord(
-            reference=request.reference,
-            owner_reference=owner_reference,
-            content=request.content,
-            revision=self._content_revision(request.content),
-        )
+        match request.reference.kind:
+            case ContentKind.PLAN:
+                return self._plan_persistence.put(request)
+            case ContentKind.DISPATCH_PLAN:
+                return self._dispatch_persistence.put(request)
+            case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
+                raise UnsupportedCapabilityError("GitHub artifact writes require compare-and-swap support")
+            case unreachable:
+                assert_never(unreachable)
 
     def _replay_pending_content(self) -> None:
         acknowledgements: list[ReplayAcknowledgement] = []
@@ -911,7 +882,7 @@ class GitHubBackend:
             cached = self._cached_content(mutation.write.reference)
             try:
                 record = self._write_online_content(mutation.write, cached)
-            except ContentConflictError:
+            except (ContentConflictError, UnsupportedCapabilityError):
                 continue
             except (BacklogError, ContentUnavailableError, OSError):
                 break

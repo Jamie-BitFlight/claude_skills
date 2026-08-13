@@ -9,6 +9,7 @@ import pytest
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
+    ArtifactManifest,
     ContentConflictError,
     ContentKind,
     ContentQuery,
@@ -91,6 +92,51 @@ def test_revisionless_plan_update_fails_closed_without_gist_mutation() -> None:
     provider.store_artifact_content.assert_not_called()
     client.store.assert_not_called()
     index.register.assert_not_called()
+
+
+def test_online_artifact_content_update_fails_closed_before_gist_store(tmp_path: Path) -> None:
+    reference = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="research", name="note")
+    provider = MagicMock()
+    provider.read_artifact_content_from_remote.return_value = "before"
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    with pytest.raises(UnsupportedCapabilityError, match="compare-and-swap"):
+        backend.put_content(ContentWrite(reference=reference, content="after"))
+
+    provider.store_artifact_content.assert_not_called()
+    provider.set_manifest.assert_not_called()
+
+
+def test_online_artifact_manifest_update_fails_closed_before_gist_store(tmp_path: Path) -> None:
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="#1", name="manifest")
+    provider = MagicMock()
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    with pytest.raises(UnsupportedCapabilityError, match="compare-and-swap"):
+        backend.put_content(
+            ContentWrite(
+                reference=reference, content=ArtifactManifest(issue_number=1, last_updated="new").model_dump_json()
+            )
+        )
+
+    provider.store_artifact_content.assert_not_called()
+    provider.set_manifest.assert_not_called()
+
+
+def test_online_artifact_read_remains_available(tmp_path: Path) -> None:
+    reference = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="research", name="note")
+    provider = MagicMock()
+    provider.read_artifact_content_from_remote.return_value = "stored"
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    record = backend.get_content(reference)
+
+    assert (record.content, record.pending, record.stale) == ("stored", False, False)
+    provider.store_artifact_content.assert_not_called()
 
 
 class _UnavailablePlanPersistence:

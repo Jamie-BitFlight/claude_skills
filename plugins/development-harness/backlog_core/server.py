@@ -46,6 +46,7 @@ from .models import (
     BackendAvailability as _BackendAvailability,
     BackendStatus as _BackendStatus,
     BacklogError,
+    ContentConflictError,
     ContentKind,
     ContentNotFoundError,
     ContentRef,
@@ -58,6 +59,7 @@ from .models import (
     GitHubUnavailableError,
     Output,
     RegisterResult,
+    UnsupportedCapabilityError,
     init as _init_models,
 )
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
@@ -3933,7 +3935,13 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
         )
         register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
         log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", artifact_id, item_id)
-    except (BacklogError, ContentUnavailableError, _GithubException) as exc:
+    except (
+        BacklogError,
+        ContentUnavailableError,
+        ContentConflictError,
+        UnsupportedCapabilityError,
+        _GithubException,
+    ) as exc:
         log.warning(
             "dispatch_create_plan: artifact registration failed for item %s (artifact=%s): %s",
             item_id,
