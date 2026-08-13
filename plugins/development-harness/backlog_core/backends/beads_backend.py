@@ -268,7 +268,7 @@ class BeadsBackend:
 
     def list_work_items(self) -> list[BacklogItem]:
         """List work items projected from native Beads issues."""
-        issues = parse_issue_list(self._runner.run_json(["list", "--all"]))
+        issues = parse_issue_list(self._runner.run_json(["list", "--all", "--limit", "0"]))
         items: list[BacklogItem] = []
         for issue in issues:
             try:

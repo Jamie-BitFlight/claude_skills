@@ -2992,29 +2992,8 @@ class TestApplyPlanToItemBeadsNanoid:
             reset_config()
 
 
-# ---------------------------------------------------------------------------
-# _auto_register_plan_artifact — beads nanoid safe-skip
-# ---------------------------------------------------------------------------
-
-
-class TestAutoRegisterPlanArtifactBeadsNanoid:
-    """_auto_register_plan_artifact skips artifact registration for beads nanoid issue refs."""
-
-    def test_auto_register_plan_artifact_no_warning_for_beads_nanoid(self, mocker: MockerFixture) -> None:
-        """update_item(plan=...) on a beads item emits no 'Could not parse issue number' warning.
-
-        Tests: _auto_register_plan_artifact early-return path for string-ID backends.
-        How: Configure a BeadsBackend (issue_id_type='string'); write an item with
-             issue='bd-f7a2'; call update_item(plan=...); verify no exception is raised
-             and no "Could not parse issue number" warning is emitted.
-        Why: _auto_register_plan_artifact is called unconditionally after
-             _apply_plan_to_item, with no issue_id_type guard. Without the guard it
-             calls parse_issue_number('bd-f7a2'), which returns None, and emits a
-             spurious "Could not parse issue number from 'bd-f7a2'" warning even
-             though the plan update itself succeeded cleanly — a fully-supported
-             beads operation reported as degraded.
-        """
-
+class TestPlanAssociationBeadsNanoid:
+    def test_plan_association_does_not_publish_artifact_for_beads_nanoid(self, mocker: MockerFixture) -> None:
         import backlog_core.models as models
         from backlog_core.backend_protocol import reset_config, set_config
         from backlog_core.backend_types import BacklogConfig

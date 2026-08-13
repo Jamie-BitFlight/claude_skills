@@ -173,7 +173,7 @@ class _RecordingBdRunner:
         self.text_calls: list[list[str]] = []
 
     def run_json(self, argv: Sequence[str]) -> list[dict[str, Any]]:
-        assert list(argv) == ["list", "--all"]
+        assert list(argv) == ["list", "--all", "--limit", "0"]
         return [self.issue]
 
     def run_text(self, argv: Sequence[str]) -> str:

@@ -24,7 +24,6 @@ from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
 
 from . import models as _models
-from .artifact_manifest_store import register_manifest_entry
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
 from .entry_blocks import ENTRY_RE, _render_entry_raw, parse_entries
@@ -34,14 +33,11 @@ from .models import (
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
     VALID_NEW_ITEM_PRIORITIES,
-    ArtifactEntry,
-    ArtifactType,
     BackendUnavailableError,
     BacklogError,
     BacklogItem,
     ContentKind,
     ContentQuery,
-    ContentRef,
     ContentUnavailableError,
     DuplicateItemError,
     Entry,
@@ -782,47 +778,6 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
                 out.warn(f"  WARNING: Could not post plan to issue {issue_ref}: {e}")
 
     return True
-
-
-def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", output: Output | None = None) -> None:
-    """Register *plan* as a task-plan artifact on the item's GitHub Issue.
-
-    Best-effort writes log a warning; unavailable manifest reads propagate. Called
-    after :func:`_apply_plan_to_item` when the backlog item has a linked
-    GitHub Issue.  No-ops silently for string-ID backends (e.g. beads) —
-    artifact registration targets GitHub issue manifests only.
-
-    Args:
-        item: Backlog item whose linked issue will receive the artifact entry.
-        plan: Repo-relative path to the plan file (e.g. ``"plan/tasks-1-foo.yaml"``).
-        repo: GitHub repository slug ``"owner/name"``.  Resolved via :func:`_repo`.
-        output: Optional output collector for warning messages.
-    """
-    out = output or Output()
-    issue_ref = item.issue
-    if not issue_ref:
-        return
-    if get_config().backend.issue_id_type == "string":
-        # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub
-        # issue number — artifact registration targets GitHub issue manifests
-        # only, so there is nothing to register against for this backend.
-        return
-    issue_number = parse_issue_number(issue_ref)
-    if issue_number is None:
-        out.warn(f"  WARNING: Could not parse issue number from {issue_ref!r}; skipping artifact registration")
-        return
-
-    try:
-        provider = get_config().backend
-        if not isinstance(provider, ContentProvider):
-            raise ContentUnavailableError("Active backend does not support artifact content")
-        owner = f"#{issue_number}"
-        reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=owner, name="manifest")
-        entry = ArtifactEntry(artifact_type=ArtifactType.TASK_PLAN, artifact_id=plan)
-        register_manifest_entry(provider, reference, issue_number, entry)
-        out.info(f"  Artifact registered: task-plan {plan} on issue #{issue_number}")
-    except (BacklogError, GithubException, OSError, RuntimeError) as exc:
-        out.warn(f"  WARNING: Artifact registration failed for {plan} on issue #{issue_number}: {exc}")
 
 
 def _resolve_groomed_content(
@@ -3322,7 +3277,6 @@ def update_item(
         _apply_plan_to_item(item, plan, repo, output=out)
         out.info(f"  Plan: {plan}")
         result["plan"] = plan
-        _auto_register_plan_artifact(item, plan, repo, output=out)
 
     if not item.issue and (not title or status or verified):
         issue_num = _create_issue_and_update_item(item, repo, output=out)
