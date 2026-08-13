@@ -35,6 +35,9 @@ from backlog_core.models import BacklogItem
 from backlog_core.server import mcp as _backlog_mcp
 from sam_schema import artifacts, dispatch
 from sam_schema.cli import app
+from sam_schema.core.backends.local_context_backend import LocalContextBackend
+from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
+from sam_schema.core.context_config import ContextConfig, reset_context_config, set_context_config
 from sam_schema.server import mcp as _sam_mcp
 from typer.testing import CliRunner
 
@@ -64,7 +67,7 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
 
 
 @pytest.fixture
-def dh_env(tmp_path: Path):
+def dh_env(tmp_path: Path, request: pytest.FixtureRequest):
     """Provide an isolated SQLite backlog provider shared by both transports.
 
     The CLI selects SQLite through ``BACKLOG_BACKEND``. The in-process MCP
@@ -82,6 +85,9 @@ def dh_env(tmp_path: Path):
     db_path = dh_paths.state_root() / "backlog.sqlite3"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     _set_bp_config(_BPBacklogConfig(backend=SQLiteBackend(str(db_path))))
+    set_context_config(ContextConfig(backend=InMemoryContextBackend()))
+    if request.node.name.startswith("test_active_task_"):
+        set_context_config(ContextConfig(backend=LocalContextBackend()))
 
     yield env
 
@@ -89,6 +95,7 @@ def dh_env(tmp_path: Path):
         os.environ["DH_STATE_HOME"] = saved_dh_home
     else:
         os.environ.pop("DH_STATE_HOME", None)
+    reset_context_config()
     _reset_bp_config()
 
 
