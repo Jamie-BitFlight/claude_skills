@@ -22,6 +22,7 @@ from backlog_core.models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
+    UnsupportedCapabilityError,
 )
 from github import GithubException
 from pydantic import BaseModel
@@ -316,6 +317,11 @@ def test_backend_hides_private_work_item_heads_from_artifact_listing(
     records = backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
 
     assert [(record.reference, record.content) for record in records] == [(artifact, "public")]
+
+    with pytest.raises(UnsupportedCapabilityError, match="provider-private"):
+        backend.get_content(head)
+    with pytest.raises(UnsupportedCapabilityError, match="provider-private"):
+        backend.put_content(ContentWrite(reference=head, content="replacement"))
 
     backend._cache.cache_content(ContentRecord(reference=head, content="private"))
     backend.try_get_github = MagicMock(return_value=None)

@@ -950,6 +950,8 @@ class GitHubBackend:
         Returns:
             The provider or cached logical content record.
         """
+        if is_work_item_head_ref(reference):
+            raise UnsupportedCapabilityError("Content reference is provider-private")
         if self.try_get_github() is None:
             return self._cache.get_content(reference, stale=True)
         self._replay_pending_content()
@@ -971,6 +973,8 @@ class GitHubBackend:
         Returns:
             The applied or pending logical content record.
         """
+        if is_work_item_head_ref(request.reference):
+            raise UnsupportedCapabilityError("Content reference is provider-private")
         cached = self._cached_content(request.reference)
         if self.try_get_github() is None:
             if request.create_only and cached is not None:
