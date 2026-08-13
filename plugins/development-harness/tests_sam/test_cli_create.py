@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 from sam_schema.cli import app
+from sam_schema.core.backends.content import ContentTaskProvider
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -92,13 +93,7 @@ class TestSamCreateBasic:
         data = json.loads(result.stdout)
         assert _UUID_PLAN_ID_RE.match(data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
 
-    def test_create_writes_file_to_disk(self, plan_dir: Path) -> None:
-        """Created plan file exists on disk at the reported path.
-
-        Tests: File creation side effect.
-        How: Invoke create, check file exists at reported path.
-        Why: If the file is not written, all downstream operations fail.
-        """
+    def test_create_persists_to_configured_provider(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         # Arrange
         # Act
         result = runner.invoke(
@@ -108,16 +103,10 @@ class TestSamCreateBasic:
         )
         # Assert
         assert result.exit_code == 0
-        json.loads(result.stdout)
-        assert len(list(plan_dir.glob("*.yaml"))) == 1
+        plan_id = json.loads(result.stdout)["plan_id"]
+        assert content_backend.read_plan(plan_id)["goal"] == "Test goal"
 
-    def test_create_file_has_yaml_extension(self, plan_dir: Path) -> None:
-        """Created file uses .yaml extension.
-
-        Tests: File naming convention.
-        How: Check suffix of created file.
-        Why: Pure YAML format is the canonical plan format per ADR-001.
-        """
+    def test_create_does_not_write_legacy_yaml(self, plan_dir: Path) -> None:
         # Arrange / Act
         result = runner.invoke(
             app,
@@ -126,8 +115,7 @@ class TestSamCreateBasic:
         )
         # Assert
         assert result.exit_code == 0
-        json.loads(result.stdout)
-        assert next(plan_dir.glob("*.yaml")).suffix == ".yaml"
+        assert not list(plan_dir.glob("*.yaml"))
 
     def test_create_assigns_unique_plan_ids(self, plan_dir: Path) -> None:
         """Two consecutive creates produce distinct UUID plan_ids.
@@ -541,13 +529,9 @@ class TestSamCreateRoundTrip:
         assert task["title"] == "Body preservation test"
         assert task["agent"] == "python-cli-architect"
 
-    def test_create_plan_dir_auto_created_if_missing(self, tmp_path: Path) -> None:
-        """Plan directory is auto-created if it does not exist.
-
-        Tests: Directory auto-creation.
-        How: Pass non-existent plan_dir, verify plan is created.
-        Why: First-time users should not need to mkdir before create.
-        """
+    def test_create_uses_provider_when_plan_dir_is_missing(
+        self, tmp_path: Path, content_backend: ContentTaskProvider
+    ) -> None:
         # Arrange
         new_dir = tmp_path / "auto-created-plan"
         assert not new_dir.exists()
@@ -559,7 +543,9 @@ class TestSamCreateRoundTrip:
         )
         # Assert
         assert result.exit_code == 0
-        assert new_dir.exists()
+        assert not new_dir.exists()
+        plan_id = json.loads(result.stdout)["plan_id"]
+        assert content_backend.read_plan(plan_id)["goal"] == "Goal"
 
 
 # ---------------------------------------------------------------------------
@@ -575,7 +561,9 @@ class TestSamCreateWithIssue:
     Why: GitHub issue is metadata; plan addressing uses UUID to avoid collisions.
     """
 
-    def test_create_with_issue_produces_uuid_plan_id(self, plan_dir: Path) -> None:
+    def test_create_with_issue_produces_uuid_plan_id(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
         """--issue 951 produces a UUID plan_id, not P951.
 
         Tests: plan_id format when --issue is provided.
@@ -593,15 +581,9 @@ class TestSamCreateWithIssue:
         assert result.exit_code == 0, result.stdout
         data = json.loads(result.stdout)
         assert _UUID_PLAN_ID_RE.match(data["plan_id"]), f"Expected UUID plan_id, got: {data['plan_id']!r}"
-        assert len(list(plan_dir.glob("*.yaml"))) == 1
+        assert content_backend.read_plan(data["plan_id"])["issue"] == "951"
 
-    def test_create_with_issue_file_exists_at_reported_path(self, plan_dir: Path) -> None:
-        """File created with --issue exists on disk at the path returned in JSON.
-
-        Tests: Disk write side effect for issue-annotated plans.
-        How: Create with --issue, stat the reported path.
-        Why: If the file is not written, all downstream read/claim operations fail.
-        """
+    def test_create_with_issue_persists_to_provider(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         # Arrange / Act
         result = runner.invoke(
             app,
@@ -610,8 +592,8 @@ class TestSamCreateWithIssue:
         )
         # Assert
         assert result.exit_code == 0, result.stdout
-        json.loads(result.stdout)
-        assert len(list(plan_dir.glob("*.yaml"))) == 1
+        plan_id = json.loads(result.stdout)["plan_id"]
+        assert content_backend.read_plan(plan_id)["issue"] == "42"
 
     def test_create_with_issue_stores_issue_in_plan(self, plan_dir: Path) -> None:
         """--issue value is persisted inside the plan file.

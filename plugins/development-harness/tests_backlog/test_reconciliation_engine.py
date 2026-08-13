@@ -108,24 +108,32 @@ def test_unchanged_body_is_a_no_op() -> None:
 def test_equal_body_updates_provider_fields_without_patch() -> None:
     baseline = _item("same")
     local = baseline.model_copy(deep=True)
+    local.reference = "opaque-cache-key"
     local.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
 
     plan = _plan(local, _provider(render_issue_body(baseline)))
 
     assert plan.provider_patches == []
-    observed = plan.cache_actions[0].record.item.metadata
-    assert (observed.status, observed.labels, observed.updated_at) == ("open", ["feature"], "rev-1")
+    observed = plan.cache_actions[0].record.item
+    assert observed.reference == "opaque-cache-key"
+    assert (observed.metadata.status, observed.metadata.labels, observed.metadata.updated_at) == (
+        "open",
+        ["feature"],
+        "rev-1",
+    )
 
 
 def test_local_only_change_requests_patch_and_checkpoint() -> None:
     baseline = _item("before")
     local = _item("after", fingerprint=synchronized_fingerprint(baseline))
+    local.reference = "opaque-cache-key"
 
     plan = _plan(local, _provider(render_issue_body(baseline)))
     outcome = _applied(plan)
 
     assert len(plan.provider_patches) == 1
     assert any(action.phase == "checkpoint" for action in plan.cache_actions)
+    assert all(action.record.item.reference == "opaque-cache-key" for action in plan.cache_actions)
     assert outcome.result.provider_patches == 1
     assert outcome.advance_snapshot_checkpoint is True
 
@@ -180,11 +188,13 @@ def test_remote_only_item_requests_logical_cache_creation() -> None:
     plan = _plan(None, remote)
 
     assert plan.cache_actions[0].key == "#2"
+    assert plan.cache_actions[0].record.item.reference == "#2"
     assert plan.cache_actions[0].record.item.description == "remote"
 
 
 def test_tombstone_unlinks_without_discarding_local_content() -> None:
     local = _item("keep me", fingerprint="checkpoint")
+    local.reference = "opaque-cache-key"
 
     plan = _plan(local, _provider("", exists=False))
 
@@ -192,6 +202,7 @@ def test_tombstone_unlinks_without_discarding_local_content() -> None:
     outcome = _applied(plan)
 
     assert action.kind == "unlink"
+    assert action.record.item.reference == "opaque-cache-key"
     assert action.record.item.description == "keep me"
     assert action.record.item.metadata.issue == ""
     assert outcome.result.deleted_provider_items == 1

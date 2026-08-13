@@ -23,6 +23,8 @@ from sam_schema.server import mcp
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
+    from sam_schema.core.backends.content import ContentTaskProvider
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -70,9 +72,9 @@ from tests_sam.conftest import make_task_def as _task_def
 
 
 @pytest.fixture
-def task_backend() -> InMemoryTaskProvider:
+def task_backend(content_backend: ContentTaskProvider) -> InMemoryTaskProvider:
     """Fresh in-memory task backend — function scope, no filesystem."""
-    return InMemoryTaskProvider()
+    return content_backend
 
 
 @pytest.fixture

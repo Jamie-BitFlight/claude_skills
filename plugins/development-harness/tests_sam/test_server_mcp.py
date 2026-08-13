@@ -20,17 +20,18 @@ from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 from sam_schema.core.models import CreatePlanError, Plan, TaskStatus
 from sam_schema.server import mcp
-from sam_schema.writers.yaml_writer import write_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from sam_schema.core.backends.content import ContentTaskProvider
 
 
 # ---------------------------------------------------------------------------
 # Helpers (shared — see conftest.py)
 # ---------------------------------------------------------------------------
 
-from tests_sam.conftest import make_task
+from tests_sam.conftest import make_task, seed_plan
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -38,23 +39,12 @@ from tests_sam.conftest import make_task
 
 
 @pytest.fixture
-def plan_dir(tmp_path: Path) -> Path:
-    """Write a two-task plan file and return the plan directory path.
-
-    Directory layout::
-
-        tmp_path/
-        └── plan/
-            └── P001-mcp-test.yaml   (T1 complete, T2 depends on T1)
-
-    Returns:
-        Path to the plan directory (``tmp_path/plan``).
-    """
+def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     tasks = [make_task("T1", status=TaskStatus.COMPLETE), make_task("T2", dependencies=["T1"])]
     plan = Plan(feature="mcp-test", version="1.0", goal="MCP test goal", tasks=tasks)
-    write_plan(plan, p_dir / "P001-mcp-test.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
     return p_dir
 
 
@@ -514,20 +504,7 @@ async def test_mcp_sam_update_sets_context(tmp_path: Path) -> None:
 
 
 @pytest.fixture
-def multi_plan_dir(tmp_path: Path) -> Path:
-    """Write three plan files in a plan directory and return its path.
-
-    Directory layout::
-
-        tmp_path/
-        └── plan/
-            ├── P001-alpha-feature.yaml   (goal: "Implement alpha")
-            ├── P002-beta-feature.yaml    (goal: "Implement beta")
-            └── P003-gamma-search.yaml     (goal: "Search integration")
-
-    Returns:
-        Path to the plan directory (``tmp_path/plan``).
-    """
+def multi_plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
 
@@ -538,7 +515,7 @@ def multi_plan_dir(tmp_path: Path) -> Path:
     ]:
         tasks = [make_task("T1")]
         plan = Plan(feature=feature, version="1.0", goal=goal, tasks=tasks)
-        write_plan(plan, p_dir / f"P{plan_num:03d}-{feature}.yaml", force_single=True)
+        seed_plan(content_backend, f"P{plan_num}", plan)
 
     return p_dir
 
@@ -762,7 +739,7 @@ async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
+async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path, content_backend: ContentTaskProvider) -> None:
     """sam_plan status includes autonomy key with the value stored in the plan.
 
     Tests: autonomy field surfaces through sam_plan status via MCP protocol.
@@ -776,7 +753,7 @@ async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
     plan = Plan(
         feature="autonomy-test", version="1.0", goal="Test autonomy surfacing", tasks=tasks, autonomy="checkpoint"
     )
-    write_plan(plan, p_dir / "P001-autonomy-test.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     async with Client(mcp) as client:

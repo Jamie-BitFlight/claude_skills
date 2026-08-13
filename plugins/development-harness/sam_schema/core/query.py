@@ -29,6 +29,8 @@ from sam_schema.writers.yaml_writer import (
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from sam_schema.core.task_backend_types import PlanUpdateValue
+
 _LEGACY_TASKS_RE = re.compile(r"^tasks-(\d+)-")
 
 
@@ -120,7 +122,7 @@ def update_plan_fields(
     plan_path: Path,
     task_id: str | None = None,
     *,
-    set_fields: dict[str, str | int | list[str]] | None = None,
+    set_fields: dict[str, PlanUpdateValue] | None = None,
     context: str | None = None,
     append_section_name: str | None = None,
     section_content: str | None = None,

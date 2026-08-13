@@ -19,8 +19,15 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SUCCESSFUL_STATUSES
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError, TaskValidationError
-from sam_schema.core.models import PlanState, Task
-from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
+from sam_schema.core.models import AcceptanceCriterion, PlanState, Task
+from sam_schema.core.task_backend_types import (
+    DocumentData,
+    DocumentHandle,
+    PlanData,
+    PlanSummary,
+    PlanUpdateValue,
+    TaskData,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -284,6 +291,7 @@ class GitHubTaskProvider:
         context: str | None = None,
         issue: int | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create a plan as a parent GitHub Issue with task sub-issues."""
         for i, task in enumerate(tasks):
@@ -328,7 +336,7 @@ class GitHubTaskProvider:
                 )
             )
 
-        return PlanData(
+        plan_data = PlanData(
             plan_id=plan_id,
             feature=slug,
             version="1",
@@ -340,6 +348,11 @@ class GitHubTaskProvider:
             tasks=task_data_list,
             source_path=None,
         )
+        if acceptance_criteria_structured:
+            plan_data["acceptance_criteria_structured"] = [
+                criterion.model_dump() for criterion in acceptance_criteria_structured
+            ]
+        return plan_data
 
     def read_plan(self, plan_id: str) -> PlanData:
         """Fetch the plan issue and all task sub-issues."""
@@ -389,7 +402,7 @@ class GitHubTaskProvider:
         return summaries[offset:end]
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
     ) -> None:
         """Update top-level fields on a plan issue body."""
         node = self._fetch_plan_node(plan_id)

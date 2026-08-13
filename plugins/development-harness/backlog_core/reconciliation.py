@@ -115,20 +115,30 @@ def _compose(local: BacklogItem, provider: ProviderItem, body_item: BacklogItem)
         }
     )
     return BacklogItem(
-        title=provider.title, description=body_item.description, sections=body_item.sections, metadata=metadata
+        title=provider.title,
+        reference=local.reference,
+        description=body_item.description,
+        sections=body_item.sections,
+        metadata=metadata,
     )
 
 
 def _new_local_item(provider: ProviderItem) -> BacklogItem:
     parsed = parse_issue_body(provider.body)
-    return _compose(BacklogItem(), provider, parsed)
+    return _compose(BacklogItem(reference=provider.reference), provider, parsed)
 
 
 def _checkpoint(item: BacklogItem, revision: str) -> BacklogItem:
     metadata = item.metadata.model_copy(
         update={"sync_fingerprint": synchronized_fingerprint(item), "updated_at": revision}
     )
-    return BacklogItem(title=item.title, description=item.description, sections=item.sections, metadata=metadata)
+    return BacklogItem(
+        title=item.title,
+        reference=item.reference,
+        description=item.description,
+        sections=item.sections,
+        metadata=metadata,
+    )
 
 
 def _candidate(
@@ -184,7 +194,11 @@ def _plan_item(
     if not provider.exists:
         metadata = local.metadata.model_copy(update={"issue": "", "sync_fingerprint": "", "updated_at": ""})
         unlinked = BacklogItem(
-            title=local.title, description=local.description, sections=local.sections, metadata=metadata
+            title=local.title,
+            reference=local.reference,
+            description=local.description,
+            sections=local.sections,
+            metadata=metadata,
         )
         plan.cache_actions.append(_action(record.key, unlinked, kind="unlink"))
         plan.result.changed_references.append(provider.reference)

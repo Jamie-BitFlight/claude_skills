@@ -32,7 +32,7 @@ from sam_schema.core.exceptions import (
     TaskNotFoundError,
     TaskValidationError,
 )
-from sam_schema.core.models import PlanState, Task
+from sam_schema.core.models import AcceptanceCriterion, PlanState, Task
 from sam_schema.core.query import _new_plan_id
 
 if TYPE_CHECKING:
@@ -47,6 +47,7 @@ __all__ = ["InMemoryTaskProvider"]
 # TypedDict.update().  Created at module load; safe to reuse across calls.
 from sam_schema.core.task_backend_types import (
     PlanFieldsUpdate as _PlanFieldsUpdate,
+    PlanUpdateValue,
     TaskFieldsUpdate as _TaskFieldsUpdate,
 )
 
@@ -212,6 +213,7 @@ class InMemoryTaskProvider:
         context: str | None = None,
         issue: int | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create a new plan with an auto-assigned or issue-derived plan_id.
 
@@ -223,6 +225,7 @@ class InMemoryTaskProvider:
             issue: Optional GitHub issue number. When provided, the plan_id
                 is ``P{issue}``; otherwise an auto-incremented ID is used.
             acceptance_criteria: Optional plan-level acceptance criteria markdown.
+            acceptance_criteria_structured: Optional executable acceptance criteria.
 
         Returns:
             PlanData with the assigned plan_id.
@@ -257,6 +260,10 @@ class InMemoryTaskProvider:
             "source_path": None,
             "state": PlanState.DRAFTING if not tasks else PlanState.READY,
         }
+        if acceptance_criteria_structured:
+            plan_data["acceptance_criteria_structured"] = [
+                criterion.model_dump() for criterion in acceptance_criteria_structured
+            ]
         self._plans[plan_id] = copy.deepcopy(plan_data)
         return copy.deepcopy(plan_data)
 
@@ -313,7 +320,7 @@ class InMemoryTaskProvider:
         return paginated
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
     ) -> None:
         """Update top-level fields on a plan.
 

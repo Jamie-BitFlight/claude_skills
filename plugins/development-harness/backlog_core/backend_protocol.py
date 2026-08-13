@@ -41,7 +41,13 @@ from .backend_types import (
     SyncProvider,
     WorkItemBackend,
 )
-from .models import ContentConflictError, ContentProviderError, ContentUnavailableError, UnsupportedCapabilityError
+from .models import (
+    ContentConflictError,
+    ContentNotFoundError,
+    ContentProviderError,
+    ContentUnavailableError,
+    UnsupportedCapabilityError,
+)
 
 if TYPE_CHECKING:
     import types
@@ -57,6 +63,7 @@ __all__ = [
     "BacklogConfig",
     "BranchBackend",
     "ContentConflictError",
+    "ContentNotFoundError",
     "ContentProvider",
     "ContentProviderError",
     "ContentUnavailableError",

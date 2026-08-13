@@ -65,6 +65,7 @@ from backlog_core.models import (
     BacklogItem,
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
@@ -279,7 +280,7 @@ class BeadsBackend:
         """Return one Beads KV content record by logical identity."""
         record = self._find_content(reference)
         if record is None:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return record
 
     def put_content(self, request: ContentWrite) -> ContentRecord:

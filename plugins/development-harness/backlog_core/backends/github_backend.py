@@ -29,6 +29,7 @@ from backlog_core.models import (
     BacklogItem,
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
@@ -100,7 +101,7 @@ class _GitHubPlanPersistence:
     def get(self, reference: ContentRef) -> ContentRecord:
         entry = next((entry for entry in self._entries() if entry.plan_id == reference.name), None)
         if entry is None:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return self._record(entry)
 
     def put(self, request: ContentWrite) -> ContentRecord:
@@ -149,7 +150,7 @@ class _GitHubPlanPersistence:
         )
         reference = ContentRef(kind=ContentKind.PLAN, name=entry.plan_id)
         if content is None:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return ContentRecord(
             reference=reference,
             owner_reference=self._owner(entry),
@@ -188,7 +189,7 @@ class _GitHubDispatchPersistence:
     def get(self, reference: ContentRef) -> ContentRecord:
         entry = next((entry for entry in self._entries() if entry.name == reference.name), None)
         if entry is None:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return self._record(entry)
 
     def put(self, request: ContentWrite) -> ContentRecord:
@@ -225,7 +226,7 @@ class _GitHubDispatchPersistence:
         )
         if content is None:
             reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name)
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return ContentRecord(
             reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name),
             owner_reference=entry.owner_reference,
@@ -852,7 +853,7 @@ class GitHubBackend:
                     f"{reference.artifact_type}/{reference.name}",
                 )
         if content is None:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return ContentRecord(
             reference=reference,
             owner_reference=owner_reference,

@@ -46,6 +46,7 @@ from .models import (
     BackendStatus as _BackendStatus,
     BacklogError,
     ContentKind,
+    ContentNotFoundError,
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
@@ -3283,7 +3284,7 @@ def _manifest_reference(item_id: ItemId) -> ContentRef:
 def _load_manifest(provider: ContentProvider, item_id: ItemId) -> ArtifactManifest:
     try:
         return ArtifactManifest.model_validate_json(provider.get_content(_manifest_reference(item_id)).content)
-    except ContentUnavailableError:
+    except ContentNotFoundError:
         return ArtifactManifest(issue_number=item_id)
 
 
@@ -4143,7 +4144,7 @@ async def dispatch_create_plan(
     if not overwrite:
         try:
             _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
-        except ContentUnavailableError:
+        except ContentNotFoundError:
             pass
         else:
             return {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()}

@@ -13,8 +13,10 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
-from ruamel.yaml import YAML
 from sam_schema.cli import app
+from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.models import Task
+from sam_schema.core.task_backend_types import PlanData
 from typer.testing import CliRunner
 
 if TYPE_CHECKING:
@@ -27,56 +29,40 @@ runner = CliRunner()
 # Fixtures
 # ---------------------------------------------------------------------------
 
-_PLAN_YAML = """\
-feature: claim-test
-goal: Test claim functionality
-tasks:
-  - id: T1
-    title: Ready task
-    status: not-started
-    agent: test-agent
-    dependencies: []
-    priority: 1
-    complexity: low
-  - id: T2
-    title: In-progress task
-    status: in-progress
-    agent: test-agent
-    dependencies: []
-    priority: 2
-    complexity: medium
-    started: "2026-03-10T10:00:00Z"
-  - id: T3
-    title: Complete task
-    status: complete
-    agent: test-agent
-    dependencies: []
-    priority: 3
-    complexity: low
-    completed: "2026-03-10T14:00:00Z"
-"""
-
 
 @pytest.fixture
-def plan_dir(tmp_path: Path) -> Path:
-    """Create a plan directory with a plan containing tasks in various states.
+def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
+    plan = content_backend.create_plan(
+        "claim-test",
+        "Test claim functionality",
+        [
+            Task(id="T1", title="Ready task", status="not-started", agent="test-agent", priority=1, complexity="low"),
+            Task(
+                id="T2",
+                title="In-progress task",
+                status="in-progress",
+                agent="test-agent",
+                priority=2,
+                complexity="medium",
+                started="2026-03-10T10:00:00Z",
+            ),
+            Task(
+                id="T3",
+                title="Complete task",
+                status="complete",
+                agent="test-agent",
+                priority=3,
+                complexity="low",
+                completed="2026-03-10T14:00:00Z",
+            ),
+        ],
+    )
+    return tmp_path / plan["plan_id"]
 
-    Layout:
-        plan/P001-claim-test.yaml -- T1 (not-started), T2 (in-progress), T3 (complete)
 
-    Returns:
-        Path to a ``plan/`` directory.
-    """
-    d = tmp_path / "plan"
-    d.mkdir()
-    (d / "P001-claim-test.yaml").write_text(_PLAN_YAML, encoding="utf-8")
-    return d
-
-
-def _load_yaml(path: Path) -> dict:
-    """Load a YAML file and return its contents."""
-    y = YAML(typ="rt")
-    return y.load(path.read_text(encoding="utf-8"))
+def _stored_plan(content_backend: ContentTaskProvider) -> PlanData:
+    plan_id = content_backend.list_plans()[0]["plan_id"]
+    return content_backend.read_plan(plan_id)
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +87,9 @@ class TestSamClaimSuccess:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0, result.stdout
@@ -115,7 +103,9 @@ class TestSamClaimSuccess:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         data = json.loads(result.stdout)
@@ -130,7 +120,9 @@ class TestSamClaimSuccess:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         data = json.loads(result.stdout)
@@ -145,40 +137,40 @@ class TestSamClaimSuccess:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         data = json.loads(result.stdout)
         assert data["started"] is not None
         assert "T" in data["started"]  # ISO format contains T separator
 
-    def test_claim_updates_status_on_disk(self, plan_dir: Path) -> None:
-        """Claiming writes ``in-progress`` status to the plan file.
-
-        Tests: Disk mutation.
-        How: Claim T1, read back YAML, check status.
-        Why: Status must persist -- in-memory-only claim is useless.
-        """
+    def test_claim_updates_status_in_provider(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         # Arrange / Act
-        runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        runner.invoke(
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
+        )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-claim-test.yaml")
+        plan_data = _stored_plan(content_backend)
         assert plan_data["tasks"][0]["status"] == "in-progress"
 
-    def test_claim_writes_started_timestamp_on_disk(self, plan_dir: Path) -> None:
-        """Claiming writes a ``started`` timestamp to the task on disk.
-
-        Tests: Timestamp persistence.
-        How: Claim T1, read back YAML, check started field.
-        Why: Started timestamp drives activity tracking.
-        """
+    def test_claim_writes_started_timestamp_to_provider(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
         # Arrange / Act
-        runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        runner.invoke(
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
+        )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-claim-test.yaml")
+        plan_data = _stored_plan(content_backend)
         assert plan_data["tasks"][0].get("started") is not None
 
-    def test_claim_does_not_alter_other_tasks(self, plan_dir: Path) -> None:
+    def test_claim_does_not_alter_other_tasks(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Claiming T1 does not change T2 or T3 status.
 
         Tests: Task isolation during claim.
@@ -186,9 +178,13 @@ class TestSamClaimSuccess:
         Why: Cross-task mutation is a critical data corruption bug.
         """
         # Arrange / Act
-        runner.invoke(app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"})
+        runner.invoke(
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
+        )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-claim-test.yaml")
+        plan_data = _stored_plan(content_backend)
         assert plan_data["tasks"][1]["status"] == "in-progress"  # T2 was already in-progress
         assert plan_data["tasks"][2]["status"] == "complete"  # T3 was already complete
 
@@ -217,7 +213,9 @@ class TestSamClaimAlreadyClaimed:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T2", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0, result.stdout
@@ -235,7 +233,9 @@ class TestSamClaimAlreadyClaimed:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T3", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T3", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0, result.stdout
@@ -252,7 +252,9 @@ class TestSamClaimAlreadyClaimed:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T2", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T2", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         payload = json.loads(result.stdout)
@@ -270,13 +272,17 @@ class TestSamClaimAlreadyClaimed:
         """
         # Arrange -- first claim succeeds
         first = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         assert first.exit_code == 0
 
         # Act -- second claim is rejected gracefully
         second = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert second.exit_code == 0, second.stdout
@@ -321,7 +327,9 @@ class TestSamClaimNonexistent:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T99", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T99", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 1
@@ -335,26 +343,25 @@ class TestSamClaimNonexistent:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app, ["plan", "claim", "--address", plan_dir.name, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
         assert result.exit_code == 1
 
-    def test_claim_missing_plan_dir_exits_1(self, tmp_path: Path) -> None:
-        """Claim with non-existent plan_dir exits 1.
-
-        Tests: Missing directory handling.
-        How: Point to nonexistent directory.
-        Why: Must surface error, not traceback.
-        """
+    def test_claim_uses_provider_when_plan_dir_is_missing(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
         # Arrange
-        missing = tmp_path / "no-such-dir"
+        missing = plan_dir
         # Act
         result = runner.invoke(
-            app, ["plan", "claim", "--address", "P1/T1", "--plan-dir", str(missing)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "claim", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(missing)],
+            env={"NO_COLOR": "1"},
         )
         # Assert
-        assert result.exit_code == 1
+        assert result.exit_code == 0
+        assert _stored_plan(content_backend)["tasks"][0]["status"] == "in-progress"
 
 
 class TestSamClaimParser:

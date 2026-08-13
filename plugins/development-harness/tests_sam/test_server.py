@@ -47,16 +47,17 @@ from sam_schema.core.models import (
     UpdateTaskResult,
 )
 from sam_schema.server import sam_plan, sam_task
-from sam_schema.writers.yaml_writer import write_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from sam_schema.core.backends.content import ContentTaskProvider
 
 # ---------------------------------------------------------------------------
 # Helpers (shared — see conftest.py)
 # ---------------------------------------------------------------------------
 
-from tests_sam.conftest import make_task
+from tests_sam.conftest import make_task, seed_plan
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -64,26 +65,14 @@ from tests_sam.conftest import make_task
 
 
 @pytest.fixture
-def plan_dir(tmp_path: Path) -> Path:
-    """Create a plan directory with a two-task plan file.
-
-    Directory layout::
-
-        tmp_path/
-        └── plan/
-            └── P1-test-feature.yaml   (T1 complete, T2 depends on T1)
-
-    Returns:
-        Path to the plan directory (``tmp_path/plan``).
-    """
+def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
 
     tasks = [make_task("T1", status=TaskStatus.COMPLETE), make_task("T2", dependencies=["T1"])]
     plan = Plan(feature="test-feature", version="1.0", tasks=tasks)
 
-    plan_file = p_dir / "P1-test-feature.yaml"
-    write_plan(plan, plan_file, force_single=True)
+    seed_plan(content_backend, "P1", plan)
     return p_dir
 
 
@@ -206,7 +195,9 @@ def test_sam_state_accepts_all_valid_status_values(plan_dir: Path, plan_dir_str:
         assert result.status == status_str
 
 
-def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> None:
+def test_sam_state_failed_auto_skips_transitive_downstream(
+    tmp_path: Path, content_backend: ContentTaskProvider
+) -> None:
     """sam_task(state=failed) auto-skips transitive downstream dependencies."""
     # Arrange
     plan_dir = tmp_path / "plan"
@@ -220,7 +211,7 @@ def test_sam_state_failed_auto_skips_transitive_downstream(tmp_path: Path) -> No
             make_task("T3", dependencies=["T2"]),
         ],
     )
-    write_plan(plan, plan_dir / "P1-failed-cascade.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     result = sam_task(plan="P1", task="T1", config=StateTaskConfig(status="failed"), plan_dir=str(plan_dir))
@@ -330,7 +321,7 @@ def test_sam_ready_invalid_plan_address_returns_error_dict(plan_dir: Path, plan_
         sam_plan(config=ReadyPlanConfig(), plan="P999", plan_dir=plan_dir_str)
 
 
-def test_sam_ready_all_complete_plan_returns_empty_list(tmp_path: Path) -> None:
+def test_sam_ready_all_complete_plan_returns_empty_list(tmp_path: Path, content_backend: ContentTaskProvider) -> None:
     """sam_plan(ready) returns empty ready_tasks when all tasks are complete.
 
     Tests: sam_plan ready with no ready tasks.
@@ -346,7 +337,7 @@ def test_sam_ready_all_complete_plan_returns_empty_list(tmp_path: Path) -> None:
         make_task("T2", status=TaskStatus.COMPLETE, dependencies=["T1"]),
     ]
     plan = Plan(feature="done-feature", version="1.0", tasks=tasks)
-    write_plan(plan, p_dir / "P1-done-feature.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     result = sam_plan(config=ReadyPlanConfig(), plan="P1", plan_dir=str(p_dir))
@@ -441,7 +432,7 @@ def test_sam_status_has_cycles_false_for_acyclic_plan(plan_dir: Path, plan_dir_s
     assert result.has_cycles is False
 
 
-def test_sam_status_has_cycles_true_for_cyclic_plan(tmp_path: Path) -> None:
+def test_sam_status_has_cycles_true_for_cyclic_plan(tmp_path: Path, content_backend: ContentTaskProvider) -> None:
     """sam_plan(status) has_cycles is True when the dependency graph contains a cycle.
 
     Tests: sam_plan status cycle detection with a real cyclic plan.
@@ -472,7 +463,7 @@ def test_sam_status_has_cycles_true_for_cyclic_plan(tmp_path: Path) -> None:
         ),
     ]
     plan = Plan(feature="cyclic-feature", version="1.0", tasks=tasks)
-    write_plan(plan, p_dir / "P1-cyclic-feature.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     result = sam_plan(config=StatusPlanConfig(), plan="P1", plan_dir=str(p_dir))
@@ -497,14 +488,14 @@ def test_sam_read_with_task_returns_task_assignment_shape(plan_dir_str: str) -> 
     assert result.task.id == "T1"
 
 
-def test_sam_read_with_task_includes_plan_goal(tmp_path: Path) -> None:
+def test_sam_read_with_task_includes_plan_goal(tmp_path: Path, content_backend: ContentTaskProvider) -> None:
     """sam_task(read) with task param surfaces plan_goal from the plan in TaskAssignment."""
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     tasks = [make_task("T1")]
     plan = Plan(feature="goal-feature", version="1.0", goal="Ship the goal feature", tasks=tasks)
-    write_plan(plan, p_dir / "P1-goal-feature.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     result = sam_task(plan="P1", task="T1", config=ReadTaskConfig(), plan_dir=str(p_dir))
@@ -514,14 +505,14 @@ def test_sam_read_with_task_includes_plan_goal(tmp_path: Path) -> None:
     assert result.plan_goal == "Ship the goal feature"
 
 
-def test_sam_read_with_task_includes_plan_context(tmp_path: Path) -> None:
+def test_sam_read_with_task_includes_plan_context(tmp_path: Path, content_backend: ContentTaskProvider) -> None:
     """sam_task(read) with task param surfaces plan_context in TaskAssignment."""
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     tasks = [make_task("T1")]
     plan = Plan(feature="ctx-feature", version="1.0", context="Shared context text here", tasks=tasks)
-    write_plan(plan, p_dir / "P1-ctx-feature.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     result = sam_task(plan="P1", task="T1", config=ReadTaskConfig(), plan_dir=str(p_dir))
@@ -728,7 +719,7 @@ def test_sam_update_context_sets_plan_context(tmp_path: Path) -> None:
     assert read_result.plan_context == "Shared context narrative."
 
 
-def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
+def test_sam_update_append_section_adds_to_task_body(tmp_path: Path, memory_backend: ContentTaskProvider) -> None:
     """sam_task(update) with append_section appends a markdown section to the task body.
 
     Tests: sam_task update append-section functionality.
@@ -752,7 +743,6 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     )
     assert isinstance(create_result, CreatePlanResult)
     plan_id = create_result.plan_id
-    plan_path = p_dir / f"{plan_id}.yaml"
 
     # Act
     update_result = sam_task(
@@ -766,10 +756,9 @@ def test_sam_update_append_section_adds_to_task_body(tmp_path: Path) -> None:
     # Assert
     assert update_result.updated is True
 
-    # Verify by reading the raw file — the section should be appended to task body
-    raw = plan_path.read_text(encoding="utf-8")
-    assert "Divergence Notes" in raw
-    assert "No divergence observed." in raw
+    task = memory_backend.read_task(plan_id, "T01")
+    assert "Divergence Notes" in task["context_notes"]
+    assert "No divergence observed." in task["context_notes"]
 
 
 def test_sam_update_invalid_address_returns_error(tmp_path: Path) -> None:
@@ -1000,7 +989,7 @@ def test_append_task_config_accepts_legacy_task_id_alias() -> None:
     assert "task" not in config.task.model_dump(mode="json")
 
 
-def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> None:
+def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task calls backend.append_task for the given plan.
 
     AC #2: sam_plan(action='append_task', plan=P, task=<TaskDefinition>) must append
@@ -1046,6 +1035,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
         "state": "drafting",
     }
     set_task_config(TaskConfig(backend=mock_backend))
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: mock_backend)
 
     try:
         task_def = TaskDefinition(
@@ -1071,7 +1061,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path) -> N
         reset_task_config()
 
 
-def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
+def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task returns a success acknowledgment dict.
 
     AC #2: the response must not be an error dict; it must contain a truthy
@@ -1087,6 +1077,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
 
     backend = InMemoryTaskProvider()
     set_task_config(TaskConfig(backend=backend))
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
 
     try:
         create_result = sam_plan(config=CreatePlanConfig(slug="append-test", goal="Append goal", tasks=[]))
@@ -1114,7 +1105,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path) -> None:
         reset_task_config()
 
 
-def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
+def test_sam_append_task_plan_not_found_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task raises PlanNotFoundError when plan does not exist.
 
     AC #6: backend must raise PlanNotFoundError for unknown plan_id.
@@ -1131,6 +1122,7 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
 
     backend = InMemoryTaskProvider()
     set_task_config(TaskConfig(backend=backend))
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
 
     try:
         task_def = TaskDefinition(id="T1", title="Task", agent="a")
@@ -1142,7 +1134,7 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path) -> None:
         reset_task_config()
 
 
-def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
+def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task raises an error when duplicate task ID is appended.
 
     AC #6: backend raises TaskValidationError when a duplicate task ID is appended.
@@ -1158,6 +1150,7 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
 
     backend = InMemoryTaskProvider()
     set_task_config(TaskConfig(backend=backend))
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
 
     try:
         create_result = sam_plan(config=CreatePlanConfig(slug="dup-task", goal="Goal", tasks=[]))
@@ -1181,7 +1174,7 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> None:
+def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=finalize calls backend.finalize_plan (or update_plan_fields).
 
     AC #14: finalize must clear the drafting state via a dedicated backend call.
@@ -1199,6 +1192,7 @@ def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path) -> No
     mock_backend.finalize_plan.return_value = {"finalized": True, "state": "ready"}
     mock_backend.update_plan_fields.return_value = {"updated": True}
     set_task_config(TaskConfig(backend=mock_backend))
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: mock_backend)
 
     try:
         # Act

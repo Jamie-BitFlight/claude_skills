@@ -67,6 +67,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "fastmcp",
         "mcp",
         "pydantic",
+        "backlog_core",
         "dh_core",
         "sam_schema",
     },
@@ -136,7 +137,8 @@ def _extract_import_roots(filepath: Path) -> set[str]:
             for alias in node.names:
                 root = alias.name.split(".")[0]
                 roots.add(root)
-        elif isinstance(node, ast.ImportFrom):
+            continue
+        if isinstance(node, ast.ImportFrom):
             if node.level > 0:
                 # Relative import (from . import ... or from .foo import ...)
                 # These are internal package references, not external deps.

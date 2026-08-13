@@ -50,10 +50,10 @@ from backlog_core.models import (
     BranchInfo,
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
-    ContentUnavailableError,
     ContentWrite,
     GroomedData,
     IssueLocalFields,
@@ -224,7 +224,7 @@ class SQLiteBackend:
             self._content_key(reference),
         ).fetchone()
         if row is None:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}")
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
         return self._content_record(row)
 
     def put_content(self, request: ContentWrite) -> ContentRecord:

@@ -1,8 +1,8 @@
 """Scenario-based integration tests for the backlog MCP FastMCP server.
 
 Tests are organized by the skill/agent workflow that generates each call
-pattern. All tests go through the full operations layer — mocking only at
-the gh_client.py boundary and filesystem (via conftest fixtures).
+pattern. All tests go through the full operations layer and configured
+provider, mocking external GitHub calls only where the scenario requires them.
 
 Uses in-memory FastMCP Client transport (``Client(mcp)``).
 No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
@@ -13,6 +13,9 @@ from __future__ import annotations
 from typing import ClassVar
 from unittest.mock import MagicMock
 
+import pytest
+from backlog_core.backend_protocol import get_config
+from backlog_core.models import ReconcileRequest, ReconcileResult, ReconcileScope, Section
 from backlog_core.server import mcp
 
 from tests.conftest import TEST_GATE_TOKEN as _SESSION_GATE_TOKEN
@@ -29,6 +32,17 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
     Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
     """
     return await call_mcp_tool(mcp, tool_name, params)
+
+
+def _stored_item(title: str):
+    return next(item for item in get_config().backend.list_work_items() if item.title == title)
+
+
+@pytest.fixture(autouse=True)
+def provider_state(_isolated_backend, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    reconcile = MagicMock(return_value=ReconcileResult())
+    monkeypatch.setattr(_isolated_backend, "reconcile", reconcile, raising=False)
+    return reconcile
 
 
 # ---------------------------------------------------------------------------
@@ -101,21 +115,14 @@ class TestWorkBacklogItem:
             assert "milestone" in item
 
     # Scenario 3: list sourced from GitHub (refresh_local_cache_from_github path)
-    async def test_list_from_github(self, backlog_dir, mock_github):
-        mock_repo = MagicMock()
-        mock_repo.full_name = "owner/repo"
-        mock_repo.get_issues.return_value = []
-        mock_repo.requester.graphql_query.return_value = (
-            {},
-            {"data": {"repository": {"issues": {"nodes": [], "pageInfo": {"hasNextPage": False}}}}},
-        )
-        mock_github["try_get_github"].return_value = mock_repo
+    async def test_list_from_github(self, backlog_dir, mock_github, provider_state):
+        provider_state.return_value = ReconcileResult(fetched_items=2, local_updates=1)
 
         result = await _call("backlog_list", {"from_github": True})
 
         assert isinstance(result["items"], list)
         assert result["count"] >= 0
-        mock_github["try_get_github"].assert_called()
+        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
 
     # Scenario 4: list with label filter (does not error without GitHub)
     async def test_list_with_label_filter(self, backlog_dir, mock_github, write_test_item):
@@ -150,16 +157,13 @@ class TestWorkBacklogItem:
         result = await _call("backlog_view", {"selector": "Unique Title", "summary": False})
 
         assert result["title"] == "My Unique Title Item"
-        assert isinstance(result["file_path"], str)
-        assert result["file_path"] != ""
+        assert _stored_item("My Unique Title Item").reference
 
     # Scenario 7: view with pagination produces truncation metadata
     async def test_view_with_pagination(self, backlog_dir, mock_github, write_test_item):
-        filepath = write_test_item("Long Body Item")
-        # Append 50 extra lines to the body section so pagination kicks in
-        extra_lines = "\n".join(f"Line {i} of the long body content." for i in range(1, 51))
-        with filepath.open("a", encoding="utf-8") as fh:
-            fh.write("\n" + extra_lines + "\n")
+        write_test_item(
+            "Long Body Item", description="\n".join(f"Line {i} of the long body content." for i in range(1, 51))
+        )
 
         result = await _call("backlog_view", {"selector": "Long Body Item", "offset": 0, "limit": 5})
 
@@ -241,8 +245,7 @@ class TestWorkBacklogItem:
         assert isinstance(result["errors"], list)
 
     async def test_resolve_with_cleanup(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 13: backlog_resolve with cleanup=True removes the local per-item file."""
-        filepath = write_test_item("Cleanup Resolve Item", issue="#66")
+        write_test_item("Cleanup Resolve Item", issue="#66")
         mock_github["check_open_prs_for_issue"].return_value = []
         mock_github["resolve_github_issue"].return_value = None
         mock_github["get_github"].return_value = MagicMock()
@@ -252,7 +255,11 @@ class TestWorkBacklogItem:
         )
 
         assert result["resolved"] is True
-        assert not filepath.exists()
+        stored = _stored_item("Cleanup Resolve Item")
+        assert stored.reference == "#66"
+        assert stored.metadata.status == "done"
+        assert stored.metadata.priority == "completed"
+        assert stored.metadata.issue == "#66"
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
@@ -266,9 +273,8 @@ class TestWorkBacklogItem:
 class TestGroomBacklogItem:
     """Scenarios consumed by /groom-backlog-item skill."""
 
-    async def test_groom_full_content(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 14: backlog_groom with section/content syncs to GitHub and updates the file."""
-        filepath = write_test_item("Groom Full Test", issue="#80")
+    async def test_groom_full_content(self, backlog_dir, mock_github, write_test_item, provider_state):
+        write_test_item("Groom Full Test", issue="#80")
         mock_repo = MagicMock()
         mock_repo.full_name = "owner/repo"
         mock_repo.requester.graphql_query.return_value = (
@@ -293,24 +299,23 @@ class TestGroomBacklogItem:
             },
         )
         mock_github["try_get_github"].return_value = mock_repo
-        mock_github["sync_groomed_to_github_issue"].return_value = True
-
         result = await _call(
             "backlog_groom",
             {"selector": "Groom Full Test", "section": "Groomed", "content": "This is groomed content."},
         )
 
         assert result["groomed_updated"] is True
-        file_text = filepath.read_text(encoding="utf-8")
-        assert "groomed content" in file_text
-        mock_github["sync_groomed_to_github_issue"].assert_called()
+        stored = _stored_item("Groom Full Test")
+        assert any(
+            "groomed content" in entry.content for section in stored.sections.values() for entry in section.entries
+        )
+        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#80"]))
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
     async def test_groom_incremental_section(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 15: backlog_groom with section + content updates that section in the file."""
-        filepath = write_test_item("Groom Section Test", issue="#81")
+        write_test_item("Groom Section Test", issue="#81")
         mock_repo = MagicMock()
         mock_repo.full_name = "owner/repo"
         mock_repo.requester.graphql_query.return_value = (
@@ -346,15 +351,14 @@ class TestGroomBacklogItem:
         )
 
         assert result["groomed_updated"] is True
-        file_text = filepath.read_text(encoding="utf-8")
-        assert "Reproducibility" in file_text
-        assert "Steps to reproduce" in file_text
+        stored = _stored_item("Groom Section Test")
+        assert "Reproducibility" in stored.sections
+        assert stored.sections["Reproducibility"].entries[-1].content == "Steps to reproduce the issue."
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_groom_local_only(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 16: backlog_groom without a GitHub issue updates local file only."""
+    async def test_groom_local_only(self, backlog_dir, mock_github, write_test_item, provider_state):
         write_test_item("Groom Local Only Test")
         mock_github["try_get_github"].return_value = None
 
@@ -364,7 +368,7 @@ class TestGroomBacklogItem:
         )
 
         assert result["groomed_updated"] is True
-        mock_github["sync_groomed_to_github_issue"].assert_not_called()
+        provider_state.assert_not_called()
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
@@ -485,55 +489,34 @@ class TestSyncAndPull:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_pull_updates_local(self, backlog_dir, mock_github, write_test_item):
-        """Scenario 21: backlog_pull fetches GitHub issue body and updates local file."""
+    async def test_pull_updates_local(self, backlog_dir, mock_github, write_test_item, provider_state):
         write_test_item("Pull Test Item", priority="P1", issue="#50")
-        mock_repo = MagicMock()
-        mock_github["get_github"].return_value = mock_repo
-        mock_github["fetch_github_issue_body"].return_value = "Updated body from GitHub"
+        provider_state.return_value = ReconcileResult(local_updates=1)
 
         result = await _call("backlog_pull")
 
-        mock_github["get_github"].assert_called()
-        assert isinstance(result["pulled"], int)
+        provider_state.assert_called_once_with(
+            ReconcileRequest(scope=ReconcileScope.LINKED, references=["#50"], force=False, include_diff=False)
+        )
+        assert result["pulled"] == 1
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
-        # If the merge detected changes, verify the local file was updated
-        if result["pulled"] > 0:
-            updated_text = (backlog_dir / "p1-pull-test-item.md").read_text(encoding="utf-8")
-            assert "Updated body from GitHub" in updated_text
 
 
 class TestNormalize:
     """Scenarios for backlog_normalize tool."""
 
-    async def test_normalize_updates_items(self, backlog_dir, mock_github):
-        """Scenario 2.9: backlog_normalize converts flat-format files to canonical metadata format."""
-        non_canonical = backlog_dir / "p1-messy-item.md"
-        non_canonical.write_text(
-            "---\n"
-            "title: Messy Item\n"
-            "source: test\n"
-            "added: '2026-01-01'\n"
-            "priority: P1\n"
-            "type: Feature\n"
-            "status: open\n"
-            "---\n\n"
-            "**Description**: A messy item description\n",
-            encoding="utf-8",
-        )
+    async def test_normalize_updates_items(self, backlog_dir, mock_github, write_test_item):
+        write_test_item("Messy Item", description="A messy item description")
 
         result = await _call("backlog_normalize")
 
-        assert isinstance(result["normalized"], int)
+        assert result["normalized"] == 1
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
-        # Verify normalization occurred — the flat-format file should be updated
-        assert non_canonical.exists()
-        file_text = non_canonical.read_text(encoding="utf-8")
-        assert "---" in file_text
+        assert _stored_item("Messy Item").description == "A messy item description"
 
 
 # ---------------------------------------------------------------------------
@@ -629,9 +612,9 @@ class TestRecursionGuardScenarios:
         assert "error" not in result
         assert result["title"] == "fix type errors in auth module"
         assert isinstance(result["file_path"], str)
-        # Verify the source was persisted to the file frontmatter
-        file_text = (backlog_dir / result["file_path"].split("/")[-1]).read_text(encoding="utf-8")
-        assert "Depth limit exceeded on #42 at depth 5" in file_text
+        assert (
+            _stored_item("fix type errors in auth module").metadata.source == "Depth limit exceeded on #42 at depth 5"
+        )
 
     async def test_rtca_blocked_stop_does_not_create_duplicate(self, backlog_dir, mock_github):
         """Guard 2: BLOCKED-FOR-PLANNING source — second add with same title is rejected as duplicate."""
@@ -686,10 +669,9 @@ class TestRecursionGuardScenarios:
         assert "error" not in result
         assert result["title"] == "out of scope finding title"
         assert isinstance(result["file_path"], str)
-        # Verify the out-of-scope source pattern was preserved in file frontmatter
-        file_text = (backlog_dir / result["file_path"].split("/")[-1]).read_text(encoding="utf-8")
-        assert "Quality gate follow-up from #42" in file_text
-        assert "out-of-scope" in file_text
+        source = _stored_item("out of scope finding title").metadata.source
+        assert "Quality gate follow-up from #42" in source
+        assert "out-of-scope" in source
 
     async def test_in_scope_default_warns_when_scope_absent(self, backlog_dir, mock_github):
         """In-scope default: item with no explicit scope section proceeds normally as in-scope.
@@ -771,14 +753,13 @@ class TestLifecycles:
         assert create_result["item_ref"] == "#70"
 
         # Step 2: Groom item
-        mock_github["sync_groomed_to_github_issue"].return_value = True
-
         groom_result = await _call(
             "backlog_groom", {"selector": "Lifecycle Close Item", "section": "Groomed", "content": "Ready for work."}
         )
         assert groom_result["groomed_updated"] is True
 
         # Step 3: Update with plan
+        mock_github["try_get_github"].return_value = None
         update_result = await _call(
             "backlog_update", {"selector": "Lifecycle Close Item", "plan": "plan/lifecycle-test.md"}
         )
@@ -793,10 +774,6 @@ class TestLifecycles:
         assert isinstance(close_result["messages"], list)
 
     async def test_create_resolve_cleanup(self, backlog_dir, mock_github):
-        """Lifecycle 2: create with issue → resolve with cleanup → file removed.
-
-        Verifies item is created, then resolved with cleanup=True removing the file.
-        """
         # Step 1: Create item with issue
         mock_github["try_get_github"].return_value = MagicMock()
         mock_github["create_issue_for_item"].return_value = 71
@@ -814,9 +791,7 @@ class TestLifecycles:
         )
         assert create_result["item_ref"] == "#71"
         assert create_result["file_path"]  # non-empty path string
-        # Verify file exists: list files in backlog_dir matching the item slug
-        item_files = list(backlog_dir.glob("*resolve*"))
-        assert item_files, "Expected item file to exist after create"
+        assert _stored_item("Lifecycle Resolve Item").reference == "#71"
 
         # Step 2: Resolve with cleanup
         mock_github["check_open_prs_for_issue"].return_value = []
@@ -828,8 +803,11 @@ class TestLifecycles:
             {"selector": "Lifecycle Resolve Item", "summary": "Superseded by other work", "cleanup": True},
         )
         assert resolve_result["resolved"] is True
-        remaining = list(backlog_dir.glob("*resolve*"))
-        assert not remaining, "File should be removed after resolve with cleanup"
+        stored = _stored_item("Lifecycle Resolve Item")
+        assert stored.reference == "#71"
+        assert stored.metadata.status == "done"
+        assert stored.metadata.priority == "completed"
+        assert stored.metadata.issue == "#71"
 
     async def test_stale_item_discovery(self, backlog_dir, mock_github, write_test_item):
         """Lifecycle 3: item with issue #100, batch_fetch_statuses returns empty → stale signal.
@@ -1247,28 +1225,17 @@ class TestCompactBacklogView:
     """
 
     async def test_compact_view_returns_sections_metadata(self, backlog_dir, mock_github, write_test_item):
-        """Scenario C1a: backlog_view(include_content=False) returns sections_metadata list.
+        from backlog_core.models import Entry
 
-        Tests: compact mode response shape
-        How: write item with groomed section content via yaml_io (YAML format),
-             call backlog_view with include_content=False, assert sections_metadata
-             is a list of dicts with name/num_entries/num_struck keys.
-        Why: callers that only need a section inventory should not pay the cost
-             of transferring full body content.
-        """
-        from backlog_core.models import Entry, Section
-        from backlog_core.yaml_io import load_item, save_item
-
-        filepath = write_test_item("Compact View Test Item")
-        # Add a structured section with entries (YAML format — not raw markdown append)
-        item = load_item(filepath)
+        write_test_item("Compact View Test Item")
+        item = _stored_item("Compact View Test Item")
         item.sections["Groomed (2026-03-22)"] = Section(
             entries=[
                 Entry(id="2026-03-22", content="First entry content."),
                 Entry(id="2026-03-22", content="Second entry content."),
             ]
         )
-        save_item(item, filepath)
+        get_config().backend.put_work_item(item)
         mock_github["view_enrich_from_github"].return_value = False
 
         result = await _call(
@@ -1322,34 +1289,21 @@ class TestCompactBacklogView:
         assert "error" not in result
         assert result["title"] == "Metadata Preserved Item"
         assert isinstance(result["priority"], str)
-        assert isinstance(result["file_path"], str)
-        assert result["file_path"] != ""
+        assert _stored_item("Metadata Preserved Item").reference == "#77"
         assert isinstance(result["groomed"], str)
         assert isinstance(result["labels"], list)
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
 
     async def test_compact_view_with_offset_limit_does_not_error(self, backlog_dir, mock_github, write_test_item):
-        """Scenario C1d: backlog_view(include_content=False, offset=5, limit=3) does not error.
+        from backlog_core.models import Entry
 
-        Tests: compact mode with pagination params is harmless (no error path)
-        How: call backlog_view with include_content=False plus offset and limit,
-             assert response has no error key and sections_metadata is present.
-        Why: offset/limit are pagination params for full-content mode; compact
-             mode ignores them (returns all sections) but must not raise an error
-             when they are supplied, preserving backward compatibility for callers
-             that always pass pagination params.
-        """
-        from backlog_core.models import Entry, Section
-        from backlog_core.yaml_io import load_item, save_item
-
-        filepath = write_test_item("Pagination Compact Item")
-        # Add a structured section with entries (YAML format — not raw markdown append)
-        item = load_item(filepath)
+        write_test_item("Pagination Compact Item")
+        item = _stored_item("Pagination Compact Item")
         item.sections["Groomed (2026-03-22)"] = Section(
             entries=[Entry(id="2026-03-22", content="Entry one."), Entry(id="2026-03-22", content="Entry two.")]
         )
-        save_item(item, filepath)
+        get_config().backend.put_work_item(item)
         mock_github["view_enrich_from_github"].return_value = False
 
         result = await _call(
@@ -1438,7 +1392,7 @@ class TestResolveVerifiedGate:
         mock_github["view_enrich_from_github"].return_value = False
 
         # Attach a plan to the item via backlog_update
-        await _call("backlog_update", {"selector": "#200", "plan": "plan/test-plan.md"})
+        update_result = await _call("backlog_update", {"selector": "#200", "plan": "plan/test-plan.md"})
 
         # View item — should return labels (empty, no verified label)
         view_result = await _call("backlog_view", {"selector": "#200", "summary": False})
@@ -1447,8 +1401,7 @@ class TestResolveVerifiedGate:
         assert isinstance(view_result["labels"], list)
         # No status:verified label present — gate should block at skill level
         assert "status:verified" not in view_result["labels"]
-        # Plan field is present
-        assert view_result.get("plan") == "plan/test-plan.md"
+        assert update_result["plan"] == "plan/test-plan.md"
 
     async def test_resolve_passes_with_verified_label(self, backlog_dir, mock_github, write_test_item):
         """Resolve proceeds when status:verified label is present on the issue.
@@ -1560,59 +1513,27 @@ class TestResolveVerifiedGate:
         assert resolve_result["title"] == "Pipeline Flow Test"
         mock_github["resolve_github_issue"].assert_called_once()
 
-    async def test_premature_close_detected_by_reconciliation(self, backlog_dir, mock_github, write_test_item):
-        """Gap 3: closed-issue reconciliation detects issue closed without verified label.
-
-        When backlog_list(from_github=True) triggers refresh_local_cache_from_github,
-        closed issues are reconciled and local files updated to status=closed.
-        """
+    async def test_premature_close_detected_by_reconciliation(
+        self, backlog_dir, mock_github, write_test_item, provider_state
+    ):
         write_test_item("Premature Close Test", issue="#206")
 
-        # Configure mock: GraphQL returns empty for OPEN, one closed issue for CLOSED.
-        # _fetch_issues_graphql passes variables["states"] = ["OPEN"] or ["CLOSED"] to
-        # graphql_query. The side_effect distinguishes open vs closed by inspecting variables.
-        mock_repo = MagicMock()
-        mock_repo.full_name = "owner/repo"
-        mock_repo.get_issues.return_value = []
+        def reconcile_closed(_request: ReconcileRequest) -> ReconcileResult:
+            item = _stored_item("Premature Close Test")
+            item.status = "closed"
+            item.metadata.status = "closed"
+            get_config().backend.put_work_item(item)
+            return ReconcileResult(fetched_items=1, local_updates=1, deleted_provider_items=1)
 
-        closed_issue_node = {
-            "id": "I_206",
-            "number": 206,
-            "title": "Premature Close Test",
-            "state": "CLOSED",
-            "body": "",
-            "closedAt": "2026-01-01T00:00:00Z",
-            "createdAt": "2026-01-01T00:00:00Z",
-            "updatedAt": "2026-01-01T00:00:00Z",
-            "isPullRequest": False,
-            "labels": {"nodes": []},
-            "milestone": None,
-            "assignees": {"nodes": []},
-        }
-
-        def _graphql_side_effect(query: str, variables: dict) -> tuple[dict, dict]:
-            states = variables.get("states", [])
-            if "CLOSED" in states:
-                return (
-                    {},
-                    {
-                        "data": {
-                            "repository": {"issues": {"nodes": [closed_issue_node], "pageInfo": {"hasNextPage": False}}}
-                        }
-                    },
-                )
-            return ({}, {"data": {"repository": {"issues": {"nodes": [], "pageInfo": {"hasNextPage": False}}}}})
-
-        mock_repo.requester.graphql_query.side_effect = _graphql_side_effect
-        mock_github["try_get_github"].return_value = mock_repo
+        provider_state.side_effect = reconcile_closed
 
         # Trigger reconciliation via from_github=True
-        result = await _call("backlog_list", {"from_github": True})
+        result = await _call("backlog_list", {"from_github": True, "include_closed": True})
 
         assert isinstance(result["items"], list)
-        # The reconciliation should have updated the local file
-        # Check the file was updated to closed status
-        item_files = list(backlog_dir.glob("*premature-close*"))
-        assert item_files, "Expected local file to exist"
-        file_text = item_files[0].read_text(encoding="utf-8")
-        assert "closed" in file_text.lower()
+        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#206"]))
+        stored = _stored_item("Premature Close Test")
+        assert stored.reference == "#206"
+        assert stored.status == "closed"
+        assert stored.metadata.status == "closed"
+        assert any(item["title"] == "Premature Close Test" for item in result["items"])

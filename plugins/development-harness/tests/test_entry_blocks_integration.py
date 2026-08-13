@@ -2,15 +2,10 @@
 
 Tests the round-trip: create item -> groom with entries -> strike -> view -> verify.
 
-Note: A 1-second sleep is inserted between groom calls to ensure unique
-entry timestamps. Without this, all entries share the same timestamp and
-parse_entries generates synthetic dedup suffixes (e.g., ``-0``, ``-1``)
-that ``strike_entry`` cannot locate in the raw file text.
 """
 
 from __future__ import annotations
 
-import time
 from typing import cast
 
 from backlog_core import operations
@@ -24,9 +19,7 @@ def test_full_entry_lifecycle(backlog_dir, mock_github):
     # Create
     operations.add_item(title="Lifecycle Test", priority="P1", description="Test lifecycle", output=out)
 
-    # Append two entries to Decision section with unique timestamps
     operations.groom_item(selector="Lifecycle Test", section="Decision", content="First decision.", output=out)
-    time.sleep(1.1)  # Ensure distinct entry timestamps
     operations.groom_item(selector="Lifecycle Test", section="Decision", content="Second decision.", output=out)
 
     # View — should show 2 active entries

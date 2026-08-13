@@ -49,6 +49,7 @@ from backlog_core.models import (
     ArtifactType,
     BacklogError,
     ContentKind,
+    ContentNotFoundError,
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
@@ -65,6 +66,7 @@ from pydantic import BaseModel
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import ConcurrentClaimUnsupportedError, PlanNotFoundError, SamError, TaskNotFoundError
 from sam_schema.core.models import (
+    AcceptanceCriterion,
     ActiveTaskClearResult,
     ActiveTaskGetResult,
     ActiveTaskSetResult,
@@ -198,6 +200,7 @@ def create_plan(
     tasks: list[dict[str, Any]] | list[Any],
     context: str | None = None,
     issue: int | None = None,
+    acceptance_criteria_structured: list[AcceptanceCriterion] | None = None,
 ) -> CreatePlanResult:
     """Create a new plan with the given slug, goal, and task definitions.
 
@@ -212,6 +215,7 @@ def create_plan(
         tasks: List of task definitions (dicts or Task models).
         context: Optional plan-level context narrative (markdown).
         issue: Optional GitHub issue number to associate with the plan.
+        acceptance_criteria_structured: Optional executable acceptance criteria.
 
     Returns:
         :class:`~sam_schema.core.models.CreatePlanResult` on success with
@@ -238,7 +242,14 @@ def create_plan(
         else:
             normalized_tasks.append(Task.model_validate(dict(t)))
 
-    plan_data = backend.create_plan(slug=slug, goal=goal, tasks=normalized_tasks, context=context, issue=issue)
+    plan_data = backend.create_plan(
+        slug=slug,
+        goal=goal,
+        tasks=normalized_tasks,
+        context=context,
+        issue=issue,
+        acceptance_criteria_structured=acceptance_criteria_structured,
+    )
 
     plan_id_str = plan_data["plan_id"]
 
@@ -571,6 +582,10 @@ def update_plan_fields(
         # by_alias=True: set_fields uses kebab-case keys (wire convention);
         # alias keys must match so we extract only the requested keys.
         plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
+        if "acceptance-criteria-structured" in plan_fields:
+            plan_fields["acceptance-criteria-structured"] = [
+                criterion.model_dump(mode="json") for criterion in validated.acceptance_criteria_structured
+            ]
 
     # Only call the plan-level update when there is something to write at the
     # plan level (context narrative or validated plan-level fields). Task-only
@@ -1261,7 +1276,7 @@ def dispatch_create_plan(
         plan_exists = True
         try:
             provider.get_content(reference)
-        except ContentUnavailableError:
+        except ContentNotFoundError:
             plan_exists = False
         if plan_exists:
             return {
@@ -1852,7 +1867,7 @@ def _manifest_reference(item_id: int | str) -> ContentRef:
 def _load_manifest(provider: ContentProvider, item_id: int | str) -> ArtifactManifest:
     try:
         return ArtifactManifest.model_validate_json(provider.get_content(_manifest_reference(item_id)).content)
-    except ContentUnavailableError:
+    except ContentNotFoundError:
         return ArtifactManifest(issue_number=item_id)
 
 

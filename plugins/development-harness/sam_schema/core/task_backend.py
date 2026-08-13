@@ -24,8 +24,15 @@ from typing_extensions import Protocol, runtime_checkable
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from sam_schema.core.models import Task
-    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
+    from sam_schema.core.models import AcceptanceCriterion, Task
+    from sam_schema.core.task_backend_types import (
+        DocumentData,
+        DocumentHandle,
+        PlanData,
+        PlanSummary,
+        PlanUpdateValue,
+        TaskData,
+    )
 
 __all__ = ["TaskBackend"]
 
@@ -57,6 +64,7 @@ class TaskBackend(Protocol):
         context: str | None = None,
         issue: int | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create a new plan with the given slug and task definitions.
 
@@ -67,6 +75,7 @@ class TaskBackend(Protocol):
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number to associate with this plan.
             acceptance_criteria: Optional plan-level acceptance criteria markdown.
+            acceptance_criteria_structured: Optional executable acceptance criteria.
 
         Returns:
             PlanData containing the created plan with backend-assigned plan_id.
@@ -105,7 +114,7 @@ class TaskBackend(Protocol):
         ...
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
     ) -> None:
         """Update top-level fields on a plan.
 

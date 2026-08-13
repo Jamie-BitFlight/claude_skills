@@ -518,6 +518,10 @@ class ContentUnavailableError(ContentProviderError):
     """Raised when requested content is unavailable from the selected backend."""
 
 
+class ContentNotFoundError(ContentUnavailableError):
+    """Raised when an authoritative provider confirms requested content is absent."""
+
+
 class ContentConflictError(ContentProviderError):
     """Raised when an expected content revision no longer matches provider state."""
 

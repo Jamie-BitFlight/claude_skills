@@ -98,8 +98,9 @@ def test_file_cache_distinguishes_stale_hit_from_unavailable_miss(tmp_path: Path
 
     # Then: a hit is marked stale while a miss raises the explicit unavailable outcome
     assert stale.stale is True
-    with pytest.raises(ContentUnavailableError):
+    with pytest.raises(ContentUnavailableError) as exc_info:
         cache.get_content(_reference("#2"), stale=True)
+    assert type(exc_info.value) is ContentUnavailableError
 
 
 def test_queue_write_is_atomic_when_state_replacement_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

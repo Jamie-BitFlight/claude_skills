@@ -12,8 +12,10 @@ import json
 from typing import TYPE_CHECKING
 
 import pytest
-from ruamel.yaml import YAML
 from sam_schema.cli import app
+from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.models import Task
+from sam_schema.core.task_backend_types import PlanData
 from typer.testing import CliRunner
 
 if TYPE_CHECKING:
@@ -26,83 +28,43 @@ runner = CliRunner()
 # Fixtures
 # ---------------------------------------------------------------------------
 
-_PLAN_YAML = """\
-plan-id: P1
-feature: update-test
-version: "1.0"
-description: Update test plan
-state: ready
-autonomy: checkpoint
-goal: Test update functionality
-context: Original context
-acceptance_criteria: Update fields persist
-issue: "99"
-tasks:
-  - id: T1
-    title: First task
-    status: not-started
-    agent: test-agent
-    dependencies: []
-    blocked_by: []
-    parallelize_with: []
-    skills: []
-    priority: 3
-    complexity: medium
-    created: null
-    started: null
-    completed: null
-    last_activity: null
-    body: First task body
-    description: First task description
-  - id: T2
-    title: Second task
-    status: not-started
-    agent: test-agent
-    dependencies:
-      - T1
-    blocked_by: []
-    parallelize_with: []
-    skills: []
-    priority: 2
-    complexity: high
-    created: null
-    started: null
-    completed: null
-    last_activity: null
-    body: Second task body
-    description: Second task description
-"""
-
 
 @pytest.fixture
-def plan_dir(tmp_path: Path) -> Path:
-    """Create a directory-layout plan for update tests."""
-    d = tmp_path / "plan"
-    d.mkdir()
-    plan = d / "P001-update-test.yaml"
-    plan.mkdir()
-    data = YAML(typ="safe").load(_PLAN_YAML)
-    tasks = data.pop("tasks")
-    data["task_files"] = [f"task-{task['id']}.yaml" for task in tasks]
-    y = YAML()
-    y.dump(data, (plan / "plan.yaml").open("w", encoding="utf-8"))
-    for task in tasks:
-        y.dump(task, (plan / f"task-{task['id']}.yaml").open("w", encoding="utf-8"))
-    return d
+def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
+    plan = content_backend.create_plan(
+        "update-test",
+        "Test update functionality",
+        [
+            Task(
+                id="T1",
+                title="First task",
+                status="not-started",
+                agent="test-agent",
+                priority=3,
+                complexity="medium",
+                body="First task body",
+                description="First task description",
+            ),
+            Task(
+                id="T2",
+                title="Second task",
+                status="not-started",
+                agent="test-agent",
+                dependencies=["T1"],
+                priority=2,
+                complexity="high",
+                body="Second task body",
+                description="Second task description",
+            ),
+        ],
+        context="Original context",
+        issue=99,
+    )
+    return tmp_path / plan["plan_id"]
 
 
-def _load_yaml(path: Path) -> dict:
-    """Load a canonical YAML plan file or directory."""
-    y = YAML(typ="rt")
-    if not path.exists() and path.suffix == ".yaml":
-        path = path.with_suffix("")
-    if path.is_dir():
-        data = y.load((path / "plan.yaml").read_text(encoding="utf-8"))
-        data["tasks"] = [
-            y.load(task_path.read_text(encoding="utf-8")) for task_path in sorted(path.glob("task-*.yaml"))
-        ]
-        return data
-    return y.load(path.read_text(encoding="utf-8"))
+def _stored_plan(content_backend: ContentTaskProvider, plan_dir: Path) -> PlanData:
+    return content_backend.read_plan(plan_dir.name)
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +80,7 @@ class TestSamUpdateContext:
     Why: AC6 -- sam plan update sets context on plan.
     """
 
-    def test_update_context_changes_plan_context(self, plan_dir: Path) -> None:
+    def test_update_context_changes_plan_context(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Update --context replaces the plan-level context field.
 
         Tests: Context field replacement.
@@ -132,7 +94,7 @@ class TestSamUpdateContext:
                 "plan",
                 "update",
                 "--plan-address",
-                "P1",
+                plan_dir.name,
                 "--context",
                 "Updated context text",
                 "--plan-dir",
@@ -146,10 +108,12 @@ class TestSamUpdateContext:
         assert data["updated"] is True
 
         # Verify persistence
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         assert plan_data["context"] == "Updated context text"
 
-    def test_update_context_preserves_other_plan_fields(self, plan_dir: Path) -> None:
+    def test_update_context_preserves_other_plan_fields(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
         """Update --context does not alter feature, goal, or tasks.
 
         Tests: Field isolation during context update.
@@ -159,11 +123,20 @@ class TestSamUpdateContext:
         # Arrange / Act
         runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1", "--context", "New context", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                plan_dir.name,
+                "--context",
+                "New context",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         assert plan_data["feature"] == "update-test"
         assert plan_data["goal"] == "Test update functionality"
         assert len(plan_data["tasks"]) == 2
@@ -178,16 +151,18 @@ class TestSamUpdateContext:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1", "--context", "ctx", "--plan-dir", str(plan_dir)],
+            ["plan", "update", "--plan-address", plan_dir.name, "--context", "ctx", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
         data = json.loads(result.stdout)
         assert data["updated"] is True
-        assert data["address"] == "1"
+        assert data["address"] == plan_dir.name
 
-    def test_update_mixed_task_and_context_applies_both(self, plan_dir: Path) -> None:
+    def test_update_mixed_task_and_context_applies_both(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
         """A task-address update combined with --context applies both changes.
 
         Tests: Plan-level context is not silently dropped by a task-scoped update.
@@ -203,7 +178,7 @@ class TestSamUpdateContext:
                 "plan",
                 "update",
                 "--plan-address",
-                "P1/T1",
+                f"{plan_dir.name}/T1",
                 "--title",
                 "New title",
                 "--context",
@@ -215,7 +190,7 @@ class TestSamUpdateContext:
         )
         # Assert
         assert result.exit_code == 0, result.stdout
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         assert plan_data["context"] == "Shared context text"
         assert plan_data["tasks"][0]["title"] == "New title"
 
@@ -233,7 +208,7 @@ class TestSamUpdateSetField:
     Why: Agents need to update arbitrary task fields during execution.
     """
 
-    def test_update_set_task_priority(self, plan_dir: Path) -> None:
+    def test_update_set_task_priority(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Update typed field options priority=1 on a task changes priority value.
 
         Tests: Single field update on task.
@@ -243,16 +218,16 @@ class TestSamUpdateSetField:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
+            ["plan", "update", "--plan-address", f"{plan_dir.name}/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         # typed field options passes values as strings; ruamel.yaml may store as str or int
         assert str(plan_data["tasks"][0]["priority"]) == "1"
 
-    def test_update_set_task_status(self, plan_dir: Path) -> None:
+    def test_update_set_task_status(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Update typed field options status=in-progress changes the task status.
 
         Tests: Status field update via typed field options.
@@ -262,15 +237,24 @@ class TestSamUpdateSetField:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T1", "--task-status", "in-progress", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                f"{plan_dir.name}/T1",
+                "--task-status",
+                "in-progress",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert
         assert result.exit_code == 0
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         assert plan_data["tasks"][0]["status"] == "in-progress"
 
-    def test_update_set_preserves_other_task_fields(self, plan_dir: Path) -> None:
+    def test_update_set_preserves_other_task_fields(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Update typed field options on one field does not alter other task fields.
 
         Tests: Field isolation during task update.
@@ -280,15 +264,15 @@ class TestSamUpdateSetField:
         # Arrange / Act
         runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
+            ["plan", "update", "--plan-address", f"{plan_dir.name}/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         assert plan_data["tasks"][0]["title"] == "First task"
         assert plan_data["tasks"][0]["agent"] == "test-agent"
 
-    def test_update_set_targets_correct_task(self, plan_dir: Path) -> None:
+    def test_update_set_targets_correct_task(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Update P1/T2 typed field options priority=1 only updates T2, not T1.
 
         Tests: Task targeting accuracy.
@@ -298,11 +282,11 @@ class TestSamUpdateSetField:
         # Arrange / Act
         runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T2", "--priority", "1", "--plan-dir", str(plan_dir)],
+            ["plan", "update", "--plan-address", f"{plan_dir.name}/T2", "--priority", "1", "--plan-dir", str(plan_dir)],
             env={"NO_COLOR": "1"},
         )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
+        plan_data = _stored_plan(content_backend, plan_dir)
         assert plan_data["tasks"][0]["priority"] == 3  # T1 unchanged
         assert str(plan_data["tasks"][1]["priority"]) == "1"  # T2 updated
 
@@ -315,7 +299,16 @@ class TestSamUpdateSetField:
         """
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T1", "--set", "priority1", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                f"{plan_dir.name}/T1",
+                "--set",
+                "priority1",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         assert result.exit_code != 0
@@ -325,7 +318,9 @@ class TestSamUpdateSetField:
     def test_update_positional_address_is_rejected(self, plan_dir: Path) -> None:
         """A positional plan address is rejected by ``plan update``."""
         result = runner.invoke(
-            app, ["plan", "update", "P1/T1", "--priority", "1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app,
+            ["plan", "update", f"{plan_dir.name}/T1", "--priority", "1", "--plan-dir", str(plan_dir)],
+            env={"NO_COLOR": "1"},
         )
         assert result.exit_code != 0
         assert result.stdout == ""
@@ -335,7 +330,16 @@ class TestSamUpdateSetField:
         """Unknown update options fail before plan mutation."""
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T1", "--unknown", "value", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                f"{plan_dir.name}/T1",
+                "--unknown",
+                "value",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         assert result.exit_code != 0
@@ -356,7 +360,7 @@ class TestSamUpdateAppendSection:
     Why: Agents append divergence notes and context manifests during execution.
     """
 
-    def test_append_section_adds_content_to_task(self, plan_dir: Path) -> None:
+    def test_append_section_adds_content_to_task(self, plan_dir: Path, content_backend: ContentTaskProvider) -> None:
         """Append section adds a named markdown section to the task.
 
         Tests: Section creation.
@@ -370,7 +374,7 @@ class TestSamUpdateAppendSection:
                 "plan",
                 "update",
                 "--plan-address",
-                "P1/T1",
+                f"{plan_dir.name}/T1",
                 "--append-section",
                 "Divergence Notes",
                 "--section-content",
@@ -382,12 +386,14 @@ class TestSamUpdateAppendSection:
         )
         # Assert
         assert result.exit_code == 0, result.stdout
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
-        context_notes = str(plan_data["tasks"][0].get("context-notes", ""))
+        plan_data = _stored_plan(content_backend, plan_dir)
+        context_notes = plan_data["tasks"][0].get("context_notes", "")
         assert "Divergence Notes" in context_notes
         assert "Found a deviation" in context_notes
 
-    def test_append_section_preserves_existing_content(self, plan_dir: Path) -> None:
+    def test_append_section_preserves_existing_content(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
         """Appending a second section preserves the first section.
 
         Tests: Additive section appending.
@@ -401,7 +407,7 @@ class TestSamUpdateAppendSection:
                 "plan",
                 "update",
                 "--plan-address",
-                "P1/T1",
+                f"{plan_dir.name}/T1",
                 "--append-section",
                 "Notes",
                 "--section-content",
@@ -418,7 +424,7 @@ class TestSamUpdateAppendSection:
                 "plan",
                 "update",
                 "--plan-address",
-                "P1/T1",
+                f"{plan_dir.name}/T1",
                 "--append-section",
                 "More Notes",
                 "--section-content",
@@ -429,8 +435,8 @@ class TestSamUpdateAppendSection:
             env={"NO_COLOR": "1"},
         )
         # Assert
-        plan_data = _load_yaml(plan_dir / "P001-update-test.yaml")
-        context_notes = str(plan_data["tasks"][0].get("context-notes", ""))
+        plan_data = _stored_plan(content_backend, plan_dir)
+        context_notes = plan_data["tasks"][0].get("context_notes", "")
         assert "First note." in context_notes
         assert "Second note." in context_notes
 
@@ -448,7 +454,7 @@ class TestSamUpdateAppendSection:
                 "plan",
                 "update",
                 "--plan-address",
-                "P1",
+                plan_dir.name,
                 "--append-section",
                 "Notes",
                 "--section-content",
@@ -471,7 +477,16 @@ class TestSamUpdateAppendSection:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T1", "--append-section", "Notes", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                f"{plan_dir.name}/T1",
+                "--append-section",
+                "Notes",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert
@@ -500,7 +515,7 @@ class TestSamUpdateErrors:
         """
         # Arrange / Act
         result = runner.invoke(
-            app, ["plan", "update", "--plan-address", "P1", "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
+            app, ["plan", "update", "--plan-address", plan_dir.name, "--plan-dir", str(plan_dir)], env={"NO_COLOR": "1"}
         )
         # Assert
         assert result.exit_code == 1
@@ -531,7 +546,16 @@ class TestSamUpdateErrors:
         # Arrange / Act
         result = runner.invoke(
             app,
-            ["plan", "update", "--plan-address", "P1/T99", "--task-status", "complete", "--plan-dir", str(plan_dir)],
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                f"{plan_dir.name}/T99",
+                "--task-status",
+                "complete",
+                "--plan-dir",
+                str(plan_dir),
+            ],
             env={"NO_COLOR": "1"},
         )
         # Assert

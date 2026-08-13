@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import patch
 
+from backlog_core.backend_protocol import get_config
 from backlog_core.models import BacklogItem, IssueStatus
 from backlog_core.operations import _filter_closed_items, list_items
 from backlog_core.server import mcp
@@ -46,12 +47,10 @@ def _make_mixed_items() -> list[BacklogItem]:
     ]
 
 
-async def _call_mcp(tool_name: str, params: dict | None = None) -> dict:
-    """Call a tool through the in-memory FastMCP transport and parse the result.
-
-    Delegates to tests.helpers.call_mcp_tool bound to this module's mcp server.
-    """
-    return await call_mcp_tool(mcp, tool_name, params)
+def _seed_items(items: list[BacklogItem]) -> None:
+    backend = get_config().backend
+    for item in items:
+        backend.put_work_item(item)
 
 
 # ---------------------------------------------------------------------------
@@ -116,10 +115,8 @@ class TestListItemsIncludeClosed:
     def test_list_items_excludes_closed_by_default(self) -> None:
         """list_items without include_closed filters out terminal status items."""
         items = _make_mixed_items()
-        with (
-            patch("backlog_core.operations.parse_backlog", return_value=items),
-            patch("backlog_core.operations.batch_fetch_statuses", return_value={}),
-        ):
+        _seed_items(items)
+        with patch("backlog_core.operations.batch_fetch_statuses", return_value={}):
             result = list_items(include_closed=False)
         result_items = cast("list[dict[str, str | bool]]", result["items"])
         titles = [it["title"] for it in result_items]
@@ -132,10 +129,8 @@ class TestListItemsIncludeClosed:
     def test_list_items_includes_closed_when_flag_set(self) -> None:
         """list_items with include_closed=True returns terminal status items too."""
         items = _make_mixed_items()
-        with (
-            patch("backlog_core.operations.parse_backlog", return_value=items),
-            patch("backlog_core.operations.batch_fetch_statuses", return_value={}),
-        ):
+        _seed_items(items)
+        with patch("backlog_core.operations.batch_fetch_statuses", return_value={}):
             result = list_items(include_closed=True)
         result_items = cast("list[dict[str, str | bool]]", result["items"])
         titles = [it["title"] for it in result_items]
@@ -147,10 +142,8 @@ class TestListItemsIncludeClosed:
     def test_list_items_count_reflects_filtering(self) -> None:
         """The count field in result matches the number of items after filtering."""
         items = _make_mixed_items()
-        with (
-            patch("backlog_core.operations.parse_backlog", return_value=items),
-            patch("backlog_core.operations.batch_fetch_statuses", return_value={}),
-        ):
+        _seed_items(items)
+        with patch("backlog_core.operations.batch_fetch_statuses", return_value={}):
             result_filtered = list_items(include_closed=False)
             result_all = list_items(include_closed=True)
         filtered_items = cast("list[dict[str, str | bool]]", result_filtered["items"])
@@ -173,10 +166,8 @@ class TestListItemsIncludeClosed:
             6: IssueStatus(status="closed", milestone=""),
             7: IssueStatus(status="open", milestone=""),
         }
-        with (
-            patch("backlog_core.operations.parse_backlog", return_value=items),
-            patch("backlog_core.operations.batch_fetch_statuses", return_value=status_map),
-        ):
+        _seed_items(items)
+        with patch("backlog_core.operations.batch_fetch_statuses", return_value=status_map):
             result = list_items(include_closed=True)
         result_items = cast("list[dict[str, str | bool]]", result["items"])
         # All items with a GitHub issue should have status and milestone fields
@@ -190,10 +181,8 @@ class TestListItemsIncludeClosed:
     def test_list_items_skipped_items_excluded_regardless(self) -> None:
         """Items with skip=True are excluded even when include_closed=True."""
         items = [_make_item("Normal", status="open", skip=False), _make_item("Skipped", status="open", skip=True)]
-        with (
-            patch("backlog_core.operations.parse_backlog", return_value=items),
-            patch("backlog_core.operations.batch_fetch_statuses", return_value={}),
-        ):
+        _seed_items(items)
+        with patch("backlog_core.operations.batch_fetch_statuses", return_value={}):
             result = list_items(include_closed=True)
         assert result["count"] == 1
         result_items = cast("list[dict[str, str | bool]]", result["items"])
@@ -212,7 +201,7 @@ class TestMCPIncludeClosedPropagation:
         """backlog_list MCP tool defaults include_closed to False."""
         op_result = {"items": [], "count": 0}
         with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
-            await _call_mcp("backlog_list", {})
+            await call_mcp_tool(mcp, "backlog_list", {})
         call_kwargs = mock_list.call_args.kwargs
         assert call_kwargs["include_closed"] is False
 
@@ -220,7 +209,7 @@ class TestMCPIncludeClosedPropagation:
         """backlog_list MCP tool forwards include_closed=True to operations."""
         op_result = {"items": [], "count": 0}
         with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
-            await _call_mcp("backlog_list", {"include_closed": True})
+            await call_mcp_tool(mcp, "backlog_list", {"include_closed": True})
         call_kwargs = mock_list.call_args.kwargs
         assert call_kwargs["include_closed"] is True
 
@@ -234,7 +223,7 @@ class TestMCPIncludeClosedPropagation:
             "count": 2,
         }
         with patch("dh_core.operations.list_items", return_value=op_result):
-            response = await _call_mcp("backlog_list", {"include_closed": True})
+            response = await call_mcp_tool(mcp, "backlog_list", {"include_closed": True})
         assert response["count"] == 2
         titles = [it["title"] for it in response["items"]]
         assert "Done" in titles
@@ -244,7 +233,7 @@ class TestMCPIncludeClosedPropagation:
         """backlog_list without include_closed returns only non-terminal items."""
         op_result = {"items": [{"title": "Active", "section": "P1", "issue": "", "plan": ""}], "count": 1}
         with patch("dh_core.operations.list_items", return_value=op_result):
-            response = await _call_mcp("backlog_list", {})
+            response = await call_mcp_tool(mcp, "backlog_list", {})
         assert response["count"] == 1
         assert response["items"][0]["title"] == "Active"
 
@@ -252,7 +241,7 @@ class TestMCPIncludeClosedPropagation:
         """backlog_list forwards include_closed alongside other filter params."""
         op_result = {"items": [], "count": 0}
         with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
-            await _call_mcp("backlog_list", {"include_closed": True, "section": "P0"})
+            await call_mcp_tool(mcp, "backlog_list", {"include_closed": True, "section": "P0"})
         call_kwargs = mock_list.call_args.kwargs
         assert call_kwargs["include_closed"] is True
         assert call_kwargs["section"] == "P0"

@@ -16,6 +16,7 @@ from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import (
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRef,
     ContentUnavailableError,
@@ -161,7 +162,7 @@ def test_native_content_contract_when_identity_owner_and_revision_change(local_p
         local_provider.put_content(
             ContentWrite(reference=plan_ref, content="stale", expected_revision=created.revision)
         )
-    with pytest.raises(ContentUnavailableError):
+    with pytest.raises(ContentNotFoundError):
         local_provider.get_content(ContentRef(kind=ContentKind.PLAN, name="missing/opaque"))
 
 

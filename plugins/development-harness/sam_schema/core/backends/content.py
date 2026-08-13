@@ -10,8 +10,8 @@ from backlog_core.models import ContentKind, ContentQuery, ContentRef, ContentWr
 from pydantic import TypeAdapter
 
 from sam_schema.core.backends.memory import InMemoryTaskProvider
-from sam_schema.core.models import PlanState, Task
-from sam_schema.core.task_backend_types import PlanData
+from sam_schema.core.models import AcceptanceCriterion, PlanState, Task
+from sam_schema.core.task_backend_types import PlanData, PlanUpdateValue
 
 _PLAN_DATA_ADAPTER = TypeAdapter(PlanData)
 _PLAN_DATA_ADAPTER.rebuild(_types_namespace={"PlanState": PlanState})
@@ -55,6 +55,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
         context: str | None = None,
         issue: int | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create and persist a plan.
 
@@ -62,7 +63,13 @@ class ContentTaskProvider(InMemoryTaskProvider):
             The created plan.
         """
         plan = super().create_plan(
-            slug, goal, tasks, context=context, issue=issue, acceptance_criteria=acceptance_criteria
+            slug,
+            goal,
+            tasks,
+            context=context,
+            issue=issue,
+            acceptance_criteria=acceptance_criteria,
+            acceptance_criteria_structured=acceptance_criteria_structured,
         )
         self._flush(plan["plan_id"], f"#{issue}" if issue is not None else "")
         return plan
@@ -72,7 +79,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
         self._flush(plan_id, owner_reference)
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, PlanUpdateValue] | None = None
     ) -> None:
         """Update and persist plan fields."""
         super().update_plan_fields(plan_id, context=context, set_fields=set_fields)

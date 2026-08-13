@@ -228,7 +228,13 @@ def _sam_plan_create(config: CreatePlanConfig, plan_dir: str) -> CreatePlanResul
     """
     backend = _get_backend(plan_dir)
     result = operations.create_plan(
-        backend, slug=config.slug, goal=config.goal, tasks=config.tasks, context=config.context, issue=config.issue
+        backend,
+        slug=config.slug,
+        goal=config.goal,
+        tasks=config.tasks,
+        context=config.context,
+        issue=config.issue,
+        acceptance_criteria_structured=config.acceptance_criteria_structured,
     )
     if isinstance(result, CreatePlanError):
         raise ToolError(f"{result.error}: {result.reason} (hint: {result.hint})")

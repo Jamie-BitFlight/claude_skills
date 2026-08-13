@@ -12,8 +12,9 @@ All types follow the pattern established in backlog_core/backend_protocol.py:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, NotRequired
+from typing import TYPE_CHECKING, Annotated, Any, NotRequired, TypeAlias
 
+from pydantic import AliasChoices, Field
 from typing_extensions import TypedDict
 
 if TYPE_CHECKING:
@@ -25,9 +26,12 @@ __all__ = [
     "PlanData",
     "PlanFieldsUpdate",
     "PlanSummary",
+    "PlanUpdateValue",
     "TaskData",
     "TaskFieldsUpdate",
 ]
+
+PlanUpdateValue: TypeAlias = str | int | list[str] | list[dict[str, str]]
 
 # TaskDefinitionDict was removed in the RC1 refactor (PR #1773).
 # Backends now accept Task instances or plain dicts directly via append_task.
@@ -153,6 +157,10 @@ class PlanFieldsUpdate(TypedDict, total=False):
     goal: str
     context: str
     acceptance_criteria: str
+    acceptance_criteria_structured: Annotated[
+        list[dict[str, str]],
+        Field(validation_alias=AliasChoices("acceptance-criteria-structured", "acceptance_criteria_structured")),
+    ]
     issue: str | None
     source_path: str | None
     state: PlanState

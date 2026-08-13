@@ -21,7 +21,15 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.dispatch_state import DispatchStateManager
-from backlog_core.models import BacklogError, ContentKind, ContentQuery, ContentRef, ContentWrite, DispatchItemRecord
+from backlog_core.models import (
+    BacklogError,
+    ContentKind,
+    ContentQuery,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+    DispatchItemRecord,
+)
 from backlog_core.server import mcp
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
@@ -1023,6 +1031,21 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" in data
         assert "already exists" in data["error"] or str(existing_plan_file) in data["error"]
+
+    async def test_create_plan_does_not_overwrite_when_existing_plan_is_unavailable(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        get_content = mocker.patch.object(
+            patch_create_plan_path, "get_content", side_effect=ContentUnavailableError("offline cache miss")
+        )
+        put_content = mocker.patch.object(patch_create_plan_path, "put_content")
+
+        async with Client(mcp) as client:
+            with pytest.raises(ToolError, match="offline cache miss"):
+                await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
+
+        get_content.assert_called_once()
+        put_content.assert_not_called()
 
     async def test_create_plan_milestone_mismatch(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan returns an error when milestone numbers disagree.

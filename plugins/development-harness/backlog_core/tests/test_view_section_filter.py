@@ -3,7 +3,7 @@
 Bug A: backlog_view(selector="...", summary=False, section="Concerns") returns
 the full item body (100k+ characters) instead of only the Concerns section
 content.  Root cause: _assemble_view_content only applies the ``section``
-parameter in the ``elif item and item.sections:`` branch (YAML items with no
+parameter in the ``elif item and item.sections:`` branch (structured items with no
 raw body).  When ``result.body`` is populated by view_enrich_from_github the
 ``if body:`` branch runs instead and ignores ``section`` entirely.
 
@@ -25,10 +25,12 @@ from typing import TYPE_CHECKING, TypeGuard
 from backlog_core.models import BacklogItem, Section
 from backlog_core.operations import _build_sections_compact, view_item
 
+from ._view_test_helpers import _configure_memory_view
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-    from backlog_core.models import GroomedSectionMetadata, SectionEntryDict, SectionEntryMetadata, ViewItemResult
+    from backlog_core.models import GroomedSectionMetadata, SectionEntryDict, SectionEntryMetadata
 
 
 def _is_section_entry_metadata(
@@ -94,7 +96,7 @@ Step 2: add integration test.
 
 
 def _make_local_item(title: str = "Test Item") -> BacklogItem:
-    """Return a minimal BacklogItem with one section for local cache.
+    """Return a minimal BacklogItem with one provider-owned section.
 
     The local item is intentionally different from the GitHub body so tests can
     distinguish which source drove the result.
@@ -128,15 +130,7 @@ class TestViewItemSectionFilterAppliesToGithubBody:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=99)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_A
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=99, body=_MULTI_SECTION_BODY_BUG_A)
 
         # Act
         result = view_item("#99", include_content=True, section="Concerns")
@@ -163,15 +157,7 @@ class TestViewItemSectionFilterAppliesToGithubBody:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=99)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_A
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=99, body=_MULTI_SECTION_BODY_BUG_A)
 
         # Act
         result = view_item("#99", include_content=True, section="Concerns")
@@ -217,15 +203,7 @@ class TestSectionEntryDoesNotIncludeNextSectionHeader:
         entry content (no entry blocks present — falls back to sec_body.strip()).
         """
         # Arrange — no local item; test via raw body injection only
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[])
-        mocker.patch("backlog_core.operations.find_item", return_value=None)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=100)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_B
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, issue_num=100, body=_MULTI_SECTION_BODY_BUG_B)
 
         # Act
         result = view_item("#100", include_content=True)
@@ -267,15 +245,7 @@ class TestSectionEntryDoesNotIncludeNextSectionHeader:
         It is included as a non-regression anchor: it must stay green.
         """
         # Arrange
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[])
-        mocker.patch("backlog_core.operations.find_item", return_value=None)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=101)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_B
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, issue_num=101, body=_MULTI_SECTION_BODY_BUG_B)
 
         # Act
         result = view_item("#101", include_content=True)
@@ -402,15 +372,7 @@ class TestAssembleViewCompactSectionFilter:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=200)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_A
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=200, body=_MULTI_SECTION_BODY_BUG_A)
 
         # Act
         result = view_item("#200", include_content=False, section="Concerns")
@@ -436,15 +398,7 @@ class TestAssembleViewCompactSectionFilter:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=201)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_A
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=201, body=_MULTI_SECTION_BODY_BUG_A)
 
         # Act
         result = view_item("#201", include_content=False, section="Concerns")
@@ -464,15 +418,7 @@ class TestAssembleViewCompactSectionFilter:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=202)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY_BUG_A
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=202, body=_MULTI_SECTION_BODY_BUG_A)
 
         # Act
         result = view_item("#202", include_content=False)

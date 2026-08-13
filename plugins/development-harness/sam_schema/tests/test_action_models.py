@@ -5,7 +5,19 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from sam_schema.core.action_models import TaskDefinition
+from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
+
+
+def test_create_plan_schema_describes_provider_neutral_identity() -> None:
+    properties = CreatePlanConfig.model_json_schema()["properties"]
+
+    assert properties["slug"]["description"] == (
+        "Logical feature slug stored as the plan's feature identifier (e.g., 'auth-system')."
+    )
+    assert properties["issue"]["description"] == (
+        "Legacy numeric owner alias. Stores the number in plan metadata and associates persisted plan content "
+        "with owner reference '#<issue>'. Prefer owner_reference for provider-native identifiers."
+    )
 
 
 def test_task_definition_rejects_unknown_fields() -> None:

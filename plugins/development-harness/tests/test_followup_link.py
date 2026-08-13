@@ -1,7 +1,7 @@
 """Tests for the follow-up link primitive (T-P3-FOLLOWUP).
 
 Verifies that ``link_followup`` persists the ``followup_to`` metadata field
-to YAML frontmatter (durable), and ``list_followups`` retrieves items by
+through the configured provider, and ``list_followups`` retrieves items by
 origin logical ID (queryable).  Also exercises the MCP tool wrappers to
 confirm parameter forwarding through the server layer.
 """
@@ -22,27 +22,19 @@ from tests.helpers import call_mcp_tool
 
 
 def test_link_followup_persists_and_list_followups_queries(write_test_item) -> None:
-    """link_followup writes followup_to to YAML; list_followups finds it back.
-
-    Creates a follow-up item, links it to plan ``P1``, then re-reads the
-    YAML file from disk to confirm the field survived the round-trip
-    (durability).  Then queries ``list_followups("P1")`` and asserts the
-    item appears (queryability).
-    """
     from backlog_core.operations import link_followup, list_followups
 
     write_test_item("Origin item", priority="P1", description="the origin")
-    followup_path = write_test_item("Follow-up task", priority="P2", description="needs more work")
+    followup_ref = write_test_item("Follow-up task", priority="P2", description="needs more work")
 
     # Link the follow-up to plan P1.
     result = link_followup("Follow-up task", "P1")
     assert result["title"] == "Follow-up task"
     assert result["followup_to"] == "P1"
 
-    # Durability: re-read the YAML file from disk and check the field is there.
-    from backlog_core.yaml_io import load_item
+    from backlog_core.backend_protocol import get_config
 
-    reloaded = load_item(followup_path)
+    reloaded = get_config().backend.get_work_item(followup_ref)
     assert reloaded.metadata.followup_to == "P1"
 
     # Queryability: list_followups returns the linked item.

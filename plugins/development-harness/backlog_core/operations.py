@@ -786,7 +786,7 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
 def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", output: Output | None = None) -> None:
     """Register *plan* as a task-plan artifact on the item's GitHub Issue.
 
-    Best-effort: logs a warning on any failure but never raises.  Called
+    Best-effort writes log a warning; unavailable manifest reads propagate. Called
     after :func:`_apply_plan_to_item` when the backlog item has a linked
     GitHub Issue.  No-ops silently for string-ID backends (e.g. beads) —
     artifact registration targets GitHub issue manifests only.
@@ -821,7 +821,7 @@ def _auto_register_plan_artifact(item: BacklogItem, plan: str, repo: str = "", o
         try:
             record = provider.get_content(reference)
             manifest = _models.ArtifactManifest.model_validate_json(record.content)
-        except ContentUnavailableError:
+        except _models.ContentNotFoundError:
             manifest = _models.ArtifactManifest(issue_number=issue_number)
         entry = ArtifactEntry(artifact_type=ArtifactType.TASK_PLAN, artifact_id=plan)
         updated_manifest = registry.register(manifest, entry)

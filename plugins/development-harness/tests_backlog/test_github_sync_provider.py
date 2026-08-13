@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
@@ -10,9 +11,11 @@ from backlog_core.models import (
     BacklogError,
     BacklogItem,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
+    ContentUnavailableError,
     ContentWrite,
     ProviderPatch,
     ReconcileRequest,
@@ -383,6 +386,22 @@ def test_github_content_provider_reads_cached_plan_while_github_is_offline(tmp_p
     # Then: the provider-owned FileCache serves an explicitly stale copy without any artifact filesystem access
     assert (cached.content, cached.stale) == ("cached plan", True)
     artifact_provider.read_local_artifact_content.assert_not_called()
+
+
+def test_github_content_provider_distinguishes_online_not_found_from_offline_cache_miss(tmp_path: Path) -> None:
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.return_value = None
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
+    reference = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="test", name="missing")
+
+    backend.try_get_github = MagicMock(return_value=None)
+    with pytest.raises(ContentUnavailableError) as offline:
+        backend.get_content(reference)
+    assert type(offline.value) is ContentUnavailableError
+
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    with pytest.raises(ContentNotFoundError):
+        backend.get_content(reference)
 
 
 def test_github_content_provider_queues_offline_write_and_returns_stale_cache(tmp_path: Path) -> None:

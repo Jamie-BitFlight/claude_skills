@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from github.AuthenticatedUser import AuthenticatedUser
 
 # Ensure graphql_factories is importable regardless of pytest invocation path.
@@ -41,8 +42,10 @@ from backlog_core.models import (
     ContentKind,
     ContentRecord,
     ContentRef,
+    ContentUnavailableError,
 )
 from backlog_core.server import mcp
+from fastmcp.exceptions import ToolError
 from graphql_factories import (
     make_issue_by_number_response,
     make_issue_comment_node,
@@ -524,6 +527,19 @@ async def test_artifact_register_without_content_writes_only_manifest() -> None:
     assert mock_provider.put_content.call_args.args[0].reference == ContentRef(
         kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest"
     )
+
+
+async def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.side_effect = ContentUnavailableError("offline cache miss")
+
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
+        pytest.raises(ToolError, match="offline cache miss"),
+    ):
+        await _call("artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"})
+
+    mock_provider.put_content.assert_not_called()
 
 
 async def test_artifact_register_with_content_writes_to_configured_provider() -> None:

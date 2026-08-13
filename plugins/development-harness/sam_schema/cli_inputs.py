@@ -9,6 +9,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstrain
 from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig, TaskDefinition
 from sam_schema.core.models import (
     TASK_ID_PATTERN,
+    AcceptanceCriterion,
     AnalysisMethod,
     BookendType,
     Complexity,
@@ -166,6 +167,11 @@ class PlanUpdateFields(_CliInput):
         default=None,
         validation_alias=AliasChoices("acceptance-criteria", "acceptance_criteria"),
         serialization_alias="acceptance-criteria",
+    )
+    acceptance_criteria_structured: list[AcceptanceCriterion] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("acceptance-criteria-structured", "acceptance_criteria_structured"),
+        serialization_alias="acceptance-criteria-structured",
     )
     issue: str | None = None
     architecture: str | None = None

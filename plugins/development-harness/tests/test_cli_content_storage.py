@@ -4,12 +4,13 @@ import ast
 import json
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from backlog_core.backend_protocol import set_config
-from backlog_core.backend_types import BacklogConfig
+from backlog_core.backend_types import BacklogConfig, ContentProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ContentKind, ContentQuery, ContentRef
+from backlog_core.models import ContentKind, ContentQuery, ContentRef, ContentUnavailableError
 from dh_core import operations
 from sam_schema.core.backends.content import ContentTaskProvider
 
@@ -56,6 +57,17 @@ def test_artifact_operations_use_configured_content_provider(content_provider: I
     )
 
 
+def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
+    provider = MagicMock(spec=ContentProvider)
+    provider.get_content.side_effect = ContentUnavailableError("offline cache miss")
+    set_config(BacklogConfig(backend=provider))
+
+    with pytest.raises(ContentUnavailableError, match="offline cache miss"):
+        operations.artifact_register(42, "research", "report")
+
+    provider.put_content.assert_not_called()
+
+
 def test_dispatch_operations_use_dedicated_configured_content(content_provider: InMemoryBackend) -> None:
     created = operations.dispatch_create_plan(10, _dispatch_plan())
     read = operations.dispatch_read_plan(10)
@@ -67,6 +79,17 @@ def test_dispatch_operations_use_dedicated_configured_content(content_provider: 
     records = content_provider.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
     assert len(records) == 1
     assert json.loads(records[0].content)["milestone"]["number"] == 10
+
+
+def test_dispatch_create_does_not_overwrite_when_existing_plan_is_unavailable() -> None:
+    provider = MagicMock(spec=ContentProvider)
+    provider.get_content.side_effect = ContentUnavailableError("offline cache miss")
+    set_config(BacklogConfig(backend=provider))
+
+    with pytest.raises(ContentUnavailableError, match="offline cache miss"):
+        operations.dispatch_create_plan(10, _dispatch_plan())
+
+    provider.put_content.assert_not_called()
 
 
 def test_dh_core_has_no_legacy_content_storage_reachability() -> None:

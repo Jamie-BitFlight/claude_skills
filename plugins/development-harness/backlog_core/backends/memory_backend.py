@@ -39,10 +39,10 @@ from backlog_core.models import (
     BranchInfo,
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
-    ContentUnavailableError,
     ContentWrite,
     GroomedData,
     IssueLocalFields,
@@ -167,7 +167,7 @@ class InMemoryBackend:
         try:
             return self._content[self._content_key(reference)]
         except KeyError:
-            raise ContentUnavailableError(f"Content is unavailable: {reference.model_dump_json()}") from None
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}") from None
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Create or replace one in-memory content record."""
