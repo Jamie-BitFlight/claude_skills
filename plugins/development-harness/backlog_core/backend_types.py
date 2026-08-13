@@ -15,12 +15,18 @@ if TYPE_CHECKING:
         BackendStatus,
         BacklogItem,
         BranchInfo,
+        ContentQuery,
+        ContentRecord,
+        ContentRef,
+        ContentWrite,
         GroomedData,
         IssueLocalFields,
         IssueStatus,
         MergeResult,
         Output,
         PullRequestRef,
+        ReconcileRequest,
+        ReconcileResult,
         SamTask,
         ViewItemResult,
     )
@@ -132,6 +138,10 @@ class WorkItemBackend(Protocol):
     issue_id_type: Literal["integer", "string"]
     supports_branches: bool
 
+    def list_work_items(self) -> list[BacklogItem]: ...
+    def get_work_item(self, reference: str) -> BacklogItem: ...
+    def put_work_item(self, item: BacklogItem) -> None: ...
+
     # Repository access (generic subset)
     def try_get_github(self, repo: str = "") -> Repository | None: ...
     def probe_backend_status(self, repo: str = "") -> BackendStatus: ...
@@ -186,6 +196,22 @@ class WorkItemBackend(Protocol):
     def section_heading(self) -> dict[str, str]: ...
     def render_groomed_section(self, groomed: GroomedData) -> str: ...
     def section_display_title(self, key: str, groomed_date: str = "") -> str: ...
+
+
+@runtime_checkable
+class SyncProvider(Protocol):
+    """Optional one-method reconciliation capability for remote backends."""
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult: ...
+
+
+@runtime_checkable
+class ContentProvider(Protocol):
+    """Optional logical plan and artifact content capability."""
+
+    def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
+    def get_content(self, reference: ContentRef) -> ContentRecord: ...
+    def put_content(self, request: ContentWrite) -> ContentRecord: ...
 
 
 @runtime_checkable
@@ -246,7 +272,6 @@ class GitHubExtras(Protocol):
         milestone_number: int | None = None,
         since: datetime | None = None,
         callback: Callable[[IssueNode], None] | None = None,
-        track_timestamp: bool = False,
     ) -> list[IssueNode]: ...
 
     # Issue comments (GraphQL)

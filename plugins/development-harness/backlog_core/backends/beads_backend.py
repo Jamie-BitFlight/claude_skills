@@ -35,13 +35,27 @@ meaningful integer representation.  Affected methods raise
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import json
 import logging
-from typing import TYPE_CHECKING, Literal
+import os
+import uuid
+from collections.abc import Iterator, Sequence
+from pathlib import Path
+from threading import Lock
+from typing import TYPE_CHECKING, Final, Literal, Protocol
 
 from pydantic import ValidationError
 
 from backlog_core import github_sync, rendering as _rendering
-from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
+from backlog_core.backends.bd_runner import (
+    BdInvocationError,
+    BdJsonDecodeError,
+    BdNotInstalledError,
+    BdRunner,
+    JsonValue,
+)
 from backlog_core.backends.beads_models import (
     BeadsIssueType,
     BeadsStatus,
@@ -53,6 +67,14 @@ from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
     BacklogItem,
+    ContentConflictError,
+    ContentKind,
+    ContentNotFoundError,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
     GroomedData,
     IssueLocalFields,
     IssueStatus,
@@ -70,6 +92,63 @@ if TYPE_CHECKING:
 __all__ = ["BeadsBackend"]
 
 _log = logging.getLogger(__name__)
+_CONTENT_KEY_PREFIX: Final[str] = "dh.content."
+_CONTENT_LOCK_FILE: Final[str] = "dh-content.lock"
+_THREAD_LOCKS: Final[dict[Path, Lock]] = {}
+_THREAD_LOCKS_GUARD: Final = Lock()
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
+
+class _BdRunnerLike(Protocol):
+    def run_json(self, argv: Sequence[str]) -> JsonValue: ...
+
+    def run_text(self, argv: Sequence[str]) -> str: ...
+
+    def is_available(self) -> bool: ...
+
+
+def _beads_workspace_path(runner: _BdRunnerLike) -> Path:
+    try:
+        workspace = runner.run_json(["where"])
+    except (BdInvocationError, BdJsonDecodeError, BdNotInstalledError) as exc:
+        raise ContentUnavailableError("Beads content store is unavailable") from exc
+    if not isinstance(workspace, dict) or not isinstance(path := workspace.get("path"), str) or not path:
+        raise ContentUnavailableError("Beads workspace could not be resolved")
+    return Path(path).resolve()
+
+
+@contextlib.contextmanager
+def _beads_content_lock(runner: _BdRunnerLike) -> Iterator[None]:
+    lock_path = _beads_workspace_path(runner) / _CONTENT_LOCK_FILE
+    with _THREAD_LOCKS_GUARD:
+        thread_lock = _THREAD_LOCKS.setdefault(lock_path, Lock())
+    with thread_lock:
+        try:
+            lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError as exc:
+            raise ContentUnavailableError("Beads content store is unavailable") from exc
+        try:
+            try:
+                if os.name == "nt":
+                    msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
+                else:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            except OSError as exc:
+                raise ContentUnavailableError("Beads content store is unavailable") from exc
+            try:
+                yield
+            finally:
+                if os.name == "nt":
+                    msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        finally:
+            os.close(lock_fd)
+
 
 # ---------------------------------------------------------------------------
 # Type and priority mapping helpers
@@ -86,6 +165,16 @@ _ITEM_TYPE_TO_BEADS: dict[str, str] = {
     "spike": BeadsIssueType.SPIKE,
     "story": BeadsIssueType.STORY,
     "milestone": BeadsIssueType.MILESTONE,
+}
+
+_LOGICAL_STATUS_TO_BEADS: Final[dict[str, str]] = {
+    "done": BeadsStatus.CLOSED,
+    "resolved": BeadsStatus.CLOSED,
+    "completed": BeadsStatus.CLOSED,
+    "closed": BeadsStatus.CLOSED,
+    "in-progress": BeadsStatus.IN_PROGRESS,
+    "needs-grooming": BeadsStatus.OPEN,
+    "groomed": BeadsStatus.OPEN,
 }
 
 
@@ -121,6 +210,10 @@ def _beads_priority_for_item_priority(priority: str) -> str:
     return "2"
 
 
+def _beads_status_for_item_status(status: str) -> str:
+    return _LOGICAL_STATUS_TO_BEADS.get(status.casefold(), status)
+
+
 _ADR_001_NOTE = (
     "BeadsBackend does not implement GitHub-specific operations. See ADR-001 in the project architecture documentation."
 )
@@ -151,8 +244,7 @@ class BeadsBackend:
     - ``supports_batch_issue_update = False`` — beads does not expose GraphQL.
     - ``issue_id_type = "string"`` — beads issues are identified by string
       nanoids (e.g. ``"bd-a3f8"``).  When ``item.issue`` is absent, the item
-      title is used as the selector.  The list command skips live batch-status
-      fetch and relies on the local YAML cache instead.
+      title is used as the selector.
     - ``supports_branches = False`` — beads does not manage git branches;
       callers must check this flag before invoking ``BranchBackend`` methods.
 
@@ -170,9 +262,165 @@ class BeadsBackend:
     issue_id_type: Literal["integer", "string"] = "string"
     supports_branches: bool = False
 
-    def __init__(self, runner: BdRunner | None = None) -> None:
+    def __init__(self, runner: _BdRunnerLike | None = None) -> None:
         """Store the runner; do not touch the filesystem or spawn processes."""
-        self._runner: BdRunner = runner if runner is not None else BdRunner()
+        self._runner: _BdRunnerLike = runner if runner is not None else BdRunner()
+
+    def list_work_items(self) -> list[BacklogItem]:
+        """List work items projected from native Beads issues."""
+        issues = parse_issue_list(self._runner.run_json(["list", "--all", "--limit", "0"]))
+        items: list[BacklogItem] = []
+        for issue in issues:
+            try:
+                item = BacklogItem.model_validate_json(issue.notes or "")
+            except (ValidationError, ValueError):
+                item = BacklogItem(title=issue.title)
+            metadata = item.metadata.model_copy(
+                update={
+                    "issue": issue.id,
+                    "status": issue.status.value,
+                    "priority": f"P{int(issue.priority)}",
+                    "item_type": issue.type.value,
+                    **({"updated_at": issue.updated_at} if issue.updated_at else {}),
+                }
+            )
+            items.append(
+                BacklogItem.model_validate({
+                    **item.model_dump(),
+                    "title": issue.title,
+                    "description": issue.description or item.description,
+                    "reference": issue.id,
+                    "metadata": metadata,
+                })
+            )
+        return items
+
+    def get_work_item(self, reference: str) -> BacklogItem:
+        """Get a native Beads issue by its nanoid reference."""
+        for item in self.list_work_items():
+            if reference == item.reference:
+                return item
+        raise KeyError(reference)
+
+    def put_work_item(self, item: BacklogItem) -> None:
+        """Upsert canonical work-item content on a native Beads issue."""
+        if not item.issue:
+            item.issue = self.create_beads_issue_for_item(item) or ""
+        if not item.issue:
+            raise ContentUnavailableError("Beads work item could not be created")
+        item.reference = item.issue
+        self._runner.run_text([
+            "update",
+            item.issue,
+            "--title",
+            item.title,
+            "--description",
+            item.description,
+            "--notes",
+            item.model_dump_json(),
+            "--status",
+            _beads_status_for_item_status(item.metadata.status),
+        ])
+
+    def list_content(self, query: ContentQuery) -> list[ContentRecord]:
+        """Return the requested bounded page from the native Beads KV store."""
+        try:
+            raw = self._runner.run_json(["kv", "list"])
+        except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
+            raise ContentUnavailableError("Beads content store is unavailable") from exc
+        if not isinstance(raw, dict):
+            raise ContentUnavailableError("Beads content store returned an invalid listing")
+        records: list[ContentRecord] = []
+        for key, value in raw.items():
+            if not key.startswith(_CONTENT_KEY_PREFIX):
+                continue
+            if not isinstance(value, str):
+                raise ContentUnavailableError("Beads content store returned an invalid record")
+            try:
+                record = ContentRecord.model_validate_json(value)
+            except ValidationError as exc:
+                raise ContentUnavailableError("Beads content store returned an invalid record") from exc
+            if (
+                record.reference.kind == query.kind
+                and (query.owner_reference is None or record.owner_reference == query.owner_reference)
+                and query.search.casefold() in record.reference.name.casefold()
+            ):
+                records.append(record)
+        records.sort(
+            key=lambda record: (record.reference.namespace, record.reference.artifact_type, record.reference.name)
+        )
+        return records[query.offset : query.offset + query.limit]
+
+    def get_content(self, reference: ContentRef) -> ContentRecord:
+        """Return one Beads KV content record by logical identity."""
+        record = self._find_content(reference)
+        if record is None:
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
+        return record
+
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        """Create or replace one record in the native Beads KV store."""
+        with _beads_content_lock(self._runner):
+            current = self._find_content(request.reference)
+            current_revision = current.revision if current is not None else ""
+            if request.create_only and current is not None:
+                raise ContentConflictError("Content already exists")
+            if request.expected_revision and request.expected_revision != current_revision:
+                raise ContentConflictError("Content revision no longer matches")
+            owner_reference = request.reference.namespace
+            if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
+                owner_reference = (
+                    request.owner_reference
+                    if request.owner_reference is not None
+                    else current.owner_reference
+                    if current is not None
+                    else ""
+                )
+            record = ContentRecord(
+                reference=request.reference,
+                owner_reference=owner_reference,
+                content=request.content,
+                revision=uuid.uuid4().hex,
+            )
+            try:
+                self._runner.run_text([
+                    "kv",
+                    "set",
+                    self._content_key(request.reference),
+                    json.dumps(record.model_dump(mode="json"), separators=(",", ":")),
+                ])
+            except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
+                raise ContentUnavailableError("Beads content store is unavailable") from exc
+            return record
+
+    def _find_content(self, reference: ContentRef) -> ContentRecord | None:
+        try:
+            raw = self._runner.run_json(["kv", "get", self._content_key(reference)])
+        except BdInvocationError as exc:
+            if exc.returncode != 1:
+                raise ContentUnavailableError("Beads content store is unavailable") from exc
+            try:
+                raw = json.loads(exc.stdout)
+            except json.JSONDecodeError as decode_error:
+                raise ContentUnavailableError("Beads content store is unavailable") from decode_error
+        except (BdNotInstalledError, BdJsonDecodeError) as exc:
+            raise ContentUnavailableError("Beads content store is unavailable") from exc
+        if not isinstance(raw, dict):
+            raise ContentUnavailableError("Beads content store returned an invalid record")
+        if raw.get("found") is False:
+            return None
+        value = raw.get("value")
+        if not isinstance(value, str):
+            raise ContentUnavailableError("Beads content store returned an invalid record")
+        try:
+            return ContentRecord.model_validate_json(value)
+        except ValidationError as exc:
+            raise ContentUnavailableError("Beads content store returned an invalid record") from exc
+
+    @staticmethod
+    def _content_key(reference: ContentRef) -> str:
+        digest = hashlib.sha256(reference.model_dump_json().encode()).hexdigest()
+        return f"{_CONTENT_KEY_PREFIX}{digest}"
 
     # ------------------------------------------------------------------
     # Repository access

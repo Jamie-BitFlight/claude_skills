@@ -112,10 +112,10 @@ class _FakeArtifactRegistryClient(ArtifactRegistryClient):
         super().__init__(provider=None)
         self._fake_store = store
 
-    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan", plan_id: str | None = None) -> None:
         self._fake_store.store(issue, content, artifact_type=artifact_type)
 
-    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+    def read(self, issue: int, artifact_type: str = "task-plan", *, plan_id: str | None = None) -> str | None:
         return self._fake_store.read(issue, artifact_type)
 
     def store_index(self, sentinel_issue: int, content: str) -> None:

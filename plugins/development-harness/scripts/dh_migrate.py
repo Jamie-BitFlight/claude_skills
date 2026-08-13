@@ -333,7 +333,7 @@ def _artifact_manifest_instructions(project_root: Path) -> dict[str, object]:
         "steps": [
             "artifact_list(item_id=N) — find entries with old prefixes",
             (
-                "artifact_register(item_id=N, artifact_type=T, artifact_id=<new_relative_path>)"
+                "artifact_register(item_id=N, artifact_type=T, artifact_id=<new_relative_path>, content=<artifact body>)"
                 " — re-register with new path"
             ),
         ],

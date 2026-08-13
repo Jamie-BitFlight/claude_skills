@@ -382,9 +382,9 @@
       "from_fork": "complete-implementation.found",
       "branch_condition": "No — QG plan not found",
       "path": [
-        "sam_plan(action=list, search='qg-{slug}')",
+        "sam_plan list action with search='qg-{slug}'",
         "Found:No",
-        "sam_plan(action=create) tasks list from phase mapping table",
+        "sam_plan create action with tasks from the phase mapping table",
         "Enter SAM Dispatch Loop"
       ],
       "crosses_into_files": [],
@@ -396,7 +396,7 @@
       "from_fork": "complete-implementation.found",
       "branch_condition": "Yes — QG plan exists",
       "path": [
-        "sam_plan(action=list, search='qg-{slug}')",
+        "sam_plan list action with search='qg-{slug}'",
         "Found:Yes",
         "Check all tasks terminal?"
       ],
@@ -791,7 +791,7 @@
       "from_fork": "complete-implementation.scopeexists",
       "branch_condition": "No — section absent",
       "path": [
-        "sam_plan(action='read', plan='{plan_id}')",
+        "sam_plan(plan='{plan_id}', config={'action':'read'})",
         "ScopeExists:No",
         "Emit WARNING: No ## Scope section — Defaulting to in-scope",
         "IN-SCOPE — proceed to Step 4"
@@ -806,7 +806,11 @@
     {
       "from_fork": "complete-implementation.scopeexists",
       "branch_condition": "Yes — ## Scope present",
-      "path": ["sam_plan(action='read', plan='{plan_id}')", "ScopeExists:Yes", "ScopeValue?"],
+      "path": [
+        "sam_plan(plan='{plan_id}', config={'action':'read'})",
+        "ScopeExists:Yes",
+        "ScopeValue?"
+      ],
       "crosses_into_files": [
         "plugins/development-harness/skills/complete-implementation/references/recursive-follow-up-handling.md"
       ],

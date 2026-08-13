@@ -34,6 +34,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from backlog_core.backend_types import BacklogConfig as BackendConfig, WorkItemBackend
+from backlog_core.backends.beads_backend import BeadsBackend
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import BackendUnavailableError, BacklogError
 from backlog_core.sync_engine import _startup_sync_loop
 from backlog_core.sync_state import (
@@ -1175,6 +1179,33 @@ class TestKillSwitch:
             f"Got {launch_count} launch(es). Finding #8."
         )
 
+    @pytest.mark.parametrize(
+        "backend",
+        [
+            pytest.param(InMemoryBackend(), id="memory"),
+            pytest.param(SQLiteBackend(), id="sqlite"),
+            pytest.param(BeadsBackend(), id="beads"),
+        ],
+    )
+    async def test_sync_skipped_when_backend_lacks_reconciliation(
+        self, backend: WorkItemBackend, mocker: MockerFixture
+    ) -> None:
+        reset_sync_state()
+
+        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
+        mocker.patch("backlog_core.server._get_config", return_value=BackendConfig(backend=backend))
+        mocker.patch("backlog_core.server._active_startup_sync_task", None)
+        create_task = mocker.patch("backlog_core.server.asyncio.create_task")
+
+        from backlog_core.server import _backlog_lifespan, sync_now
+
+        async with _backlog_lifespan(object()):
+            result = await sync_now()
+
+        create_task.assert_not_called()
+        assert result["triggered"] is False
+        assert result["messages"] == ["Active backend does not support reconciliation."]
+
     async def test_sync_runs_when_kill_switch_enabled(self, mocker: MockerFixture) -> None:
         """startup sync IS launched when the kill-switch is true (default)."""
         reset_sync_state()
@@ -1226,10 +1257,11 @@ class TestBackendFailurePropagation:
         """
         from backlog_core.models import GitHubUnavailableError
 
-        # Patch try_get_github to raise instead of return None.
-        mocker.patch(
-            "backlog_core.operations.try_get_github", side_effect=GitHubUnavailableError("GITHUB_TOKEN not set")
-        )
+        class UnavailableSyncBackend(InMemoryBackend):
+            def reconcile(self, request: object) -> None:
+                raise GitHubUnavailableError("GITHUB_TOKEN not set")
+
+        mocker.patch("backlog_core.operations.get_config", return_value=BackendConfig(backend=UnavailableSyncBackend()))
 
         state = fresh_sync_state
         await _startup_sync_loop(state)

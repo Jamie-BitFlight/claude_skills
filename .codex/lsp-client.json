@@ -1,0 +1,13 @@
+{
+  "lsp": {
+    "basedpyright": {
+      "disabled": true
+    },
+    "ty": {
+      "priority": 100
+    },
+    "oxlint": {
+      "priority": 100
+    }
+  }
+}

@@ -430,9 +430,8 @@ def test_artifact_manifest_instructions_mentions_artifact_register(fake_project:
     result = _artifact_manifest_instructions(fake_project)
     steps = result["steps"]
 
-    # Assert: key MCP tool name is mentioned in the steps
     assert isinstance(steps, list)
-    assert any("artifact_register" in str(step) for step in steps)
+    assert any("content=<artifact body>" in str(step) for step in steps)
 
 
 def test_artifact_manifest_instructions_shows_old_prefixes(fake_project: Path) -> None:

@@ -21,6 +21,6 @@ Work does NOT produce:
 
 A completed work result must produce:
 
-- a SAM plan file created by `dh:add-new-feature` and retrievable via `sam_plan(action='list')`
-- a `plan` field on the backlog item set to the plan address `P{id}` via `backlog_update`
+- a SAM plan created by `dh:add-new-feature` and discoverable via `sam_plan(config={"action": "list"})`
+- a `plan` field on the backlog item set to the returned `plan_ref` via `backlog_update`
 - item status transitioned to `in-progress` via `backlog_update(status="in-progress")`

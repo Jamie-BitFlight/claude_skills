@@ -65,8 +65,15 @@ from sam_schema.core.query import _new_plan_id
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from sam_schema.core.models import Task
-    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
+    from sam_schema.core.models import AcceptanceCriterion, Task
+    from sam_schema.core.task_backend_types import (
+        DocumentData,
+        DocumentHandle,
+        PlanData,
+        PlanSummary,
+        PlanUpdateValue,
+        TaskData,
+    )
 
 __all__ = ["BeadsContextBackend", "BeadsTaskProvider"]
 
@@ -530,7 +537,9 @@ class BeadsTaskProvider:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create a beads epic for the plan and child issues for each task.
 
@@ -544,7 +553,9 @@ class BeadsTaskProvider:
             tasks: Ordered validated Task models to create as child issues.
             context: Optional context narrative appended to epic description.
             issue: Optional GitHub issue number stored in plan metadata only.
+            owner_reference: Optional opaque owner reference, ignored by this backend.
             acceptance_criteria: Optional plan-level acceptance criteria text.
+            acceptance_criteria_structured: Optional executable acceptance criteria.
 
         Returns:
             PlanData with the backend-assigned plan_id.
@@ -599,6 +610,10 @@ class BeadsTaskProvider:
             "state": PlanState.DRAFTING if not tasks else PlanState.READY,
             "backend_ref": epic.id,
         }
+        if acceptance_criteria_structured:
+            plan_data["acceptance_criteria_structured"] = [
+                criterion.model_dump() for criterion in acceptance_criteria_structured
+            ]
         return plan_data
 
     def read_plan(self, plan_id: str) -> PlanData:
@@ -732,7 +747,12 @@ class BeadsTaskProvider:
         return paginated
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level fields on the beads epic for a plan.
 
@@ -743,6 +763,7 @@ class BeadsTaskProvider:
             plan_id: SAM plan identifier.
             context: When provided, appended to the epic notes as context.
             set_fields: Optional field map with new values.
+            owner_reference: Optional opaque backend owner reference.
 
         Raises:
             PlanNotFoundError: When plan_id has no registered epic.

@@ -1,11 +1,17 @@
 # SAM Task File Format
 
-**Status**: Snapshot (last synced 2026-03-31)
+**Status**: Snapshot (last synced 2026-08-12)
 **Purpose**: Reference for SAM task file structure and the configured provider/workflow interfaces
+**Audience**: Contributor/developer reference for the logical task schema and supported MCP/CLI operations.
 
 > **Drift warning**: This document drifts from the implementation between updates. The authoritative source for field definitions is `plugins/development-harness/sam_schema/core/models.py` (the `Task` Pydantic model). For planning or implementation work, verify field names, types, and defaults against `models.py` and the generated schema (run the repository's schema generator from the development-harness project when available). For conceptual discussion, this document is sufficient as a point-in-time snapshot.
 
-Use the configured provider's native interface for provider-native state: in a Beads workspace, use `bd` directly for CRUD, readiness, claims/status, and dependencies. Use SAM MCP or the DH CLI for structured plan/task semantics, dispatch, artifacts, and validation that `bd` does not provide. Do not make ad-hoc edits to semantic task files; use the owning interface for the operation.
+The configured backend is the sole owner of work items, grooming, plans, tasks, and artifacts. Use
+`sam_plan`, `sam_task`, `sam_active_task`, or the grouped DH CLI adapter for structured operations;
+use `bd` directly only for Beads-native issue graph operations. Remote providers may privately use
+`FileCache` for stale reads and queued offline writes. Beads, SQLite, and Memory use native
+storage and never read/write backlog YAML or instantiate `FileCache`. Do not select `TASKBACKEND`,
+an artifact provider, a local fallback, or a backend per plan.
 
 ---
 
@@ -25,7 +31,7 @@ mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"claim"
     -- Claim task (transition from not-started to in-progress)
 mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"state","status":"complete"})
     -- Transition task status (complete | blocked | deferred | skipped)
-mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","set_fields_json":{"priority":1}})
     -- Patch task fields (JSON object {"field": "value", ...})
 mcp__plugin_dh_sam__sam_task(plan="P{id}", task="T{M}", config={"action":"update","append_section":"Heading","section_content":"..."})
     -- Append a markdown section to the task body
@@ -48,9 +54,9 @@ mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"ready"})
     -- List tasks ready for dispatch (not-started, all deps resolved)
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","context":"..."})
     -- Update plan context field
-mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"update","set_fields_json":{"goal":"..."}})
     -- Patch plan-level fields
-mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"append_task","task_yaml":"<single-task YAML string>"})
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"append_task","task":<single task dict>})
     -- Append a single task to a plan in state="drafting"; backends do not enforce the drafting precondition
 mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action":"finalize"})
     -- Finalize a drafting plan: clear state="drafting" → state="ready", making tasks dispatchable
@@ -62,23 +68,25 @@ For large plans (rule of thumb: 16+ tasks), use the three-call incremental workf
 single monolithic `create` call:
 
 ```text
-1. sam_plan(action='create', tasks=[])
+1. sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[]})
    -- Creates a plan in state="drafting". Returns plan_id (e.g. "Pd9e0f1a2-{slug}").
 
-2. sam_plan(plan='P{id}', action='append_task', task=<single task dict>) × N
+2. sam_plan(plan='P{id}', config={"action":"append_task", "task":<single task dict>}) × N
    -- Appends one task at a time. Each call validates the task via Task.model_validate().
    -- state remains "drafting" throughout. Callers must serialize writes (single-writer
       assumption — concurrent append_task calls for the same plan are not safe).
 
-3. sam_plan(plan='P{id}', action='finalize')
-   -- Clears state="drafting" → state="ready". Plan is now visible to sam_plan ready/status.
+3. sam_plan(plan='P{id}', config={"action":"finalize"})
+   -- Clears state="drafting" → state="ready". Plan is now visible to
+   -- sam_plan(plan='P{id}', config={"action":"ready"}) and
+      sam_plan(plan='P{id}', config={"action":"status"}).
 ```
 
 **Drafting state semantics**: While a plan is in `state="drafting"`:
 
-- `sam_plan(action='read')` returns the plan with `state="drafting"`
-- `sam_plan(action='status')` returns a `PlanStatus` with `state="drafting"` instead of dispatchable task counts
-- `sam_plan(action='ready')` returns a `ReadyTasksResult` with `state="drafting"` and an empty `ready_tasks` list
+- `sam_plan(plan='P{id}', config={"action":"read"})` returns the plan with `state="drafting"`
+- `sam_plan(plan='P{id}', config={"action":"status"})` returns a `PlanStatus` with `state="drafting"` instead of dispatchable task counts
+- `sam_plan(plan='P{id}', config={"action":"ready"})` returns a `ReadyTasksResult` with `state="drafting"` and an empty `ready_tasks` list
 
 This prevents partial plans from being dispatched before all tasks have been appended.
 
@@ -96,7 +104,7 @@ mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{id}","task"
     -- Register active task for current session (replaces direct active-task-{sid}.json writes)
 mcp__plugin_dh_sam__sam_active_task(config={"action":"get"})
     -- Retrieve active task context for current session
-mcp__plugin_dh_sam__sam_active_task(config={"action":"update","set_fields_json":"{...}"})
+mcp__plugin_dh_sam__sam_active_task(config={"action":"update","set_fields_json":{"priority":1}})
     -- Update fields on the active task without repeating its address
 mcp__plugin_dh_sam__sam_active_task(config={"action":"clear"})
     -- Clear active task context for current session
@@ -106,7 +114,7 @@ mcp__plugin_dh_sam__sam_active_task(config={"action":"clear"})
 > annotated `readonly=True` in FastMCP, so Claude Code did not prompt for confirmation
 > on read operations. `sam_task` cannot be readonly because it also includes write
 > actions (`claim`, `state`, `update`). Consequence: Claude Code will show a
-> confirmation prompt for `sam_task(action="read")` calls that previously did not
+> confirmation prompt for `sam_task(config={"action":"read"})` calls that previously did not
 > require one. This is a known, accepted trade-off — a clean 3-tool interface
 > outweighs the read UX regression. If read-without-prompt becomes required, a
 > separate readonly `sam_task_read` tool can be extracted in a future iteration.
@@ -138,19 +146,14 @@ Use the grouped script-path examples in the validated guide below. The historica
 
 ## Naming Convention
 
-### File Names
+### Logical Plan and Task Addresses
 
-Plan files are stored under the per-project state directory (`~/.dh/projects/{project-slug}/plan/`), resolved via `dh_paths.plan_dir()`. The `{project-slug}` is computed from the absolute project root path by replacing `/` with `-`.
+The configured backend owns physical persistence. The names below are logical addresses and schema
+examples, not a filesystem contract; provider IDs and cache paths must not be exposed to callers.
 
 ```text
-~/.dh/projects/{project-slug}/plan/P{id}-{slug}.yaml            # single-file plan (under 500 lines)
-~/.dh/projects/{project-slug}/plan/P{id}-{slug}/                # directory plan (500+ lines)
-    P{id}-PLAN.yaml               # plan-level metadata, goal, context, task list
-    P{id}-ARCHITECT.md            # architecture spec
-    P{id}-CONTEXT.md              # feature context
-    tasks/
-        T01.yaml
-        T02.yaml
+P{id}                         # plan logical identifier
+P{id}/T{M}                    # task logical address
 ```
 
 `{id}` is a hex string assigned by `plan create`. `{slug}` is lowercase-hyphenated from the feature name.
@@ -163,11 +166,14 @@ Pc7d8e9f0/T04     -- task T04 in plan Pc7d8e9f0
 my-slug/T1        -- task T1 in plan matching slug "my-slug"
 ```
 
-`plan read --address Pc7d8e9f0/T3` globs the plan directory under `dh_paths.plan_dir()` for `P{id}-*/` and finds `T03.yaml` (or the T03 section in a single-file plan). Plans created by `sam_plan(action='create')` have UUID-hex IDs (8 hex chars, e.g. `Pc7d8e9f0`); legacy numeric IDs (`P1`, `P42`) exist only for unmigrated plans created before this naming scheme.
+`plan read --address Pc7d8e9f0/T3` addresses task `T03` in plan `Pc7d8e9f0` through the configured
+backend. Plans created by the `sam_plan` create action have UUID-hex IDs (8 hex chars, e.g.
+`Pc7d8e9f0`); legacy numeric IDs (`P1`, `P42`) exist only for unmigrated plans.
 
 ### Legacy Names
 
-Plans created before this specification use `tasks-{N}-{slug}.md` naming (formerly stored in the repo-relative `plan/` directory, now resolved via `dh_paths.plan_dir()`). The addressing module resolves both patterns. Migrate using `plan migrate`. See [Legacy Format Support](#legacy-format-support).
+Plans created before this specification may use `tasks-{N}-{slug}.md` records. The configured
+backend's `plan migrate` operation handles supported legacy records. See [Legacy Format Support](#legacy-format-support).
 
 ---
 
@@ -203,9 +209,8 @@ tasks:
 - `checkpoint`: pause for user confirmation after each dependency wave of tasks completes
 - `per_task`: dispatch one task at a time via a single `Agent` call and pause for user confirmation before the next
 
-For the complete field specification:
-
-- [Plan Schema](./plan-schema.json) — generated by the schema generator
+For the complete field specification, see the authoritative [`Plan` model](../sam_schema/core/models.py)
+(`class Plan`).
 
 ---
 
@@ -289,7 +294,7 @@ All content fields are stored as YAML multiline scalars. Default is an empty str
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `github-issue` | `str \| int` | `null` | Linked sub-issue identifier. Integer for GitHub issue numbers; string for beads IDs (e.g. `"bd-a3f8"`). |
+| `github-issue` | `str \| int` | `null` | Legacy field name for the linked work-item reference; treat its value as opaque and do not use it to select storage. |
 
 ### Status Values
 
@@ -383,9 +388,8 @@ bookend-type: null
 github-issue: 842
 ```
 
-For the complete field specification:
-
-- [Task Schema](./task-schema.json) — generated by the schema generator
+For the complete field specification, see the authoritative [`Task` model](../sam_schema/core/models.py)
+(`class Task`).
 
 ---
 
@@ -418,7 +422,7 @@ Task metadata fields are owned by specific components. In a Beads workspace, nat
 
 ---
 
-## DH CLI Usage Guide (Validated Fallback Reference)
+## DH CLI Usage Guide (Validated Alternate Transport)
 
 The direct script-path contract is authoritative. Every data-bearing value is a named option; successful output is compact JSON on stdout and diagnostics are on stderr. `--format` is not supported. In a Beads workspace, use `bd` directly for Beads-native CRUD, status, dependencies, and readiness; use this CLI only for structured plans and workflow operations.
 
@@ -450,17 +454,19 @@ The structured MCP composites remain MCP-only transport names (`sam_plan`, `sam_
 
 ### Supported Legacy Patterns (Read-Only)
 
-The historical `sam` CLI read but did not write these legacy formats; use the grouped DH CLI commands shown below for current work:
+The historical `sam` CLI read but did not write these legacy formats. They are migration inputs
+only; use the grouped DH CLI commands shown below for current work.
 
 | Pattern | Example | Support |
 |---------|---------|---------|
-| `tasks-{N}-{slug}.md` with YAML frontmatter | `tasks-3-my-feature.md` (under plan_dir()) | Read via `plan read`, `plan ready`, `plan status` |
-| `tasks-{N}-{slug}/` directory with `.md` files | `tasks-3-my-feature/T01.md` (under plan_dir()) | Read only |
+| `tasks-{N}-{slug}.md` with YAML frontmatter | `tasks-3-my-feature.md` | Read via `plan read`, `plan ready`, `plan status` |
+| `tasks-{N}-{slug}/` directory with `.md` files | `tasks-3-my-feature/T01.md` | Read only |
 | Bold markdown fields (`**Status**: NOT STARTED`) | legacy `.md` files | Read via `plan migrate` preprocessing |
 
 ### Number Collision Warning
 
-When a canonical `P{id}-{slug}.yaml` file and a legacy `tasks-{NNN}-{slug}.md` file share the same identifier (both under `plan_dir()`), the canonical file takes precedence. The grouped DH CLI emits a warning to stderr:
+When a canonical `P{id}` record and a legacy `tasks-{NNN}-{slug}.md` record share the same
+identifier, the canonical record takes precedence. The grouped DH CLI emits a warning to stderr:
 
 ```text
 WARNING: Pb5c6d7e8 resolved to 'Pb5c6d7e8-research-curator-code-analysis.yaml' but a legacy file
@@ -480,7 +486,7 @@ Migrate a legacy plan to the canonical format:
 
 ```bash
 # 1. Migrate format (YAML frontmatter .md -> pure YAML .yaml)
-#    Legacy files are resolved from dh_paths.plan_dir() automatically
+#    Legacy records are resolved by the configured backend
 uv run plugins/development-harness/sam_schema/cli.py plan migrate --plan-address tasks-3-my-feature.md
 
 # 2. Rename to P{id} convention (dry run first)
@@ -523,47 +529,37 @@ Disabled hooks take precedence over profile and exit 0 after consuming stdin (Cl
 
 ## TaskAssignment Schema Reference
 
-- [Plan Schema](./plan-schema.json) — generated by the schema generator
-- [Task Schema](./task-schema.json) — generated by the schema generator
-- [TaskAssignment Schema](./assignment-schema.json) — generated by the schema generator
-
-Generate current schema files:
-
-```bash
-uv run python -m sam_schema.schema --model Plan > plugins/development-harness/docs/plan-schema.json
-uv run python -m sam_schema.schema --model Task > plugins/development-harness/docs/task-schema.json
-uv run python -m sam_schema.schema --model TaskAssignment > plugins/development-harness/docs/assignment-schema.json
-```
+The authoritative [`TaskAssignment` model](../sam_schema/core/models.py) (`class TaskAssignment`)
+combines plan context with the selected task. The consolidated `sam_task` read action returns this
+model; consult [`sam_task` and its action configuration](../sam_schema/core/action_models.py) for
+the current operation contract.
 
 ---
 
 ## Artifact Manifest Integration
 
-Task-plan artifacts are registered in the artifact manifest with `type: "task-plan"`. The manifest is stored in the GitHub Issue body and serves as the authoritative registry for all plan artifacts.
+Task-plan artifacts are registered in the artifact manifest with `type: "task-plan"`. The
+configured backend owns the manifest and serves as the authoritative registry for plan artifacts.
 
 ### MCP Tools for Artifact Management
 
 Four MCP tools support artifact registration and discovery:
 
 ```text
-artifact_register   -- Register a new artifact in the manifest (adds entry to GitHub Issue body)
-artifact_list       -- List all registered artifacts for a plan/issue
-artifact_get        -- Get metadata for a specific artifact by path
-artifact_read       -- Read artifact content by path (used by worktree-isolated agents)
+artifact_register   -- Register a new artifact in the configured-backend manifest
+artifact_list       -- List all registered artifacts for a work item
+artifact_get        -- Get metadata for a specific artifact type
+artifact_read       -- Read artifact content by owner reference and artifact type
 ```
 
 Each has a full CLI equivalent under `artifact register|list|get|read`; see
 [backend-providers.md](./backend-providers.md) "CLI vs MCP Capability Surface" for the flag
 mapping.
 
-### Auto-Registration via sam_create
+### Artifact Registration
 
-When `sam_create` is invoked with an `issue` field present in the plan, it automatically registers the created task-plan artifact in the manifest. No separate `artifact_register` call is needed for the initial plan creation when the issue number is known.
-
-Manual registration is required when:
-
-- The plan is created without an `issue` field and the issue is linked later
-- Non-plan artifacts (feature-context, architect-spec) are produced by planning agents
+Producers register task-plan and non-plan artifacts explicitly with `artifact_register` after
+creating their content. Plan ownership or a backlog update does not imply artifact registration.
 
 ---
 

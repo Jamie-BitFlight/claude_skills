@@ -14,6 +14,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+from backlog_core.backend_protocol import get_config
+from backlog_core.backend_types import IssueNode
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogError, Output, ValidationError
 from backlog_core.server import mcp
 
@@ -24,40 +27,36 @@ from tests.helpers import call_mcp_tool
 # ---------------------------------------------------------------------------
 
 
-def _make_issue(
-    number: int = 1,
+@pytest.fixture
+def configured_github_backend(monkeypatch: pytest.MonkeyPatch) -> tuple[InMemoryBackend, MagicMock]:
+    backend = get_config().backend
+    assert isinstance(backend, InMemoryBackend)
+    repository = MagicMock(full_name="owner/repo")
+    monkeypatch.setattr(backend, "get_github", lambda repo="", timeout=15: repository)
+    return backend, repository
+
+
+def _seed_issue(
+    backend: InMemoryBackend,
+    number: int,
     title: str = "Test issue",
-    state: str = "open",
+    state: str = "OPEN",
     labels: list[str] | None = None,
     assignees: list[str] | None = None,
-    milestone_title: str | None = None,
-) -> MagicMock:
-    """Build a MagicMock mimicking a PyGithub Issue object.
-
-    Sets pull_request=None so _collect_issues does not skip it (PRs are filtered out).
-    """
-    issue = MagicMock()
-    issue.number = number
-    issue.title = title
-    issue.state = state
-    # pull_request must be None — _collect_issues skips issues where pull_request is not None
-    issue.pull_request = None
-    issue.labels = [MagicMock(name=lb) for lb in (labels or [])]
-    for i, lb_name in enumerate(labels or []):
-        issue.labels[i].name = lb_name
-    issue.assignees = [MagicMock(login=a) for a in (assignees or [])]
-    for i, login in enumerate(assignees or []):
-        issue.assignees[i].login = login
-    if milestone_title:
-        issue.milestone = MagicMock()
-        issue.milestone.title = milestone_title
-    else:
-        issue.milestone = None
-    issue.created_at = MagicMock()
-    issue.created_at.strftime.return_value = "2026-03-01T00:00:00Z"
-    issue.updated_at = MagicMock()
-    issue.updated_at.strftime.return_value = "2026-03-15T00:00:00Z"
-    return issue
+) -> None:
+    issue: IssueNode = {
+        "id": f"issue-node-{number}",
+        "number": number,
+        "title": title,
+        "state": state,
+        "body": "",
+        "createdAt": "2026-03-01T00:00:00Z",
+        "updatedAt": "2026-03-15T00:00:00Z",
+        "labels": [{"id": f"label-{name}", "name": name} for name in labels or []],
+        "milestone": None,
+        "assignees": [{"login": login} for login in assignees or []],
+    }
+    backend._issues[number] = issue
 
 
 async def _call(tool_name: str, params: dict | None = None) -> dict:
@@ -73,47 +72,17 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_list_issues_returns_issues_with_expected_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_issues_returns_issues_with_expected_fields(
+    configured_github_backend: tuple[InMemoryBackend, MagicMock],
+) -> None:
     """list_issues returns dicts with all required fields for each issue.
 
     Tests: list_issues operation field mapping
     How: Mock get_github to return a single issue; verify field names and values.
     Why: Field names are the contract between server and MCP consumers.
     """
-    # Arrange
-    mock_repo = MagicMock()
-    mock_repo.full_name = "owner/repo"
-    issue = _make_issue(number=42, title="Fix crash", state="open", labels=["bug"], assignees=["alice"])
-    mock_repo.get_issues.return_value = [issue]
-    mock_repo.get_milestones.return_value = []
-    mock_repo.get_labels.return_value = []
-    mock_repo.requester.graphql_query.return_value = (
-        {},
-        {
-            "data": {
-                "repository": {
-                    "issues": {
-                        "nodes": [
-                            {
-                                "id": "I_42",
-                                "number": 42,
-                                "title": "Fix crash",
-                                "state": "OPEN",
-                                "body": "",
-                                "createdAt": "2026-03-01T00:00:00Z",
-                                "updatedAt": "2026-03-15T00:00:00Z",
-                                "labels": {"nodes": [{"id": "L_1", "name": "bug"}]},
-                                "assignees": {"nodes": [{"login": "alice"}]},
-                                "milestone": None,
-                            }
-                        ],
-                        "pageInfo": {"hasNextPage": False},
-                    }
-                }
-            }
-        },
-    )
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
+    backend, _ = configured_github_backend
+    _seed_issue(backend, 42, title="Fix crash", labels=["bug"], assignees=["alice"])
 
     from backlog_core.operations import list_issues
 
@@ -135,47 +104,16 @@ def test_list_issues_returns_issues_with_expected_fields(monkeypatch: pytest.Mon
     assert "updated_at" in entry
 
 
-def test_list_issues_respects_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_issues_respects_limit(configured_github_backend: tuple[InMemoryBackend, MagicMock]) -> None:
     """list_issues stops collecting once limit is reached.
 
     Tests: list_issues limit parameter
     How: Provide 5 issues, request limit=2, verify only 2 returned.
     Why: Limit prevents unbounded API consumption.
     """
-    # Arrange
-    mock_repo = MagicMock()
-    mock_repo.full_name = "owner/repo"
-    mock_repo.get_issues.return_value = [_make_issue(number=i) for i in range(5)]
-    mock_repo.get_milestones.return_value = []
-    mock_repo.get_labels.return_value = []
-    mock_repo.requester.graphql_query.return_value = (
-        {},
-        {
-            "data": {
-                "repository": {
-                    "issues": {
-                        "nodes": [
-                            {
-                                "id": f"I_{i}",
-                                "number": i,
-                                "title": "Test issue",
-                                "state": "OPEN",
-                                "body": "",
-                                "createdAt": "2026-03-01T00:00:00Z",
-                                "updatedAt": "2026-03-15T00:00:00Z",
-                                "labels": {"nodes": []},
-                                "assignees": {"nodes": []},
-                                "milestone": None,
-                            }
-                            for i in range(5)
-                        ],
-                        "pageInfo": {"hasNextPage": False},
-                    }
-                }
-            }
-        },
-    )
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
+    backend, _ = configured_github_backend
+    for number in range(5):
+        _seed_issue(backend, number)
 
     from backlog_core.operations import list_issues
 
@@ -235,7 +173,9 @@ def test_list_issues_invalid_state_raises_validation_error(monkeypatch: pytest.M
         list_issues(state="invalid")
 
 
-def test_list_issues_github_exception_raises_backlog_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_issues_github_exception_raises_backlog_error(
+    configured_github_backend: tuple[InMemoryBackend, MagicMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """list_issues wraps GithubException as BacklogError.
 
     Tests: list_issues error handling
@@ -245,13 +185,12 @@ def test_list_issues_github_exception_raises_backlog_error(monkeypatch: pytest.M
     # Arrange
     from github import GithubException
 
-    mock_repo = MagicMock()
-    mock_repo.full_name = "owner/repo"
-    mock_repo.get_issues.side_effect = GithubException(status=500, data="Server error", headers={})
-    mock_repo.get_milestones.return_value = []
-    mock_repo.get_labels.return_value = []
-    mock_repo.requester.graphql_query.side_effect = GithubException(status=500, data="Server error", headers={})
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
+    backend, _ = configured_github_backend
+    monkeypatch.setattr(
+        backend,
+        "_fetch_issues_graphql",
+        MagicMock(side_effect=GithubException(status=500, data="Server error", headers={})),
+    )
 
     from backlog_core.operations import list_issues
 
@@ -325,43 +264,15 @@ def test_list_issues_output_messages_merged(monkeypatch: pytest.MonkeyPatch) -> 
 # ---------------------------------------------------------------------------
 
 
-def test_comment_issue_returns_expected_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_comment_issue_returns_expected_fields(configured_github_backend: tuple[InMemoryBackend, MagicMock]) -> None:
     """comment_issue returns issue_number, comment_id, and comment_url.
 
     Tests: comment_issue field mapping
     How: Mock get_issue and create_comment; verify returned dict keys.
     Why: Callers depend on comment_id and comment_url for downstream linking.
     """
-    # Arrange
-    mock_repo = MagicMock()
-    mock_repo.full_name = "owner/repo"
-    mock_repo.requester.graphql_query.side_effect = [
-        # First call: _fetch_issue_graphql
-        (
-            {},
-            {
-                "data": {
-                    "repository": {
-                        "issue": {
-                            "id": "I_NODE_42",
-                            "number": 42,
-                            "title": "Fix crash",
-                            "state": "OPEN",
-                            "body": "",
-                            "createdAt": "2026-03-01T00:00:00Z",
-                            "updatedAt": "2026-03-15T00:00:00Z",
-                            "labels": {"nodes": []},
-                            "assignees": {"nodes": []},
-                            "milestone": None,
-                        }
-                    }
-                }
-            },
-        ),
-        # Second call: _add_comment_graphql
-        ({}, {"data": {"addComment": {"commentEdge": {"node": {"id": "C_999"}}}}}),
-    ]
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
+    backend, repository = configured_github_backend
+    _seed_issue(backend, 42, title="Fix crash")
 
     from backlog_core.operations import comment_issue
 
@@ -370,7 +281,9 @@ def test_comment_issue_returns_expected_fields(monkeypatch: pytest.MonkeyPatch) 
 
     # Assert
     assert result["issue_number"] == 42
-    assert result["comment_id"] == "C_999"
+    comments = backend._fetch_issue_comments_graphql(repository, "owner", "repo", 42)
+    assert result["comment_id"] == comments[0]["id"]
+    assert comments[0]["body"] == "LGTM!"
     assert "comment_url" in result
 
 
@@ -408,7 +321,9 @@ def test_comment_issue_empty_body_raises_validation_error(monkeypatch: pytest.Mo
         comment_issue(issue_number=1, body="")
 
 
-def test_comment_issue_github_exception_raises_backlog_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_comment_issue_github_exception_raises_backlog_error(
+    configured_github_backend: tuple[InMemoryBackend, MagicMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """comment_issue wraps GithubException as BacklogError.
 
     Tests: comment_issue error handling
@@ -418,10 +333,12 @@ def test_comment_issue_github_exception_raises_backlog_error(monkeypatch: pytest
     # Arrange
     from github import GithubException
 
-    mock_repo = MagicMock()
-    mock_repo.full_name = "owner/repo"
-    mock_repo.requester.graphql_query.side_effect = GithubException(status=404, data="Not found", headers={})
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
+    backend, _ = configured_github_backend
+    monkeypatch.setattr(
+        backend,
+        "_fetch_issue_graphql",
+        MagicMock(side_effect=GithubException(status=404, data="Not found", headers={})),
+    )
 
     from backlog_core.operations import comment_issue
 

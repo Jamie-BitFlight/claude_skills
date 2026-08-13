@@ -1,3 +1,5 @@
+> **SUPERSEDED — DO NOT IMPLEMENT THIS DESIGN.** Current authority: [`backlog_core/ARCHITECTURE.md`](../backlog_core/ARCHITECTURE.md) and [`architect-backlog-snapshot-reconciliation.md`](../../../plan/architect-backlog-snapshot-reconciliation.md). Invalid assumption: **universal YAML** is the cache and authority model.
+
 <!-- DRAFT — 2026-02-27 — Pending verification against live script behavior -->
 # Backlog Item Lifecycle
 

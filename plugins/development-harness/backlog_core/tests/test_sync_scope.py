@@ -1,31 +1,17 @@
-"""Regression tests for finalization workflow correctness (Failure 2 — doc-only fix).
+"""Regression tests for finalization sync scope after GitHub issue #2452.
 
-Failure 2 summary: finally.md documented a ``backlog_sync(flush_only=true)`` call as the
-finalization step after grooming. This parameter was never implemented in the MCP tool
-schema — the server's Pydantic validation silently dropped the unknown kwarg, resolving
-to a full bidirectional sweep of all 321 issues instead of the expected lightweight
-JSONL export (which was itself aspirational and never realized).
-
-Path B fix (doc-only): Remove the flush_only documentation and replace with the correct
-pattern — use ``backlog_pull(selector=<item_ref>)`` for per-item cache refresh, and
-warn explicitly against calling the expensive ``backlog_sync()``.
-
-These tests verify the documented contract post-fix:
-- ``backlog_sync`` exposes no ``flush_only`` parameter in its MCP schema
-- ``sync_items`` always performs a full sweep — no selective mode exists
-- ``finally.md`` no longer references ``flush_only`` anywhere in its content
-- ``pull_by_selector`` fetches only the targeted item, not all items
-
-Reference: GitHub issue #2452.
+The MCP schema still excludes the never-implemented ``flush_only`` input. Explicit sync
+reconciles linked provider references, while selector pull reconciles one targeted reference.
 """
 
 from __future__ import annotations
 
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
 
+from backlog_core.models import BacklogItem, ReconcileRequest, ReconcileResult, ReconcileScope
 from backlog_core.operations import pull_by_selector, sync_items
 from backlog_core.server import backlog_sync
 
@@ -36,6 +22,20 @@ if TYPE_CHECKING:
 # Path to the finalization workflow file that was corrected by #2452.
 # Resolves relative to this test file: ../../.. → plugins/development-harness/
 _FINALLY_MD = Path(__file__).parent.parent.parent / "skills/work-backlog-item/references/workflows/groom/finally.md"
+
+
+class _SyncBackend:
+    def __init__(self, items: list[BacklogItem], result: ReconcileResult) -> None:
+        self.items = items
+        self.result = result
+        self.requests: list[ReconcileRequest] = []
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return self.items
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+        self.requests.append(request)
+        return self.result
 
 
 class TestFinallyWorkflowFinalization:
@@ -71,36 +71,18 @@ class TestFinallyWorkflowFinalization:
             f"The flush_only capability was never implemented — do not add it."
         )
 
-    def test_sync_items_always_sweeps_all_items(self, mocker: MockerFixture) -> None:
-        """sync_items must call both helpers with the full item list on every invocation.
+    def test_sync_items_reconciles_linked_backend_references(self, mocker: MockerFixture) -> None:
+        items = [BacklogItem(reference="local-1", title="One", section="P1", issue="12")]
+        backend = _SyncBackend(items, ReconcileResult(provider_patches=2))
+        mocker.patch("backlog_core.operations.get_config", return_value=SimpleNamespace(backend=backend))
+        mock_create = mocker.patch("backlog_core.operations.sync_create_missing_issues", return_value={"created": 1})
 
-        When invoked with no arguments, sync_items always performs a full sweep —
-        calling sync_create_missing_issues and sync_push_groomed_content with every
-        item returned by parse_backlog. There is no flush_only or selective mode.
+        result = sync_items(dry_run=True)
 
-        This guards against a future refactor that might add a conditional path
-        skipping the full sweep when some flag is set.
-        """
-        # Arrange
-        fake_items = [MagicMock(), MagicMock(), MagicMock()]
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=fake_items)
-        mock_create = mocker.patch("backlog_core.operations.sync_create_missing_issues", return_value={"created": 0})
-        mock_push = mocker.patch("backlog_core.operations.sync_push_groomed_content", return_value={"pushed": 0})
-
-        # Act
-        result = sync_items()
-
-        # Assert: both helpers called exactly once, each receiving the full item list
-        mock_create.assert_called_once()
-        mock_push.assert_called_once()
-        assert mock_create.call_args.args[0] is fake_items, (
-            "sync_create_missing_issues must receive the full items list from parse_backlog"
-        )
-        assert mock_push.call_args.args[0] is fake_items, (
-            "sync_push_groomed_content must receive the full items list from parse_backlog"
-        )
-        assert "created" in result
-        assert "pushed" in result
+        mock_create.assert_called_once_with(items, "", True, output=mocker.ANY)
+        assert backend.requests == [ReconcileRequest(scope=ReconcileScope.LINKED, references=["12"], dry_run=True)]
+        assert result["created"] == 1
+        assert result["pushed"] == 2
 
     def test_finally_md_does_not_reference_flush_only(self) -> None:
         """finally.md must not contain any reference to the phantom flush_only parameter.
@@ -127,32 +109,12 @@ class TestFinallyWorkflowFinalization:
         )
 
     def test_backlog_pull_selector_refreshes_single_item(self, mocker: MockerFixture) -> None:
-        """pull_by_selector must fetch only the targeted item, not all items.
+        backend = _SyncBackend([], ReconcileResult(file_paths={"#2452": "cache://2452"}))
+        mocker.patch("backlog_core.operations.get_config", return_value=SimpleNamespace(backend=backend))
 
-        This verifies that pull_by_selector(selector="#N") issues exactly one
-        pull_single_issue call for the matched issue number. It does NOT trigger
-        a full sweep of all items — confirming the per-item refresh pattern
-        documented in the corrected finally.md as the safe finalization step.
-
-        The selector "#2452" exercises the issue-number path in pull_by_selector,
-        which calls parse_issue_selector then pull_single_issue directly.
-        """
-        # Arrange
-        mock_repo = MagicMock()
-        mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
-        mock_pull = mocker.patch(
-            "backlog_core.operations.pull_single_issue", return_value={"file_path": "/tmp/test-2452.md"}
-        )
-
-        # Act: issue-number selector bypasses the title-lookup path
         result = pull_by_selector("#2452")
 
-        # Assert: exactly one pull for the targeted item
-        mock_pull.assert_called_once()
-        call_args = mock_pull.call_args
-        assert call_args.args[0] is mock_repo, "pull_single_issue must receive the github repo object from get_github()"
-        assert call_args.args[1] == 2452, "pull_single_issue must receive the parsed issue number 2452"
-        assert call_args.kwargs.get("diff_mode") is False, (
-            "diff_mode must be False when pull_by_selector is called without diff=True"
-        )
-        assert result.get("file_path") is not None, "pull_by_selector must return a file_path in its result dict"
+        assert backend.requests == [
+            ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#2452"], include_diff=False)
+        ]
+        assert result["file_path"] == "cache://2452"

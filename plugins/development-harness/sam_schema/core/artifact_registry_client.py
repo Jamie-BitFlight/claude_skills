@@ -11,9 +11,8 @@ Write contract (ADR-2509-5):
     write path — a write that cannot reach Gist must not silently succeed.
 
 Read contract (ADR-2509-5):
-    ``read()`` fetches Gist-first and may fall back to local storage on a
-    remote miss.  The caller is responsible for annotating the response to
-    indicate which source was used.
+    ``read()`` fetches only from the configured remote provider.  GitHub's
+    provider-owned ``FileCache`` is the only offline/stale read path.
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from backlog_core.artifact_provider import ArtifactBackend, create_artifact_prov
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType, BacklogError
 
-from .exceptions import ArtifactWriteError
+from .exceptions import ArtifactWriteError, PlanIndexError
 
 _log = logging.getLogger(__name__)
 
@@ -35,7 +34,8 @@ _TASK_PLAN_TYPE = ArtifactType.TASK_PLAN.value  # "task-plan"
 #: Logical artifact path used as the Gist filename key for task-plan content.
 #: The path is synthetic (not a real filesystem path) — the Gist filename is
 #: derived from it via ``/`` → ``--`` substitution.
-_TASK_PLAN_PATH_TEMPLATE = "sam-plan/task-plan-issue-{issue}.yaml"
+_LEGACY_TASK_PLAN_PATH_TEMPLATE = "sam-plan/task-plan-issue-{issue}.yaml"
+_TASK_PLAN_PATH_TEMPLATE = "sam-plan/task-plan-issue-{issue}-plan-{plan_id}.yaml"
 
 #: Artifact type string for plan-index content.
 _PLAN_INDEX_TYPE = "plan-index"
@@ -44,6 +44,26 @@ _PLAN_INDEX_TYPE = "plan-index"
 _PLAN_INDEX_PATH = "sam-plan/plan-index.yaml"
 
 _artifact_registry = ArtifactRegistry()
+
+
+class PlanIndexUnavailableError(PlanIndexError):
+    """Raised when the authoritative plan index cannot be read."""
+
+    def __init__(self, sentinel_issue: int, reason: str) -> None:
+        """Initialize the unavailable index read details."""
+        self.sentinel_issue = sentinel_issue
+        super().__init__(
+            plan_id="<plan-index>", reason=f"Gist read unavailable for sentinel issue #{sentinel_issue}: {reason}"
+        )
+
+
+class PlanContentUnavailableError(PlanIndexError):
+    """Raised when plan content cannot be read from the configured provider."""
+
+    def __init__(self, issue: int, plan_id: str | None, reason: str) -> None:
+        """Initialize the unavailable plan-content read details."""
+        self.issue = issue
+        super().__init__(plan_id=plan_id or "<unknown>", reason=f"Gist read unavailable for issue #{issue}: {reason}")
 
 
 def _get_provider() -> ArtifactBackend:
@@ -114,7 +134,9 @@ class ArtifactRegistryClient:
             self._provider = _get_provider()
         return self._provider
 
-    def store(self, issue: int, content: str, *, artifact_type: str = _TASK_PLAN_TYPE) -> None:
+    def store(
+        self, issue: int, content: str, *, artifact_type: str = _TASK_PLAN_TYPE, plan_id: str | None = None
+    ) -> None:
         """Upload plan YAML to GitHub Gist via the artifact registry.
 
         Registers a manifest entry and stores the content as a Gist file.
@@ -125,12 +147,13 @@ class ArtifactRegistryClient:
             issue: GitHub issue number keying the Gist.
             content: Plan YAML string to store.
             artifact_type: Artifact type string.  Defaults to ``"task-plan"``.
+            plan_id: Logical plan ID for a plan-specific artifact identity.
 
         Raises:
             ArtifactWriteError: When the Gist write fails for any reason.
                 No silent fallback to local storage is attempted.
         """
-        path = _TASK_PLAN_PATH_TEMPLATE.format(issue=issue)
+        path = _task_plan_path(issue, plan_id)
         provider = self._provider_instance()
         try:
             # Step 1: register the manifest entry so artifact_read can resolve it.
@@ -178,60 +201,62 @@ class ArtifactRegistryClient:
                 artifact_type,
                 exc,
             )
-            raise ArtifactWriteError(plan_id="<unknown>", issue=issue, reason=str(exc)) from exc
+            raise ArtifactWriteError(plan_id=plan_id or "<unknown>", issue=issue, reason=str(exc)) from exc
 
-    def read(self, issue: int, artifact_type: str = _TASK_PLAN_TYPE) -> str | None:
-        """Retrieve plan YAML from GitHub Gist, falling back to local cache.
+    def read(self, issue: int, artifact_type: str = _TASK_PLAN_TYPE, *, plan_id: str | None = None) -> str | None:
+        """Retrieve plan YAML from the configured GitHub provider.
 
         Gist-first retrieval strategy:
         1. Resolve the manifest entry for the given artifact type.
         2. Fetch content from the Gist using the registered ``artifact_id`` path.
-        3. On Gist miss (no entry or no content): attempt local filesystem read.
-        4. Return ``None`` when neither source has content.
+        3. For plan-specific reads only, check the old issue-only identity as
+           provider-private migration compatibility.
+        4. Return ``None`` only when the remote provider confirms no content.
 
         Args:
             issue: GitHub issue number keying the Gist.
             artifact_type: Artifact type string.  Defaults to ``"task-plan"``.
+            plan_id: Logical plan ID for a plan-specific artifact identity.
 
         Returns:
-            Content string when found, or ``None`` when absent from both
-            Gist and local filesystem.
+            Content string when found, or ``None`` when confirmed absent.
+
+        Raises:
+            PlanContentUnavailableError: When the configured provider cannot be read.
         """
-        path = _TASK_PLAN_PATH_TEMPLATE.format(issue=issue)
+        path = _task_plan_path(issue, plan_id)
         try:
             provider = self._provider_instance()
         except (BacklogError, ArtifactWriteError) as exc:
             _log.warning("ArtifactRegistryClient.read: provider unavailable for issue #%d: %s", issue, exc)
-            return None
+            raise PlanContentUnavailableError(issue, plan_id, str(exc)) from exc
 
-        # Step 1: try Gist-first via read_artifact_content_from_remote.
         try:
             remote_content = provider.read_artifact_content_from_remote(issue, artifact_type, path)
             if remote_content is not None:
                 _log.debug("ArtifactRegistryClient.read: Gist hit for issue #%d (path=%s)", issue, path)
                 return remote_content
         except (BacklogError, OSError) as exc:
-            _log.warning(
-                "ArtifactRegistryClient.read: Gist read failed for issue #%d (path=%s): %s — falling back to local",
-                issue,
-                path,
-                exc,
-            )
+            _log.warning("ArtifactRegistryClient.read: Gist read failed for issue #%d (path=%s): %s", issue, path, exc)
+            raise PlanContentUnavailableError(issue, plan_id, str(exc)) from exc
 
-        # Step 2: fall back to local filesystem.
-        try:
-            local_content = provider.read_local_artifact_content(path)
-            if local_content is not None:
+        if plan_id is not None:
+            legacy_path = _LEGACY_TASK_PLAN_PATH_TEMPLATE.format(issue=issue)
+            try:
+                legacy_content = provider.read_artifact_content_from_remote(issue, artifact_type, legacy_path)
+                if legacy_content is not None:
+                    _log.debug(
+                        "ArtifactRegistryClient.read: legacy Gist hit for issue #%d (path=%s)", issue, legacy_path
+                    )
+                    return legacy_content
+            except (BacklogError, OSError) as exc:
                 _log.warning(
-                    "ArtifactRegistryClient.read: Gist content unavailable for issue #%d, serving from local cache (path=%s)",
+                    "ArtifactRegistryClient.read: legacy Gist read failed for issue #%d (path=%s): %s",
                     issue,
-                    path,
+                    legacy_path,
+                    exc,
                 )
-                return local_content
-        except (ValueError, OSError) as exc:
-            _log.warning(
-                "ArtifactRegistryClient.read: local read also failed for issue #%d (path=%s): %s", issue, path, exc
-            )
+                raise PlanContentUnavailableError(issue, plan_id, str(exc)) from exc
 
         _log.debug("ArtifactRegistryClient.read: content not found for issue #%d (path=%s)", issue, path)
         return None
@@ -287,6 +312,9 @@ class ArtifactRegistryClient:
 
         Returns:
             Plan-index YAML string when found, or ``None`` when absent.
+
+        Raises:
+            PlanIndexUnavailableError: When the configured provider cannot be read.
         """
         try:
             provider = self._provider_instance()
@@ -294,7 +322,7 @@ class ArtifactRegistryClient:
             _log.warning(
                 "ArtifactRegistryClient.read_index: provider unavailable for sentinel #%d: %s", sentinel_issue, exc
             )
-            return None
+            raise PlanIndexUnavailableError(sentinel_issue, str(exc)) from exc
 
         try:
             remote_content = provider.read_artifact_content_from_remote(
@@ -306,18 +334,12 @@ class ArtifactRegistryClient:
             _log.warning(
                 "ArtifactRegistryClient.read_index: Gist read failed for sentinel #%d: %s", sentinel_issue, exc
             )
-
-        # Local fallback for plan-index.
-        try:
-            provider_local = self._provider_instance()
-            local_content = provider_local.read_local_artifact_content(_PLAN_INDEX_PATH)
-            if local_content is not None:
-                _log.warning(
-                    "ArtifactRegistryClient.read_index: serving plan-index from local cache for sentinel #%d",
-                    sentinel_issue,
-                )
-                return local_content
-        except (ValueError, OSError):
-            pass
+            raise PlanIndexUnavailableError(sentinel_issue, str(exc)) from exc
 
         return None
+
+
+def _task_plan_path(issue: int, plan_id: str | None) -> str:
+    if plan_id is None:
+        return _LEGACY_TASK_PLAN_PATH_TEMPLATE.format(issue=issue)
+    return _TASK_PLAN_PATH_TEMPLATE.format(issue=issue, plan_id=plan_id)

@@ -1,12 +1,12 @@
-"""Tests for artifact content storage and retrieval via GitHub issue comments.
+"""Tests for artifact content storage and retrieval via configured providers.
 
 Covers:
 - _build_artifact_content_comment: structure, truncation
 - _extract_content_from_comment: happy path, malformed input
 - GitHubArtifactProvider.store_artifact_content: create new, update existing
 - GitHubArtifactProvider.read_artifact_content_from_remote: found, not found
-- artifact_register MCP tool: with content (tier 1), auto-read local file (tier 2), no content/no file (tier 3)
-- artifact_read MCP tool: GitHub-first, filesystem fallback, neither available
+- artifact_register MCP tool: manifest-only and explicit logical-content writes
+- artifact_read MCP tool: logical-content retrieval through the configured provider
 
 All GitHub API calls are mocked at the ``_graphql_request`` boundary
 (``backlog_core.gh_client._graphql_request``) using fixture factories from
@@ -15,10 +15,12 @@ All GitHub API calls are mocked at the ``_graphql_request`` boundary
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from github.AuthenticatedUser import AuthenticatedUser
 
 # Ensure graphql_factories is importable regardless of pytest invocation path.
@@ -26,14 +28,26 @@ _tests_dir = Path(__file__).parent
 if str(_tests_dir) not in sys.path:
     sys.path.insert(0, str(_tests_dir))
 
+from backlog_core.artifact_manifest_store import artifact_content_reference
 from backlog_core.artifact_provider import (
     _GITHUB_COMMENT_MAX_CHARS,
     GitHubArtifactProvider,
     _build_artifact_content_comment,
     _extract_content_from_comment,
 )
-from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus, ArtifactType
+from backlog_core.backend_types import ContentProvider
+from backlog_core.models import (
+    ArtifactEntry,
+    ArtifactManifest,
+    ArtifactStatus,
+    ArtifactType,
+    ContentKind,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+)
 from backlog_core.server import mcp
+from fastmcp.exceptions import ToolError
 from graphql_factories import (
     make_issue_by_number_response,
     make_issue_comment_node,
@@ -65,6 +79,22 @@ def _make_mock_repo() -> MagicMock:
         mocked at the module level, so the repo object is only passed through.
     """
     return MagicMock()
+
+
+def _manifest_record(manifest: ArtifactManifest) -> ContentRecord:
+    return ContentRecord(
+        reference=ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=str(manifest.issue_number), name="manifest"),
+        content=manifest.model_dump_json(),
+    )
+
+
+def _artifact_record(item_id: int, artifact_type: str, artifact_id: str, content: str) -> ContentRecord:
+    return ContentRecord(
+        reference=ContentRef(
+            kind=ContentKind.ARTIFACT_CONTENT, namespace=str(item_id), artifact_type=artifact_type, name=artifact_id
+        ),
+        content=content,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -473,63 +503,49 @@ def test_read_artifact_content_from_remote_ignores_wrong_type(tmp_path: Path) ->
 # ---------------------------------------------------------------------------
 
 
-async def test_artifact_register_without_content_and_no_local_file_registers_manifest_only() -> None:
-    """Verify artifact_register emits a warning when content and local file are both absent.
-
-    Tests: artifact_register MCP tool — tier 3 (manifest-only).
-    How: Mock provider with no local file, call tool without content param.
-    Why: Callers need a warning signal to detect missing content — not a silent no-op.
-    """
-    # Arrange — no explicit content and no local file (tier 3: manifest-only)
-    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
-    mock_provider.set_manifest.return_value = None
-    mock_provider.read_local_artifact_content.return_value = None  # no local file
-
-    with (
-        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
-    ):
-        mock_registry.register.return_value = mock_manifest.model_copy(
-            update={"artifacts": [ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md")]}
-        )
-        # Act
-        result = await _call(
-            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
-        )
-
-    # Assert
-    assert result.get("error") is None
-    assert result["registered"] is True
-    assert result["content_stored"] is False
-    mock_provider.store_artifact_content.assert_not_called()
-    # A warning must be emitted so callers can detect the missing content
-    assert any("no local file" in w.lower() or "manifest entry" in w.lower() for w in result.get("warnings", []))
-
-
-async def test_artifact_register_with_content_stores_to_github() -> None:
-    """Verify artifact_register stores explicit content to GitHub.
-
-    Tests: artifact_register MCP tool — tier 1 (explicit content).
-    How: Pass content parameter, verify store_artifact_content called correctly.
-    Why: Explicit content upload is the primary storage path for agent-produced artifacts.
-    """
+async def test_artifact_register_rejects_missing_content_before_provider_mutation() -> None:
     # Arrange
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
-    mock_provider.set_manifest.return_value = None
-    mock_provider.store_artifact_content.return_value = None
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
+
+    with patch("backlog_core.server._get_artifact_provider", return_value=mock_provider), pytest.raises(ToolError):
+        await _call("artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"})
+
+    mock_provider.get_content.assert_not_called()
+    mock_provider.put_content.assert_not_called()
+
+
+async def test_artifact_register_does_not_replace_unavailable_manifest() -> None:
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.side_effect = ContentUnavailableError("offline cache miss")
 
     with (
         patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
+        pytest.raises(ToolError, match="offline cache miss"),
     ):
-        mock_registry.register.return_value = mock_manifest.model_copy(
-            update={"artifacts": [ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md")]}
+        await _call(
+            "artifact_register",
+            {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": "# Research"},
         )
-        # Act
+
+    assert mock_provider.put_content.call_args.args[0].reference == artifact_content_reference(
+        42,
+        ArtifactEntry(
+            artifact_type=ArtifactType.RESEARCH,
+            artifact_id="plan/r.md",
+            content_revision=hashlib.sha256(b"# Research").hexdigest(),
+        ),
+    )
+
+
+async def test_artifact_register_with_content_writes_to_configured_provider() -> None:
+    # Arrange
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
+
+    with patch("backlog_core.server._get_artifact_provider", return_value=mock_provider):
         result = await _call(
             "artifact_register",
             {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": "# Research content"},
@@ -539,44 +555,32 @@ async def test_artifact_register_with_content_stores_to_github() -> None:
     assert result.get("error") is None
     assert result["registered"] is True
     assert result["content_stored"] is True
-    mock_provider.store_artifact_content.assert_called_once_with(42, "research", "plan/r.md", "# Research content")
-
-
-async def test_artifact_register_without_content_reads_local_file_and_uploads() -> None:
-    """Verify artifact_register auto-reads local file content and uploads when no explicit content given.
-
-    Tests: artifact_register MCP tool — tier 2 (auto-read from filesystem).
-    How: Mock read_local_artifact_content to return file content, verify upload called.
-    Why: Agents should not need to explicitly pass file content when it already exists on disk.
-    """
-    # Arrange — no explicit content but local file exists (tier 2: auto-read from filesystem)
-    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
-    mock_provider.set_manifest.return_value = None
-    mock_provider.read_local_artifact_content.return_value = "# File content read automatically"
-    mock_provider.store_artifact_content.return_value = None
-
-    with (
-        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
-        patch("backlog_core.server._artifact_registry") as mock_registry,
-    ):
-        mock_registry.register.return_value = mock_manifest.model_copy(
-            update={"artifacts": [ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md")]}
-        )
-        # Act
-        result = await _call(
-            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md"}
-        )
-
-    # Assert
-    assert result.get("error") is None
-    assert result["registered"] is True
-    assert result["content_stored"] is True
-    mock_provider.read_local_artifact_content.assert_called_once_with("plan/r.md")
-    mock_provider.store_artifact_content.assert_called_once_with(
-        42, "research", "plan/r.md", "# File content read automatically"
+    assert mock_provider.put_content.call_count == 2
+    published_manifest = ArtifactManifest.model_validate_json(
+        mock_provider.put_content.call_args_list[1].args[0].content
     )
+    assert mock_provider.put_content.call_args_list[0].args[0].reference == artifact_content_reference(
+        42, published_manifest.artifacts[0]
+    )
+    assert mock_provider.put_content.call_args_list[0].args[0].content == "# Research content"
+    assert mock_provider.put_content.call_args_list[1].args[0].reference == ContentRef(
+        kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest"
+    )
+
+
+async def test_artifact_register_rejects_empty_content_before_provider_mutation() -> None:
+    # Arrange
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
+
+    with patch("backlog_core.server._get_artifact_provider", return_value=mock_provider), pytest.raises(ToolError):
+        await _call(
+            "artifact_register", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r.md", "content": ""}
+        )
+
+    mock_provider.get_content.assert_not_called()
+    mock_provider.put_content.assert_not_called()
 
 
 async def test_artifact_register_with_invalid_type_returns_error() -> None:
@@ -588,31 +592,23 @@ async def test_artifact_register_with_invalid_type_returns_error() -> None:
     """
     # Arrange / Act
     result = await _call(
-        "artifact_register", {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md"}
+        "artifact_register",
+        {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md", "content": "# Content"},
     )
 
     # Assert
     assert "error" in result
 
 
-# ---------------------------------------------------------------------------
-# artifact_read MCP tool — GitHub-first, filesystem fallback
-# ---------------------------------------------------------------------------
-
-
-async def test_artifact_read_returns_github_content_when_available() -> None:
-    """Verify artifact_read returns content from GitHub when present.
-
-    Tests: artifact_read MCP tool — GitHub-first path.
-    How: Mock provider with read_artifact_content_from_remote returning content.
-    Why: GitHub-stored content takes precedence over filesystem for worktree isolation.
-    """
+async def test_artifact_read_returns_configured_provider_content() -> None:
     # Arrange
     entry = ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md", status=ArtifactStatus.CURRENT)
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[entry])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
-    mock_provider.read_artifact_content_from_remote.return_value = "# From GitHub"
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.side_effect = [
+        _manifest_record(mock_manifest),
+        _artifact_record(42, "research", "plan/r.md", "# From configured provider"),
+    ]
 
     with (
         patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
@@ -624,24 +620,21 @@ async def test_artifact_read_returns_github_content_when_available() -> None:
 
     # Assert
     assert result.get("error") is None
-    assert result["content"] == "# From GitHub"
-    mock_provider.read_artifact_content.assert_not_called()
+    assert result["content"] == "# From configured provider"
+    assert mock_provider.get_content.call_args_list[1].args[0] == ContentRef(
+        kind=ContentKind.ARTIFACT_CONTENT, namespace="42", artifact_type="research", name="plan/r.md"
+    )
 
 
-async def test_artifact_read_falls_back_to_filesystem_when_github_returns_none(tmp_path: Path) -> None:
-    """Verify artifact_read falls back to filesystem when GitHub returns no content.
-
-    Tests: artifact_read MCP tool — filesystem fallback.
-    How: Mock read_artifact_content_from_remote to return None, read_artifact_content for file.
-    Why: Artifacts not stored as comments must still be readable from local disk.
-    """
+async def test_artifact_read_requires_no_filesystem_fallback() -> None:
     # Arrange
     entry = ArtifactEntry(artifact_type=ArtifactType.RESEARCH, artifact_id="plan/r.md", status=ArtifactStatus.CURRENT)
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[entry])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
-    mock_provider.read_artifact_content_from_remote.return_value = None
-    mock_provider.read_artifact_content.return_value = "# From filesystem"
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.side_effect = [
+        _manifest_record(mock_manifest),
+        _artifact_record(42, "research", "plan/r.md", "# Provider-only content"),
+    ]
 
     with (
         patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
@@ -653,8 +646,7 @@ async def test_artifact_read_falls_back_to_filesystem_when_github_returns_none(t
 
     # Assert
     assert result.get("error") is None
-    assert result["content"] == "# From filesystem"
-    mock_provider.read_artifact_content.assert_called_once_with("plan/r.md")
+    assert result["content"] == "# Provider-only content"
 
 
 async def test_artifact_read_returns_error_when_type_not_found() -> None:
@@ -716,9 +708,11 @@ async def test_artifact_read_multi_entry_returns_most_recent_and_warns() -> None
         created_at="2026-06-01T10:00:00Z",
     )
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[older_entry, newer_entry])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
-    mock_provider.read_artifact_content_from_remote.return_value = "# Newer content"
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.side_effect = [
+        _manifest_record(mock_manifest),
+        _artifact_record(42, "research", "plan/r-new.md", "# Newer content"),
+    ]
 
     with (
         patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),

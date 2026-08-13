@@ -438,9 +438,9 @@ class TestStructuredKeyDriftStillDelivered:
     """Finding #5: dict matches but body header drifts → matched slice, not directory."""
 
     def test_structured_key_format_drift_returns_matched_not_directory(self, mocker: MockerFixture) -> None:
-        """A YAML item whose structured keys differ in FORMAT from the body headers.
+        """A provider item whose structured keys differ in FORMAT from the body headers.
 
-        Arrange a local YAML item whose structured section key is 'RT-ICA' while the
+        Arrange a provider item whose structured section key is 'RT-ICA' while the
         rendered body header is formatted differently ('RT ICA'), so the structured
         ``sections`` dict matches the requested name but ``narrow_body_to_named_sections``
         finds no exact body header.  The matched narrowing must still be delivered (the

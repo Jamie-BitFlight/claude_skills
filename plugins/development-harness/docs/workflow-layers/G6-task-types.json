@@ -112,7 +112,7 @@
           "evidence": "If no backlog item exists for the fix, the agent does NOT call backlog_add first. Instead it passes the descriptive title directly to --quick, which creates a minimal item inline (Step 2 of this workflow)."
         },
         {
-          "step_label": "Create single-task quick plan via sam_plan(action='create') with slug 'quick-{slug}'",
+          "step_label": "Create a single-task quick plan via the sam_plan create action with slug 'quick-{slug}'",
           "source_file": "quick/start.md:# Quick Mode (Step Q)",
           "applies": "only-this-type",
           "evidence": "Create the quick plan using the SAM MCP tool: mcp__plugin_dh_sam__sam_plan(config={\"action\": \"create\", \"slug\": \"quick-{slug}\", \"tasks\": [{\"id\": \"T1\", \"complexity\": \"low\"}]})"

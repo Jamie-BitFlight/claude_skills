@@ -129,6 +129,7 @@ the task or delegation prompt:
 mcp__plugin_dh_backlog__artifact_register(
   item_id={issue_number},
   artifact_type="codebase-analysis",
+  artifact_id="code-review-performance-{issue_number}",
   content={structured_verdict_json},
   status="complete",
   agent="reviewer-performance"

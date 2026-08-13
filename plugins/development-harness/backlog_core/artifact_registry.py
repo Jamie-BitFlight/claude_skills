@@ -1,8 +1,7 @@
 """Business logic for the artifact manifest registry.
 
 This module is purely stateless — all methods accept and return
-``ArtifactManifest`` objects without internal state.  No I/O is performed
-here; all GitHub interaction is in :mod:`backlog_core.artifact_provider`.
+``ArtifactManifest`` objects without internal state. No I/O is performed here.
 
 Manifest section format stored in GitHub Issue bodies::
 
@@ -257,7 +256,12 @@ class ArtifactRegistry:
                 # Exact match — update in-place.
                 updated.append(
                     existing.model_copy(
-                        update={"status": entry.status, "agent": entry.agent, "created_at": entry.created_at}
+                        update={
+                            "status": entry.status,
+                            "agent": entry.agent,
+                            "created_at": entry.created_at,
+                            "content_revision": entry.content_revision,
+                        }
                     )
                 )
                 upserted = True

@@ -7,7 +7,7 @@
       "produced_by": {
         "skill": "add-new-feature",
         "source_file": "skills/add-new-feature/SKILL.md:## Phase 1: Discovery (@dh:feature-researcher)",
-        "action": "artifact_register(item_id={issue}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='feature-researcher', content=...)",
+        "action": "artifact_register(item_id={issue}, artifact_type='feature-context', artifact_id='plan/feature-context-{slug}.md', agent='feature-researcher', content=...)",
         "agent": "feature-researcher"
       },
       "consumed_by": [
@@ -42,7 +42,7 @@
           "agent": "feature-verifier"
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
@@ -52,7 +52,7 @@
       "produced_by": {
         "skill": "work-backlog-item",
         "source_file": "skills/work-backlog-item/references/workflows/groom/analyze.md:Discovery Gate",
-        "action": "artifact_register(item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content=...)",
+        "action": "artifact_register(item_id={issue_number}, artifact_type='feature-context', artifact_id='plan/feature-context-{slug}.md', agent='discovery', content=...)",
         "agent": null
       },
       "consumed_by": [
@@ -69,7 +69,7 @@
           "agent": null
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
@@ -90,7 +90,7 @@
           "agent": null
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
@@ -100,7 +100,7 @@
       "produced_by": {
         "skill": "add-new-feature",
         "source_file": "skills/add-new-feature/SKILL.md:## Phase 3: Architecture Spec (design-spec role)",
-        "action": "artifact_register(item_id={issue}, artifact_type='architect', path='plan/architect-{slug}.md', agent='planning', content=...)",
+        "action": "artifact_register(item_id={issue}, artifact_type='architect', artifact_id='plan/architect-{slug}.md', agent='planning', content=...)",
         "agent": "python-cli-design-spec"
       },
       "consumed_by": [
@@ -123,37 +123,37 @@
           "agent": null
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
       "id": "G2.task-plan",
       "name": "task-plan",
-      "artifact_type_key": "task-plan",
+      "artifact_type_key": null,
       "produced_by": {
         "skill": "add-new-feature",
         "source_file": "skills/add-new-feature/SKILL.md:## Phase 4: Task Decomposition (@dh:swarm-task-planner)",
-        "action": "sam_plan(action='create', ...) — auto-registered as artifact_type='task-plan' by sam_plan MCP",
+        "action": "sam_plan create action returns an opaque plan_ref; backlog_update associates that plan_ref with the owner",
         "agent": "swarm-task-planner"
       },
       "consumed_by": [
         {
           "skill": "implement-feature",
-          "source_file": "skills/implement-feature/SKILL.md:(plan_address passed to skill)",
-          "action": "sam_plan(action='read', plan='{plan_address}')",
+          "source_file": "skills/implement-feature/SKILL.md:## Resolve Plan",
+          "action": "sam_plan(plan='{plan_ref}', config={'action':'read'})",
           "agent": null
         },
         {
           "skill": "complete-implementation",
           "source_file": "skills/complete-implementation/SKILL.md:Resolve Plan Address",
-          "action": "plan/P{id}-{slug}.yaml — plan address P{N} used in all sam calls",
+          "action": "sam_plan(plan='{plan_ref}', config={'action':'read'})",
           "agent": null
         },
         {
           "skill": "implement-feature",
-          "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
-          "action": "artifact_read(item_id, artifact_type='task-plan')",
-          "agent": "tn-verification-gate"
+          "source_file": "skills/implement-feature/SKILL.md:## Resolve Plan",
+          "action": "sam_plan(plan='{plan_ref}', config={'action':'read'})",
+          "agent": null
         }
       ],
       "storage": "sam_plan",
@@ -166,7 +166,7 @@
       "produced_by": {
         "skill": "implement-feature",
         "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
-        "action": "artifact_register(item_id=N, artifact_type='T0-baseline', content=<baseline yaml string>, agent='t0-baseline-capture')",
+        "action": "artifact_register(item_id=N, artifact_type='T0-baseline', artifact_id='T0-baseline-{slug}', content=<baseline yaml string>, agent='t0-baseline-capture')",
         "agent": "t0-baseline-capture"
       },
       "consumed_by": [
@@ -177,7 +177,7 @@
           "agent": "tn-verification-gate"
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
@@ -187,7 +187,7 @@
       "produced_by": {
         "skill": "implement-feature",
         "source_file": "skills/implement-feature/SKILL.md:Bookend Artifact Registration",
-        "action": "artifact_register(item_id=N, artifact_type='TN-verification', content=<verification yaml string>, agent='tn-verification-gate')",
+        "action": "artifact_register(item_id=N, artifact_type='TN-verification', artifact_id='TN-verification-{slug}', content=<verification yaml string>, agent='tn-verification-gate')",
         "agent": "tn-verification-gate"
       },
       "consumed_by": [
@@ -198,7 +198,7 @@
           "agent": null
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
@@ -208,7 +208,7 @@
       "produced_by": {
         "skill": "complete-implementation",
         "source_file": "skills/complete-implementation/SKILL.md:Quality Gates T4 Drift Audit",
-        "action": "artifact_register(item_id={item_id}, type='audit-report', artifact_id='doc-drift-audit-{slug}', content={report_markdown}, status='complete', agent='doc-drift-auditor')",
+        "action": "artifact_register(item_id={item_id}, artifact_type='audit-report', artifact_id='doc-drift-audit-{slug}', content={report_markdown}, status='current', agent='doc-drift-auditor')",
         "agent": "doc-drift-auditor"
       },
       "consumed_by": [
@@ -219,7 +219,7 @@
           "agent": null
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {
@@ -229,7 +229,7 @@
       "produced_by": {
         "skill": "add-new-feature",
         "source_file": "skills/add-new-feature/SKILL.md:## Phase 1: Discovery (@dh:feature-researcher)",
-        "action": "artifact_register(..., artifact_type='research', ...) by any research agent",
+        "action": "Research agent registers content with item_id, artifact_type='research', a stable artifact_id, agent, and content",
         "agent": null
       },
       "consumed_by": [
@@ -240,7 +240,7 @@
           "agent": "feature-researcher"
         }
       ],
-      "storage": "gist_artifact",
+      "storage": "provider_artifact",
       "persistent": true
     },
     {

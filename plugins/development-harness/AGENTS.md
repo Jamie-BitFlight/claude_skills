@@ -15,7 +15,7 @@ Language-agnostic development process harness that orchestrates feature developm
 **Design Principles:**
 
 - The harness owns the *process*; language plugins own the *specialists*
-- Every stage produces an MCP-registered artifact (stateless handoff) — stored via `artifact_register` and retrieved via `artifact_read`, never via direct filesystem paths
+- Every stage produces a logical handoff. Document artifacts use `artifact_register` and `artifact_read`; plans and task state use `sam_plan` and `sam_task`. Neither surface exposes direct filesystem paths.
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints
 - Without a language manifest, the harness falls back to `dh:task-worker` (specialist profile not loaded — task-worker executes directly)
 - Task complexity is context-fit under uncertainty — see [Context-Fit Complexity Model](./docs/sdlc-layers/layer-0/context-fit-complexity.md)
@@ -26,7 +26,8 @@ Language-agnostic development process harness that orchestrates feature developm
 
 ### SAM 7-Stage Pipeline
 
-The harness walks a feature request through seven stages, each producing a named artifact stored in `plan/`. Stages gate on artifact completion, not conversation state.
+The harness walks a feature request through seven stages, each producing a named artifact
+registered through the configured backend. Stages gate on artifact completion, not conversation state.
 
 1. **S1 Discovery** - Understand the feature, codebase, and constraints
 2. **S2 Planning + RT-ICA** - Generate a plan with information completeness analysis
@@ -78,44 +79,37 @@ The full resolution protocol is documented in [./skills/development-harness/refe
 
 ## State Management
 
-All artifacts are written to the per-project state directory (`~/.dh/projects/{project-slug}/plan/`). The `{project-slug}` is derived from the absolute project root path (replacing `/` with `-`). The base state directory can be overridden via the `DH_STATE_HOME` environment variable (used in CI and testing).
+The configured backend is the sole storage boundary for work items, grooming, plans, task
+records, artifact manifests, and artifact content. `create_backend()` resolves that backend once;
+MCP, CLI, skills, and agents use its logical protocols and do not select a second provider.
 
-Skills and agents access plan artifacts via MCP tools — not via `dh_paths` directly. See the Artifact Manifest System section below for the discovery and access pattern.
+Remote-capable providers privately compose `FileCache` for snapshots, stale reads, queued offline
+mutations, provider revisions, and artifact/plan continuity. Cache misses are unavailable data,
+not authoritative empty results; revision conflicts retain pending work. Beads, SQLite, and Memory
+use native storage directly: they never instantiate `FileCache`, read or write backlog YAML, or
+queue remote mutations.
 
-**Token pattern:** `ARTIFACT:{TYPE}({SCOPE_OR_ID})`
-
-**File layout example** (under `~/.dh/projects/{project-slug}/`):
-
-- `plan/feature-context-{slug}.md` - S1 output
-- `plan/architect-{slug}.md` - architecture output
-- `plan/P{id}-{slug}.yaml` - task plan
-- `plan/T0-baseline-{slug}.yaml` - pre-implementation baseline
-- `plan/TN-verification-{slug}.yaml` - post-implementation verification
-- `backlog/*.md` - backlog item cache (synced from the selected backend; GitHub Issues by default)
-- `context/active-task-{session-id}.json` - ephemeral task execution context
-
-The `.dh/` directory in the repository root (Tier 1) holds committed project configuration. State files live outside the repo at `~/.dh/`, preventing pollution of the working tree.
+Agents address plans and tasks logically (`P{id}/T{M}`) through `sam_plan`, `sam_task`, or the
+grouped DH CLI adapter. Physical paths, cache records, provider IDs, and wire formats are backend
+internals. Use `sam_active_task` for session-scoped execution context.
 
 Full conventions in [./skills/development-harness/references/artifact-conventions.md](./skills/development-harness/references/artifact-conventions.md).
-
-**Gotcha — `plan_dir` is NOT a repo-relative path:**
-
-The `plan_dir` parameter in `sam_read`, `sam_update`, `sam_create`, and related MCP tools defaults to `"plan"`. This does NOT mean `{repo_root}/plan/`. The SAM MCP server resolves it through `dh_paths.plan_dir()`, which produces `~/.dh/projects/{project-slug}/plan/`. The repo's `plan/` directory contains only stub placeholders; all real plan YAML files live in the DH state directory outside the repo.
 
 **Gotcha — Large plans must use the incremental append workflow:**
 
 For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
-`sam_plan create`:
+the `sam_plan` create action:
 
-1. `sam_plan(action='create', tasks=[], issue=<github_issue_number>)` — creates a drafting plan and registers it as an artifact on the issue; returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
-2. `sam_plan(plan='Pa1b2c3d4', action='append_task', task=<TaskDefinition dict>)` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
-3. `sam_plan(plan='Pa1b2c3d4', action='finalize')` — clears drafting state, plan becomes ready and artifact content is updated
+1. `sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[], "owner_reference":<work_item_reference>})` — creates a drafting plan and returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
+2. `sam_plan(plan='Pa1b2c3d4', config={"action":"append_task", "task":<single_task_object>})` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
+3. `sam_plan(plan='Pa1b2c3d4', config={"action":"finalize"})` — clears drafting state and makes the plan ready
 
-While a plan is in `state="drafting"`, `sam_plan ready` and `sam_plan status` return their normal
-result models with `state="drafting"` instead of dispatchable task data — this prevents dispatching
-a partial plan. Only `finalize` makes the plan visible to the dispatch loop.
+While a plan is in `state="drafting"`, `sam_plan(plan='<returned-plan-id>', config={"action":"ready"})`
+and `sam_plan(plan='<returned-plan-id>', config={"action":"status"})` return their normal result
+models with `state="drafting"` instead of dispatchable task data — this prevents dispatching a
+partial plan. Only `finalize` makes the plan visible to the dispatch loop.
 
-CLI equivalent: `plan create --slug ... --goal ... --issue <github_issue_number>` (omit
+CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_reference>` (omit
 `--task-id`/`--task-title` to start in `state="drafting"`) → `plan append-task --plan-address
 <plan_id> --task-id ... --task-title ...` × N → `plan finalize --plan-address <plan_id>`. See
 [docs/TASK_FILE_FORMAT.md](./docs/TASK_FILE_FORMAT.md) "DH CLI Usage Guide" for the full
@@ -123,28 +117,26 @@ grouped-command reference.
 
 **Gotcha — `append_task` is single-writer only:**
 
-`TaskBackend.append_task` is NOT safe under concurrent writers. Do NOT call `append_task` for
-the same plan from multiple agents or sessions simultaneously. The single-writer assumption is
-part of the architectural contract: callers must serialize writes, and backends are not required
-to detect or recover from concurrent appends. Behavior under concurrent writes is **undefined**.
+`append_task` is single-writer for a given plan. Serialize appends through the configured backend;
+concurrent writes are outside the contract. Do NOT call `append_task` for
+the same plan from multiple agents or sessions simultaneously.
 
-Two distinct types of plan data exist:
-
-- **SAM task plan YAML files** (`P{id}-{slug}.yaml`, `T0-baseline-*.yaml`, etc.) — stored in `~/.dh/projects/{slug}/plan/` by the SAM MCP. Access via `sam_read`, `sam_list`, `sam_update` — never via direct filesystem path.
-- **Plan artifact markdown files** (`plan/feature-context-{slug}.md`, `plan/architect-{slug}.md`, etc.) — written to the repo root worktree's `plan/` directory. Not visible from isolated worktrees. Access via `artifact_read(item_id, artifact_type)` — not filesystem path.
+Plans, tasks, and artifacts are logical backend records. Their physical representation is private to
+the configured backend; access them through `sam_*` and `artifact_*` operations.
 
 ---
 
 ## Artifact Manifest System
 
-Plan artifacts are registered in a structured manifest stored by the active artifact provider (the GitHub Issue body in the default deployment). The manifest is the discovery mechanism — consumers query it via MCP to find artifacts for a work item.
+Document artifacts are registered in a structured manifest owned by the configured backend. The
+manifest is the discovery mechanism — consumers query it via MCP to find artifacts for a work item.
 
 **MCP tools (on backlog server) — Artifact Management:**
 
-- `artifact_register` — Register or update an artifact entry (item_id, type, path, status, agent)
-- `artifact_list` — List all artifacts for an issue, optionally filtered by type
-- `artifact_get` — Get metadata for a specific artifact type on an issue
-- `artifact_read` — Read artifact file content from root worktree path (with path safety validation)
+- `artifact_register` — Register or update an artifact entry (`item_id`, `artifact_type`, `artifact_id`, `status`, `agent`, `content`)
+- `artifact_list` — List all artifacts for a work item, optionally filtered by `artifact_type`
+- `artifact_get` — Get metadata for a specific artifact type on a work item
+- `artifact_read` — Read logical artifact content resolved by the configured backend
 
 Each tool above has a full CLI equivalent under `artifact register|list|get|read` — see
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
@@ -156,26 +148,36 @@ authoritative flag mapping.
 |---|---|---|
 | `feature-context` | `@dh:feature-researcher` | S1 discovery output |
 | `architect` | `@dh:swarm-task-planner` | S2 architecture output |
-| `task-plan` | SAM (`sam_plan create`) | Auto-registered on plan creation |
 | `codebase-analysis` | **`@dh:code-reviewer`** | Code review verdict; read by `complete-implementation` Phase T1 |
 | `T0-baseline` | `@dh:t0-baseline-capture` | Pre-implementation baseline |
 | `TN-verification` | `@dh:tn-verification-gate` | Post-implementation verification |
 | `dispatch-plan` | `dispatch_create_plan` | Milestone dispatch plan |
 | `audit-report` | **`@dh:doc-drift-auditor`** | Documentation drift audit; NOT used by `@dh:code-reviewer` |
 
-**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
+Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
+associate the returned logical address with the owning work item through `backlog_update`.
 
-**Registration:** Producers call `artifact_register` after creation. Auto-registration is built into `sam_create` and `backlog_update(plan=...)`.
+**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id=<owner>, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
 
-**Consumer discovery:** Consumers (including worktree-isolated agents) call `artifact_list` then `artifact_read` instead of filesystem access — plan files are in the root worktree and not visible inside isolated worktrees.
+**Registration:** Producers call `artifact_register` after creating document-artifact content.
+Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores
+only the logical plan association on the owning work item. Never duplicate plan content through
+`artifact_register`.
 
-**MCP-native rule for agents:** Agents store system artifacts exclusively via `artifact_register` with `content=` — the content is uploaded to the active artifact provider and retrievable through its configured access path. The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation files committed to the repo). Filesystem paths under `~/.dh/` are an implementation detail of the MCP servers, not a stable agent interface.
+**Consumer discovery:** Consumers (including worktree-isolated agents) call `artifact_list` then
+`artifact_read` for document artifacts and `sam_plan` for plans instead of using filesystem access.
+The configured backend resolves content for every worktree.
+
+**MCP-native rule for agents:** Agents store document artifacts via `artifact_register` with
+`content=` and store plans through `sam_plan`. The configured backend owns persistence and retrieval.
+The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation
+files committed to the repo).
 
 **Prohibited patterns — do not write these in agent instructions or tool calls:**
 
-- `Write(file_path="~/.dh/...")` for any artifact — use `artifact_register(item_id, type, content=..., path=logical_id)` instead
-- `Read(file_path="~/.dh/.../T0-baseline-*.yaml")` — use `artifact_read(item_id, "T0-baseline")` instead
-- `artifact_register(...)` without `content=` — path-only registration stores a pointer to a local file that is unreachable from worktree-isolated agents and CI environments
+- Direct filesystem writes for system artifacts — use `artifact_register(item_id=<owner>, artifact_type=<type>, artifact_id=<logical-id>, content=...)` instead
+- Direct filesystem reads for system artifacts — use `artifact_read(item_id=<owner>, artifact_type="T0-baseline")` instead
+- `artifact_register(...)` without `content=` — identifier-only registration does not persist artifact content
 
 ## Dispatch Orchestration System
 
@@ -183,7 +185,7 @@ Wave-based parallel execution state for `/work-milestone`. State is persisted to
 
 **MCP tools (on backlog server) — Dispatch Orchestration:**
 
-- `dispatch_read(milestone_number)` — Read an existing dispatch plan from `plan/milestone-{N}-dispatch.yaml`. Returns parsed plan structure or error.
+- `dispatch_read(milestone_number)` — Read provider-owned dispatch content. Returns the parsed plan structure or an error.
 - `dispatch_validate(milestone_number)` — Validate structural integrity of an existing dispatch plan. Returns is_valid, errors, warnings.
 - `dispatch_stale_check(milestone_number)` — Check whether any wave items have stale or dead PIDs and return staleness summary.
 - `dispatch_create_plan(milestone_number, plan, overwrite, validate, issue)` — Validate and persist a dispatch plan atomically. `plan` is a typed DispatchPlan object. Returns `milestone_number`, `wave_count`, `item_count`, `is_valid`, `errors`, `warnings`, and `messages`. Set overwrite=True when re-grooming. Pass issue to auto-register as a `dispatch-plan` artifact.
@@ -198,7 +200,7 @@ read|validate|stale-check|create-plan|conflicts|wave-start|item-status|wave-stat
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
 authoritative flag mapping.
 
-**Workflow:** `/groom-milestone` calls `dispatch_create_plan` to validate and persist the dispatch plan YAML. `/work-milestone` calls `dispatch_wave_start` per wave, `dispatch_spawn` to launch sessions, and `dispatch_wave_status` to poll progress. Spawned sessions call `dispatch_item_status` on completion.
+**Workflow:** `/groom-milestone` calls `dispatch_create_plan` to validate and persist provider-owned dispatch content. `/work-milestone` calls `dispatch_wave_start` per wave, `dispatch_spawn` to launch sessions, and `dispatch_wave_status` to poll progress. Spawned sessions call `dispatch_item_status` on completion.
 
 ---
 
@@ -245,7 +247,7 @@ The manifest schema is documented in [./skills/development-harness/references/la
 
 ### Why
 
-`dh:task-worker` carries full dh tool permissions (SAM MCP, backlog MCP). When a task's `agent:` field is set, `task-worker` reads it via SAM MCP and passes it to `profile_load` to load specialist behavior internally. This ensures the SAM lifecycle (claim → execute → `sam_task(action='state')`) is always owned by an agent that has the tools to execute it.
+`dh:task-worker` carries full dh tool permissions (SAM MCP, backlog MCP). When a task's `agent:` field is set, `task-worker` reads it via SAM MCP and passes it to `profile_load` to load specialist behavior internally. This ensures the SAM lifecycle (claim → execute → `sam_task(config={"action":"state"})`) is always owned by an agent that has the tools to execute it.
 
 Dispatching `dh:task-worker` preserves SAM and backlog MCP access so the worker can execute the complete SAM lifecycle and update task state.
 
@@ -256,7 +258,7 @@ The `agent:` field is read by `task-worker` — not by the orchestrator. The orc
 ```mermaid
 flowchart TD
     Orchestrator([Orchestrator]) -->|"subagent_type='dh:task-worker'"| Worker[dh:task-worker]
-    Worker -->|"sam_read(plan, task)"| SAM[SAM MCP]
+    Worker -->|"sam_task(plan, task, config={action:read})"| SAM[SAM MCP]
     SAM -->|"agent: field value"| Worker
     Worker -->|"profile_load(agent_name=...)"| Profile[Specialist behavior loaded]
     Profile --> Execute[Execute task with full dh tool permissions]
@@ -504,8 +506,8 @@ FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp list \
 # List all plans
 FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp call \
   --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_sam_server.py" \
-  --target sam_list \
-  --input-json '{}'
+  --target sam_plan \
+  --input-json '{"config":{"action":"list"}}'
 ```
 
 **Why `--command` is required**: The server files use relative imports (`from . import models`) and sibling packages (`import dh_paths`). Running `fastmcp call server.py` directly hits an asyncio conflict when invoked from within Claude Code's async context. The `--command` flag launches the runner script as a fresh subprocess, matching how the plugin cache launches the server.
@@ -540,102 +542,41 @@ uv run fastmcp call \
 
 When discussing, extending, or adding backend providers for the development harness — including state management, task management, planning, issues, jobs, milestones, or boards — read [docs/backend-providers.md](./docs/backend-providers.md) first. Amend that document with any new points, references, discoveries, or user inputs that arise during the conversation.
 
-The backlog MCP server uses a `BacklogBackend` Protocol (`backlog_core/backend_protocol.py`) to decouple all operations from any specific storage platform. The following backends are available:
+The backlog MCP server uses the provider-neutral `WorkItemBackend` and `ContentProvider`
+protocols (`backlog_core/backend_protocol.py`). One configured backend owns all work-item,
+grooming, plan, task, artifact-manifest, and artifact-content operations. The following backend
+families are available:
 
 - `github` (default) — GitHub Issues via GraphQL + PyGithub REST. Requires `GITHUB_TOKEN`.
 - `sqlite` — local 6-table SQLite schema, WAL mode. No external credentials.
-- `memory` — in-memory test double. No persistence.
+- `memory` — in-memory native test double. No persistence, YAML, or `FileCache`.
 - `beads` — routes to `bd` CLI via lazy subprocess wrapper. Auto-detected when `.beads/dh-backend` marker file exists at project root (explicit opt-in required). `bd` binary validated on first use; raises `BdNotInstalledError` on failure with no silent fallback.
 
 Select via `BACKLOG_BACKEND` env var, `backlog.backend` key in `.dh/config.yaml` (project config dir or `~/.dh/`), or auto-detected from `.beads/dh-backend` marker file presence. Default is `github` when no selector matches — existing deployments require no changes.
 
 Future platform backends (GitLab, Linear, Supabase) will implement the same Protocol. See [docs/backend-providers.md](./docs/backend-providers.md) for the full Protocol reference, method groups, configuration examples, and platform capability comparison.
 
-The backlog MCP server also exposes `profile_load` (agent_profile tool) for loading named agent profiles that specialize task-worker behavior at dispatch time. Profile definitions live in the backlog server configuration; see [docs/backend-providers.md](./docs/backend-providers.md) for the module boundary.
+The backlog MCP server also exposes `profile_load` (agent_profile tool) for loading named agent
+profiles that specialize task-worker behavior at dispatch time. Profile definitions live in the
+backlog server configuration; see [docs/backend-providers.md](./docs/backend-providers.md) for
+the module boundary.
 
-The SAM MCP server uses a `TaskBackend` Protocol (`sam_schema/core/task_backend.py`) to decouple plan/task operations from storage. The following backends are available:
+Remote-capable providers privately compose `FileCache`; it owns stale snapshots, queued offline
+mutations, revisions, and provider-specific plan/artifact persistence. Beads, SQLite, and Memory
+use native storage directly and never read/write backlog YAML or instantiate `FileCache`.
+Backend unavailability and unsupported content capabilities are explicit outcomes; callers do not
+fall back to another provider.
 
-- `local` (default) — wraps existing YAML I/O stack. **In the MCP server context**, `local` resolves to `GistTaskLayer(LocalYamlTaskProvider)` — plans with an associated GitHub issue are written through to Gist and are portable across environments (CI, worktrees, fresh checkouts). Plans without an issue (`issue=None`) are local-only and emit a non-portability warning. CLI/direct callers that instantiate `LocalYamlTaskProvider` directly do NOT get GistTaskLayer wrapping and remain single-machine only.
-- `github` — maps plans to GitHub Issues, tasks to sub-issues with `sam:{status}` labels. Requires IssueBackend + DocumentBackend (#984).
-- `memory` — in-memory test double. No persistence.
-- `beads` — maps plans to beads epics and tasks to child issues with `--parent` links for structured consumers. Beads-native issue, dependency, readiness, status, notes, and metadata operations use `bd` directly; adapter-only indexes/context may use `bd remember`.
+Plans and artifacts are addressed logically through `sam_*` and `artifact_*` operations. An
+issue or owner reference links a plan to its work item; it never selects a separate plan backend.
 
-Select via `TASKBACKEND` env var or subsystem override in `.dh/config.yaml`. Default is `local` when neither is set — existing deployments require no changes.
+### Plan and artifact capability boundary
 
-**`.dh/config.yaml` subsystem override:**
-
-```yaml
-backend:
-  name: github   # global default (used for backlog)
-
-task:
-  backend: local   # SAM task backend — github not yet fully implemented (#984)
-
-context:
-  backend: local   # SAM context backend
-```
-
-> **Important**: `backend.name` is the global default and applies to all subsystems that lack a specific override. If you set `backend.name: github` (e.g. to configure the backlog backend), you MUST also add `task.backend: local` and `context.backend: local` — otherwise the SAM server will attempt the GitHub task backend, which is incomplete and raises `NotImplementedError`.
-
-### GistTaskLayer — Write-Through Plan Storage
-
-`GistTaskLayer` (`sam_schema/core/gist_task_layer.py`) is a `TaskBackend` wrapper that sits between the MCP server and `LocalYamlTaskProvider`. It is active in the MCP server context only — CLI callers use `LocalYamlTaskProvider` directly.
-
-**Write-through (create and mutations):**
-
-- `create_plan` with `issue` set: local write → Gist content upload via `artifact_client.store(issue, yaml)` → plan index registration. The Gist upload is mandatory and **raises `ArtifactWriteError` on failure** — no silent fallback. A plan index registration failure is a warning (content is still in Gist, but `plan_id` reverse-lookup may not resolve cross-environment).
-- `create_plan` with `issue=None`: local write only. The MCP response includes a non-portability warning. No Gist upload is attempted.
-- All mutations (update_task_status, update_task_fields, update_plan_fields, append_task, finalize_plan): local-first read-modify-write → Gist write-back via `artifact_client.store()`. Write failure raises `ArtifactWriteError`.
-
-**Dual-read fallback (read_plan and list_plans):**
-
-- `read_plan`: resolves `plan_id → issue` via `PlanIdIndex`, fetches YAML from Gist. Falls back to `LocalYamlTaskProvider.read_plan()` when Gist content is unavailable or the index has no entry for `plan_id` (backward-compatible with pre-fix local-only plans). Source is always annotated in the response (`source="gist"` or `source="local"`). `PlanNotFoundError` is raised when both Gist and local miss.
-- `list_plans`: merges `PlanIdIndex.list_all()` (Gist-registered) with `LocalYamlTaskProvider.list_plans()` and deduplicates.
-
-**claim_task atomicity decision (ADR-2509-3 resolution — Option 3: Serialized Dispatch):**
-
-As of 2026-05-30, the GitHub REST and GraphQL APIs provide no conditional/atomic mutation primitive for labels (`addLabels`/`removeLabels` are idempotent, not conditional). Gist blob read-modify-write has no compare-and-swap. The available options were:
-
-1. GitHub conditional mutation — **rejected**: no such primitive exists in the GitHub API as of implementation date.
-2. External lock (Redis, Gist-based lock file) — **rejected**: adds operational complexity with no benefit when the dispatch pattern already serializes.
-3. Serialized Dispatch (chosen) — the exactly-once guarantee is provided by the caller (the `implement-feature` dispatch orchestrator), not by `claim_task` itself. The dispatch loop claims one task at a time per orchestrator per dispatch wave, and waits for the claim response before dispatching the next task.
-4. Accept eventual consistency — **rejected**: highest-ambiguity option; requires idempotent task outputs, which the `TaskBackend` Protocol does not guarantee.
-
-**Declared contract deviation**: `GistTaskLayer.claim_task()` does NOT provide exactly-once in isolation. If two callers invoke `claim_task` concurrently on the same task, both may return `True`. Exactly-once is guaranteed only when the caller serializes dispatch (the `implement-feature` orchestrator pattern). `claim_task` for `issue=None` plans raises `ConcurrentClaimUnsupportedError` immediately.
-
-After a successful claim, `GistTaskLayer` performs a best-effort Gist write-back so `read_plan` returns consistent task status. Write-back failure logs a WARNING and does not roll back the claim — the local YAML is the authoritative claim record.
-
-**PlanIdIndex configuration (`sam.plan_index_issue`):**
-
-`PlanIdIndex` stores a `plan_id → issue` reverse-map YAML blob on a sentinel GitHub issue configured under `sam.plan_index_issue` in `.dh/config.yaml`:
-
-```yaml
-sam:
-  plan_index_issue: 2509  # replace with a dedicated 'SAM Plan Registry' issue number
-```
-
-Recommendation: create a dedicated pinned issue in the repo labelled "SAM Plan Registry" and use its number here. Using a working-feature issue (like 2509) as the sentinel is valid for development but not recommended for long-lived deployments.
-
-What happens when `sam.plan_index_issue` is unset:
-
-- `create_plan` with `issue` set: plan content uploads to Gist, but index registration raises `PlanIndexConfigError` and the warning "Set sam.plan_index_issue in .dh/config.yaml to enable plan_id reverse lookup." is added to the MCP response. The plan is still in Gist and readable via its issue number, but `plan_id`-based reverse-lookup will fail across environments.
-- `read_plan(plan_id)`: index resolution returns `None` (no exception) → falls back to `LocalYamlTaskProvider.read_plan(plan_id)`. Local file must exist for the read to succeed.
-- `list_plans`: `PlanIdIndex.list_all()` returns an empty list (no exception); only local plans are returned.
-
-### ArtifactBackend Protocol
-
-Stores artifact manifest metadata (distinct from `BacklogBackend` coordination state). Defined in `backlog_core/artifact_provider.py`.
-
-Four implementations:
-
-- `GitHubGistArtifactProvider` (default) — manifests in a private GitHub Gist linked from the issue body. Requires `GITHUB_TOKEN` with `gist` scope.
-- `LinearArtifactProvider` — manifests in Linear Attachment metadata.
-- `GitLabArtifactProvider` — manifests in a private GitLab Snippet linked via issue note.
-- `LocalFilesystemArtifactProvider` — manifests at `~/.dh/projects/{slug}/artifacts/{issue_number}.json`; content at `{git_project_root}/{artifact_id}`.
-
-**Fallback behavior**: `_get_artifact_provider()` in `server.py` attempts the configured remote backend. On `GitHubUnavailableError` or `BacklogError`, it silently activates `LocalFilesystemArtifactProvider`. Callers receive the same response shape; a `warnings` entry reading `"Artifacts stored in local filesystem provider. Remote sync unavailable."` is added when fallback is active.
-
-**Explicit local selection**: Set `BACKLOG_BACKEND=local` or add `backlog:\n  backend: local` in `.dh/config.yaml` (project config dir) to always use local storage.
+The configured backend implements the logical plan and artifact capabilities. `sam_plan`,
+`sam_task`, `sam_active_task`, and `artifact_*` calls use that same backend; there is no
+`TASKBACKEND`, independent artifact provider, local filesystem fallback, or per-plan backend
+selection. Remote providers may use a private `FileCache` for stale reads and queued writes.
+Beads, SQLite, and Memory remain native-only and never use YAML or cache storage.
 
 ---
 

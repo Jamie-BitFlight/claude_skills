@@ -2,7 +2,7 @@
 name: multi-perspective-review
 argument-hint: "--diff <git-range> [--issue <N>]"
 user-invocable: true
-description: "Dispatches four parallel perspective reviewers (Security, Performance, Quality, Accessibility) against a diff via TeamCreate and dh:task-worker. Creates an ephemeral SAM plan with four tasks, collects structured verdicts via SendMessage, prints one summary line per perspective, and exits non-zero if any perspective returns REJECT. SKIP is a passing outcome."
+description: "Use when a diff needs four parallel perspective reviewers (Security, Performance, Quality, Accessibility). Creates an ephemeral SAM plan, collects structured verdicts, prints one summary line per perspective, and exits non-zero if any perspective returns REJECT. SKIP is a passing outcome."
 ---
 
 # Multi-Perspective Review
@@ -53,35 +53,35 @@ Do not create a team or a plan when `changed_files` is empty.
 
 ---
 
-## Step 2: Derive Slug
+## Step 2: Derive Review Slug
 
-Derive the review slug using the first matching rule:
+Derive `review_slug` exactly once using the first matching rule:
 
 1. `--slug` argument is provided → use its value directly
 2. `--issue <N>` argument is provided → `review-{N}` (e.g., `review-2181`)
 3. Neither provided → read current git branch name via `git rev-parse --abbrev-ref HEAD` and
    use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
 
-The derived slug is used in the ephemeral plan slug, the team name, and log messages.
+Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the team name.
 
 ---
 
 ## Step 3: Create Ephemeral Review Plan (check-or-create)
 
-**CRITICAL: check-or-create semantics are mandatory.** Do NOT call `sam_plan(action='create')`
-blindly — this causes ephemeral plan accumulation and slug-collision duplicates on repeated runs.
+**CRITICAL: check-or-create semantics are mandatory.** List matching plans before creating one so
+repeated runs reuse the existing address.
 
 ### 3a: Check for Existing Plan
 
 Call:
 
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "review-{slug}"
+```python
+mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "{review_slug}"})
 ```
 
-Inspect the returned `plans` array. If any plan has `feature` equal to `review-{slug}`:
+Inspect the returned `items` array. If any item has `feature` equal to `{review_slug}`:
 
-- Use its plan address as `{PA}` (e.g., `P8a3f1b29`)
+- Store its non-empty `plan_ref` as `{PA}` (e.g., `#2181,P8a3f1b29`)
 - Skip step 3b — do not create a new plan
 
 If no matching plan is found, proceed to step 3b.
@@ -95,77 +95,65 @@ Changed files:
 {each file on its own line}
 ```
 
-Create the plan via the CLI with the first review task (T1) inline, then append the remaining
-three tasks. All four tasks have `dependencies: []` — they are independent and run in parallel.
+Create all four tasks in one typed MCP call. Replace `{changed_files_block}` with the literal
+newline-separated changed-files block. Omit `issue` when `--issue` was not provided.
 
-Note: the CLI's `plan create` accepts only one inline task per call (mapping table, verified
-2026-08-05) — unlike MCP's `tasks=[...]` list, the remaining tasks are added via `plan append-task`
-below. The `--task-body`/`--task-agent`/`--task-priority`/`--task-complexity` flags follow the
-`--task-{field}` naming convention already established for `plan create`/`plan append-task` calls
-elsewhere in this repo (see `quick/start.md`); verify against `--help` before first use since the
-mapping table's flag list for these two actions is not fully enumerated.
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan create \
-  --slug "review-{slug}" \
-  --goal "Multi-perspective review for {slug}" \
-  --issue <issue_number_or_omit_if_absent> \
-  --task-id T1 \
-  --task-title "Security Review" \
-  --task-agent "reviewer-security" \
-  --task-priority 1 \
-  --task-complexity medium \
-  --task-body "## Security Review
-Changed files:
-{newline-separated changed_files list}
-Review each file through the security perspective lens.
-Return structured verdict per verdict-schema.md."
+```python
+mcp__plugin_dh_sam__sam_plan(
+    config={
+        "action": "create",
+        "slug": "{review_slug}",
+        "goal": "Multi-perspective review for {review_slug}",
+        "issue": <issue_number_or_omit_if_absent>,
+        "tasks": [
+            {
+                "id": "T1",
+                "title": "Security Review",
+                "agent": "dh:reviewer-security",
+                "priority": 1,
+                "complexity": "medium",
+                "dependencies": [],
+                "body": "Review every changed file through the security lens.\n"
+                "Return structured verdict per verdict-schema.md.\n\n{changed_files_block}",
+            },
+            {
+                "id": "T2",
+                "title": "Performance Review",
+                "agent": "dh:reviewer-performance",
+                "priority": 1,
+                "complexity": "medium",
+                "dependencies": [],
+                "body": "Review every changed file through the performance lens.\n"
+                "Return structured verdict per verdict-schema.md.\n\n{changed_files_block}",
+            },
+            {
+                "id": "T3",
+                "title": "Quality Review",
+                "agent": "dh:reviewer-quality",
+                "priority": 1,
+                "complexity": "medium",
+                "dependencies": [],
+                "body": "Review every changed file through the quality lens.\n"
+                "Return structured verdict per verdict-schema.md.\n\n{changed_files_block}",
+            },
+            {
+                "id": "T4",
+                "title": "Accessibility Review",
+                "agent": "dh:reviewer-accessibility",
+                "priority": 1,
+                "complexity": "low",
+                "dependencies": [],
+                "body": "Apply the SKIP rule first. Otherwise review ARIA attributes, color-only "
+                "signals, and keyboard parity. Return structured verdict per verdict-schema.md."
+                "\n\n{changed_files_block}",
+            },
+        ],
+    }
+)
 ```
 
-Store the returned plan address as `{PA}`, then append T2, T3, and T4:
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan append-task \
-  --plan-address {PA} \
-  --task-id T2 \
-  --task-title "Performance Review" \
-  --task-agent "reviewer-performance" \
-  --task-priority 1 \
-  --task-complexity medium \
-  --task-body "## Performance Review
-Changed files:
-{newline-separated changed_files list}
-Review each file through the performance perspective lens.
-Return structured verdict per verdict-schema.md."
-
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan append-task \
-  --plan-address {PA} \
-  --task-id T3 \
-  --task-title "Quality Review" \
-  --task-agent "reviewer-quality" \
-  --task-priority 1 \
-  --task-complexity medium \
-  --task-body "## Quality Review
-Changed files:
-{newline-separated changed_files list}
-Review each file through the quality perspective lens.
-Return structured verdict per verdict-schema.md."
-
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan append-task \
-  --plan-address {PA} \
-  --task-id T4 \
-  --task-title "Accessibility Review" \
-  --task-agent "reviewer-accessibility" \
-  --task-priority 1 \
-  --task-complexity low \
-  --task-body "## Accessibility Review
-Changed files:
-{newline-separated changed_files list}
-Apply SKIP detection rule from verdict-schema.md first.
-If SKIP applies, emit SKIP verdict immediately.
-Otherwise, review for ARIA attributes, color-only signals, keyboard parity.
-Return structured verdict per verdict-schema.md."
-```
+Store the returned `plan_ref` as `{PA}`. Completion criterion: `plan_ref` is non-empty and the
+result has `task_count=4`.
 
 ---
 
@@ -174,7 +162,7 @@ Return structured verdict per verdict-schema.md."
 Create the team:
 
 ```text
-TeamCreate(team_name="multi-review-{slug}")
+TeamCreate(team_name="multi-{review_slug}")
 ```
 
 Dispatch all four workers simultaneously. Do NOT wait between spawns — all four are independent
@@ -186,28 +174,28 @@ SAM task tells `dh:task-worker` which specialist profile to load via `profile_lo
 
 ```text
 Agent(
-  team_name="multi-review-{slug}",
+  team_name="multi-{review_slug}",
   name="security-worker",
   subagent_type="dh:task-worker",
   prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on security review. Your task: {PA}/T1.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T1\")"
 )
 
 Agent(
-  team_name="multi-review-{slug}",
+  team_name="multi-{review_slug}",
   name="performance-worker",
   subagent_type="dh:task-worker",
   prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on performance review. Your task: {PA}/T2.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T2\")"
 )
 
 Agent(
-  team_name="multi-review-{slug}",
+  team_name="multi-{review_slug}",
   name="quality-worker",
   subagent_type="dh:task-worker",
   prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on quality review. Your task: {PA}/T3.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T3\")"
 )
 
 Agent(
-  team_name="multi-review-{slug}",
+  team_name="multi-{review_slug}",
   name="accessibility-worker",
   subagent_type="dh:task-worker",
   prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on accessibility review. Your task: {PA}/T4.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T4\")"
@@ -313,7 +301,7 @@ Security: APPROVE (0 findings) | Performance: REJECT (1 finding) | Quality: APPR
 TeamDelete cleans up the team after all workers are done:
 
 ```text
-TeamDelete(team_name="multi-review-{slug}")
+TeamDelete(team_name="multi-{review_slug}")
 ```
 
 ---
@@ -326,13 +314,13 @@ flowchart TD
     Parse --> Files["git diff --name-only range → changed_files list"]
     Files --> Empty{changed_files empty?}
     Empty -->|Yes| Abort[ABORT — no changed files to review]
-    Empty -->|No| Slug[Derive slug from --slug or --issue or git branch]
-    Slug --> CheckPlan["sam_plan(action='list', search='review-{slug}')"]
+    Empty -->|No| Slug[Derive review_slug once]
+    Slug --> CheckPlan["sam_plan(config: list + search)"]
     CheckPlan --> PlanExists{Plan with slug exists?}
     PlanExists -->|Yes — reuse| PlanAddr["Store existing plan address as {PA}"]
-    PlanExists -->|No — create| CreatePlan["sam_plan(action='create', slug='review-{slug}', tasks=[T1..T4])"]
+    PlanExists -->|No — create| CreatePlan["sam_plan(config: create + T1..T4)"]
     CreatePlan --> PlanAddr
-    PlanAddr --> Team["TeamCreate(team_name='multi-review-{slug}')"]
+    PlanAddr --> Team["TeamCreate(team_name='multi-{review_slug}')"]
     Team --> Parallel[Dispatch 4 workers in parallel — no wait between spawns]
     Parallel --> W1["Agent(name='security-worker', subagent_type='dh:task-worker')"]
     Parallel --> W2["Agent(name='performance-worker', subagent_type='dh:task-worker')"]
@@ -357,13 +345,14 @@ The ephemeral plan always has exactly four tasks:
 
 | Task | Perspective | Agent field | dependencies |
 |------|-------------|-------------|--------------|
-| T1 | Security | `reviewer-security` | `[]` |
-| T2 | Performance | `reviewer-performance` | `[]` |
-| T3 | Quality | `reviewer-quality` | `[]` |
-| T4 | Accessibility | `reviewer-accessibility` | `[]` |
+| T1 | Security | `dh:reviewer-security` | `[]` |
+| T2 | Performance | `dh:reviewer-performance` | `[]` |
+| T3 | Quality | `dh:reviewer-quality` | `[]` |
+| T4 | Accessibility | `dh:reviewer-accessibility` | `[]` |
 
 All four tasks have `dependencies: []` — they are independent and run in parallel. The
-`agent:` field is read internally by `dh:task-worker` via `sam_task(action='read')` and passed
+`agent:` field is read internally by `dh:task-worker` via
+`mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})` and passed
 to `profile_load` to load the specialist reviewer behavior. The orchestrator always passes only
 the task reference `{PA}/T{N}` to the worker prompt.
 
@@ -373,8 +362,7 @@ the task reference `{PA}/T{N}` to the worker prompt.
 
 - **SKIP is a passing outcome.** A perspective that SKIPs is not a blocker.
 - **All four verdicts must arrive before the gate runs.** Do not apply the gate on partial results.
-- **Check-or-create prevents plan accumulation.** Always call `sam_plan(action='list')` before
-  `sam_plan(action='create')`.
+- **Check-or-create prevents plan accumulation.** Always list by search before creating.
 - **Dispatch uses `dh:task-worker` exclusively.** Specialist behavior is selected through the task profile.
 - **Do not embed the verdict schema or UI pattern list.** Reference
   [./references/verdict-schema.md](./references/verdict-schema.md) for all schema definitions.

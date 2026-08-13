@@ -13,7 +13,7 @@ The 7 bare stage names used as workflow skill directory names under `plugins/dev
 | S1 | `discovery` | Understand the feature request, identify constraints, and survey the codebase state before any planning occurs. | `plugins/development-harness/skills/discovery/SKILL.md` |
 | S2 | `planning` | Produce a structured plan covering solution architecture, acceptance tests, risk assessment, and RT-ICA completeness gate. | `plugins/development-harness/skills/planning/SKILL.md` |
 | S3 | `context-integration` | Validate the S2 plan against actual codebase state, resolving gaps and updating the plan artifact before task decomposition. | `plugins/development-harness/skills/context-integration/SKILL.md` |
-| S4 | `task-decomposition` | Break the validated plan into executable, independently-delegatable task files with acceptance criteria and dependency ordering. | `plugins/development-harness/skills/task-decomposition/SKILL.md` |
+| S4 | `task-decomposition` | Break the validated plan into executable, independently-delegatable task records with acceptance criteria and dependency ordering. | `plugins/development-harness/skills/task-decomposition/SKILL.md` |
 | S5 | `execution` | Implement each task using language-appropriate specialist agents; produce execution artifacts per task. | `plugins/development-harness/skills/execution/SKILL.md` |
 | S6 | `forensic-review` | Verify each executed task against its acceptance criteria; identify regressions, gaps, and quality violations. | `plugins/development-harness/skills/forensic-review/SKILL.md` |
 | S7 | `final-verification` | Certify the complete feature against the original discovery and acceptance criteria; produce a CERTIFIED or NOT_CERTIFIED verdict. | `plugins/development-harness/skills/final-verification/SKILL.md` |
@@ -29,7 +29,7 @@ skill_activation: /dh:discovery
 purpose: Understand the feature request, identify constraints, and survey the codebase state before any planning occurs.
 inputs: Feature description, codebase root path, any prior context files
 outputs: DISCOVERY artifact containing problem framing, constraint inventory, affected surfaces, and open questions
-artifact_access: artifact_register(item_id, "feature-context", path, agent, content=...) / artifact_read(item_id, "feature-context")
+artifact_access: artifact_register(item_id=item_id, artifact_type="feature-context", artifact_id=artifact_id, agent=agent, content=content) / artifact_read(item_id=item_id, artifact_type="feature-context")
 ```
 
 #### S2 — `planning`
@@ -41,7 +41,7 @@ skill_activation: /dh:planning
 purpose: Produce a structured plan covering solution architecture, acceptance tests, risk assessment, and RT-ICA completeness gate.
 inputs: DISCOVERY artifact, codebase context
 outputs: PLAN artifact with architecture, acceptance tests in Given/When/Then format, risk assessment, task skeletons, and RT-ICA gate result
-artifact_access: artifact_register(item_id, "architect", path, agent, content=...) / artifact_read(item_id, "architect")
+artifact_access: artifact_register(item_id=item_id, artifact_type="architect", artifact_id=artifact_id, agent=agent, content=content) / artifact_read(item_id=item_id, artifact_type="architect")
 ```
 
 #### S3 — `context-integration`
@@ -53,7 +53,7 @@ skill_activation: /dh:context-integration
 purpose: Validate the S2 plan against actual codebase state, resolving gaps and updating the plan artifact before task decomposition.
 inputs: PLAN artifact, live codebase read access
 outputs: Amended PLAN artifact with resolved gaps, confirmed assumptions, and updated constraints
-artifact_access: artifact_read(item_id, "architect") / artifact_register(item_id, "architect", path, agent, content=...)
+artifact_access: artifact_read(item_id=item_id, artifact_type="architect") / artifact_register(item_id=item_id, artifact_type="architect", artifact_id=artifact_id, agent=agent, content=content)
 ```
 
 #### S4 — `task-decomposition`
@@ -62,10 +62,10 @@ artifact_access: artifact_read(item_id, "architect") / artifact_register(item_id
 stage_id: S4
 name: task-decomposition
 skill_activation: /dh:task-decomposition
-purpose: Break the validated plan into executable, independently-delegatable task files with acceptance criteria and dependency ordering.
+purpose: Break the validated plan into executable, independently-delegatable task records with acceptance criteria and dependency ordering.
 inputs: Amended PLAN artifact
-outputs: One TASK file per work unit, with acceptance criteria, agent routing, and dependency graph
-artifact_access: sam_plan(action=create, slug, goal, tasks=[...], issue=issue_number) / sam_task(plan, task, config={action:read})
+outputs: One TASK record per work unit, with acceptance criteria, agent routing, and dependency graph
+artifact_access: sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": tasks, "issue": issue_number}) / sam_task(plan=plan_ref, task=task_id, config={"action": "read"})
 ```
 
 #### S5 — `execution`
@@ -75,9 +75,9 @@ stage_id: S5
 name: execution
 skill_activation: /dh:execution
 purpose: Implement each task using language-appropriate specialist agents; produce execution artifacts per task.
-inputs: TASK file, quality gate commands from language manifest
+inputs: TASK record, quality gate commands from language manifest
 outputs: EXECUTION artifact per task containing implementation evidence and quality gate results
-artifact_access: sam_task(plan, task, config={action:read}) / sam_task(plan, task, config={action:update, append_section="Execution Results", section_content=...})
+artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}) / sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": "Execution Results", "section_content": content})
 ```
 
 #### S6 — `forensic-review`
@@ -87,9 +87,9 @@ stage_id: S6
 name: forensic-review
 skill_activation: /dh:forensic-review
 purpose: Verify each executed task against its acceptance criteria; identify regressions, gaps, and quality violations.
-inputs: TASK file, EXECUTION artifact, codebase diff
+inputs: TASK record, EXECUTION artifact, codebase diff
 outputs: REVIEW artifact per task with pass/fail per acceptance criterion and remediation instructions
-artifact_access: sam_task(plan, task, config={action:read}) / sam_task(plan, task, config={action:update, append_section="Review Results", section_content=...})
+artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}) / sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": "Review Results", "section_content": content})
 ```
 
 #### S7 — `final-verification`
@@ -101,7 +101,7 @@ skill_activation: /dh:final-verification
 purpose: Certify the complete feature against the original discovery and acceptance criteria; produce a CERTIFIED or NOT_CERTIFIED verdict.
 inputs: DISCOVERY artifact, all REVIEW artifacts, codebase state
 outputs: VERIFICATION artifact with per-criterion verdict and overall CERTIFIED or NOT_CERTIFIED determination
-artifact_access: sam_task(plan, task, config={action:read}) / sam_task(plan, task, config={action:update, append_section="Final Verification", section_content=...})
+artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}) / sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": "Final Verification", "section_content": content})
 ```
 
 ---

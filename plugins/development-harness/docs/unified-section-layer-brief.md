@@ -1,157 +1,98 @@
-# Design Brief: Unified Section Layer for backlog_core
+# Design Brief: Unified Section Layer for `backlog_core`
 
-Surfaced through code review and conversation, 2026-06-05.
-This brief must be handed to the discovery and architecture agents before any
-planning begins. It contains constraints that the codebase alone will not reveal.
+This contributor brief defines the section-wire contract. Consumer workflows must use the
+configured backlog MCP/CLI operations and must not parse provider bodies, cache files, or wire
+timestamps themselves.
 
----
+## Outcome
 
-## Root Cause
+Make every section use one addressable entry representation. Preserve the logical section and
+entry model across GitHub, Beads, SQLite, and memory providers while keeping provider-specific
+serialization inside each adapter.
 
-The writer was never enforced. Two rendering paths exist because prose sections
-were added after entry sections without holding the line on format:
+Completion criterion: a read, append, replace, strike, `since`, or show operation returns the
+same logical result regardless of the selected provider, or returns an explicit unavailable or
+stale outcome when that provider cannot supply it.
 
-- **Entry sections**: `## Header\n\n<div><sub>{timestamp}</sub>content</div>`
-- **Prose sections**: `## Header\n\nplain text`
+## Root cause
 
-Every complexity downstream — `_sections_from_body_or_yaml`, the YAML fallback,
-the subset check, the two-path read logic — is a symptom of this writer
-inconsistency. The fix is at the writer, not the reader.
+The writer was not enforced. Entry sections use timestamped `<div>` blocks while prose sections
+can still be emitted as plain text. Readers consequently contain fallback parsing, YAML/body
+reconciliation, and synthetic-ID branches. Fix the writer and adapter boundary; do not add a
+third reader path.
 
----
+## Canonical logical contract
 
-## Constraint 1: Zero-timestamp IDs are invalid
+The unified layer owns these operations:
 
-`_build_sections_metadata` generates synthetic IDs with a zero timestamp when
-parsing a body that has no `<div>` blocks. This is not a parsing limitation —
-it is a writer failure that the reader papered over.
+- `write_entry_section(name, entries)` for tracked discrete entries;
+- `write_prose_section(name, text)` for one freeform entry;
+- read, append, replace, strike, `show`, and `since` operations over logical entries.
 
-A zero-timestamp ID is not unique. Multiple entries written this way get the
-same ID, silently breaking:
-- `since` filtering — all entries look like epoch
-- deduplication — different entries are indistinguishable
-- struck tracking — cannot reliably target a specific entry
+Every emitted entry has an opaque stable `id`, content, and provider-normalized timestamp
+metadata. The `<div><sub>...</sub>...</div>` block is the GitHub-compatible wire primitive,
+but callers never write that markup directly. Local providers may use native structured rows;
+their adapters must expose the same logical result without pretending to be GitHub.
 
-**The zero-timestamp fallback must be eliminated entirely.** It must not survive
-into the unified layer in any form.
+### ID and timestamp rules
 
----
+1. Never emit or preserve a zero timestamp as an entry ID. It cannot support ordering,
+   deduplication, strike targeting, or `since` filtering.
+2. Prefer an explicit entry write timestamp. When a legacy entry lacks one, derive a deterministic
+   baseline from the adapter's authoritative item creation metadata, section identity, and
+   position: `{item_created_at}-{section_name}-{position_index}`. The baseline must be non-empty,
+   stable for the same input, and unique within the item.
+3. GitHub's GraphQL adapter reads raw `createdAt` and `updatedAt` fields and converts them at the
+   adapter boundary to the canonical timestamp fields. Do not expose `createdAt` as a universal
+   domain field and do not make Beads, SQLite, or memory adapters fabricate GitHub wire keys.
+4. A provider that has no authoritative creation timestamp must use its own stable record
+   metadata or report that the legacy entry is unavailable for timestamp-sensitive operations;
+   it must not substitute `0000-00-00` or an epoch sentinel.
+5. Suffix duplicate IDs deterministically only after the authoritative baseline is chosen.
 
-## Constraint 2: Real IDs are always derivable
+## Read and migration behavior
 
-The GitHub issue `createdAt` is available on every item. When an entry has no
-explicit write timestamp, the correct baseline is:
+Use one logical read path:
 
-```
-{issue.createdAt}-{section_name}-{position_index}
-```
+1. Ask the configured provider for the item/section.
+2. Let the adapter decode its native representation into logical sections and entries.
+3. Normalize legacy plain-text content once through the writer, using the adapter's creation
+   metadata for the baseline ID.
+4. Apply `show`/`since` in the logical layer and return the result.
 
-This gives a non-colliding ID that:
-- sorts correctly relative to entries with real timestamps
-- is deterministic (same input → same ID, safe to regenerate)
-- is unique within an issue (section + index suffix)
+The YAML or private provider cache is downstream state, never a second source of entry IDs.
+Use it as an optimization only when its revision matches the provider result. If content is
+served from a remote provider's cache, mark it stale; if no record can be obtained, propagate
+an unavailable error. Do not silently replace remote data with a local file or claim that a
+queued write reached the remote provider.
 
-The architecture must use this baseline for any entry that arrives without a
-real timestamp. There is no valid case for a zero-timestamp ID.
+## Mechanical boundary
 
----
+Known-input parsing, search, filtering, section addressing, artifact lookup, plan lookup, and
+progress counting belong in scripts, CLI commands, or MCP tools. Consumer instructions should
+name the operation and interpret its returned evidence; they should not reproduce a grep,
+parser, filter pipeline, or multi-call state update. Keep unique evidence interpretation,
+diagnosis, synthesis, and design decisions in the agent reasoning layer.
 
-## Constraint 3: All sections use the same wire format
+## Contributor acceptance criteria
 
-The unified layer must enforce one wire format for all sections — prose and
-entry alike. The `<div>` block is the correct primitive because it already
-carries the ID and timestamp that makes entries addressable.
+- [ ] All section writers route through the unified layer; no provider adapter writes an
+  unwrapped section when it claims the canonical wire contract.
+- [ ] No reader or migration path creates a zero-timestamp ID.
+- [ ] GitHub `createdAt`/`updatedAt` conversion is confined to the GitHub adapter and tests cover
+  both raw wire keys and canonical fields.
+- [ ] Beads uses its native `bd` records/KV store without a GitHub-shaped cache; SQLite and memory
+  remain native local providers.
+- [ ] Remote cache reads expose `stale`; queued writes expose `pending`; missing or unavailable
+  provider data remains an error.
+- [ ] `show` and `since` operate on normalized logical entries, with deterministic duplicate-ID
+  handling.
+- [ ] Consumer docs point to MCP/CLI/script operations for mechanical lookup and leave evidence
+  interpretation to the agent.
 
-For prose sections, the wrapper is one `<div>` block containing the full prose
-text as its content. The ID is derived per Constraint 2.
+## Out of scope
 
-**Callers never write raw `<div>` tags.** The unified layer provides:
-- `write_entry_section(name, entries)` — list of tracked discrete items
-- `write_prose_section(name, text)` — freeform text, wrapped as single entry
-
-The layer decides the wire format. No caller bypasses it.
-
----
-
-## Constraint 4: The reader becomes trivial
-
-Once the writer is enforced, every body has `<div>` blocks on every section.
-The reader has one path:
-
-1. Parse `<div>` blocks → extract real IDs and timestamps
-2. Associate each block with its owning `##`/`###` header
-
-`_sections_from_body_or_yaml`, the YAML subset check, and the zero-timestamp
-avoidance logic are all deleted. They exist only to compensate for writer
-inconsistency.
-
----
-
-## Constraint 5: Migration path for existing items
-
-Items already written in the old format (plain `##` headers, no `<div>` blocks)
-must be migrated on first read or first write — not left as a permanent
-special case.
-
-On first read of a plain-text section: wrap it using the `createdAt` baseline
-ID (Constraint 2), write it back through the unified writer, then return the
-normalised form. This is a one-time migration per item, not a permanent
-two-path read.
-
----
-
-## Constraint 6: The YAML cache is downstream, not a source of truth
-
-The YAML local cache stores structured `Section` objects with entry IDs. Those
-IDs come from the wire format. If the wire format is unified, the YAML cache
-is always consistent with it — there is no divergence to handle.
-
-`_build_sections_from_yaml_item` may survive as an optimisation (avoid
-re-parsing the body when the YAML is fresh), but it must never be the fallback
-for missing IDs. The body is always the source of truth for IDs.
-
----
-
-## Known affected systems (preliminary — codebase analysis will expand this)
-
-| File | Role |
-|---|---|
-| `backlog_core/github_sync.py` | `render_issue_body`, `_render_section_entries` — primary writers |
-| `backlog_core/gh_client.py` | body write paths, groomed section appending |
-| `backlog_core/parsing.py` | `## Story`, `## Description`, `## Acceptance Criteria` construction |
-| `backlog_core/operations.py` | `_build_sections_metadata`, `_build_sections_from_yaml_item`, `_sections_from_body_or_yaml`, `_paginate_body_result` |
-| `backlog_core/rendering.py` | groomed section rendering |
-| `backlog_core/backends/sqlite_backend.py` | direct `## heading\n\n` writes |
-| `backlog_core/backends/memory_backend.py` | direct `## heading\n\n` writes |
-| `backlog_core/backends/beads_artifact_provider.py` | section handling |
-
----
-
-## Open questions for the architecture agent
-
-1. Does a "markdown navigator system" already exist partially in the codebase,
-   or does it need to be built from scratch? Search for any existing section
-   abstraction layer before designing a new one.
-
-2. Are there other rendering inconsistencies beyond prose vs entry sections?
-   The codebase analysis agent must audit all write paths for any section
-   format that bypasses the `<div>` wrapper.
-
-3. What is the correct behaviour when a body arrives from an external source
-   (e.g. a manually edited GitHub issue) that does not use `<div>` blocks?
-   The unified layer must define a clear normalisation policy.
-
-4. Does the `since` filter need to be preserved exactly as-is, or is this an
-   opportunity to redesign it against the unified ID format?
-
----
-
-## What the architecture must NOT do
-
-- Add a third read path to handle the migration case
-- Preserve the zero-timestamp fallback for any reason
-- Leave `_sections_from_body_or_yaml` in place as a permanent bridge
-- Design the unified layer as a wrapper around the existing two paths
-
-The existing two-path complexity is the problem. The architecture replaces it,
-not wraps it.
+- Do not change the lifecycle state machine or invent provider-specific consumer workflows.
+- Do not make provider identifiers, file paths, cache roots, or GitHub API objects part of the
+  logical section contract.
+- Do not preserve a permanent dual-path reader for legacy content.

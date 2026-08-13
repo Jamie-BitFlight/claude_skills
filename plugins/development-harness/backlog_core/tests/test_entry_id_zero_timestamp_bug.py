@@ -2,7 +2,7 @@
 
 Every entry in every section returned by ``view_item`` / ``backlog_view`` has
 ``"id": "0000-00-00T00:00:00Z"`` regardless of the real timestamp persisted in
-YAML.  Two independent mechanisms destroy the real IDs at read/render time.
+the provider-owned structured item.  Two independent mechanisms destroy the real IDs at read/render time.
 
 **Mechanism 1 — GitHub-enriched path** (operations.py ~line 3269)
     ``view_enrich_from_github`` injects a plain-text body (no
@@ -10,8 +10,8 @@ YAML.  Two independent mechanisms destroy the real IDs at read/render time.
     that plain-text body, finds no ``ENTRY_RE`` matches, and falls back to
     ``f"{added_date}T00:00:00Z"`` for every entry.
 
-**Mechanism 2 — Paginated YAML path** (operations.py ~lines 3288-3290)
-    ``render_sections_as_body`` drops ``e.id`` when serialising YAML entries to
+**Mechanism 2 — Paginated structured-item path** (operations.py ~lines 3288-3290)
+    ``render_sections_as_body`` drops ``e.id`` when serialising structured entries to
     markdown (only ``e.content`` is emitted).  When pagination is active
     (``offset > 0`` or ``limit > 0``), the post-pagination metadata rebuild
     calls ``_build_sections_metadata(result.body, …)`` on that ID-stripped
@@ -27,7 +27,7 @@ where ``added_date`` defaults to ``"0000-00-00"``.
 Each test here:
 
 1. Sets up a ``BacklogItem`` with at least one ``Entry`` whose ``id`` is a real
-   ``now_iso()`` timestamp persisted in the YAML structure.
+   ``now_iso()`` timestamp persisted in the provider record.
 2. Simulates exactly the condition that triggers zero-ID output for that
    mechanism (GitHub body enrichment for M1; pagination for M2).
 3. Asserts that every entry in the returned sections carries the real persisted
@@ -44,6 +44,8 @@ from typing import TYPE_CHECKING
 from backlog_core.models import BacklogItem, Entry, Section, ViewItemResult
 from backlog_core.operations import view_item
 from backlog_core.parsing import now_iso
+
+from ._view_test_helpers import _configure_memory_view
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -109,14 +111,14 @@ def _collect_entry_ids(result: ViewItemResult) -> list[tuple[str, str]]:
 
 
 class TestMechanism1GitHubEnrichedZeroId:
-    """M1 regression: GitHub-enriched body overwrites YAML entry IDs with zero timestamps.
+    """M1 regression: GitHub-enriched body overwrites provider entry IDs with zero timestamps.
 
     ``view_enrich_from_github`` injects a plain-text body string.
     ``_assemble_view_content`` then calls ``_build_sections_metadata(body, ...)``
     on that plain-text body.  Because the body contains no
     ``<div><sub>timestamp</sub>`` wrappers, ``parse_entries`` finds no
     ``ENTRY_RE`` matches and falls back to ``f"{added_date}T00:00:00Z"`` for
-    every entry, discarding the real IDs from the YAML structure.
+    every entry, discarding the real IDs from the structured item.
 
     The test isolates M1 by: (a) providing a local item with a real entry ID,
     (b) injecting a plain-text GitHub body with NO entry-block wrappers,
@@ -124,7 +126,7 @@ class TestMechanism1GitHubEnrichedZeroId:
     """
 
     def test_github_enriched_view_item_returns_real_entry_id_not_zero(self, mocker: MockerFixture) -> None:
-        """view_item with GitHub enrichment must return the real YAML entry ID.
+        """view_item with GitHub enrichment must return the real provider entry ID.
 
         Arrange: local BacklogItem with one entry whose id is a real now_iso()
         timestamp.  GitHub enrichment injects a plain-text body (no entry-block
@@ -138,7 +140,7 @@ class TestMechanism1GitHubEnrichedZeroId:
 
         RED (pre-fix): ``_build_sections_metadata`` parses the plain-text GitHub
         body, finds no ENTRY_RE matches, and emits ``"0000-00-00T00:00:00Z"``
-        for every entry — the real YAML ID is silently discarded.
+        for every entry — the real provider ID is silently discarded.
         """
         section_name = "Acceptance Criteria"
         item, real_id = _make_item_with_real_entry(section_name)
@@ -147,18 +149,8 @@ class TestMechanism1GitHubEnrichedZeroId:
         # and GitHub enrichment injects a plain-text body for the same section.
         # The injected body contains NO <div><sub> entry-block wrappers — exactly
         # the condition that triggers M1 zero-ID production.
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
-        mocker.patch("backlog_core.operations.find_item", return_value=item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=9901)
-
         plain_text_body = f"## {section_name}\n\nThis entry has a real timestamp ID.\n"
-
-        def _inject_plain_text_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            """Simulate GitHub body enrichment with plain-text (no entry-block wrappers)."""
-            result.body = plain_text_body
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_plain_text_body)
+        _configure_memory_view(mocker, item=item, issue_num=9901, body=plain_text_body)
 
         # Act — no pagination (limit=0, offset=0) isolates M1 from M2
         result = view_item(selector="9901", include_content=True, offset=0, limit=0)
@@ -182,23 +174,23 @@ class TestMechanism1GitHubEnrichedZeroId:
                 f"Expected real id={real_id!r}. "
                 "Root cause: _build_sections_metadata parses the plain-text GitHub body "
                 "and finds no <div><sub> wrappers, so parse_entries falls back to "
-                "f'{added_date}T00:00:00Z'. Fix: preserve YAML entry IDs when enriching "
+                "f'{added_date}T00:00:00Z'. Fix: preserve provider entry IDs when enriching "
                 "from GitHub, or write entry-block wrappers into the GitHub body."
             )
             assert got_id == real_id, (
                 f"M1 (GitHub-enriched path): section={sec_name!r} entry id={got_id!r} "
                 f"does not match the real persisted id={real_id!r}. "
-                "The entry ID from the YAML structure must survive GitHub body enrichment."
+                "The entry ID from the provider record must survive GitHub body enrichment."
             )
 
 
 # ---------------------------------------------------------------------------
-# M2 — Paginated YAML path: render_sections_as_body drops e.id
+# M2 — Paginated structured-item path: render_sections_as_body drops e.id
 # ---------------------------------------------------------------------------
 
 
-class TestMechanism2PaginatedYamlZeroId:
-    """M2 regression: paginated YAML path overwrites entry IDs with zero timestamps.
+class TestMechanism2PaginatedStructuredItemZeroId:
+    """M2 regression: pagination overwrites structured-item entry IDs with zero timestamps.
 
     ``render_sections_as_body`` serialises entries as plain text (only
     ``e.content``, never ``e.id``).  When pagination is active
@@ -208,16 +200,16 @@ class TestMechanism2PaginatedYamlZeroId:
     ``result.sections`` produced by ``_build_sections_from_yaml_item``.
 
     The test isolates M2 by: (a) providing a local item with a real entry ID,
-    (b) making GitHub enrichment unavailable (returns False) so only the YAML
-    path runs, (c) passing limit=1 to activate the pagination branch.
+    (b) using a provider item without an issue reference so no enrichment runs,
+    (c) passing an offset to activate the pagination branch.
     """
 
-    def test_paginated_yaml_view_item_returns_real_entry_id_not_zero(self, mocker: MockerFixture) -> None:
-        """view_item with pagination on a YAML item must return the real entry ID.
+    def test_paginated_provider_view_item_returns_real_entry_id_not_zero(self, mocker: MockerFixture) -> None:
+        """view_item with pagination on a provider item must return the real entry ID.
 
         Arrange: local BacklogItem with one entry whose id is a real now_iso()
-        timestamp.  GitHub enrichment returns False (backend unreachable) so the
-        YAML path is the sole source.
+        timestamp.  The item has no issue reference, so the provider record is
+        the sole source.
 
         Act: view_item(include_content=True, offset=1, limit=0) — pagination
         active (offset>0 sets paginate=True), no GitHub enrichment.
@@ -235,13 +227,7 @@ class TestMechanism2PaginatedYamlZeroId:
         section_name = "Acceptance Criteria"
         item, real_id = _make_item_with_real_entry(section_name)
 
-        # Patch the operations layer — GitHub backend is unreachable so only the
-        # YAML path executes.  parse_issue_selector returns None to ensure
-        # view_enrich_from_github is never called (no issue number to enrich from).
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
-        mocker.patch("backlog_core.operations.find_item", return_value=item)
-        # No GitHub issue number: view_item skips the enrichment branch entirely
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=None)
+        _configure_memory_view(mocker, item=item)
 
         # Act — offset=1 activates the pagination branch (paginate=True) while
         # keeping the section content in the returned body, isolating M2.
@@ -253,22 +239,22 @@ class TestMechanism2PaginatedYamlZeroId:
 
         # Assert — result.sections must be populated
         assert result.sections, (
-            "M2 (paginated YAML): result.sections must not be empty. "
+            "M2 (paginated provider item): result.sections must not be empty. "
             "If empty, check that the BacklogItem has at least one entry and "
             "that render_sections_as_body produced a non-empty body."
         )
 
         entry_pairs = _collect_entry_ids(result)
         assert entry_pairs, (
-            "M2 (paginated YAML): no entries found in result.sections. "
-            "The section must contain the entry from the YAML BacklogItem. "
+            "M2 (paginated provider item): no entries found in result.sections. "
+            "The section must contain the entry from the provider BacklogItem. "
             "offset=1 skips the '## Sections' index line so the 'Acceptance Criteria' "
             "section and its entry remain in the paginated body."
         )
 
         for sec_name, got_id in entry_pairs:
             assert not got_id.startswith(_ZERO_ID_PREFIX), (
-                f"M2 (paginated YAML path): section={sec_name!r} entry id={got_id!r} "
+                f"M2 (paginated provider path): section={sec_name!r} entry id={got_id!r} "
                 f"is the zero-timestamp default from entry_blocks.py:158. "
                 f"Expected real id={real_id!r}. "
                 "Root cause: render_sections_as_body drops e.id (only e.content is emitted); "
@@ -279,9 +265,9 @@ class TestMechanism2PaginatedYamlZeroId:
                 "the _build_sections_metadata overwrite when result.sections is already correct."
             )
             assert got_id == real_id, (
-                f"M2 (paginated YAML path): section={sec_name!r} entry id={got_id!r} "
+                f"M2 (paginated provider path): section={sec_name!r} entry id={got_id!r} "
                 f"does not match the real persisted id={real_id!r}. "
-                "The entry ID from the YAML structure must survive pagination."
+                "The entry ID from the provider record must survive pagination."
             )
 
 

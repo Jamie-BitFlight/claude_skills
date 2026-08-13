@@ -22,6 +22,8 @@ import pytest
 from backlog_core.models import BacklogItem, ValidationError
 from backlog_core.operations import _resolve_groomed_content, groom_item
 
+from ._view_test_helpers import _configure_memory_view
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
@@ -59,16 +61,9 @@ def test_groom_item_mark_groomed_no_content_does_not_call_update_item(mocker: Mo
     update_item is never called when has_input evaluates to False.
     """
     # Arrange
-    fake_item = MagicMock(spec=BacklogItem)
-    fake_item.file_path = None
-    fake_item.issue = None
-
-    mocker.patch("backlog_core.operations.parse_backlog", return_value=[fake_item])
-    mocker.patch("backlog_core.operations.find_item", return_value=fake_item)
+    fake_item = BacklogItem(title="test-item")
+    _configure_memory_view(mocker, item=fake_item)
     mock_update_item = mocker.patch("backlog_core.operations.update_item")
-    # mark_groomed path tries a second parse_backlog + find_item; item.file_path=None
-    # and item.issue=None means neither the metadata nor GitHub label branch executes,
-    # so no further mocking is required.
 
     # Act
     result = groom_item(selector="test-item", mark_groomed=True)
@@ -85,12 +80,8 @@ def test_groom_item_mark_groomed_with_content_calls_update_item(mocker: MockerFi
     test confirms that Fix 2 did not accidentally suppress the normal write path.
     """
     # Arrange
-    fake_item = MagicMock(spec=BacklogItem)
-    fake_item.file_path = None
-    fake_item.issue = None
-
-    mocker.patch("backlog_core.operations.parse_backlog", return_value=[fake_item])
-    mocker.patch("backlog_core.operations.find_item", return_value=fake_item)
+    fake_item = BacklogItem(title="test-item")
+    _configure_memory_view(mocker, item=fake_item)
     mock_update_item = mocker.patch("backlog_core.operations.update_item", return_value={"groomed_updated": True})
 
     # Act
@@ -119,18 +110,9 @@ def test_groom_item_mark_groomed_skipped_when_item_not_found_after_reparse(mocke
     Fix 3: when fresh_item is None, emit out.warn() and set result["mark_groomed_skipped"]=True.
     """
     # Arrange — first find_item call (initial lookup) returns item, second (re-lookup) returns None
-    fake_item = MagicMock(spec=BacklogItem)
-    fake_item.file_path = None
-    fake_item.issue = None
-
-    find_item_call_count = {"n": 0}
-
-    def find_item_side_effect(items: object, selector: object) -> BacklogItem | None:
-        find_item_call_count["n"] += 1
-        return fake_item if find_item_call_count["n"] == 1 else None
-
-    mocker.patch("backlog_core.operations.parse_backlog", return_value=[fake_item])
-    mocker.patch("backlog_core.operations.find_item", side_effect=find_item_side_effect)
+    fake_item = BacklogItem(title="vanishing-item")
+    backend = _configure_memory_view(mocker, item=fake_item)
+    mocker.patch.object(backend, "list_work_items", side_effect=[[fake_item], []])
     mocker.patch("backlog_core.operations.update_item", return_value={"updated": True})
     mock_update_metadata = mocker.patch("backlog_core.operations.update_item_metadata")
     mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")

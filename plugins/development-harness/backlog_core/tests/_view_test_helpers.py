@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogItem, Section, ViewItemResult
 
 if TYPE_CHECKING:
@@ -48,18 +50,35 @@ def _make_local_item(title: str = "Issue 2495") -> BacklogItem:
     return BacklogItem(title=title, sections={"Acceptance Criteria": Section()})
 
 
-def _patch_github_body(mocker: MockerFixture, issue_num: int, body: str) -> None:
-    """Patch the operations layer so view_item enriches from a controlled body."""
-    local_item = _make_local_item()
-    mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-    mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-    mocker.patch("backlog_core.operations.parse_issue_selector", return_value=issue_num)
+def _configure_memory_view(
+    mocker: MockerFixture,
+    *,
+    item: BacklogItem | None = None,
+    issue_num: int | None = None,
+    body: str | None = None,
+    reachable: bool = True,
+) -> InMemoryBackend:
+    backend = InMemoryBackend()
+    if item is not None:
+        if issue_num is not None:
+            item = BacklogItem.model_validate({**item.model_dump(), "issue": f"#{issue_num}"})
+        backend.put_work_item(item)
 
-    def _inject_body(result: ViewItemResult, issue: str, repo: str = "") -> bool:
-        result.body = body
+    def _enrich(result: ViewItemResult, issue: str, repo: str = "") -> bool:
+        if not reachable:
+            return False
+        if body is not None:
+            result.body = body
         return True
 
-    mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+    mocker.patch.object(backend, "view_enrich_from_github", side_effect=_enrich)
+    mocker.patch("backlog_core.operations.get_config", return_value=BacklogConfig(backend=backend))
+    return backend
+
+
+def _patch_github_body(mocker: MockerFixture, issue_num: int, body: str) -> None:
+    """Patch the operations layer so view_item enriches from a controlled body."""
+    _configure_memory_view(mocker, item=_make_local_item(), issue_num=issue_num, body=body)
 
 
 def _resp_body(resp: dict[str, object]) -> str:
@@ -113,6 +132,7 @@ __all__ = [
     "_FILLER",
     "_HUGE_SINGLE",
     "_OVER_BUDGET_BODY",
+    "_configure_memory_view",
     "_make_local_item",
     "_patch_github_body",
     "_resp_body",

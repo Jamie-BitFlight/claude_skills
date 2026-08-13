@@ -20,8 +20,12 @@ os.environ.setdefault("MAX_MCP_OUTPUT_TOKENS", "4900")
 from typing import TYPE_CHECKING
 
 import pytest
+from backlog_core.backend_protocol import reset_config, set_config
+from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.memory_backend import InMemoryBackend
 from sam_schema.core.action_models import TaskDefinition
-from sam_schema.core.backends.memory import InMemoryTaskProvider
+from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.backends.local_yaml import _plan_to_plan_data
 from sam_schema.core.models import Complexity, Plan, Priority, Task, TaskStatus
 from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
@@ -87,24 +91,32 @@ def make_task_def(
     })
 
 
+def seed_plan(backend: ContentTaskProvider, plan_id: str, plan: Plan) -> None:
+    backend._plans[plan_id] = _plan_to_plan_data(plan, plan_id)
+    backend._flush(plan_id)
+
+
 # ---------------------------------------------------------------------------
 # Backend fixture
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def memory_backend() -> Generator[InMemoryTaskProvider, None, None]:
-    """Inject a fresh InMemoryTaskProvider via set_task_config.
-
-    Calls reset_task_config() in teardown to prevent cross-test contamination.
-
-    Yields:
-        Configured InMemoryTaskProvider instance.
-    """
-    backend = InMemoryTaskProvider()
+@pytest.fixture(autouse=True)
+def content_backend(monkeypatch: pytest.MonkeyPatch) -> Generator[ContentTaskProvider, None, None]:
+    provider = InMemoryBackend()
+    backend = ContentTaskProvider(provider)
+    set_config(BacklogConfig(backend=provider))
     set_task_config(TaskConfig(backend=backend))
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
+    monkeypatch.setattr("sam_schema.sam_plan._backend", lambda: backend)
     yield backend
     reset_task_config()
+    reset_config()
+
+
+@pytest.fixture
+def memory_backend(content_backend: ContentTaskProvider) -> ContentTaskProvider:
+    return content_backend
 
 
 # ---------------------------------------------------------------------------

@@ -59,7 +59,7 @@
         "Search Python language manifest",
         "Resolve design-spec role (e.g. python-engineering:python-cli-design-spec)",
         "Dispatch design-spec agent",
-        "Verify artifact_list(artifact_type='architect')",
+        "Verify artifact_list(item_id={issue}, artifact_type='architect')",
         "Phase 4: swarm-task-planner"
       ],
       "crosses_into_files": ["skills/add-new-feature/SKILL.md"],
@@ -75,7 +75,7 @@
         "Search TypeScript language manifest",
         "Resolve design-spec role",
         "Dispatch design-spec agent",
-        "Verify artifact_list(artifact_type='architect')",
+        "Verify artifact_list(item_id={issue}, artifact_type='architect')",
         "Phase 4: swarm-task-planner"
       ],
       "crosses_into_files": ["skills/add-new-feature/SKILL.md"],
@@ -91,7 +91,7 @@
         "Search Rust language manifest",
         "Resolve design-spec role",
         "Dispatch design-spec agent",
-        "Verify artifact_list(artifact_type='architect')",
+        "Verify artifact_list(item_id={issue}, artifact_type='architect')",
         "Phase 4: swarm-task-planner"
       ],
       "crosses_into_files": ["skills/add-new-feature/SKILL.md"],
@@ -106,7 +106,7 @@
         "No language manifest marker",
         "Fallback: dh:task-worker (no specialist profile loaded)",
         "Dispatch dh:task-worker as architect",
-        "Verify artifact_list(artifact_type='architect')",
+        "Verify artifact_list(item_id={issue}, artifact_type='architect')",
         "Phase 4: swarm-task-planner"
       ],
       "crosses_into_files": [],
@@ -121,7 +121,7 @@
         "Manifest exists",
         "Resolve design-spec role from manifest",
         "Dispatch design-spec agent",
-        "Verify artifact_list(artifact_type='architect')",
+        "Verify artifact_list(item_id={issue}, artifact_type='architect')",
         "Phase 4: swarm-task-planner"
       ],
       "crosses_into_files": ["skills/add-new-feature/SKILL.md"],
@@ -136,7 +136,7 @@
         "Manifest absent",
         "Fallback: dh:task-worker (no specialist profile loaded)",
         "Dispatch dh:task-worker as architect",
-        "Verify artifact_list(artifact_type='architect')",
+        "Verify artifact_list(item_id={issue}, artifact_type='architect')",
         "Phase 4: swarm-task-planner"
       ],
       "crosses_into_files": [],
@@ -308,7 +308,7 @@
         "Step 4: Monitor all batch agents for completion",
         "Step 4a: contract-verification per completed task",
         "Step 4b: SendMessage shutdown per teammate",
-        "Step 5: sam_plan(action='status') — all batch tasks complete",
+        "Step 5: the sam_plan status result shows all batch tasks complete",
         "If checkpoint → Wave-Completion Confirmation Gate (user yes/no before next batch)",
         "If full_auto → skip gate, proceed immediately",
         "If tasks remain → loop back to step 2",
@@ -372,7 +372,7 @@
       "branch_condition": "No — spawned via single Agent call",
       "path": [
         "Agent is not a teammate",
-        "Re-spawn agent with same task file path and task ID",
+        "Re-spawn agent with the same opaque plan_ref and task_id",
         "SubagentStop hook updates status on completion"
       ],
       "crosses_into_files": ["skills/start-task/SKILL.md"],
@@ -394,7 +394,7 @@
       "branch_condition": "No — still silent",
       "path": [
         "No response within 2 min",
-        "Re-spawn agent with same task file path and task ID",
+        "Re-spawn agent with the same opaque plan_ref and task_id",
         "SubagentStop hook updates status on completion"
       ],
       "crosses_into_files": ["skills/start-task/SKILL.md"],
@@ -409,7 +409,7 @@
         "Phase 1: @dh:feature-researcher → feature-context-{slug}.md (artifact_register)",
         "Phase 2: @dh:codebase-analyzer → codebase-{focus}-{slug}.md per focus area (artifact_register)",
         "Phase 3: design-spec agent → architect spec (artifact_register, artifact_type='architect')",
-        "Phase 4: @dh:swarm-task-planner → sam_plan(action='create') → task plan P{N} auto-registers task-plan artifact",
+        "Phase 4: @dh:swarm-task-planner runs the sam_plan create action; backlog_update associates the returned opaque plan_ref with the owner",
         "Phase 5: @dh:plan-validator → validation gate (pass required to proceed)",
         "Phase 6: @dh:dh-context-gathering → context manifest",
         "SUCCESS → hands off to implement-feature"
@@ -423,7 +423,7 @@
       "from_fork": "implement-feature.COMPLETION",
       "branch_condition": "All tasks show COMPLETE",
       "path": [
-        "Progress Loop: sam_plan(action='status') → all tasks COMPLETE",
+        "Progress Loop: the sam_plan status result shows all tasks COMPLETE",
         "Completion Gate: Skill(skill='complete-implementation', args='{task_file_path}')"
       ],
       "crosses_into_files": ["skills/complete-implementation/SKILL.md"],

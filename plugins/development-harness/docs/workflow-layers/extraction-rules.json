@@ -2,10 +2,10 @@
   "1": ["numbered or bulleted step with actor + action text", "wave headers with step lists"],
   "2": ["conditional guards: If --quick, When BACKLOG_BACKEND=, Skip when:, Only if:"],
   "3": [
-    "artifact reads: artifact_read(...), backlog_view(..., section=...), sam_plan(action='status')"
+    "artifact reads: artifact_read(...), backlog_view(..., section=...), sam_plan status action"
   ],
   "4": [
-    "artifact writes: artifact_register(content=...), backlog_groom(section=..., content=...), sam_plan(action='create')"
+    "artifact writes: artifact_register(content=...), backlog_groom(section=..., content=...), sam_plan create action"
   ],
   "5": ["agent dispatch: subagent_type='dh:...', TeamCreate(team_name=...), named wave members"],
   "6": [

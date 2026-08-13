@@ -1,18 +1,3 @@
-"""Tests — SAM server routes all tools through TaskBackend via sam_task / sam_plan.
-
-Test groups:
-    1. Backend routing — each tool calls the expected TaskBackend method
-       (not query / yaml_reader / yaml_writer) via get_task_config().backend
-    2. Exception handling — PlanNotFoundError / TaskNotFoundError from the backend
-       propagate as fastmcp.exceptions.ToolError (MCP isError=true), not {"error": "..."} dicts
-    3. Module initialisation — server.py source contains set_task_config and
-       create_task_backend at module level (not inside a function)
-    4. Structural — server.py source has no direct query / yaml_reader / yaml_writer
-       imports after the refactor
-
-No @pytest.mark.asyncio decorators — asyncio_mode = "auto" is set in pyproject.toml.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -20,17 +5,18 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.models import ContentKind, ContentRecord, ContentRef, ContentWrite
 from dh_core.operations import _validated_task_patch
 from fastmcp.exceptions import ToolError
 from pytest_mock import MockerFixture  # ruff: ignore[unused-import] — available for future use
+from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
-from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
-from sam_schema.server import _sam_plan_create, _sam_plan_read, mcp
+from sam_schema.server import _get_backend, _sam_plan_read, mcp
 
 from tests.helpers import call_mcp_tool
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -120,16 +106,7 @@ _MINIMAL_TASKS_LIST = [
 
 
 @pytest.fixture
-def backend_mock() -> Generator[MagicMock, None, None]:
-    """Inject a MagicMock TaskBackend via set_task_config for test isolation.
-
-    Configures default return values for all Protocol methods so tool code
-    can reach the assertion point without crashing after T04. Calls
-    reset_task_config() in teardown to prevent cross-test contamination.
-
-    Yields:
-        Configured MagicMock satisfying the TaskBackend Protocol surface.
-    """
+def backend_mock(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock_backend = MagicMock()
     mock_backend.read_plan.return_value = _PLAN_DATA
     mock_backend.read_task.return_value = _TASK_DATA
@@ -143,9 +120,8 @@ def backend_mock() -> Generator[MagicMock, None, None]:
     mock_backend.update_task_fields.return_value = None
     mock_backend.append_task_section.return_value = None
 
-    set_task_config(TaskConfig(backend=mock_backend))
-    yield mock_backend
-    reset_task_config()
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: mock_backend)
+    return mock_backend
 
 
 # ---------------------------------------------------------------------------
@@ -169,12 +145,10 @@ async def test_sam_read_plan_only_routes_through_backend_read_plan(backend_mock:
     backend_mock.read_plan.assert_called_once_with("P1")
 
 
-def test_sam_plan_read_keeps_flat_plan_shape_with_fallback_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Fallback warnings are additive top-level fields, not a ReadResult wrapper."""
-    local_fallback = MagicMock()
-    local_fallback.last_read_source = "local"
-    local_fallback.read_plan.return_value = _PLAN_DATA
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: local_fallback)
+def test_sam_plan_read_keeps_flat_plan_shape(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = MagicMock()
+    backend.read_plan.return_value = _PLAN_DATA
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
 
     response = _sam_plan_read("P1", "plan")
 
@@ -182,7 +156,6 @@ def test_sam_plan_read_keeps_flat_plan_shape_with_fallback_warning(monkeypatch: 
 
     assert isinstance(response, ReadResult)
     assert response.plan.feature == "test-feature"
-    assert response.warnings == ["Plan P1 served from local cache — Gist copy may be unavailable or predates this fix."]
 
 
 async def test_sam_read_with_task_routes_through_backend_read_task(backend_mock: MagicMock) -> None:
@@ -359,6 +332,37 @@ async def test_sam_create_routes_through_backend_create_plan(backend_mock: Magic
     assert slug_value == "test-slug"
 
 
+async def test_sam_create_persists_opaque_owner_in_one_content_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an empty provider-backed MCP server whose writes are observable.
+    provider = InMemoryBackend()
+    writes: list[ContentWrite] = []
+    original_put = provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(provider, "put_content", record_write)
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: ContentTaskProvider(provider))
+
+    # When: the MCP create action receives an opaque owner reference.
+    result = await _call(
+        "sam_plan",
+        {
+            "config": {
+                "action": "create",
+                "slug": "owned-plan",
+                "goal": "Persist ownership",
+                "owner_reference": "bd-a1b2",
+            }
+        },
+    )
+
+    # Then: exactly one content write creates the owned plan.
+    assert [write.owner_reference for write in writes] == ["bd-a1b2"]
+    assert provider.get_content(ContentRef(kind=ContentKind.PLAN, name=result["plan_id"])).owner_reference == "bd-a1b2"
+
+
 async def test_sam_update_plan_fields_routes_through_backend_update_plan_fields(backend_mock: MagicMock) -> None:
     """sam_plan action=update calls backend.update_plan_fields.
 
@@ -373,6 +377,38 @@ async def test_sam_update_plan_fields_routes_through_backend_update_plan_fields(
 
     # Assert
     backend_mock.update_plan_fields.assert_called_once()
+
+
+async def test_sam_update_persists_fields_and_owner_in_one_content_write(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: an existing provider-backed plan and observable writes after creation.
+    provider = InMemoryBackend()
+    task_provider = ContentTaskProvider(provider)
+    plan = task_provider.create_plan("owned-update", "persist atomically", [], owner_reference="bd-old")
+    writes: list[ContentWrite] = []
+    original_put = provider.put_content
+
+    def record_write(request: ContentWrite) -> ContentRecord:
+        writes.append(request)
+        return original_put(request)
+
+    monkeypatch.setattr(provider, "put_content", record_write)
+    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: ContentTaskProvider(provider))
+
+    # When: the MCP update action changes context and ownership.
+    result = await _call(
+        "sam_plan",
+        {
+            "plan": plan["plan_id"],
+            "config": {"action": "update", "context": "updated by MCP", "owner_reference": "bd-new"},
+        },
+    )
+
+    # Then: one write carries both changes and fresh hydration observes them.
+    assert result["updated"] is True
+    assert [write.owner_reference for write in writes] == ["bd-new"]
+    fresh_provider = ContentTaskProvider(provider)
+    assert fresh_provider.read_plan(plan["plan_id"])["context"] == "updated by MCP"
+    assert provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan["plan_id"])).owner_reference == "bd-new"
 
 
 async def test_sam_update_task_fields_routes_through_backend_update_task(backend_mock: MagicMock) -> None:
@@ -507,40 +543,22 @@ async def test_sam_claim_raises_tool_error_when_backend_raises_plan_not_found(ba
 
 
 # ---------------------------------------------------------------------------
-# Group 3: Module initialisation — set_task_config called at module level
 # ---------------------------------------------------------------------------
 
 
-def test_server_module_source_calls_set_task_config() -> None:
-    """server.py source contains a call to set_task_config.
-
-    After T04, the module must call set_task_config(TaskConfig(backend=...))
-    at import time so that get_task_config() succeeds without manual setup.
-    This structural check ensures the initialisation is present in the source.
-
-    Why: Without module-level initialisation, a fresh import leaves
-    get_task_config() raising RuntimeError, breaking all 8 MCP tools.
-    """
+def test_server_module_uses_backlog_content_provider() -> None:
     import sam_schema.server as server_module
 
     source = inspect.getsource(server_module)
-    assert "set_task_config" in source
+    assert "get_backlog_config" in source
+    assert "ContentProvider" in source
 
 
-def test_server_module_source_calls_create_task_backend() -> None:
-    """server.py source contains a call to create_task_backend.
-
-    After T04, the backend instance must be obtained via the factory function
-    create_task_backend(), which honours the TASKBACKEND env var and
-    .dh/config.yaml, rather than directly constructing LocalYamlTaskProvider.
-
-    Why: Direct construction bypasses backend selection, breaking env-based
-    backend switching used in tests and CI.
-    """
+def test_server_module_constructs_content_task_provider() -> None:
     import sam_schema.server as server_module
 
     source = inspect.getsource(server_module)
-    assert "create_task_backend" in source
+    assert "ContentTaskProvider(provider)" in source
 
 
 # ---------------------------------------------------------------------------
@@ -662,15 +680,13 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     from pathlib import Path as _Path
 
     from ruamel.yaml import YAML
-    from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, Task, TaskStatus
-    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+    from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 
     # Arrange: create plan via LocalYamlTaskProvider so the file is real YAML
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(
+    minimal_task = Task(
         id="T01",
         title="Task One",
         status=TaskStatus.NOT_STARTED,
@@ -679,35 +695,26 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
         complexity=Complexity.LOW,
     )
     backend = LocalYamlTaskProvider(p_dir)
-    set_task_config(TaskConfig(backend=backend))
-    try:
-        result = _sam_plan_create(CreatePlanConfig(slug="roundtrip", goal="Goal", tasks=[minimal_task]), str(p_dir))
-        assert isinstance(result, CreatePlanResult), f"sam_create failed: {result}"
-        plan_id = result.plan_id
-        plan_path = _Path(p_dir) / f"{plan_id}.yaml"
+    plan_id = backend.create_plan("roundtrip", "Goal", [minimal_task])["plan_id"]
+    plan_path = _Path(p_dir) / f"{plan_id}.yaml"
 
-        # Act: update task with a Task model that has non-empty dependencies
-        task_data = backend.read_task(plan_id, "T01")
-        updated_task = Task.model_validate({**task_data, "dependencies": ["T01", "T02"]})
-        backend.update_task(plan_id, updated_task)
+    task_data = backend.read_task(plan_id, "T01")
+    updated_task = Task.model_validate({**task_data, "dependencies": ["T01", "T02"]})
+    backend.update_task(plan_id, updated_task)
 
-        # Assert: read the raw YAML file — dependencies must be a sequence, not a string
-        yaml = YAML()
-        loaded = yaml.load(plan_path)
-        # Navigate to the task in the loaded structure
-        tasks_raw = loaded.get("tasks") or loaded.get("task") or []
-        if not isinstance(tasks_raw, list):
-            tasks_raw = [tasks_raw]
-        t01 = next((t for t in tasks_raw if t.get("task") == "T01" or t.get("id") == "T01"), None)
-        assert t01 is not None, f"Could not find T01 in raw YAML: {dict(loaded)}"
-        deps_raw = t01.get("dependencies", [])
-        assert isinstance(deps_raw, list), (
-            f"Expected list for 'dependencies' in YAML but got {type(deps_raw).__name__!r}: {deps_raw!r}\n"
-            "This is the str() coercion bug — update_task must write YAML sequences."
-        )
-        assert list(deps_raw) == ["T01", "T02"], f"Expected ['T01', 'T02'] but got: {list(deps_raw)!r}"
-    finally:
-        reset_task_config()
+    yaml = YAML()
+    loaded = yaml.load(plan_path)
+    tasks_raw = loaded.get("tasks") or loaded.get("task") or []
+    if not isinstance(tasks_raw, list):
+        tasks_raw = [tasks_raw]
+    t01 = next((t for t in tasks_raw if t.get("task") == "T01" or t.get("id") == "T01"), None)
+    assert t01 is not None, f"Could not find T01 in raw YAML: {dict(loaded)}"
+    deps_raw = t01.get("dependencies", [])
+    assert isinstance(deps_raw, list), (
+        f"Expected list for 'dependencies' in YAML but got {type(deps_raw).__name__!r}: {deps_raw!r}\n"
+        "This is the str() coercion bug — update_task must write YAML sequences."
+    )
+    assert list(deps_raw) == ["T01", "T02"], f"Expected ['T01', 'T02'] but got: {list(deps_raw)!r}"
 
 
 async def test_sam_update_set_fields_json_writes_via_update_task(backend_mock: MagicMock) -> None:
@@ -758,15 +765,13 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
         1. returned Task.parallelize_with == ["T01", "T02"]
         2. model_dump() produces a single key for the field (no duplication)
     """
-    from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, TaskStatus
-    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
+    from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 
     # Arrange: create a plan with a task that has no parallelize_with entries
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
-    minimal_task = TaskDefinition(
+    minimal_task = Task(
         id="T01",
         title="Task One",
         status=TaskStatus.NOT_STARTED,
@@ -775,57 +780,29 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
         complexity=Complexity.LOW,
     )
     backend = LocalYamlTaskProvider(p_dir)
-    set_task_config(TaskConfig(backend=backend))
-    try:
-        result = _sam_plan_create(CreatePlanConfig(slug="kebabmerge", goal="Goal", tasks=[minimal_task]), str(p_dir))
-        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
-        plan_id = result.plan_id
+    plan_id = backend.create_plan("kebabmerge", "Goal", [minimal_task])["plan_id"]
 
-        # Act: patch parallelize-with using the MCP wire (kebab-case) key
-        raw_fields: dict = {"parallelize-with": ["T01", "T02"]}
-        patched_task = _validated_task_patch(backend, plan_id, "T01", raw_fields)
+    raw_fields: dict = {"parallelize-with": ["T01", "T02"]}
+    patched_task = _validated_task_patch(backend, plan_id, "T01", raw_fields)
 
-        # Assert 1: field value is correct
-        assert patched_task.parallelize_with == ["T01", "T02"], (
-            f"Expected ['T01', 'T02'] but got {patched_task.parallelize_with!r}.\n"
-            "This is the kebab/snake key collision bug from #1528 Fix 1."
-        )
+    assert patched_task.parallelize_with == ["T01", "T02"], (
+        f"Expected ['T01', 'T02'] but got {patched_task.parallelize_with!r}.\n"
+        "This is the kebab/snake key collision bug from #1528 Fix 1."
+    )
 
-        # Assert 2: model_dump produces exactly one key for the parallelize field — no duplication
-        dumped = patched_task.model_dump()
-        assert "parallelize_with" in dumped, "Expected 'parallelize_with' snake_case key in model_dump()"
-        assert "parallelize-with" not in dumped, (
-            "Unexpected 'parallelize-with' key found in model_dump() — "
-            "this means both snake and kebab keys survived the merge."
-        )
-    finally:
-        reset_task_config()
+    dumped = patched_task.model_dump()
+    assert "parallelize_with" in dumped, "Expected 'parallelize_with' snake_case key in model_dump()"
+    assert "parallelize-with" not in dumped, (
+        "Unexpected 'parallelize-with' key found in model_dump() — "
+        "this means both snake and kebab keys survived the merge."
+    )
 
 
-def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> None:
-    """sam_task action=update with a kebab-case field persists the value correctly in YAML.
+async def test_sam_update_kebab_case_field_roundtrips_through_provider() -> None:
+    from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 
-    Integration regression guard for Fix 1 in #1528: after patching parallelize-with
-    via the MCP sam_task update action, the stored YAML must contain a proper sequence,
-    not a repr string or an empty list.
-
-    Arrange: create a plan with one task via LocalYamlTaskProvider.
-    Act: call sam_task update with set_fields_json={"parallelize-with": ["T01", "T02"]}.
-    Assert: raw YAML file contains parallelize-with as a list, not a repr string.
-    """
-    import asyncio
-    from pathlib import Path as _Path
-
-    from ruamel.yaml import YAML
-    from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Complexity, CreatePlanResult, Priority, TaskStatus
-    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
-
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-    minimal_task = TaskDefinition(
+    backend = _get_backend("ignored")
+    minimal_task = Task(
         id="T01",
         title="Task One",
         status=TaskStatus.NOT_STARTED,
@@ -833,176 +810,84 @@ def test_sam_update_kebab_case_field_roundtrips_through_yaml(tmp_path: Path) -> 
         priority=Priority.HIGH,
         complexity=Complexity.LOW,
     )
-    backend = LocalYamlTaskProvider(p_dir)
-    set_task_config(TaskConfig(backend=backend))
-    try:
-        result = _sam_plan_create(CreatePlanConfig(slug="kebabint", goal="Goal", tasks=[minimal_task]), str(p_dir))
-        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
-        plan_id = result.plan_id
+    plan_id = backend.create_plan("kebabint", "Goal", [minimal_task])["plan_id"]
 
-        # Act: update via the MCP handler using the kebab-case wire key
-        update_result = asyncio.run(
-            _call(
-                "sam_task",
-                {
-                    "plan": plan_id,
-                    "task": "T01",
-                    "config": {"action": "update", "set_fields_json": {"parallelize-with": ["T01", "T02"]}},
-                },
-            )
-        )
-        assert "error" not in update_result, f"sam_task update failed: {update_result}"
+    update_result = await _call(
+        "sam_task",
+        {
+            "plan": plan_id,
+            "task": "T01",
+            "config": {"action": "update", "set_fields_json": {"parallelize-with": ["T01", "T02"]}},
+        },
+    )
 
-        # Assert: read raw YAML back and verify parallelize-with is a list
-        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}.*")) + list(_Path(p_dir).glob(f"{plan_id}-*"))
-        assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
-        yaml = YAML()
-        loaded = yaml.load(plan_yaml_files[0])
-        tasks_raw = loaded.get("tasks") or []
-        t01 = next((t for t in tasks_raw if t.get("task") == "T01" or t.get("id") == "T01"), None)
-        assert t01 is not None, f"T01 not found in raw YAML. Keys: {list(loaded.keys())}"
-        pw_raw = t01.get("parallelize-with", t01.get("parallelize_with", []))
-        assert isinstance(pw_raw, list), (
-            f"Expected list for 'parallelize-with' in YAML but got {type(pw_raw).__name__!r}: {pw_raw!r}\n"
-            "Fix 1 in #1528 should have prevented the kebab/snake merge collision."
-        )
-        assert list(pw_raw) == ["T01", "T02"], f"Expected ['T01', 'T02'] but got: {list(pw_raw)!r}"
-    finally:
-        reset_task_config()
+    assert "error" not in update_result, f"sam_task update failed: {update_result}"
+    assert _get_backend("ignored").read_task(plan_id, "T01")["parallelize_with"] == ["T01", "T02"]
 
 
-def test_sam_plan_update_serializes_list_model_fields_as_dicts(tmp_path: Path) -> None:
-    """sam_plan update with acceptance-criteria-structured stores plain dicts, not model reprs.
+async def test_sam_plan_update_persists_list_model_fields_as_dicts() -> None:
+    backend = _get_backend("ignored")
+    plan_id = backend.create_plan("acstest", "Goal", [])["plan_id"]
+    ac_value = [
+        {
+            "criterion-id": "AC01",
+            "description": "The thing works",
+            "check-command": "echo ok",
+            "expected-baseline": "any",
+            "expected-final": "pass",
+        }
+    ]
 
-    Regression guard for Fix 2 in #1528: model_dump(by_alias=True) without mode='json'
-    returns AcceptanceCriterion instances for list[AcceptanceCriterion] fields.
-    ruamel.yaml serializes those as Python repr strings. mode='json' ensures the values
-    are JSON-native dicts before passing to the backend.
+    update_result = await _call(
+        "sam_plan",
+        {
+            "plan": plan_id,
+            "config": {"action": "update", "set_fields_json": {"acceptance-criteria-structured": ac_value}},
+        },
+    )
 
-    Arrange: create a plan; update it with a structured acceptance criterion via MCP.
-    Act: read the plan back via backend.read_plan.
-    Assert: acceptance-criteria-structured is a list of dicts, not model reprs.
-    """
-    import asyncio
-
-    from sam_schema.core.action_models import CreatePlanConfig
-    from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import CreatePlanResult
-    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
-
-    # Arrange
-    p_dir = tmp_path / "plan"
-    p_dir.mkdir()
-    backend = LocalYamlTaskProvider(p_dir)
-    set_task_config(TaskConfig(backend=backend))
-    try:
-        result = _sam_plan_create(CreatePlanConfig(slug="acstest", goal="Goal", tasks=[]), str(p_dir))
-        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
-        plan_id = result.plan_id
-
-        # Act: update the plan with a structured acceptance criterion via MCP call
-        # Using _call (MCP handler) so the discriminated-union config deserialization runs
-        ac_value = [
-            {
-                "criterion-id": "AC01",
-                "description": "The thing works",
-                "check-command": "echo ok",
-                "expected-baseline": "any",
-                "expected-final": "pass",
-            }
-        ]
-        update_result = asyncio.run(
-            _call(
-                "sam_plan",
-                {
-                    "plan": plan_id,
-                    "plan_dir": str(p_dir),
-                    "config": {"action": "update", "set_fields_json": {"acceptance-criteria-structured": ac_value}},
-                },
-            )
-        )
-        assert "error" not in update_result, f"sam_plan update failed: {update_result}"
-
-        # Assert: read the plan back — acceptance_criteria_structured must be list of dicts
-        plan_data = backend.read_plan(plan_id)
-        acs = plan_data.get("acceptance-criteria-structured") or plan_data.get("acceptance_criteria_structured") or []
-        assert isinstance(acs, list), f"Expected list but got {type(acs).__name__!r}: {acs!r}"
-        assert len(acs) == 1, f"Expected 1 criterion but got {len(acs)}: {acs!r}"
-        first = acs[0]
-        assert isinstance(first, dict), (
-            f"Expected dict for criterion but got {type(first).__name__!r}: {first!r}\n"
-            "This is the model_dump without mode='json' bug from #1528 Fix 2 — "
-            "AcceptanceCriterion instances must be serialized to dicts."
-        )
-        criterion_id = first.get("criterion-id") or first.get("criterion_id")
-        assert criterion_id == "AC01", f"Expected criterion-id 'AC01' but got: {criterion_id!r}"
-    finally:
-        reset_task_config()
+    assert "error" not in update_result, f"sam_plan update failed: {update_result}"
+    acs = _get_backend("ignored").read_plan(plan_id).get("acceptance_criteria_structured") or []
+    assert isinstance(acs, list), f"Expected list but got {type(acs).__name__!r}: {acs!r}"
+    assert len(acs) == 1, f"Expected 1 criterion but got {len(acs)}: {acs!r}"
+    first = acs[0]
+    assert isinstance(first, dict), f"Expected dict for criterion but got {type(first).__name__!r}: {first!r}"
+    criterion_id = first.get("criterion-id") or first.get("criterion_id")
+    assert criterion_id == "AC01", f"Expected criterion-id 'AC01' but got: {criterion_id!r}"
 
 
-def test_sam_plan_update_list_field_no_repr_in_yaml(tmp_path: Path) -> None:
-    """sam_plan update does not write AcceptanceCriterion repr strings to YAML.
-
-    Regression guard for Fix 2 in #1528: raw YAML must not contain the class name
-    'AcceptanceCriterion' anywhere — that would mean Pydantic model instances were
-    passed to ruamel.yaml instead of plain dicts.
-
-    Arrange: create a plan; update acceptance-criteria-structured via MCP.
-    Act: read the raw YAML file.
-    Assert: 'AcceptanceCriterion' does not appear anywhere in the YAML content.
-    """
-    import asyncio
+def test_local_yaml_plan_update_list_field_has_no_model_repr(tmp_path: Path) -> None:
     from pathlib import Path as _Path
 
-    from sam_schema.core.action_models import CreatePlanConfig
+    from dh_core.operations import update_plan_fields
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import CreatePlanResult
-    from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     backend = LocalYamlTaskProvider(p_dir)
-    set_task_config(TaskConfig(backend=backend))
-    try:
-        result = _sam_plan_create(CreatePlanConfig(slug="noreprtest", goal="Goal", tasks=[]), str(p_dir))
-        assert isinstance(result, CreatePlanResult), f"sam_plan create failed: {result}"
-        plan_id = result.plan_id
+    plan_id = backend.create_plan("noreprtest", "Goal", [])["plan_id"]
+    ac_value = [
+        {
+            "criterion-id": "AC01",
+            "description": "No repr allowed",
+            "check-command": "echo pass",
+            "expected-baseline": "any",
+            "expected-final": "pass",
+        }
+    ]
 
-        # Act: update the plan with a structured acceptance criterion via MCP call
-        ac_value = [
-            {
-                "criterion-id": "AC01",
-                "description": "No repr allowed",
-                "check-command": "echo pass",
-                "expected-baseline": "any",
-                "expected-final": "pass",
-            }
-        ]
-        update_result = asyncio.run(
-            _call(
-                "sam_plan",
-                {
-                    "plan": plan_id,
-                    "plan_dir": str(p_dir),
-                    "config": {"action": "update", "set_fields_json": {"acceptance-criteria-structured": ac_value}},
-                },
-            )
-        )
-        assert "error" not in update_result, f"sam_plan update failed: {update_result}"
+    update_plan_fields(backend, plan_id, set_fields={"acceptance-criteria-structured": ac_value})
 
-        # Assert: raw YAML must not contain the Pydantic class name
-        plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}.*")) + list(_Path(p_dir).glob(f"{plan_id}-*"))
-        assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
-        raw_content = plan_yaml_files[0].read_text()
-        assert "AcceptanceCriterion" not in raw_content, (
-            "Found 'AcceptanceCriterion' in raw YAML — Pydantic model instances were "
-            "serialized as repr strings instead of dicts.\n"
-            "This is the model_dump without mode='json' bug from #1528 Fix 2.\n"
-            f"YAML content snippet: {raw_content[:500]!r}"
-        )
-    finally:
-        reset_task_config()
+    plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}.*")) + list(_Path(p_dir).glob(f"{plan_id}-*"))
+    assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
+    raw_content = plan_yaml_files[0].read_text()
+    assert "AcceptanceCriterion" not in raw_content, (
+        "Found 'AcceptanceCriterion' in raw YAML — Pydantic model instances were "
+        "serialized as repr strings instead of dicts.\n"
+        "This is the model_dump without mode='json' bug from #1528 Fix 2.\n"
+        f"YAML content snippet: {raw_content[:500]!r}"
+    )
 
 
 # ---------------------------------------------------------------------------

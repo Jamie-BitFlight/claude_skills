@@ -1,13 +1,14 @@
 """Tests for sync_issues_graphql() in backlog_core/gh_client.py.
 
-Covers: pagination delegation, since-filter passthrough, callback invocation,
-timestamp read/write, and error propagation.
+Covers pagination delegation, explicit since-filter passthrough, callback invocation,
+and error propagation. Checkpoint persistence belongs to the provider-owned cache.
 
 All PyGithub boundary objects are mocked — no live API calls.
 """
 
 from __future__ import annotations
 
+import inspect
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -17,8 +18,6 @@ from backlog_core.gh_client import sync_issues_graphql
 from backlog_core.models import BacklogError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 
@@ -147,65 +146,13 @@ class TestSyncIssuesGraphqlCallbackCalledPerIssue:
 
 
 # ---------------------------------------------------------------------------
-# TestSyncIssuesGraphqlTimestampRead
+# TestSyncIssuesGraphqlCheckpointBoundary
 # ---------------------------------------------------------------------------
 
 
-class TestSyncIssuesGraphqlTrackTimestampReadsLastSync:
-    """When track_timestamp=True and .last_sync exists, its value is passed as since."""
-
-    def test_sync_issues_graphql_track_timestamp_reads_last_sync(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """Arrange: .last_sync file contains a timestamp; track_timestamp=True; since=None.
-        Act: call sync_issues_graphql.
-        Assert: _fetch_issues_graphql called with since equal to the file content.
-        """
-        # Arrange
-        repo = _make_mock_repo(mocker)
-        stored_ts = "2024-06-01T12:00:00+00:00"
-        last_sync_file = tmp_path / ".last_sync"
-        last_sync_file.write_text(stored_ts, encoding="utf-8")
-
-        mocker.patch("backlog_core.gh_client._dh_paths.state_root", return_value=tmp_path)
-        mock_fetch = mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=[])
-
-        # Act
-        sync_issues_graphql(repo, "test-owner", "test-repo", track_timestamp=True)
-
-        # Assert
-        call_kwargs = mock_fetch.call_args
-        assert call_kwargs.kwargs["since"] == stored_ts
-
-
-# ---------------------------------------------------------------------------
-# TestSyncIssuesGraphqlTimestampWrite
-# ---------------------------------------------------------------------------
-
-
-class TestSyncIssuesGraphqlTrackTimestampWritesAfterFetch:
-    """When track_timestamp=True, .last_sync is written after a successful fetch."""
-
-    def test_sync_issues_graphql_track_timestamp_writes_after_fetch(
-        self, mocker: MockerFixture, tmp_path: Path
-    ) -> None:
-        """Arrange: no existing .last_sync; track_timestamp=True.
-        Act: call sync_issues_graphql.
-        Assert: .last_sync file is created and contains a valid ISO timestamp.
-        """
-        # Arrange
-        repo = _make_mock_repo(mocker)
-        mocker.patch("backlog_core.gh_client._dh_paths.state_root", return_value=tmp_path)
-        mocker.patch("backlog_core.gh_client._fetch_issues_graphql", return_value=[])
-
-        # Act
-        sync_issues_graphql(repo, "test-owner", "test-repo", track_timestamp=True)
-
-        # Assert
-        last_sync_file = tmp_path / ".last_sync"
-        assert last_sync_file.exists()
-        written = last_sync_file.read_text(encoding="utf-8").strip()
-        # Should parse as a valid ISO datetime
-        parsed = datetime.fromisoformat(written)
-        assert parsed.tzinfo is not None
+class TestSyncIssuesGraphqlCheckpointBoundary:
+    def test_sync_issues_graphql_has_no_track_timestamp_parameter(self) -> None:
+        assert "track_timestamp" not in inspect.signature(sync_issues_graphql).parameters
 
 
 # ---------------------------------------------------------------------------

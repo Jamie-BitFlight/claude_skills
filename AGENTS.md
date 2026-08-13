@@ -298,6 +298,17 @@ discarding an unexpected diff (`git checkout`, `git restore`, `git reset --hard`
 and confirm it is unintended rather than assuming it is an agent artifact — an unexplained change
 is a reason to investigate and ask, not a reason to revert.
 
+### Branch-transfer preflight
+
+1. Before branch switching, selective checkout or cherry-pick, stash cleanup, or source-branch deletion, run
+   `uv run scripts/audit_branch_transfer.py --source <source-ref> --base <base-ref> --target <target-ref> --manifest <manifest.json>`.
+2. Build the compact JSON manifest using the schema in `uv run scripts/audit_branch_transfer.py --help`; record
+   each source-only commit and changed path as transferred, intentionally excluded with a non-empty reason, or
+   preserved by a named recovery ref.
+
+Complete the operation only when the guard emits `{"ok":true}`: the manifest accounts for every source-only
+commit and changed path.
+
 ## Testing Patterns
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`
@@ -316,12 +327,9 @@ is a reason to investigate and ask, not a reason to revert.
 
 ## Type Checking
 
-Two type checkers run in CI:
-
-1. **ty** (Astral, primary) — `uv run ty check .`. `mypy` is legacy and being migrated away from
-   this repo's own code; plugin-facing *documentation* keeps mypy as a secondary option since
-   external plugin users may still run it.
-2. **basedpyright** (secondary) — run via `pep723-loader`
+This repository enforces **ty** (Astral) only: `uv run ty check .`. `mypy`,
+`pyright`, and `basedpyright` are not repository quality gates; references to
+them in plugin-facing documentation describe options for external plugin users.
 
 ### Known ty overrides (in `pyproject.toml [tool.ty]`)
 
@@ -349,7 +357,6 @@ Quality Gate requires ALL of these to pass:
 | Job | What it does |
 |-----|-------------|
 | `lint-python` | Ruff lint + format (via prek) |
-| `typecheck-python` | basedpyright |
 | `typecheck-ty` | ty (Astral) |
 | `lint-js` | Biome (JS/TS/JSON) |
 | `lint-markdown` | markdownlint-cli2 |
@@ -361,6 +368,9 @@ Quality Gate requires ALL of these to pass:
 | `test-node` | npm test (if defined) |
 
 ## Backlog & Planning System
+
+Before creating or updating Beads, skills, or persistent agent memories, load `writing-for-agents`; write ordered
+steps with checkable, exhaustive completion criteria and keep each shared reference in one source.
 
 ### Backlog (provider-native plus structured MCP operations)
 

@@ -1,5 +1,8 @@
 # Backlog MCP Package — Architecture Spec
 
+> **Audience: contributor/developer.** This document describes package seams, ownership, and
+> implementation constraints for maintainers; consumer setup and usage belong in the plugin docs.
+>
 > **Status: target architecture.** The provider-owned `FileCache` boundary described here is the
 > required end state. Direct YAML access and independently selected artifact/task providers named
 > as migration debt below remain in the current implementation until the linked implementation
@@ -12,11 +15,15 @@ Extract all business logic from `.claude/skills/backlog/scripts/backlog.py` into
 1. **CLI wrapper** (`backlog.py`) — Typer CLI, calls operations module
 2. **MCP server** (`server.py`) — FastMCP 3.x, calls operations module
 
-## Source File
+## Historical Source File
 
-All logic originates from: `.claude/skills/backlog/scripts/backlog.py`
+The extracted logic originated in `.claude/skills/backlog/scripts/backlog.py`; current runtime
+ownership is defined by the package modules and configured backend contracts below.
 
-Each agent MUST read the full source file and extract ONLY the functions assigned to their module.
+Use the source and focused tests as truth surfaces. To enumerate definitions before moving code, run
+`rg -n '^(async )?(def|class) ' plugins/development-harness/backlog_core`; validate the ownership
+boundary with `uv run pytest plugins/development-harness/backlog_core/tests/test_import_boundaries.py -q`.
+Do not treat this document's approximate line references as an extraction checklist.
 
 ## Storage Ownership and File Cache
 
@@ -49,9 +56,9 @@ The cache owns all local persistence needed for remote-provider continuity:
 text; `merge_item` merges local and remote items with conflict resolution rules. It performs no
 cache I/O.
 
-**Bulk migration**: `scripts/migrate_backlog_to_yaml.py` converts an existing backlog directory
-from `.md` frontmatter files to `.yaml` format in-place. It uses `yaml_io.load_item` and
-`yaml_io.save_item` and deletes the source `.md` file after a successful write.
+**Bulk migration**: `scripts/migrate_backlog_to_yaml.py` scans legacy Markdown and delegates
+conversion, serialisation, and round-trip verification to `FileCache`. The script renames a source
+`.md` to `.md.bak` only after the cache-owned conversion succeeds.
 
 ## Module Dependency Graph
 
@@ -60,7 +67,7 @@ models.py             ← standalone, no imports from other mcp modules
 backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
 parsing.py            ← imports from models; pure parsing, selection, and transformation helpers
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
-yaml_io.py            ← private YAML codec imported only by file_cache.py and migration tooling
+yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
@@ -285,8 +292,9 @@ reader that falls back to the legacy `.md` parser during migration.
 
 **Imports from other modules**: `from .models import BacklogItem`, `from .parsing import parse_item_file`
 
-**Allowed consumer**: `file_cache.py` and explicit migration tooling only. Runtime imports from
-`operations.py`, `server.py`, or backend-neutral helpers are architecture violations.
+**Allowed consumer**: `file_cache.py` only. Migration tooling invokes its `FileCache` API rather
+than importing the codec. Runtime imports from `operations.py`, `server.py`, or backend-neutral
+helpers are architecture violations.
 
 ---
 
@@ -316,8 +324,8 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 - Concurrent provider changes produce an explicit conflict and retain the pending mutation.
 - Failed synchronization never discards cached content or queued work.
 
-The cache-record update and queue append are one durable transaction. Every queued mutation has a
-stable idempotency key derived from its logical object, base revision, and intended content. Replay
+The cache-record update and queue append are one durable transaction owned by the remote provider.
+Every queued mutation has a stable idempotency key derived from its logical object, base revision, and intended content. Replay
 removes only mutations explicitly acknowledged by the provider; after a partial replay, applied
 entries remain checkpointed and every unapplied, conflicted, or failed entry remains queued.
 
@@ -328,14 +336,15 @@ may access the cache directly.
 
 ## Module: reconciliation.py
 
-**Responsibility**: Filesystem-free reconciliation policy used internally by remote-capable
+**Responsibility**: Pure, filesystem-free reconciliation policy used internally by remote-capable
 backends. It compares normalized provider snapshots with logical cached records, applies canonical
-merge and field-ownership rules, and returns cache/provider actions plus outcome counts.
+merge and field-ownership rules, and returns persistence/provider actions, checkpoint decisions, and
+outcome counts. It never reads or writes YAML, cache paths, checkpoints, or queues.
 
 The module imports only models and pure parse/render/merge helpers. It does not import
 `backend_protocol.py`, `operations.py`, `file_cache.py`, `yaml_io.py`, provider clients, or path
 resolvers. The owning backend supplies snapshots and records, executes returned actions through its
-private provider adapter and `FileCache`, then reports a `ReconcileResult`.
+private provider adapter and `FileCache`, applies checkpoint decisions, then reports a `ReconcileResult`.
 
 ---
 
@@ -452,16 +461,19 @@ implementation details.
 
   class ContentKind(StrEnum):
       PLAN = "plan"
+      DISPATCH_PLAN = "dispatch_plan"
       ARTIFACT_MANIFEST = "artifact_manifest"
       ARTIFACT_CONTENT = "artifact_content"
 
   class ContentRef(BaseModel):
       kind: ContentKind
+      namespace: str = ""
+      artifact_type: str = ""
       name: str
 
   class ContentQuery(BaseModel):
       kind: ContentKind
-      owner_reference: str = ""
+      owner_reference: str | None = None
       search: str = ""
       offset: int = Field(default=0, ge=0)
       limit: int = Field(default=100, ge=1, le=100)
@@ -474,25 +486,42 @@ implementation details.
       stale: bool = False
       pending: bool = False
 
+  class ContentWrite(BaseModel):
+      reference: ContentRef
+      content: str
+      owner_reference: str | None = None
+      expected_revision: str = ""
+
   @runtime_checkable
   class ContentProvider(Protocol):
       def list_content(self, query: ContentQuery) -> list[ContentRecord]: ...
       def get_content(self, reference: ContentRef) -> ContentRecord: ...
-      def put_content(
-          self,
-          reference: ContentRef,
-          content: str,
-          owner_reference: str = "",
-          expected_revision: str = "",
-      ) -> ContentRecord: ...
+      def put_content(self, request: ContentWrite) -> ContentRecord: ...
   ```
 
-  `ContentRef(kind, name)` is stable identity within one project-scoped backend instance; ownership
-  is mutable record metadata and never participates in the storage key. Updating `owner_reference`
-  through `put_content()` therefore reassigns a plan atomically without copying or leaving a stale
-  record. A non-empty owner is the opaque work-item identifier from that backend; an empty value
-  means unlinked content in that backend instance's project namespace. Providers must not share
-  names across backend instances or project roots. `list_content()` provides bounded plan discovery
+  The complete `ContentRef` is storage identity. `PLAN` and `DISPATCH_PLAN` records require empty
+  `namespace` and `artifact_type`, so `(PLAN, "", "", plan_id)` and
+  `(DISPATCH_PLAN, "", "", dispatch_plan_id)` remain stable while mutable
+  `ContentRecord.owner_reference` is reassigned. `DISPATCH_PLAN` is a separate kind so
+  `ContentQuery(kind=PLAN)` only discovers SAM `PlanData`; dispatch JSON is discovered through
+  `ContentQuery(kind=DISPATCH_PLAN)` and is never parsed as `PlanData`. Artifact manifests require
+  the owning work-item reference as `namespace` and use the canonical name `manifest`. Artifact
+  content requires both the owning work-item namespace and `artifact_type`, producing
+  `(ARTIFACT_CONTENT, item_reference, artifact_type, artifact_id)`. Pydantic model validation
+  rejects references that violate these kind-specific invariants. This prevents equal artifact
+  paths on different items or under different artifact types from colliding.
+
+  For `PLAN` and `DISPATCH_PLAN` records, `ContentWrite.owner_reference=None` preserves the current
+  owner; any string, including `""`, atomically reassigns or unlinks it. For artifact kinds, ownership is fixed by
+  `ContentRef.namespace`; validation rejects a non-`None` write owner that conflicts with that
+  namespace.
+
+  An empty plan owner means unlinked content in the backend instance's project namespace.
+  For `ContentQuery`, `owner_reference=None` discovers all owners, while `owner_reference=""`
+  selects only unowned/project-level plans. This query filter is distinct from
+  `ContentWrite.owner_reference=None`, which preserves the current plan owner.
+  Providers must not share plan names across backend instances or project roots.
+  `list_content()` provides bounded plan discovery
   without requiring a known name; artifact callers normally address content directly. `revision`
   is opaque and compared only for equality. Remote offline reads may return `stale=True`; accepted
   offline writes return `pending=True`. Local-provider results set both flags false. Missing cached remote data raises
@@ -500,14 +529,18 @@ implementation details.
   the capability raises `UnsupportedCapabilityError`. No caller selects a second provider after any
   of these outcomes.
 
-  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add optional
-  `owner_reference: str = ""`. The operation rejects requests that provide both. It stringifies
-  `issue` for numeric providers and otherwise passes `owner_reference` unchanged to the configured
-  backend. This preserves existing callers while allowing opaque Beads and future provider IDs.
+  Plan create/update MCP inputs retain the existing optional numeric `issue` field and add
+  `owner_reference: str | None = None`. For update, `None` preserves ownership, a non-empty string
+  reassigns it, and explicit `""` unlinks it. For create, `None` normalizes to unlinked `""`.
+  The operation rejects `issue` together with any non-`None` owner reference, stringifies `issue`
+  for numeric providers, and otherwise passes the opaque value unchanged. This preserves existing
+  callers while allowing Beads and future provider IDs.
 - `BacklogConfig` — dataclass wrapping only the active backend instance; passed by dependency
   injection to `operations.py` and `server.py`. It does not expose a cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured
   provider, creates a `FileCache` for remote-capable providers, and injects it into that provider.
+  GitHub also privately composes its existing issue/Gist plan and artifact persistence adapters
+  behind `ContentProvider`; their provider wire formats do not escape the backend.
   Local providers are created without a cache. Resolution order is explicit name →
   `BACKLOG_BACKEND` environment variable → `backlog.backend` in `.dh/config.yaml` →
   `.beads/dh-backend` marker auto-detect → default `"github"`.
@@ -592,9 +625,8 @@ and artifact access go through `get_config().backend`.
 adapters, or local backend implementations. Existing direct YAML, provider-client, and independent
 artifact-provider access is migration debt and does not describe a permitted architecture.
 
-The same restriction applies to `reconciliation.py`: its current direct `parse_backlog`,
-`load_item`, and `save_item` usage must move behind the remote provider's `FileCache`. Reconciliation
-classifies snapshots and asks the provider to persist outcomes; it does not own filesystem storage.
+The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
+the provider to persist outcomes; it does not own filesystem storage.
 
 ---
 

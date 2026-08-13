@@ -1,5 +1,8 @@
 # Development Harness Purpose
 
+**Audience**: Mixed overview. Use this document to orient contributors and agents to the logical
+product contract; follow linked contributor references for implementation detail.
+
 ## Purpose
 
 Development Harness targets a generic agent work-management system that
@@ -162,30 +165,18 @@ MCP commands or workflow behavior.
 
 ## Current Boundary
 
-The preceding sections describe the target contract, not fully implemented
-behavior today.
+The configured backend is the single routing decision for work items, grooming, plans, tasks,
+artifact manifests, and artifact content. MCP and CLI expose interchangeable logical operations;
+`bd` remains the native interface for Beads issue graphs and readiness where that capability is
+stronger than the structured adapter.
 
-- MCP is currently the primary structured interface for many operations; the
-  CLI does not expose every MCP capability surface, and neither surface proxies
-  every provider-native tool. The authoritative list of MCP-only operations is
-  in [backend-providers.md](./backend-providers.md) "CLI vs MCP Capability
-  Surface". In Beads-backed projects, `bd` is the native interface for issue
-  graph, status, dependency, readiness, label, notes, and metadata operations.
-  Close/resolve satisfies the "delete" CRUD verb per DEC-1; no destructive
-  delete is planned.
-- CLI and MCP durability differs: MCP plan paths use Gist write-through, while
-  CLI and direct paths can remain local-only. The backlog persistence boundary
-  (GitHub Issues source of truth for the default backend; only `GitHubBackend`
-  remote-backed; branch operations not capability-gated) is documented in
-  [backend-providers.md](./backend-providers.md) "Backlog Persistence Boundary".
-- Present interfaces expose GitHub issue numbers and file or path addressing;
-  agents do not yet see only logical objects.
-- Plans and tasks are mostly provider-neutral, but select CLI and manager paths
-  remain backend-coupled.
-- Artifact manifests may use remote providers, while established content-serving
-  paths currently use or fall back to the local filesystem.
-- Backlog persistence remains partly GitHub- and filesystem-shaped.
+Remote-capable providers privately own `FileCache` for stale snapshots, durable queued offline
+mutations, revisions, and provider-specific persistence. Beads, SQLite, and Memory use native
+storage directly and never read or write backlog YAML or instantiate `FileCache`. Backend failures,
+cache misses, conflicts, and unsupported capabilities are explicit results; callers do not route
+to an independent task backend, artifact provider, local filesystem fallback, or per-plan provider.
 
-Until these boundaries are removed, consumers must treat provider neutrality and
-frontend interchangeability as target, domain-specific properties—not blanket
-properties of the current system.
+Provider IDs, issue bodies, paths, database rows, and wire formats remain implementation details.
+Consumers should use logical identifiers and the supported MCP/CLI operations. The architecture
+spec marks any remaining direct YAML or independent-provider code paths as migration debt; those
+paths are not supported workflow contracts.

@@ -8,6 +8,7 @@ parse that JSON and assert on structured fields.
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -60,6 +61,26 @@ def _write_item(backlog_dir: Path, name: str = "item1.md") -> Path:
     path = backlog_dir / name
     path.write_text(_VALID_ITEM_MD, encoding="utf-8")
     return path
+
+
+def test_migration_script_uses_no_yaml_codec_directly() -> None:
+    module_path = sys.modules["scripts.migrate_backlog_to_yaml"].__file__
+    assert module_path is not None
+    source = Path(module_path).read_text(encoding="utf-8")
+    imports = {
+        node.module
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    called_names = {
+        node.func.id
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+
+    assert "backlog_core.yaml_io" not in imports
+    assert "ruamel.yaml" not in imports
+    assert "YAML" not in called_names
 
 
 # ---------------------------------------------------------------------------

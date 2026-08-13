@@ -17,13 +17,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from dh_core import operations
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
+from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.exceptions import PlanNotFoundError
 from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 from sam_schema.core.plan_id_index import PlanIdIndex
+from sam_schema.server import _get_backend
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -68,11 +69,11 @@ class _EmptyArtifactRegistryClient(ArtifactRegistryClient):
         super().__init__()
         self._store = store
 
-    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan") -> None:
+    def store(self, issue: int, content: str, *, artifact_type: str = "task-plan", plan_id: str | None = None) -> None:
         """Delegate to the in-memory store."""
         self._store.store(issue, content, artifact_type=artifact_type)
 
-    def read(self, issue: int, artifact_type: str = "task-plan") -> str | None:
+    def read(self, issue: int, artifact_type: str = "task-plan", *, plan_id: str | None = None) -> str | None:
         """Delegate to the in-memory store."""
         return self._store.read(issue, artifact_type)
 
@@ -159,19 +160,18 @@ def test_local_plan_readable_via_fallback(tmp_path: Path) -> None:
     assert retrieved["tasks"][0]["title"] == "Pre-fix task"
 
 
-def test_operations_read_plan_surfaces_local_fallback_warning(tmp_path: Path) -> None:
-    """Local Gist fallback is surfaced to callers as a ReadResult warning."""
+def test_server_backend_does_not_fallback_to_local_plan(tmp_path: Path) -> None:
     plan_dir = tmp_path / "plan"
     plan_dir.mkdir()
     plan_id = _create_local_only_plan(
         plan_dir, "warning-plan", [Task(id="T1", title="Task", status=TaskStatus.NOT_STARTED)]
     )
 
-    result = operations.read_plan(_make_layer_with_empty_gist(plan_dir), plan_id)
+    backend = _get_backend(str(plan_dir))
 
-    assert result.warnings == [
-        f"Plan {plan_id} served from local cache — Gist copy may be unavailable or predates this fix."
-    ]
+    assert isinstance(backend, ContentTaskProvider)
+    with pytest.raises(PlanNotFoundError):
+        backend.read_plan(plan_id)
 
 
 def test_local_plan_full_content_equality(tmp_path: Path) -> None:

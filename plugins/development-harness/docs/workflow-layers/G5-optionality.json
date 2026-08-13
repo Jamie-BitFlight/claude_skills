@@ -184,7 +184,7 @@
       "id": "G5.discovery.artifact-register",
       "skill": "discovery",
       "source_file": "SKILL.md:Output",
-      "step_label": "artifact_register(artifact_type=\"feature-context\", ...)",
+      "step_label": "Register feature-context content with owner reference, stable logical artifact ID, producer, and content",
       "optionality": "mandatory",
       "skip_condition": null,
       "skip_trigger": null,

@@ -136,6 +136,7 @@ Register via MCP:
 mcp__plugin_dh_backlog__artifact_register(
   item_id={issue_number},
   artifact_type="codebase-analysis",
+  artifact_id="code-review-accessibility-{issue_number}",
   content={verdict_block_json},
   status="complete",
   agent="reviewer-accessibility"

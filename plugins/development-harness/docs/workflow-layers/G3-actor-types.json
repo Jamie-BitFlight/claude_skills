@@ -4,7 +4,7 @@
       "id": "G3.implement-feature.query-plan-status",
       "skill": "implement-feature",
       "source_file": "implement-feature/SKILL.md:Progress Loop",
-      "action_label": "Query status via sam_plan(action=status)",
+      "action_label": "Query status via the sam_plan status action",
       "actor_type": "orchestrator-raw",
       "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"P{N}\")",
       "agent_name": null
@@ -13,7 +13,7 @@
       "id": "G3.implement-feature.query-ready-tasks",
       "skill": "implement-feature",
       "source_file": "implement-feature/SKILL.md:Progress Loop",
-      "action_label": "Query ready tasks via sam_plan(action=ready) or backlog_get_ready_sam_tasks",
+      "action_label": "Query ready tasks via the sam_plan ready action or backlog_get_ready_sam_tasks",
       "actor_type": "orchestrator-raw",
       "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"ready\"}, plan=\"P{N}\")",
       "agent_name": null
@@ -166,7 +166,7 @@
       "id": "G3.complete-implementation.qg-plan-check",
       "skill": "complete-implementation",
       "source_file": "complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 1",
-      "action_label": "Check for existing QG plan via sam_plan(action=list)",
+      "action_label": "Check for an existing QG plan via the sam_plan list action",
       "actor_type": "orchestrator-raw",
       "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"list\", \"search\": \"qg-{slug}\"})",
       "agent_name": null
@@ -175,7 +175,7 @@
       "id": "G3.complete-implementation.qg-plan-create",
       "skill": "complete-implementation",
       "source_file": "complete-implementation/SKILL.md:Quality Gate Plan Creation:Step 2",
-      "action_label": "Create QG plan via sam_plan(action=create) with phase task list",
+      "action_label": "Create QG plan via the sam_plan create action with the phase task list",
       "actor_type": "orchestrator-raw",
       "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"create\"} ... tasks list from phase mapping table)",
       "agent_name": null
@@ -202,7 +202,7 @@
       "id": "G3.complete-implementation.dispatch-loop-ready",
       "skill": "complete-implementation",
       "source_file": "complete-implementation/SKILL.md:SAM Dispatch Loop:Dispatch Loop",
-      "action_label": "Get next ready QG task via sam_plan(action=ready)",
+      "action_label": "Get the next ready QG task via the sam_plan ready action",
       "actor_type": "orchestrator-raw",
       "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"ready\"}, plan=\"{QG}\")",
       "agent_name": null
@@ -229,7 +229,7 @@
       "id": "G3.complete-implementation.completion-verification",
       "skill": "complete-implementation",
       "source_file": "complete-implementation/SKILL.md:Completion Verification Gate",
-      "action_label": "Verify all QG tasks completed via sam_plan(action=status)",
+      "action_label": "Verify all QG tasks completed via the sam_plan status action",
       "actor_type": "orchestrator-raw",
       "evidence": "mcp__plugin_dh_sam__sam_plan(config={\"action\": \"status\"}, plan=\"{PQG}\")",
       "agent_name": null
@@ -249,7 +249,7 @@
       "source_file": "complete-implementation/SKILL.md:Constants:Step 1: Detect Follow-up Files",
       "action_label": "Dispatch fix-loop tasks via subagent_type=dh:task-worker when T1 returns NEEDS-WORK/FAIL",
       "actor_type": "agent-raw-prompt",
-      "evidence": "sam_plan(action='create', slug=\"fix-{slug}-blocking-N\") one task per entry (agent: dh:task-worker); dispatch via subagent_type=\"dh:task-worker\"",
+      "evidence": "The sam_plan create action creates one task per entry (agent: dh:task-worker); dispatch uses subagent_type=\"dh:task-worker\"",
       "agent_name": "dh:task-worker"
     },
     {
@@ -562,7 +562,7 @@
       "id": "G3.start-task.discover-artifacts",
       "skill": "start-task",
       "source_file": "start-task/SKILL.md:Starting a Task",
-      "action_label": "Step 1a: Discover plan artifacts via artifact_list when issue number known",
+      "action_label": "Step 1a: Discover supporting document artifacts via artifact_list when the owner reference is known",
       "actor_type": "orchestrator-raw",
       "evidence": "If the TaskAssignment JSON contains a parent_issue_number ... artifact_list(item_id=...)",
       "agent_name": null

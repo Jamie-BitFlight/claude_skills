@@ -23,7 +23,7 @@ from sam_schema.core.addressing import AddressingError, resolve_plan_address
 from sam_schema.core.backends._utils import validate_appended_task
 from sam_schema.core.dependencies import DependencyGraph
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
-from sam_schema.core.models import Plan, PlanState, PlanStatus, ReadResult, Task, TaskStatus
+from sam_schema.core.models import AcceptanceCriterion, Plan, PlanState, PlanStatus, ReadResult, Task, TaskStatus
 from sam_schema.readers import detect
 from sam_schema.readers.normalize import normalize_plan
 from sam_schema.writers.yaml_writer import (
@@ -38,7 +38,14 @@ from sam_schema.writers.yaml_writer import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
+    from sam_schema.core.task_backend_types import (
+        DocumentData,
+        DocumentHandle,
+        PlanData,
+        PlanSummary,
+        PlanUpdateValue,
+        TaskData,
+    )
 
 __all__ = ["LocalYamlTaskProvider"]
 
@@ -296,15 +303,14 @@ class LocalYamlTaskProvider:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create a new plan and write it to disk as a YAML file.
 
         Validates each task against the ``Task`` Pydantic model, assigns a
         UUID-derived plan ID, and writes via ``yaml_writer.create_plan_file``.
-        The ``acceptance_criteria`` parameter is accepted for Protocol
-        compatibility but is not written by this backend; use
-        ``update_plan_fields()`` after creation to set it.
 
         Args:
             slug: Human-readable identifier slug for the plan.
@@ -312,8 +318,9 @@ class LocalYamlTaskProvider:
             tasks: Ordered list of validated Task models.
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number.
-            acceptance_criteria: Accepted but not written by this backend.
-                Use ``update_plan_fields()`` post-creation to set it.
+            owner_reference: Optional opaque owner reference, ignored by this backend.
+            acceptance_criteria: Optional plan-level acceptance criteria.
+            acceptance_criteria_structured: Optional executable acceptance criteria.
 
         Returns:
             PlanData with backend-assigned plan_id.
@@ -354,6 +361,8 @@ class LocalYamlTaskProvider:
             feature=slug,
             goal=goal,
             context=context,
+            acceptance_criteria=acceptance_criteria,
+            acceptance_criteria_structured=list(acceptance_criteria_structured or []),
             issue=str(issue) if issue is not None else None,
             tasks=validated_tasks,
             source_path=output_path,
@@ -444,7 +453,12 @@ class LocalYamlTaskProvider:
         return paginated
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level fields on a plan.
 
@@ -452,6 +466,7 @@ class LocalYamlTaskProvider:
             plan_id: Backend-assigned plan identifier.
             context: When provided, replaces the plan context narrative.
             set_fields: Optional mapping of field names to new values.
+            owner_reference: Optional opaque backend owner reference.
 
         Raises:
             PlanNotFoundError: When plan_id cannot be resolved.

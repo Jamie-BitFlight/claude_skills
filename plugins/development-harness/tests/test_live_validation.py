@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import logging
 import os
-import subprocess
 import uuid
 
 import backlog_core.models as _bc_models
+import backlog_core.server as _backlog_server
 import pytest
 from backlog_core.backend_protocol import reset_config as _bp_reset_config, set_config as _bp_set_config
 from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
@@ -89,6 +89,7 @@ def live_items(tmp_path_factory, monkeypatch_class):
     import dh_paths
 
     tmp_root = tmp_path_factory.mktemp("live_backlog")
+    monkeypatch_class.setattr(_backlog_server, "_startup_sync_enabled", lambda: False)
     monkeypatch_class.setenv("DH_STATE_HOME", str(tmp_root / "dh_state"))
 
     fake_project_root = tmp_root / "project"
@@ -151,17 +152,42 @@ def live_items(tmp_path_factory, monkeypatch_class):
     # Restore backend_protocol singleton so later tests don't inherit the test config.
     _bp_reset_config()
 
-    repo_slug = os.environ.get("GITHUB_REPO", existing.default_repo if existing is not None else "")
-    if repo_slug:
-        for issue_num in ctx["issues"]:
-            result = subprocess.run(
-                ["gh", "issue", "close", str(issue_num), "--repo", repo_slug, "--reason", "not planned"],
-                capture_output=True,
-                text=True,
-                check=False,
+    # Teardown: close all created issues — log failures instead of swallowing silently
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token and ctx["issues"]:
+        try:
+            from github import Auth, Github, GithubException
+        except ImportError:
+            logger.warning(
+                "PyGithub not available — cannot clean up %d test issues: %s", len(ctx["issues"]), ctx["issues"]
             )
-            if result.returncode:
-                logger.warning("Failed to close test issue #%d: %s", issue_num, result.stderr)
+        else:
+            try:
+                from backlog_core.models import RepoDiscoveryError, discover_repo
+
+                try:
+                    repo_slug = discover_repo()
+                except RepoDiscoveryError:
+                    # repo_root is a temp non-git dir and GITHUB_REPO is unset;
+                    # fall back to the pre-patched default_repo if available
+                    repo_slug = existing.default_repo if existing is not None else ""
+                if not repo_slug:
+                    logger.warning("Cannot determine repo slug for teardown cleanup of issues: %s", ctx["issues"])
+                else:
+                    g = Github(auth=Auth.Token(token))
+                    repo = g.get_repo(repo_slug)
+                    for issue_num in ctx["issues"]:
+                        try:
+                            issue = repo.get_issue(issue_num)
+                            issue.edit(state="closed")
+                        except GithubException:
+                            logger.warning(
+                                "Failed to close test issue #%d — will remain open as orphan", issue_num, exc_info=True
+                            )
+            except GithubException:
+                logger.warning(
+                    "Failed to connect to GitHub for teardown cleanup of issues: %s", ctx["issues"], exc_info=True
+                )
 
 
 @pytest.fixture(scope="class")
@@ -221,7 +247,7 @@ class TestLiveLifecycle:
         """L2: backlog_list returns the item created in L1."""
         if not live_items["l1_ok"]:
             pytest.skip("L1 (test_l1_add_with_real_issue) did not complete — skipping dependent test")
-        result = await _call("backlog_list", {"title": live_items["title_prefix"]})
+        result = await _call("backlog_list", {})
 
         assert isinstance(result["items"], list)
         assert result["count"] >= 1

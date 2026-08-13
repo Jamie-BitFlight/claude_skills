@@ -9,7 +9,7 @@ from backlog_core.models import ArtifactStatus, ArtifactType
 from dh_core import operations
 
 from sam_schema.cli_inputs import parse_item_id
-from sam_schema.cli_output import emit_result, err
+from sam_schema.cli_output import emit_result
 
 app = typer.Typer(help="Artifact manifest operations.", no_args_is_help=True, rich_markup_mode=None)
 
@@ -19,9 +19,9 @@ def register(
     item_id: Annotated[str, typer.Option("--item-id")],
     artifact_type: Annotated[ArtifactType, typer.Option("--artifact-type")],
     artifact_id: Annotated[str, typer.Option("--artifact-id")],
+    content: Annotated[str, typer.Option("--content")],
     status: Annotated[ArtifactStatus, typer.Option("--status")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, typer.Option("--agent")] = "",
-    content: Annotated[str | None, typer.Option("--content")] = None,
 ) -> None:
     """Register or update an artifact."""
     emit_result(
@@ -73,28 +73,6 @@ def read(
     emit_result(
         operations.artifact_read(
             item_id=parse_item_id(item_id), artifact_type=artifact_type.value, artifact_id=artifact_id
-        )
-    )
-
-
-@app.command("migrate")
-def migrate(
-    item_id: Annotated[str | None, typer.Option("--item-id")] = None,
-    dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
-    old_artifact_id: Annotated[str | None, typer.Option("--old-artifact-id")] = None,
-    new_artifact_id: Annotated[str | None, typer.Option("--new-artifact-id")] = None,
-) -> None:
-    """Migrate artifacts or rename one manifest entry."""
-    if (old_artifact_id is None) != (new_artifact_id is None):
-        err("--old-artifact-id and --new-artifact-id must be provided together")
-    if old_artifact_id is not None and item_id is None:
-        err("--item-id is required when renaming an artifact")
-    emit_result(
-        operations.artifact_migrate(
-            item_id=parse_item_id(item_id) if item_id is not None else None,
-            dry_run=dry_run,
-            old_artifact_id=old_artifact_id,
-            new_artifact_id=new_artifact_id,
         )
     )
 

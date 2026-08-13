@@ -20,17 +20,18 @@ from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 from sam_schema.core.models import CreatePlanError, Plan, TaskStatus
 from sam_schema.server import mcp
-from sam_schema.writers.yaml_writer import write_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from sam_schema.core.backends.content import ContentTaskProvider
 
 
 # ---------------------------------------------------------------------------
 # Helpers (shared — see conftest.py)
 # ---------------------------------------------------------------------------
 
-from tests_sam.conftest import make_task
+from tests_sam.conftest import make_task, seed_plan
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -38,23 +39,12 @@ from tests_sam.conftest import make_task
 
 
 @pytest.fixture
-def plan_dir(tmp_path: Path) -> Path:
-    """Write a two-task plan file and return the plan directory path.
-
-    Directory layout::
-
-        tmp_path/
-        └── plan/
-            └── P001-mcp-test.yaml   (T1 complete, T2 depends on T1)
-
-    Returns:
-        Path to the plan directory (``tmp_path/plan``).
-    """
+def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     tasks = [make_task("T1", status=TaskStatus.COMPLETE), make_task("T2", dependencies=["T1"])]
     plan = Plan(feature="mcp-test", version="1.0", goal="MCP test goal", tasks=tasks)
-    write_plan(plan, p_dir / "P001-mcp-test.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
     return p_dir
 
 
@@ -135,6 +125,64 @@ async def test_mcp_sam_read_plan_only_returns_plan_fields(plan_dir: Path) -> Non
     assert data.plan.feature == "mcp-test"
     # plan-only read returns a ReadResult, not a TaskAssignment — no task field
     assert not hasattr(data, "task")
+
+
+@pytest.fixture
+def provider_only_plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
+    seed_plan(content_backend, "P1", Plan(feature="legacy-id", version="1.0", tasks=[make_task("T1")]))
+    seed_plan(content_backend, "Pa1b2c3d4", Plan(feature="uuid-id", version="1.0", tasks=[make_task("T1")]))
+    seed_plan(content_backend, "P2", Plan(feature="unique-slug", version="1.0", tasks=[make_task("T1")]))
+    return tmp_path / "provider-only"
+
+
+@pytest.mark.parametrize(
+    ("address", "expected_feature"), [("p1", "legacy-id"), ("pA1B2C3D4", "uuid-id"), ("unique-slug", "unique-slug")]
+)
+async def test_mcp_sam_plan_resolves_provider_logical_addresses(
+    provider_only_plan_dir: Path, address: str, expected_feature: str
+) -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "sam_plan", {"config": {"action": "read"}, "plan": address, "plan_dir": str(provider_only_plan_dir)}
+        )
+
+    assert result.data.plan.feature == expected_feature
+
+
+@pytest.mark.parametrize(
+    ("address", "expected_plan_id"), [("p1", "P1"), ("pA1B2C3D4", "Pa1b2c3d4"), ("unique-slug", "P2")]
+)
+async def test_mcp_sam_task_resolves_provider_logical_addresses(
+    provider_only_plan_dir: Path, address: str, expected_plan_id: str
+) -> None:
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "sam_task",
+            {"plan": address, "task": "T1", "config": {"action": "read"}, "plan_dir": str(provider_only_plan_dir)},
+        )
+
+    assert result.data.plan_number == expected_plan_id
+
+
+@pytest.mark.parametrize("tool_name", ["sam_plan", "sam_task"])
+async def test_mcp_provider_address_rejects_ambiguous_feature_slug(
+    tmp_path: Path, content_backend: ContentTaskProvider, tool_name: str
+) -> None:
+    seed_plan(content_backend, "P1", Plan(feature="duplicate-slug", version="1.0", tasks=[make_task("T1")]))
+    seed_plan(content_backend, "P2", Plan(feature="duplicate-slug", version="1.0", tasks=[make_task("T1")]))
+    arguments = {
+        "sam_plan": {"config": {"action": "read"}, "plan": "duplicate-slug", "plan_dir": str(tmp_path / "absent")},
+        "sam_task": {
+            "plan": "duplicate-slug",
+            "task": "T1",
+            "config": {"action": "read"},
+            "plan_dir": str(tmp_path / "absent"),
+        },
+    }
+
+    with pytest.raises(ToolError, match="matches multiple provider plans"):
+        async with Client(mcp) as client:
+            await client.call_tool(tool_name, arguments[tool_name])
 
 
 async def test_mcp_sam_read_missing_task_returns_error_dict(plan_dir: Path) -> None:
@@ -514,20 +562,7 @@ async def test_mcp_sam_update_sets_context(tmp_path: Path) -> None:
 
 
 @pytest.fixture
-def multi_plan_dir(tmp_path: Path) -> Path:
-    """Write three plan files in a plan directory and return its path.
-
-    Directory layout::
-
-        tmp_path/
-        └── plan/
-            ├── P001-alpha-feature.yaml   (goal: "Implement alpha")
-            ├── P002-beta-feature.yaml    (goal: "Implement beta")
-            └── P003-gamma-search.yaml     (goal: "Search integration")
-
-    Returns:
-        Path to the plan directory (``tmp_path/plan``).
-    """
+def multi_plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
 
@@ -538,7 +573,7 @@ def multi_plan_dir(tmp_path: Path) -> Path:
     ]:
         tasks = [make_task("T1")]
         plan = Plan(feature=feature, version="1.0", goal=goal, tasks=tasks)
-        write_plan(plan, p_dir / f"P{plan_num:03d}-{feature}.yaml", force_single=True)
+        seed_plan(content_backend, f"P{plan_num}", plan)
 
     return p_dir
 
@@ -762,7 +797,7 @@ async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
+async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path, content_backend: ContentTaskProvider) -> None:
     """sam_plan status includes autonomy key with the value stored in the plan.
 
     Tests: autonomy field surfaces through sam_plan status via MCP protocol.
@@ -776,7 +811,7 @@ async def test_sam_plan_status_includes_autonomy_key(tmp_path: Path) -> None:
     plan = Plan(
         feature="autonomy-test", version="1.0", goal="Test autonomy surfacing", tasks=tasks, autonomy="checkpoint"
     )
-    write_plan(plan, p_dir / "P001-autonomy-test.yaml", force_single=True)
+    seed_plan(content_backend, "P1", plan)
 
     # Act
     async with Client(mcp) as client:

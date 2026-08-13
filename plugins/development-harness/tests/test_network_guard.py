@@ -25,6 +25,10 @@ from tests.network_blocked import NetworkBlocked
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _probe_command(probe: Path, *args: str) -> list[str]:
+    return [sys.executable, "-m", "pytest", str(probe), "-q", "-o", "addopts=", "--rootdir", str(_PLUGIN_ROOT), *args]
+
+
 def test_outbound_connection_is_blocked() -> None:
     """A direct outbound TCP connect raises instead of reaching the internet.
 
@@ -67,18 +71,19 @@ def test_loopback_is_still_allowed() -> None:
         server.close()
 
 
-def test_unix_socket_is_still_allowed(tmp_path: Path) -> None:
+def test_unix_socket_is_still_allowed() -> None:
     """``AF_UNIX`` filesystem sockets stay allowed for local IPC."""
-    path = str(tmp_path / "guard.sock")
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    try:
-        server.bind(path)
-        server.listen(1)
-        client.connect(path)
-    finally:
-        client.close()
-        server.close()
+    with tempfile.TemporaryDirectory(prefix="dh-sock-") as socket_dir:
+        path = str(Path(socket_dir) / "guard.sock")
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            server.bind(path)
+            server.listen(1)
+            client.connect(path)
+        finally:
+            client.close()
+            server.close()
 
 
 def test_no_public_allow_network_fixture() -> None:
@@ -95,10 +100,11 @@ def test_no_public_allow_network_fixture() -> None:
         """
     ) as probe:
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", str(probe), "-q", "-p", "no:randomly", "--rootdir", str(_PLUGIN_ROOT)],
+            _probe_command(probe),
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
+            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
             timeout=15,
             check=False,
         )
@@ -125,23 +131,11 @@ def test_double_gate_requires_env_var() -> None:
         """
     ) as probe:
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                str(probe),
-                "-q",
-                "-p",
-                "no:randomly",
-                "-m",
-                "e2e",
-                "--rootdir",
-                str(_PLUGIN_ROOT),
-            ],
+            [*_probe_command(probe), "-m", "e2e"],
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": ""},
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
             timeout=15,
             check=False,
         )
@@ -169,23 +163,11 @@ def test_double_gate_opens_with_env_var() -> None:
         """
     ) as probe:
         result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                str(probe),
-                "-q",
-                "-p",
-                "no:randomly",
-                "-m",
-                "e2e",
-                "--rootdir",
-                str(_PLUGIN_ROOT),
-            ],
+            [*_probe_command(probe), "-m", "e2e"],
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1"},
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
             timeout=15,
             check=False,
         )
@@ -206,10 +188,11 @@ def test_guard_restores_sockets_after_session() -> None:
         """
     ) as probe:
         subprocess.run(
-            [sys.executable, "-m", "pytest", str(probe), "-q", "-p", "no:randomly", "--rootdir", str(_PLUGIN_ROOT)],
+            _probe_command(probe),
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
+            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
             timeout=15,
             check=True,
         )
@@ -251,11 +234,12 @@ def test_guard_covers_testpath(testpath: str) -> None:
     )
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", str(probe), "-q", "-p", "no:randomly", "--rootdir", str(_PLUGIN_ROOT)],
+            _probe_command(probe),
             capture_output=True,
             text=True,
             cwd=str(_PLUGIN_ROOT),
-            timeout=10,
+            env={**os.environ, "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+            timeout=30,
             check=False,
         )
     finally:

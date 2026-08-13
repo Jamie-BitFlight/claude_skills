@@ -21,16 +21,32 @@ DN-3: ``create_task_issue`` is a GitHubExtras method and is no longer
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+from collections.abc import Sequence
+from multiprocessing import get_context
+from multiprocessing.synchronize import Barrier as ProcessBarrier
 from pathlib import Path
-from typing import TYPE_CHECKING
+from threading import BrokenBarrierError
+from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
 import pytest
 from backlog_core.backend_types import WorkItemBackend
 from backlog_core.backends.bd_runner import BdRunner
-from backlog_core.backends.beads_backend import BeadsBackend
-from backlog_core.models import BackendAvailability, BacklogItem, BacklogItemMetadata, ViewItemResult
+from backlog_core.backends.beads_backend import BeadsBackend, _beads_workspace_path
+from backlog_core.models import (
+    BackendAvailability,
+    BacklogItem,
+    BacklogItemMetadata,
+    ContentConflictError,
+    ContentKind,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+    ViewItemResult,
+)
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -62,6 +78,176 @@ def _make_item(issue: str = "bd-a3f8", title: str = "Fix authentication bug") ->
             source="test", added="2026-01-01", priority="P2", item_type="Task", status="open", issue=issue
         ),
     )
+
+
+@pytest.mark.unit
+def test_beads_workspace_path_uses_native_workspace_resolution(tmp_path: Path) -> None:
+    runner = MagicMock()
+    runner.run_json.return_value = {"path": str(tmp_path / ".beads")}
+
+    assert _beads_workspace_path(runner) == (tmp_path / ".beads").resolve()
+    runner.run_json.assert_called_once_with(["where"])
+
+
+class _ProcessKvRunner:
+    def __init__(self, state_path: Path, write_barrier: ProcessBarrier) -> None:
+        self._state_path = state_path
+        self._write_barrier = write_barrier
+
+    def run_json(self, argv: Sequence[str]) -> dict[str, bool | str]:
+        if list(argv) == ["where"]:
+            return {"path": str(self._state_path.parent)}
+        assert list(argv[:2]) == ["kv", "get"]
+        if not self._state_path.exists():
+            return {"found": False}
+        return {"found": True, "value": self._state_path.read_text(encoding="utf-8")}
+
+    def run_text(self, argv: Sequence[str]) -> str:
+        assert list(argv[:2]) == ["kv", "set"]
+        with contextlib.suppress(BrokenBarrierError):
+            self._write_barrier.wait(timeout=2)
+        self._state_path.write_text(argv[3], encoding="utf-8")
+        return ""
+
+    def is_available(self) -> bool:
+        return True
+
+
+def _put_stale_plan_in_process(
+    workspace: str, state_path: str, write_barrier: ProcessBarrier, content: str, results: Any
+) -> None:
+    os.chdir(workspace)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    backend = BeadsBackend(runner=_ProcessKvRunner(Path(state_path), write_barrier))
+    try:
+        backend.put_content(
+            ContentWrite(reference=reference, owner_reference="#123", content=content, expected_revision="before")
+        )
+    except ContentConflictError:
+        results.put(("conflict", content))
+    else:
+        results.put(("success", content))
+
+
+@pytest.mark.unit
+def test_put_content_serializes_stale_revision_writers_across_processes(tmp_path: Path) -> None:
+    # Given: two workers with the same stale Beads plan revision and workspace
+    workspace = tmp_path / "workspace"
+    workspace.joinpath(".beads").mkdir(parents=True)
+    state_path = workspace / ".beads" / "content.json"
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    state_path.write_text(
+        ContentRecord(
+            reference=reference, owner_reference="#123", content="before", revision="before"
+        ).model_dump_json(),
+        encoding="utf-8",
+    )
+    context = get_context("spawn")
+    write_barrier = context.Barrier(2)
+    results = context.Queue()
+    contents = ["first winner", "second winner"]
+    workers = [
+        context.Process(
+            target=_put_stale_plan_in_process, args=(str(workspace), str(state_path), write_barrier, content, results)
+        )
+        for content in contents
+    ]
+
+    # When: both workers compare the stale revision before racing to native kv set
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(timeout=10)
+
+    # Then: one native write wins, one receives a conflict, and the winner is durable
+    assert [worker.exitcode for worker in workers] == [0, 0]
+    outcomes = [results.get(timeout=2) for _ in workers]
+    assert sorted(status for status, _ in outcomes) == ["conflict", "success"]
+    [winner] = [content for status, content in outcomes if status == "success"]
+    assert ContentRecord.model_validate_json(state_path.read_text(encoding="utf-8")).content == winner
+
+
+class _RecordingBdRunner:
+    def __init__(self, issue: dict[str, Any]) -> None:
+        self.issue = issue
+        self.text_calls: list[list[str]] = []
+
+    def run_json(self, argv: Sequence[str]) -> list[dict[str, Any]]:
+        assert list(argv) == ["list", "--all", "--limit", "0"]
+        return [self.issue]
+
+    def run_text(self, argv: Sequence[str]) -> str:
+        args = list(argv)
+        self.text_calls.append(args)
+        if args[0:2] != ["update", self.issue["id"]]:
+            raise AssertionError(f"unexpected bd command: {args!r}")
+        for flag in ("--notes", "--status"):
+            value = args[args.index(flag) + 1]
+            self.issue["notes" if flag == "--notes" else "status"] = value
+        return ""
+
+    def is_available(self) -> bool:
+        return True
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("native_status", "notes"),
+    [
+        ("closed", None),
+        (
+            "in_progress",
+            BacklogItem(metadata=BacklogItemMetadata(status="open", groomed="2026-02-01")).model_dump_json(),
+        ),
+    ],
+)
+def test_list_then_put_preserves_native_status_in_canonical_metadata(native_status: str, notes: str | None) -> None:
+    issue = dict(_BD_SHOW_FIXTURE, status=native_status, notes=notes)
+    runner = _RecordingBdRunner(issue)
+    backend = BeadsBackend(runner=runner)
+
+    [item] = backend.list_work_items()
+
+    assert item.metadata.status == native_status
+    assert item.status == native_status
+    if notes is not None:
+        assert item.metadata.groomed == "2026-02-01"
+
+    backend.put_work_item(item)
+
+    update = runner.text_calls[-1]
+    assert update[update.index("--status") + 1] == native_status
+    assert json.loads(update[update.index("--notes") + 1])["metadata"]["status"] == native_status
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("logical_status", "native_status"),
+    [
+        ("done", "closed"),
+        ("resolved", "closed"),
+        ("completed", "closed"),
+        ("closed", "closed"),
+        ("in-progress", "in_progress"),
+        ("needs-grooming", "open"),
+        ("groomed", "open"),
+        ("blocked", "blocked"),
+    ],
+)
+def test_lifecycle_metadata_status_is_persisted_and_mapped(logical_status: str, native_status: str, mocker) -> None:
+    from backlog_core.backend_types import BacklogConfig
+    from backlog_core.operations import _apply_updates_to_item
+
+    issue = dict(_BD_SHOW_FIXTURE)
+    runner = _RecordingBdRunner(issue)
+    backend = BeadsBackend(runner=runner)
+    mocker.patch("backlog_core.operations.get_config", return_value=BacklogConfig(backend=backend))
+
+    _apply_updates_to_item("bd-a3f8", {"metadata": {"status": logical_status}}, set_synced=False)
+
+    update = runner.text_calls[-1]
+    assert update[update.index("--status") + 1] == native_status
+    assert json.loads(update[update.index("--notes") + 1])["metadata"]["status"] == logical_status
 
 
 # ---------------------------------------------------------------------------

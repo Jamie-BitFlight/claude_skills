@@ -151,9 +151,9 @@
       "agents_dispatched": ["dh:task-worker (one per ready task — dynamic count)"],
       "concurrency": "parallel",
       "dependencies": [
-        "SAM task dependencies govern readiness — only tasks with all dependencies complete appear in sam_plan(action=ready)"
+        "SAM task dependencies govern readiness — only tasks with all dependencies complete appear in the sam_plan ready result"
       ],
-      "barrier": "After step 5 confirms all tasks in the current batch are complete: sam_plan(action=status) check — then commit batch; full_auto: no wave gate; checkpoint: Wave-Completion Confirmation Gate fires (await user confirmation before next batch)",
+      "barrier": "After step 5 confirms all tasks in the current batch are complete: check the sam_plan status result, then commit the batch; full_auto: no wave gate; checkpoint: Wave-Completion Confirmation Gate fires (await user confirmation before next batch)",
       "team_name_pattern": "impl-{slug}",
       "wave": null
     },
@@ -201,7 +201,7 @@
         "T5 depends on T4",
         "T6 depends on T5"
       ],
-      "barrier": "Completion Verification Gate: sam_plan(action=status) — all T0–T6 must reach terminal status (complete or skipped for T5 only)",
+      "barrier": "Completion Verification Gate: the sam_plan status result shows all T0–T6 terminal (complete or skipped for T5 only)",
       "team_name_pattern": "impl-{slug}",
       "wave": null
     },
@@ -225,7 +225,7 @@
         "T4 depends on T3",
         "T5 depends on T4"
       ],
-      "barrier": "Step 5 — Completion verification gate: sam_plan(action=status, plan='{PQG}') — all 5 tasks must have status==complete, T5 may be skipped if T4 found 0 drift",
+      "barrier": "Step 5 — Completion verification gate: sam_plan(plan='{PQG}', config={'action':'status'}) shows all 5 tasks complete; T5 may be skipped if T4 found 0 drift",
       "team_name_pattern": "impl-{slug}",
       "wave": null
     },

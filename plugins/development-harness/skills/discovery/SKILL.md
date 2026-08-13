@@ -120,7 +120,7 @@ Artifact registered via MCP:
 artifact_register(
     item_id={issue},
     artifact_type="feature-context",
-    path="plan/feature-context-{slug}.md",
+    artifact_id="plan/feature-context-{slug}.md",
     agent="discovery",
     content="{full DISCOVERY markdown below}"
 )

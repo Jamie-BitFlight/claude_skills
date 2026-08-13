@@ -2,31 +2,26 @@
 
 Covers:
 - BackendAvailability enum members and serialisation (test cases 1-3)
-- probe_backend_status() unit tests mocking all GitHub/filesystem operations (4-12)
+- probe_backend_status() unit tests mocking GitHub operations (4-12)
 - backlog_list response integration: "backend" key shape and existing key preservation (13-15)
 
-No real network calls are made. All GitHub API access and filesystem operations are mocked
-via pytest monkeypatch and unittest.mock.patch.
+No real network calls are made. GitHub API access is mocked via pytest monkeypatch and
+unittest.mock.patch.
 
 asyncio_mode = "auto" is set globally in pyproject.toml — no @pytest.mark.asyncio decorators.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
-import backlog_core.models as _bc_models
 import pytest
 from backlog_core.gh_client import probe_backend_status
-from backlog_core.models import BackendAvailability, BackendStatus, BacklogConfig
+from backlog_core.models import BackendAvailability, BackendStatus
 from backlog_core.server import mcp
 from github import GithubException
 
 from tests.helpers import call_mcp_tool
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Helper: call a tool via in-memory FastMCP transport
@@ -291,60 +286,6 @@ class TestBackendStatusAllFieldsPopulated:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def probe_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Set up isolated filesystem for probe_backend_status tests.
-
-    Patches BACKLOG_DIR to a temp directory and sets DH_STATE_HOME so that
-    dh_paths.state_root() resolves under tmp_path. Returns the BACKLOG_DIR
-    path so tests can add .md files to control cache_total_count.
-
-    Args:
-        tmp_path: pytest-provided temporary directory.
-        monkeypatch: pytest monkeypatch fixture.
-
-    Returns:
-        Path to the patched BACKLOG_DIR.
-    """
-    backlog_dir = tmp_path / "backlog"
-    backlog_dir.mkdir()
-
-    # Redirect BACKLOG_DIR used by probe_backend_status via _config.backlog_dir.
-    # monkeypatch.setattr on BACKLOG_DIR no longer works after the BacklogConfig
-    # refactor — get_backlog_dir() reads from _config, not a module-level var.
-    existing = _bc_models._config
-    monkeypatch.setattr(
-        _bc_models,
-        "_config",
-        BacklogConfig(
-            repo_root=tmp_path,
-            backlog_dir=backlog_dir,
-            default_repo=existing.default_repo if existing is not None else "",
-        ),
-    )
-
-    # Redirect dh_paths.state_root() so .last_sync resolves under tmp_path
-    state_root = tmp_path / "state"
-    state_root.mkdir()
-    monkeypatch.setattr("backlog_core.gh_client._dh_paths", _make_dh_paths_mock(state_root))
-
-    return backlog_dir
-
-
-def _make_dh_paths_mock(state_root: Path) -> MagicMock:
-    """Build a minimal dh_paths mock that returns a fixed state_root.
-
-    Args:
-        state_root: Directory that state_root() should return.
-
-    Returns:
-        MagicMock with state_root() configured.
-    """
-    mock = MagicMock()
-    mock.state_root.return_value = state_root
-    return mock
-
-
 # ---------------------------------------------------------------------------
 # Probe unit tests — GITHUB_TOKEN not set
 # ---------------------------------------------------------------------------
@@ -358,7 +299,7 @@ class TestProbeBackendStatusNoToken:
          must report this clearly so users know to configure credentials.
     """
 
-    def test_no_token_returns_needs_authentication(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_token_returns_needs_authentication(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """GITHUB_TOKEN absent -> availability=NEEDS_AUTHENTICATION.
 
         Tests: probe_backend_status() with no token
@@ -371,7 +312,7 @@ class TestProbeBackendStatusNoToken:
 
         assert result.availability == BackendAvailability.NEEDS_AUTHENTICATION
 
-    def test_no_token_error_contains_github_token(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_token_error_contains_github_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """GITHUB_TOKEN absent -> error field contains 'GITHUB_TOKEN'.
 
         Tests: probe_backend_status() error message with no token
@@ -383,6 +324,14 @@ class TestProbeBackendStatusNoToken:
         result = probe_backend_status()
 
         assert "GITHUB_TOKEN" in result.error
+
+    def test_no_token_uses_provider_status_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+
+        result = probe_backend_status()
+
+        assert result.cache_total_count == 0
+        assert result.last_sync == ""
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +347,7 @@ class TestProbeBackendStatusReachable:
          that the backend integration is working correctly.
     """
 
-    def test_reachable_returns_reachable_availability(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_reachable_returns_reachable_availability(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Token set, GitHub reachable -> availability=REACHABLE.
 
         Tests: probe_backend_status() happy path availability
@@ -418,7 +367,7 @@ class TestProbeBackendStatusReachable:
 
         assert result.availability == BackendAvailability.REACHABLE
 
-    def test_reachable_returns_correct_open_count(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_reachable_returns_correct_open_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Token set, GitHub reachable -> open_count matches repo.open_issues_count.
 
         Tests: probe_backend_status() open_count extraction
@@ -438,7 +387,7 @@ class TestProbeBackendStatusReachable:
 
         assert result.open_count == 5
 
-    def test_reachable_returns_correct_total_count(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_reachable_returns_correct_total_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Token set, GitHub reachable -> total_count matches repo.get_issues().totalCount.
 
         Tests: probe_backend_status() total_count extraction
@@ -472,7 +421,7 @@ class TestProbeBackendStatusGitHubUnreachable:
          ERROR classification helps diagnose firewall or network issues.
     """
 
-    def test_unreachable_returns_error_availability(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_unreachable_returns_error_availability(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """try_get_github returns None -> availability=ERROR.
 
         Tests: probe_backend_status() with failed connection
@@ -486,7 +435,7 @@ class TestProbeBackendStatusGitHubUnreachable:
 
         assert result.availability == BackendAvailability.ERROR
 
-    def test_unreachable_error_field_is_populated(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_unreachable_error_field_is_populated(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """try_get_github returns None -> error field is non-empty.
 
         Tests: probe_backend_status() error message on connection failure
@@ -514,7 +463,7 @@ class TestProbeBackendStatusRateLimited:
          lets clients back off rather than treating it as a hard error.
     """
 
-    def test_403_exception_returns_rate_limited(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_403_exception_returns_rate_limited(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """GithubException with status=403 -> availability=RATE_LIMITED.
 
         Tests: probe_backend_status() 403 rate-limit branch
@@ -548,7 +497,7 @@ class TestProbeBackendStatusCountFetchFailure:
          the backend works but counts are unavailable.
     """
 
-    def test_non_403_exception_returns_reachable(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_non_403_exception_returns_reachable(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Non-403 GithubException during count fetch -> availability=REACHABLE.
 
         Tests: probe_backend_status() non-403 exception branch
@@ -566,7 +515,7 @@ class TestProbeBackendStatusCountFetchFailure:
 
         assert result.availability == BackendAvailability.REACHABLE
 
-    def test_non_403_exception_open_count_is_none(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_non_403_exception_open_count_is_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Non-403 GithubException -> open_count is None.
 
         Tests: probe_backend_status() count fields when count fetch fails
@@ -584,7 +533,7 @@ class TestProbeBackendStatusCountFetchFailure:
 
         assert result.open_count is None
 
-    def test_non_403_exception_error_field_is_populated(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_non_403_exception_error_field_is_populated(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Non-403 GithubException -> error field contains the exception text.
 
         Tests: probe_backend_status() error capture for non-403 failures
@@ -601,126 +550,6 @@ class TestProbeBackendStatusCountFetchFailure:
             result = probe_backend_status()
 
         assert result.error != ""
-
-
-# ---------------------------------------------------------------------------
-# Probe unit tests — cache directory counts
-# ---------------------------------------------------------------------------
-
-
-class TestProbeBackendStatusCacheCounts:
-    """probe_backend_status counts .md files in BACKLOG_DIR for cache_total_count.
-
-    Tests: probe_backend_status() cache file counting.
-    Why: cache_total_count gives users visibility into local cache size
-         without requiring a GitHub connection.
-    """
-
-    def test_empty_cache_dir_returns_zero_cache_total_count(
-        self, probe_env: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Empty BACKLOG_DIR -> cache_total_count=0.
-
-        Tests: probe_backend_status() empty cache directory
-        How: Leave BACKLOG_DIR empty; remove token; check cache_total_count
-        Why: Zero is the correct count when no cached files exist
-        """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-
-        result = probe_backend_status()
-
-        assert result.cache_total_count == 0
-
-    def test_cache_dir_with_md_files_returns_correct_count(
-        self, probe_env: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """BACKLOG_DIR with N .md files -> cache_total_count=N.
-
-        Tests: probe_backend_status() cache file counting
-        How: Create 3 .md files in BACKLOG_DIR; remove token; check count
-        Why: Count must match actual file presence for reliable status
-        """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-
-        (probe_env / "p1-feature-one.md").write_text("---\ntitle: Feature One\n---")
-        (probe_env / "p1-feature-two.md").write_text("---\ntitle: Feature Two\n---")
-        (probe_env / "p2-bug-three.md").write_text("---\ntitle: Bug Three\n---")
-
-        result = probe_backend_status()
-
-        assert result.cache_total_count == 3
-
-    def test_non_md_files_not_counted(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Non-.md files in BACKLOG_DIR do not contribute to cache_total_count.
-
-        Tests: probe_backend_status() glob specificity
-        How: Create 1 .md and 2 non-.md files; verify count is 1
-        Why: Only .md backlog items should be counted; config/lock files must be excluded
-        """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-
-        (probe_env / "p1-item.md").write_text("---\ntitle: Item\n---")
-        (probe_env / "config.json").write_text("{}")
-        (probe_env / ".gitkeep").write_text("")
-
-        result = probe_backend_status()
-
-        assert result.cache_total_count == 1
-
-
-# ---------------------------------------------------------------------------
-# Probe unit tests — last_sync timestamp
-# ---------------------------------------------------------------------------
-
-
-class TestProbeBackendStatusLastSync:
-    """probe_backend_status reads last_sync from the .last_sync file.
-
-    Tests: probe_backend_status() last_sync field population.
-    Why: Clients display the last sync time to help users understand cache
-         freshness; missing or wrong values undermine trust in status data.
-    """
-
-    def test_last_sync_present_returns_timestamp(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """.last_sync file present -> last_sync equals file contents.
-
-        Tests: probe_backend_status() last_sync from file
-        How: Write a timestamp string to .last_sync; verify result.last_sync matches
-        Why: The timestamp must be read exactly as stored, not interpreted
-        """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-
-        timestamp = "2026-03-23T10:30:00Z"
-
-        # Get the state_root path that the probe will read from
-        import backlog_core.gh_client as _gh_module
-
-        state_root = _gh_module._dh_paths.state_root()
-        (state_root / ".last_sync").write_text(timestamp, encoding="utf-8")
-
-        result = probe_backend_status()
-
-        assert result.last_sync == timestamp
-
-    def test_last_sync_absent_returns_empty_string(self, probe_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """.last_sync file absent -> last_sync is ''.
-
-        Tests: probe_backend_status() last_sync when file missing
-        How: Ensure .last_sync does not exist in state_root; verify result.last_sync == ''
-        Why: Empty string is the defined sentinel for 'never synced'
-        """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-
-        import backlog_core.gh_client as _gh_module
-
-        state_root = _gh_module._dh_paths.state_root()
-        last_sync_path = state_root / ".last_sync"
-        if last_sync_path.exists():
-            last_sync_path.unlink()
-
-        result = probe_backend_status()
-
-        assert result.last_sync == ""
 
 
 # ---------------------------------------------------------------------------

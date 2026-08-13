@@ -1,159 +1,53 @@
-"""Tests for auto-registration of plan artifacts in backlog_update (T8).
-
-Covers:
-- _auto_register_plan_artifact registers task-plan artifact when item has issue
-- _auto_register_plan_artifact is skipped when item has no issue number
-- Registration failure does not block the call (best-effort, warns)
-- Item with issue="#123" format is parsed correctly
-- Item with malformed issue string logs warning and skips
-"""
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from backlog_core.models import ArtifactManifest, ArtifactType, BacklogItem, Output
-from backlog_core.operations import _auto_register_plan_artifact
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+from backlog_core.backend_types import BacklogConfig, WorkItemBackend
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.models import BacklogItem, BacklogItemMetadata, ContentKind, ContentQuery
+from backlog_core.operations import update_item
 
 
-def _make_item(issue: str = "", file_path: str = "") -> BacklogItem:
-    """Return a minimal BacklogItem for testing."""
-    return BacklogItem(title="Test Feature", issue=issue, file_path=file_path)
+def _make_item(issue: str = "#42") -> BacklogItem:
+    return BacklogItem(
+        title="Test Feature",
+        reference="test-feature",
+        description="Test item",
+        metadata=BacklogItemMetadata(
+            source="test", added="2026-01-01", priority="P1", status="open", issue=issue, topic="test-feature"
+        ),
+    )
 
 
-def _empty_manifest(issue_number: int = 42) -> ArtifactManifest:
-    """Return an empty ArtifactManifest."""
-    return ArtifactManifest(issue_number=issue_number)
+def test_update_item_plan_persists_association_without_manifest_write() -> None:
+    item = _make_item()
+    provider = InMemoryBackend()
+    provider.put_work_item(item)
+    provider.put_content = MagicMock(side_effect=AssertionError("plan update wrote an artifact manifest"))
+
+    with (
+        patch("backlog_core.operations.get_config", return_value=BacklogConfig(backend=provider)),
+        patch("backlog_core.operations.try_get_github", return_value=None),
+    ):
+        result = update_item(selector=item.title, plan="plan/tasks-1-foo.yaml")
+
+    assert result["plan"] == "plan/tasks-1-foo.yaml"
+    assert provider.get_work_item(item.reference).metadata.plan == "plan/tasks-1-foo.yaml"
+    provider.put_content.assert_not_called()
+    assert provider.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST)) == []
 
 
-# ---------------------------------------------------------------------------
-# Tests: _auto_register_plan_artifact
-# ---------------------------------------------------------------------------
+def test_update_item_plan_succeeds_without_artifact_capability() -> None:
+    item = _make_item()
+    provider = MagicMock(spec=WorkItemBackend)
+    provider.issue_id_type = "integer"
+    provider.list_work_items.return_value = [item]
+    provider.get_work_item.return_value = item
+    provider.try_get_github.return_value = None
 
+    with patch("backlog_core.operations.get_config", return_value=BacklogConfig(backend=provider)):
+        result = update_item(selector=item.title, plan="plan/tasks-2-bar.yaml")
 
-class TestAutoRegisterPlanArtifact:
-    """Tests for the _auto_register_plan_artifact helper."""
-
-    def test_auto_register_plan_artifact_with_issue_registers_task_plan(self) -> None:
-        """When item has a linked issue, the plan is registered as task-plan artifact."""
-        item = _make_item(issue="#42")
-        out = Output()
-
-        mock_provider = MagicMock()
-        mock_provider.get_manifest.return_value = _empty_manifest(issue_number=42)
-        updated_manifest = _empty_manifest(issue_number=42)
-
-        with (
-            patch("backlog_core.operations.create_artifact_provider", return_value=mock_provider) as mock_factory,
-            patch("backlog_core.operations.ArtifactRegistry") as mock_registry_cls,
-        ):
-            mock_registry = MagicMock()
-            mock_registry.register.return_value = updated_manifest
-            mock_registry_cls.return_value = mock_registry
-
-            _auto_register_plan_artifact(item, "plan/tasks-1-foo.yaml", repo="owner/repo", output=out)
-
-        # Factory was called with the correct repo
-        mock_factory.assert_called_once_with(repo="owner/repo")
-        # Manifest was fetched for issue 42
-        mock_provider.get_manifest.assert_called_once_with(42)
-        # Register was called with a task-plan entry pointing at the plan path
-        mock_registry.register.assert_called_once()
-        call_args = mock_registry.register.call_args
-        entry = call_args[0][1]  # second positional arg is the ArtifactEntry
-        assert entry.artifact_type == ArtifactType.TASK_PLAN
-        assert entry.artifact_id == "plan/tasks-1-foo.yaml"
-        # Updated manifest was persisted
-        mock_provider.set_manifest.assert_called_once_with(42, updated_manifest)
-        # Info message was emitted
-        assert any("Artifact registered" in m for m in out.messages)
-        assert out.warnings == []
-
-    def test_auto_register_plan_artifact_without_issue_skips_silently(self) -> None:
-        """When item has no issue number, registration is skipped entirely."""
-        item = _make_item(issue="")
-        out = Output()
-
-        with (
-            patch("backlog_core.operations.create_artifact_provider") as mock_factory,
-            patch("backlog_core.operations.ArtifactRegistry") as mock_registry_cls,
-        ):
-            _auto_register_plan_artifact(item, "plan/tasks-1-foo.yaml", repo="owner/repo", output=out)
-
-            mock_factory.assert_not_called()
-            mock_registry_cls.assert_not_called()
-
-        assert out.warnings == []
-        assert out.messages == []
-
-    def test_auto_register_plan_artifact_registration_failure_does_not_raise(self) -> None:
-        """Registration failure logs a warning but does not propagate the exception."""
-        item = _make_item(issue="#99")
-        out = Output()
-
-        mock_provider = MagicMock()
-        mock_provider.get_manifest.side_effect = RuntimeError("GitHub unavailable")
-
-        with patch("backlog_core.operations.create_artifact_provider", return_value=mock_provider):
-            # Must not raise
-            _auto_register_plan_artifact(item, "plan/tasks-1-bar.yaml", repo="owner/repo", output=out)
-
-        assert any("WARNING" in w and "Artifact registration failed" in w for w in out.warnings)
-
-    def test_auto_register_plan_artifact_malformed_issue_string_warns_and_skips(self) -> None:
-        """Item with unparseable issue string logs a warning and does not call the provider."""
-        item = _make_item(issue="not-a-number")
-        out = Output()
-
-        with patch("backlog_core.operations.create_artifact_provider") as mock_factory:
-            _auto_register_plan_artifact(item, "plan/tasks-1-foo.yaml", repo="owner/repo", output=out)
-            mock_factory.assert_not_called()
-
-        assert any("WARNING" in w and "Could not parse issue number" in w for w in out.warnings)
-
-    def test_auto_register_plan_artifact_issue_without_hash_prefix(self) -> None:
-        """Issue string without '#' prefix (bare number) is still parsed correctly."""
-        item = _make_item(issue="123")
-        out = Output()
-
-        mock_provider = MagicMock()
-        mock_provider.get_manifest.return_value = _empty_manifest(issue_number=123)
-
-        with (
-            patch("backlog_core.operations.create_artifact_provider", return_value=mock_provider),
-            patch("backlog_core.operations.ArtifactRegistry") as mock_registry_cls,
-        ):
-            mock_registry = MagicMock()
-            mock_registry.register.return_value = _empty_manifest(issue_number=123)
-            mock_registry_cls.return_value = mock_registry
-
-            _auto_register_plan_artifact(item, "plan/tasks-1-baz.yaml", repo="owner/repo", output=out)
-
-        mock_provider.get_manifest.assert_called_once_with(123)
-        assert out.warnings == []
-
-    def test_auto_register_plan_artifact_set_manifest_failure_warns(self) -> None:
-        """set_manifest failure logs a warning but does not propagate."""
-        item = _make_item(issue="#7")
-        out = Output()
-
-        mock_provider = MagicMock()
-        mock_provider.get_manifest.return_value = _empty_manifest(issue_number=7)
-        mock_provider.set_manifest.side_effect = OSError("network timeout")
-
-        with (
-            patch("backlog_core.operations.create_artifact_provider", return_value=mock_provider),
-            patch("backlog_core.operations.ArtifactRegistry") as mock_registry_cls,
-        ):
-            mock_registry = MagicMock()
-            mock_registry.register.return_value = _empty_manifest(issue_number=7)
-            mock_registry_cls.return_value = mock_registry
-
-            # Must not raise
-            _auto_register_plan_artifact(item, "plan/tasks-1-qux.yaml", repo="owner/repo", output=out)
-
-        assert any("WARNING" in w for w in out.warnings)
+    assert result["plan"] == "plan/tasks-2-bar.yaml"
+    assert item.metadata.plan == "plan/tasks-2-bar.yaml"
+    provider.put_work_item.assert_called_once_with(item)

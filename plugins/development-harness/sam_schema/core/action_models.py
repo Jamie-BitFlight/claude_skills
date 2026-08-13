@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from sam_schema.core.models import _BEADS_ID_PATTERN, STATUS_MAP, TASK_ID_PATTERN, Task, TaskStatus
+from sam_schema.core.models import _BEADS_ID_PATTERN, STATUS_MAP, TASK_ID_PATTERN, AcceptanceCriterion, Task, TaskStatus
 
 # ---------------------------------------------------------------------------
 # Shared base — eliminates 17x repeated model_config boilerplate
@@ -191,11 +191,7 @@ class CreatePlanConfig(_ActionConfigBase):
 
     action: Literal["create"] = "create"
     slug: str = Field(
-        ...,
-        description=(
-            "Short identifier for the plan (e.g., 'auth-system'). "
-            "Used to compose the plan filename: P{NNN}-{slug}.yaml."
-        ),
+        ..., description="Logical feature slug stored as the plan's feature identifier (e.g., 'auth-system')."
     )
     goal: str = Field(..., description="Human-readable goal statement for the plan.")
     tasks: list[TaskDefinition] = Field(
@@ -213,13 +209,27 @@ class CreatePlanConfig(_ActionConfigBase):
     context: str | None = Field(
         default=None, description="Optional plan-level context (markdown prose). Stored as Plan.context."
     )
+    acceptance_criteria_structured: list[AcceptanceCriterion] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("acceptance-criteria-structured", "acceptance_criteria_structured"),
+        serialization_alias="acceptance-criteria-structured",
+    )
     issue: int | None = Field(
         default=None,
         description=(
-            "Optional GitHub issue number. When provided, auto-registers the created plan "
-            "file as a task-plan artifact on the issue."
+            "Legacy numeric owner alias. Stores the number in plan metadata and associates persisted plan content "
+            "with owner reference '#<issue>'. Prefer owner_reference for provider-native identifiers."
         ),
     )
+    owner_reference: str | None = Field(
+        default=None, description="Optional opaque backend owner reference for the created plan."
+    )
+
+    @model_validator(mode="after")
+    def _exclusive_owner(self) -> CreatePlanConfig:
+        if self.issue is not None and self.owner_reference is not None:
+            raise ValueError("issue and owner_reference cannot be combined")
+        return self
 
 
 class ListPlansConfig(_ActionConfigBase):
@@ -299,6 +309,16 @@ class UpdatePlanConfig(_ActionConfigBase):
     section_content: str | None = Field(
         default=None, description="Body text for the appended section. Used with append_section_name and task_id."
     )
+    owner_reference: str | None = Field(
+        default=None, description="Optional opaque backend owner reference; empty unlinks the plan."
+    )
+
+    @model_validator(mode="after")
+    def _exclusive_owner(self) -> UpdatePlanConfig:
+        has_issue = self.set_fields_json is not None and self.set_fields_json.get("issue") is not None
+        if self.owner_reference is not None and has_issue:
+            raise ValueError("issue and owner_reference cannot be combined")
+        return self
 
 
 class AppendTaskConfig(_ActionConfigBase):

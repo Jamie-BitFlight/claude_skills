@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 
 import pytest
+from ruamel.yaml import YAML
 from sam_schema.cli import app
+from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.models import Plan
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -20,20 +23,15 @@ _PURE_YAML_SINGLE: Path = FIXTURES_DIR / "pure_yaml_single.yaml"
 
 
 @pytest.fixture
-def plan_dir(tmp_path: Path) -> Path:
-    """Create a temporary plan directory containing a copy of pure_yaml_single.yaml.
-
-    The file is named ``P001-auth-system.yaml`` so address ``P1`` resolves
-    to it via numeric match, and ``auth-system`` resolves via slug match.
-
-    Returns:
-        Path to a ``plan/`` directory with one plan file.
-    """
-    d = tmp_path / "plan"
-    d.mkdir()
-    content = _PURE_YAML_SINGLE.read_text(encoding="utf-8")
-    (d / "P001-auth-system.yaml").write_text(content, encoding="utf-8")
-    return d
+def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
+    plan = Plan.model_validate(YAML(typ="safe").load(_PURE_YAML_SINGLE.read_text(encoding="utf-8")))
+    stored = content_backend.create_plan(
+        plan.feature,
+        plan.goal or plan.description,
+        plan.tasks,
+        issue=int(plan.issue) if plan.issue is not None else None,
+    )
+    return tmp_path / stored["plan_id"]
 
 
 # ---------------------------------------------------------------------------
@@ -57,7 +55,7 @@ def test_append_task_uses_typed_options(plan_dir: Path) -> None:
             "plan",
             "append-task",
             "--plan-address",
-            "P1",
+            plan_dir.name,
             "--plan-dir",
             str(plan_dir),
             "--task-id",
@@ -93,12 +91,14 @@ def test_append_task_stdin_carries_fields_absent_from_typed_options(plan_dir: Pa
         "  Do the thing.\n"
     )
     result = runner.invoke(
-        app, ["plan", "append-task", "--plan-address", "P1", "--plan-dir", str(plan_dir), "--stdin"], input=task_yaml
+        app,
+        ["plan", "append-task", "--plan-address", plan_dir.name, "--plan-dir", str(plan_dir), "--stdin"],
+        input=task_yaml,
     )
     assert result.exit_code == 0, result.stdout
     assert json.loads(result.stdout) == {"appended": True, "task_id": "T4"}
 
-    read_result = runner.invoke(app, ["plan", "read", "--address", "P1/T4", "--plan-dir", str(plan_dir)])
+    read_result = runner.invoke(app, ["plan", "read", "--address", f"{plan_dir.name}/T4", "--plan-dir", str(plan_dir)])
     task = json.loads(read_result.stdout)["task"]
     assert task["skills"] == ["python-engineering:python3-cli"]
     assert task["body"] == "## Objective\nDo the thing.\n"
@@ -113,7 +113,17 @@ def test_append_task_stdin_combined_with_typed_option_is_rejected(plan_dir: Path
     """
     result = runner.invoke(
         app,
-        ["plan", "append-task", "--plan-address", "P1", "--plan-dir", str(plan_dir), "--stdin", "--task-id", "T4"],
+        [
+            "plan",
+            "append-task",
+            "--plan-address",
+            plan_dir.name,
+            "--plan-dir",
+            str(plan_dir),
+            "--stdin",
+            "--task-id",
+            "T4",
+        ],
         input="task: T4\ntitle: x\n",
     )
     assert result.exit_code != 0
@@ -291,13 +301,11 @@ def test_list_offset_and_limit_paginate_results(plan_dir: Path) -> None:
     assert len(items) <= 1
 
 
-def test_list_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
-    """List with non-existent plan_dir exits 1."""
+def test_list_uses_provider_when_plan_dir_is_missing(tmp_path: Path) -> None:
     missing = tmp_path / "no-such-dir"
     result = runner.invoke(app, ["plan", "list", "--plan-dir", str(missing)])
-    assert result.exit_code == 1
-    assert not result.stdout
-    assert "Error:" in result.stderr
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["items"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +315,7 @@ def test_list_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
 
 def test_read_returns_task_assignment_json_with_task_address(plan_dir: Path) -> None:
     """Read P1/T1 returns TaskAssignment JSON with plan context + nested task."""
-    result = runner.invoke(app, ["plan", "read", "--address", "P1/T1", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "read", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     # TaskAssignment wraps the task inside a "task" field.
@@ -318,7 +326,7 @@ def test_read_returns_task_assignment_json_with_task_address(plan_dir: Path) -> 
 
 def test_read_task_assignment_includes_plan_fields(plan_dir: Path) -> None:
     """Read P1/T1 returns plan-level fields alongside the task."""
-    result = runner.invoke(app, ["plan", "read", "--address", "P1/T1", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "read", "--address", f"{plan_dir.name}/T1", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     # Plan-level fields are present at top level (may be None if not set in fixture).
@@ -329,7 +337,7 @@ def test_read_task_assignment_includes_plan_fields(plan_dir: Path) -> None:
 
 def test_read_uses_slug_address(plan_dir: Path) -> None:
     """Read Pauth-system/T2 resolves via slug match and returns TaskAssignment."""
-    result = runner.invoke(app, ["plan", "read", "--address", "Pauth-system/T2", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "read", "--address", "auth-system/T2", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert data["task"]["id"] == "T2"
@@ -345,7 +353,7 @@ def test_read_invalid_address_exits_with_code_1(plan_dir: Path) -> None:
 
 def test_read_plan_only_address_returns_plan_json(plan_dir: Path) -> None:
     """Read P1 (no task part) returns ReadResult JSON — plan is nested under 'plan' key."""
-    result = runner.invoke(app, ["plan", "read", "--address", "P1", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "read", "--address", plan_dir.name, "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     # read_plan returns a ReadResult with .plan, .gaps, .source_format, .source_path.
@@ -363,7 +371,7 @@ def test_read_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
 
 def test_read_nonexistent_task_exits_with_code_1(plan_dir: Path) -> None:
     """Read P1/T99 (task not in plan) exits 1."""
-    result = runner.invoke(app, ["plan", "read", "--address", "P1/T99", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "read", "--address", f"{plan_dir.name}/T99", "--plan-dir", str(plan_dir)])
     assert result.exit_code == 1
 
 
@@ -381,7 +389,7 @@ def test_read_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
 
 def test_status_returns_json_summary(plan_dir: Path) -> None:
     """Status P1 returns JSON with feature, total_tasks, and by_status."""
-    result = runner.invoke(app, ["plan", "status", "--plan-address", "P1", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "status", "--plan-address", plan_dir.name, "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert data["feature"] == "auth-system"
@@ -404,23 +412,18 @@ def test_status_missing_plan_dir_exits_with_code_1(tmp_path: Path) -> None:
     assert result.exit_code == 1
 
 
-def test_status_all_skips_structurally_malformed_plan(plan_dir: Path) -> None:
-    """Status --all warns and skips a plan whose top level is not a YAML mapping.
+def test_status_all_does_not_fallback_to_local_yaml(plan_dir: Path, tmp_path: Path) -> None:
+    local_plan_dir = tmp_path / "plan"
+    local_plan_dir.mkdir()
+    (local_plan_dir / "P002-bad.yaml").write_text("- just\n- a\n- list\n", encoding="utf-8")
 
-    Tests: warn-and-skip resilience against a TypeError-raising candidate.
-    How: Add a bare-list YAML file (raises TypeError in the reader, not ValueError)
-        alongside the valid fixture plan, then request --all.
-    Why: A single malformed plan must not abort the rest of the listing.
-    """
-    (plan_dir / "P002-bad.yaml").write_text("- just\n- a\n- list\n", encoding="utf-8")
-
-    result = runner.invoke(app, ["plan", "status", "--all", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "status", "--all", "--plan-dir", str(local_plan_dir)])
 
     assert result.exit_code == 0, result.stdout
     data = json.loads(result.stdout)
     assert len(data) == 1
     assert data[0]["feature"] == "auth-system"
-    assert "Warning: skipping" in result.stderr
+    assert result.stderr == ""
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +433,7 @@ def test_status_all_skips_structurally_malformed_plan(plan_dir: Path) -> None:
 
 def test_ready_returns_json_list(plan_dir: Path) -> None:
     """Ready P1 returns a JSON envelope with ready_tasks (may be empty or contain tasks)."""
-    result = runner.invoke(app, ["plan", "ready", "--plan-address", "P1", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "ready", "--plan-address", plan_dir.name, "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert isinstance(data, dict)
@@ -451,7 +454,17 @@ def test_ready_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
 def test_state_updates_task_status_and_prints_confirmation(plan_dir: Path) -> None:
     """State P1/T3 in-progress updates status and prints old -> new."""
     result = runner.invoke(
-        app, ["plan", "state", "--address", "P1/T3", "--new-status", "in-progress", "--plan-dir", str(plan_dir)]
+        app,
+        [
+            "plan",
+            "state",
+            "--address",
+            f"{plan_dir.name}/T3",
+            "--new-status",
+            "in-progress",
+            "--plan-dir",
+            str(plan_dir),
+        ],
     )
     assert result.exit_code == 0
     assert "T3" in result.stdout
@@ -461,7 +474,8 @@ def test_state_updates_task_status_and_prints_confirmation(plan_dir: Path) -> No
 def test_state_invalid_status_value_is_rejected_by_typer(plan_dir: Path) -> None:
     """State rejects an invalid typed status before execution."""
     result = runner.invoke(
-        app, ["plan", "state", "--address", "P1/T1", "--new-status", "bananas", "--plan-dir", str(plan_dir)]
+        app,
+        ["plan", "state", "--address", f"{plan_dir.name}/T1", "--new-status", "bananas", "--plan-dir", str(plan_dir)],
     )
     assert result.exit_code == 2
     assert "Error" in result.stderr
@@ -470,7 +484,7 @@ def test_state_invalid_status_value_is_rejected_by_typer(plan_dir: Path) -> None
 def test_state_missing_task_component_exits_with_code_1(plan_dir: Path) -> None:
     """State P1 (no task) exits 1."""
     result = runner.invoke(
-        app, ["plan", "state", "--address", "P1", "--new-status", "complete", "--plan-dir", str(plan_dir)]
+        app, ["plan", "state", "--address", plan_dir.name, "--new-status", "complete", "--plan-dir", str(plan_dir)]
     )
     assert result.exit_code == 1
 
@@ -478,7 +492,8 @@ def test_state_missing_task_component_exits_with_code_1(plan_dir: Path) -> None:
 def test_state_nonexistent_task_exits_with_code_1(plan_dir: Path) -> None:
     """State P1/T99 (task not in plan) exits 1."""
     result = runner.invoke(
-        app, ["plan", "state", "--address", "P1/T99", "--new-status", "complete", "--plan-dir", str(plan_dir)]
+        app,
+        ["plan", "state", "--address", f"{plan_dir.name}/T99", "--new-status", "complete", "--plan-dir", str(plan_dir)],
     )
     assert result.exit_code == 1
 
@@ -486,7 +501,8 @@ def test_state_nonexistent_task_exits_with_code_1(plan_dir: Path) -> None:
 def test_state_output_shows_old_and_new_status(plan_dir: Path) -> None:
     """State P1/T3 complete shows both old and new status in output."""
     result = runner.invoke(
-        app, ["plan", "state", "--address", "P1/T3", "--new-status", "complete", "--plan-dir", str(plan_dir)]
+        app,
+        ["plan", "state", "--address", f"{plan_dir.name}/T3", "--new-status", "complete", "--plan-dir", str(plan_dir)],
     )
     assert result.exit_code == 0
     data = json.loads(result.stdout)
@@ -511,7 +527,7 @@ def test_migrate_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
 
 def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
     """Validate P1 on a canonical YAML plan reports no errors or warnings."""
-    result = runner.invoke(app, ["plan", "validate", "--address", "P1", "--plan-dir", str(plan_dir)])
+    result = runner.invoke(app, ["plan", "validate", "--address", plan_dir.name, "--plan-dir", str(plan_dir)])
     assert result.exit_code == 0
     data = json.loads(result.stdout)
     assert data["valid"] is True
@@ -519,25 +535,18 @@ def test_validate_canonical_plan_reports_valid(plan_dir: Path) -> None:
     assert data["warnings"] == []
 
 
-def test_validate_structurally_malformed_plan_reports_invalid_instead_of_crashing(tmp_path: Path) -> None:
-    """Validate on a plan whose top level is not a mapping returns valid:false, not a traceback.
+def test_validate_does_not_fallback_to_local_yaml(tmp_path: Path) -> None:
+    local_plan_dir = tmp_path / "plan"
+    local_plan_dir.mkdir()
+    (local_plan_dir / "P001-auth-system.yaml").write_text(
+        _PURE_YAML_SINGLE.read_text(encoding="utf-8"), encoding="utf-8"
+    )
 
-    Tests: TypeError from the reader is converted into the JSON validation contract.
-    How: Write a bare-list YAML file (not a mapping) and validate it.
-    Why: Callers of ``sam plan validate`` parse JSON on stdout -- an uncaught traceback
-        breaks that contract for the exact malformed-plan case validate exists to detect.
-    """
-    d = tmp_path / "plan"
-    d.mkdir()
-    (d / "P001-bad.yaml").write_text("- just\n- a\n- list\n", encoding="utf-8")
-
-    result = runner.invoke(app, ["plan", "validate", "--address", "P1", "--plan-dir", str(d)])
+    result = runner.invoke(app, ["plan", "validate", "--address", "P1", "--plan-dir", str(local_plan_dir)])
 
     assert result.exit_code == 1
-    data = json.loads(result.stdout)
-    assert data["valid"] is False
-    assert data["errors"]
-    assert data["warnings"] == []
+    assert result.stdout == ""
+    assert "Plan not found" in result.stderr
 
 
 def test_removed_cli_forms_are_rejected() -> None:

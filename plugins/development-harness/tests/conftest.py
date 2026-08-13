@@ -4,10 +4,9 @@ Adds the plugin root to sys.path so ``from backlog_core.parsing import ...``
 resolves correctly regardless of pytest invocation directory.
 
 Shared fixtures for scenario integration tests:
-- ``backlog_dir``: Redirects backlog state to tmp_path via DH_STATE_HOME for
-  test isolation (uses dh_paths.backlog_dir() path conventions)
-- ``mock_github``: Patches all gh_client.py functions at operations.py boundary
-- ``write_test_item``: Factory for creating per-item files with valid frontmatter
+- ``backlog_dir``: Redirects legacy path-specific tests to an isolated directory
+- ``mock_github``: Patches GitHub delegates at the operations boundary
+- ``write_test_item``: Creates work items through the configured backend
 """
 
 from __future__ import annotations
@@ -39,14 +38,37 @@ if str(_docs_dir) not in sys.path:
 
 import backlog_core.models as _bc_models
 import pytest
+from backlog_core.backend_protocol import reset_config, set_config
+from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.models import ReconcileRequest, ReconcileResult
 
 if TYPE_CHECKING:
     from backlog_core.models import GroomedData, Section
 
 
+class ProviderMemoryBackend(InMemoryBackend):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reconcile_requests: list[ReconcileRequest] = []
+        self.reconcile_result = ReconcileResult()
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+        self.reconcile_requests.append(request)
+        return self.reconcile_result
+
+
 # ---------------------------------------------------------------------------
 # Shared fixtures for backlog scenario integration tests
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _isolated_backend(monkeypatch: pytest.MonkeyPatch) -> object:
+    backend = ProviderMemoryBackend()
+    set_config(BacklogConfig(backend=backend))
+    yield backend
+    reset_config()
 
 
 @pytest.fixture
@@ -112,7 +134,6 @@ def mock_github(monkeypatch):
         "apply_status_verified": None,
         "fetch_open_issues_by_title": {},
         "view_enrich_from_github": False,
-        "sync_groomed_to_github_issue": True,
         "fetch_github_issue_body": "issue body from github",
         "issue_to_local_fields": IssueLocalFields(
             title="Test", body="body", priority="P1", item_type="Feature", status="open"
@@ -126,19 +147,7 @@ def mock_github(monkeypatch):
 
 
 @pytest.fixture
-def write_test_item(backlog_dir: Path) -> object:
-    """Factory: create per-item ``.yaml`` file loadable by yaml_io in test backlog_dir.
-
-    Creates pure-YAML backlog item files via ``yaml_io.save_item()``, replacing the
-    legacy ``build_backlog_frontmatter`` + ``.md`` approach.
-
-    Usage::
-
-        filepath = write_test_item("My Title", priority="P0", issue="#42")
-
-    Returns the Path to the created ``.yaml`` file.
-    """
-
+def write_test_item() -> object:
     def _write(
         title: str,
         priority: str = "P1",
@@ -147,16 +156,16 @@ def write_test_item(backlog_dir: Path) -> object:
         status: str = "open",
         type_val: str = "Feature",
         sections: dict[str, Section | GroomedData] | None = None,
-    ) -> Path:
+    ) -> str:
         from backlog_core.models import BacklogItem, BacklogItemMetadata
         from backlog_core.parsing import title_to_slug
-        from backlog_core.yaml_io import save_item
 
         slug = title_to_slug(title)
-        filepath = backlog_dir / f"{priority.lower()}-{slug}.yaml"
+        reference = issue or f"{priority.lower()}-{slug}"
         item = BacklogItem(
             title=title,
             description=description,
+            reference=reference,
             metadata=BacklogItemMetadata(
                 source="test",
                 added="2026-01-01",
@@ -168,8 +177,10 @@ def write_test_item(backlog_dir: Path) -> object:
             ),
             sections=sections or {},
         )
-        save_item(item, filepath)
-        return filepath
+        from backlog_core.backend_protocol import get_config
+
+        get_config().backend.put_work_item(item)
+        return reference
 
     return _write
 

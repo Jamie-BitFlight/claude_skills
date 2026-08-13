@@ -30,12 +30,13 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from functools import wraps
+from threading import RLock
+from typing import TYPE_CHECKING, Any, Concatenate, Literal, ParamSpec, TypeVar
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from github.Repository import Repository
 
     from backlog_core.models import Output, SamTask
@@ -48,6 +49,13 @@ from backlog_core.models import (
     BacklogItem,
     BacklogItemMetadata,
     BranchInfo,
+    ContentConflictError,
+    ContentKind,
+    ContentNotFoundError,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
     GroomedData,
     IssueLocalFields,
     IssueStatus,
@@ -108,6 +116,22 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS content_records (
+    kind             TEXT NOT NULL,
+    namespace        TEXT NOT NULL,
+    artifact_type    TEXT NOT NULL,
+    name             TEXT NOT NULL,
+    owner_reference  TEXT NOT NULL,
+    content           TEXT NOT NULL,
+    revision          INTEGER NOT NULL,
+    PRIMARY KEY (kind, namespace, artifact_type, name)
+);
+
+CREATE TABLE IF NOT EXISTS work_item_records (
+    reference TEXT PRIMARY KEY,
+    content   TEXT NOT NULL
+);
+
 PRAGMA journal_mode=WAL;
 """
 
@@ -115,6 +139,21 @@ PRAGMA journal_mode=WAL;
 def _now() -> str:
     """Return current UTC time as ISO 8601 string."""
     return datetime.now(UTC).isoformat()
+
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+
+def _serialized_connection_operation(
+    method: Callable[Concatenate[SQLiteBackend, _P], _T],
+) -> Callable[Concatenate[SQLiteBackend, _P], _T]:
+    @wraps(method)
+    def locked(self: SQLiteBackend, /, *args: _P.args, **kwargs: _P.kwargs) -> _T:
+        with self._content_lock:
+            return method(self, *args, **kwargs)
+
+    return locked
 
 
 class SQLiteBackend:
@@ -151,8 +190,121 @@ class SQLiteBackend:
         self._db_path = db_path
         self._conn = sqlite3.connect(db_path, check_same_thread=False, detect_types=sqlite3.PARSE_DECLTYPES)
         self._conn.row_factory = sqlite3.Row
+        self._content_lock = RLock()
         self._conn.executescript(_SCHEMA_SQL)
         self._conn.commit()
+
+    @_serialized_connection_operation
+    def list_work_items(self) -> list[BacklogItem]:
+        """List native SQLite work items.
+
+        Returns:
+            Persisted work items.
+        """
+        rows = self._conn.execute("SELECT content FROM work_item_records ORDER BY reference").fetchall()
+        return [BacklogItem.model_validate_json(row["content"]) for row in rows]
+
+    @_serialized_connection_operation
+    def get_work_item(self, reference: str) -> BacklogItem:
+        """Get a work item by its stable reference.
+
+        Returns:
+            The matching work item.
+        """
+        row = self._conn.execute("SELECT content FROM work_item_records WHERE reference = ?", (reference,)).fetchone()
+        if row is not None:
+            return BacklogItem.model_validate_json(row["content"])
+        raise KeyError(reference)
+
+    @_serialized_connection_operation
+    def put_work_item(self, item: BacklogItem) -> None:
+        """Upsert a work item under its stable reference."""
+        item.reference = item.reference or item.issue or uuid.uuid4().hex
+        reference = item.reference
+        self._conn.execute(
+            "INSERT INTO work_item_records (reference, content) VALUES (?, ?) "
+            "ON CONFLICT(reference) DO UPDATE SET content = excluded.content",
+            (reference, item.model_dump_json()),
+        )
+        self._conn.commit()
+
+    @_serialized_connection_operation
+    def list_content(self, query: ContentQuery) -> list[ContentRecord]:
+        """Return the requested bounded page from SQLite content."""
+        rows = self._conn.execute(
+            "SELECT * FROM content_records WHERE kind = ? AND (? IS NULL OR owner_reference = ?) "
+            "AND instr(lower(name), lower(?)) > 0 ORDER BY namespace, artifact_type, name LIMIT ? OFFSET ?",
+            (query.kind, query.owner_reference, query.owner_reference, query.search, query.limit, query.offset),
+        ).fetchall()
+        return [self._content_record(row) for row in rows]
+
+    @_serialized_connection_operation
+    def get_content(self, reference: ContentRef) -> ContentRecord:
+        """Return one SQLite content record by logical identity."""
+        row = self._conn.execute(
+            "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
+            self._content_key(reference),
+        ).fetchone()
+        if row is None:
+            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
+        return self._content_record(row)
+
+    @_serialized_connection_operation
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        """Create or replace one SQLite content record.
+
+        Returns:
+            The stored record with its new revision.
+        """
+        with self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            current = self._conn.execute(
+                "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
+                self._content_key(request.reference),
+            ).fetchone()
+            current_revision = str(current["revision"]) if current is not None else ""
+            if request.create_only and current is not None:
+                raise ContentConflictError("Content already exists")
+            if request.expected_revision and request.expected_revision != current_revision:
+                raise ContentConflictError("Content revision no longer matches")
+            owner_reference = request.reference.namespace
+            if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
+                owner_reference = (
+                    request.owner_reference
+                    if request.owner_reference is not None
+                    else str(current["owner_reference"])
+                    if current is not None
+                    else ""
+                )
+            revision = int(current_revision or "0") + 1
+            self._conn.execute(
+                "INSERT INTO content_records "
+                "(kind, namespace, artifact_type, name, owner_reference, content, revision) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(kind, namespace, artifact_type, name) DO UPDATE SET "
+                "owner_reference = excluded.owner_reference, content = excluded.content, revision = excluded.revision",
+                (*self._content_key(request.reference), owner_reference, request.content, revision),
+            )
+        return ContentRecord(
+            reference=request.reference,
+            owner_reference=owner_reference,
+            content=request.content,
+            revision=str(revision),
+        )
+
+    @staticmethod
+    def _content_key(reference: ContentRef) -> tuple[str, str, str, str]:
+        return (reference.kind, reference.namespace, reference.artifact_type, reference.name)
+
+    @staticmethod
+    def _content_record(row: sqlite3.Row) -> ContentRecord:
+        return ContentRecord(
+            reference=ContentRef(
+                kind=row["kind"], namespace=row["namespace"], artifact_type=row["artifact_type"], name=row["name"]
+            ),
+            owner_reference=row["owner_reference"],
+            content=row["content"],
+            revision=str(row["revision"]),
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -277,6 +429,7 @@ class SQLiteBackend:
     # Issue CRUD
     # ------------------------------------------------------------------
 
+    @_serialized_connection_operation
     def _fetch_issue_graphql(self, repo: Repository, owner: str, repo_name: str, issue_number: int) -> IssueNode:
         """Return the stored IssueNode for the given number.
 
@@ -298,6 +451,7 @@ class SQLiteBackend:
             raise KeyError(msg)
         return self._row_to_issue_node(row)
 
+    @_serialized_connection_operation
     def _fetch_issues_graphql(
         self,
         repo: Repository,
@@ -346,6 +500,7 @@ class SQLiteBackend:
 
         return nodes
 
+    @_serialized_connection_operation
     def _update_issue_graphql(
         self,
         repo: Repository,
@@ -423,7 +578,6 @@ class SQLiteBackend:
         milestone_number: int | None = None,
         since: datetime | None = None,
         callback: Callable[[IssueNode], None] | None = None,
-        track_timestamp: bool = False,
     ) -> list[IssueNode]:
         """Return stored issues, calling callback for each.
 
@@ -436,7 +590,6 @@ class SQLiteBackend:
             milestone_number: Optional milestone number to filter by.
             since: Ignored.
             callback: Optional function called for each fetched IssueNode.
-            track_timestamp: Ignored.
 
         Returns:
             List of ``IssueNode`` TypedDicts.
@@ -449,6 +602,7 @@ class SQLiteBackend:
                 callback(issue)
         return issues
 
+    @_serialized_connection_operation
     def create_issue_for_item(
         self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:
@@ -475,6 +629,7 @@ class SQLiteBackend:
         self._conn.commit()
         return number
 
+    @_serialized_connection_operation
     def close_github_issue(
         self,
         issue_ref: str,
@@ -502,6 +657,7 @@ class SQLiteBackend:
         )
         self._conn.commit()
 
+    @_serialized_connection_operation
     def resolve_github_issue(
         self,
         issue_ref: str,
@@ -533,6 +689,7 @@ class SQLiteBackend:
         )
         self._conn.commit()
 
+    @_serialized_connection_operation
     def fetch_open_issues_by_title(self, repo: Repository) -> dict[str, int]:
         """Return a mapping of open issue titles to issue numbers.
 
@@ -545,6 +702,7 @@ class SQLiteBackend:
         rows = self._conn.execute("SELECT title, issue_number FROM items WHERE status = 'open'").fetchall()
         return {str(row["title"]): int(row["issue_number"]) for row in rows}
 
+    @_serialized_connection_operation
     def fetch_github_issue_body(self, repo_obj: Repository, issue_num: int, output: Output | None = None) -> str | None:
         """Return the body of the stored issue, or None if not found.
 
@@ -571,6 +729,7 @@ class SQLiteBackend:
         """
         return []
 
+    @_serialized_connection_operation
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
         """Return statuses for items that have issue numbers.
 
@@ -592,6 +751,7 @@ class SQLiteBackend:
                 result[num] = IssueStatus(status=str(row["status"]))
         return result
 
+    @_serialized_connection_operation
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
         """Return the status string for a single item.
 
@@ -610,6 +770,7 @@ class SQLiteBackend:
         row = self._conn.execute("SELECT status FROM items WHERE issue_number = ?", (num,)).fetchone()
         return str(row["status"]) if row is not None else "open"
 
+    @_serialized_connection_operation
     def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
         """Enrich a ViewItemResult from stored issue data.
 
@@ -649,6 +810,7 @@ class SQLiteBackend:
     # Issue comments
     # ------------------------------------------------------------------
 
+    @_serialized_connection_operation
     def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str:
         """Add a comment to an issue and return its ID.
 
@@ -670,6 +832,7 @@ class SQLiteBackend:
         self._conn.commit()
         return comment_id
 
+    @_serialized_connection_operation
     def _fetch_issue_comments_graphql(
         self, repo: Repository, owner: str, repo_name: str, issue_number: int
     ) -> list[IssueCommentNode]:
@@ -699,6 +862,7 @@ class SQLiteBackend:
             for row in rows
         ]
 
+    @_serialized_connection_operation
     def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode:
         """Return a comment by its ID.
 
@@ -725,6 +889,7 @@ class SQLiteBackend:
             updated_at=str(row["updated_at"]),
         )
 
+    @_serialized_connection_operation
     def _update_issue_comment_graphql(self, repo: Repository, comment_node_id: str, body: str) -> None:
         """Update a comment's body.
 
@@ -740,6 +905,7 @@ class SQLiteBackend:
     # Status mutations
     # ------------------------------------------------------------------
 
+    @_serialized_connection_operation
     def apply_status_in_progress(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """Store an in-progress tag on the item's issue row.
 
@@ -755,6 +921,7 @@ class SQLiteBackend:
         self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'in-progress')", (num,))
         self._conn.commit()
 
+    @_serialized_connection_operation
     def apply_status_verified(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """Store a verified tag on the item's issue row.
 
@@ -770,6 +937,7 @@ class SQLiteBackend:
         self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'verified')", (num,))
         self._conn.commit()
 
+    @_serialized_connection_operation
     def apply_status_groomed(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """Store a groomed tag on the item's issue row.
 
@@ -785,6 +953,7 @@ class SQLiteBackend:
         self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'groomed')", (num,))
         self._conn.commit()
 
+    @_serialized_connection_operation
     def sync_groomed_to_github_issue(
         self,
         repo_obj: Repository,
@@ -821,6 +990,7 @@ class SQLiteBackend:
     # Milestones and projects
     # ------------------------------------------------------------------
 
+    @_serialized_connection_operation
     def _fetch_milestones_graphql(
         self, repo: Repository, owner: str, repo_name: str, states: list[str] | None = None
     ) -> list[MilestoneFullNode]:
@@ -869,6 +1039,7 @@ class SQLiteBackend:
     # Task issues
     # ------------------------------------------------------------------
 
+    @_serialized_connection_operation
     def create_task_issue(
         self,
         repo: Repository,
@@ -914,6 +1085,7 @@ class SQLiteBackend:
         row = self._conn.execute("SELECT * FROM items WHERE issue_number = ?", (number,)).fetchone()
         return self._row_to_issue_node(row)
 
+    @_serialized_connection_operation
     def get_task_issues(
         self, repo: Repository, parent_issue_number: int, output: Output | None = None
     ) -> list[IssueNode]:
@@ -930,6 +1102,7 @@ class SQLiteBackend:
         rows = self._conn.execute("SELECT * FROM items ORDER BY issue_number").fetchall()
         return [self._row_to_issue_node(r) for r in rows]
 
+    @_serialized_connection_operation
     def update_task_status(
         self, repo: Repository, issue_number: int, new_status: str, output: Output | None = None
     ) -> bool:

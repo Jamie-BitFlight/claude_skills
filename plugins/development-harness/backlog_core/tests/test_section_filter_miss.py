@@ -31,6 +31,8 @@ from typing import TYPE_CHECKING
 from backlog_core.models import BacklogItem, Section, ViewItemResult
 from backlog_core.operations import _apply_body_section_filter, view_item
 
+from ._view_test_helpers import _configure_memory_view
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
@@ -153,15 +155,7 @@ class TestViewItemSectionFilterMissExposedInResponse:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=300)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _BODY_NO_NONEXISTENT
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=300, body=_BODY_NO_NONEXISTENT)
 
         # Act
         result = view_item("#300", include_content=True, section="NonExistent")
@@ -183,15 +177,7 @@ class TestViewItemSectionFilterMissExposedInResponse:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=301)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _BODY_WITH_CONCERNS
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=301, body=_BODY_WITH_CONCERNS)
 
         # Act
         result = view_item("#301", include_content=True, section="Concerns")
@@ -215,15 +201,7 @@ class TestViewItemSectionFilterMissExposedInResponse:
         """
         # Arrange
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=302)
-
-        def _inject_body(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
-            result.body = _BODY_NO_NONEXISTENT
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=302, body=_BODY_NO_NONEXISTENT)
 
         # Act
         result = view_item("#302", include_content=False, section="NonExistent")

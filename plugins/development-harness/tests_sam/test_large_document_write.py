@@ -23,7 +23,7 @@ from sam_schema.core.models import Complexity, Priority
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from sam_schema.core.backends.memory import InMemoryTaskProvider
+    from sam_schema.core.backends.content import ContentTaskProvider
 
 # ---------------------------------------------------------------------------
 # Task generation helpers
@@ -108,7 +108,7 @@ def _extract_task_fields(task: Mapping[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskProvider) -> None:
+def test_A_monolithic_50_task_create_round_trips(memory_backend: ContentTaskProvider) -> None:
     """Monolithic create with 50 tasks completes and round-trips field content correctly.
 
     AC #18 Test A: sam_plan(action='create', tasks=<50 TaskDefinition objects>) must succeed
@@ -152,7 +152,7 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: InMemoryTaskPro
 # ---------------------------------------------------------------------------
 
 
-def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMemoryTaskProvider) -> None:
+def test_B_incremental_50_append_matches_monolithic_create(memory_backend: ContentTaskProvider) -> None:
     """50 sequential append_task calls produce plan with identical content to monolithic create.
 
     AC #18 Test B: the plan produced by create({tasks:[]}) + 50 x append_task
@@ -207,7 +207,7 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: InMem
 # ---------------------------------------------------------------------------
 
 
-def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: InMemoryTaskProvider) -> None:
+def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: ContentTaskProvider) -> None:
     """Create with 5 tasks then append 45 more: total 50 tasks in correct order.
 
     AC #18 Test C: mixed approach must produce correct task ordering (T01 first,

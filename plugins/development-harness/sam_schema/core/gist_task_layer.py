@@ -61,9 +61,16 @@ if TYPE_CHECKING:
 
     from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
-    from sam_schema.core.models import Task
+    from sam_schema.core.models import AcceptanceCriterion, Task
     from sam_schema.core.plan_id_index import PlanIdIndex, PlanIndexEntry
-    from sam_schema.core.task_backend_types import DocumentData, DocumentHandle, PlanData, PlanSummary, TaskData
+    from sam_schema.core.task_backend_types import (
+        DocumentData,
+        DocumentHandle,
+        PlanData,
+        PlanSummary,
+        PlanUpdateValue,
+        TaskData,
+    )
 
 _yaml_safe = YAML(typ="safe")
 
@@ -208,7 +215,9 @@ class GistTaskLayer:
         *,
         context: str | None = None,
         issue: int | None = None,
+        owner_reference: str | None = None,
         acceptance_criteria: str | None = None,
+        acceptance_criteria_structured: Sequence[AcceptanceCriterion] | None = None,
     ) -> PlanData:
         """Create a plan and upload YAML to Gist when an issue is provided.
 
@@ -233,7 +242,9 @@ class GistTaskLayer:
             context: Optional plan-level context narrative.
             issue: Optional GitHub issue number.  When provided, enables
                 Gist write-through.  When ``None``, plan is local-only.
+            owner_reference: Optional opaque owner reference passed to the local backend.
             acceptance_criteria: Optional plan-level acceptance criteria.
+            acceptance_criteria_structured: Optional executable acceptance criteria.
 
         Returns:
             :class:`PlanData` dict.  When ``issue`` is ``None``, the dict
@@ -250,7 +261,14 @@ class GistTaskLayer:
 
         # Step 1: local write (always — establishes the plan_id).
         plan_data = self._local.create_plan(
-            slug=slug, goal=goal, tasks=tasks, context=context, issue=issue, acceptance_criteria=acceptance_criteria
+            slug=slug,
+            goal=goal,
+            tasks=tasks,
+            context=context,
+            issue=issue,
+            owner_reference=owner_reference,
+            acceptance_criteria=acceptance_criteria,
+            acceptance_criteria_structured=acceptance_criteria_structured,
         )
         plan_id = plan_data["plan_id"]
 
@@ -772,7 +790,12 @@ class GistTaskLayer:
         self._write_hash_sidecar(hash_sidecar, content_hash, plan_id)
 
     def update_plan_fields(
-        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
+        self,
+        plan_id: str,
+        *,
+        context: str | None = None,
+        set_fields: dict[str, PlanUpdateValue] | None = None,
+        owner_reference: str | None = None,
     ) -> None:
         """Update top-level plan fields with mandatory Gist write-through (ADR-2509-5).
 
@@ -789,13 +812,14 @@ class GistTaskLayer:
             plan_id: Backend-assigned plan identifier.
             context: When provided, replaces the plan context narrative.
             set_fields: Optional mapping of field names to new values.
+            owner_reference: Optional opaque backend owner reference.
 
         Raises:
             ArtifactWriteError: When Gist write fails and plan has an issue.
             PlanNotFoundError: Propagated from ``local_backend``.
         """
         # Step 1: apply mutation locally first.
-        self._local.update_plan_fields(plan_id, context=context, set_fields=set_fields)
+        self._local.update_plan_fields(plan_id, context=context, set_fields=set_fields, owner_reference=owner_reference)
 
         # Steps 2-4: Gist write-through when issue is known.
         issue = self._resolve_issue(plan_id)

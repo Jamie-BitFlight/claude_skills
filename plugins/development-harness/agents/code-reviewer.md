@@ -166,7 +166,7 @@ Register via MCP:
 ```text
 mcp__plugin_dh_backlog__artifact_register(
   item_id={item_id},
-  type="codebase-analysis",
+  artifact_type="codebase-analysis",
   artifact_id="code-review-{task_id}-{slug}",
   content={report_markdown},
   status="complete",

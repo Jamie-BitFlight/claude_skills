@@ -14,14 +14,12 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-import dh_paths as _dh_paths
 from github import Auth, Github, GithubException
 from typing_extensions import TypedDict
 
-from . import models as _models
 from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from .entry_blocks import wrap_entry
 from .models import (
@@ -637,23 +635,11 @@ def sync_issues_graphql(
     milestone_number: int | None = None,
     since: datetime | None = None,
     callback: Callable[[IssueNode], None] | None = None,
-    track_timestamp: bool = False,
 ) -> list[IssueNode]:
-    """Shared GraphQL sync primitive — fetch issues with optional filtering, callback, and timestamp tracking.
+    """Fetch issues with optional filtering and a per-issue callback.
 
-    Wraps ``_fetch_issues_graphql`` with three optional behaviours:
-
-    - **since filter**: pass a ``datetime`` to restrict results to issues updated at or after
-      that time.  When ``track_timestamp=True`` and ``since`` is ``None``, the value is read
-      from the ``.last_sync`` file automatically.
-    - **per-issue callback**: when provided, ``callback`` is called with each ``IssueNode``
-      dict as it is processed.
-    - **timestamp tracking**: when ``track_timestamp=True``, reads ``.last_sync`` before the
-      fetch and writes the sync-start timestamp after a successful fetch so the next call can
-      run incrementally.
-
-    No new pagination logic is introduced — all pagination is delegated to
-    ``_fetch_issues_graphql`` / ``_graphql_request_paginated``.
+    Pagination is delegated to ``_fetch_issues_graphql``. Checkpoints are supplied
+    explicitly through ``since`` and persisted by the owning provider.
 
     Args:
         repo: PyGithub Repository object.
@@ -662,13 +648,9 @@ def sync_issues_graphql(
         state: Issue state filter — ``"OPEN"``, ``"CLOSED"``, or ``"OPEN,CLOSED"``.
         labels: Optional list of label names to filter by.
         milestone_number: Optional milestone number to filter by.
-        since: Optional lower-bound datetime.  Only issues updated at or after this time are
-            returned.  When ``track_timestamp=True`` and this is ``None``, the value is read
-            from the ``.last_sync`` file.
+        since: Optional lower-bound datetime. Only issues updated at or after this time are returned.
         callback: Optional callable invoked with each ``IssueNode`` dict.  The full list is
             still returned regardless of whether a callback is provided.
-        track_timestamp: When ``True``, reads the ``.last_sync`` file to populate ``since``
-            (if not already set) and writes the sync-start timestamp after a successful fetch.
 
     Returns:
         Full list of ``IssueNode`` dicts (may be empty).
@@ -676,28 +658,19 @@ def sync_issues_graphql(
     Raises:
         BacklogError: Propagated from ``_fetch_issues_graphql`` on GraphQL errors.
     """
-    since_str: str | None = since.isoformat() if since is not None else None
-    last_sync_path = None
-    sync_start: str | None = None
-
-    if track_timestamp:
-        last_sync_path = _dh_paths.state_root() / ".last_sync"
-        # Record start BEFORE fetching to avoid missing issues updated during the fetch.
-        sync_start = datetime.now(UTC).isoformat()
-        if since_str is None and last_sync_path.exists():
-            since_str = last_sync_path.read_text(encoding="utf-8").strip() or None
-
     issues = _fetch_issues_graphql(
-        repo, owner, repo_name, state=state, labels=labels, milestone_number=milestone_number, since=since_str
+        repo,
+        owner,
+        repo_name,
+        state=state,
+        labels=labels,
+        milestone_number=milestone_number,
+        since=since.isoformat() if since is not None else None,
     )
 
     if callback is not None:
         for issue_node in issues:
             callback(issue_node)
-
-    if track_timestamp and last_sync_path is not None and sync_start is not None:
-        last_sync_path.parent.mkdir(parents=True, exist_ok=True)
-        last_sync_path.write_text(sync_start, encoding="utf-8")
 
     return issues
 
@@ -1216,33 +1189,15 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
             value resolved by :func:`~backlog_core.models.resolve_repo`.
 
     Returns:
-        BackendStatus with availability, open/total issue counts, cache
-        total count, and last sync timestamp populated from observed state.
+        BackendStatus with availability and live issue counts. Cache fields retain
+        their defaults because the provider owns cache observation.
     """
-    yaml_files = list(_models.get_backlog_dir().glob("*.yaml"))
-    yaml_stems = {f.stem for f in yaml_files}
-    md_files = [f for f in _models.get_backlog_dir().glob("*.md") if f.stem not in yaml_stems]
-    cache_total_count = len(yaml_files) + len(md_files)
-
-    last_sync_path = _dh_paths.state_root() / ".last_sync"
-    try:
-        last_sync = last_sync_path.read_text(encoding="utf-8").strip() if last_sync_path.exists() else ""
-    except OSError:
-        last_sync = ""
-
     if not os.environ.get("GITHUB_TOKEN"):
-        return BackendStatus(
-            availability=BackendAvailability.NEEDS_AUTHENTICATION,
-            cache_total_count=cache_total_count,
-            last_sync=last_sync,
-            error="GITHUB_TOKEN not set",
-        )
+        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GITHUB_TOKEN not set")
 
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
             availability=BackendAvailability.ERROR,
-            cache_total_count=cache_total_count,
-            last_sync=last_sync,
             error="GitHub repository unavailable — token set but connection failed",
         )
 
@@ -1251,26 +1206,10 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
         total_count: int | None = repo_obj.get_issues(state="all").totalCount
     except GithubException as exc:
         if exc.status == _HTTP_FORBIDDEN:
-            return BackendStatus(
-                availability=BackendAvailability.RATE_LIMITED,
-                cache_total_count=cache_total_count,
-                last_sync=last_sync,
-                error=str(exc),
-            )
-        return BackendStatus(
-            availability=BackendAvailability.REACHABLE,
-            cache_total_count=cache_total_count,
-            last_sync=last_sync,
-            error=str(exc),
-        )
+            return BackendStatus(availability=BackendAvailability.RATE_LIMITED, error=str(exc))
+        return BackendStatus(availability=BackendAvailability.REACHABLE, error=str(exc))
 
-    return BackendStatus(
-        availability=BackendAvailability.REACHABLE,
-        open_count=open_count,
-        total_count=total_count,
-        cache_total_count=cache_total_count,
-        last_sync=last_sync,
-    )
+    return BackendStatus(availability=BackendAvailability.REACHABLE, open_count=open_count, total_count=total_count)
 
 
 # ---------------------------------------------------------------------------

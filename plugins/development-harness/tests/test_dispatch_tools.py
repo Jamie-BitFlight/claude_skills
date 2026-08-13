@@ -14,14 +14,29 @@ Strategy:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.dispatch_state import DispatchStateManager
-from backlog_core.models import DispatchItemRecord
-from backlog_core.server import mcp
+from backlog_core.models import (
+    ArtifactManifest,
+    BacklogError,
+    ContentConflictError,
+    ContentKind,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+    DispatchItemRecord,
+    UnsupportedCapabilityError,
+)
+from backlog_core.server import dispatch_create_plan, mcp
+from dispatch_schema.core.models import DispatchPlan
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 
@@ -119,6 +134,32 @@ def patch_state_manager(mocker: MockerFixture, mgr: DispatchStateManager) -> Dis
 
 
 @pytest.fixture
+def dispatch_content_backend(mocker: MockerFixture) -> InMemoryBackend:
+    backend = InMemoryBackend()
+    mocker.patch("backlog_core.server._get_artifact_provider", return_value=backend)
+    return backend
+
+
+def _store_dispatch_plan(backend: InMemoryBackend, milestone: int = 10, issues: list[int] | None = None) -> None:
+    plan = _make_valid_plan_dict(milestone=milestone, issue=(issues or [101])[0])
+    if issues and len(issues) > 1:
+        plan["waves"][0]["items"] = [{"title": f"Issue {issue}", "issue": issue, "priority": "P2"} for issue in issues]
+    backend.put_content(
+        ContentWrite(
+            reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name=f"dispatch-milestone-{milestone}"),
+            content=json.dumps(plan),
+        )
+    )
+
+
+def _has_dispatch_plan(backend: InMemoryBackend, milestone: int = 10) -> bool:
+    return any(
+        record.reference == ContentRef(kind=ContentKind.DISPATCH_PLAN, name=f"dispatch-milestone-{milestone}")
+        for record in backend.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
+    )
+
+
+@pytest.fixture
 def dispatch_plan_file(tmp_path: Path) -> Path:
     """Write a minimal dispatch plan YAML to a tmp file and return its path.
 
@@ -131,13 +172,13 @@ def dispatch_plan_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def patch_dispatch_plan_path(mocker: MockerFixture, dispatch_plan_file: Path) -> Path:
+def patch_dispatch_plan_path(dispatch_content_backend: InMemoryBackend, dispatch_plan_file: Path) -> Path:
     """Patch _dispatch_plan_path() to return the tmp dispatch plan file.
 
     Returns:
         Path to the patched dispatch plan file.
     """
-    mocker.patch("backlog_core.server._dispatch_plan_path", return_value=dispatch_plan_file)
+    _store_dispatch_plan(dispatch_content_backend)
     return dispatch_plan_file
 
 
@@ -514,7 +555,11 @@ class TestDispatchSpawn:
     """
 
     async def test_spawn_end_to_end_single_wave(
-        self, patch_state_manager: DispatchStateManager, tmp_path: Path, mocker: MockerFixture
+        self,
+        patch_state_manager: DispatchStateManager,
+        dispatch_content_backend: InMemoryBackend,
+        tmp_path: Path,
+        mocker: MockerFixture,
     ) -> None:
         """dispatch_spawn processes one wave and returns a completion summary.
 
@@ -534,9 +579,7 @@ class TestDispatchSpawn:
              the item monitoring loop.
         """
         # Arrange — single-item plan to avoid concurrent thread writes to SQLite.
-        plan_path = tmp_path / "milestone-10-dispatch.yaml"
-        plan_path.write_text(_make_dispatch_plan_yaml(milestone=10, wave_num=1, issues=[101]))
-        mocker.patch("backlog_core.server._dispatch_plan_path", return_value=plan_path)
+        _store_dispatch_plan(dispatch_content_backend, issues=[101])
 
         result_file = tmp_path / "result-101.json"
         result_file.write_text(json.dumps({"status": "ok", "cost": 0.01}))
@@ -562,7 +605,7 @@ class TestDispatchSpawn:
         assert data["failed"] == 0
 
     async def test_spawn_missing_plan_returns_error(
-        self, patch_state_manager: DispatchStateManager, mocker: MockerFixture
+        self, patch_state_manager: DispatchStateManager, dispatch_content_backend: InMemoryBackend
     ) -> None:
         """dispatch_spawn returns an error dict when the dispatch plan file is absent.
 
@@ -573,9 +616,6 @@ class TestDispatchSpawn:
              return a meaningful error rather than an unhandled exception.
         """
         # Arrange
-        missing = Path("/tmp/does-not-exist-abc123/milestone-10-dispatch.yaml")
-        mocker.patch("backlog_core.server._dispatch_plan_path", return_value=missing)
-
         # Act
         async with Client(mcp) as client:
             result = await client.call_tool("dispatch_spawn", {"milestone": 10, "wave_num": 1})
@@ -586,7 +626,11 @@ class TestDispatchSpawn:
         assert "10" in str(data["error"]) or "not found" in data["error"].lower()
 
     async def test_spawn_subprocess_non_json_output_marks_item_failed(
-        self, patch_state_manager: DispatchStateManager, tmp_path: Path, mocker: MockerFixture
+        self,
+        patch_state_manager: DispatchStateManager,
+        dispatch_content_backend: InMemoryBackend,
+        tmp_path: Path,
+        mocker: MockerFixture,
     ) -> None:
         """dispatch_spawn marks an item failed when spawn.py emits non-JSON stdout.
 
@@ -599,9 +643,7 @@ class TestDispatchSpawn:
              must record the failure so the operator can diagnose it.
         """
         # Arrange — single-item plan; patch plan path to tmp file.
-        plan_path = tmp_path / "milestone-10-dispatch.yaml"
-        plan_path.write_text(_make_dispatch_plan_yaml(milestone=10, wave_num=1, issues=[101]))
-        mocker.patch("backlog_core.server._dispatch_plan_path", return_value=plan_path)
+        _store_dispatch_plan(dispatch_content_backend, issues=[101])
 
         def _bad_subprocess(*args: Any, **kwargs: Any) -> MagicMock:
             proc = MagicMock()
@@ -620,7 +662,11 @@ class TestDispatchSpawn:
         assert data["failed"] > 0
 
     async def test_spawn_calls_check_stale_pids_at_startup(
-        self, patch_state_manager: DispatchStateManager, tmp_path: Path, mocker: MockerFixture
+        self,
+        patch_state_manager: DispatchStateManager,
+        dispatch_content_backend: InMemoryBackend,
+        tmp_path: Path,
+        mocker: MockerFixture,
     ) -> None:
         """dispatch_spawn calls check_stale_pids before spawning to clean up prior runs.
 
@@ -634,9 +680,7 @@ class TestDispatchSpawn:
              regardless of whether stale items exist in a given test run.
         """
         # Arrange — single-item plan; spy on check_stale_pids.
-        plan_path = tmp_path / "milestone-10-dispatch.yaml"
-        plan_path.write_text(_make_dispatch_plan_yaml(milestone=10, wave_num=1, issues=[101]))
-        mocker.patch("backlog_core.server._dispatch_plan_path", return_value=plan_path)
+        _store_dispatch_plan(dispatch_content_backend, issues=[101])
 
         check_stale_spy = mocker.spy(patch_state_manager, "check_stale_pids")
 
@@ -693,37 +737,14 @@ def valid_plan_dict() -> dict:
 
 
 @pytest.fixture
-def plan_target_path(tmp_path: Path) -> Path:
-    """Return a non-existent plan file path inside tmp_path.
-
-    Returns:
-        Path object pointing to a file that does not exist yet.
-    """
-    return tmp_path / "milestone-10-dispatch.yaml"
+def patch_create_plan_path(dispatch_content_backend: InMemoryBackend) -> InMemoryBackend:
+    return dispatch_content_backend
 
 
 @pytest.fixture
-def patch_create_plan_path(mocker: MockerFixture, plan_target_path: Path) -> Path:
-    """Patch _dispatch_plan_path() to return a non-existent tmp path (for creation tests).
-
-    Returns:
-        Path to the patched (non-existent) dispatch plan file location.
-    """
-    mocker.patch("backlog_core.server._dispatch_plan_path", return_value=plan_target_path)
-    return plan_target_path
-
-
-@pytest.fixture
-def existing_plan_file(tmp_path: Path, mocker: MockerFixture) -> Path:
-    """Pre-write a valid dispatch plan file and patch _dispatch_plan_path to return it.
-
-    Returns:
-        Path to the pre-written dispatch plan file.
-    """
-    plan_path = tmp_path / "milestone-10-dispatch.yaml"
-    plan_path.write_text(_make_dispatch_plan_yaml())
-    mocker.patch("backlog_core.server._dispatch_plan_path", return_value=plan_path)
-    return plan_path
+def existing_plan_file(dispatch_content_backend: InMemoryBackend) -> InMemoryBackend:
+    _store_dispatch_plan(dispatch_content_backend)
+    return dispatch_content_backend
 
 
 class TestDispatchCreatePlan:
@@ -746,7 +767,7 @@ class TestDispatchCreatePlan:
     # Happy-path tests
     # ------------------------------------------------------------------
 
-    async def test_create_plan_valid_yaml(self, valid_plan_dict: dict, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_valid_yaml(self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan writes a file and returns success metadata for a valid plan dict.
 
         Tests: dispatch_create_plan — happy path
@@ -770,9 +791,34 @@ class TestDispatchCreatePlan:
         assert data["wave_count"] == 1
         assert data["item_count"] == 1
         assert data["is_valid"] is True
-        assert target.exists()
+        assert _has_dispatch_plan(target)
 
-    async def test_create_plan_kebab_case_keys(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_conflicts_when_concurrent_create_wins(
+        self, patch_create_plan_path: InMemoryBackend, valid_plan_dict: dict, mocker: MockerFixture
+    ) -> None:
+        # Given: another creator persists the same plan after this tool confirms absence.
+        original_put = patch_create_plan_path.put_content
+
+        def create_before_requested_write(request: ContentWrite) -> ContentRecord:
+            original_put(ContentWrite(reference=request.reference, content="concurrent creation", create_only=True))
+            return original_put(request)
+
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=create_before_requested_write)
+
+        # When: the tool attempts its original create.
+        async with Client(mcp) as client:
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
+
+        # Then: create_only rejects the stale create and preserves the winner.
+        assert "error" in result.data
+        assert (
+            patch_create_plan_path.get_content(
+                ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
+            ).content
+            == "concurrent creation"
+        )
+
+    async def test_create_plan_kebab_case_keys(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan accepts kebab-case alias keys in the plan dict.
 
         Tests: dispatch_create_plan — kebab-case key acceptance
@@ -796,9 +842,9 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["wave_count"] == 1
-        assert patch_create_plan_path.exists()
+        assert _has_dispatch_plan(patch_create_plan_path)
 
-    async def test_create_plan_snake_case_keys(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_snake_case_keys(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan accepts snake_case alias keys in the plan dict.
 
         Tests: dispatch_create_plan — snake_case key acceptance
@@ -822,9 +868,11 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["item_count"] == 1
-        assert patch_create_plan_path.exists()
+        assert _has_dispatch_plan(patch_create_plan_path)
 
-    async def test_create_plan_validate_false(self, valid_plan_dict: dict, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_validate_false(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend
+    ) -> None:
         """dispatch_create_plan skips integrity validation when validate=False.
 
         Tests: dispatch_create_plan — validate=False path
@@ -846,9 +894,9 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["is_valid"] is None
-        assert target.exists()
+        assert _has_dispatch_plan(target)
 
-    async def test_create_plan_overwrite_existing(self, existing_plan_file: Path) -> None:
+    async def test_create_plan_overwrite_existing(self, existing_plan_file: InMemoryBackend) -> None:
         """dispatch_create_plan replaces an existing file when overwrite=True.
 
         Tests: dispatch_create_plan — overwrite=True success path
@@ -882,10 +930,43 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["item_count"] == 2
-        assert existing_plan_file.exists()
+        assert _has_dispatch_plan(existing_plan_file)
+
+    async def test_create_plan_overwrite_conflicts_when_observed_revision_changes(
+        self, existing_plan_file: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        # Given: an existing plan whose revision changes between the tool read and write.
+        original_put = existing_plan_file.put_content
+
+        def replace_before_requested_write(request: ContentWrite) -> ContentRecord:
+            original_put(
+                ContentWrite(
+                    reference=request.reference,
+                    content="concurrent replacement",
+                    expected_revision=existing_plan_file.get_content(request.reference).revision,
+                )
+            )
+            return original_put(request)
+
+        mocker.patch.object(existing_plan_file, "put_content", side_effect=replace_before_requested_write)
+
+        # When: overwrite=True attempts to update against the observed revision.
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan", {"milestone_number": 10, "plan": _make_valid_plan_dict(), "overwrite": True}
+            )
+
+        # Then: the stale update conflicts and cannot replace the concurrent content.
+        assert "error" in result.data
+        assert (
+            existing_plan_file.get_content(
+                ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
+            ).content
+            == "concurrent replacement"
+        )
 
     async def test_create_plan_with_issue(
-        self, valid_plan_dict: dict, patch_create_plan_path: Path, mocker: MockerFixture
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
     ) -> None:
         """dispatch_create_plan attempts artifact registration when issue is provided.
 
@@ -907,13 +988,121 @@ class TestDispatchCreatePlan:
         # Assert
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
-        register_mock.assert_called_once_with(42, patch_create_plan_path)
+        register_mock.assert_called_once_with(
+            42, "dispatch-milestone-10", DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
+        )
+
+    async def test_create_plan_with_issue_is_readable_as_artifact(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend
+    ) -> None:
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+            )
+            artifact = await client.call_tool("artifact_read", {"item_id": 42, "artifact_type": "dispatch-plan"})
+
+        assert "error" not in result.data
+        assert artifact.data["content"] == DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
+
+    async def test_create_plan_artifact_content_failure_does_not_register_manifest(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        original_put_content = patch_create_plan_path.put_content
+
+        def fail_artifact_content(request: ContentWrite) -> ContentRecord:
+            if request.reference.kind == ContentKind.ARTIFACT_CONTENT:
+                raise ContentUnavailableError("artifact content unavailable")
+            return original_put_content(request)
+
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=fail_artifact_content)
+
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+            )
+
+        assert "error" not in result.data
+        assert patch_create_plan_path.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST)) == []
+
+    async def test_create_plan_issue_manifest_unavailable_is_best_effort(
+        self, valid_plan_dict: dict, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        unavailable_backend = InMemoryBackend()
+        original_get_content = unavailable_backend.get_content
+
+        def unavailable_manifest(reference: ContentRef) -> ContentRecord:
+            if reference.kind == ContentKind.ARTIFACT_MANIFEST:
+                raise ContentUnavailableError("manifest provider unavailable")
+            return original_get_content(reference)
+
+        mocker.patch.object(unavailable_backend, "get_content", side_effect=unavailable_manifest)
+        put_spy = mocker.spy(unavailable_backend, "put_content")
+        active_backend = unavailable_backend
+        mocker.patch("backlog_core.server._get_artifact_provider", side_effect=lambda: active_backend)
+
+        with caplog.at_level(logging.WARNING, logger="backlog_core.server"):
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+                )
+
+        data: dict[str, Any] = result.data
+        assert "error" not in data, f"Unexpected error: {data.get('error')}"
+        assert _has_dispatch_plan(unavailable_backend)
+        assert [call.args[0].reference.kind for call in put_spy.call_args_list] == [
+            ContentKind.DISPATCH_PLAN,
+            ContentKind.ARTIFACT_CONTENT,
+        ]
+        assert any("manifest provider unavailable" in record.message for record in caplog.records)
+
+        confirmed_missing_backend = InMemoryBackend()
+        active_backend = confirmed_missing_backend
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan",
+                {"milestone_number": 11, "plan": _make_valid_plan_dict(milestone=11), "issue": 42},
+            )
+
+        data = result.data
+        assert "error" not in data, f"Unexpected error: {data.get('error')}"
+        manifests = confirmed_missing_backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST))
+        assert len(manifests) == 1
+        assert "dispatch-milestone-11" in manifests[0].content
+
+    async def test_create_plan_issue_manifest_conflict_is_best_effort(
+        self, valid_plan_dict: dict, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        backend = InMemoryBackend()
+        manifest_reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="42", name="manifest")
+        backend.put_content(
+            ContentWrite(reference=manifest_reference, content=ArtifactManifest(issue_number=42).model_dump_json())
+        )
+        original_put_content = backend.put_content
+
+        def conflict_manifest(request: ContentWrite) -> ContentRecord:
+            if request.reference.kind == ContentKind.ARTIFACT_MANIFEST and request.expected_revision:
+                raise ContentConflictError("manifest revision conflict")
+            return original_put_content(request)
+
+        mocker.patch.object(backend, "put_content", side_effect=conflict_manifest)
+        mocker.patch("backlog_core.server._get_artifact_provider", return_value=backend)
+
+        with caplog.at_level(logging.WARNING, logger="backlog_core.server"):
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+                )
+
+        data: dict[str, Any] = result.data
+        assert "error" not in data, f"Unexpected error: {data.get('error')}"
+        assert _has_dispatch_plan(backend)
+        assert any("manifest revision conflict" in record.message for record in caplog.records)
 
     # ------------------------------------------------------------------
     # Error-case tests
     # ------------------------------------------------------------------
 
-    async def test_create_plan_invalid_plan_structure(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_invalid_plan_structure(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan raises ToolError when the plan dict fails Pydantic validation.
 
         Tests: dispatch_create_plan — Pydantic validation failure for structurally invalid input
@@ -935,9 +1124,9 @@ class TestDispatchCreatePlan:
             with pytest.raises(ToolError, match=r"int_parsing|not-a-number|integer"):
                 await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": bad_plan})
 
-        assert not patch_create_plan_path.exists()
+        assert not _has_dispatch_plan(patch_create_plan_path)
 
-    async def test_create_plan_missing_milestone_field(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_missing_milestone_field(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan raises ToolError when the plan dict is missing the milestone block.
 
         Tests: dispatch_create_plan — missing required top-level field
@@ -954,9 +1143,9 @@ class TestDispatchCreatePlan:
             with pytest.raises(ToolError, match=r"milestone|missing|required"):
                 await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": no_milestone_plan})
 
-        assert not patch_create_plan_path.exists()
+        assert not _has_dispatch_plan(patch_create_plan_path)
 
-    async def test_create_plan_missing_required_field(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_missing_required_field(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan raises ToolError when 'waves' is absent from the plan dict.
 
         Tests: dispatch_create_plan — Pydantic validation failure for missing required field
@@ -973,7 +1162,7 @@ class TestDispatchCreatePlan:
             with pytest.raises(ToolError, match=r"waves|missing|required"):
                 await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": no_waves_plan})
 
-    async def test_create_plan_empty_waves(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_empty_waves(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan raises ToolError when waves is an empty list.
 
         Tests: dispatch_create_plan — min_length=1 enforcement on waves
@@ -993,7 +1182,7 @@ class TestDispatchCreatePlan:
             with pytest.raises(ToolError, match=r"waves|too_short|min"):
                 await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": empty_waves_plan})
 
-    async def test_create_plan_file_exists_no_overwrite(self, existing_plan_file: Path) -> None:
+    async def test_create_plan_file_exists_no_overwrite(self, existing_plan_file: InMemoryBackend) -> None:
         """dispatch_create_plan returns an error when the file exists and overwrite=False.
 
         Tests: dispatch_create_plan — overwrite=False protection
@@ -1015,7 +1204,22 @@ class TestDispatchCreatePlan:
         assert "error" in data
         assert "already exists" in data["error"] or str(existing_plan_file) in data["error"]
 
-    async def test_create_plan_milestone_mismatch(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_does_not_overwrite_when_existing_plan_is_unavailable(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        get_content = mocker.patch.object(
+            patch_create_plan_path, "get_content", side_effect=ContentUnavailableError("offline cache miss")
+        )
+        put_content = mocker.patch.object(patch_create_plan_path, "put_content")
+
+        async with Client(mcp) as client:
+            with pytest.raises(ToolError, match="offline cache miss"):
+                await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
+
+        get_content.assert_called_once()
+        put_content.assert_not_called()
+
+    async def test_create_plan_milestone_mismatch(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan returns an error when milestone numbers disagree.
 
         Tests: dispatch_create_plan — milestone consistency check
@@ -1039,10 +1243,10 @@ class TestDispatchCreatePlan:
         assert "error" in data
         assert "mismatch" in data["error"].lower() or "10" in data["error"]
 
-    async def test_create_plan_symlink_target(
-        self, valid_plan_dict: dict, patch_create_plan_path: Path, mocker: MockerFixture
+    async def test_create_plan_provider_failure(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
     ) -> None:
-        """dispatch_create_plan returns an error when write_dispatch_plan raises ValueError.
+        """dispatch_create_plan returns an error when backend persistence fails.
 
         Tests: dispatch_create_plan — symlink rejection from writer
         How: Patch asyncio.to_thread so write_dispatch_plan raises ValueError with
@@ -1050,15 +1254,7 @@ class TestDispatchCreatePlan:
         Why: write_dispatch_plan rejects symlink targets for security; the tool must
              surface this as a structured error, not an unhandled exception.
         """
-        # Arrange — patch asyncio.to_thread selectively for write_dispatch_plan call
-        original_to_thread = __import__("asyncio").to_thread
-
-        async def _selective_to_thread(func: Any, *args: Any, **kwargs: Any) -> Any:
-            if getattr(func, "__name__", "") == "write_dispatch_plan":
-                raise ValueError("symlink target rejected")
-            return await original_to_thread(func, *args, **kwargs)
-
-        mocker.patch("asyncio.to_thread", side_effect=_selective_to_thread)
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=BacklogError("provider rejected write"))
 
         # Act
         async with Client(mcp) as client:
@@ -1067,13 +1263,38 @@ class TestDispatchCreatePlan:
         # Assert
         data: dict[str, Any] = result.data
         assert "error" in data
-        assert "symlink" in data["error"].lower() or "symlink" in data["error"]
+        assert "provider rejected write" in data["error"]
+
+    async def test_create_plan_unsupported_write_returns_structured_error(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        put_content = mocker.patch.object(
+            patch_create_plan_path,
+            "put_content",
+            side_effect=UnsupportedCapabilityError("GitHub dispatch writes are not supported"),
+        )
+
+        async with Client(mcp) as client:
+            result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
+
+        assert "error" in result.data
+        assert "dispatch writes are not supported" in result.data["error"]
+        put_content.assert_called_once()
+        assert not _has_dispatch_plan(patch_create_plan_path)
+
+    async def test_create_plan_unrelated_write_error_propagates(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=RuntimeError("unexpected failure"))
+
+        with pytest.raises(RuntimeError, match="unexpected failure"):
+            await dispatch_create_plan(10, DispatchPlan.model_validate(valid_plan_dict))
 
     # ------------------------------------------------------------------
     # Validation-integration tests
     # ------------------------------------------------------------------
 
-    async def test_create_plan_duplicate_issues(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_duplicate_issues(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan surfaces is_valid=False when the same issue appears twice.
 
         Tests: dispatch_create_plan — duplicate issue detection via validate_plan_integrity
@@ -1104,9 +1325,9 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected tool error: {data.get('error')}"
         assert data["is_valid"] is False
-        assert patch_create_plan_path.exists()
+        assert _has_dispatch_plan(patch_create_plan_path)
 
-    async def test_create_plan_broken_depends_on(self, patch_create_plan_path: Path) -> None:
+    async def test_create_plan_broken_depends_on(self, patch_create_plan_path: InMemoryBackend) -> None:
         """dispatch_create_plan surfaces is_valid=False when depends_on references missing issue.
 
         Tests: dispatch_create_plan — broken depends_on detection via validate_plan_integrity
@@ -1137,4 +1358,4 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected tool error: {data.get('error')}"
         assert data["is_valid"] is False
-        assert patch_create_plan_path.exists()
+        assert _has_dispatch_plan(patch_create_plan_path)

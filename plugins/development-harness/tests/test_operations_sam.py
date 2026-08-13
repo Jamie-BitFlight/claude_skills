@@ -13,92 +13,25 @@ Cache I/O is isolated with monkeypatch on Path.home() to avoid writing to the re
 
 from __future__ import annotations
 
-import json
-from datetime import datetime
 from typing import TYPE_CHECKING, cast
 
-import dh_paths
 import pytest
-from backlog_core.models import GitHubUnavailableError, Output
+from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.models import (
+    ContentKind,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+    GitHubUnavailableError,
+    Output,
+)
 from backlog_core.operations import create_sam_task, get_ready_sam_tasks, get_sam_tasks, update_sam_task_status
+from sam_schema.core.backends.content import ContentTaskProvider
+from sam_schema.core.models import Task, TaskStatus
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_mock_sub_issue(
-    *,
-    number: int = 100,
-    title: str = "Test task",
-    html_url: str = "https://github.com/org/repo/issues/100",
-    body: str = "",
-) -> dict:
-    """Return a dict mimicking a GraphQL IssueNode with number, title, body, etc."""
-    return {
-        "id": f"I_{number}",
-        "number": number,
-        "title": title,
-        "state": "OPEN",
-        "body": body,
-        "createdAt": "",
-        "updatedAt": "",
-        "labels": [],
-        "milestone": None,
-        "assignees": [],
-    }
-
-
-def _make_sam_task_body(
-    task_id: str = "T1",
-    feature: str = "my-feature",
-    status: str = "not-started",
-    agent: str = "context-gathering",
-    priority: int = 1,
-    skills: list[str] | None = None,
-    dependencies: list[str] | None = None,
-) -> str:
-    """Build a minimal issue body with a sam:task YAML block."""
-    skills_yaml = ", ".join(f'"{s}"' for s in (skills or []))
-    deps_yaml = ", ".join(f'"{d}"' for d in (dependencies or []))
-    return (
-        "## What\n\nDo the thing.\n\n"
-        f"<!-- sam:task\n"
-        f"task_id: {task_id}\n"
-        f"feature: {feature}\n"
-        f"task_type: implement\n"
-        f"status: {status}\n"
-        f"agent: {agent}\n"
-        f"priority: {priority}\n"
-        f"skills: [{skills_yaml}]\n"
-        f"dependencies: [{deps_yaml}]\n"
-        "-->\n"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Redirect DH_STATE_HOME to tmp_path so cache files are isolated.
-
-    Tests: Cache I/O isolation.
-    How: Sets DH_STATE_HOME env var so dh_paths.context_dir() resolves under tmp_path.
-    Why: Prevents tests from writing to or reading from the real ~/.dh/projects/.
-    """
-    dh_home = tmp_path / "dh"
-    dh_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("DH_STATE_HOME", str(dh_home))
-    return dh_home
 
 
 # ---------------------------------------------------------------------------
@@ -258,144 +191,169 @@ class TestCreateSamTask:
 
 
 class TestGetSamTasks:
-    """Unit tests for get_sam_tasks().
+    def test_get_sam_tasks_and_readiness_include_owner_plan_on_page_two(self) -> None:
+        provider = InMemoryBackend()
+        task_provider = ContentTaskProvider(provider)
+        for index in range(101):
+            task_provider.create_plan(
+                f"feature-{index}",
+                "Do the work",
+                [Task(id=f"T{index}", title=f"Task {index}", status=TaskStatus.NOT_STARTED)],
+                issue=480,
+            )
+        set_config(BacklogConfig(backend=provider))
 
-    Tests online fetch (via mocked get_task_issues), offline cache fallback,
-    and cache write behaviour. All GitHub I/O and Path.home() are isolated.
-    """
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+            ready = get_ready_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
 
-    def test_get_sam_tasks_online(self, mocker: MockerFixture, isolated_home: Path) -> None:
-        """get_sam_tasks returns tasks dict when GitHub is available.
+        assert result["count"] == 101
+        tasks = cast("list[dict[str, object]]", result["tasks"])
+        ready_tasks = cast("list[dict[str, object]]", ready["ready_tasks"])
+        assert any(task["feature"] == "feature-100" for task in tasks)
+        assert ready["count"] == 101
+        assert any(task["id"] == "T100" for task in ready_tasks)
 
-        Tests: get_sam_tasks happy path with GitHub available.
-        How: Mock try_get_github and get_task_issues; verify return dict shape and task fields.
-        Why: Verifies the function correctly fetches sub-issues and maps them to task dicts.
-        """
-        # Arrange
-        mock_repo = mocker.MagicMock()
-        body = _make_sam_task_body(task_id="T1", feature="my-feature", status="not-started")
-        mock_si = _make_mock_sub_issue(number=101, title="[my-feature/T1] implement: thing", body=body)
+    def test_get_sam_tasks_normalizes_legacy_yaml_plan_content(self) -> None:
+        provider = InMemoryBackend()
+        provider.put_content(
+            ContentWrite(
+                reference=ContentRef(kind=ContentKind.PLAN, name="Plegacy"),
+                owner_reference="#480",
+                content='plan-id: Plegacy\nfeature: legacy-feature\nversion: "1.0"\ngoal: Read legacy plan content\nissue: 480\ntasks:\n  - id: T1\n    title: Read legacy task\n    status: NOT STARTED\n    agent: legacy-agent\n    priority: 2\n    skills: [python]\n    dependencies: []',
+            )
+        )
+        set_config(BacklogConfig(backend=provider))
 
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations.get_task_issues", return_value=[mock_si])
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
 
-        # Act
-        result = get_sam_tasks(parent_issue_number=480, refresh_cache=False)
+        assert result["unavailable"] is False
+        assert result["tasks"] == [
+            {
+                "task_id": "T1",
+                "feature": "legacy-feature",
+                "status": "not-started",
+                "agent": "legacy-agent",
+                "priority": 2,
+                "skills": ["python"],
+                "dependencies": [],
+                "issue_number": 0,
+                "issue_url": "",
+                "title": "Read legacy task",
+            }
+        ]
 
-        # Assert
-        assert result["count"] == 1
-        assert result["parent_issue_number"] == 480
-        tasks = result["tasks"]
-        assert isinstance(tasks, list)
-        assert len(tasks) == 1
-        assert tasks[0]["issue_number"] == 101
-        assert tasks[0]["task_id"] == "T1"
-        assert tasks[0]["feature"] == "my-feature"
-
-    def test_get_sam_tasks_offline_with_cache(self, mocker: MockerFixture, tmp_path: Path, isolated_home: Path) -> None:
-        """get_sam_tasks returns cached tasks when GitHub is unavailable but cache exists.
-
-        Tests: get_sam_tasks offline fallback path.
-        How: Mock try_get_github to return None; pre-write cache file in tmp_path;
-             assert cached tasks are returned.
-        Why: Ensures agents can query task status even when GitHub is unreachable,
-             using the last-known-good cache as the data source.
-        """
-        # Arrange: create cache file in the isolated DH context directory
-        cache_dir = dh_paths.context_dir()
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_data = {
-            "feature_slug": "my-feature",
-            "parent_issue_number": 480,
-            "synced_at": "2026-03-06T12:00:00+00:00",
-            "tasks": [
-                {
-                    "issue_number": 101,
-                    "task_id": "T1",
-                    "feature": "my-feature",
-                    "status": "not-started",
-                    "agent": "context-gathering",
-                    "priority": 1,
-                    "skills": ["python3-development"],
-                    "dependencies": [],
-                }
+    def test_get_sam_tasks_reads_native_plan_content_without_github_or_context_cache(
+        self, mocker: MockerFixture
+    ) -> None:
+        provider = InMemoryBackend()
+        task_provider = ContentTaskProvider(provider)
+        task_provider.create_plan(
+            "my-feature",
+            "Do the work",
+            [
+                Task(
+                    id="T1",
+                    title="Implement thing",
+                    status=TaskStatus.NOT_STARTED,
+                    agent="some-agent",
+                    priority=2,
+                    skills=["python"],
+                    github_issue=101,
+                )
             ],
-            "count": 1,
-        }
-        cache_file = cache_dir / "sam-tasks-my-feature.json"
-        cache_file.write_text(json.dumps(cache_data), encoding="utf-8")
+            issue=480,
+        )
+        set_config(BacklogConfig(backend=provider))
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=AssertionError("GitHub bypass"))
 
-        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
 
-        # Act
-        result = get_sam_tasks(parent_issue_number=480)
-
-        # Assert
         assert result["count"] == 1
         assert result["parent_issue_number"] == 480
-        tasks = result["tasks"]
-        assert isinstance(tasks, list)
-        assert len(tasks) == 1
-        assert tasks[0]["task_id"] == "T1"
-        # Verify a warning was emitted about GitHub unavailability
-        warnings = result.get("warnings", [])
-        assert isinstance(warnings, list)
-        assert any("WARNING" in w for w in warnings)
+        assert result["stale"] is False
+        assert result["unavailable"] is False
+        assert result["tasks"] == [
+            {
+                "task_id": "T1",
+                "feature": "my-feature",
+                "status": "not-started",
+                "agent": "some-agent",
+                "priority": 2,
+                "skills": ["python"],
+                "dependencies": [],
+                "issue_number": 101,
+                "issue_url": "",
+                "title": "Implement thing",
+            }
+        ]
 
-    def test_get_sam_tasks_offline_no_cache(self, mocker: MockerFixture, isolated_home: Path) -> None:
-        """get_sam_tasks returns empty tasks when GitHub is unavailable and no cache exists.
+    def test_get_sam_tasks_accepts_opaque_parent_reference(self) -> None:
+        provider = InMemoryBackend()
+        task_provider = ContentTaskProvider(provider)
+        plan = task_provider.create_plan(
+            "opaque-feature", "Do the work", [Task(id="T1", title="Task", status=TaskStatus.NOT_STARTED)]
+        )
+        task_provider.set_owner(plan["plan_id"], "bd-a1b2")
+        set_config(BacklogConfig(backend=provider))
 
-        Tests: get_sam_tasks double-offline path.
-        How: Mock try_get_github to return None; no cache file in tmp_path.
-        Why: Ensures the function degrades gracefully returning an empty list with a warning,
-             rather than raising an exception that would halt the orchestrator.
-        """
-        # Arrange
-        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        try:
+            result = get_sam_tasks(parent_issue_number="bd-a1b2")
+        finally:
+            reset_config()
 
-        # Act
-        result = get_sam_tasks(parent_issue_number=480)
+        assert result["count"] == 1
+        assert result["parent_issue_number"] == "bd-a1b2"
 
-        # Assert
+    def test_get_sam_tasks_surfaces_provider_staleness(self, mocker: MockerFixture) -> None:
+        provider = InMemoryBackend()
+        task_provider = ContentTaskProvider(provider)
+        task_provider.create_plan(
+            "stale-feature", "Do the work", [Task(id="T1", title="Task", status=TaskStatus.NOT_STARTED)], issue=480
+        )
+        original_list_content = provider.list_content
+        mocker.patch.object(
+            provider,
+            "list_content",
+            side_effect=lambda query: [
+                record.model_copy(update={"stale": True}) for record in original_list_content(query)
+            ],
+        )
+        set_config(BacklogConfig(backend=provider))
+
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
+
+        assert result["stale"] is True
+        assert result["unavailable"] is False
+        assert result["count"] == 1
+        assert result["warnings"]
+
+    def test_get_sam_tasks_returns_explicit_unavailable_result(self, mocker: MockerFixture) -> None:
+        provider = InMemoryBackend()
+        mocker.patch.object(provider, "list_content", side_effect=ContentUnavailableError("offline cache miss"))
+        set_config(BacklogConfig(backend=provider))
+
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
+
         assert result["tasks"] == []
         assert result["count"] == 0
-        assert result["parent_issue_number"] == 480
-        warnings = result.get("warnings", [])
-        assert isinstance(warnings, list)
-        assert any("WARNING" in w for w in warnings)
-
-    def test_get_sam_tasks_writes_cache(self, mocker: MockerFixture, isolated_home: Path) -> None:
-        """get_sam_tasks writes the cache file after a successful GitHub fetch.
-
-        Tests: get_sam_tasks cache write path.
-        How: Mock GitHub functions; run with refresh_cache=True; assert cache file exists
-             with valid JSON and correct parent_issue_number.
-        Why: The cache file is the offline fallback. Verifying it is written ensures that
-             subsequent offline requests return correct data.
-        """
-        # Arrange
-        mock_repo = mocker.MagicMock()
-        body = _make_sam_task_body(task_id="T1", feature="cache-feature", status="not-started")
-        mock_si = _make_mock_sub_issue(number=202, title="[cache-feature/T1] task", body=body)
-
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations.get_task_issues", return_value=[mock_si])
-
-        # Act
-        result = get_sam_tasks(parent_issue_number=555, refresh_cache=True)
-
-        # Assert: cache file was written to the isolated DH context directory
-        cache_dir = dh_paths.context_dir()
-        cache_file = cache_dir / "sam-tasks-cache-feature.json"
-        assert cache_file.exists(), "Cache file was not written"
-        cached = json.loads(cache_file.read_text(encoding="utf-8"))
-        assert cached["parent_issue_number"] == 555
-        assert cached["feature_slug"] == "cache-feature"
-        assert datetime.fromisoformat(cached["synced_at"]).tzinfo is not None
-        assert cached["count"] == 1
-        assert len(cached["tasks"]) == 1
-        # Result should also have the correct data
-        assert result["count"] == 1
+        assert result["stale"] is False
+        assert result["unavailable"] is True
+        assert result["errors"] == ["offline cache miss"]
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +445,7 @@ class TestGetReadySamTasks:
     tasks with all terminal deps are included, and cross-feature #N deps are always satisfied.
     """
 
-    def test_get_ready_sam_tasks_dep_resolution(self, mocker: MockerFixture, isolated_home: Path) -> None:
+    def test_get_ready_sam_tasks_dep_resolution(self, mocker: MockerFixture) -> None:
         """get_ready_sam_tasks excludes T2 while T1 is not-started, includes T2 when T1 is complete.
 
         Tests: get_ready_sam_tasks dependency gate logic.
@@ -496,17 +454,11 @@ class TestGetReadySamTasks:
         Why: Verifies the inline readiness logic correctly resolves feature-scoped
              dependencies, mirroring implementation_manager.py get_ready_tasks().
         """
-        # Arrange: T1 not-started, T2 depends on T1
-        mock_repo = mocker.MagicMock()
-        body_t1_not_started = _make_sam_task_body(
-            task_id="T1", feature="dep-feature", status="not-started", dependencies=[]
-        )
-        body_t2 = _make_sam_task_body(task_id="T2", feature="dep-feature", status="not-started", dependencies=["T1"])
-        mock_si_t1 = _make_mock_sub_issue(number=201, title="[dep-feature/T1] task1", body=body_t1_not_started)
-        mock_si_t2 = _make_mock_sub_issue(number=202, title="[dep-feature/T2] task2", body=body_t2)
-
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mock_get_issues = mocker.patch("backlog_core.operations.get_task_issues", return_value=[mock_si_t1, mock_si_t2])
+        tasks = [
+            {"task_id": "T1", "feature": "dep-feature", "status": "not-started", "dependencies": []},
+            {"task_id": "T2", "feature": "dep-feature", "status": "not-started", "dependencies": ["T1"]},
+        ]
+        get_tasks = mocker.patch("backlog_core.operations.get_sam_tasks", return_value={"tasks": tasks})
 
         # Act: T1 not-started — T2 should be blocked
         result_blocked = get_ready_sam_tasks(parent_issue_number=480)
@@ -517,10 +469,7 @@ class TestGetReadySamTasks:
         assert "T1" in ready_ids, "T1 should be ready (no dependencies)"
         assert "T2" not in ready_ids, "T2 should be blocked while T1 is not-started"
 
-        # Arrange: T1 now complete, T2 should unblock
-        body_t1_complete = _make_sam_task_body(task_id="T1", feature="dep-feature", status="complete", dependencies=[])
-        mock_si_t1_done = _make_mock_sub_issue(number=201, title="[dep-feature/T1] task1", body=body_t1_complete)
-        mock_get_issues.return_value = [mock_si_t1_done, mock_si_t2]
+        get_tasks.return_value = {"tasks": [{**tasks[0], "status": "complete"}, tasks[1]]}
 
         # Act: T1 complete — T2 should now be ready
         result_unblocked = get_ready_sam_tasks(parent_issue_number=480)
@@ -531,7 +480,7 @@ class TestGetReadySamTasks:
         assert "T2" in ready_ids_after, "T2 should be ready when T1 is complete"
         assert "T1" not in ready_ids_after, "T1 is complete — not returned as ready"
 
-    def test_get_ready_sam_tasks_cross_feature_dep(self, mocker: MockerFixture, isolated_home: Path) -> None:
+    def test_get_ready_sam_tasks_cross_feature_dep(self, mocker: MockerFixture) -> None:
         """get_ready_sam_tasks treats cross-feature #N deps as always-satisfied.
 
         Tests: get_ready_sam_tasks cross-feature dependency handling.
@@ -541,15 +490,20 @@ class TestGetReadySamTasks:
              They cannot be resolved by scanning local tasks, so they are treated as satisfied
              to avoid permanently blocking tasks that depend on external work.
         """
-        # Arrange
-        mock_repo = mocker.MagicMock()
-        body_cross = _make_sam_task_body(
-            task_id="T3", feature="cross-feature", status="not-started", dependencies=["#479"]
+        mocker.patch(
+            "backlog_core.operations.get_sam_tasks",
+            return_value={
+                "tasks": [
+                    {
+                        "task_id": "T3",
+                        "feature": "cross-feature",
+                        "status": "not-started",
+                        "dependencies": ["#479"],
+                        "issue_number": 301,
+                    }
+                ]
+            },
         )
-        mock_si = _make_mock_sub_issue(number=301, title="[cross-feature/T3] cross-dep task", body=body_cross)
-
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations.get_task_issues", return_value=[mock_si])
 
         # Act
         result = get_ready_sam_tasks(parent_issue_number=480)

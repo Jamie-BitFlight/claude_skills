@@ -1,305 +1,216 @@
-# Plan Artifact Lifecycle Policy
+# Plan and Artifact Lifecycle
 
-## Purpose and Scope
+This policy defines how agents create, read, update, register, and verify plans
+and artifacts. The configured backend owns the complete lifecycle: work-item
+grooming, plan and task state, artifact manifests, and artifact content.
 
-This document defines the lifecycle policy for plan artifacts produced during the SAM (Structured Agent-Managed) workflow. It classifies artifacts into two categories (human-decision and generated), establishes rules for when generated artifacts may be updated, defines divergence detection and classification criteria, and specifies how divergence findings are surfaced to the human for review.
+Read [backend-providers.md](./backend-providers.md) for backend selection,
+cache states, and provider troubleshooting.
 
-**Scope**:
+<lifecycle_contract>
 
-- Artifact classification taxonomy and immutability/mutability rules
-- Divergence detection during task execution and quality gates
-- Divergence classification thresholds (design-refinement vs intent-divergence)
-- Divergence recording format for task files
-- Divergence reporting format at completion
+## Storage contract
 
-**Out of scope**:
+Use one active backend for the work item and everything it owns. Address plans
+and artifacts with logical references, not provider-specific paths:
 
-- Changes to Python scripts or CLI tools (`implementation_manager.py`, `task_status_hook.py`)
-- Changes to generator agent prompts (`feature-researcher`, `swarm-task-planner`, `python-cli-design-spec`)
-- Retroactive modification of existing plan artifacts (forward-only policy)
-
-**Related documents**:
-
-- SAM workflow documentation: [local-workflow.md](./../rules/local-workflow.md)
-- Task file format specification: [TASK_FILE_FORMAT.md](./TASK_FILE_FORMAT.md)
-- Start-task skill (divergence recording trigger): [start-task SKILL.md](./../skills/start-task/SKILL.md)
-- Context-refinement agent (freshness check): [context-refinement.md](./../../plugins/python3-development/agents/context-refinement.md)
-
----
-
-## Artifact Classification
-
-Plan artifacts fall into two categories based on their origin and the rules governing their modification.
-
-### Category 1: Human-Decision Artifacts (Immutable)
-
-These artifacts capture the human's original intent. Agents must NEVER modify them.
-
-| Artifact | Access | Created by |
+| Logical record | Identity | Owner |
 |---|---|---|
-| Backlog items | Via `backlog_view(selector)` or `backlog_list()` MCP tools | Human (via `/create-backlog-item`) |
-| Grooming output | Embedded in backlog item under `## Groomed` | Human (via grooming session) |
-| Fact-check results | Embedded in backlog item under `## Fact-Check` | Human or agent (captures human-verified facts) |
-| RT-ICA assessments | Embedded in backlog item under `## RT-ICA` | Agent (captures human-approved assessment) |
-| Interview transcripts | `.dh/docs/interviews/` or inline | Human |
-| Human design decisions | Embedded in feature-context under `## Original Request` or backlog item | Human |
+| Plan | Logical `plan_id` | The plan's opaque work-item reference, when linked |
+| Artifact manifest | Owner reference plus the canonical `manifest` name | The work item |
+| Artifact content | Owner reference, artifact type, and logical name | The work item or plan |
 
-### Category 2: Generated Artifacts (Mutable, Intent-Bound)
+Use `sam_plan`, `sam_task`, `artifact_list`, and `artifact_read` to access these
+logical records. Treat the returned owner reference, revision, and status as the
+observable identity and state; do not infer authority from a local path.
 
-These artifacts are produced by agents during planning phases. They may be updated, but updates must stay within the intent established by human-decision artifacts.
+Remote backends may return `stale=true`, `pending=true`, or unavailable errors;
+local SQLite and memory backends do not use the remote cache contract. Follow the
+handling rules in [backend-providers.md](./backend-providers.md) before claiming
+that a write or verification is complete.
 
-| Artifact | Access | Created by | Updated by |
-|---|---|---|---|
-| Feature context | `artifact_read(item_id, 'feature-context')` | `feature-researcher` agent | `context-refinement` agent |
-| Codebase analysis | `artifact_read(item_id, 'codebase-analysis')` | `codebase-analyzer` agent | Not updated (informational snapshot) |
-| Architecture spec | `artifact_read(item_id, 'architect')` | `python-cli-design-spec` agent | `context-refinement` agent |
-| Task plan | `sam_read(plan="P{id}")` | `swarm-task-planner` agent | Status fields by hooks; Context Manifest by `context-refinement` |
-| Context Manifest | Embedded in task file (via `sam_read`) | `context-gathering` agent | `context-refinement` agent (existing behavior) |
+</lifecycle_contract>
 
-> **Research artifacts as discovery pointers**: Research artifacts (`artifact_type="research"`)
-> may contain `resource_url` and `github_url` YAML frontmatter fields pointing to upstream
-> primary sources. Consuming agents (feature-researcher, architect) MUST follow these URLs
-> when present — the local research summary is a discovery index, not an authoritative
-> document. See [add-new-feature/SKILL.md](../skills/add-new-feature/SKILL.md) Phase 1 and Phase 3 delegation prompts for the
-> authoritative fetch directive.
+<artifact_classes>
 
----
+## Artifact classes
 
-## Rules for Human-Decision Artifacts
+### Human-decision artifacts
 
-1. No agent may edit, append to, or rewrite a human-decision artifact.
-2. Human-decision artifacts are the source of truth for intent.
-3. When a generated artifact references a human-decision artifact, the reference must be by path, not by transcription (transcription decouples from the source and drifts).
+Treat the following as immutable intent:
 
----
+- The work item description and acceptance criteria.
+- Groomed sections, including fact-check, RT-ICA, constraints, and impact.
+- Human decisions recorded in the work item or a generated artifact's intent
+  source.
+- Interview or decision records explicitly identified as human input.
 
-## Rules for Generated Artifacts
+Read these records from the configured backend. Agents MUST preserve their
+meaning and MUST NOT rewrite them to match an implementation.
 
-1. Generated artifacts may be annotated with divergence information by the `context-refinement` agent.
-2. Generated artifacts must NOT be silently rewritten to match implementation -- annotations are appended, not edits.
-3. When a generated artifact's design decision conflicts with a human-decision artifact, the divergence is classified as "intent divergence" and flagged for human review.
-4. Codebase analysis files are informational snapshots and are not updated. They reflect the state of the codebase at analysis time. Staleness is expected and acceptable -- they are research inputs, not living documents.
+### Generated artifacts
 
-### Annotation vs Rewrite Distinction
+Treat the following as intent-bound, generated records:
 
-**Annotation** (permitted): Appending a clearly demarcated section to a generated artifact that notes what changed and why. The original content remains intact. The annotation is visually distinct.
+- Feature context and research summaries.
+- Codebase analysis snapshots.
+- Architecture and design specifications.
+- Task plans, task sections, and context manifests.
+- Validation, report, and divergence records.
 
-**Rewrite** (prohibited): Modifying the original content of a generated artifact to match implementation. This destroys the record of what was planned and makes it impossible to trace divergence.
+Generated content may receive an appended annotation, but its original content
+remains intact. A codebase analysis is a snapshot: record newer facts elsewhere
+instead of silently changing the original analysis.
 
----
+</artifact_classes>
 
-## Divergence Detection
+<agent_workflow>
 
-Divergence between plan artifacts and implementation is detected at two points in the SAM workflow:
+## Agent workflow
 
-### During Task Execution (Step 5a in start-task)
+Complete these steps in order. Each step has a checkable completion criterion.
 
-When an agent implements a task, it compares the architect spec and feature-context claims against what it is actually building. If a non-trivial difference is observed, the agent records a divergence note in the task file. See the [Divergence Recording](#divergence-recording) section for the format.
+1. **Resolve intent.** Read the work item with `backlog_view` and inspect its
+   acceptance criteria, groomed sections, and owner reference. If required
+   intent is absent, report the missing section and stop. **Complete when:** the
+   input and its authoritative owner reference are recorded.
+2. **Create or locate the plan.** Use `sam_plan` to create or read the plan and
+   use `sam_task` to inspect its tasks. Keep the same owner reference as the work
+   item. **Complete when:** a plan read returns the expected goal, owner, task
+   identifiers, and statuses.
+3. **Produce generated artifacts.** Write the feature context, architecture,
+   analysis, or report content required by the task. Preserve links to intent
+   sources instead of copying intent into the artifact. **Complete when:** each
+   artifact has a logical type, name, producer, and content.
+4. **Register content.** Call `artifact_register` with the work-item or plan
+   owner reference and the generated content. Register a manifest entry even
+   when the provider stores the content natively. **Complete when:**
+   `artifact_list` returns one current entry for every produced artifact and
+   `artifact_read` returns the registered content.
+5. **Claim and execute tasks.** Claim work with `sam_task`, make the smallest
+   implementation that satisfies the plan, and update task state through
+   `sam_task`. **Complete when:** each changed task has a terminal status and
+   its evidence is readable through the same backend.
+6. **Record divergence.** Compare implementation behavior with the plan and
+   intent sources. Record every material difference in the task or report
+   content using the format below. **Complete when:** every recorded difference
+   has a classification, owner reference, source section, reason, and timestamp.
+7. **Verify and close.** Re-read the acceptance criteria, plan status, manifest,
+   and required artifact content. Resolve or close the work item only after all
+   required evidence is current and provider-acknowledged. **Complete when:**
+   no required read is stale or unavailable and no required write remains
+   pending.
 
-The agent records a divergence note when ALL of these conditions hold:
+When a remote read is stale, use it only as explicitly labelled context and
+repeat the read after reachability returns. When a write is pending, report the
+queue state and do not mark the corresponding task or work item complete.
 
-1. The agent is implementing something that differs from what the architect spec or feature-context describes
-2. The difference is not a trivial implementation detail (e.g., different variable name, different import path)
-3. The difference affects the observable behavior, structure, or scope of the feature
+</agent_workflow>
 
-The agent does NOT record a divergence note for:
+<divergence_policy>
 
-- Implementation choices not addressed by the plan (the plan is silent on the topic)
-- Standard coding patterns or style choices
-- Bug fixes in the plan's own inconsistencies (e.g., the plan references a non-existent API -- the fix is obvious)
+## Divergence policy
 
-### During Quality Gates (Phase 6 in complete-implementation)
+Record a divergence when all of these are true:
 
-The `context-refinement` agent performs a plan artifact freshness check after completing its existing Context Manifest update. It reads all task files for the feature, collects divergence notes and discovered-during-implementation sections, compares key claims in the architect spec against actual implementation files, and classifies each divergence. See [context-refinement.md](./../../plugins/python3-development/agents/context-refinement.md) for the agent's full process.
+1. The implementation differs from an architect, feature-context, or groomed
+   claim.
+2. The difference is more than a naming, import, or style choice.
+3. The difference changes observable behavior, structure, constraints, or scope.
 
----
+Do not record a divergence when the plan is silent, a standard coding pattern
+fills the gap, or the implementation corrects an obvious inconsistency without
+changing intent.
 
-## Divergence Classification
+Classify each recorded difference as follows:
 
-Each divergence is classified using the following threshold table. The classification determines whether human review is required.
-
-| Change type | Classification | Action |
+| Difference | Classification | Required action |
 |---|---|---|
-| Implementation detail differs from architect spec (e.g., different function signature, different module name) | design-refinement | Auto-record in task file. No approval needed. |
-| Approach differs from architect spec but achieves same goal stated in backlog item (e.g., used Strategy B instead of Strategy A) | design-refinement | Auto-record in task file and annotate architect spec. No approval needed. |
-| Scope expanded or reduced beyond what backlog item specifies | intent-divergence | Record and flag for human review. |
-| Goal redefined or abandoned (e.g., backlog says "add feature X" but implementation skips it) | intent-divergence | Record and flag for human review. |
-| Constraint from grooming output violated (e.g., grooming says "must be backward-compatible" but implementation breaks compatibility) | intent-divergence | Record and flag for human review. |
+| A module, signature, or implementation detail changed while the goal and constraints remain satisfied | `design-refinement` | Append a note and annotate the generated design artifact. |
+| The approach changed but still satisfies the work-item goal | `design-refinement` | Append a note and annotate the generated design artifact. |
+| Scope, goal, or a groomed constraint changed | `intent-divergence` | Append a note and surface it for human review. |
 
-**Intent Source resolution**: The `context-refinement` agent locates the human-decision artifact via the `Intent Source` field in the feature-context or architect spec header. If `Intent Source` is absent (pre-policy artifact), intent-divergence classification is skipped and all divergences default to design-refinement.
+If an older artifact has no intent source, classify a difference as
+`design-refinement` and record that the intent source was unavailable. Do not
+invent a human decision.
 
----
+### Divergence note
 
-## Divergence Recording
-
-During task execution, agents record divergence observations in the task file under a `## Divergence Notes` section. Each note follows this format:
+Append notes to generated task or report content with this shape:
 
 ````markdown
 ## Divergence Notes
 
-### DN-1: {Brief title}
+### DN-1: {brief title}
 
-- **Plan artifact**: `artifact_read(item_id={N}, artifact_type="architect")`, section "{section name}"
-- **Plan claim**: "{quoted text from plan artifact}"
-- **Actual implementation**: "{what was actually done and why}"
-- **Classification**: design-refinement | intent-divergence
-- **Recorded**: {ISO timestamp}
+- **Owner reference**: `{work-item or plan reference}`
+- **Plan artifact**: `artifact_read(item_id={owner_ref}, artifact_type="architect")`, section "{section}"
+- **Plan claim**: "{short quotation or precise paraphrase}"
+- **Actual implementation**: "{what changed and why}"
+- **Classification**: `design-refinement` | `intent-divergence`
+- **Recorded**: {ISO 8601 timestamp}
 ````
 
-**Fields**:
+The note count in task metadata is a convenience index. The note body remains
+the evidence source.
 
-- **Plan artifact**: File path and section name where the divergent claim appears
-- **Plan claim**: Direct quotation from the plan artifact
-- **Actual implementation**: Description of what was actually done and the reason for the difference
-- **Classification**: The agent's assessment -- either `design-refinement` or `intent-divergence`
-- **Recorded**: ISO 8601 timestamp when the note was recorded
+### Freshness report
 
-**Counting**: The `divergence-notes` field in task file YAML frontmatter holds an integer count of divergence notes in the task body. This enables the `context-refinement` agent to quickly identify which tasks recorded divergences without parsing every task body. See [TASK_FILE_FORMAT.md](./TASK_FILE_FORMAT.md) for the field specification.
+After execution, compare every material claim in the plan and generated
+artifacts with the implementation. Append a `Post-Implementation Annotations`
+section to generated artifacts when differences exist. Keep the original text,
+link each note to its task, and include a `DIVERGENCE_REQUIRING_REVIEW` block in
+the completion report when any `intent-divergence` exists.
 
-**Trigger**: This recording step is described in [start-task SKILL.md](./../skills/start-task/SKILL.md) as Step 5a.
+</divergence_policy>
 
----
+<manifest_policy>
 
-## Divergence Reporting
+## Manifest policy
 
-After all tasks complete, the `context-refinement` agent (Phase 6 of the quality gates in the complete-implementation skill) performs a plan artifact freshness check and produces a structured report.
+The active backend stores one logical manifest per work-item owner. The manifest
+records artifact type, logical name, status, producer, creation or update time,
+and content revision. It is the discovery index; it is not a second copy of the
+artifact body.
 
-### Annotation of Plan Artifacts
+Producer agents MUST:
 
-If divergences are found, the agent appends a `## Post-Implementation Annotations` section to the feature-context and architect spec files:
+1. Produce content with a stable logical artifact type and name.
+2. Register or idempotently update it with `artifact_register`.
+3. Read it back with `artifact_list` and `artifact_read`.
 
-````markdown
-## Post-Implementation Annotations
+Consumer agents MUST:
 
-_Added by context-refinement agent on {date}_
+1. Discover entries with `artifact_list` before selecting an existing artifact.
+2. Read the selected content with `artifact_read`.
+3. Treat a missing entry, stale result, unavailable result, or pending write as
+   incomplete evidence.
 
-### Design Refinements
+Registration is idempotent for the same owner, type, and logical name. A retry
+may update the existing entry; it MUST NOT create a second current entry.
 
-1. **{Title}**: {Description of what changed and why}
-   - Original: "{quoted from plan}"
-   - Actual: "{what was implemented}"
-   - Recorded in: {task file path}, DN-{N}
+</manifest_policy>
 
-### Intent Divergences Requiring Review
+<migration_policy>
 
-1. **{Title}**: {Description of how implementation diverges from human intent}
-   - Human intent: "{quoted from backlog item or grooming output}"
-   - Actual: "{what was implemented}"
-   - Recorded in: {task file path}, DN-{N}
-   - **Action needed**: Human review required
-````
+## Forward compatibility and migration debt
 
-If no intent divergences are found, the `### Intent Divergences Requiring Review` subsection is omitted.
+Apply this policy to new records. Preserve existing human intent and generated
+content while it is being read. Existing records may contain path fields or
+provider-specific references; treat those fields as migration metadata and
+rewrite them only through the configured backend's migration operation.
 
-### Surfacing to the Human
+Do not make a file path the canonical artifact identity, add a second backend
+selector, or silently copy an old record into a new authority. A migration is
+complete only when the manifest lists the logical owner, type, name, status, and
+content revision and `artifact_read` returns the migrated content.
 
-When intent divergences are detected, the agent includes a `DIVERGENCE_REQUIRING_REVIEW` block in its output:
+</migration_policy>
 
-```text
-DIVERGENCE_REQUIRING_REVIEW:
-  1. [Title]: [Brief description]
-     - Human intent: [quoted]
-     - Actual: [description]
-     - Task: [task file path]
-```
+## Related documents
 
-The complete-implementation orchestrator checks for this block after Phase 6 completes. If present, it includes the divergence findings in its final summary to the human. This is informational, not blocking -- the human reviews divergences at their discretion after completion.
-
-If no `DIVERGENCE_REQUIRING_REVIEW` block is present, the feature proceeds normally with no additional output.
-
----
-
-## Artifact Manifest
-
-The artifact manifest is a structured registry for generated artifacts. It provides a single discovery point for all plan artifacts associated with a feature, replacing ad-hoc filesystem scanning with explicit registration.
-
-### Storage
-
-In the default GitHub artifact deployment, the manifest is stored in the GitHub Issue body between HTML comment delimiters:
-
-```html
-<!-- ARTIFACT_MANIFEST_START -->
-```yaml
-artifacts:
-  - type: feature-context
-    path: plan/feature-context-my-feature.md
-    status: current
-    created_at: "2026-03-15T00:00:00Z"
-    agent: feature-researcher
-  - type: architect-spec
-    path: plan/architect-my-feature.md
-    status: current
-    created_at: "2026-03-15T01:00:00Z"
-    agent: python-cli-design-spec
-  - type: task-plan
-    path: plan/Pc7d8e9f0-my-feature.yaml
-    status: current
-    created_at: "2026-03-15T02:00:00Z"
-    agent: swarm-task-planner
-# Note: paths are state-relative (resolved from dh_paths.state_root(), not project root)
-```
-<!-- ARTIFACT_MANIFEST_END -->
-```
-
-Each entry records the artifact `type`, filesystem `path`, `status` (current, superseded, or stale), `created_at` timestamp, and the `agent` that produced it.
-
-### Source of Truth
-
-The active artifact provider is the source of truth for the manifest. In the default GitHub artifact deployment, local plan files under `~/.dh/projects/{slug}/plan/` are the content cache and the manifest in the issue body is the authoritative registry of what artifacts exist, their types, and their status. Other providers use their configured native manifest store.
-
-### Producer Registration
-
-Producer agents register artifacts via the `artifact_register` MCP tool after writing a plan artifact to disk. Registration adds an entry to the manifest in the active artifact provider (the GitHub Issue body in the default deployment). This ensures that every generated artifact is discoverable without filesystem scanning.
-
-### Consumer Discovery
-
-Consumer agents discover artifacts via the `artifact_list` MCP tool, which reads the manifest from the active artifact provider and returns the list of registered artifacts. For content access, consumers use `artifact_read`, which retrieves the artifact content by path.
-
-### Worktree-Isolated Agents
-
-Agents running in worktree isolation (`Agent(isolation: "worktree")`) cannot access plan artifacts via the filesystem because their working tree is a separate checkout. These agents use `artifact_read` to access artifact content via MCP instead of filesystem reads, ensuring they receive the same content as agents in the main worktree.
-
----
-
-## Backward Compatibility
-
-This policy applies forward-only. Existing plan artifacts are not retroactively modified.
-
-### Existing Plan Artifacts
-
-No changes are made to existing files in `~/.dh/projects/{slug}/plan/`. Existing feature-context files, architect specs, and task files continue to work as before. They lack `Artifact Type` and `Intent Source` metadata, which means:
-
-- The `context-refinement` agent treats missing `Intent Source` as "skip intent-divergence classification"
-- All divergences in pre-policy artifacts are classified as `design-refinement` (safe default)
-- No retroactive annotations are added
-
-### Existing Task Files
-
-The `divergence-notes` field is optional with a default of 0. Existing task files without this field are unaffected. The `implementation_manager.py` parser ignores unknown fields, so the new field does not require parser changes.
-
-### Existing Agent Behavior
-
-- `feature-verifier` continues to read plan artifacts as ground truth for goal verification. Post-implementation annotations do not change the original content -- they are appended sections that the verifier can distinguish from the original plan.
-- `doc-drift-auditor` continues to audit project documentation against code. Its scope does not overlap with plan artifact freshness checking. Phase 4 catches documentation that no longer matches code; Phase 6 catches plans that no longer match what was built.
-
-### Lifecycle Metadata for New Artifacts
-
-New artifacts created after this policy is in place will include lifecycle metadata headers:
-
-- `Artifact Type: generated` -- identifies the artifact as a generated (mutable) artifact
-- `Intent Source: ~/.dh/projects/{slug}/backlog/{backlog-item-file}.md` -- links to the human-decision artifact that established the intent
-
-These fields enable the `context-refinement` agent to locate the human intent when classifying divergence. Their absence in pre-policy artifacts triggers the safe default behavior described above.
-
----
-
-## Related Documents
-
-Read these together to get the full system picture:
-
-- [Default Development Flow](../skills/development-harness/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
-- [Artifact Conventions](../skills/development-harness/references/artifact-conventions.md) — naming, file layout, cross-referencing
-- [Workflow Architecture Diagram](./workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
-- [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
-- [Task File Format](./TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)
-- [Domain model source](../sam_schema/core/models.py) — authoritative field definitions (`Task` class)
+- [Backend providers](./backend-providers.md) — one-backend ownership, cache states, and configuration.
+- [Default development flow](../skills/development-harness/references/default-development-flow.md) — stage sequencing.
+- [Artifact conventions](../skills/development-harness/references/artifact-conventions.md) — naming and cross-referencing.
+- [Backlog item lifecycle](./backlog-item-lifecycle.md) — work-item grooming and closure.
+- [Task file format](./TASK_FILE_FORMAT.md) — legacy field reference; verify current fields against the active backend.

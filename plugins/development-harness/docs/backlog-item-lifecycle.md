@@ -1,5 +1,8 @@
 # Backlog Item End-to-End Lifecycle
 
+**Audience**: Contributor/developer process reference. It preserves the observable workflow while
+the configured backend owns storage and provider-specific persistence.
+
 **Purpose**: Authoritative process graph for the full journey of a backlog item — from idea capture through implementation, verification, and closure. This document connects the backlog management layer (item creation, grooming, research) to the SAM execution layer (planning, implementation, quality gates).
 
 **Sources**:
@@ -92,7 +95,9 @@ flowchart LR
 
 Phases 3 and 4 both execute inside the `/dh:add-new-feature` skill (invoked by `/dh:work-backlog-item`). The skill runs 6 sequential phases: discovery, codebase analysis, architecture, task decomposition, plan validation, and context manifest.
 
-Each phase produces artifacts stored via the three-primitive model defined in [Backend Providers](./backend-providers.md): Work Items (IssueBackend) for coordination state, Sub-items (TaskBackend) for SAM task orchestration, and Documents (DocumentBackend) for durable handoff content between phases.
+Each phase produces logical records and artifacts through the configured backend. Work-item state,
+grooming, plans, tasks, artifact manifests, and artifact content share that backend; remote
+providers may privately use `FileCache`, while Beads, SQLite, and Memory use native storage.
 
 ---
 
@@ -118,7 +123,7 @@ flowchart TD
     P1_COLLECT_AUTO --> P1_VALIDATE
 
     P1_VALIDATE -->|"required field missing"| P1_STOP_INVALID(["STOP — report missing field<br>(title, priority, or description)"])
-    P1_VALIDATE -->|"all required fields present"| P1_DEDUP{"Step 3: Duplicate detection<br>Scan backlog/ for case-insensitive<br>title overlap ≤ 2 token edit distance"}
+    P1_VALIDATE -->|"all required fields present"| P1_DEDUP{"Step 3: Duplicate detection<br>backlog_list search/filter<br>title overlap ≤ 2 token edit distance"}
     P1_DEDUP -->|"Duplicate found (guided/quick)"| P1_CONFIRM{"User confirms<br>proceed?"}
     P1_DEDUP -->|"Duplicate found (--auto)"| P1_STOP_DUP(["STOP — duplicate detected<br>No file written"])
     P1_DEDUP -->|No duplicate| P1_COMPOSE
@@ -126,11 +131,11 @@ flowchart TD
     P1_CONFIRM -->|"Yes — proceed anyway"| P1_COMPOSE
 
     P1_COMPOSE["Step 4: Compose item block<br>Fields: Title, Source, Added (date),<br>Priority, Type, Description,<br>Verbatim user report (REQUIRED),<br>How to reproduce (if provided)"]
-    P1_COMPOSE --> P1_ADD["Step 5: backlog_add MCP tool<br>Registers backlog item via MCP<br>(stored in project state directory)"]
+    P1_COMPOSE --> P1_ADD["Step 5: backlog_add MCP tool<br>Registers backlog item via configured backend"]
 
-    P1_ADD --> P1_ISSUE{"GitHub Issue?"}
-    P1_ISSUE -->|"P0/P1 + user confirmed<br>or --auto + --create-issue"| P1_GH_CREATE["GitHub Issue created<br>issue field set in frontmatter"]
-    P1_ISSUE -->|"P2/Idea or user declined<br>or --auto without --create-issue"| P1_NO_GH["No GitHub Issue"]
+    P1_ADD --> P1_ISSUE{"Remote work-item reference?"}
+    P1_ISSUE -->|"Configured backend supports and request confirms"| P1_GH_CREATE["Backend work item linked<br>owner reference recorded"]
+    P1_ISSUE -->|"No remote reference requested or supported"| P1_NO_GH["No remote reference"]
 
     P1_GH_CREATE --> P1_DONE["Step 6: Confirm write<br>Show title, priority, date<br>Next steps:<br>  /dh:groom-backlog-item {title}<br>  /dh:work-backlog-item {title}"]
     P1_NO_GH --> P1_DONE
@@ -151,11 +156,11 @@ flowchart TD
 | P1_STOP_DUP | orchestrator | duplicate detection result | error report (no file written) | terminal |
 | P1_STOP_DECLINE | orchestrator | user decline | error report | terminal |
 | P1_COMPOSE | orchestrator | validated fields | item block (title, source, added, priority, type, description, verbatim_user_report, how_to_reproduce) | always → P1_ADD |
-| P1_ADD | `backlog_add` MCP | item block | registered backlog item (project state managed by MCP server), `issue` field if created | always → P1_ISSUE |
-| P1_ISSUE | orchestrator | priority, user preference, `--create-issue` flag | issue creation decision | P0/P1 + confirmed → P1_GH_CREATE, otherwise → P1_NO_GH |
-| P1_GH_CREATE | `backlog_add` MCP | item fields | GitHub Issue number, `issue` frontmatter field | always → P1_DONE |
-| P1_NO_GH | orchestrator | — | no issue created | always → P1_DONE |
-| P1_DONE | orchestrator | item file path, title, priority | confirmation message, next-step suggestions | terminal |
+| P1_ADD | `backlog_add` MCP | item block | registered logical backlog item, optional owner reference | always → P1_ISSUE |
+| P1_ISSUE | orchestrator | priority, user preference, remote-reference flag | linkage decision | confirmed and supported → P1_GH_CREATE, otherwise → P1_NO_GH |
+| P1_GH_CREATE | `backlog_add` MCP | item fields | configured-backend work-item reference | always → P1_DONE |
+| P1_NO_GH | orchestrator | — | no remote reference | always → P1_DONE |
+| P1_DONE | orchestrator | logical item reference, title, priority | confirmation message, next-step suggestions | terminal |
 
 **Strip implementation instructions from description** (Step 2): **Why:** Implementation instructions in the description contaminate the problem statement. Grooming and architecture phases need to understand WHAT is broken, not HOW to fix it. The `verbatim_user_report` preserves the original words — including any solution suggestions — for reference.
 
@@ -170,7 +175,7 @@ flowchart TD
 
 - Missing required field (title, priority, description) — STOP, report field name.
 - Duplicate detected in auto mode — STOP, no file written.
-- `GITHUB_TOKEN` not set for P0/P1 issue creation — per-item file still written; issue creation skipped with error report.
+- Remote provider unavailable — backend reports the failure explicitly; callers do not switch to a local storage provider.
 
 **Transition to next phase**: Text suggestion only ("Next steps: Groom: /dh:groom-backlog-item {title}"). No automatic invocation. The transition from capture to grooming is entirely implied — a human or orchestrator must decide to invoke the next step. (Confirmed: audit Finding 9 Gap A.)
 
@@ -195,7 +200,7 @@ flowchart TD
     P2_VALID -->|"No — scope/priority/context changed"| P2_SKIP(["Report invalid — skip this item"])
     P2_VALID -->|"Yes — still belongs in backlog"| P2_DONE_CHECK{"C2: Evidence work already done?<br>git log + backlog_list_merged_prs + file read"}
     P2_DONE_CHECK -->|"Already done — evidence found"| P2_SKIP
-    P2_DONE_CHECK -->|"Not done — no evidence"| P2_ISSUE_CHECK["C3: Check GitHub issue presence<br>Check metadata.issue or index link<br>(result does not affect routing)"]
+    P2_DONE_CHECK -->|"Not done — no evidence"| P2_ISSUE_CHECK["C3: Check work-item linkage<br>Check the logical owner reference<br>(result does not select storage)"]
     P2_ISSUE_CHECK --> P2_GROOMED_CHECK{"C4: Already groomed today?<br>groomed == today's date<br>AND all required sections present?"}
     P2_GROOMED_CHECK -->|"Yes — already groomed today<br>with all sections present"| P2_DRIFT["Step 2.5: Drift Check<br>Mode A: Plan Drift<br>Mode B: Grooming Drift<br>Then STOP — do not proceed to Step 3"]
     P2_GROOMED_CHECK -->|"No — not groomed today<br>or sections missing"| P2_EXTRACT["Step 3: Extract item details<br>title, description, research questions,<br>source, suggested_location"]
@@ -221,7 +226,7 @@ flowchart TD
     P2_DECISION -->|"APPROVED — all AVAILABLE<br>or DERIVABLE resolved"| P2_WRITE["Step 9: Write groomed content<br>via backlog_groom MCP calls<br>(one call per section, incremental)"]
     P2_DECISION -->|"BLOCKED — MISSING conditions<br>remain after self-resolution"| P2_BLOCKED(["STOP — batch all MISSING<br>conditions and present to user<br>Wait for user answers<br>Re-check after responses"])
 
-    P2_WRITE --> P2_DONE["Set groomed frontmatter field<br>(YYYY-MM-DD date)<br>Sync to GitHub issue body<br>if issue exists"]
+    P2_WRITE --> P2_DONE["Set groomed metadata<br>(YYYY-MM-DD date)<br>Persist through configured backend"]
 ```
 
 ### Node Contracts
@@ -232,12 +237,12 @@ flowchart TD
 | P2_LIST | `backlog_list` MCP | scope argument | filtered item list | always → P2_VALIDATE |
 | P2_VALIDATE | orchestrator | item list | per-item validation sequence | always → P2_VALID (per item) |
 | P2_VALID | orchestrator | item context, current backlog state | validity determination | invalid → P2_SKIP, valid → P2_DONE_CHECK |
-| P2_DONE_CHECK | orchestrator | `git log`, `backlog_list_merged_prs`, file reads | already-done evidence | done → P2_SKIP, not done → P2_ISSUE_CHECK |
-| P2_ISSUE_CHECK | orchestrator | `metadata.issue` field, index link | GitHub issue presence | always → P2_GROOMED_CHECK |
-| P2_GROOMED_CHECK | orchestrator | `groomed` frontmatter field, required section presence | groomed-today determination | groomed today → P2_DRIFT, not groomed → P2_EXTRACT |
+| P2_DONE_CHECK | orchestrator | `git log`, `backlog_list_merged_prs`, `backlog_view` | already-done evidence | done → P2_SKIP, not done → P2_ISSUE_CHECK |
+| P2_ISSUE_CHECK | orchestrator | logical owner reference, backend linkage | work-item linkage | always → P2_GROOMED_CHECK |
+| P2_GROOMED_CHECK | orchestrator | `groomed` metadata, required section presence | groomed-today determination | groomed today → P2_DRIFT, not groomed → P2_EXTRACT |
 | P2_SKIP | orchestrator | validity/done-check result | skip report | terminal (for this item) |
 | P2_DRIFT | orchestrator | plan state, groomed content, codebase state | drift report (Mode A or B) | terminal (STOP — do not proceed to Step 3) |
-| P2_EXTRACT | orchestrator | item file content | title, description, research questions, source, suggested_location | always → P2_RTICA_INIT |
+| P2_EXTRACT | orchestrator | logical item content | title, description, research questions, source, suggested_location | always → P2_RTICA_INIT |
 | P2_RTICA_INIT | orchestrator | extracted item details only (Wave 1 sections not yet produced) | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')` | always → P2_SCOPE |
 | P2_SCOPE | orchestrator | RT-ICA distribution (AVAILABLE/DERIVABLE/MISSING counts) | scope size (MINIMAL/NARROW/STANDARD/FULL) | always → P2_SWARM |
 | P2_WAVE1 | `fact-checker` + `impact-analyst` + `classifier` (parallel teammates) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')`, Issue Classification via `backlog_groom(section='Issue Classification')` | all complete → P2_WAVE2 |
@@ -245,9 +250,9 @@ flowchart TD
 | P2_WAVE3 | `groomer` teammate | all prior sections | Reproducibility, Priority, Impact, Benefits, Expected Behavior, AC, Files, Resources, Dependencies, Effort — each via `backlog_groom(section='{name}')` | complete → P2_RTICA_FINAL |
 | P2_RTICA_FINAL | orchestrator or `rtica-assessor` | full swarm output, all groomed sections | final RT-ICA assessment (replaces P2_RTICA_INIT snapshot), self-resolution attempts | always → P2_DECISION |
 | P2_DECISION | orchestrator | RT-ICA final result | APPROVED or BLOCKED determination | APPROVED → P2_WRITE, BLOCKED → P2_BLOCKED |
-| P2_WRITE | `backlog_groom` MCP (multiple calls) | groomed sections content | per-section writes to item file | always → P2_DONE |
+| P2_WRITE | `backlog_groom` MCP (multiple calls) | groomed sections content | per-section writes to logical item | always → P2_DONE |
 | P2_BLOCKED | orchestrator | MISSING conditions list | user-facing report of unresolved conditions | terminal (wait for user answers) |
-| P2_DONE | `backlog_groom` MCP | groomed date | `groomed` frontmatter field (YYYY-MM-DD), GitHub issue body sync | terminal |
+| P2_DONE | `backlog_groom` MCP | groomed date | `groomed` metadata and configured-backend persistence | terminal |
 
 **Swarm agents and their outputs**:
 
@@ -258,21 +263,23 @@ flowchart TD
 - **alignment-analyst** (Wave 2) — Compares existing implementation against the item's design intent (Description field). Samples affected systems from the Impact Radius section. Produces: Alignment assessment (ALIGNED | DIVERGENT | NOT_APPLICABLE), divergences table (Area, Expected, Actual, Severity, File), and summary counts. Writes via `backlog_groom(section="Design Intent Alignment")`. Blocked by impact-analyst completion.
 - **groomer** (Wave 3) — Reads all prior sections. Produces: Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. Each subsection written individually via `backlog_groom(section="{subsection name}")`.
 
-**RT-ICA runs twice**: Step 3.5 (initial snapshot, item-level info only) and Step 8.5 (final pass, full swarm output). The Step 8.5 result replaces the Step 3.5 snapshot in the item file (same `section="RT-ICA"` call overwrites). **Why:** The initial snapshot calibrates swarm intensity — scope sizing (Step 3.6) uses the AVAILABLE/DERIVABLE/MISSING distribution to choose swarm intensity. The final pass incorporates swarm discoveries (fact-check results convert DERIVABLE to AVAILABLE, refuted claims convert AVAILABLE to MISSING).
+**RT-ICA runs twice**: Step 3.5 (initial snapshot, item-level info only) and Step 8.5 (final pass, full swarm output). The Step 8.5 result replaces the Step 3.5 snapshot in the logical item (same `section="RT-ICA"` call overwrites). **Why:** The initial snapshot calibrates swarm intensity — scope sizing (Step 3.6) uses the AVAILABLE/DERIVABLE/MISSING distribution to choose swarm intensity. The final pass incorporates swarm discoveries (fact-check results convert DERIVABLE to AVAILABLE, refuted claims convert AVAILABLE to MISSING).
 
-**Metadata written**: `groomed` frontmatter field set to `YYYY-MM-DD` (not nested under `metadata.`). This field records when grooming occurred and is distinct from the item's status field.
+**Metadata written**: `groomed` metadata is set to `YYYY-MM-DD`. This records when grooming
+occurred and is distinct from the item's status field.
 
 **Status advancement via `mark_groomed`**: Passing `mark_groomed=True` to the `backlog_groom` MCP tool triggers a status transition after all content writes complete:
 
-1. The item's `metadata.status` field is set to `groomed` in the local per-item file.
-2. When the active backend is `github`: the `status:needs-grooming` GitHub label is removed from the issue (no-op if already absent — it is removed as a side effect of each content sync, so it may already be gone). For other backends, the equivalent status field is cleared in the backend store.
-3. When the active backend is `github`: the `status:groomed` GitHub label is added to the issue; if the label does not exist on the repository, it is created automatically. For other backends, the equivalent `groomed` status marker is applied in the backend store.
+1. The item's status is set to `groomed` through the configured backend.
+2. The backend applies its equivalent status transition and any provider synchronization.
 
 The flag works with both single-section writes and the batch `sections` parameter. When `sections` is used with `mark_groomed=True`, all sections are written first; the status transition fires exactly once after the batch completes.
 
-**Idempotent**: Calling `backlog_groom` with `mark_groomed=True` multiple times is safe. If `status:groomed` is already present on the issue, the GitHub label update is skipped entirely. If `status:needs-grooming` was already removed, the removal is a no-op.
+**Idempotent**: Calling `backlog_groom` with `mark_groomed=True` multiple times is safe; the
+configured backend treats an already-groomed item as a no-op.
 
-**Error handling**: If the GitHub label transition fails, the local frontmatter update still applies and a warning is recorded in the result. Content writes are not affected.
+**Error handling**: A backend status-transition failure is returned explicitly. Content writes and
+their queued remote mutation, when applicable, retain their backend-defined outcome.
 
 **Re-lookup failure**: After content is written, `groom_item` re-parses the backlog to locate the item by selector before advancing status. If this re-lookup returns `None` (e.g., selector ambiguity after a title change during content write), the status advance is skipped. The response contains `mark_groomed_skipped: true` and a human-readable `mark_groomed_skip_reason` that includes the selector and indicates the item was not found in the re-parsed backlog. A warning is also emitted. The caller must check for `mark_groomed_skipped` in the result dict and re-run the `backlog_groom` call if the status advance is required.
 
@@ -313,19 +320,19 @@ flowchart TD
     P3_RTICA_GATE -->|APPROVED| P3_COMPOSE["work-backlog-item Step 5:<br>Compose feature request<br>Carry DERIVABLE items as<br>'Assumptions to confirm'"]
     P3_COMPOSE --> P3_INVOKE["work-backlog-item Step 6:<br>Skill(skill='add-new-feature',<br>args='{composed feature request}')<br>Direct skill call — not a suggestion"]
 
-    P3_INVOKE --> P3_ARTIFACT_DISCOVER{"Pre-Phase:<br>Artifact Discovery<br>artifact_list(item_id=N)<br>Existing artifacts?"}
+    P3_INVOKE --> P3_ARTIFACT_DISCOVER{"Pre-Phase:<br>Artifact Discovery<br>artifact_list(item_id={work_item_reference})<br>Existing artifacts?"}
     P3_ARTIFACT_DISCOVER -->|"Artifacts exist —<br>inject into delegation prompts"| P3_ARTIFACT_APPEND["Append prior_artifacts block<br>to each phase delegation prompt"]
     P3_ARTIFACT_DISCOVER -->|"No artifacts —<br>start fresh"| P3_RESEARCH
     P3_ARTIFACT_APPEND --> P3_RESEARCH
 
-    P3_RESEARCH["Phase 1: Feature Research<br>Agent: @dh:feature-researcher<br>Output: plan/feature-context-{slug}.md<br>Constraint: WHAT/WHY only — no HOW<br>Artifact registered: feature-context"]
+    P3_RESEARCH["Phase 1: Feature Research<br>Agent: @dh:feature-researcher<br>Output: feature-context artifact<br>Constraint: WHAT/WHY only — no HOW<br>Artifact registered: feature-context"]
 
     P3_RESEARCH --> P3_CODEBASE{"Phase 2: Codebase Analysis<br>Does feature-context reference unfamiliar<br>patterns, unknown architecture, or<br>untested conventions?<br>Agent: @dh:codebase-analyzer"}
-    P3_CODEBASE -->|"Yes — unknown patterns<br>or conventions present"| P3_CODEBASE_OUT["Output: plan/codebase/{FOCUS}.md<br>per focus area<br>Constraint: WHAT exists today only<br>Artifact registered: codebase-analysis"]
+    P3_CODEBASE -->|"Yes — unknown patterns<br>or conventions present"| P3_CODEBASE_OUT["Output: codebase-analysis artifact<br>per focus area<br>Constraint: WHAT exists today only"]
     P3_CODEBASE -->|"No — patterns already<br>captured in feature-context"| P3_ARCHITECT
     P3_CODEBASE_OUT --> P3_ARCHITECT
 
-    P3_ARCHITECT["Phase 3: Architecture Design<br>Agent: resolved from language manifest<br>(pyproject.toml → @python3-development:python-cli-design-spec)<br>Input: feature-context + optional codebase analysis<br>Output: plan/architect-{slug}.md<br>Constraint: HOW only — interfaces, contracts, models<br>Artifact registered: architect"]
+    P3_ARCHITECT["Phase 3: Architecture Design<br>Agent: resolved from language manifest<br>(pyproject.toml → @python3-development:python-cli-design-spec)<br>Input: feature-context + optional codebase analysis<br>Output: architect artifact<br>Constraint: HOW only — interfaces, contracts, models"]
 ```
 
 ### Node Contracts
@@ -340,20 +347,29 @@ flowchart TD
 | P3_BLOCKED | orchestrator | MISSING conditions list | user-facing report, skill NOT invoked | terminal |
 | P3_COMPOSE | orchestrator (`work-backlog-item` Step 5) | groomed item, DERIVABLE items | composed feature request with 'Assumptions to confirm' | always → P3_INVOKE |
 | P3_INVOKE | orchestrator (`work-backlog-item` Step 6) | composed feature request | `Skill()` call to `add-new-feature` | always → P3_ARTIFACT_DISCOVER |
-| P3_ARTIFACT_DISCOVER | `artifact_list` MCP | `item_id` | existing artifact manifest (or empty) | artifacts exist → P3_ARTIFACT_APPEND, none → P3_RESEARCH |
+| P3_ARTIFACT_DISCOVER | `artifact_list` MCP | opaque owner reference | existing artifact manifest (or empty) | artifacts exist → P3_ARTIFACT_APPEND, none → P3_RESEARCH |
 | P3_ARTIFACT_APPEND | orchestrator | artifact manifest | `prior_artifacts` block added to delegation prompts | always → P3_RESEARCH |
-| P3_RESEARCH | `@dh:feature-researcher` | composed feature request, prior artifacts (if any) | `plan/feature-context-{slug}.md`, `artifact_register(type='feature-context')` | always → P3_CODEBASE |
+| P3_RESEARCH | `@dh:feature-researcher` | composed feature request, prior artifacts (if any) | feature-context artifact registered with owner, `artifact_type`, logical `artifact_id`, and content | always → P3_CODEBASE |
 | P3_CODEBASE | orchestrator | feature context, codebase state | codebase analysis decision | invoked → P3_CODEBASE_OUT, skipped → P3_ARCHITECT |
-| P3_CODEBASE_OUT | `@dh:codebase-analyzer` | focus areas (patterns, architecture, testing, conventions) | `plan/codebase/{FOCUS}.md` per focus, `artifact_register(type='codebase-analysis')` | always → P3_ARCHITECT |
-| P3_ARCHITECT | language manifest agent (e.g. `@python3-development:python-cli-design-spec`) | feature context + optional codebase analysis | `plan/architect-{slug}.md`, `artifact_register(type='architect')` | terminal (continues to Phase 4) |
+| P3_CODEBASE_OUT | `@dh:codebase-analyzer` | focus areas (patterns, architecture, testing, conventions) | registered `codebase-analysis` artifact content | always → P3_ARCHITECT |
+| P3_ARCHITECT | language manifest agent (e.g. `@python3-development:python-cli-design-spec`) | feature context + optional codebase analysis | registered `architect` artifact content | terminal (continues to Phase 4) |
 
 **Agent selection for architecture**: The skill does NOT hardcode `@python3-development:python-cli-design-spec`. It resolves the `design-spec` role from the language manifest at runtime based on project detection markers (`pyproject.toml` → Python, `package.json` → TypeScript, `Cargo.toml` → Rust, none → dh:task-worker fallback).
 
-**Artifact registration**: Each phase calls `artifact_register` after writing its file, with `item_id`, `artifact_type`, `path` (state-relative), and `agent` fields.
+**Artifact registration**: Each document-artifact phase calls `artifact_register` with the opaque
+owner reference, `artifact_type`, logical artifact identifier, and `agent` fields. The configured
+backend owns content persistence. Plans are created and read only through `sam_plan`.
 
-**Storage**: Feature context and architecture specs are registered as Documents via the artifact manifest system. See [Backend Providers — SAM Storage Model](./backend-providers.md#sam-storage-model) for the document lifecycle.
+**Storage**: Feature context and architecture specs are registered as logical artifacts through the
+configured backend. Remote providers may cache them privately; local providers keep them in native
+storage.
 
-**Artifact access is MCP-first**: Consumers retrieve artifacts via `artifact_read(item_id, artifact_type)` and register them via `artifact_register(item_id, artifact_type, path, agent, content)`. Task plans are accessed via `sam_read(plan, task)`. The MCP servers resolve storage internally — consumers never construct filesystem paths.
+**Artifact access is MCP-first**: Consumers retrieve artifacts via
+`artifact_read(item_id=<owner-reference>, artifact_type=<type>)` and register them via
+`artifact_register(item_id=<owner-reference>, artifact_type=<type>, artifact_id=<logical-id>,
+agent=<producer>, content=<body>)`. Task plans are accessed via `sam_task` and `sam_plan`. The
+configured backend resolves storage internally — consumers use logical addresses, never provider
+or filesystem paths.
 
 **No feasibility gate exists** between RT-ICA APPROVED and SAM planning invocation. The transition from "do we have enough information?" to "start planning" is direct — no assessment of technical feasibility, effort/value, risk, or alternative approaches (audit Finding 1).
 
@@ -361,7 +377,9 @@ flowchart TD
 
 ## Phase 4: Planning
 
-**Entry precondition**: Architecture document (`plan/architect-{slug}.md`) exists. Still inside `/dh:add-new-feature` (Phases 4-6 of 6 internal phases).
+**Entry precondition**: The `architect` artifact exists for the logical owner and is retrievable with
+`artifact_read(item_id=<owner-reference>, artifact_type="architect")`. Still inside
+`/dh:add-new-feature` (Phases 4-6 of 6 internal phases).
 
 **Skill**: `/dh:add-new-feature` (Phases 4-6)
 
@@ -371,16 +389,16 @@ The following diagram is the authoritative procedure for Phase 4 — Planning (/
 
 ```mermaid
 flowchart TD
-    P4_DECOMPOSE["Phase 4: Task Decomposition<br>Agent: @dh:swarm-task-planner<br>Input: architect-{slug}.md + feature-context<br>Output: plan/P{id}-{slug}.yaml via sam_create<br>Every task has: status, dependencies,<br>priority, complexity, agent, AC (3+),<br>verification steps (3+)"]
+    P4_DECOMPOSE["Phase 4: Task Decomposition<br>Agent: @dh:swarm-task-planner<br>Input: architect artifact + feature-context<br>Output: logical plan via the sam_plan create action<br>Every task has: status, dependencies,<br>priority, complexity, agent, AC (3+),<br>verification steps (3+)"]
 
     P4_DECOMPOSE --> P4_BOOKEND{"acceptance-criteria-structured<br>non-empty?"}
     P4_BOOKEND -->|"Non-empty — generate bookends"| P4_BOOKEND_GEN["swarm-task-planner generates<br>T0 (baseline) + TN (verification)<br>bookend tasks inside the plan<br>T0: priority 1, deps []<br>TN: deps = all non-bookend task IDs"]
     P4_BOOKEND -->|"Empty — skip bookends"| P4_NO_BOOKEND["No bookend tasks generated"]
-    P4_BOOKEND_GEN --> P4_REGISTER
-    P4_NO_BOOKEND --> P4_REGISTER
+    P4_BOOKEND_GEN --> P4_CREATED
+    P4_NO_BOOKEND --> P4_CREATED
 
-    P4_REGISTER["Artifact registered: task-plan<br>(auto-registered by sam_create when issue set)"]
-    P4_REGISTER --> P4_VALIDATE
+    P4_CREATED["Logical plan created through sam_plan<br>Plan address returned to the workflow"]
+    P4_CREATED --> P4_VALIDATE
 
     P4_VALIDATE["Phase 5: Plan Validation<br>Agent: @dh:plan-validator<br>Checks: AC coverage, dependency DAG,<br>agent assignments, verification steps,<br>impact radius coverage"]
     P4_VALIDATE --> P4_VAL_RESULT{Validator returns?}
@@ -388,26 +406,26 @@ flowchart TD
     P4_VAL_RESULT -->|"BLOCKED — specific gaps listed"| P4_FIX["Re-invoke swarm-task-planner<br>with validator gap list as context<br>Fix identified gaps before retry"]
     P4_FIX -->|"gaps addressed — retry validation"| P4_VALIDATE
 
-    P4_CONTEXT["Phase 6: Context Manifest<br>Agent: @dh:dh-context-gathering<br>Writes context manifest INTO the plan<br>via sam_update (not a separate file)<br>Maps each task to files, artifacts,<br>external context it needs"]
+    P4_CONTEXT["Phase 6: Context Manifest<br>Agent: @dh:dh-context-gathering<br>Writes context manifest INTO the plan<br>via sam_plan (not a separate provider)<br>Maps each task to files, artifacts,<br>external context it needs"]
 
-    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='plan/P{id}-{slug}.yaml')<br>Links plan to backlog item"]
-    P4_LINK --> P4_DONE(["add-new-feature complete<br>Report slug + task file path<br>Next: /dh:implement-feature"])
+    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='{plan_ref}')<br>Links returned opaque plan_ref to backlog item"]
+    P4_LINK --> P4_DONE(["add-new-feature complete<br>Report plan address<br>Next: /dh:implement-feature"])
 ```
 
 ### Node Contracts
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P4_DECOMPOSE | `@dh:swarm-task-planner` | `plan/architect-{slug}.md`, `plan/feature-context-{slug}.md` | `plan/P{id}-{slug}.yaml` via `sam_create`, tasks with status/deps/priority/complexity/agent/AC/verification | always → P4_BOOKEND |
+| P4_DECOMPOSE | `@dh:swarm-task-planner` | architect and feature-context artifacts | logical plan via the `sam_plan` create action, tasks with status/deps/priority/complexity/agent/AC/verification | always → P4_BOOKEND |
 | P4_BOOKEND | orchestrator | `acceptance-criteria-structured` field | bookend decision | non-empty → P4_BOOKEND_GEN, empty → P4_NO_BOOKEND |
-| P4_BOOKEND_GEN | `@dh:swarm-task-planner` | structured acceptance criteria | T0 task (priority 1, deps=[]) + TN task (deps=all non-bookend IDs) inside plan | always → P4_REGISTER |
-| P4_NO_BOOKEND | orchestrator | — | no bookend tasks | always → P4_REGISTER |
-| P4_REGISTER | `sam_create` MCP (auto-registration) | plan YAML, issue number | `artifact_register(type='task-plan')` | always → P4_VALIDATE |
-| P4_VALIDATE | `@dh:plan-validator` | plan YAML | READY or BLOCKED with specific gap list | always → P4_VAL_RESULT |
+| P4_BOOKEND_GEN | `@dh:swarm-task-planner` | structured acceptance criteria | T0 task (priority 1, deps=[]) + TN task (deps=all non-bookend IDs) inside plan | always → P4_CREATED |
+| P4_NO_BOOKEND | orchestrator | — | no bookend tasks | always → P4_CREATED |
+| P4_CREATED | `sam_plan` MCP | slug, goal, tasks, owner reference | logical plan address; plan content remains on the SAM capability | always → P4_VALIDATE |
+| P4_VALIDATE | `@dh:plan-validator` | logical plan record | READY or BLOCKED with specific gap list | always → P4_VAL_RESULT |
 | P4_VAL_RESULT | orchestrator | validator output | routing decision | READY → P4_CONTEXT, BLOCKED → P4_FIX |
 | P4_FIX | orchestrator | validator BLOCKED output with gap list | re-invoke `swarm-task-planner` with gap context | loops back to P4_DECOMPOSE |
-| P4_CONTEXT | `@dh:dh-context-gathering` | plan YAML, codebase state, artifact manifest | context manifest written into plan via `sam_update` | always → P4_LINK |
-| P4_LINK | `backlog_update` MCP | item selector (title), plan path | `plan` field linked on backlog item, `status` → `in-progress` | always → P4_DONE |
+| P4_CONTEXT | `@dh:dh-context-gathering` | logical plan record, codebase state, artifact manifest | context manifest written into plan via `sam_plan` | always → P4_LINK |
+| P4_LINK | `backlog_update` MCP | item selector (title), plan address | `plan` field linked on backlog item, `status` → `in-progress` | always → P4_DONE |
 
 > **Quick-path exception**: When the fix arrives via the Proactive Fix Gate (--quick), the SAM plan
 > slug is `quick-{slug}` with a single T1 task (complexity=low). The state machine transition
@@ -415,17 +433,21 @@ flowchart TD
 > quick/start.md Step 2) occurs during quick-path execution, not at Step 7 of the full
 > work-backlog-item pipeline.
 
-| P4_DONE | orchestrator | slug, task file path | completion report, next-step instruction (`/dh:implement-feature`) | terminal |
+| P4_DONE | orchestrator | slug, logical plan address | completion report, next-step instruction (`/dh:implement-feature`) | terminal |
 
-**Storage**: The SAM plan is created via `sam_create`, which maps to TaskBackend operations (Work Item for the plan, Sub-items for tasks). See [Backend Providers — TaskBackend Protocol](./backend-providers.md#taskbackend-protocol-912--to-be-created).
+**Storage**: The SAM plan is created via the `sam_plan` create action through the configured backend. The same
+backend owns the plan and its task records; no second task provider is selected.
 
 **plan-validator returns READY or BLOCKED** (not PASS/BLOCKED as previously documented). BLOCKED includes specific gaps that must be fixed before retrying.
 
-**T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside `P{id}-{slug}.yaml` with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
+**T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside the logical plan with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
 
-**context-gathering writes into the plan YAML** via `sam_update`, not to a separate file. The plan file path remains `~/.dh/projects/{project-slug}/plan/P{id}-{slug}.yaml`.
+**context-gathering writes into the plan record** via `sam_plan`, not to a separate provider.
 
-**Status advance**: `backlog_update(selector="{title}", plan="plan/P{id}-{slug}.yaml")` links the SAM plan file to the GitHub issue. The `status` field transition to `in-progress` happens via `work-backlog-item` Step 7. For the quick-path case, see the Quick-path exception note in the P4_LINK row above.
+**Status advance**: `backlog_update(selector="{title}", plan="{plan_ref}")` links the opaque plan
+reference returned by `sam_plan` to
+the work item through the configured backend. The `status` transition to `in-progress` happens via
+`work-backlog-item` Step 7.
 
 **Failure paths**:
 
@@ -446,18 +468,18 @@ The following diagram is the authoritative procedure for Phase 5 — Execution (
 
 ```mermaid
 flowchart TD
-    P5_START(["Orchestrator invokes<br>/dh:implement-feature"]) --> P5_STATUS["sam_status(plan='P{N}')<br>Query plan status"]
+    P5_START(["Orchestrator invokes<br>/dh:implement-feature"]) --> P5_STATUS["sam_plan(plan='P{N}', config={\"action\":\"status\"})<br>Query plan status"]
 
-    P5_STATUS --> P5_READY{"Fetch ready tasks<br>(ONCE per batch)<br>backlog_get_ready_sam_tasks<br>or sam_ready"}
+    P5_STATUS --> P5_READY{"Fetch ready tasks<br>(ONCE per batch)<br>sam_plan(plan='P{N}', config={\"action\":\"ready\"})"}
     %% Note: BLOCKED tasks also produce no ready tasks — see Gap note in Phase 5 prose
     P5_READY -->|"No ready tasks —<br>all tasks show COMPLETE"| P5_COMPLETE
-    P5_READY -->|"1 task ready"| P5_DISPATCH_SINGLE["Dispatch via single Agent call<br>Skill(skill='start-task',<br>args='{task_file_path} --task {T}')"]
+    P5_READY -->|"1 task ready"| P5_DISPATCH_SINGLE["Dispatch via single Agent call<br>Skill(skill='start-task',<br>args='P{N} --task {T}')"]
     P5_READY -->|"2+ tasks ready"| P5_DISPATCH_TEAM["TeamCreate(team_name='impl-{slug}')<br>Spawn one teammate per ready task<br>Each calls start-task"]
 
     P5_DISPATCH_SINGLE --> P5_HOOK
     P5_DISPATCH_TEAM --> P5_HOOK
 
-    P5_HOOK["SubagentStop hook fires:<br>task_status_hook.py marks<br>task COMPLETE in plan YAML<br>Syncs to GitHub sub-issue<br>if github_issue field set"]
+    P5_HOOK["SubagentStop hook fires:<br>task_status_hook.py marks<br>task COMPLETE through configured backend"]
 
     P5_HOOK --> P5_CONCERNS{"Agent returned<br>&lt;concerns&gt; block?"}
     P5_CONCERNS -->|Yes| P5_LOG_CONCERNS["Append concerns to backlog<br>via backlog_groom"]
@@ -477,51 +499,51 @@ flowchart TD
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P5_START | orchestrator | task file path (from P4_DONE) | skill invocation | always → P5_STATUS |
-| P5_STATUS | `sam_status` MCP | plan address `P{N}` | plan status summary (per-task states) | always → P5_READY |
-| P5_READY | `backlog_get_ready_sam_tasks` or `sam_ready` MCP | plan address | list of ready tasks (deps resolved, not claimed) | none ready + all terminal → P5_COMPLETE, 1 ready → P5_DISPATCH_SINGLE, 2+ ready → P5_DISPATCH_TEAM |
-| P5_DISPATCH_SINGLE | orchestrator | task file path, task ID | `Skill('start-task', args)` call | always → P5_HOOK |
-| P5_DISPATCH_TEAM | orchestrator | task file path, ready task IDs | `TeamCreate` with one teammate per task, each calls `start-task` | always → P5_HOOK |
-| P5_HOOK | `task_status_hook.py` (SubagentStop) | agent completion signal, active-task context file | task status → COMPLETE in plan YAML, GitHub sub-issue sync | always → P5_CONCERNS |
+| P5_START | orchestrator | plan address (from P4_DONE) | skill invocation | always → P5_STATUS |
+| P5_STATUS | `sam_plan` MCP | plan address `P{N}` | plan status summary (per-task states) | always → P5_READY |
+| P5_READY | `sam_plan` MCP (`plan="<plan-address>", config={"action":"ready"}`) | plan address | list of ready tasks (deps resolved, not claimed) | none ready + all terminal → P5_COMPLETE, 1 ready → P5_DISPATCH_SINGLE, 2+ ready → P5_DISPATCH_TEAM |
+| P5_DISPATCH_SINGLE | orchestrator | plan address, task ID | `Skill('start-task', args)` call | always → P5_HOOK |
+| P5_DISPATCH_TEAM | orchestrator | plan address, ready task IDs | `TeamCreate` with one teammate per task, each calls `start-task` | always → P5_HOOK |
+| P5_HOOK | `task_status_hook.py` (SubagentStop) | agent completion signal, active-task context | task status → COMPLETE through configured backend | always → P5_CONCERNS |
 | P5_CONCERNS | orchestrator | agent output | concerns block presence check | concerns present → P5_LOG_CONCERNS, none → P5_BATCH_CHECK |
 | P5_LOG_CONCERNS | `backlog_groom` MCP | concerns text | concerns appended to backlog item | always → P5_BATCH_CHECK |
 | P5_BATCH_CHECK | orchestrator | batch task states | batch completion check | all complete → P5_STATUS (loop), incomplete → P5_WAIT |
 | P5_WAIT | orchestrator | running agent handles | agent completion signals | agent completes → P5_BATCH_CHECK |
-| P5_COMPLETE | orchestrator | `sam_status` showing all COMPLETE | completion gate passed | always → P5_INVOKE_QG |
-| P5_INVOKE_QG | orchestrator | task file path | `Skill('complete-implementation', args)` call | terminal (enters Phase 6) |
+| P5_COMPLETE | orchestrator | `sam_plan(plan="<plan-address>", config={"action":"status"})` showing all COMPLETE | completion gate passed | always → P5_INVOKE_QG |
+| P5_INVOKE_QG | orchestrator | logical plan address | `Skill('complete-implementation', args)` call | terminal (enters Phase 6) |
 
 **start-task internal procedure** (Actor: specialist agent):
 
-1. `sam_read(plan="P{N}", task="T{M}")` — returns a `TaskAssignment` model
-2. Optionally discovers plan artifacts via `artifact_list` + `artifact_read`
+1. `sam_task(plan="P{N}", task="T{M}", config={"action":"read"})` — returns a `TaskAssignment` model
+2. Optionally discovers supporting document artifacts via `artifact_list` + `artifact_read`
 3. Selects task (from `--task` argument or first `not-started` with resolved deps)
 4. Loads task-level skills via `Skill(skill="{skill-name}")` for each name in `task.skills`
-5. `sam_task(action='claim', plan="P{N}", task="T{M}")` — if `claimed: false`, STOP (do not implement). **Storage**: `claim_task` on the `TaskBackend` transitions status to `in-progress`. Under `GistTaskLayer` (MCP server context), exactly-once is provided by serialized dispatch at the orchestrator level, not by the operation itself — two concurrent callers may both receive `True` (ADR-2509-3, Option 3). See [Backend Providers — TaskBackend Protocol](./backend-providers.md#taskbackend-protocol-912--to-be-created).
-6. Writes active-task context file to `~/.dh/projects/{project-slug}/context/active-task-{CLAUDE_CODE_SESSION_ID}.json` (required for hook-driven updates)
+5. `sam_task(plan="P{N}", task="T{M}", config={"action":"claim"})` — if `claimed: false`, STOP (do not implement). The configured backend transitions status to `in-progress`; serialize claims for the same task.
+6. Registers active-task context with `sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})` (required for hook-driven updates)
 7. Implements against acceptance criteria and verification steps
 8. Commits (prohibition on `Fixes #N` trailers — only `/dh:complete-implementation` Final Step may include these)
 
 **Hook mechanisms**:
 
-- `SubagentStop` hook (on `/dh:implement-feature`) — marks task COMPLETE after sub-agent finishes, syncs to the backend sub-issue (GitHub issue number when using `github` backend; beads child-issue ID when using `beads` backend)
-- `PostToolUse` hook (on `/dh:start-task`, matcher: Write|Edit|Bash) — records `last-activity` timestamp on every tool call during task execution. Uses the active-task context file to know which task to update.
+- `SubagentStop` hook (on `/dh:implement-feature`) — marks task COMPLETE after sub-agent finishes through the configured backend
+- `PostToolUse` hook (on `/dh:start-task`, matcher: Write|Edit|Bash) — records `last-activity` timestamp on every tool call during task execution through the active-task context.
 
 **Bookend task dispatch**:
 
-- T0 dispatches first (priority 1, no dependencies) — runs `t0-baseline-capture` agent, writes `T0-baseline-{slug}.yaml`
-- TN dispatches last (depends on all non-bookend tasks) — runs `tn-verification-gate` agent, writes `TN-verification-{slug}.yaml`
-- Both write to `~/.dh/projects/{project-slug}/plan/`
-- When parent story issue number is known, `artifact_register` instructions are added to bookend task delegation prompts
+- T0 dispatches first (priority 1, no dependencies) — runs `t0-baseline-capture` agent and registers a `T0-baseline` artifact
+- TN dispatches last (depends on all non-bookend tasks) — runs `tn-verification-gate` agent and registers a `TN-verification` artifact
+- Both persist through the configured backend
+- `artifact_register` instructions are added to bookend task delegation prompts
 
 **complete-implementation is explicitly invoked** when all tasks show COMPLETE. The skill uses `Skill(skill="complete-implementation", args="{task_file_path}")` — a direct invocation, not a text suggestion.
 
 **BLOCKED task handling**: NOT FOUND in source. Neither `implement-feature` nor `start-task` documents an explicit procedure for BLOCKED tasks. The completion gate triggers only when all tasks are COMPLETE. No documented escalation path or loop-exit condition for BLOCKED tasks exists in these skill files.
 
-**Recommended BLOCKED task escalation**: When `sam_status` shows tasks in BLOCKED state after multiple dispatch cycles with no progress, the recommended approach is for the orchestrator to escalate to the user with: the blocked task list, each task's blocking reason (from the task body or status output), and a request for direction. The dispatch loop should not spin indefinitely on BLOCKED tasks — if a full dispatch cycle produces no state changes (no tasks transition from BLOCKED to another state), the orchestrator should break the loop and report. This guidance is not currently codified in the skill files; it is a documented recommendation for orchestrator behavior.
+**Recommended BLOCKED task escalation**: When `sam_plan(plan="<plan-address>", config={"action":"status"})` shows tasks in BLOCKED state after multiple dispatch cycles with no progress, the recommended approach is for the orchestrator to escalate to the user with: the blocked task list, each task's blocking reason (from the task body or status output), and a request for direction. The dispatch loop should not spin indefinitely on BLOCKED tasks — if a full dispatch cycle produces no state changes (no tasks transition from BLOCKED to another state), the orchestrator should break the loop and report. This guidance is not currently codified in the skill files; it is a documented recommendation for orchestrator behavior.
 
 **Failure paths**:
 
-- `sam_claim` returns `claimed: false` — agent stops, does not implement (another agent is running this task)
+- `sam_task(config={"action":"claim"})` returns `claimed: false` — agent stops, does not implement (another agent is running this task)
 - TN verification with `status: regressed` on any criterion — detected in Phase 6 pre-phase, not in the execution loop itself
 
 ---
@@ -540,27 +562,27 @@ The following diagram is the authoritative procedure for Phase 6 — Quality Gat
 
 ```mermaid
 flowchart TD
-    P6_START(["/dh:complete-implementation invoked"]) --> P6_TN_CHECK{"Pre-Phase 1 — TN Verification Check<br>Read TN-verification-{slug}.yaml<br>Aggregate — FAIL if any record<br>has status = regressed"}
+    P6_START(["/dh:complete-implementation invoked"]) --> P6_TN_CHECK{"Pre-Phase 1 — TN Verification Check<br>Read TN-verification artifact via artifact_read<br>Aggregate — FAIL if any record<br>has status = regressed"}
     P6_TN_CHECK -->|"Any regressed"| P6_TN_BLOCK(["STOP — list each criterion<br>with check_command, T0/TN stdout<br>Block completion"])
     P6_TN_CHECK -->|"All passed or file absent"| P6_ARTIFACT_DISCOVER
 
-    P6_ARTIFACT_DISCOVER["Pre-Phase 1a: Artifact Discovery<br>artifact_list(item_id=N)<br>when parent issue number is known<br>Pass manifest to QG agents"]
+    P6_ARTIFACT_DISCOVER["Pre-Phase 1a: Artifact Discovery<br>artifact_list(item_id={work_item_reference})<br>when the owner reference is known<br>Pass manifest to QG agents"]
 
     P6_ARTIFACT_DISCOVER --> P6_CONCERNS{"Pre-Phase 1b: Process Concerns<br>backlog_view — does item have<br>## Concerns section with<br>unchecked items?"}
     P6_CONCERNS -->|"Unchecked concerns exist"| P6_CONCERNS_VERIFY["For each concern:<br>Verify by reading file/running check<br>If verified: check off + create backlog item<br>If not verified: check off as 'Not confirmed'<br>Update via backlog_groom section='Concerns'"]
     P6_CONCERNS -->|"No concerns section<br>or all checked"| P6_QG_CREATE
     P6_CONCERNS_VERIFY --> P6_QG_CREATE
 
-    P6_QG_CREATE{"Check for existing QG plan<br>sam_list(search='qg-{slug}')<br>Result?"}
-    P6_QG_CREATE -->|"No existing plan"| P6_QG_BUILD["build_quality_gate_plan(<br>slug, issue, impl_plan_address)<br>from sam_schema.core.quality_gates<br><br>sam_create(slug='qg-{slug}',<br>goal='Quality gate enforcement',<br>tasks=[...], issue)"]
-    P6_QG_CREATE -->|"Existing plan —<br>some tasks remain non-terminal"| P6_QG_RESET["Reset BLOCKED tasks to not-started<br>via sam_state per task<br>Re-enter dispatch loop"]
+    P6_QG_CREATE{"Check for existing QG plan<br>sam_plan(config={action:'list',search:'qg-{slug}'})<br>Result?"}
+    P6_QG_CREATE -->|"No existing plan"| P6_QG_BUILD["build_quality_gate_plan(<br>slug, owner_reference, impl_plan_address)<br>from sam_schema.core.quality_gates<br><br>sam_plan(config={action:'create',<br>slug:'qg-{slug}',goal:'Quality gate enforcement',<br>tasks:[...], owner_reference})"]
+    P6_QG_CREATE -->|"Existing plan —<br>some tasks remain non-terminal"| P6_QG_RESET["Reset BLOCKED tasks to not-started<br>via sam_task(config={action:'state'})<br>Re-enter dispatch loop"]
     P6_QG_CREATE -->|"Existing plan —<br>all tasks terminal"| P6_VERIFY_GATE
 
     P6_QG_BUILD --> P6_CLAIM
     P6_QG_RESET --> P6_CLAIM
 
     subgraph P6_LOOP [SAM Dispatch Loop]
-        P6_CLAIM["sam_claim + start-task<br>per ready task"] --> P6_T0
+        P6_CLAIM["sam_task(plan='P{N}', task='T{M}',<br>config={action:'claim'}) + start-task<br>per ready task"] --> P6_T0
         P6_CLAIM --> P6_T1
         P6_T0["T0: multi-perspective-review<br>Deps: none (parallel)<br>Any REJECT → follow-up handling<br>like T1 NEEDS_WORK"]
         P6_T1["T1: code-reviewer<br>Deps: none"]
@@ -569,19 +591,19 @@ flowchart TD
         P6_T3 -->|complete| P6_T4["T4: doc-drift-auditor<br>Deps: T3"]
         P6_T4 --> P6_T4_DRIFT{"T4 ARTIFACTS return:<br>Total findings count > 0?"}
         P6_T4_DRIFT -->|"1 or more findings —<br>drift"| P6_T5["T5: service-docs-maintainer<br>Deps: T4"]
-        P6_T4_DRIFT -->|"0 findings —<br>no drift"| P6_SKIP_T5["sam_state(plan, task='T5',<br>status='skipped')"]
+        P6_T4_DRIFT -->|"0 findings —<br>no drift"| P6_SKIP_T5["sam_task(plan='P{N}', task='T5',<br>config={action:'state',status:'skipped'})"]
         P6_T5 --> P6_T6["T6: context-refinement<br>Deps: T5"]
         P6_SKIP_T5 --> P6_T6
     end
 
-    P6_LOOP --> P6_VERIFY_GATE{"Completion Verification Gate<br>sam_status(plan='{QG}')<br>All 7 tasks terminal?"}
+    P6_LOOP --> P6_VERIFY_GATE{"Completion Verification Gate<br>sam_plan(plan='P{N}', config={action:'status'})<br>All 7 tasks terminal?"}
     P6_VERIFY_GATE -->|"All complete/skipped<br>(only T5 may be skipped)"| P6_FOLLOWUP
     P6_VERIFY_GATE -->|"Any non-terminal<br>or unauthorized skip"| P6_BLOCKED(["COMPLETION BLOCKED<br>Report failed tasks<br>To resume: re-run<br>/complete-implementation"])
 
-    P6_FOLLOWUP["Recursive Follow-up Detection<br>Detect follow-up files from<br>T1 ARTIFACTS output or glob:<br>P*-{slug}-followup-*.yaml"]
+    P6_FOLLOWUP["Recursive Follow-up Detection<br>Detect follow-up artifact records from<br>T1 ARTIFACTS output or artifact_list<br>for the owner reference"]
     P6_FOLLOWUP --> P6_DETECT{"Follow-up files found?"}
     P6_DETECT -->|"No follow-up files"| P6_APPLY_VERIFIED
-    P6_DETECT -->|"Follow-up files exist"| P6_ROUTE["For each follow-up:<br>1. Derive search slug from filename<br>2. Search backlog via backlog_list<br>3. If match: backlog_update with plan<br>4. If no match: create-backlog-item --auto"]
+    P6_DETECT -->|"Follow-up artifacts exist"| P6_ROUTE["For each follow-up artifact:<br>1. Use its logical plan address and owner reference<br>2. Search work items via backlog_list<br>3. If matched: backlog_update with the plan address<br>4. If unmatched: create a work item through backlog_add"]
 
     P6_ROUTE --> P6_DEPTH_GUARD{depth >= 5?}
     P6_DEPTH_GUARD -->|"Yes — limit reached"| P6_DEPTH_STOP["RECURSION DEPTH LIMIT REACHED<br>Route remaining to backlog"]
@@ -594,24 +616,24 @@ flowchart TD
     P6_RECURSE_IMMEDIATE --> P6_APPLY_VERIFIED
     P6_DEFER --> P6_APPLY_VERIFIED
 
-    P6_APPLY_VERIFIED["Apply status:verified label<br>backlog_update(selector, verified=True)"]
-    P6_APPLY_VERIFIED --> P6_FINAL["Final commit and push<br>Read resolved issue Concerns: surface active entries<br>Final Handoff Output:<br>'Clear context and run:<br>/dh:work-backlog-item &lt;next-item&gt;'"]
+    P6_APPLY_VERIFIED["Apply verified status<br>backlog_update(owner_reference, verified=True)"]
+    P6_APPLY_VERIFIED --> P6_FINAL["Final commit and push<br>Read resolved work-item Concerns: surface active entries<br>Final Handoff Output:<br>'Clear context and run:<br>/dh:work-backlog-item &lt;next-item&gt;'"]
 ```
 
 ### Node Contracts
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P6_START | orchestrator | task file path (from P5_INVOKE_QG) | skill invocation | always → P6_TN_CHECK |
-| P6_TN_CHECK | orchestrator | `TN-verification-{slug}.yaml` | aggregated TN result (pass/regressed) | any regressed → P6_TN_BLOCK, all passed or file absent → P6_ARTIFACT_DISCOVER |
+| P6_START | orchestrator | plan address (from P5_INVOKE_QG) | skill invocation | always → P6_TN_CHECK |
+| P6_TN_CHECK | orchestrator | `TN-verification` artifact | aggregated TN result (pass/regressed) | any regressed → P6_TN_BLOCK, all passed or artifact absent → P6_ARTIFACT_DISCOVER |
 | P6_TN_BLOCK | orchestrator | per-criterion regression details (check_command, T0/TN stdout) | regression report | terminal (blocks completion) |
-| P6_ARTIFACT_DISCOVER | `artifact_list` MCP | `item_id` | artifact manifest for QG agents | always → P6_CONCERNS |
+| P6_ARTIFACT_DISCOVER | `artifact_list` MCP | opaque owner reference | artifact manifest for QG agents | always → P6_CONCERNS |
 | P6_CONCERNS | `backlog_view` MCP | item selector | `## Concerns` section with unchecked items | unchecked concerns → P6_CONCERNS_VERIFY, no concerns → P6_QG_CREATE |
 | P6_CONCERNS_VERIFY | orchestrator | unchecked concern items | per-concern: verified → backlog item created, not verified → checked off as 'Not confirmed'; `backlog_groom(section='Concerns')` | always → P6_QG_CREATE |
-| P6_QG_CREATE | `sam_list` MCP | `search='qg-{slug}'` | existing QG plan presence check | no plan → P6_QG_BUILD, plan with remaining tasks → P6_QG_RESET, all terminal → P6_VERIFY_GATE |
-| P6_QG_BUILD | `build_quality_gate_plan()` + `sam_create` MCP | slug, issue, impl_plan_address | QG plan YAML (`qg-{slug}`) with 7 tasks | always → P6_LOOP |
-| P6_QG_RESET | `sam_state` MCP (per task) | BLOCKED task IDs | tasks reset to `not-started` | always → P6_LOOP |
-| P6_CLAIM | orchestrator | ready task IDs from QG plan | `sam_claim` + `start-task` per ready task | always → P6_T0 and P6_T1 (both ready, first iteration) |
+| P6_QG_CREATE | `sam_plan` MCP | `search='qg-{slug}'` | existing QG plan presence check | no plan → P6_QG_BUILD, plan with remaining tasks → P6_QG_RESET, all terminal → P6_VERIFY_GATE |
+| P6_QG_BUILD | `build_quality_gate_plan()` + `sam_plan` MCP | slug, owner reference, impl_plan_address | QG plan (`qg-{slug}`) with 7 tasks | always → P6_LOOP |
+| P6_QG_RESET | `sam_task` MCP (`config={"action":"state"}` per task) | BLOCKED task IDs | tasks reset to `not-started` | always → P6_LOOP |
+| P6_CLAIM | orchestrator | ready task IDs from QG plan | `sam_task(config={"action":"claim"})` + `start-task` per ready task | always → P6_T0 and P6_T1 (both ready, first iteration) |
 | P6_T0 | `dh:multi-perspective-review` (orchestrated) | implementation code, plan artifacts | per-perspective verdicts (APPROVE/REJECT) | any REJECT → follow-up handling (same path as T1 NEEDS_WORK); else complete |
 | P6_T1 | `code-reviewer` agent | implementation code, plan artifacts | code review output | complete → P6_T2 |
 | P6_T2 | `feature-verifier` agent | T1 output, implementation, acceptance criteria | feature verification result | complete → P6_T3 |
@@ -619,35 +641,35 @@ flowchart TD
 | P6_T4 | `doc-drift-auditor` agent | T3 output, documentation files, codebase | drift audit; `Total findings: {count}` in ARTIFACTS return; full report in `audit-report` artifact | always → P6_T4_DRIFT |
 | P6_T4_DRIFT | orchestrator | T4 `Total findings` count from ARTIFACTS return | drift presence determination | 1 or more findings → P6_T5, 0 findings → P6_SKIP_T5 |
 | P6_T5 | `service-docs-maintainer` agent | T4 drift findings, documentation files | updated documentation | complete → P6_T6 |
-| P6_SKIP_T5 | `sam_state` MCP | T5 task ID, `status='skipped'` | T5 marked skipped | always → P6_T6 |
+| P6_SKIP_T5 | `sam_task` MCP (`config={"action":"state"}`) | T5 task ID, `status='skipped'` | T5 marked skipped | always → P6_T6 |
 | P6_T6 | `context-refinement` agent | T5 output (or skip), full QG context | refined context artifacts | complete → P6_VERIFY_GATE |
-| P6_VERIFY_GATE | `sam_status` MCP | QG plan address | all-terminal check | all complete/skipped (T5 only) → P6_FOLLOWUP, non-terminal or unauthorized skip → P6_BLOCKED |
+| P6_VERIFY_GATE | `sam_plan` MCP (`config={"action":"status"}`) | QG plan address | all-terminal check | all complete/skipped (T5 only) → P6_FOLLOWUP, non-terminal or unauthorized skip → P6_BLOCKED |
 | P6_BLOCKED | orchestrator | failed task list | blocked report with resume instruction | terminal |
 | P6_FOLLOWUP | orchestrator | QG plan state | follow-up routing decision | always → P6_DETECT |
-| P6_DETECT | orchestrator | T1 ARTIFACTS output, glob `P*-{slug}-followup-*.yaml` | follow-up file list | always → P6_ROUTE |
+| P6_DETECT | orchestrator | T1 ARTIFACTS output and artifact manifest | follow-up artifact records | always → P6_ROUTE |
 | P6_ROUTE | orchestrator + `backlog_list` + `backlog_update` or `create-backlog-item` MCP | follow-up files, backlog state | follow-ups linked or created | always → P6_RECURSE |
 | P6_DEPTH_GUARD | orchestrator | `{recursion_depth}`, `DH_RECURSIVE_REVIEW_TASK_DEPTH` (=5) | depth comparison result | depth >= 5 → P6_DEPTH_STOP; depth < 5 → P6_RTCA_GUARD |
-| P6_DEPTH_STOP | orchestrator | in-scope follow-up titles, parent issue number, depth count | systemic design issue warning; `backlog_add` per remaining in-scope finding | terminal for recursion path |
+| P6_DEPTH_STOP | orchestrator | in-scope follow-up titles, parent owner reference, depth count | systemic design issue warning; `backlog_add` per remaining in-scope finding | terminal for recursion path |
 | P6_RTCA_GUARD | orchestrator | plan artifact (BLOCKED-FOR-PLANNING signal) | RT-ICA status determination | BLOCKED → P6_RTCA_STOP; not BLOCKED → P6_RECURSE |
 | P6_RTCA_STOP | orchestrator | blocking gaps from planner-rt-ica artifact, followup backlog item title | RT-ICA BLOCKED message with gap list and resume instruction | terminal for this follow-up; continues to next follow-up if any |
 | P6_RECURSE | orchestrator | follow-up slug, follow-up priority, parent slug | recursion gate evaluation | slug matches parent AND priority=High → P6_RECURSE_IMMEDIATE, either not met → P6_DEFER |
-| P6_RECURSE_IMMEDIATE | orchestrator | follow-up plan path | `Skill('implement-feature', followup)` then re-run `complete-implementation` | always → P6_APPLY_VERIFIED |
+| P6_RECURSE_IMMEDIATE | orchestrator | follow-up logical plan address | `Skill('implement-feature', followup)` then re-run `complete-implementation` | always → P6_APPLY_VERIFIED |
 | P6_DEFER | orchestrator | follow-up title | deferred follow-up message | always → P6_APPLY_VERIFIED |
-| P6_APPLY_VERIFIED | `backlog_update` MCP | item selector, `verified=True` | `status:verified` label applied to GitHub Issue | always → P6_RESOLVE |
-| P6_RESOLVE | `backlog_resolve` MCP | item selector, summary | issue closed, item state → resolved | always → P6_FINAL |
-| P6_FINAL | orchestrator | resolved issue number `#{N}` (from P6_RESOLVE) | final commit, push; Concerns block displayed if active entries present; slug-search routing output | active concerns → Concerns block + slug-search; no concerns or section absent → slug-search only; backend error → ⚠ warning + slug-search |
+| P6_APPLY_VERIFIED | `backlog_update` MCP | opaque owner reference, `verified=True` | backend status becomes verified | always → P6_RESOLVE |
+| P6_RESOLVE | `backlog_resolve` MCP | item selector, summary | work item closed, item state → resolved | always → P6_FINAL |
+| P6_FINAL | orchestrator | resolved logical item reference | final commit, push; Concerns block displayed if active entries present; slug-search routing output | active concerns → Concerns block + slug-search; no concerns or section absent → slug-search only; backend error → warning + slug-search |
 
-**Input modes**: The skill accepts either a plan file path (SAM path → 7-task QG) or an issue number (proportional path → 5-task QG when issue has no linked plan).
+**Input modes**: The skill accepts either a logical plan address (SAM path → 7-task QG) or an opaque work-item owner reference (proportional path → 5-task QG when no linked plan exists).
 
-**Proportional Quality Gate path** (issue-only, no linked plan):
+**Proportional Quality Gate path** (owner-reference-only, no linked plan):
 
 - 5 tasks: T1 code-reviewer, T2 test verification, T3 acceptance check, T4 doc-drift-auditor, T5 service-docs-maintainer
-- Plan created via `build_proportional_quality_gate_plan(slug=f"issue-{N}", ...)` with `pqg-` prefix
+- Plan created via `build_proportional_quality_gate_plan` with a slug derived from the owner reference and a `pqg-` prefix
 - T1–T4 required; T5 (documentation update) may be skipped only when T4 finds no drift — same skip whitelist as the SAM path
 - No recursive follow-up handling (explicitly skipped)
-- `status:verified` applied directly via `backlog_update(selector="#{N}", verified=True)`
+- Verified status applied through `backlog_update(owner_reference, verified=True)`
 
-**T5 skip condition** (applies to both the SAM and proportional paths): After T4 completes, the orchestrator reads the `Total findings: {count}` line from the `doc-drift-auditor` agent's `ARTIFACTS` return block (the full drift report is registered as the `audit-report` artifact). If `Total findings: 0` → skip T5 via `sam_state(status='skipped')`. If 1 or more → T5 proceeds. If the count line is absent, the orchestrator reads the `audit-report` artifact and treats a non-empty `## Findings by Category` as drift. **Why:** Documentation update has no value when no drift exists. Other QG tasks (code review, feature verification, integration check) always have verification value even if the implementation is perfect — but running `service-docs-maintainer` on a codebase with no drift would produce no changes.
+**T5 skip condition** (applies to both the SAM and proportional paths): After T4 completes, the orchestrator reads the `Total findings: {count}` line from the `doc-drift-auditor` agent's `ARTIFACTS` return block (the full drift report is registered as the `audit-report` artifact). If `Total findings: 0` → skip T5 via `sam_task(config={"action":"state","status":"skipped"})`. If 1 or more → T5 proceeds. If the count line is absent, the orchestrator reads the `audit-report` artifact and treats a non-empty `## Findings by Category` as drift. **Why:** Documentation update has no value when no drift exists. Other QG tasks (code review, feature verification, integration check) always have verification value even if the implementation is perfect — but running `service-docs-maintainer` on a codebase with no drift would produce no changes.
 
 **Recursive follow-up routing** requires BOTH conditions: (1) the follow-up slug matches the parent feature slug (ADR-3), and (2) the follow-up priority is High (ADR-2). **Why:** Slug matching prevents unrelated bugs found during review from hijacking the current feature's quality gates. Priority gating prevents low-priority same-feature follow-ups from delaying completion.
 
@@ -655,15 +677,19 @@ flowchart TD
 
 **RT-ICA BLOCKED stop**: Guard 2 checks whether the follow-up's linked planner-rt-ica artifact contains `BLOCKED-FOR-PLANNING`. If so, the follow-up is not recursed and the user receives the blocking conditions with a resume instruction: `/dh:work-backlog-item {title}`. Remaining follow-ups continue processing.
 
-**Out-of-scope routing**: A follow-up task file with `## Scope: out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never reaches the recursion gate. This prevents out-of-scope findings from blocking the current implementation cycle.
+**Out-of-scope routing**: A follow-up provider-owned plan or artifact record whose structured scope
+is `out-of-scope` is routed to the backlog via `backlog_add` at the Classify step (Step 3) and never
+reaches the recursion gate. The record remains addressable through its opaque `plan_ref` or logical
+artifact identity; no task-file path is involved. This prevents out-of-scope findings from blocking
+the current implementation cycle.
 
-**complete-implementation invokes `backlog_resolve` as its terminal step**. After quality gates pass, it: (1) applies `status:verified` label, (2) commits and pushes, (3) calls `backlog_resolve(selector, summary="Implementation complete — AC verified PASS")` to close the issue and transition to resolved. This closes the GitHub Issue (or equivalent per backend) without requiring manual follow-up. `/work-backlog-item resolve` remains available as a fallback if `complete-implementation` was interrupted before the resolve step.
+**complete-implementation invokes `backlog_resolve` as its terminal step**. After quality gates pass, it: (1) applies verified status through the configured backend, (2) commits and pushes, (3) calls `backlog_resolve(selector, summary="Implementation complete — AC verified PASS")` to close the work item and transition to resolved. `/work-backlog-item resolve` remains available if `complete-implementation` was interrupted before the resolve step.
 
 **Failure paths**:
 
 - TN regression detected — STOP, block completion with per-criterion details
 - Any QG task non-terminal or unauthorized skip (skip on task other than T5) — COMPLETION BLOCKED, report failed tasks, user re-runs the skill
-- BLOCKED tasks on resume are reset to `not-started` via `sam_state`, then loop re-enters
+- BLOCKED tasks on resume are reset to `not-started` via `sam_task(config={"action":"state"})`, then loop re-enters
 
 ---
 
@@ -682,7 +708,8 @@ ADR-9 inverted the close/resolve semantics from ADR-8 to match natural language:
 - **close** = dismissed without completion. Item will NOT be worked. Terminal, no work done.
 - **resolve** = completed with evidence trail. Work IS done. Terminal.
 
-Both operations close the GitHub Issue. The distinction lives in the structured comment and optionally in labels.
+Both operations close the logical work item through the configured backend. The distinction lives in
+the structured result and any provider-specific representation.
 
 The following diagram is the authoritative procedure for Phase 7 — Closure (/dh:work-backlog-item close or resolve). Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
@@ -723,7 +750,7 @@ flowchart TD
         P7_AC_GATE -->|"Overall PASS"| P7_PR_CHECK
 
         P7_PR_CHECK{"9e: Open PR check<br>git log --grep='Fixes #N|Closes #N'"}
-        P7_PR_CHECK -->|"Open PR found"| P7_STOP_PR_WAIT(["Update local status only<br>GitHub Issue will auto-close<br>when PR merges — STOP"])
+        P7_PR_CHECK -->|"Open PR found"| P7_STOP_PR_WAIT(["Update backend status only<br>work item closes when PR merges — STOP"])
         P7_PR_CHECK -->|"No open PR"| P7_RESOLVE_CALL
 
         P7_RESOLVE_CALL["9f: backlog_resolve(<br>selector, summary (required),<br>plan, method, notes,<br>follow_ups, findings)"]
@@ -745,20 +772,20 @@ flowchart TD
 | P7_CLOSE_REF | orchestrator | reason value | reference-needed check | duplicate/superseded → P7_CLOSE_ASK_REF, other → P7_CLOSE_COMMENT |
 | P7_CLOSE_ASK_REF | user | — | reference item (title or `#N`) | always → P7_CLOSE_COMMENT |
 | P7_CLOSE_COMMENT | user | — | optional comment text | always → P7_CLOSE_CALL |
-| P7_CLOSE_CALL | `backlog_close` MCP | selector, reason, reference, comment | GitHub Issue closed, `{"status": "closed", "close_reason": "{reason}"}` metadata | terminal |
-| P7_VERIFIED_GATE | orchestrator | `status:verified` label on GitHub Issue, `--force` flag, Plan field presence | verified gate result | label present → P7_CHECKLIST_GATE, absent + `--force` → P7_CHECKLIST_GATE, absent without force → P7_STOP_UNVERIFIED |
+| P7_CLOSE_CALL | `backlog_close` MCP | selector, reason, reference, comment | work item closed, `{"status": "closed", "close_reason": "{reason}"}` metadata | terminal |
+| P7_VERIFIED_GATE | orchestrator | verified status, `--force` flag, plan presence | verified gate result | verified → P7_CHECKLIST_GATE, absent + `--force` → P7_CHECKLIST_GATE, absent without force → P7_STOP_UNVERIFIED |
 | P7_STOP_UNVERIFIED | orchestrator | — | 3-option report (run QG, force, or close) | terminal |
-| P7_CHECKLIST_GATE | orchestrator | plan YAML, task completion counts | checklist completeness check | incomplete → P7_STOP_UNCHECKED, 100% or no plan → P7_AC_GATE |
+| P7_CHECKLIST_GATE | orchestrator | logical plan, task completion counts | checklist completeness check | incomplete → P7_STOP_UNCHECKED, 100% or no plan → P7_AC_GATE |
 | P7_STOP_UNCHECKED | orchestrator | unchecked task list | unchecked tasks report | terminal |
 | P7_AC_GATE | `dh:task-worker` | acceptance criteria, codebase state | per-criterion `[PASS]`/`[FAIL]` with file:line evidence | overall PASS → P7_PR_CHECK, overall FAIL → P7_STOP_AC_FAIL |
 | P7_STOP_AC_FAIL | orchestrator | per-criterion gap report | AC failure report | terminal |
 | P7_PR_CHECK | orchestrator | `git log --grep='Fixes #N\|Closes #N'` | open PR presence check | PR found → P7_STOP_PR_WAIT, no PR → P7_RESOLVE_CALL |
 | P7_STOP_PR_WAIT | orchestrator | open PR reference | local status update only, wait for PR merge | terminal |
-| P7_RESOLVE_CALL | `backlog_resolve` MCP | selector, summary (required), plan, method, notes, follow_ups, findings | GitHub Issue closed, `{"status": "done", "priority": "completed", "plan": "{plan}"}` metadata | terminal |
+| P7_RESOLVE_CALL | `backlog_resolve` MCP | selector, summary (required), plan, method, notes, follow_ups, findings | work item closed, `{"status": "done", "priority": "completed", "plan": "{plan}"}` metadata | terminal |
 
-**close metadata** (ADR-9): `{"status": "closed", "close_reason": "{reason}"}`. When using the `github` backend: a comment `Closed ({reason}). Reference: {reference}. {comment}` is added and the GitHub issue state is set to `closed`. For other backends, the equivalent close operation is applied in the backend store.
+**close metadata** (ADR-9): `{"status": "closed", "close_reason": "{reason}"}`. The configured backend records the close reason, reference, and comment and transitions the work item to closed.
 
-**resolve metadata** (ADR-9): `{"status": "done", "priority": "completed", "plan": "{plan}"}`. When using the `github` backend: a structured markdown comment is added and the GitHub issue state is set to `closed`. For other backends, the equivalent resolve operation is applied in the backend store.
+**resolve metadata** (ADR-9): `{"status": "done", "priority": "completed", "plan": "{plan}"}`. The configured backend records the evidence and transitions the work item to resolved.
 
 **"Already implemented" discovery** during grooming should use `resolve(summary="Already implemented via PR #N / commit {sha}")`, not `close` (per ADR-9 Consequences).
 
@@ -769,9 +796,9 @@ flowchart TD
 - Resolve without `status:verified` and no `--force` — STOP with 3 options
 - Checklist incomplete — STOP with unchecked task list
 - AC verification FAIL — STOP with per-criterion gap report
-- Open PR detected — defer GitHub issue close to PR merge, update local status only
+- Open PR detected — defer work-item closure to PR merge, update backend status only
 
-**`--cleanup` flag**: Both `backlog_close` and `backlog_resolve` accept `cleanup: bool` to remove local file after operation. Documented in ADR-9 tool params but NOT exercised in the current Step 9 procedure.
+**`--cleanup` flag**: Both `backlog_close` and `backlog_resolve` accept `cleanup: bool`; when requested, cleanup is managed by the configured backend. It does not expose or require local-file deletion, and the current Step 9 procedure does not exercise it.
 
 **`--force` flag**: Bypasses `status:verified` gate (9b.5) and open PR gate (9e).
 
@@ -795,7 +822,8 @@ The warning is advisory — the write still proceeds. No suppression mechanism e
 
 ### Gap 3: No Auto-Advance After Grooming (Session observation)
 
-After `backlog_groom` writes all sections and sets the `groomed` frontmatter field, no automatic label transition occurs. The skill source does not document an explicit `status:groomed` label change — only the frontmatter field is set.
+After `backlog_groom` writes all sections and sets the `groomed` metadata field, status transition
+is owned by the configured backend.
 
 ### Gap 4: No Machine-Readable Parent/Child Links (Session observation)
 
@@ -829,7 +857,9 @@ No staleness check on RT-ICA results. If groomed in a previous session and codeb
 
 ### Audit Finding F6: No Feedback Loop on Groomer Agent Quality (Severity: Medium)
 
-Groomer output is written directly to the item file in Step 9. No quality check, no section completeness validation, no rejection/retry path if output is incomplete or includes implementation details. Source: audit Finding 6 (2026-03-02).
+Groomer output is written through `backlog_groom` in Step 9. No quality check, no section
+completeness validation, no rejection/retry path if output is incomplete or includes implementation
+details. Source: audit Finding 6 (2026-03-02).
 
 ### Audit Finding F7: Auto-Mode P1 Default (Severity: Low)
 

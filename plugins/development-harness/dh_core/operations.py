@@ -36,48 +36,50 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-import dh_paths
 import dispatch_schema as _ds
-from backlog_core.artifact_migration import migrate_dry_run, migrate_live_run
-from backlog_core.artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
-from backlog_core.artifact_provider_local import LocalFilesystemArtifactProvider
+from backlog_core.artifact_manifest_store import (
+    artifact_content_reference,
+    load_manifest as _load_manifest_record,
+    publish_artifact,
+)
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.backend_protocol import get_config
-from backlog_core.backend_types import GitHubExtras
+from backlog_core.backend_types import ContentProvider, GitHubExtras
 from backlog_core.dispatch_state import DispatchStateManager
 from backlog_core.models import (
     ArtifactContent,
     ArtifactEntry,
+    ArtifactManifest,
     ArtifactStatus,
     ArtifactType,
     BacklogError,
+    ContentConflictError,
+    ContentKind,
+    ContentNotFoundError,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
     DispatchItemRecord,
     DispatchSpawnSummary,
     DispatchWaveSummary,
     GitHubUnavailableError,
     Output,
-    get_default_repo,
+    UnsupportedCapabilityError,
     get_repo_root,
 )
 from dispatch_schema import Wave
 from github import GithubException
 from pydantic import BaseModel
 from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import (
-    ArtifactWriteError,
-    ConcurrentClaimUnsupportedError,
-    PlanNotFoundError,
-    SamError,
-    TaskNotFoundError,
-)
+from sam_schema.core.exceptions import ConcurrentClaimUnsupportedError, PlanNotFoundError, SamError, TaskNotFoundError
 from sam_schema.core.models import (
+    AcceptanceCriterion,
     ActiveTaskClearResult,
     ActiveTaskGetResult,
     ActiveTaskSetResult,
     ActiveTaskUpdateResult,
     AppendTaskResult,
     ClaimResult,
-    CreatePlanError,
     CreatePlanResult,
     FinalizePlanResult,
     Plan,
@@ -113,7 +115,6 @@ __all__ = [
     "apply_status_verified",
     "artifact_get",
     "artifact_list",
-    "artifact_migrate",
     "artifact_read",
     # --- Artifact operations ---
     "artifact_register",
@@ -181,10 +182,8 @@ __all__ = [
     "set_active_task",
     "strike_entry",
     "sync_create_missing_issues",
-    "sync_groomed_to_github_issue",
     "sync_issues_graphql",
     "sync_items",
-    "sync_push_groomed_content",
     "try_get_github",
     "unknown_key_to_heading",
     "update_active_task",
@@ -208,34 +207,32 @@ def create_plan(
     tasks: list[dict[str, Any]] | list[Any],
     context: str | None = None,
     issue: int | None = None,
-) -> CreatePlanResult | CreatePlanError:
+    owner_reference: str | None = None,
+    acceptance_criteria_structured: list[AcceptanceCriterion] | None = None,
+) -> CreatePlanResult:
     """Create a new plan with the given slug, goal, and task definitions.
 
     This is the unified operation called by both the CLI and MCP server.
-    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
-    and pass it here. The operation handles all business logic: plan
-    creation, artifact write error handling, and response assembly.
+    Both frontends resolve the configured backend and pass it here. The
+    operation handles plan creation and response assembly.
 
     Args:
-        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
-            LocalYamlTaskProvider). The caller is responsible for
-            backend selection — this function is backend-agnostic.
+        backend: The configured task backend.
         slug: Human-readable identifier slug for the plan.
         goal: One-sentence goal statement for the plan.
         tasks: List of task definitions (dicts or Task models).
         context: Optional plan-level context narrative (markdown).
         issue: Optional GitHub issue number to associate with the plan.
+        owner_reference: Optional opaque provider-native owner reference.
+        acceptance_criteria_structured: Optional executable acceptance criteria.
 
     Returns:
         :class:`~sam_schema.core.models.CreatePlanResult` on success with
-        ``plan_id``, ``task_count``, ``plan_ref``, and optional
-        ``warnings``. On Gist write failure, returns
-        :class:`~sam_schema.core.models.CreatePlanError` (structured error so
-        the caller knows the plan is not portable).
+        ``plan_id``, ``task_count``, and ``plan_ref``.
 
     Raises:
         ValueError: When any task definition fails schema validation.
-        OSError: When the local filesystem write fails.
+        ArtifactWriteError: When the configured provider cannot persist the plan.
     """
     # Normalize tasks to Task models if they aren't already.
     # The CLI passes raw dicts (from YAML), the MCP server passes
@@ -254,83 +251,45 @@ def create_plan(
         else:
             normalized_tasks.append(Task.model_validate(dict(t)))
 
-    try:
-        plan_data = backend.create_plan(slug=slug, goal=goal, tasks=normalized_tasks, context=context, issue=issue)
-    except ArtifactWriteError as exc:
-        # Gist write failed — return structured error (ADR-2509-5).
-        # The plan may exist locally (local_backend wrote it), but it
-        # is NOT durable.
-        _log.error("create_plan: ArtifactWriteError for plan (issue #%s): %s", exc.issue, exc.reason)
-        return CreatePlanError(
-            error="create_plan failed: artifact write to Gist unsuccessful",
-            reason=exc.reason,
-            plan_id=exc.plan_id,
-            issue=exc.issue,
-            local_path=None,
-            hint="The plan was written to local disk only. Check GitHub connectivity and retry to upload to Gist.",
-        )
+    plan_data = backend.create_plan(
+        slug=slug,
+        goal=goal,
+        tasks=normalized_tasks,
+        context=context,
+        issue=issue,
+        owner_reference=owner_reference,
+        acceptance_criteria_structured=acceptance_criteria_structured,
+    )
 
     plan_id_str = plan_data["plan_id"]
 
     # Compute plan_ref: #{issue},{plan_id} when issue is set, else plan_id.
     plan_ref = f"#{issue},{plan_id_str}" if issue is not None else plan_id_str
 
-    # Collect warnings: local-only non-portability + backend-specific warnings.
-    warnings: list[str] = []
-    if issue is None:
-        warnings.append(
-            f"Plan {plan_id_str} has no associated issue — stored locally only. "
-            "This plan is not portable across environments and cannot be retrieved from CI "
-            "or fresh checkouts. Associate a GitHub issue to enable portability."
-        )
-
-    # GistTaskLayer-specific: surface index warnings if present.
-    last_warnings = getattr(backend, "last_warnings", None)
-    if last_warnings:
-        warnings.extend(last_warnings)
-
-    return CreatePlanResult(
-        plan_id=plan_id_str, task_count=len(plan_data["tasks"]), plan_ref=plan_ref, warnings=warnings or None
-    )
+    return CreatePlanResult(plan_id=plan_id_str, task_count=len(plan_data["tasks"]), plan_ref=plan_ref)
 
 
 def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
     """Read a plan by its address and return a :class:`ReadResult`.
 
     This is the unified operation called by both the CLI and MCP server.
-    Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
-    and pass it here. The operation handles all business logic: plan
-    retrieval, Plan model conversion, and source-degradation warning
-    surfacing.
+    Both frontends resolve the configured backend and pass it here. The
+    operation handles plan retrieval and model conversion.
 
     Args:
-        backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
-            LocalYamlTaskProvider). The caller is responsible for
-            backend selection — this function is backend-agnostic.
+        backend: The configured task backend.
         plan: Plan address string (e.g. ``"P1"`` or slug).
 
     Returns:
         A :class:`~sam_schema.core.models.ReadResult` containing the
         parsed :class:`~sam_schema.core.models.Plan` and any
-        :class:`~sam_schema.core.models.SchemaGap` records. When the
-        backend served the plan from local cache, a ``warnings`` key is
-        added to the result's source metadata.
+        :class:`~sam_schema.core.models.SchemaGap` records.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
     """
     plan_data = backend.read_plan(plan)
     plan_model = Plan.model_validate(plan_data)
-
-    # Surface source annotation when plan was served from local cache.
-    # Use getattr to stay backend-agnostic — not all backends have
-    # last_read_source (only GistTaskLayer does).
-    last_read_source = getattr(backend, "last_read_source", None)
-    warnings: list[str] = []
-    if last_read_source == "local":
-        warning = f"Plan {plan} served from local cache — Gist copy may be unavailable or predates this fix."
-        _log.warning(warning)
-        warnings.append(warning)
 
     source_path_str = plan_data.get("source_path") or ""
     source_path = Path(source_path_str) if source_path_str else Path()
@@ -341,7 +300,7 @@ def read_plan(backend: TaskBackend, plan: str) -> ReadResult:
     raw_gaps = plan_data.get("gaps") or []
     gaps = [SchemaGap.model_validate(g) for g in raw_gaps]
 
-    return ReadResult(plan=plan_model, gaps=gaps, warnings=warnings, source_format="backend", source_path=source_path)
+    return ReadResult(plan=plan_model, gaps=gaps, source_format="backend", source_path=source_path)
 
 
 def list_plans(
@@ -568,6 +527,7 @@ def update_plan_fields(
     *,
     context: str | None = None,
     set_fields: dict[str, Any] | None = None,
+    owner_reference: str | None = None,
     task_id: str | None = None,
     append_section_name: str | None = None,
     section_content: str | None = None,
@@ -604,6 +564,8 @@ def update_plan_fields(
             the backend. When ``None``, no fields are modified.
         task_id: Task ID to target for task-level operations. ``None`` means
             plan-level operations only.
+        owner_reference: Optional opaque backend owner reference. When set,
+            it is persisted with the plan-level write.
         append_section_name: Section heading to append. Requires
             ``section_content`` and ``task_id``.
         section_content: Body text for the appended section.
@@ -633,12 +595,19 @@ def update_plan_fields(
         # by_alias=True: set_fields uses kebab-case keys (wire convention);
         # alias keys must match so we extract only the requested keys.
         plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
+        if "acceptance-criteria-structured" in plan_fields:
+            plan_fields["acceptance-criteria-structured"] = [
+                criterion.model_dump(mode="json") for criterion in validated.acceptance_criteria_structured
+            ]
 
     # Only call the plan-level update when there is something to write at the
     # plan level (context narrative or validated plan-level fields). Task-only
     # writes should not trigger a no-op plan update.
-    if context is not None or plan_fields is not None:
-        backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+    if context is not None or plan_fields is not None or owner_reference is not None:
+        if owner_reference is None:
+            backend.update_plan_fields(plan, context=context, set_fields=plan_fields)
+        else:
+            backend.update_plan_fields(plan, context=context, set_fields=plan_fields, owner_reference=owner_reference)
 
     if set_fields is not None and task_id is not None:
         backend.update_task_fields(plan, task_id, set_fields)
@@ -1198,10 +1167,8 @@ from backlog_core.operations import (
     resolve_item,
     strike_entry,
     sync_create_missing_issues,
-    sync_groomed_to_github_issue,
     sync_issues_graphql,
     sync_items,
-    sync_push_groomed_content,
     try_get_github,
     unknown_key_to_heading,
     update_item,
@@ -1212,21 +1179,24 @@ from backlog_core.operations import (
     view_item,
 )
 
+
 # ---------------------------------------------------------------------------
 # Dispatch operations (Task 2.31)
 # ---------------------------------------------------------------------------
-# Thin wrappers around dispatch_schema functions.  Each resolves the project
-# root via backlog_core.models.get_repo_root() and delegates to the
-# dispatch_schema function, returning a dict matching the MCP server response.
+def _get_content_provider() -> ContentProvider:
+    provider = get_config().backend
+    if not isinstance(provider, ContentProvider):
+        raise ContentUnavailableError("Active backend does not support content")
+    return provider
 
 
-def _dispatch_plan_path(milestone_number: int) -> Path:
-    """Return the canonical dispatch plan path for a milestone.
+def _dispatch_reference(milestone_number: int) -> ContentRef:
+    return ContentRef(kind=ContentKind.DISPATCH_PLAN, name=f"dispatch-milestone-{milestone_number}")
 
-    Resolves the project root from ``backlog_core.models.get_repo_root()``
-    and delegates to ``dispatch_schema.dispatch_plan_path``.
-    """
-    return _ds.dispatch_plan_path(milestone_number, get_repo_root())
+
+def _read_dispatch_plan(milestone_number: int) -> _ds.DispatchPlan:
+    record = _get_content_provider().get_content(_dispatch_reference(milestone_number))
+    return _ds.DispatchPlan.model_validate_json(record.content)
 
 
 def dispatch_read_plan(milestone_number: int) -> dict[str, Any]:
@@ -1235,11 +1205,10 @@ def dispatch_read_plan(milestone_number: int) -> dict[str, Any]:
     Returns:
         Dict with ``milestone_number`` and ``plan``, or ``error`` on failure.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     try:
-        plan = _ds.read_dispatch_plan(plan_path)
-    except FileNotFoundError:
-        return {"error": f"Dispatch plan not found: {plan_path}", "milestone_number": milestone_number}
+        plan = _read_dispatch_plan(milestone_number)
+    except ContentUnavailableError:
+        return {"error": "Dispatch plan not found", "milestone_number": milestone_number}
     except ValueError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     return {"milestone_number": milestone_number, "plan": plan.model_dump()}
@@ -1251,10 +1220,9 @@ def dispatch_validate_plan(milestone_number: int) -> dict[str, Any]:
     Returns:
         Dict with ``is_valid``, ``errors``, ``warnings``, or ``error``.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     try:
-        plan = _ds.read_dispatch_plan(plan_path)
-    except (FileNotFoundError, ValueError) as exc:
+        plan = _read_dispatch_plan(milestone_number)
+    except (ContentUnavailableError, ValueError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     result = _ds.validate_plan_integrity(plan)
     return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
@@ -1267,10 +1235,9 @@ def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any
         Dict with ``is_stale``, ``added_issues``, ``removed_issues``,
         ``message``, or ``error`` on failure.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     try:
-        plan = _ds.read_dispatch_plan(plan_path)
-    except (FileNotFoundError, ValueError) as exc:
+        plan = _read_dispatch_plan(milestone_number)
+    except (ContentUnavailableError, ValueError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
 
     backend = get_config().backend
@@ -1302,13 +1269,12 @@ def dispatch_create_plan(
     validate: bool = True,
     issue: int | None = None,
 ) -> dict[str, Any]:
-    """Create or overwrite a dispatch plan YAML file for a milestone.
+    """Create or overwrite a provider-owned dispatch plan for a milestone.
 
     Returns:
         Dict with ``wave_count``, ``item_count``, ``is_valid``, ``errors``,
         ``warnings``, or ``error`` on failure.
     """
-    plan_path = _dispatch_plan_path(milestone_number)
     plan_model = _ds.DispatchPlan.model_validate(plan)
 
     if plan_model.milestone.number != milestone_number:
@@ -1320,18 +1286,26 @@ def dispatch_create_plan(
             "milestone_number": milestone_number,
         }
 
-    if not overwrite and plan_path.exists():
-        return {
-            "error": f"Plan file already exists: {plan_path}. Pass overwrite=True to replace it.",
-            "milestone_number": milestone_number,
-        }
+    provider = _get_content_provider()
+    reference = _dispatch_reference(milestone_number)
+    try:
+        current = provider.get_content(reference)
+    except ContentNotFoundError:
+        write = ContentWrite(reference=reference, content=plan_model.model_dump_json(), create_only=True)
+    else:
+        if not overwrite:
+            return {
+                "error": "Dispatch plan already exists. Pass overwrite=True to replace it.",
+                "milestone_number": milestone_number,
+            }
+        write = ContentWrite(
+            reference=reference, content=plan_model.model_dump_json(), expected_revision=current.revision
+        )
 
     try:
-        _ds.write_dispatch_plan(plan_model, plan_path)
-    except ValueError as exc:
-        return {"error": f"Cannot write plan (symlink target rejected): {exc}", "milestone_number": milestone_number}
-    except OSError as exc:
-        return {"error": f"Failed to write plan file: {exc}", "milestone_number": milestone_number}
+        provider.put_content(write)
+    except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
+        return {"error": str(exc), "milestone_number": milestone_number}
 
     is_valid: bool | None = None
     val_errors: list[str] = []
@@ -1344,21 +1318,19 @@ def dispatch_create_plan(
 
     # Register the dispatch-plan artifact (best-effort) when an issue is provided.
     if issue is not None:
-        try:
-            provider = _get_artifact_provider()
-            registry = _get_artifact_registry()
-            entry = ArtifactEntry(
-                artifact_type=ArtifactType.DISPATCH_PLAN,
-                artifact_id=str(plan_path),
-                status=ArtifactStatus.CURRENT,
-                agent="dispatch_create_plan",
-            )
-            manifest = provider.get_manifest(issue)
-            updated_manifest = registry.register(manifest, entry)
-            provider.set_manifest(issue, updated_manifest)
-        except (BacklogError, GithubException) as exc:
+        registration = artifact_register(
+            issue,
+            ArtifactType.DISPATCH_PLAN.value,
+            reference.name,
+            content=plan_model.model_dump_json(),
+            agent="dispatch_create_plan",
+        )
+        if "error" in registration:
             _log.warning(
-                "dispatch_create_plan: artifact registration failed for item %s (path=%s): %s", issue, plan_path, exc
+                "dispatch_create_plan: artifact registration failed for item %s (artifact=%s): %s",
+                issue,
+                reference.name,
+                registration["error"],
             )
 
     wave_count = len(plan_model.waves)
@@ -1413,7 +1385,7 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
 
 def _dispatch_db_path() -> Path:
     """Return the dispatch state database path for the current project."""
-    project_root = _get_project_root()
+    project_root = get_repo_root()
     project_stub = str(project_root).lstrip("/").replace("/", "-")
     db_path = Path.home() / ".dh" / "projects" / project_stub / "dispatch-state.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1768,8 +1740,8 @@ async def _run_dispatch_spawn(
         Dict with DispatchSpawnSummary fields, or error dict on failure.
     """
     try:
-        plan = await asyncio.to_thread(_ds.read_dispatch_plan, _dispatch_plan_path(milestone))
-    except FileNotFoundError:
+        plan = await asyncio.to_thread(_read_dispatch_plan, milestone)
+    except ContentUnavailableError:
         return {"error": f"Dispatch plan not found for milestone {milestone}", "milestone": milestone}
     except ValueError as exc:
         return {"error": f"Invalid dispatch plan: {exc}", "milestone": milestone}
@@ -1907,51 +1879,19 @@ def dispatch_spawn(
 # Artifact operations (Task 2.30)
 # ---------------------------------------------------------------------------
 
-_artifact_state: dict[str, Any] = {"provider": None, "registry": None, "warning": None}
+_artifact_registry = ArtifactRegistry()
 
 
-def _get_project_root() -> Path:
-    """Return the git project root via backlog_core.models.get_repo_root()."""
-    return get_repo_root()
+def _manifest_reference(item_id: int | str) -> ContentRef:
+    return ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=str(item_id), name="manifest")
 
 
-def _get_artifact_provider() -> ArtifactBackend:
-    """Return (or lazily create) the ArtifactBackend singleton.
-
-    Falls back to LocalFilesystemArtifactProvider when the remote backend
-    is unavailable or unconfigured.
-    """
-    if _artifact_state["provider"] is not None:
-        return _artifact_state["provider"]
-
-    repo = get_default_repo()
-    if not repo:
-        provider = LocalFilesystemArtifactProvider(root_worktree=dh_paths.git_project_root())
-    else:
-        try:
-            provider = create_artifact_provider(repo=repo, root_worktree=_get_project_root())
-        except (BacklogError, GithubException, OSError):
-            provider = LocalFilesystemArtifactProvider(root_worktree=dh_paths.git_project_root())
-    _artifact_state["provider"] = provider
-    if isinstance(provider, LocalFilesystemArtifactProvider):
-        _artifact_state["warning"] = "Artifacts stored in local filesystem provider. Remote sync unavailable."
-    return _artifact_state["provider"]
-
-
-def _get_artifact_registry() -> ArtifactRegistry:
-    """Return the lazily created ArtifactRegistry singleton."""
-    if _artifact_state["registry"] is None:
-        _artifact_state["registry"] = ArtifactRegistry()
-    return _artifact_state["registry"]
+def _load_manifest(provider: ContentProvider, item_id: int | str) -> ArtifactManifest:
+    return _load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
 
 
 def artifact_register(
-    item_id: int | str,
-    artifact_type: str,
-    artifact_id: str,
-    status: str = "current",
-    agent: str = "",
-    content: str | None = None,
+    item_id: int | str, artifact_type: str, artifact_id: str, content: str, status: str = "current", agent: str = ""
 ) -> dict[str, Any]:
     """Upsert an artifact entry in the manifest for a backlog item.
 
@@ -1961,9 +1901,9 @@ def artifact_register(
     """
     out = Output()
     try:
-        provider = _get_artifact_provider()
-        if _artifact_state["warning"] is not None:
-            out.warnings.append(_artifact_state["warning"])
+        if not content:
+            return {"error": "Artifact content must not be empty.", **out.to_dict()}
+        provider = _get_content_provider()
         artifact_type_enum = ArtifactType(artifact_type)
         status_enum = ArtifactStatus(status)
         entry = ArtifactEntry(
@@ -1974,34 +1914,14 @@ def artifact_register(
             agent=agent,
         )
 
-        registry = _get_artifact_registry()
-        manifest = provider.get_manifest(item_id)
-        existed = any(
-            e.artifact_type == artifact_type_enum and e.artifact_id == artifact_id for e in manifest.artifacts
-        )
-        updated_manifest = registry.register(manifest, entry)
-        provider.set_manifest(item_id, updated_manifest)
+        updated_manifest, existed = publish_artifact(provider, _manifest_reference(item_id), item_id, entry, content)
         action = "updated" if existed else "added"
-
-        upload_content = content
-        if upload_content is None:
-            upload_content = provider.read_local_artifact_content(artifact_id)
-            if upload_content is None:
-                out.warn(
-                    f"No content provided and no local file found at {artifact_id!r}. "
-                    "Manifest entry registered without content storage."
-                )
-
-        content_stored = False
-        if upload_content is not None:
-            provider.store_artifact_content(item_id, artifact_type, artifact_id, upload_content)
-            content_stored = True
 
         return {
             "registered": True,
             "artifact_count": len(updated_manifest.artifacts),
             "action": action,
-            "content_stored": content_stored,
+            "content_stored": True,
             **out.to_dict(),
         }
     except (ValueError, KeyError) as exc:
@@ -2018,14 +1938,12 @@ def artifact_list(item_id: int | str, artifact_type: str | None = None) -> dict[
     """
     out = Output()
     try:
-        provider = _get_artifact_provider()
-        if _artifact_state["warning"] is not None:
-            out.warnings.append(_artifact_state["warning"])
+        provider = _get_content_provider()
         type_filter: ArtifactType | None = ArtifactType(artifact_type) if artifact_type else None
-        registry = _get_artifact_registry()
-
-        manifest = provider.get_manifest(item_id)
-        entries = registry.get_by_type(manifest, type_filter) if type_filter is not None else manifest.artifacts
+        manifest = _load_manifest(provider, item_id)
+        entries = (
+            _artifact_registry.get_by_type(manifest, type_filter) if type_filter is not None else manifest.artifacts
+        )
         artifacts = [e.model_dump(mode="json") for e in entries]
         return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
     except (ValueError, KeyError) as exc:
@@ -2042,14 +1960,12 @@ def artifact_get(item_id: int | str, artifact_type: str, artifact_id: str | None
     """
     out = Output()
     try:
-        provider = _get_artifact_provider()
-        if _artifact_state["warning"] is not None:
-            out.warnings.append(_artifact_state["warning"])
+        provider = _get_content_provider()
         type_enum = ArtifactType(artifact_type)
-        registry = _get_artifact_registry()
-
-        manifest = provider.get_manifest(item_id)
-        entries = registry.get_by_type(manifest, type_enum)
+        manifest = _load_manifest(provider, item_id)
+        entries = _artifact_registry.get_by_type(manifest, type_enum)
+        if artifact_id is not None:
+            entries = [entry for entry in entries if entry.artifact_id == artifact_id]
         artifacts = [e.model_dump(mode="json") for e in entries]
         if not artifacts:
             return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
@@ -2068,14 +1984,10 @@ def artifact_read(item_id: int | str, artifact_type: str, artifact_id: str | Non
     """
     out = Output()
     try:
-        provider = _get_artifact_provider()
-        if _artifact_state["warning"] is not None:
-            out.warnings.append(_artifact_state["warning"])
+        provider = _get_content_provider()
         type_enum = ArtifactType(artifact_type)
-        registry = _get_artifact_registry()
-
-        manifest = provider.get_manifest(item_id)
-        entries = registry.get_by_type(manifest, type_enum)
+        manifest = _load_manifest(provider, item_id)
+        entries = _artifact_registry.get_by_type(manifest, type_enum)
         if not entries:
             return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
         if artifact_id is not None:
@@ -2094,79 +2006,12 @@ def artifact_read(item_id: int | str, artifact_type: str, artifact_id: str | Non
                 f"returning most recent ({entry.artifact_id!r}). Skipped: {skipped}"
             )
 
-        github_content = provider.read_artifact_content_from_remote(item_id, artifact_type, entry.artifact_id)
-        if github_content is not None:
-            result = ArtifactContent(
-                artifact_type=entry.artifact_type, path=entry.artifact_id, content=github_content, status=entry.status
-            )
-        else:
-            content = provider.read_artifact_content(entry.artifact_id)
-            result = ArtifactContent(
-                artifact_type=entry.artifact_type, path=entry.artifact_id, content=content, status=entry.status
-            )
+        content = provider.get_content(artifact_content_reference(item_id, entry)).content
+        result = ArtifactContent(
+            artifact_type=entry.artifact_type, path=entry.artifact_id, content=content, status=entry.status
+        )
         return {**result.model_dump(mode="json"), **out.to_dict()}
     except (ValueError, KeyError) as exc:
         return {"error": f"Invalid parameter: {exc}", **out.to_dict()}
     except BacklogError as exc:
         return {"error": str(exc), **out.to_dict()}
-
-
-def _artifact_migrate_rename(
-    item_id: ItemId, old_artifact_id: str, new_artifact_id: str, out: Output
-) -> dict[str, Any]:
-    """Rename a single artifact_id within the manifest for one item.
-
-    Returns:
-        Dict with ``migrated``, ``old_id``, ``new_id``, or ``error``.
-    """
-    try:
-        provider = _get_artifact_provider()
-        if _artifact_state["warning"] is not None:
-            out.warnings.append(_artifact_state["warning"])
-        manifest = provider.get_manifest(item_id)
-        updated = False
-        for entry in manifest.artifacts:
-            if entry.artifact_id == old_artifact_id:
-                entry.artifact_id = new_artifact_id
-                updated = True
-                break
-        if not updated:
-            return {"error": f"Artifact '{old_artifact_id}' not found for item #{item_id}", **out.to_dict()}
-        provider.set_manifest(item_id, manifest)
-        return {"migrated": 1, "old_id": old_artifact_id, "new_id": new_artifact_id, **out.to_dict()}
-    except BacklogError as exc:
-        return {"error": str(exc), **out.to_dict()}
-
-
-def artifact_migrate(
-    item_id: ItemId | None = None,
-    dry_run: bool = False,
-    old_artifact_id: str | None = None,
-    new_artifact_id: str | None = None,
-) -> dict[str, Any]:
-    """Migrate existing plan/research artifacts into the artifact manifest system.
-
-    When ``old_artifact_id`` and ``new_artifact_id`` are provided, performs a
-    single-item migration (rename).  Otherwise, scans ``plan/`` and ``research/``
-    directories for artifact files and registers them.
-
-    Returns:
-        Dict with migration results, or ``error`` on failure.
-    """
-    out = Output()
-
-    if old_artifact_id is not None and new_artifact_id is not None and item_id is not None:
-        return _artifact_migrate_rename(item_id, old_artifact_id, new_artifact_id, out)
-
-    if dry_run:
-        try:
-            result = migrate_dry_run(item_id)
-        except OSError as exc:
-            return {"error": f"Discovery failed: {exc}", **out.to_dict()}
-        return {**result, **out.to_dict()}
-
-    try:
-        result = migrate_live_run(item_id, out)
-    except (BacklogError, GithubException, OSError) as exc:
-        return {"error": f"Migration failed: {exc}", **out.to_dict()}
-    return {**result, **out.to_dict()}

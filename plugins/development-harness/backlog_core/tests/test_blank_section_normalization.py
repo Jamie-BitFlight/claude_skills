@@ -40,10 +40,10 @@ import pytest
 from backlog_core.models import BacklogItem, Section
 from backlog_core.operations import _resolve_section_indices, view_item
 
+from ._view_test_helpers import _configure_memory_view
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
-
-    from backlog_core.models import ViewItemResult
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -168,17 +168,8 @@ class TestViewItemBlankSectionBehavesLikeNone:
     """
 
     def _setup_github_mock(self, mocker: MockerFixture, issue_num: int) -> BacklogItem:
-        """Patch parse_backlog, find_item, parse_issue_selector, and view_enrich."""
         local_item = _make_local_item()
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[local_item])
-        mocker.patch("backlog_core.operations.find_item", return_value=local_item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=issue_num)
-
-        def _inject_body(result: ViewItemResult, inum: str, repo: str = "") -> bool:
-            result.body = _MULTI_SECTION_BODY
-            return True
-
-        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=_inject_body)
+        _configure_memory_view(mocker, item=local_item, issue_num=issue_num, body=_MULTI_SECTION_BODY)
         return local_item
 
     def test_blank_section_does_not_suppress_sections_index(self, mocker: MockerFixture) -> None:

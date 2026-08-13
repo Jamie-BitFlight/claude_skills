@@ -4,7 +4,9 @@ After Step 1 (Detect Follow-up Files) confirms follow-ups exist, execute these s
 
 ### Step 2: Search Backlog by Title Keywords
 
-For each follow-up plan, derive a search slug from the plan's `feature` field returned by `sam_plan(action='list')`:
+For each follow-up plan, store the opaque `plan_ref` returned by
+`sam_plan(config={"action": "list", "search": "{parent_slug}-followup"})` as
+`{followup_plan_address}`. Derive a search slug from that result's `feature` field:
 
 ```text
 Input:  feature = "data-validation-followup-1"   (from sam_plan list result)
@@ -14,7 +16,7 @@ Output: "data validation"
 ```
 
 Search the backlog using a 2-strategy fallback chain. Strategy 3 (LLM semantic match) is
-**explicitly excluded** from follow-up routing: follow-up filenames are machine-derived slugs,
+**explicitly excluded** from follow-up routing: follow-up features are machine-derived slugs,
 not human semantic queries, so LLM semantic selection would have low fidelity against
 human-authored backlog titles.
 
@@ -22,7 +24,7 @@ The following diagram is the authoritative procedure for Step 2 backlog search s
 
 ```mermaid
 flowchart TD
-    Derive["Derive slug from filename<br>(hyphens → spaces)"] --> S1["Strategy 1 — substring<br>backlog_list(title='{slug}')"]
+    Derive["Derive slug from feature<br>(hyphens → spaces)"] --> S1["Strategy 1 — substring<br>backlog_list(title='{slug}')"]
     S1 --> R1{Results?}
     R1 -->|"One or more matches"| UseS1["Use Strategy 1 result"]
     R1 -->|"Zero results"| S2["Strategy 2 — filter-first<br>backlog_list(topic='{slug}')"]
@@ -67,10 +69,11 @@ strategies fail). If the follow-up plan's `feature` field does not match the exp
 
 ### Step 3: Classify Follow-up Findings
 
-For each follow-up plan, read its `context` field via `sam_plan(action='read', plan='{plan_id}')` and check for a `## Scope` section:
+For each follow-up plan, read its `context` field via
+`sam_plan(plan="{followup_plan_address}", config={"action": "read"})` and check for a `## Scope` section:
 
 - If `## Scope` is absent: default to **in-scope** and emit:
-  `WARNING: No ## Scope section in follow-up plan {plan_id}. Defaulting to in-scope.`
+  `WARNING: No ## Scope section in follow-up plan {followup_plan_address}. Defaulting to in-scope.`
 - If `## Scope: out-of-scope`: route immediately to backlog via `backlog_add` and
   continue to the next follow-up. Do NOT proceed to Step 4 for this follow-up.
 
@@ -78,8 +81,8 @@ The following diagram is the authoritative procedure for Step 3 Classify Follow-
 
 ```mermaid
 flowchart TD
-    ReadScope["sam_plan(action='read', plan='{plan_id}')<br>locate '## Scope' in context field"] --> ScopeExists{"Does '## Scope' section<br>exist in plan context?"}
-    ScopeExists -->|"No — section absent"| WarnDefault["Emit: WARNING: No ## Scope section in follow-up plan {plan_id}.<br>Defaulting to in-scope."]
+    ReadScope["sam_plan(plan='{followup_plan_address}', config={action:'read'})<br>locate '## Scope' in context field"] --> ScopeExists{"Does '## Scope' section<br>exist in plan context?"}
+    ScopeExists -->|"No — section absent"| WarnDefault["Emit: WARNING: No ## Scope section in follow-up plan {followup_plan_address}.<br>Defaulting to in-scope."]
     WarnDefault --> InScope["IN-SCOPE — proceed to Step 4"]
     ScopeExists -->|"Yes"| ScopeValue{"## Scope field value?"}
     ScopeValue -->|"'out-of-scope'"| OutScope["OUT-OF-SCOPE — route to backlog via backlog_add<br>Continue to next follow-up"]
@@ -91,9 +94,9 @@ Out-of-scope backlog_add call pattern:
 ```text
 backlog_add(
     title="{derived_title}",
-    body="Quality gate follow-up from #{issue_number}",
+    body="Quality gate follow-up from {item_ref}",
     labels=["type:task"],
-    source="Quality gate follow-up from #{issue_number} — out-of-scope: plan {plan_id}"
+    source="Quality gate follow-up from {item_ref} — out-of-scope: plan {followup_plan_address}"
 )
 ```
 
@@ -101,12 +104,13 @@ Output: `Out-of-scope finding routed to backlog: {title}`
 
 ### Step 4: Link or Create Backlog Item
 
-Based on Step 2 result, for each follow-up file:
+Based on Step 2 result, for each follow-up plan:
 
-**Match found** -- attach follow-up as plan to the existing backlog item using the plan ID from the `sam_plan(action='list')` result in Step 1:
+**Match found** -- attach the follow-up to the existing backlog item using the opaque
+`plan_ref` from the `sam_plan` list result:
 
 ```bash
-backlog update --selector "{matched_item_title}" --plan "{plan_id}"
+backlog update --selector "{matched_item_title}" --plan "{followup_plan_address}"
 ```
 
 **No match found** -- create a new backlog item, then attach the follow-up as plan:
@@ -115,15 +119,18 @@ backlog update --selector "{matched_item_title}" --plan "{plan_id}"
 Skill(skill: "dh:create-backlog-item", args: "--auto {derived_title}")
 ```
 
-Then attach the follow-up plan using the plan ID from Step 1:
+Then attach the follow-up plan using the same opaque address:
 
 ```bash
-backlog update --selector "{derived_title}" --plan "{plan_id}"
+backlog update --selector "{derived_title}" --plan "{followup_plan_address}"
 ```
 
 **Error handling**:
 
-- If the `backlog update` call fails after creation (title mismatch between what `dh:create-backlog-item` produced and what `update` searched for): re-invoke `backlog list`, find the most recently added item, and retry `backlog update` with its exact title. If the retry also fails, log the error and continue to the next follow-up file.
+- If the `backlog update` call fails after creation (title mismatch between what
+  `dh:create-backlog-item` produced and what `update` searched for): re-invoke `backlog list`, find
+  the most recently added item, and retry `backlog update` with its exact title. If the retry also
+  fails, log the error and continue to the next follow-up plan.
 - If `dh:create-backlog-item --auto` logs `[AUTO] STOP -- duplicate detected`: treat this as "match found" -- run `backlog update` on the duplicate's title to attach the plan.
 
 ### Step 5: Recursion Gate
@@ -137,7 +144,7 @@ If {recursion_depth} >= DH_RECURSIVE_REVIEW_TASK_DEPTH (5):
 
   Output:
   RECURSION DEPTH LIMIT REACHED — Systemic Design Issue Detected
-  Follow-up task: {plan_id}
+  Follow-up task: {followup_plan_address}
   Depth: {recursion_depth} (limit: {DH_RECURSIVE_REVIEW_TASK_DEPTH})
 
   For all remaining in-scope follow-ups (including this one):
@@ -145,7 +152,7 @@ If {recursion_depth} >= DH_RECURSIVE_REVIEW_TASK_DEPTH (5):
         title="{derived_title}",
         body="Depth limit exceeded — review cycle stopped at depth {recursion_depth}",
         labels=["type:task"],
-        source="Depth limit exceeded on #{issue_number} at depth {recursion_depth}"
+        source="Depth limit exceeded on {item_ref} at depth {recursion_depth}"
     )
 
   Stop recursion. Proceed to the Apply status:verified Label step.
@@ -162,7 +169,7 @@ If the planner-rt-ica artifact for this follow-up contains BLOCKED-FOR-PLANNING:
 
   Output:
   RECURSION STOPPED — RT-ICA BLOCKED
-  Follow-up task: {plan_id}
+  Follow-up task: {followup_plan_address}
   Depth: {recursion_depth}
   Blocking conditions: {blocking_conditions_from_artifact}
   Resume: /dh:work-backlog-item {followup_backlog_item_title}
@@ -181,21 +188,25 @@ If no BLOCKED-FOR-PLANNING signal: continue to Condition 1 (ADR-3).
 5. Both Conditions 1 and 2 met → increment depth, recurse
 6. Either not met → defer to backlog
 
-For each follow-up file, evaluate two conditions. BOTH must be true for recursion.
+For each follow-up plan, evaluate two conditions. BOTH must be true for recursion.
 
-**Condition 1 -- Same session scope (ADR-3)**: The follow-up plan's slug matches the parent plan's slug. Read the follow-up plan's `feature` field via `sam_plan(action='read', plan='{plan_id}')`: strip the `-followup-{k}` suffix. Compare against the parent plan's `feature` field (already known from the parent plan ID passed to complete-implementation). Slugs must match.
+**Condition 1 -- Same session scope (ADR-3)**: The follow-up plan's slug matches the parent
+plan's slug. Read the follow-up plan's `feature` field via
+`sam_plan(plan="{followup_plan_address}", config={"action": "read"})`, strip the
+`-followup-{k}` suffix, and compare it with the parent plan's `feature` field. Slugs must match.
 
-**Condition 2 -- High priority (ADR-2)**: Read the follow-up plan's `context` field via `sam_plan(action='read', plan='{plan_id}')` and extract the `## Priority` section. Only `High` qualifies for immediate recursion.
+**Condition 2 -- High priority (ADR-2)**: Use that read result's `context` field and extract the
+`## Priority` section. Only `High` qualifies for immediate recursion.
 
 **If BOTH conditions are met** -- recurse immediately:
 
 Increment {recursion_depth} by 1 before invoking implement-feature.
 
 ```text
-Skill(skill="implement-feature", args="{plan_id}")
+Skill(skill="implement-feature", args="{followup_plan_address}")
 ```
 
-Then re-run `complete-implementation` on the follow-up plan ID.
+Then re-run `complete-implementation` on `{followup_plan_address}`.
 
 **If EITHER condition is NOT met** -- defer to backlog:
 
@@ -209,4 +220,5 @@ Where `<title>` is the backlog item title the follow-up was linked to in Step 3.
 
 Do not recurse. The follow-up is tracked in the backlog.
 
-**Error handling**: If the follow-up plan has no `## Priority` section in its context, default to `Medium` (defer). Log: `No priority found in follow-up plan {plan_id}, defaulting to Medium (deferred).`
+**Error handling**: If the follow-up plan has no `## Priority` section in its context, default to
+`Medium` (defer). Log: `No priority found in follow-up plan {followup_plan_address}, defaulting to Medium (deferred).`

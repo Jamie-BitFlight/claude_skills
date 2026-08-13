@@ -2,6 +2,8 @@
 
 **Status:** Draft v4 amended — fact-checked 2026-06-16; five design decisions resolved 2026-06-19  
 **Date:** 2026-06-15 (amended 2026-06-19)  
+**Authority:** Historical design snapshot. Tool-call forms below are captured extraction patterns,
+not current executable signatures. Use the live server schemas and maintained architecture docs.
 **Sources read:** plugin.json, hooks.json, work-backlog-item SKILL.md, groom/swarm.md,
 add-new-feature SKILL.md, impact-analyst.md, claude-plugins-reference-2026,
 claude-skills-overview-2026, workflow-trace-methodology.md, COVERAGE.md,

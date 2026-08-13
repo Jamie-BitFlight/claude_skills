@@ -1,11 +1,15 @@
 # Workflow Architecture Diagram
 
-> **Snapshot**: 2026-03-22T15:00:00Z (SAM-enforced quality gates)
+**Audience**: Contributor/developer reference for workflow contracts and data shapes. The
+configured backend owns logical work items, grooming, plans, tasks, and artifacts; provider
+storage details shown here are not caller-facing interfaces.
+
+> **Snapshot**: 2026-08-12 (SAM-enforced quality gates and configured-backend storage)
 >
 > Sources: `plugins/development-harness/docs/TASK_FILE_FORMAT.md`, `backlog_core/server.py`, `backlog_core/models.py`,
 > `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`,
 > `plugins/development-harness/skills/complete-implementation/SKILL.md`
-> Last verified: 2026-03-22
+> Last verified: 2026-08-12
 
 **Table of Contents**
 
@@ -36,7 +40,7 @@ flowchart TD
         M2["backlog_list"]
         M3["backlog_view"]
         M4["backlog_update(selector, plan)"]
-        C1["sam_plan create"]
+        C1["sam_plan create action"]
         S1 --> A1
         S1 --> A2
         A1 --> A3
@@ -44,7 +48,7 @@ flowchart TD
         A3 --> A4
         A4 --> A5
         A5 --> A6
-        A4 -->|"§2.1 sam_plan create"| C1
+        A4 -->|"§2.1 sam_plan action=create"| C1
         M1 -->|"§2.5 BacklogItem"| M4
         M2 --> M3
     end
@@ -54,7 +58,7 @@ flowchart TD
         S3["/start-task"]
         A7["t0-baseline-capture"]
         A8["tn-verification-gate"]
-        M5["backlog_get_ready_sam_tasks(parent_issue_number)"]
+        M5["sam_plan(plan='{plan_address}', config={action:'ready'})"]
         C2["sam_plan ready"]
         C3["sam_plan status"]
         C4["sam_task claim"]
@@ -76,8 +80,8 @@ flowchart TD
 
     subgraph QualityGates [Phase 3 — Quality Gates]
         S4["/complete-implementation"]
-        QGC["build_quality_gate_plan<br>sam_plan create QG{N} plan"]
-        QGF["plan/QG{NNN}-qg-{slug}.yaml"]
+        QGC["build_quality_gate_plan<br>sam_plan create action"]
+        QGF["opaque qg_plan_address plan record"]
         QGL["SAM dispatch loop<br>sam_plan ready / sam_task claim / start-task"]
         A9["T1 code-reviewer"]
         A10["T2 feature-verifier"]
@@ -103,7 +107,7 @@ flowchart TD
         VG -->|"any task blocked or skipped<br>outside whitelist"| S4
     end
 
-    subgraph ArtifactManifest [Artifact Manifest — GitHub Issue Body]
+    subgraph ArtifactManifest [Artifact Manifest — Configured Backend]
         AR["artifact_register"]
         AL["artifact_list"]
         AREAD["artifact_read"]
@@ -127,14 +131,14 @@ flowchart TD
 
 ### 2.1 sam_plan ready output (ReadyTasksResult)
 
-Output of the SAM MCP plan-ready operation or `backlog_get_ready_sam_tasks(parent_issue_number)`. For Beads-native readiness, prefer `bd ready --parent <bead-id> --json`; use the DH CLI adapter only when richer structured readiness is required.
+Output of the configured-backend plan-ready operation. For Beads-native readiness, prefer `bd ready --parent <bead-id> --json`; use the DH CLI adapter only when richer structured readiness is required.
 
 ```json
 {
   "feature": "string (plan slug)",
   "ready_tasks": [
     {
-      "task": "T01",
+      "task": "{task_address}",
       "title": "string",
       "agent": "string",
       "skills": ["skill-name"],
@@ -149,7 +153,7 @@ Output of the SAM MCP plan-ready operation or `backlog_get_ready_sam_tasks(paren
 
 ### 2.1a sam_plan status output (PlanStatus + autonomy)
 
-Output of the SAM MCP plan-status operation. For Beads-native status, prefer `bd show <bead-id> --json` or `bd update`; use the DH CLI adapter for structured plan status.
+Output of the configured-backend plan-status operation. For Beads-native status, prefer `bd show <bead-id> --json` or `bd update`; use the DH CLI adapter for structured plan status.
 
 ```json
 {
@@ -160,7 +164,7 @@ Output of the SAM MCP plan-status operation. For Beads-native status, prefer `bd
     "in-progress": 1,
     "complete": 2
   },
-  "ready_tasks": ["T03"],
+  "ready_tasks": ["{task_address}"],
   "blocked_tasks": [],
   "completion_pct": 33.3,
   "has_cycles": false,
@@ -170,30 +174,30 @@ Output of the SAM MCP plan-status operation. For Beads-native status, prefer `bd
 
 `autonomy` is surfaced from the `Plan` model (default `"full_auto"`). The `/implement-feature` Progress Loop reads this field to determine whether to dispatch all tasks without pausing (`full_auto`), pause after each dependency wave (`checkpoint`), or dispatch one task at a time with confirmation (`per_task`).
 
-### 2.2 TaskAssignment (sam_task read P{N}/T{M})
+### 2.2 TaskAssignment (`sam_task` read for an opaque plan/task address)
 
-Output of the SAM MCP task-read operation. In a Beads workspace, use `bd show <bead-id> --json` for native task reads; use the DH CLI adapter for structured SAM task addresses.
+Output of the configured-backend task-read operation. In a Beads workspace, use `bd show <bead-id> --json` for native task reads; use the DH CLI adapter for structured task addresses.
 
 ```json
 {
-  "plan_number": 719,
+  "plan_address": "{plan_address}",
   "plan_slug": "string",
   "plan_goal": "string",
   "plan_context": "string",
   "plan_acceptance_criteria": ["string"],
   "task": {
-    "task": "T04",
+    "task": "{task_address}",
     "title": "string",
     "status": "not-started|in-progress|complete|blocked|deferred|skipped|failed",
     "agent": "string",
-    "dependencies": ["T01"],
+    "dependencies": ["{dependency_task_address}"],
     "priority": 1,
     "complexity": "low|medium|high",
     "skills": ["string"],
     "started": "ISO 8601 | null",
     "completed": "ISO 8601 | null",
     "last-activity": "ISO 8601 | null",
-    "github_issue": "int | null",
+    "linked_item_reference": "opaque | null",
     "is-bookend": "bool | null",
     "bookend-type": "t0-baseline|tn-verification | null",
     "body": "markdown string"
@@ -201,7 +205,7 @@ Output of the SAM MCP task-read operation. In a Beads workspace, use `bd show <b
 }
 ```
 
-### 2.3 T0 Baseline YAML (~/.dh/projects/{slug}/plan/T0-baseline-{slug}.yaml)
+### 2.3 T0 Baseline Artifact (configured backend)
 
 Written by `t0-baseline-capture` agent. Array of per-criterion capture records.
 
@@ -213,7 +217,7 @@ Written by `t0-baseline-capture` agent. Array of per-criterion capture records.
   stderr: "string"
 ```
 
-### 2.4 TN Verification YAML (~/.dh/projects/{slug}/plan/TN-verification-{slug}.yaml)
+### 2.4 TN Verification Artifact (configured backend)
 
 Written by `tn-verification-gate` agent. Array of `BookendVerification` records. No top-level verdict field.
 
@@ -239,30 +243,29 @@ Relevant fields for the pipeline:
   "description": "string",
   "source": "string",
   "item_type": "Feature|Bug|Refactor|Docs|Chore",
-  "issue": "string (GitHub issue number as string, or empty)",
-  "plan": "string (file path) | empty string"
+  "issue": "string (provider work-item reference, or empty)",
+  "plan": "string (logical plan address) | empty string"
 }
 ```
 
-### 2.6 Active-task context file (~/.dh/projects/{slug}/context/active-task-{CLAUDE_CODE_SESSION_ID}.json)
+### 2.6 Active-task context (session-scoped)
 
-Written by `/start-task` skill via `active-task set --address "P{N}/T{M}"` (CLI) or `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})` (MCP) — both write the same session-scoped context.
+Written by `/start-task` skill via `active-task set --address "{plan_address}/{task_address}"` (CLI) or `mcp__plugin_dh_sam__sam_active_task(config={"action":"set","plan":"{plan_address}","task":"{task_address}"})` (MCP) — both write the same session-scoped context.
 Read by `task_status_hook.py` PostToolUse handler.
 
 ```json
 {
-  "task_file_path": "~/.dh/projects/{slug}/plan/Pc7d8e9f0-my-feature.yaml",
-  "task_id": "T04",
-  "parent_issue_number": 719
+  "plan": "{plan_address}",
+  "task_id": "{task_address}",
+  "owner_reference": "work-item-719"
 }
 ```
 
-`parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
+`owner_reference` is omitted when the plan is unlinked. The hook treats absence as `None` and
+skips owner synchronization.
 
-> **Migration note**: Direct filesystem writes of `active-task-{session_id}.json` via inline
-> Python or Bash are deprecated. Use `active-task set --address "P{N}/T{M}"` (CLI) or
-> `sam_active_task(action="set")` (MCP) instead. The hook still reads from the filesystem
-> path as a compatibility bridge — this path is not migrated to MCP in this iteration.
+> **Storage note**: Set and clear this context with `active-task` or `sam_active_task`; its
+> session storage is an implementation detail and is not a plan or artifact provider.
 
 ### 2.7 sam_task claim output
 
@@ -271,7 +274,7 @@ Output of the SAM MCP task-claim operation. In a Beads workspace, use `bd update
 ```json
 {
   "claimed": true,
-  "task_id": "T04",
+  "task_id": "{task_address}",
   "started": "2026-03-15T13:00:00Z"
 }
 ```
@@ -284,20 +287,20 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 
 | Artifact | Publisher | Consumer(s) |
 |----------|-----------|-------------|
-| `~/.dh/projects/{slug}/plan/feature-context-{slug}.md` | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
-| `~/.dh/projects/{slug}/plan/codebase/{FOCUS}.md` | `codebase-analyzer` | `swarm-task-planner` |
-| `~/.dh/projects/{slug}/plan/architect-{slug}.md` | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
-| `~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml` | `swarm-task-planner` via `sam_plan create` (monolithic) or `sam_plan create` → `append_task` × N → `finalize` (incremental) | `/implement-feature`, `sam_plan ready`, `sam_plan status`, all execution agents |
-| `~/.dh/projects/{slug}/plan/T0-baseline-{slug}.yaml` | `t0-baseline-capture` | `tn-verification-gate` |
-| `~/.dh/projects/{slug}/plan/TN-verification-{slug}.yaml` | `tn-verification-gate` | `/complete-implementation` Pre-Phase 1 check |
-| `~/.dh/projects/{slug}/plan/QG{NNN}-qg-{slug}.yaml` | `/complete-implementation` via `build_quality_gate_plan` + `sam_create` | SAM dispatch loop (T1–T6 quality gate tasks) |
-| `~/.dh/projects/{slug}/context/active-task-{sid}.json` | `/start-task` skill | `task_status_hook.py` PostToolUse handler |
+| `feature-context` artifact | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
+| `codebase-analysis` artifact | `codebase-analyzer` | `swarm-task-planner` |
+| `architect` artifact | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
+| `{plan_address}` plan record | `swarm-task-planner` via the `sam_plan` create action (monolithic) or the same action followed by `append_task` × N → `finalize` (incremental) | `/implement-feature`, `sam_plan` ready/status actions, all execution agents |
+| `T0-baseline` artifact | `t0-baseline-capture` | `tn-verification-gate` |
+| `TN-verification` artifact | `tn-verification-gate` | `/complete-implementation` Pre-Phase 1 check |
+| `{qg_plan_address}` plan record | `/complete-implementation` via `build_quality_gate_plan` + the `sam_plan` create action | SAM dispatch loop (T1–T6 quality gate tasks) |
+| session active-task context | `/start-task` skill | `task_status_hook.py` PostToolUse handler |
 | `last-activity` field in task | `task_status_hook.py` PostToolUse handler | progress reporting |
 | `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | ``plan ready` readiness evaluation |
 | `status: in-progress`, `started` field | `sam_task claim` via `/start-task` | `sam_plan status`, `sam_plan ready` exclusion |
 | Follow-up task files | `code-reviewer` | `/complete-implementation` recursion gate |
 | Context Manifest in task file | `context-gathering`, `context-refinement` | executing agents, future sessions |
-| Artifact manifest (GitHub Issue body) | Producer agents via `artifact_register` | Consumer agents via `artifact_list`, worktree agents via `artifact_read` |
+| Artifact manifest (configured backend) | Producer agents via `artifact_register` | Consumer agents via `artifact_list`, worktree agents via `artifact_read` |
 
 ---
 
@@ -307,14 +310,14 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 flowchart TD
     Created([Task created]) -->|"swarm-task-planner via `plan create`"| NS[not-started]
     NS -->|"start-task skill via sam_task claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
-    IP -->|"task_status_hook.py SubagentStop<br>via plan state --address P{N}/T{M} --new-status complete"| CO[complete]
-    IP -->|"agent or human operator<br>via plan state --address P{N}/T{M} --new-status blocked"| BL[blocked]
-    IP -->|"agent or orchestrator<br>via plan state --address P{N}/T{M} --new-status failed"| FA[failed]
-    NS -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status deferred"| DE[deferred]
-    NS -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status skipped"| SK[skipped]
-    NS -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status failed"| FA
-    IP -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status deferred"| DE
-    IP -->|"orchestrator<br>via plan state --address P{N}/T{M} --new-status skipped"| SK
+    IP -->|"task_status_hook.py SubagentStop<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'complete'})"| CO[complete]
+    IP -->|"agent or human operator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'blocked'})"| BL[blocked]
+    IP -->|"agent or orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'failed'})"| FA[failed]
+    NS -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'deferred'})"| DE[deferred]
+    NS -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'skipped'})"| SK[skipped]
+    NS -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'failed'})"| FA
+    IP -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'deferred'})"| DE
+    IP -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'skipped'})"| SK
     FA -->|"auto-cascade<br>mark downstream tasks skipped"| SK
 ```
 
@@ -330,11 +333,11 @@ plans from being dispatched.
 
 ```mermaid
 flowchart TD
-    Start([Planner needs large plan]) --> Create["sam_plan(action='create',<br>tasks=[])"]
-    Create --> Drafting["Plan state = drafting<br>Plan ID assigned (e.g. Pd9e0f1a2)"]
-    Drafting --> AppendLoop["sam_plan(plan='P{N}',<br>action='append_task',<br>task=single_task_dict) × N<br>Single-writer: no concurrent appends<br>state remains drafting throughout"]
+    Start([Planner needs large plan]) --> Create["sam_plan(config={action:'create',<br>slug:'{slug}', goal:'{goal}', tasks:[]})"]
+    Create --> Drafting["Plan state = drafting<br>Opaque plan address assigned"]
+    Drafting --> AppendLoop["sam_plan(plan='{plan_address}',<br>config={action:'append_task',<br>task:single_task_dict}) × N<br>Single-writer: no concurrent appends<br>state remains drafting throughout"]
     AppendLoop --> AppendLoop
-    AppendLoop --> Finalize["sam_plan(plan='P{N}', action='finalize')"]
+    AppendLoop --> Finalize["sam_plan(plan='{plan_address}',<br>config={action:'finalize'})"]
     Finalize --> Ready["Plan state = ready<br>Tasks visible to sam_plan ready/status"]
     Ready --> Dispatch([Dispatch loop begins])
 
@@ -349,32 +352,33 @@ flowchart TD
 - `state="ready"` is set by `create` when `tasks` contains at least one task definition (monolithic path).
 - `append_task` leaves `state` unchanged — it never transitions drafting → ready.
 - `finalize` is the only operation that transitions `drafting` → `ready`.
-- Single-writer assumption: `TaskBackend.append_task` is NOT required to be atomic under
-  concurrent writers. Callers must serialize writes to the same plan. Behavior under
-  concurrent `append_task` calls for the same plan is **undefined**.
+- Single-writer assumption: `append_task` is not required to be atomic under concurrent writers.
+  Callers must serialize writes to the same logical plan through the configured backend.
 
 ---
 
 ## 5. Cross-System Dependency Chain
 
-The `parent_issue_number` (GitHub issue) propagates through these fields:
+The work-item owner reference propagates through these fields:
 
 ```mermaid
 flowchart TD
-    GH["GitHub Issue #N<br>created by backlog_add"]
-    BI["BacklogItem.issue field<br>(string, e.g. '719')"]
-    PF["plan file name<br>~/.dh/projects/{slug}/plan/P{id}-{slug}.yaml<br>issue: N in plan YAML"]
-    CTX["~/.dh/projects/{slug}/context/active-task-{sid}.json<br>parent_issue_number: N<br>written by /start-task"]
-    HOOK["task_status_hook.py<br>reads parent_issue_number<br>syncs completion to GitHub sub-issue"]
-    TF["Task field: github_issue<br>linked sub-issue number"]
+    GH["Configured backend work item<br>created by backlog_add"]
+    BI["BacklogItem.issue field<br>(opaque provider reference)"]
+    PF["logical plan address<br>{plan_address}<br>owner reference in backend"]
+    CTX["session active-task context<br>parent owner reference<br>written by /start-task"]
+    HOOK["task_status_hook.py<br>reads owner reference<br>routes completion through backend"]
+    TF["Task linked-item reference<br>provider-neutral relationship"]
     GH --> BI
     BI -->|"backlog_update(selector, plan)"| PF
-    PF -->|"`plan claim --address P{N}/T{M}`"| CTX
+    PF -->|"`sam_task(plan='{plan_address}', task='{task_address}', config={action:'claim'})`"| CTX
     CTX --> HOOK
     TF --> HOOK
 ```
 
-Key invariant: `parent_issue_number` in the context file is the GitHub story issue number for the plan. `task.github_issue` is the sub-issue to close on completion. The hook uses both fields independently.
+Key invariant: the plan owner reference identifies the work item, while the task linked-item
+reference identifies the task relationship. The hook uses both relationships through the same
+configured backend; neither field selects storage.
 
 ---
 
@@ -396,13 +400,13 @@ Processing sequence:
 
 1. Read `prompt` field from hook input (falls back to `tool_input.prompt`).
 2. Parse prompt for `/start-task <path> --task <id>` or `Skill(skill="start-task", args="<path> --task <id>")` pattern.
-3. If no match, fall back to `~/.dh/projects/{slug}/context/active-task-{session_id}.json`.
+3. If no match, read the session-scoped active-task context.
 4. If still no match, exit 0 silently (not a `/start-task` sub-agent).
-5. Call `sam_task(action='state', plan, task_id, status='complete')` via fastmcp CLI subprocess; on MCP failure, exit 0 (best-effort).
-6. Call `sam_task(action='update', plan, task_id, set_fields={'completed': <ISO timestamp>})` via fastmcp CLI subprocess.
-7. Delete `~/.dh/projects/{slug}/context/active-task-{session_id}.json`.
+5. Call `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"state", "status":"complete"})` via the FastMCP CLI subprocess; on MCP failure, exit 0 (best-effort).
+6. Call `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"update", "set_fields":{"completed": <ISO timestamp>}})` via the FastMCP CLI subprocess.
+7. Clear the session-scoped active-task context.
 
-GitHub synchronization is the responsibility of the SAM `TaskBackend` selected at server configuration time (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and only routes status writes through the SAM MCP server.
+Backend synchronization is the responsibility of the configured backend (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and only routes status writes through the SAM MCP server.
 
 Fields written: `status: complete`, `completed: <ISO timestamp>`
 
@@ -418,10 +422,10 @@ Context:    Declared on /start-task skill
 Processing sequence:
 
 1. Read `session_id` from hook input. If absent, exit 0.
-2. Read `~/.dh/projects/{slug}/context/active-task-{session_id}.json`. If absent, exit 0.
-3. Resolve `task_file_path` and `task_id` from context file.
-4. Read current task via `sam_get_task`. If `status == complete`, return without writing.
-5. Call `sam_update_plan_fields(full_path, task_id, set_fields={"last-activity": <ISO timestamp>})`.
+2. Read the session-scoped active-task context. If absent, exit 0.
+3. Resolve the logical plan address and task ID from context.
+4. Read the current task via `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"read"})`. If `status == complete`, return without writing.
+5. Call `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"update", "set_fields":{"last-activity": <ISO timestamp>}})`.
 
 Fields written: `last-activity: <ISO timestamp>`
 
@@ -431,32 +435,32 @@ Guard: skipped silently when task status is already `complete`.
 
 ## 7. Quality Gate SAM Dispatch Flow
 
-The `/complete-implementation` skill enforces quality gates via a SAM-based dispatch loop. Each of the 6 phases is a task in a dedicated QG plan (prefix `QG{N}`). The dependency chain `T1 → T2 → T3 → T4 → T5 → T6` enforces ordered execution. No phase can start until the previous phase's task reaches terminal status.
+The `/complete-implementation` skill enforces quality gates via a SAM-based dispatch loop. Each of the 6 phases is a task in a dedicated plan returned by the configured backend. The phase dependency chain enforces ordered execution. No phase can start until the previous phase's task reaches terminal status.
 
 ```mermaid
 flowchart TD
     Start(["/complete-implementation<br>invoked"]) --> PrePhase["Pre-phases<br>TN verification, artifact discovery,<br>concern processing"]
     PrePhase --> CheckQG{QG plan<br>exists?}
     CheckQG -->|"No — first run"| GenYAML["build_quality_gate_plan<br>produces 6-task YAML"]
-    GenYAML --> CreatePlan["sam_plan(config={action:create,slug:'qg-{slug}',<br>tasks:[...],issue:N})<br>→ QG{NNN}-qg-{slug}.yaml"]
-    CheckQG -->|"Yes — resume"| ResetBlocked["Reset BLOCKED tasks<br>to NOT_STARTED via sam_task state"]
+    GenYAML --> CreatePlan["sam_plan(config={action:'create',slug:'qg-{slug}',<br>tasks:[...],owner_reference:...})<br>→ opaque qg_plan_address"]
+    CheckQG -->|"Yes — resume"| ResetBlocked["Reset BLOCKED tasks<br>to NOT_STARTED via sam_task config={action:'state'}"]
     CreatePlan --> DispatchLoop
     ResetBlocked --> DispatchLoop
 
     subgraph DispatchLoop [SAM Dispatch Loop]
-        Ready["sam_plan(plan='QG{N}', config={action:ready})"] --> AnyReady{Ready tasks?}
+        Ready["sam_plan(plan='{qg_plan_address}', config={action:'ready'})"] --> AnyReady{Ready tasks?}
         AnyReady -->|No| ExitLoop([Exit loop])
-        AnyReady -->|Yes| Claim["sam_task(plan='QG{N}', task='T{M}', config={action:claim})"]
+        AnyReady -->|Yes| Claim["sam_task(plan='{qg_plan_address}', task='{task_address}', config={action:'claim'})"]
         Claim --> ClaimedOK{claimed?}
         ClaimedOK -->|No| Ready
-        ClaimedOK -->|Yes| Dispatch["Skill(skill='start-task',<br>args='plan/QG{NNN}-qg-{slug}.yaml --task T{M}')"]
-        Dispatch --> Hook["SubagentStop hook<br>sam_task state → status: complete"]
+        ClaimedOK -->|Yes| Dispatch["Skill(skill='start-task',<br>args='{qg_plan_address} --task {task_address}')"]
+        Dispatch --> Hook["SubagentStop hook<br>sam_task config={action:'state'} → status: complete"]
         Hook --> PostDispatch{Which task<br>completed?}
-        PostDispatch -->|T1| StoreFollowups["Store follow-up file paths<br>from ARTIFACTS output"]
-        PostDispatch -->|"T4 — no drift"| SkipT5["sam_task T5 state → skipped"]
-        PostDispatch -->|"T4 — drift found"| T5Ready["T5 stays NOT_STARTED,<br>dispatched on next iteration"]
-        PostDispatch -->|T6| StoreDiv["Store DIVERGENCE_REQUIRING_REVIEW<br>if present in agent output"]
-        PostDispatch -->|T2, T3, T5| NextIter["Continue loop"]
+        PostDispatch -->|"research phase"| StoreFollowups["Register follow-up artifacts<br>from ARTIFACTS output"]
+        PostDispatch -->|"doc phase — no drift"| SkipT5["sam_task config={action:'state'} → skipped"]
+        PostDispatch -->|"doc phase — drift found"| T5Ready["doc phase stays NOT_STARTED,<br>dispatched on next iteration"]
+        PostDispatch -->|"verification phase"| StoreDiv["Store DIVERGENCE_REQUIRING_REVIEW<br>if present in agent output"]
+        PostDispatch -->|"other phases"| NextIter["Continue loop"]
         StoreFollowups --> NextIter
         SkipT5 --> NextIter
         T5Ready --> NextIter
@@ -464,11 +468,11 @@ flowchart TD
         NextIter --> Ready
     end
 
-    ExitLoop --> VGate["Completion Verification Gate<br>sam_plan(plan='QG{N}', config={action:status})"]
+    ExitLoop --> VGate["Completion Verification Gate<br>sam_plan(plan='{qg_plan_address}', config={action:'status'})"]
     VGate --> VerifyAll{All 6 tasks<br>terminal?}
     VerifyAll -->|"Any task not-started,<br>in-progress, or blocked"| BlockFail["STOP<br>COMPLETION BLOCKED —<br>Quality Gate Incomplete"]
     VerifyAll -->|"Non-T5 task skipped"| BlockUnauth["STOP<br>Unauthorized skip detected"]
-    VerifyAll -->|"All tasks complete<br>or T5 skipped"| PostLoop["Recursive Follow-up Handling<br>→ Apply status:verified label<br>→ Final commit and push"]
+    VerifyAll -->|"All tasks complete<br>or T5 skipped"| PostLoop["Recursive Follow-up Handling<br>→ Apply verified status through backend<br>→ Final commit and push"]
 ```
 
 ### Skip Whitelist
@@ -477,7 +481,13 @@ Only T5 (Documentation Update) may have `status: skipped`. Skipping is triggered
 
 ### QG Plan File Location
 
-The QG plan file is written by `sam_plan(action="create")` to `plan/QG{NNN}-qg-{slug}.yaml` (in the project plan directory). The `QG{N}` address is used in all subsequent `sam_plan(action="ready")`, `sam_task(action="claim")`, `sam_task(action="state")`, and `sam_plan(action="status")` calls for this quality gate run. The `QG{NNN}` number is auto-assigned by SAM (sequential, separate from implementation plan numbering `P{id}`).
+The quality-gate plan record is created by the `sam_plan` create action through the configured backend. The
+returned opaque `{qg_plan_address}` is passed to all subsequent `sam_plan` and `sam_task` calls:
+`sam_plan(plan="{qg_plan_address}", config={"action":"ready"})`,
+`sam_task(plan="{qg_plan_address}", task="{task_address}", config={"action":"claim"})`,
+`sam_task(plan="{qg_plan_address}", task="{task_address}", config={"action":"state"})`, and
+`sam_plan(plan="{qg_plan_address}", config={"action":"status"})`. Do not infer a numeric
+sequence or filesystem path from the address.
 
 ---
 

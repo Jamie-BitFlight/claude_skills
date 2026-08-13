@@ -1416,7 +1416,7 @@
         },
         {
           "condition": "No — spawned via single Agent call",
-          "target_label": "Re-spawn agent with same task file path and task ID SubagentStop hook updates status on completion",
+          "target_label": "Re-spawn agent with the same opaque plan_ref and task_id; SubagentStop hook updates status on completion",
           "target_is_file_ref": false,
           "target_file": null
         }
@@ -1438,7 +1438,7 @@
         },
         {
           "condition": "No — still silent",
-          "target_label": "Re-spawn agent with same task file path and task ID SubagentStop hook updates status on completion",
+          "target_label": "Re-spawn agent with the same opaque plan_ref and task_id; SubagentStop hook updates status on completion",
           "target_is_file_ref": false,
           "target_file": null
         }
@@ -1748,7 +1748,7 @@
       "branches": [
         {
           "condition": "No",
-          "target_label": "sam_plan(action=create) tasks list from phase mapping table",
+          "target_label": "sam_plan create action with tasks from the phase mapping table",
           "target_is_file_ref": false,
           "target_file": null
         },

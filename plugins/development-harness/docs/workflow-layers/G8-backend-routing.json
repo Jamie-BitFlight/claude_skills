@@ -151,9 +151,9 @@
       "step_label": "mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context')",
       "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
       "call_params": "item_id={issue_number}, artifact_type='feature-context'",
-      "routes_to_protocol_method": "get_manifest",
+      "routes_to_protocol_method": "list_artifacts",
       "per_backend": {
-        "github": "Gist.edit() — read path",
+        "github": "provider-owned artifact manifest lookup",
         "sqlite": "SELECT from artifact_manifest",
         "memory": "dict lookup",
         "beads": "bd update --set-metadata read path"
@@ -167,9 +167,9 @@
       "step_label": "mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type='feature-context')",
       "mcp_tool": "mcp__plugin_dh_backlog__artifact_read",
       "call_params": "item_id={issue_number}, artifact_type='feature-context'",
-      "routes_to_protocol_method": "read_artifact_content_from_remote",
+      "routes_to_protocol_method": "read_artifact_content",
       "per_backend": {
-        "github": "Gist.edit() — read content",
+        "github": "provider-owned artifact content read",
         "sqlite": "SELECT artifact content",
         "memory": "dict content lookup",
         "beads": "bd update --set-metadata read path"
@@ -196,12 +196,12 @@
       "id": "G8.groom.artifact_register-discovery-gate-synthesize",
       "skill": "groom",
       "source_file": "groom/analyze.md:Discovery Gate — step 3 (synthesize)",
-      "step_label": "mcp__plugin_dh_backlog__artifact_register(item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content='...')",
+      "step_label": "mcp__plugin_dh_backlog__artifact_register(item_id={issue_number}, artifact_type='feature-context', artifact_id='plan/feature-context-{slug}.md', agent='discovery', content='...')",
       "mcp_tool": "mcp__plugin_dh_backlog__artifact_register",
-      "call_params": "item_id={issue_number}, artifact_type='feature-context', path='plan/feature-context-{slug}.md', agent='discovery', content='# ARTIFACT:DISCOVERY\\n...'",
+      "call_params": "item_id={issue_number}, artifact_type='feature-context', artifact_id='plan/feature-context-{slug}.md', agent='discovery', content='# ARTIFACT:DISCOVERY\\n...'",
       "routes_to_protocol_method": "set_manifest + store_artifact_content",
       "per_backend": {
-        "github": "Gist.edit()",
+        "github": "provider-owned artifact content write",
         "sqlite": "INSERT into artifact_manifest + store content",
         "memory": "dict insert",
         "beads": "bd update --set-metadata"
@@ -215,9 +215,9 @@
       "step_label": "mcp__plugin_dh_backlog__artifact_list(item_id={issue_number}, artifact_type='feature-context') [post-discovery verify]",
       "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
       "call_params": "item_id={issue_number}, artifact_type='feature-context'",
-      "routes_to_protocol_method": "get_manifest",
+      "routes_to_protocol_method": "list_artifacts",
       "per_backend": {
-        "github": "Gist.edit() — read path",
+        "github": "provider-owned artifact manifest lookup",
         "sqlite": "SELECT from artifact_manifest",
         "memory": "dict lookup",
         "beads": "bd update --set-metadata read path"
@@ -471,9 +471,9 @@
       "step_label": "artifact_list(item_id={N}, artifact_type='feature-context')",
       "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
       "call_params": "item_id={N}, artifact_type='feature-context'",
-      "routes_to_protocol_method": "get_manifest",
+      "routes_to_protocol_method": "list_artifacts",
       "per_backend": {
-        "github": "Gist.edit() — read path",
+        "github": "provider-owned artifact manifest lookup",
         "sqlite": "SELECT from artifact_manifest",
         "memory": "dict lookup",
         "beads": "bd update --set-metadata read path"
@@ -487,9 +487,9 @@
       "step_label": "Call artifact_list(item_id={N}, artifact_type='feature-context') [post dh:discovery verify]",
       "mcp_tool": "mcp__plugin_dh_backlog__artifact_list",
       "call_params": "item_id={N}, artifact_type='feature-context'",
-      "routes_to_protocol_method": "get_manifest",
+      "routes_to_protocol_method": "list_artifacts",
       "per_backend": {
-        "github": "Gist.edit() — read path",
+        "github": "provider-owned artifact manifest lookup",
         "sqlite": "SELECT from artifact_manifest",
         "memory": "dict lookup",
         "beads": "bd update --set-metadata read path"
@@ -500,9 +500,9 @@
       "id": "G8.work.sam_plan-plan-phase-create",
       "skill": "work",
       "source_file": "work/plan.md:Step 4.2 Invoke SAM Planning (via dh:add-new-feature)",
-      "step_label": "sam_plan(action='create', slug, goal, tasks=[...], issue) [invoked internally by dh:add-new-feature]",
+      "step_label": "sam_plan create action with slug, goal, tasks, and owner reference [invoked internally by dh:add-new-feature]",
       "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
-      "call_params": "config={\"action\":\"create\",\"slug\":\"{slug}\",\"goal\":\"{goal}\",\"tasks\":[...],\"issue\":\"{issue}\"}",
+      "call_params": "config={\"action\":\"create\",\"slug\":\"{slug}\",\"goal\":\"{goal}\",\"tasks\":[...],\"owner_reference\":\"{owner_reference}\"}",
       "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
       "per_backend": {
         "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
@@ -676,9 +676,9 @@
       "id": "G8.quick.sam_plan-append-task",
       "skill": "quick",
       "source_file": "quick/start.md:Step 2b — append to active plan",
-      "step_label": "mcp__plugin_dh_sam__sam_plan(config={\"action\":\"append_task\",\"plan\":\"{active_plan_id}\",\"task\":{...}})",
+      "step_label": "mcp__plugin_dh_sam__sam_plan(plan=\"{active_plan_id}\", config={\"action\":\"append_task\",\"task\":{...}})",
       "mcp_tool": "mcp__plugin_dh_sam__sam_plan",
-      "call_params": "config={\"action\":\"append_task\",\"plan\":\"{active_plan_id}\",\"task\":{\"id\":\"T{next_available_id}\",\"title\":\"{title}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1}}",
+      "call_params": "plan=\"{active_plan_id}\", config={\"action\":\"append_task\",\"task\":{\"id\":\"T{next_available_id}\",\"title\":\"{title}\",\"status\":\"not-started\",\"agent\":\"task-worker\",\"dependencies\":[],\"priority\":1}}",
       "routes_to_protocol_method": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",
       "per_backend": {
         "github": "SAM backends: local/github/memory/beads — see docs/backend-providers.md",

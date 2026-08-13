@@ -19,7 +19,10 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from sam_schema.core.models import Plan, Task
+    from sam_schema.core.task_backend_types import PlanUpdateValue
 
 # Plans whose YAML serialization exceeds this line count are split into a
 # directory of per-task files instead of a single flat file.
@@ -640,7 +643,7 @@ def append_section(path: Path, task_id: str, section_name: str, content: str) ->
     _atomic_write(path, buf.getvalue())
 
 
-def update_fields(file_path: Path, task_id: str, fields: dict[str, str | int | list[str]]) -> None:
+def update_fields(file_path: Path, task_id: str, fields: Mapping[str, PlanUpdateValue]) -> None:
     """Update multiple fields in a YAML task file in a single read-modify-write cycle.
 
     Equivalent to calling ``update_field`` for each entry in ``fields``, but
