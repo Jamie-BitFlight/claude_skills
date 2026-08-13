@@ -10,8 +10,9 @@ implementation), `claude_skills-ece` (review hardening and provider-native CAS)
 
 **Last updated:** 2026-08-13
 
-**Status:** IMPLEMENTED — remaining maintainability and runtime-lifecycle follow-ups are tracked
-separately in section 1.2
+**Status:** IMPLEMENTED FOR THE RECONCILIATION AND PROVIDER CONTRACT — remaining migration debt,
+maintainability work, and runtime-lifecycle follow-ups are tracked in the live architecture and
+section 1.2
 
 **Supersedes:** [Offline-First with Per-Item Watermarks](./architect-redesign-backlog-github-sync-offline-first.md)
 
@@ -85,10 +86,11 @@ boundaries:
    audit was strengthened so selectively moved work cannot silently lose deleted paths or Git tree
    modes.
 
-The complete live module contract is in
+The current target module contract and its remaining migration debt are in
 [backlog_core/ARCHITECTURE.md](../plugins/development-harness/backlog_core/ARCHITECTURE.md). This
-document owns the decision history, delivered dependency graph, and recovery pointers rather than
-duplicating every module detail.
+document records the delivered reconciliation/provider decision, its historical baseline, the
+implementation graph, and recovery pointers; it does not declare every target-architecture item
+complete.
 
 ### 1.2 Bead recovery index
 
@@ -147,9 +149,10 @@ bd list --all --parent claude_skills-ece \
 - Implementing the architecture inside the original decision task. That task deferred delivery to
   `claude_skills-vu8`; section 12 now records the delivered graph and its review expansion.
 
-## 3. Current constraints
+## 3. Historical baseline constraints (2026-08-12)
 
-The current code has three independent policies:
+At decision time, the code had three independent policies. The delivered implementation replaced
+these paths; this section remains only to explain why the reconciliation seam was chosen:
 
 - Startup calls `refresh_local_cache_from_github()`, which chooses `_sync_full()` or `_sync_incremental()` and writes
   fetched issues directly into the local cache.
@@ -422,9 +425,11 @@ validated audit comments:
 3. Append a tagged audit comment naming the previous revision and intended content digest.
 4. Advance the issue-bound Contents head with the observed blob SHA as the compare-and-swap
    precondition.
-5. Re-fetch and validate the winning head/comment/digest; return `applied` only for the writer whose
-   head CAS advanced.
-6. Preserve losing comments as audit evidence, return `conflict`, and leave that mutation queued and
+5. Use the exact successful Contents write response as the winning revision and return `applied`
+   only for that writer. Do not re-read the mutable path after the CAS.
+6. On later reads, validate the head's Issue identity, referenced comment, and content digest;
+   malformed or altered projections fail closed.
+7. Preserve losing comments as audit evidence, return `conflict`, and leave that mutation queued and
    uncheckpointed.
 
 This gives work-item content the same provider-native optimistic concurrency boundary as other
