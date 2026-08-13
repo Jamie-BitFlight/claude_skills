@@ -3910,17 +3910,7 @@ def _read_dispatch_plan(milestone_number: int) -> _ds.DispatchPlan:
     )
 
 
-def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str) -> None:
-    """Register the newly written dispatch plan file as a dispatch-plan artifact.
-
-    Best-effort: logs a warning on any failure but never raises.  Called after
-    ``dispatch_create_plan`` writes the plan file when the caller provides an
-    associated issue identifier.
-
-    Args:
-        item_id: Issue number or beads string identifier to register the artifact against.
-        artifact_id: Logical identifier for the stored dispatch plan.
-    """
+def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, content: str) -> None:
     log = _logging.getLogger(__name__)
     try:
         provider = _get_artifact_provider()
@@ -3929,6 +3919,17 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str) -> N
             artifact_id=artifact_id,
             status=ArtifactStatus.CURRENT,
             agent="dispatch_create_plan",
+        )
+        provider.put_content(
+            ContentWrite(
+                reference=ContentRef(
+                    kind=ContentKind.ARTIFACT_CONTENT,
+                    namespace=str(item_id),
+                    artifact_type=ArtifactType.DISPATCH_PLAN.value,
+                    name=artifact_id,
+                ),
+                content=content,
+            )
         )
         register_manifest_entry(provider, _manifest_reference(item_id), item_id, entry)
         log.info("dispatch_create_plan: registered dispatch-plan artifact %s for item %s", artifact_id, item_id)
@@ -4127,10 +4128,11 @@ async def dispatch_create_plan(
             return {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()}
 
     # 6. Write atomically
+    dispatch_content = plan.model_dump_json()
     try:
         await asyncio.to_thread(
             _get_artifact_provider().put_content,
-            ContentWrite(reference=_dispatch_reference(milestone_number), content=plan.model_dump_json()),
+            ContentWrite(reference=_dispatch_reference(milestone_number), content=dispatch_content),
         )
     except BacklogError as exc:
         return {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
@@ -4149,7 +4151,7 @@ async def dispatch_create_plan(
 
     # 8. Artifact registration (best-effort)
     if issue is not None:
-        _try_register_dispatch_plan_artifact(issue, _dispatch_reference(milestone_number).name)
+        _try_register_dispatch_plan_artifact(issue, _dispatch_reference(milestone_number).name, dispatch_content)
 
     wave_count = len(plan.waves)
     item_count = sum(len(wave.items) for wave in plan.waves)

@@ -35,11 +35,15 @@ meaningful integer representation.  Affected methods raise
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
+import os
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING, Final, Literal, Protocol
 
 from pydantic import ValidationError
@@ -89,6 +93,14 @@ __all__ = ["BeadsBackend"]
 
 _log = logging.getLogger(__name__)
 _CONTENT_KEY_PREFIX: Final[str] = "dh.content."
+_CONTENT_LOCK_FILE: Final[str] = "dh-content.lock"
+_THREAD_LOCKS: Final[dict[Path, Lock]] = {}
+_THREAD_LOCKS_GUARD: Final = Lock()
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 class _BdRunnerLike(Protocol):
@@ -97,6 +109,44 @@ class _BdRunnerLike(Protocol):
     def run_text(self, argv: Sequence[str]) -> str: ...
 
     def is_available(self) -> bool: ...
+
+
+def _beads_workspace_path() -> Path:
+    current = Path.cwd().resolve()
+    for ancestor in (current, *current.parents):
+        workspace = ancestor / ".beads"
+        if workspace.is_dir():
+            return workspace
+    return current / ".beads"
+
+
+@contextlib.contextmanager
+def _beads_content_lock() -> Iterator[None]:
+    lock_path = _beads_workspace_path() / _CONTENT_LOCK_FILE
+    with _THREAD_LOCKS_GUARD:
+        thread_lock = _THREAD_LOCKS.setdefault(lock_path, Lock())
+    with thread_lock:
+        try:
+            lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError as exc:
+            raise ContentUnavailableError("Beads content store is unavailable") from exc
+        try:
+            try:
+                if os.name == "nt":
+                    msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
+                else:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            except OSError as exc:
+                raise ContentUnavailableError("Beads content store is unavailable") from exc
+            try:
+                yield
+            finally:
+                if os.name == "nt":
+                    msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        finally:
+            os.close(lock_fd)
 
 
 # ---------------------------------------------------------------------------
@@ -309,35 +359,36 @@ class BeadsBackend:
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Create or replace one record in the native Beads KV store."""
-        current = self._find_content(request.reference)
-        current_revision = current.revision if current is not None else ""
-        if request.expected_revision and request.expected_revision != current_revision:
-            raise ContentConflictError("Content revision no longer matches")
-        owner_reference = request.reference.namespace
-        if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
-            owner_reference = (
-                request.owner_reference
-                if request.owner_reference is not None
-                else current.owner_reference
-                if current is not None
-                else ""
+        with _beads_content_lock():
+            current = self._find_content(request.reference)
+            current_revision = current.revision if current is not None else ""
+            if request.expected_revision and request.expected_revision != current_revision:
+                raise ContentConflictError("Content revision no longer matches")
+            owner_reference = request.reference.namespace
+            if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
+                owner_reference = (
+                    request.owner_reference
+                    if request.owner_reference is not None
+                    else current.owner_reference
+                    if current is not None
+                    else ""
+                )
+            record = ContentRecord(
+                reference=request.reference,
+                owner_reference=owner_reference,
+                content=request.content,
+                revision=uuid.uuid4().hex,
             )
-        record = ContentRecord(
-            reference=request.reference,
-            owner_reference=owner_reference,
-            content=request.content,
-            revision=uuid.uuid4().hex,
-        )
-        try:
-            self._runner.run_text([
-                "kv",
-                "set",
-                self._content_key(request.reference),
-                json.dumps(record.model_dump(mode="json"), separators=(",", ":")),
-            ])
-        except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
-            raise ContentUnavailableError("Beads content store is unavailable") from exc
-        return record
+            try:
+                self._runner.run_text([
+                    "kv",
+                    "set",
+                    self._content_key(request.reference),
+                    json.dumps(record.model_dump(mode="json"), separators=(",", ":")),
+                ])
+            except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
+                raise ContentUnavailableError("Beads content store is unavailable") from exc
+            return record
 
     def _find_content(self, reference: ContentRef) -> ContentRecord | None:
         try:

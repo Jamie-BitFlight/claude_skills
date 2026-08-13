@@ -22,6 +22,7 @@ from backlog_core.models import (
     ProviderPatch,
     ReconcileRequest,
     ReconcileScope,
+    UnsupportedCapabilityError,
 )
 from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
 from sam_schema.core.plan_id_index import PlanIndexEntry, _serialize_index_yaml
@@ -202,8 +203,8 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     assert cache._work_item_snapshots()[0][1].metadata.sync_fingerprint
 
 
-def test_github_content_provider_fails_closed_on_existing_plan_update(tmp_path: Path) -> None:
-    # Given: a reachable provider and one stable logical plan identity
+def test_github_content_provider_fails_closed_on_plan_creation(tmp_path: Path) -> None:
+    # Given: a reachable provider and a new logical plan identity
     artifact_provider = MagicMock()
     remote_content: dict[tuple[int, str, str], str] = {}
     artifact_provider.get_manifest.side_effect = lambda owner: ArtifactManifest(issue_number=owner)
@@ -218,19 +219,16 @@ def test_github_content_provider_fails_closed_on_existing_plan_update(tmp_path: 
     backend.try_get_github = MagicMock(return_value=MagicMock())
     reference = ContentRef(kind=ContentKind.PLAN, name="P1")
 
-    # When: the plan is created, then an expected-revision update is requested
-    created = backend.put_content(ContentWrite(reference=reference, content="v1", owner_reference="#1"))
-    remote_after_create = remote_content.copy()
-    with pytest.raises(ContentConflictError, match="revision"):
-        backend.put_content(ContentWrite(reference=reference, content="v2", expected_revision=created.revision))
+    # When: a new plan is requested without a provider CAS revision
+    with pytest.raises(UnsupportedCapabilityError):
+        backend.put_content(ContentWrite(reference=reference, content="v1", owner_reference="#1"))
 
-    # Then: GitHub's missing mutation CAS cannot overwrite the existing plan
-    assert created.reference == reference
-    assert remote_content == remote_after_create
+    # Then: no Gist content or index mutation is reported or performed
+    assert remote_content == {}
 
 
 def test_github_content_provider_keeps_linked_plans_separate_by_plan_id(tmp_path: Path) -> None:
-    # Given: two logical plans linked to the same GitHub issue
+    # Given: two existing logical plans linked to the same GitHub issue
     artifact_provider = MagicMock()
     remote_content: dict[tuple[int, str, str], str] = {}
     artifact_provider.get_manifest.side_effect = lambda owner: ArtifactManifest(issue_number=owner)
@@ -240,14 +238,16 @@ def test_github_content_provider_keeps_linked_plans_separate_by_plan_id(tmp_path
     artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
         remote_content.get((owner, artifact_type, path))
     )
-    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
-    backend.try_get_github = MagicMock(return_value=MagicMock())
+    remote_content[2531, "plan-index", "sam-plan/plan-index.yaml"] = _serialize_index_yaml([
+        PlanIndexEntry(plan_id="Pfirst", issue=42, slug="first", created_at="2026-08-12T00:00:00Z"),
+        PlanIndexEntry(plan_id="Psecond", issue=42, slug="second", created_at="2026-08-12T00:00:00Z"),
+    ])
+    remote_content[42, "task-plan", "sam-plan/task-plan-issue-42-plan-Pfirst.yaml"] = "first"
+    remote_content[42, "task-plan", "sam-plan/task-plan-issue-42-plan-Psecond.yaml"] = "second"
     first = ContentRef(kind=ContentKind.PLAN, name="Pfirst")
     second = ContentRef(kind=ContentKind.PLAN, name="Psecond")
 
-    # When: both plans are stored and fetched through a fresh backend
-    backend.put_content(ContentWrite(reference=first, content="first", owner_reference="#42"))
-    backend.put_content(ContentWrite(reference=second, content="second", owner_reference="#42"))
+    # When: both plans are fetched through a fresh backend
     fresh_backend = GitHubBackend(cache=FileCache(tmp_path / "fresh"), artifact_provider=artifact_provider)
     fresh_backend.try_get_github = MagicMock(return_value=MagicMock())
     records = fresh_backend.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference="#42"))

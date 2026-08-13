@@ -33,6 +33,7 @@ from backlog_core.models import (
     DispatchItemRecord,
 )
 from backlog_core.server import mcp
+from dispatch_schema.core.models import DispatchPlan
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 
@@ -926,7 +927,41 @@ class TestDispatchCreatePlan:
         # Assert
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
-        register_mock.assert_called_once_with(42, "dispatch-milestone-10")
+        register_mock.assert_called_once_with(
+            42, "dispatch-milestone-10", DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
+        )
+
+    async def test_create_plan_with_issue_is_readable_as_artifact(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend
+    ) -> None:
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+            )
+            artifact = await client.call_tool("artifact_read", {"item_id": 42, "artifact_type": "dispatch-plan"})
+
+        assert "error" not in result.data
+        assert artifact.data["content"] == DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
+
+    async def test_create_plan_artifact_content_failure_does_not_register_manifest(
+        self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture
+    ) -> None:
+        original_put_content = patch_create_plan_path.put_content
+
+        def fail_artifact_content(request: ContentWrite) -> ContentRecord:
+            if request.reference.kind == ContentKind.ARTIFACT_CONTENT:
+                raise ContentUnavailableError("artifact content unavailable")
+            return original_put_content(request)
+
+        mocker.patch.object(patch_create_plan_path, "put_content", side_effect=fail_artifact_content)
+
+        async with Client(mcp) as client:
+            result = await client.call_tool(
+                "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
+            )
+
+        assert "error" not in result.data
+        assert patch_create_plan_path.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST)) == []
 
     async def test_create_plan_issue_manifest_unavailable_is_best_effort(
         self, valid_plan_dict: dict, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
@@ -953,7 +988,10 @@ class TestDispatchCreatePlan:
         data: dict[str, Any] = result.data
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert _has_dispatch_plan(unavailable_backend)
-        assert all(call.args[0].reference.kind == ContentKind.DISPATCH_PLAN for call in put_spy.call_args_list)
+        assert [call.args[0].reference.kind for call in put_spy.call_args_list] == [
+            ContentKind.DISPATCH_PLAN,
+            ContentKind.ARTIFACT_CONTENT,
+        ]
         assert any("manifest provider unavailable" in record.message for record in caplog.records)
 
         confirmed_missing_backend = InMemoryBackend()

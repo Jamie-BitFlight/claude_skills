@@ -46,6 +46,7 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileResult,
     ReconcileScope,
+    UnsupportedCapabilityError,
     parse_issue_number,
 )
 from backlog_core.reconciliation import (
@@ -125,29 +126,11 @@ class _GitHubPlanPersistence:
             if current is not None
             else ""
         )
+        if current is not None and current.content == request.content and current.owner_reference == owner:
+            return current
         if request.expected_revision:
-            if current is None:
-                raise ContentConflictError("Content revision no longer matches")
-            if current.content == request.content and current.owner_reference == owner:
-                return current
             raise ContentConflictError("Content revision no longer matches")
-        issue = GitHubBackend._owner_number(owner) if owner else None
-        try:
-            if issue is None:
-                self._provider.store_artifact_content(
-                    self._sentinel_issue, "plan", self._unlinked_path(request.reference.name), request.content
-                )
-            else:
-                self._client.store(issue, request.content, plan_id=request.reference.name)
-            self._index.register(request.reference.name, issue, request.reference.name)
-        except (ArtifactWriteError, PlanIndexError) as exc:
-            raise BacklogError(str(exc)) from exc
-        return ContentRecord(
-            reference=request.reference,
-            owner_reference=owner,
-            content=request.content,
-            revision=GitHubBackend._content_revision(request.content),
-        )
+        raise UnsupportedCapabilityError("GitHub plan writes require a compare-and-swap revision")
 
     def _entries(self) -> Sequence[PlanIndexEntry]:
         try:

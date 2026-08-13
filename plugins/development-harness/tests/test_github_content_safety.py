@@ -8,7 +8,15 @@ from unittest.mock import MagicMock
 import pytest
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
 from backlog_core.file_cache import FileCache
-from backlog_core.models import ContentConflictError, ContentKind, ContentQuery, ContentRecord, ContentRef, ContentWrite
+from backlog_core.models import (
+    ContentConflictError,
+    ContentKind,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+    UnsupportedCapabilityError,
+)
 
 
 def _plan_persistence(current: ContentRecord | None) -> tuple[_GitHubPlanPersistence, MagicMock, MagicMock, MagicMock]:
@@ -54,6 +62,31 @@ def test_missing_plan_with_expected_revision_fails_closed() -> None:
 
     with pytest.raises(ContentConflictError, match="revision"):
         persistence.put(ContentWrite(reference=reference, content="new", expected_revision="prior"))
+
+    provider.store_artifact_content.assert_not_called()
+    client.store.assert_not_called()
+    index.register.assert_not_called()
+
+
+def test_plan_creation_fails_closed_without_gist_mutation() -> None:
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    persistence, provider, client, index = _plan_persistence(None)
+
+    with pytest.raises(UnsupportedCapabilityError):
+        persistence.put(ContentWrite(reference=reference, content="new"))
+
+    provider.store_artifact_content.assert_not_called()
+    client.store.assert_not_called()
+    index.register.assert_not_called()
+
+
+def test_revisionless_plan_update_fails_closed_without_gist_mutation() -> None:
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    current = ContentRecord(reference=reference, content="before", revision="current")
+    persistence, provider, client, index = _plan_persistence(current)
+
+    with pytest.raises(UnsupportedCapabilityError):
+        persistence.put(ContentWrite(reference=reference, content="after"))
 
     provider.store_artifact_content.assert_not_called()
     client.store.assert_not_called()

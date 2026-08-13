@@ -21,9 +21,14 @@ DN-3: ``create_task_issue`` is a GitHubExtras method and is no longer
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 from collections.abc import Sequence
+from multiprocessing import get_context
+from multiprocessing.synchronize import Barrier as ProcessBarrier
 from pathlib import Path
+from threading import BrokenBarrierError
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -31,7 +36,17 @@ import pytest
 from backlog_core.backend_types import WorkItemBackend
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_backend import BeadsBackend
-from backlog_core.models import BackendAvailability, BacklogItem, BacklogItemMetadata, ViewItemResult
+from backlog_core.models import (
+    BackendAvailability,
+    BacklogItem,
+    BacklogItemMetadata,
+    ContentConflictError,
+    ContentKind,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+    ViewItemResult,
+)
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -63,6 +78,82 @@ def _make_item(issue: str = "bd-a3f8", title: str = "Fix authentication bug") ->
             source="test", added="2026-01-01", priority="P2", item_type="Task", status="open", issue=issue
         ),
     )
+
+
+class _ProcessKvRunner:
+    def __init__(self, state_path: Path, write_barrier: ProcessBarrier) -> None:
+        self._state_path = state_path
+        self._write_barrier = write_barrier
+
+    def run_json(self, argv: Sequence[str]) -> dict[str, bool | str]:
+        assert list(argv[:2]) == ["kv", "get"]
+        if not self._state_path.exists():
+            return {"found": False}
+        return {"found": True, "value": self._state_path.read_text(encoding="utf-8")}
+
+    def run_text(self, argv: Sequence[str]) -> str:
+        assert list(argv[:2]) == ["kv", "set"]
+        with contextlib.suppress(BrokenBarrierError):
+            self._write_barrier.wait(timeout=2)
+        self._state_path.write_text(argv[3], encoding="utf-8")
+        return ""
+
+    def is_available(self) -> bool:
+        return True
+
+
+def _put_stale_plan_in_process(
+    workspace: str, state_path: str, write_barrier: ProcessBarrier, content: str, results: Any
+) -> None:
+    os.chdir(workspace)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    backend = BeadsBackend(runner=_ProcessKvRunner(Path(state_path), write_barrier))
+    try:
+        backend.put_content(
+            ContentWrite(reference=reference, owner_reference="#123", content=content, expected_revision="before")
+        )
+    except ContentConflictError:
+        results.put(("conflict", content))
+    else:
+        results.put(("success", content))
+
+
+@pytest.mark.unit
+def test_put_content_serializes_stale_revision_writers_across_processes(tmp_path: Path) -> None:
+    # Given: two workers with the same stale Beads plan revision and workspace
+    workspace = tmp_path / "workspace"
+    workspace.joinpath(".beads").mkdir(parents=True)
+    state_path = workspace / ".beads" / "content.json"
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    state_path.write_text(
+        ContentRecord(
+            reference=reference, owner_reference="#123", content="before", revision="before"
+        ).model_dump_json(),
+        encoding="utf-8",
+    )
+    context = get_context("spawn")
+    write_barrier = context.Barrier(2)
+    results = context.Queue()
+    contents = ["first winner", "second winner"]
+    workers = [
+        context.Process(
+            target=_put_stale_plan_in_process, args=(str(workspace), str(state_path), write_barrier, content, results)
+        )
+        for content in contents
+    ]
+
+    # When: both workers compare the stale revision before racing to native kv set
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(timeout=10)
+
+    # Then: one native write wins, one receives a conflict, and the winner is durable
+    assert [worker.exitcode for worker in workers] == [0, 0]
+    outcomes = [results.get(timeout=2) for _ in workers]
+    assert sorted(status for status, _ in outcomes) == ["conflict", "success"]
+    [winner] = [content for status, content in outcomes if status == "success"]
+    assert ContentRecord.model_validate_json(state_path.read_text(encoding="utf-8")).content == winner
 
 
 class _RecordingBdRunner:
