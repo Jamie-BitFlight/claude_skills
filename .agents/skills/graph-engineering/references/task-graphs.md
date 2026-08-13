@@ -92,8 +92,11 @@ serial work, isolated subagents, later human gates, or hypothetical future waves
 unavailable, preserve the topology and use the available serial or plain-subagent runtime instead.
 This boundary avoids a second planner, a graph-to-team compiler, and duplicate orchestration state.
 
-Runtime basis: OpenAI, [Subagents](https://developers.openai.com/codex/subagents) (accessed
-2026-08-13), and the installed `omo:teammode` v4.19.4 skill and controller contract.
+Runtime basis: OpenAI, [Subagents](https://developers.openai.com/codex/subagents), and LazyCodex's
+version-pinned [`teammode` wave mapping](https://github.com/code-yeongyu/lazycodex/blob/10f95587d3aeacf208cc1fee88a91315962d31e8/plugins/omo/components/teammode/skills/teammode/SKILL.md#L248-L261)
+and [`team.mjs` member inputs](https://github.com/code-yeongyu/lazycodex/blob/10f95587d3aeacf208cc1fee88a91315962d31e8/plugins/omo/components/teammode/skills/teammode/scripts/team.mjs#L7-L14)
+(all accessed 2026-08-13). This repository's one-writer rule intentionally tightens the upstream
+worktree guidance for overlapping files.
 
 ## The human gate
 
