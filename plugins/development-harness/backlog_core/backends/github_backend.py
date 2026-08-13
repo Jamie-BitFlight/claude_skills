@@ -687,13 +687,27 @@ class GitHubBackend:
             plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
         )
         self._advance_snapshot_checkpoint(effective_request.scope, plan.snapshot_checkpoint, outcome)
-        if outcome.result.failures == 0 and outcome.result.conflicts == 0 and not effective_request.dry_run:
-            acknowledged = {
+        if not effective_request.dry_run:
+            snapshot_by_reference = {item.reference: item for item in snapshot.items}
+            patch_references = {patch.reference for patch in plan.provider_patches}
+            patch_statuses = {result.reference: result.status for result in patch_results}
+            failed_cache_references = {
+                action.record.item.metadata.issue
+                for action in plan.cache_actions
+                for result in cache_results
+                if (action.key, action.phase) == (result.key, result.phase) and result.status == "error"
+            }
+            self._cache._acknowledge_work_items({
                 mutation.key
                 for mutation in self._cache._pending_work_item_mutations()
-                if mutation.item.metadata.issue in {item.reference for item in snapshot.items}
-            }
-            self._cache._acknowledge_work_items(acknowledged)
+                if mutation.item.metadata.issue in snapshot_by_reference
+                and mutation.item.title == snapshot_by_reference[mutation.item.metadata.issue].title
+                and mutation.item.metadata.issue not in failed_cache_references
+                and (
+                    mutation.item.metadata.issue not in patch_references
+                    or patch_statuses.get(mutation.item.metadata.issue) == "applied"
+                )
+            })
         pending_mutations = len(self._cache.pending_mutations()) + len(self._cache._pending_work_item_mutations())
         return outcome.result.model_copy(update={"pending_mutations": pending_mutations})
 
@@ -718,12 +732,15 @@ class GitHubBackend:
             self._cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark=watermark))
 
     def _load_reconcile_records(self) -> list[LogicalCacheRecord]:
-        records_by_key = {
-            key: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
+        records_by_reference = {
+            item.reference: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
         }
         for mutation in self._cache._pending_work_item_mutations():
-            records_by_key[mutation.key] = LogicalCacheRecord(key=mutation.key, item=mutation.item)
-        return list(records_by_key.values())
+            snapshot = records_by_reference.get(mutation.item.reference)
+            records_by_reference[mutation.item.reference] = LogicalCacheRecord(
+                key=snapshot.key if snapshot is not None else mutation.key, item=mutation.item
+            )
+        return list(records_by_reference.values())
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return a bounded cache-backed discovery page for GitHub content."""

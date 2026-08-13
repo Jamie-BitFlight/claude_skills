@@ -271,6 +271,81 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
     assert backend._apply_patches.call_count == 1
 
 
+def test_github_reconcile_overlays_queued_work_item_by_stable_reference(tmp_path: Path) -> None:
+    # Given: a cached snapshot whose storage path differs from its logical GitHub reference
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    snapshot = BacklogItem(title="Issue 1", reference="#1", description="cached body")
+    snapshot.metadata.issue = "#1"
+    snapshot.metadata.sync_fingerprint = synchronized_fingerprint(snapshot)
+    cache._save_item_snapshot(snapshot, Path("legacy/issue-1.yaml"))
+    queued = snapshot.model_copy(update={"description": "queued body"})
+    backend.put_work_item(queued)
+
+    # When: reconciliation loads its logical cache records
+    records = backend._load_reconcile_records()
+
+    # Then: the queued content replaces the storage-keyed snapshot without duplicating the logical record
+    assert [(record.key, record.item.reference, record.item.description) for record in records] == [
+        ("legacy/issue-1.yaml", "#1", "queued body")
+    ]
+
+
+def test_github_reconcile_acknowledges_successful_queue_despite_independent_conflict(tmp_path: Path) -> None:
+    # Given: an offline title conflict and an independent queued body update
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    conflict = BacklogItem(title="Issue 1", reference="#1", description="provider body")
+    conflict.metadata.issue = "#1"
+    conflict.metadata.sync_fingerprint = synchronized_fingerprint(conflict)
+    backend.put_work_item(conflict.model_copy(update={"title": "Renamed offline"}))
+    noop = BacklogItem(title="Issue 2", reference="#2", description="provider body")
+    noop.metadata.issue = "#2"
+    noop.metadata.sync_fingerprint = synchronized_fingerprint(noop)
+    backend.put_work_item(noop)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body=backend.render_issue_body(conflict),
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                ),
+                ProviderItem(
+                    provider_id="node-2",
+                    reference="#2",
+                    title="Issue 2",
+                    body=backend.render_issue_body(noop),
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                ),
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    backend._apply_patches = MagicMock(
+        return_value=[
+            PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2"),
+            PatchResult(provider_id="node-2", reference="#2", status="applied", revision="rev-2"),
+        ]
+    )
+
+    # When: reconnect reconciliation sees both records in the same snapshot
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1", "#2"]))
+
+    # Then: the conflict remains durable while the independently successful update is acknowledged
+    assert result.conflicts == 1
+    assert result.failures == 0
+    assert result.provider_patches == 2
+    assert [mutation.key for mutation in cache._pending_work_item_mutations()] == ["#1"]
+
+
 def test_github_queued_title_rename_survives_reconnect(tmp_path: Path) -> None:
     # Given: an offline queued rename that GitHub's body-only patch path cannot represent
     cache = FileCache(tmp_path)
