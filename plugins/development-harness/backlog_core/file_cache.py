@@ -122,12 +122,14 @@ class FileCache:
     def _pending_work_item_mutations(self) -> list[_PendingWorkItemMutation]:
         return list(self._load_state().pending_work_items)
 
-    def _acknowledge_work_items(self, keys: set[str]) -> None:
+    def _acknowledge_work_items(self, idempotency_keys: set[str]) -> None:
         self._state.transaction(
             lambda state: (
                 state.model_copy(
                     update={
-                        "pending_work_items": [entry for entry in state.pending_work_items if entry.key not in keys]
+                        "pending_work_items": [
+                            entry for entry in state.pending_work_items if entry.idempotency_key not in idempotency_keys
+                        ]
                     }
                 ),
                 None,

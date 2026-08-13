@@ -15,6 +15,7 @@ from backlog_core.models import (
     ContentRef,
     PatchResult,
     ProviderItem,
+    ProviderPatch,
     ProviderSnapshot,
     ReconcileRequest,
     ReconcileScope,
@@ -269,6 +270,50 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
     assert result.provider_patches == 1
     assert FileCache(tmp_path)._pending_work_item_mutations() == []
     assert backend._apply_patches.call_count == 1
+
+
+def test_github_reconcile_retains_mutation_queued_after_plan_construction(tmp_path: Path) -> None:
+    # Given: a queued body change whose provider patch will succeed
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = BacklogItem(title="Issue 1", description="provider body")
+    baseline.metadata.issue = "#1"
+    baseline.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
+    planned = baseline.model_copy(update={"description": "planned body"})
+    backend.put_work_item(planned)
+    planned_mutation = cache._pending_work_item_mutations()[0]
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body=backend.render_issue_body(baseline),
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                )
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    newer = planned.model_copy(update={"description": "newer body"})
+
+    def queue_newer_mutation(_patches: list[ProviderPatch]) -> list[PatchResult]:
+        backend.put_work_item(newer)
+        return [PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
+
+    backend._apply_patches = MagicMock(side_effect=queue_newer_mutation)
+
+    # When: a newer same-reference, same-title mutation is queued after planning
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    # Then: only the planned mutation is acknowledged; the newer body change remains durable
+    pending = cache._pending_work_item_mutations()
+    assert [mutation.item.description for mutation in pending] == ["newer body"]
+    assert pending[0].idempotency_key != planned_mutation.idempotency_key
 
 
 def test_github_reconcile_overlays_queued_work_item_by_stable_reference(tmp_path: Path) -> None:

@@ -86,6 +86,18 @@ def test_file_cache_coalesces_work_item_intent_and_reopens_it(tmp_path: Path) ->
     assert pending == [latest]
 
 
+def test_file_cache_acknowledges_work_item_by_idempotency_key(tmp_path: Path) -> None:
+    # Given: one durable work-item intent
+    cache = FileCache(tmp_path)
+    mutation = cache._queue_work_item("#1", BacklogItem(title="One"))
+
+    # When: the exact mutation identity is acknowledged
+    cache._acknowledge_work_items({mutation.idempotency_key})
+
+    # Then: the acknowledged entry is removed
+    assert cache._pending_work_item_mutations() == []
+
+
 def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> None:
     # Given: snapshots persisted beneath separate private cache directories
     cache = FileCache(tmp_path)

@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from github.Repository import Repository
 
     from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode
+    from backlog_core.file_cache_state import _PendingWorkItemMutation
     from backlog_core.models import (
         BackendStatus,
         BranchInfo,
@@ -656,7 +657,8 @@ class GitHubBackend:
         """
         effective_request = self._with_snapshot_checkpoint(request)
         snapshot = self._fetch_snapshot(effective_request)
-        plan = reconcile_backlog(self._load_reconcile_records(), snapshot, effective_request)
+        pending_work_items = self._cache._pending_work_item_mutations()
+        plan = reconcile_backlog(self._load_reconcile_records(pending_work_items), snapshot, effective_request)
         cache_results: list[ActionResult] = []
         for action in (entry for entry in plan.cache_actions if entry.phase == "before_provider"):
             try:
@@ -689,8 +691,8 @@ class GitHubBackend:
         self._advance_snapshot_checkpoint(effective_request.scope, plan.snapshot_checkpoint, outcome)
         if not effective_request.dry_run:
             snapshot_by_reference = {item.reference: item for item in snapshot.items}
-            patch_references = {patch.reference for patch in plan.provider_patches}
-            patch_statuses = {result.reference: result.status for result in patch_results}
+            patch_statuses = {patch.reference: "pending" for patch in plan.provider_patches}
+            patch_statuses.update({result.reference: result.status for result in patch_results})
             failed_cache_references = {
                 action.record.item.metadata.issue
                 for action in plan.cache_actions
@@ -698,15 +700,12 @@ class GitHubBackend:
                 if (action.key, action.phase) == (result.key, result.phase) and result.status == "error"
             }
             self._cache._acknowledge_work_items({
-                mutation.key
-                for mutation in self._cache._pending_work_item_mutations()
+                mutation.idempotency_key
+                for mutation in pending_work_items
                 if mutation.item.metadata.issue in snapshot_by_reference
                 and mutation.item.title == snapshot_by_reference[mutation.item.metadata.issue].title
                 and mutation.item.metadata.issue not in failed_cache_references
-                and (
-                    mutation.item.metadata.issue not in patch_references
-                    or patch_statuses.get(mutation.item.metadata.issue) == "applied"
-                )
+                and (patch_statuses.get(mutation.item.metadata.issue, "no_patch") in {"no_patch", "applied"})
             })
         pending_mutations = len(self._cache.pending_mutations()) + len(self._cache._pending_work_item_mutations())
         return outcome.result.model_copy(update={"pending_mutations": pending_mutations})
@@ -731,11 +730,15 @@ class GitHubBackend:
         ):
             self._cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark=watermark))
 
-    def _load_reconcile_records(self) -> list[LogicalCacheRecord]:
+    def _load_reconcile_records(
+        self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
+    ) -> list[LogicalCacheRecord]:
         records_by_reference = {
             item.reference: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
         }
-        for mutation in self._cache._pending_work_item_mutations():
+        for mutation in (
+            pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
+        ):
             snapshot = records_by_reference.get(mutation.item.reference)
             records_by_reference[mutation.item.reference] = LogicalCacheRecord(
                 key=snapshot.key if snapshot is not None else mutation.key, item=mutation.item
