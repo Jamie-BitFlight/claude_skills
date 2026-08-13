@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import threading
+from pathlib import Path
+
 import pytest
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ContentKind, ContentQuery, ContentRef, ContentWrite
+from backlog_core.backends.sqlite_backend import SQLiteBackend
+from backlog_core.models import ContentConflictError, ContentKind, ContentQuery, ContentRecord, ContentRef, ContentWrite
 from pydantic import ValidationError
 
 from sam_schema.core.action_models import CreatePlanConfig, UpdatePlanConfig
@@ -99,3 +103,89 @@ def test_content_task_provider_claim_uses_loaded_revision() -> None:
     assert fresh_task["status"] == "in-progress"
     assert fresh_task["started"] is not None
     assert content_provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id)).owner_reference == "bd-a1b2"
+
+
+def test_sqlite_content_write_allows_only_one_concurrent_stale_revision(tmp_path: Path) -> None:
+    # Given: separate SQLite connections holding the same revision.
+    database = str(tmp_path / "content.sqlite3")
+    first_backend = SQLiteBackend(database)
+    second_backend = SQLiteBackend(database)
+    reference = ContentRef(kind=ContentKind.PLAN, name="atomic-content")
+    initial = first_backend.put_content(ContentWrite(reference=reference, content="initial"))
+    ready = threading.Barrier(3)
+    release = threading.Event()
+    results: list[ContentRecord | ContentConflictError] = []
+
+    def write(backend: SQLiteBackend, content: str) -> None:
+        ready.wait()
+        release.wait()
+        try:
+            results.append(
+                backend.put_content(
+                    ContentWrite(reference=reference, content=content, expected_revision=initial.revision)
+                )
+            )
+        except ContentConflictError as error:
+            results.append(error)
+
+    try:
+        # When: both writers are released against the same expected revision.
+        first_thread = threading.Thread(target=write, args=(first_backend, "first"))
+        second_thread = threading.Thread(target=write, args=(second_backend, "second"))
+        first_thread.start()
+        second_thread.start()
+        ready.wait()
+        release.set()
+        first_thread.join()
+        second_thread.join()
+
+        # Then: exactly one write persists and the other reports the content conflict contract.
+        successes = [result for result in results if isinstance(result, ContentRecord)]
+        conflicts = [result for result in results if isinstance(result, ContentConflictError)]
+        assert len(successes) == len(conflicts) == 1
+        assert first_backend.get_content(reference) == successes[0]
+        assert successes[0].revision == str(int(initial.revision) + 1)
+    finally:
+        first_backend._conn.close()
+        second_backend._conn.close()
+
+
+def test_sqlite_content_task_providers_claim_once_from_concurrent_snapshots(tmp_path: Path) -> None:
+    # Given: two providers over separate SQLite connections hydrated from one not-started task.
+    database = str(tmp_path / "claims.sqlite3")
+    first_content = SQLiteBackend(database)
+    second_content = SQLiteBackend(database)
+    creator = ContentTaskProvider(first_content)
+    plan = creator.create_plan(
+        "atomic-claim", "claim once", [Task(id="T01", title="Claim once", status=TaskStatus.NOT_STARTED)]
+    )
+    plan_id = plan["plan_id"]
+    first_provider = ContentTaskProvider(first_content)
+    second_provider = ContentTaskProvider(second_content)
+    ready = threading.Barrier(3)
+    release = threading.Event()
+    results: list[bool] = []
+
+    def claim(provider: ContentTaskProvider) -> None:
+        ready.wait()
+        release.wait()
+        results.append(provider.claim_task(plan_id, "T01"))
+
+    try:
+        # When: both providers claim their loaded not-started snapshot together.
+        first_thread = threading.Thread(target=claim, args=(first_provider,))
+        second_thread = threading.Thread(target=claim, args=(second_provider,))
+        first_thread.start()
+        second_thread.start()
+        ready.wait()
+        release.set()
+        first_thread.join()
+        second_thread.join()
+
+        # Then: one caller claims the task, while the loser refreshes the persisted winner.
+        assert sorted(results) == [False, True]
+        persisted = ContentTaskProvider(first_content).read_task(plan_id, "T01")
+        assert persisted["status"] == "in-progress"
+    finally:
+        first_content._conn.close()
+        second_content._conn.close()

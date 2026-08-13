@@ -233,31 +233,32 @@ class SQLiteBackend:
         Returns:
             The stored record with its new revision.
         """
-        current = self._conn.execute(
-            "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
-            self._content_key(request.reference),
-        ).fetchone()
-        current_revision = str(current["revision"]) if current is not None else ""
-        if request.expected_revision and request.expected_revision != current_revision:
-            raise ContentConflictError("Content revision no longer matches")
-        owner_reference = request.reference.namespace
-        if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
-            owner_reference = (
-                request.owner_reference
-                if request.owner_reference is not None
-                else str(current["owner_reference"])
-                if current is not None
-                else ""
+        with self._conn:
+            self._conn.execute("BEGIN IMMEDIATE")
+            current = self._conn.execute(
+                "SELECT * FROM content_records WHERE kind = ? AND namespace = ? AND artifact_type = ? AND name = ?",
+                self._content_key(request.reference),
+            ).fetchone()
+            current_revision = str(current["revision"]) if current is not None else ""
+            if request.expected_revision and request.expected_revision != current_revision:
+                raise ContentConflictError("Content revision no longer matches")
+            owner_reference = request.reference.namespace
+            if request.reference.kind in {ContentKind.PLAN, ContentKind.DISPATCH_PLAN}:
+                owner_reference = (
+                    request.owner_reference
+                    if request.owner_reference is not None
+                    else str(current["owner_reference"])
+                    if current is not None
+                    else ""
+                )
+            revision = int(current_revision or "0") + 1
+            self._conn.execute(
+                "INSERT INTO content_records "
+                "(kind, namespace, artifact_type, name, owner_reference, content, revision) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(kind, namespace, artifact_type, name) DO UPDATE SET "
+                "owner_reference = excluded.owner_reference, content = excluded.content, revision = excluded.revision",
+                (*self._content_key(request.reference), owner_reference, request.content, revision),
             )
-        revision = int(current_revision or "0") + 1
-        self._conn.execute(
-            "INSERT INTO content_records "
-            "(kind, namespace, artifact_type, name, owner_reference, content, revision) VALUES (?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(kind, namespace, artifact_type, name) DO UPDATE SET "
-            "owner_reference = excluded.owner_reference, content = excluded.content, revision = excluded.revision",
-            (*self._content_key(request.reference), owner_reference, request.content, revision),
-        )
-        self._conn.commit()
         return ContentRecord(
             reference=request.reference,
             owner_reference=owner_reference,

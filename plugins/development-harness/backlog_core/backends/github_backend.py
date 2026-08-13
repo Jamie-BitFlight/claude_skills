@@ -16,7 +16,11 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import dh_paths as _dh_paths
-from sam_schema.core.artifact_registry_client import ArtifactRegistryClient, PlanIndexUnavailableError
+from sam_schema.core.artifact_registry_client import (
+    ArtifactRegistryClient,
+    PlanContentUnavailableError,
+    PlanIndexUnavailableError,
+)
 from sam_schema.core.exceptions import ArtifactWriteError, PlanIndexError
 from sam_schema.core.plan_id_index import PlanIndexEntry, create_plan_id_index
 
@@ -123,7 +127,7 @@ class _GitHubPlanPersistence:
                     self._sentinel_issue, "plan", self._unlinked_path(request.reference.name), request.content
                 )
             else:
-                self._client.store(issue, request.content)
+                self._client.store(issue, request.content, plan_id=request.reference.name)
             self._index.register(request.reference.name, issue, request.reference.name)
         except (ArtifactWriteError, PlanIndexError) as exc:
             raise BacklogError(str(exc)) from exc
@@ -143,13 +147,16 @@ class _GitHubPlanPersistence:
             raise BacklogError(str(exc)) from exc
 
     def _record(self, entry: PlanIndexEntry) -> ContentRecord:
-        content = (
-            self._client.read(entry.issue)
-            if entry.issue is not None
-            else self._provider.read_artifact_content_from_remote(
-                self._sentinel_issue, "plan", self._unlinked_path(entry.plan_id)
+        try:
+            content = (
+                self._client.read(entry.issue, plan_id=entry.plan_id)
+                if entry.issue is not None
+                else self._provider.read_artifact_content_from_remote(
+                    self._sentinel_issue, "plan", self._unlinked_path(entry.plan_id)
+                )
             )
-        )
+        except PlanContentUnavailableError as exc:
+            raise BacklogError(str(exc)) from exc
         reference = ContentRef(kind=ContentKind.PLAN, name=entry.plan_id)
         if content is None:
             raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
@@ -762,17 +769,25 @@ class GitHubBackend:
             if query.kind == ContentKind.PLAN:
                 try:
                     records = list(self._plan_persistence.list(query))
-                except BacklogError:
+                except ContentNotFoundError:
+                    raise
+                except (BacklogError, ContentUnavailableError, OSError):
                     online = False
                 else:
                     for record in records:
                         self._cache.cache_content(record)
                     return records
             if query.kind == ContentKind.DISPATCH_PLAN:
-                records = list(self._dispatch_persistence.list(query))
-                for record in records:
-                    self._cache.cache_content(record)
-                return records
+                try:
+                    records = list(self._dispatch_persistence.list(query))
+                except ContentNotFoundError:
+                    raise
+                except (BacklogError, ContentUnavailableError, OSError):
+                    online = False
+                else:
+                    for record in records:
+                        self._cache.cache_content(record)
+                    return records
         records = [
             record.model_copy(update={"stale": not online})
             for record in self._cache._load_state().records
@@ -797,7 +812,9 @@ class GitHubBackend:
         cached = self._cached_content(reference)
         try:
             record = self._read_online_content(reference, cached)
-        except BacklogError:
+        except ContentNotFoundError:
+            raise
+        except (BacklogError, ContentUnavailableError, OSError):
             return self._cache.get_content(reference, stale=True)
         self._cache.cache_content(record)
         return record
@@ -824,7 +841,9 @@ class GitHubBackend:
         cached = self._cached_content(request.reference)
         try:
             record = self._write_online_content(request, cached)
-        except BacklogError:
+        except ContentNotFoundError:
+            raise
+        except (BacklogError, ContentUnavailableError, OSError):
             base = cached or ContentRecord(
                 reference=request.reference,
                 owner_reference=request.reference.namespace,

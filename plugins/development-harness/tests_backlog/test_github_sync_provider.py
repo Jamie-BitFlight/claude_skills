@@ -220,6 +220,57 @@ def test_github_content_provider_preserves_plan_identity_while_reassigning_owner
     assert remote_content[2531, "plan", "sam-plan/unlinked/P1.yaml"] == "v4"
 
 
+def test_github_content_provider_keeps_linked_plans_separate_by_plan_id(tmp_path: Path) -> None:
+    # Given: two logical plans linked to the same GitHub issue
+    artifact_provider = MagicMock()
+    remote_content: dict[tuple[int, str, str], str] = {}
+    artifact_provider.get_manifest.side_effect = lambda owner: ArtifactManifest(issue_number=owner)
+    artifact_provider.store_artifact_content.side_effect = lambda owner, artifact_type, path, content: (
+        remote_content.__setitem__((owner, artifact_type, path), content)
+    )
+    artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: (
+        remote_content.get((owner, artifact_type, path))
+    )
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    first = ContentRef(kind=ContentKind.PLAN, name="Pfirst")
+    second = ContentRef(kind=ContentKind.PLAN, name="Psecond")
+
+    # When: both plans are stored and fetched through a fresh backend
+    backend.put_content(ContentWrite(reference=first, content="first", owner_reference="#42"))
+    backend.put_content(ContentWrite(reference=second, content="second", owner_reference="#42"))
+    fresh_backend = GitHubBackend(cache=FileCache(tmp_path / "fresh"), artifact_provider=artifact_provider)
+    fresh_backend.try_get_github = MagicMock(return_value=MagicMock())
+    records = fresh_backend.list_content(ContentQuery(kind=ContentKind.PLAN, owner_reference="#42"))
+
+    # Then: each logical ID has an independent Gist and manifest identity
+    assert [(record.reference, record.content) for record in records] == [(first, "first"), (second, "second")]
+    assert remote_content[42, "task-plan", "sam-plan/task-plan-issue-42-plan-Pfirst.yaml"] == "first"
+    assert remote_content[42, "task-plan", "sam-plan/task-plan-issue-42-plan-Psecond.yaml"] == "second"
+
+
+def test_github_content_provider_reads_legacy_linked_plan_path(tmp_path: Path) -> None:
+    # Given: a plan index entry and the issue-only path written before plan-specific storage
+    reference = ContentRef(kind=ContentKind.PLAN, name="Plegacy")
+    index = _serialize_index_yaml([
+        PlanIndexEntry(plan_id="Plegacy", issue=42, slug="legacy", created_at="2026-08-12T00:00:00Z")
+    ])
+    artifact_provider = MagicMock()
+    artifact_provider.read_artifact_content_from_remote.side_effect = lambda owner, artifact_type, path: {
+        (2531, "plan-index", "sam-plan/plan-index.yaml"): index,
+        (42, "task-plan", "sam-plan/task-plan-issue-42.yaml"): "legacy content",
+    }.get((owner, artifact_type, path))
+    backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: the indexed legacy plan is fetched
+    record = backend.get_content(reference)
+
+    # Then: only the remote legacy identity supplies its content
+    assert record.content == "legacy content"
+    artifact_provider.read_local_artifact_content.assert_not_called()
+
+
 def test_github_content_provider_discovers_remote_plans_with_empty_cache(tmp_path: Path) -> None:
     # Given: a provider-native index and plan while the private file cache is empty
     artifact_provider = MagicMock()
@@ -457,6 +508,75 @@ def test_github_plan_put_queues_when_index_is_unavailable(tmp_path: Path) -> Non
     assert record.pending is True
     assert len(cache.pending_mutations()) == 1
     artifact_provider.store_artifact_content.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["list", "get", "put"])
+def test_github_plan_content_outage_uses_provider_cache(tmp_path: Path, operation: str) -> None:
+    # Given: a readable plan index, a failed plan-content Gist read, and a stale cached record
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="Pcached")
+    cache.cache_content(ContentRecord(reference=reference, owner_reference="#42", content="cached plan"))
+    index = _serialize_index_yaml([
+        PlanIndexEntry(plan_id="Pcached", issue=42, slug="cached", created_at="2026-08-12T00:00:00Z")
+    ])
+    artifact_provider = MagicMock()
+
+    def read_remote(owner: int, artifact_type: str, path: str) -> str | None:
+        if (owner, artifact_type, path) == (2531, "plan-index", "sam-plan/plan-index.yaml"):
+            return index
+        raise BacklogError("plan gist unavailable")
+
+    artifact_provider.read_artifact_content_from_remote.side_effect = read_remote
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: plan discovery, read, or write reaches the unavailable Gist content
+    match operation:
+        case "list":
+            result = backend.list_content(ContentQuery(kind=ContentKind.PLAN))
+            assert [(record.content, record.stale) for record in result] == [("cached plan", True)]
+        case "get":
+            result = backend.get_content(reference)
+            assert (result.content, result.stale) == ("cached plan", True)
+        case "put":
+            result = backend.put_content(ContentWrite(reference=reference, content="queued plan"))
+            assert result.pending is True
+            assert len(cache.pending_mutations()) == 1
+        case unreachable:
+            pytest.fail(f"unexpected operation: {unreachable}")
+
+
+@pytest.mark.parametrize("operation", ["list", "get", "put"])
+def test_github_dispatch_content_outage_uses_provider_cache(tmp_path: Path, operation: str) -> None:
+    # Given: a readable dispatch index, a failed dispatch-content Gist read, and a stale cached record
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-cached")
+    cache.cache_content(ContentRecord(reference=reference, content='{"state":"cached"}'))
+    artifact_provider = MagicMock()
+
+    def read_remote(owner: int, artifact_type: str, path: str) -> str:
+        if (owner, artifact_type, path) == (2531, "dispatch-plan-index", "dispatch-plan/index.json"):
+            return '{"version":1,"entries":[{"name":"dispatch-cached","owner_reference":""}]}'
+        raise BacklogError("dispatch gist unavailable")
+
+    artifact_provider.read_artifact_content_from_remote.side_effect = read_remote
+    backend = GitHubBackend(cache=cache, artifact_provider=artifact_provider)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    # When: dispatch discovery, read, or write reaches the unavailable Gist content
+    match operation:
+        case "list":
+            result = backend.list_content(ContentQuery(kind=ContentKind.DISPATCH_PLAN))
+            assert [(record.content, record.stale) for record in result] == [('{"state":"cached"}', True)]
+        case "get":
+            result = backend.get_content(reference)
+            assert (result.content, result.stale) == ('{"state":"cached"}', True)
+        case "put":
+            result = backend.put_content(ContentWrite(reference=reference, content='{"state":"queued"}'))
+            assert result.pending is True
+            assert len(cache.pending_mutations()) == 1
+        case unreachable:
+            pytest.fail(f"unexpected operation: {unreachable}")
 
 
 def test_github_content_provider_distinguishes_online_not_found_from_offline_cache_miss(tmp_path: Path) -> None:
