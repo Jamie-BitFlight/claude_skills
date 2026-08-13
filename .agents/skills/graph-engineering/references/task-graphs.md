@@ -74,18 +74,26 @@ The runtime MUST consume that graph without adding dependencies or redesigning t
 | Irreversible action | Stop at the human gate |
 
 Initialize teammode only when the first coordination-connected parallel component becomes ready.
-Map graph facts directly into the existing team fields:
+For the installed Codex `omo:teammode` v4.19.4 controller, map graph facts into its supported
+`add-member` inputs:
 
-- node scope and file ownership become member `focus`;
-- node acceptance criteria and QA become member `deliverable`;
+- node scope and file ownership become `--focus`;
+- node acceptance criteria and QA become `--deliverable`;
 - graph dependencies determine which members may start in the current wave;
-- overlapping file ownership requires separate worktrees;
+- overlapping file ownership means the nodes cannot share a wave: repartition ownership or
+  serialize them;
 - the merge owner remains the leader, never another implicit member.
+
+With another runtime, put the same scope and acceptance criteria in its supported task description
+or spawn prompt instead of inventing `focus` or `deliverable` state fields.
 
 Disband the team when that component and its verification join finish. Do not keep team state for
 serial work, isolated subagents, later human gates, or hypothetical future waves. When teammode is
 unavailable, preserve the topology and use the available serial or plain-subagent runtime instead.
 This boundary avoids a second planner, a graph-to-team compiler, and duplicate orchestration state.
+
+Runtime basis: OpenAI, [Subagents](https://developers.openai.com/codex/subagents) (accessed
+2026-08-13), and the installed `omo:teammode` v4.19.4 skill and controller contract.
 
 ## The human gate
 
