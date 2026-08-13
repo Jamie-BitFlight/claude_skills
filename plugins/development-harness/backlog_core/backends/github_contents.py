@@ -109,6 +109,23 @@ class _GitHubContentsStore:
     def list_content(self, query: ContentQuery) -> ContentRecords:
         return list(self.list(query))
 
+    def get_many(self, references: SequenceType[ContentRef]) -> ContentRecords:
+        if not references:
+            return []
+        repository = self._repository()
+        try:
+            tree = repository.get_git_tree(repository.default_branch, recursive=True)
+        except GithubException as exc:
+            raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
+        if tree.truncated:
+            raise _GitHubContentIntegrityError("GitHub content discovery tree was truncated")
+        paths = {self._path(reference) for reference in references}
+        return [
+            self._from_blob(repository, entry.path, entry.sha)
+            for entry in tree.tree
+            if entry.type == "blob" and entry.path in paths
+        ]
+
     def get(self, reference: ContentRef) -> ContentRecord:
         repository = self._repository()
         return self._get(repository, self._path(reference), repository.default_branch)
@@ -206,7 +223,7 @@ class _GitHubContentsStore:
         except GithubException as exc:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
         try:
-            content = b64decode(encoded, validate=True)
+            content = b64decode(encoded)
         except (Base64Error, ValueError) as exc:
             raise _GitHubContentIntegrityError(f"GitHub content envelope is invalid: {path}") from exc
         return self._parse(path, content, sha)

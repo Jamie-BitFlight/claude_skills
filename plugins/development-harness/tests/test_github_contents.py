@@ -61,6 +61,7 @@ class _Repository:
         self.foreign_revision = 0
         self.mutate_after_tree = False
         self.advance_after_write = False
+        self.blob_requests: list[str] = []
         self._blobs: dict[str, str] = {}
         self._next_sha = 0
 
@@ -119,6 +120,7 @@ class _Repository:
         )
 
     def get_git_blob(self, sha: str) -> SimpleNamespace:
+        self.blob_requests.append(sha)
         return SimpleNamespace(content=b64encode(self._blobs[sha].encode()).decode())
 
     def _sha(self) -> str:
@@ -270,6 +272,35 @@ def test_malformed_native_blob_fails_closed(store: _GitHubContentsStore, reposit
         store.list(ContentQuery(kind=ContentKind.PLAN))
 
 
+def test_line_wrapped_native_blob_is_accepted(store: _GitHubContentsStore, repository: _Repository) -> None:
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+    original_get_blob = repository.get_git_blob
+
+    def line_wrapped_blob(sha: str) -> SimpleNamespace:
+        encoded = original_get_blob(sha).content
+        return SimpleNamespace(content="\n".join(encoded[index : index + 8] for index in range(0, len(encoded), 8)))
+
+    repository.get_git_blob = MagicMock(side_effect=line_wrapped_blob)
+
+    [record] = store.list(ContentQuery(kind=ContentKind.PLAN))
+
+    assert record.content == "body"
+
+
+def test_get_many_fetches_only_requested_blobs(store: _GitHubContentsStore, repository: _Repository) -> None:
+    requested = ContentRef(
+        kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="_dh-work-item-head-v1", name="head"
+    )
+    unrelated = ContentRef(kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="report", name="report")
+    store.put(ContentWrite(reference=requested, content="head"))
+    store.put(ContentWrite(reference=unrelated, content="artifact"))
+
+    [record] = store.get_many([requested])
+
+    assert record.reference == requested
+    assert repository.blob_requests == ["sha-1"]
+
+
 def test_backend_hides_private_work_item_heads_from_artifact_listing(
     tmp_path: Path, store: _GitHubContentsStore
 ) -> None:
@@ -282,6 +313,12 @@ def test_backend_hides_private_work_item_heads_from_artifact_listing(
     backend = GitHubBackend(cache=FileCache(tmp_path), artifact_provider=MagicMock(), contents=store)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
+    records = backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
+
+    assert [(record.reference, record.content) for record in records] == [(artifact, "public")]
+
+    backend._cache.cache_content(ContentRecord(reference=head, content="private"))
+    backend.try_get_github = MagicMock(return_value=None)
     records = backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, owner_reference="#1"))
 
     assert [(record.reference, record.content) for record in records] == [(artifact, "public")]

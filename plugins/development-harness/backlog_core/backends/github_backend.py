@@ -104,6 +104,11 @@ class _ContentPersistence(Protocol):
 
 
 @runtime_checkable
+class _ReferenceContentPersistence(Protocol):
+    def get_many(self, references: Sequence[ContentRef]) -> list[ContentRecord]: ...
+
+
+@runtime_checkable
 class _RemoteArtifactContentLister(Protocol):
     def list_artifact_content_from_remote(
         self, item_id: int, artifact_type: str, path_prefix: str
@@ -775,10 +780,13 @@ class GitHubBackend:
         self, repo: Repository, issues: list[IssueNode]
     ) -> tuple[dict[str, ContentRecord], dict[str, IssueCommentNode]]:
         namespaces = {f"#{issue['number']}" for issue in issues}
-        records = self._list_all_content(
-            self._contents,
-            ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, search="head", limit=self._CONTENT_PAGE_SIZE),
-        )
+        if isinstance(self._contents, _ReferenceContentPersistence):
+            records = self._contents.get_many([work_item_head_ref(reference) for reference in namespaces])
+        else:
+            records = self._list_all_content(
+                self._contents,
+                ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, search="head", limit=self._CONTENT_PAGE_SIZE),
+            )
         heads = {
             record.reference.namespace: record
             for record in records
@@ -927,6 +935,7 @@ class GitHubBackend:
             record.model_copy(update={"stale": not online})
             for record in self._cache._load_state().records
             if record.reference.kind == query.kind
+            and not is_work_item_head_ref(record.reference)
             and (query.owner_reference is None or record.owner_reference == query.owner_reference)
             and query.search.casefold() in record.reference.name.casefold()
         ]
