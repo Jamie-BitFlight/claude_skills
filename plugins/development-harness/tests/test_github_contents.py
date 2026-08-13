@@ -288,6 +288,19 @@ def test_line_wrapped_native_blob_is_accepted(store: _GitHubContentsStore, repos
     assert record.content == "body"
 
 
+def test_native_blob_rejects_non_whitespace_base64_garbage(
+    store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+    original_get_blob = repository.get_git_blob
+    repository.get_git_blob = MagicMock(
+        side_effect=lambda sha: SimpleNamespace(content=f"{original_get_blob(sha).content}!")
+    )
+
+    with pytest.raises(ContentUnavailableError, match="envelope"):
+        store.list(ContentQuery(kind=ContentKind.PLAN))
+
+
 def test_get_many_fetches_only_requested_blobs(store: _GitHubContentsStore, repository: _Repository) -> None:
     requested = ContentRef(
         kind=ContentKind.ARTIFACT_CONTENT, namespace="#1", artifact_type="_dh-work-item-head-v1", name="head"
@@ -401,6 +414,23 @@ def test_backend_migrates_validated_legacy_revision_on_first_write(tmp_path: Pat
     legacy.get.return_value = ContentRecord(reference=missing, content="legacy", revision="current")
     with pytest.raises(ContentConflictError):
         backend.put_content(ContentWrite(reference=missing, content="native", expected_revision="stale"))
+
+    with pytest.raises(ContentConflictError, match="already exists"):
+        backend.put_content(ContentWrite(reference=missing, content="replacement", create_only=True))
+
+
+def test_backend_native_pagination_fetches_each_blob_once(
+    tmp_path: Path, store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    for number in range(101):
+        store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name=f"P{number:03}"), content="body"))
+    backend = GitHubBackend(cache=FileCache(tmp_path), plan_persistence=MagicMock(), contents=store)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    records = backend.list_content(ContentQuery(kind=ContentKind.PLAN, offset=100, limit=1))
+
+    assert [record.reference.name for record in records] == ["P100"]
+    assert len(repository.blob_requests) == 101
 
 
 def test_backend_lists_native_content_when_legacy_migration_is_unavailable(

@@ -90,6 +90,8 @@ if TYPE_CHECKING:
 
 __all__ = ["GitHubBackend"]
 
+_NativeContentsStore = _GitHubContentsStore
+
 
 class _PlanPersistence(Protocol):
     def list(self, query: ContentQuery) -> Sequence[ContentRecord]: ...
@@ -1020,6 +1022,9 @@ class GitHubBackend:
             return self._contents.get(reference)
         except ContentNotFoundError:
             pass
+        return self._read_legacy_content(reference)
+
+    def _read_legacy_content(self, reference: ContentRef) -> ContentRecord:
         match reference.kind:
             case ContentKind.PLAN:
                 return self._plan_persistence.get(reference)
@@ -1044,12 +1049,17 @@ class GitHubBackend:
         )
 
     def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
-        if not request.expected_revision:
+        if not request.expected_revision and not request.create_only:
             return self._contents.put(request)
         try:
             self._contents.get(request.reference)
         except ContentNotFoundError as exc:
-            legacy = self._read_online_content(request.reference, cached)
+            try:
+                legacy = self._read_legacy_content(request.reference)
+            except ContentNotFoundError:
+                return self._contents.put(request)
+            if request.create_only:
+                raise ContentConflictError("Content already exists") from exc
             if legacy.revision != request.expected_revision:
                 raise ContentConflictError("Content revision no longer matches") from exc
             return self._contents.put(request.model_copy(update={"expected_revision": "", "create_only": True}))
@@ -1082,6 +1092,8 @@ class GitHubBackend:
 
     @staticmethod
     def _list_all_content(persistence: _ContentPersistence, query: ContentQuery) -> list[ContentRecord]:
+        if isinstance(persistence, _NativeContentsStore):
+            return persistence.list_all(query)
         records: list[ContentRecord] = []
         offset = 0
         while True:

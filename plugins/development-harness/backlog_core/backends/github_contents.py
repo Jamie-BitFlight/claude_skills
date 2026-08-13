@@ -27,6 +27,7 @@ _NOT_FOUND = 404
 _CONFLICT_STATUSES = frozenset({409, 422})
 _MAX_CONTENT_BYTES = 1_000_000
 _WRITE_ATTEMPTS = 3
+_BASE64_WHITESPACE = str.maketrans("", "", " \t\r\n\v\f")
 ContentRecords: TypeAlias = list[ContentRecord]
 
 
@@ -83,6 +84,10 @@ class _GitHubContentsStore:
         self._repository = repository
 
     def list(self, query: ContentQuery) -> SequenceType[ContentRecord]:
+        records = self.list_all(query)
+        return records[query.offset : query.offset + query.limit]
+
+    def list_all(self, query: ContentQuery) -> ContentRecords:
         repository = self._repository()
         try:
             tree = repository.get_git_tree(repository.default_branch, recursive=True)
@@ -104,7 +109,7 @@ class _GitHubContentsStore:
         filtered.sort(
             key=lambda record: (record.reference.namespace, record.reference.artifact_type, record.reference.name)
         )
-        return filtered[query.offset : query.offset + query.limit]
+        return filtered
 
     def list_content(self, query: ContentQuery) -> ContentRecords:
         return list(self.list(query))
@@ -223,7 +228,7 @@ class _GitHubContentsStore:
         except GithubException as exc:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
         try:
-            content = b64decode(encoded)
+            content = b64decode(encoded.translate(_BASE64_WHITESPACE), validate=True)
         except (Base64Error, ValueError) as exc:
             raise _GitHubContentIntegrityError(f"GitHub content envelope is invalid: {path}") from exc
         return self._parse(path, content, sha)
