@@ -23,7 +23,12 @@ _CONTENT_PAGE_SIZE = 100
 _LEGACY_PLAN_YAML = YAML(typ="safe")
 
 
-def _hydrate_plan(content: str, record_name: str) -> PlanData:
+def parse_plan_content(content: str, record_name: str) -> PlanData:
+    """Normalize canonical JSON or legacy provider YAML into plan data.
+
+    Returns:
+        The normalized plan payload.
+    """
     try:
         return _PLAN_DATA_ADAPTER.validate_json(content)
     except ValidationError as exc:
@@ -59,7 +64,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
                 ContentQuery(kind=ContentKind.PLAN, offset=offset, limit=_CONTENT_PAGE_SIZE)
             )
             for record in records:
-                plan = _hydrate_plan(record.content, record.reference.name)
+                plan = parse_plan_content(record.content, record.reference.name)
                 self._plans[plan["plan_id"]] = plan
                 self._revisions[plan["plan_id"]] = record.revision
             if len(records) < _CONTENT_PAGE_SIZE:
@@ -79,7 +84,7 @@ class ContentTaskProvider(InMemoryTaskProvider):
 
     def _refresh(self, plan_id: str) -> None:
         record = self._provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan_id))
-        self._plans[plan_id] = _hydrate_plan(record.content, record.reference.name)
+        self._plans[plan_id] = parse_plan_content(record.content, record.reference.name)
         self._revisions[plan_id] = record.revision
 
     def create_plan(

@@ -118,8 +118,6 @@ class _GitHubPlanPersistence:
     def put(self, request: ContentWrite) -> ContentRecord:
         entry = next((entry for entry in self._entries() if entry.plan_id == request.reference.name), None)
         current = self._record(entry) if entry is not None else None
-        if request.expected_revision and (current is None or current.revision != request.expected_revision):
-            raise ContentConflictError("Content revision no longer matches")
         owner = (
             request.owner_reference
             if request.owner_reference is not None
@@ -127,6 +125,12 @@ class _GitHubPlanPersistence:
             if current is not None
             else ""
         )
+        if request.expected_revision:
+            if current is None:
+                raise ContentConflictError("Content revision no longer matches")
+            if current.content == request.content and current.owner_reference == owner:
+                return current
+            raise ContentConflictError("Content revision no longer matches")
         issue = GitHubBackend._owner_number(owner) if owner else None
         try:
             if issue is None:
@@ -924,7 +928,7 @@ class GitHubBackend:
             cached = self._cached_content(mutation.write.reference)
             try:
                 record = self._write_online_content(mutation.write, cached)
-            except (BacklogError, ContentConflictError, ContentUnavailableError):
+            except (BacklogError, ContentConflictError, ContentUnavailableError, OSError):
                 break
             acknowledgements.append(
                 ReplayAcknowledgement(

@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Any, NotRequired, TypeGuard
 from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException, GithubObject  # GithubObject used only by create_milestone (ADR-004)
+from ruamel.yaml.error import YAMLError
+from sam_schema.core.backends.content import parse_plan_content
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
 from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
@@ -3853,8 +3855,11 @@ def get_sam_tasks(
     stale = any(record.stale for record in records.values())
     pending = any(record.pending for record in records.values())
     try:
-        plans = [Plan.model_validate_json(record.content) for record in records.values()]
-    except ValueError as exc:
+        plans = [
+            Plan.model_validate(parse_plan_content(record.content, record.reference.name))
+            for record in records.values()
+        ]
+    except (ValueError, YAMLError) as exc:
         out.error(f"SAM task content is invalid: {exc}")
         return {
             "tasks": [],

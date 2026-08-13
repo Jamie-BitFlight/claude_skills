@@ -18,7 +18,14 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from backlog_core.backend_protocol import BacklogConfig, reset_config, set_config
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ContentUnavailableError, GitHubUnavailableError, Output
+from backlog_core.models import (
+    ContentKind,
+    ContentRef,
+    ContentUnavailableError,
+    ContentWrite,
+    GitHubUnavailableError,
+    Output,
+)
 from backlog_core.operations import create_sam_task, get_ready_sam_tasks, get_sam_tasks, update_sam_task_status
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.models import Task, TaskStatus
@@ -184,6 +191,38 @@ class TestCreateSamTask:
 
 
 class TestGetSamTasks:
+    def test_get_sam_tasks_normalizes_legacy_yaml_plan_content(self) -> None:
+        provider = InMemoryBackend()
+        provider.put_content(
+            ContentWrite(
+                reference=ContentRef(kind=ContentKind.PLAN, name="Plegacy"),
+                owner_reference="#480",
+                content='plan-id: Plegacy\nfeature: legacy-feature\nversion: "1.0"\ngoal: Read legacy plan content\nissue: 480\ntasks:\n  - id: T1\n    title: Read legacy task\n    status: NOT STARTED\n    agent: legacy-agent\n    priority: 2\n    skills: [python]\n    dependencies: []',
+            )
+        )
+        set_config(BacklogConfig(backend=provider))
+
+        try:
+            result = get_sam_tasks(parent_issue_number=480)
+        finally:
+            reset_config()
+
+        assert result["unavailable"] is False
+        assert result["tasks"] == [
+            {
+                "task_id": "T1",
+                "feature": "legacy-feature",
+                "status": "not-started",
+                "agent": "legacy-agent",
+                "priority": 2,
+                "skills": ["python"],
+                "dependencies": [],
+                "issue_number": 0,
+                "issue_url": "",
+                "title": "Read legacy task",
+            }
+        ]
+
     def test_get_sam_tasks_reads_native_plan_content_without_github_or_context_cache(
         self, mocker: MockerFixture
     ) -> None:

@@ -202,7 +202,7 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     assert cache._work_item_snapshots()[0][1].metadata.sync_fingerprint
 
 
-def test_github_content_provider_preserves_plan_identity_while_reassigning_owner(tmp_path: Path) -> None:
+def test_github_content_provider_fails_closed_on_existing_plan_update(tmp_path: Path) -> None:
     # Given: a reachable provider and one stable logical plan identity
     artifact_provider = MagicMock()
     remote_content: dict[tuple[int, str, str], str] = {}
@@ -218,25 +218,15 @@ def test_github_content_provider_preserves_plan_identity_while_reassigning_owner
     backend.try_get_github = MagicMock(return_value=MagicMock())
     reference = ContentRef(kind=ContentKind.PLAN, name="P1")
 
-    # When: the plan is created, preserved, reassigned, then unlinked
+    # When: the plan is created, then an expected-revision update is requested
     created = backend.put_content(ContentWrite(reference=reference, content="v1", owner_reference="#1"))
-    preserved = backend.put_content(ContentWrite(reference=reference, content="v2", expected_revision=created.revision))
-    reassigned = backend.put_content(
-        ContentWrite(reference=reference, content="v3", owner_reference="#2", expected_revision=preserved.revision)
-    )
-    unlinked = backend.put_content(
-        ContentWrite(reference=reference, content="v4", owner_reference="", expected_revision=reassigned.revision)
-    )
+    remote_after_create = remote_content.copy()
+    with pytest.raises(ContentConflictError, match="revision"):
+        backend.put_content(ContentWrite(reference=reference, content="v2", expected_revision=created.revision))
 
-    # Then: ownership changes without changing the plan's kind/name identity
-    assert [
-        created.owner_reference,
-        preserved.owner_reference,
-        reassigned.owner_reference,
-        unlinked.owner_reference,
-    ] == ["#1", "#1", "#2", ""]
-    assert unlinked.reference == reference
-    assert remote_content[2531, "plan", "sam-plan/unlinked/P1.yaml"] == "v4"
+    # Then: GitHub's missing mutation CAS cannot overwrite the existing plan
+    assert created.reference == reference
+    assert remote_content == remote_after_create
 
 
 def test_github_content_provider_keeps_linked_plans_separate_by_plan_id(tmp_path: Path) -> None:
