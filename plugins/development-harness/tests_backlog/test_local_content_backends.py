@@ -10,7 +10,7 @@ from pathlib import Path
 from threading import Event
 
 import pytest
-from backlog_core.backend_protocol import set_config
+from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig, ContentProvider
 from backlog_core.backends.bd_runner import BdInvocationError, JsonValue
 from backlog_core.backends.beads_backend import BeadsBackend
@@ -215,20 +215,23 @@ def test_artifact_registration_publishes_matching_metadata_and_body(
     monkeypatch.setattr(local_provider, "put_content", put_content_in_registration_order)
     set_config(BacklogConfig(backend=local_provider))
 
-    # When: both registrations target the same public artifact identity.
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        registration_a = executor.submit(
-            operations.artifact_register, "item-1", "research", "report", "body-a", "draft", "registration-a"
-        )
-        registration_b = executor.submit(
-            operations.artifact_register, "item-1", "research", "report", "body-b", "current", "registration-b"
-        )
-        results = [registration_a.result(), registration_b.result()]
+    try:
+        # When: both registrations target the same public artifact identity.
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            registration_a = executor.submit(
+                operations.artifact_register, "item-1", "research", "report", "body-a", "draft", "registration-a"
+            )
+            registration_b = executor.submit(
+                operations.artifact_register, "item-1", "research", "report", "body-b", "current", "registration-b"
+            )
+            results = [registration_a.result(), registration_b.result()]
 
-    # Then: the final manifest metadata resolves the body from the same registration.
-    assert all(result["registered"] is True for result in results)
-    read = operations.artifact_read("item-1", "research", "report")
-    assert (read["status"], read["content"]) == ("draft", "body-a")
+        # Then: the final manifest metadata resolves the body from the same registration.
+        assert all(result["registered"] is True for result in results)
+        read = operations.artifact_read("item-1", "research", "report")
+        assert (read["status"], read["content"]) == ("draft", "body-a")
+    finally:
+        reset_config()
 
 
 @pytest.mark.unit
