@@ -4,23 +4,53 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from itertools import combinations
 from math import sqrt
-from typing import TypeAlias, TypedDict
+from typing import TypeAlias
+
+from pydantic import BaseModel, ConfigDict
 
 ToolSequences: TypeAlias = Mapping[str, Sequence[str]]
 ToolCounter: TypeAlias = Counter[str]
 SessionCluster: TypeAlias = tuple[str, ...]
+ClusterId: TypeAlias = int
+PairKey: TypeAlias = tuple[ClusterId, ClusterId]
 
 
-class ClusterResult(TypedDict):
+class ClusterResult(BaseModel):
     """Cluster assignments and per-cluster representative tools."""
+
+    model_config = ConfigDict(frozen=True)
 
     clusters: dict[str, list[str]]
     cluster_profiles: dict[str, list[str]]
 
 
+@dataclass
+class _ClusterState:
+    """Mutable incremental-merge bookkeeping for average-linkage clustering.
+
+    Purely internal — never constructed as MCP output, so it stays a plain
+    dataclass rather than joining the Pydantic conversion applied to
+    ClusterResult and the process-model shapes.
+    """
+
+    members: dict[ClusterId, SessionCluster]
+    sizes: dict[ClusterId, int]
+    active_ids: set[ClusterId]
+    pair_sim: dict[PairKey, float]
+    next_id: int = field(default=0)
+
+
 def cluster_tool_sequences(sequences: ToolSequences, n_clusters: int, top_tools_per_cluster: int) -> ClusterResult:
     """Group sessions by cosine similarity over tool-call counts.
+
+    Uses average-linkage agglomeration with a Lance-Williams incremental
+    similarity update: pairwise session similarities are computed once,
+    and cluster-to-cluster similarity is updated in O(1) per surviving
+    pair on each merge instead of being recomputed from raw session
+    vectors every merge step.
 
     Returns:
         Cluster assignments and representative tools for each cluster.
@@ -28,41 +58,86 @@ def cluster_tool_sequences(sequences: ToolSequences, n_clusters: int, top_tools_
     session_ids = tuple(sorted(sequences))
     effective_clusters = min(max(1, n_clusters), len(session_ids))
     vectors = {session_id: Counter(sequences[session_id]) for session_id in session_ids}
-    clusters = tuple((session_id,) for session_id in session_ids)
 
-    while len(clusters) > effective_clusters:
-        left_index, right_index = _most_similar_pair(clusters, vectors)
-        clusters = _merge_cluster_pair(clusters, left_index, right_index)
+    state = _initial_cluster_state(session_ids, vectors)
+    while len(state.active_ids) > effective_clusters:
+        _merge_most_similar_pair(state)
 
-    return {
-        "clusters": {str(index): list(cluster) for index, cluster in enumerate(clusters)},
-        "cluster_profiles": _cluster_profiles(clusters, vectors, top_tools_per_cluster),
+    clusters = tuple(state.members[cluster_id] for cluster_id in sorted(state.active_ids))
+
+    return ClusterResult(
+        clusters={str(index): list(cluster) for index, cluster in enumerate(clusters)},
+        cluster_profiles=_cluster_profiles(clusters, vectors, top_tools_per_cluster),
+    )
+
+
+def _pair_key(left_id: ClusterId, right_id: ClusterId) -> PairKey:
+    return (left_id, right_id) if left_id < right_id else (right_id, left_id)
+
+
+def _initial_cluster_state(session_ids: tuple[str, ...], vectors: Mapping[str, ToolCounter]) -> _ClusterState:
+    members: dict[ClusterId, SessionCluster] = {index: (session_id,) for index, session_id in enumerate(session_ids)}
+    pair_sim = {
+        _pair_key(left_index, right_index): _cosine_similarity(
+            vectors[session_ids[left_index]], vectors[session_ids[right_index]]
+        )
+        for left_index, right_index in combinations(range(len(session_ids)), 2)
     }
+    return _ClusterState(
+        members=members,
+        sizes=dict.fromkeys(members, 1),
+        active_ids=set(members),
+        pair_sim=pair_sim,
+        next_id=len(session_ids),
+    )
 
 
-def _most_similar_pair(clusters: tuple[SessionCluster, ...], vectors: Mapping[str, ToolCounter]) -> tuple[int, int]:
-    best_left = 0
-    best_right = 1
+def _most_similar_active_pair(state: _ClusterState) -> tuple[ClusterId, ClusterId]:
+    best_pair = (0, 0)
     best_score = -1.0
-    for left_index, left_cluster in enumerate(clusters[:-1]):
-        for right_offset, right_cluster in enumerate(clusters[left_index + 1 :], start=left_index + 1):
-            score = _cluster_similarity(left_cluster, right_cluster, vectors)
-            if score > best_score:
-                best_left = left_index
-                best_right = right_offset
-                best_score = score
-    return best_left, best_right
+    for left_id, right_id in combinations(sorted(state.active_ids), 2):
+        score = state.pair_sim[_pair_key(left_id, right_id)]
+        if score > best_score:
+            best_score = score
+            best_pair = (left_id, right_id)
+    return best_pair
 
 
-def _cluster_similarity(
-    left_cluster: SessionCluster, right_cluster: SessionCluster, vectors: Mapping[str, ToolCounter]
+def _lance_williams_average_linkage(
+    left_similarity: float, right_similarity: float, left_size: int, right_size: int
 ) -> float:
-    scores = [
-        _cosine_similarity(vectors[left_session], vectors[right_session])
-        for left_session in left_cluster
-        for right_session in right_cluster
-    ]
-    return sum(scores) / len(scores)
+    """UPGMA (average-linkage) Lance-Williams incremental similarity update.
+
+    sim(AB, C) = (|A| * sim(A, C) + |B| * sim(B, C)) / (|A| + |B|)
+
+    Returns:
+        Updated similarity between the merged cluster and the other cluster.
+    """
+    total_size = left_size + right_size
+    return (left_size * left_similarity + right_size * right_similarity) / total_size
+
+
+def _merge_most_similar_pair(state: _ClusterState) -> None:
+    left_id, right_id = _most_similar_active_pair(state)
+    merged_id = state.next_id
+    state.next_id += 1
+
+    for other_id in state.active_ids - {left_id, right_id}:
+        state.pair_sim[_pair_key(merged_id, other_id)] = _lance_williams_average_linkage(
+            left_similarity=state.pair_sim[_pair_key(left_id, other_id)],
+            right_similarity=state.pair_sim[_pair_key(right_id, other_id)],
+            left_size=state.sizes[left_id],
+            right_size=state.sizes[right_id],
+        )
+
+    state.members[merged_id] = tuple(sorted((*state.members[left_id], *state.members[right_id])))
+    state.sizes[merged_id] = state.sizes[left_id] + state.sizes[right_id]
+    state.active_ids -= {left_id, right_id}
+    state.active_ids.add(merged_id)
+
+    retired = {left_id, right_id}
+    for key in [key for key in state.pair_sim if key[0] in retired or key[1] in retired]:
+        del state.pair_sim[key]
 
 
 def _cosine_similarity(left: ToolCounter, right: ToolCounter) -> float:
@@ -73,13 +148,6 @@ def _cosine_similarity(left: ToolCounter, right: ToolCounter) -> float:
     shared_tools = left.keys() & right.keys()
     dot_product = sum(left[tool] * right[tool] for tool in shared_tools)
     return dot_product / (left_norm * right_norm)
-
-
-def _merge_cluster_pair(
-    clusters: tuple[SessionCluster, ...], left_index: int, right_index: int
-) -> tuple[SessionCluster, ...]:
-    merged = tuple(sorted((*clusters[left_index], *clusters[right_index])))
-    return (*tuple(cluster for index, cluster in enumerate(clusters) if index not in {left_index, right_index}), merged)
 
 
 def _cluster_profiles(
