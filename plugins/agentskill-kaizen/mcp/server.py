@@ -4,6 +4,7 @@
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
 #     "prefixspan>=0.5.2",
+#     "pydantic>=2.12.5",
 # ]
 # ///
 """Kaizen Analysis MCP Server.
@@ -32,13 +33,7 @@ from typing import Any
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from prefixspan import PrefixSpan
-from process_model import (
-    ConformanceDiagnostics,
-    ProcessModel,
-    build_process_model,
-    check_sequence_conformance,
-    render_process_model,
-)
+from process_model import ConformanceDiagnostics, ProcessModel, build_process_model, check_sequence_conformance
 from session_cluster import ClusterResult, cluster_tool_sequences
 
 # ---------------------------------------------------------------------------
@@ -300,11 +295,11 @@ async def extract_tool_sequences(glob_path: str) -> dict[str, list[str]]:
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def discover_process_model(
     glob_path: str = "", sequences: dict[str, list[str]] | None = None, *, context: Context
-) -> str:
+) -> ProcessModel:
     """Discover a process model from observed tool-call transitions.
 
     Provide either a glob path to JSONL files or pre-extracted sequences.
-    Returns a readable summary of activities, starts, transitions, and ends.
+    Returns the discovered activity, transition, start, and end counts.
 
     Args:
         glob_path: Glob pattern for JSONL transcript files; used when
@@ -314,7 +309,7 @@ async def discover_process_model(
         context: FastMCP context for progress reporting.
 
     Returns:
-        String representation of the discovered process model.
+        Discovered process model with activity, transition, start, and end counts.
 
     Raises:
         ToolError: If inputs are missing or the process model is empty.
@@ -327,7 +322,7 @@ async def discover_process_model(
     if process_model.event_count == 0:
         raise ToolError("Process model is empty after building from sequences")
 
-    return render_process_model(process_model)
+    return process_model
 
 
 # TODO: Restore Annotated[..., Field(...)] parameter annotations once

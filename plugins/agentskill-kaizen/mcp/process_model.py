@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import TypeAlias, TypedDict
+from typing import TypeAlias
+
+from pydantic import BaseModel, ConfigDict
 
 Transition: TypeAlias = tuple[str, str]
 ToolSequences: TypeAlias = Mapping[str, Sequence[str]]
 
 
-class ConformanceDiagnostics(TypedDict):
+class ConformanceDiagnostics(BaseModel):
     """Per-session conformance metrics for a target trace."""
+
+    model_config = ConfigDict(frozen=True)
 
     session_id: str
     trace_is_fit: bool
@@ -23,26 +26,29 @@ class ConformanceDiagnostics(TypedDict):
     produced_tokens: int
 
 
-@dataclass(frozen=True, slots=True)
-class ActivityCount:
+class ActivityCount(BaseModel):
     """Observed count for one tool activity."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     count: int
 
 
-@dataclass(frozen=True, slots=True)
-class TransitionCount:
+class TransitionCount(BaseModel):
     """Observed count for one source-to-target tool transition."""
+
+    model_config = ConfigDict(frozen=True)
 
     source: str
     target: str
     count: int
 
 
-@dataclass(frozen=True, slots=True)
-class ProcessModel:
+class ProcessModel(BaseModel):
     """Activity, transition, start, and end sets mined from tool traces."""
+
+    model_config = ConfigDict(frozen=True)
 
     session_count: int
     event_count: int
@@ -89,32 +95,6 @@ def build_process_model(sequences: ToolSequences) -> ProcessModel:
     )
 
 
-def render_process_model(model: ProcessModel) -> str:
-    """Render a process model as a readable text summary.
-
-    Returns:
-        Multi-line process model summary.
-    """
-    sections = [
-        "Process model",
-        f"Sessions: {model.session_count}",
-        f"Events: {model.event_count}",
-        "",
-        "Activities:",
-        *_render_activities(model.activity_counts),
-        "",
-        "Start activities:",
-        *_render_activities(model.start_counts),
-        "",
-        "Transitions:",
-        *_render_transitions(model.transition_counts),
-        "",
-        "End activities:",
-        *_render_activities(model.end_counts),
-    ]
-    return "\n".join(sections)
-
-
 def check_sequence_conformance(
     target_sequences: ToolSequences, reference_model: ProcessModel
 ) -> list[ConformanceDiagnostics]:
@@ -140,15 +120,15 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
     consumed_tokens = max(0, produced_tokens - missing_tokens)
     remaining_tokens = len(model.transition_set - frozenset(observed_transitions))
 
-    return {
-        "session_id": session_id,
-        "trace_is_fit": missing_tokens == 0,
-        "trace_fitness": _trace_fitness(missing_tokens, tools),
-        "missing_tokens": missing_tokens,
-        "remaining_tokens": remaining_tokens,
-        "consumed_tokens": consumed_tokens,
-        "produced_tokens": produced_tokens,
-    }
+    return ConformanceDiagnostics(
+        session_id=session_id,
+        trace_is_fit=missing_tokens == 0,
+        trace_fitness=_trace_fitness(missing_tokens, tools),
+        missing_tokens=missing_tokens,
+        remaining_tokens=remaining_tokens,
+        consumed_tokens=consumed_tokens,
+        produced_tokens=produced_tokens,
+    )
 
 
 def _trace_fitness(missing_tokens: int, tools: Sequence[str]) -> float:
@@ -174,18 +154,6 @@ def _transition_counts(counter: Counter[Transition]) -> tuple[TransitionCount, .
     )
 
 
-def _render_activities(counts: tuple[ActivityCount, ...]) -> list[str]:
-    if not counts:
-        return ["- none"]
-    return [f"- {entry.name}: {entry.count}" for entry in counts]
-
-
-def _render_transitions(counts: tuple[TransitionCount, ...]) -> list[str]:
-    if not counts:
-        return ["- none"]
-    return [f"- {entry.source} -> {entry.target}: {entry.count}" for entry in counts]
-
-
 __all__ = [
     "ActivityCount",
     "ConformanceDiagnostics",
@@ -195,5 +163,4 @@ __all__ = [
     "TransitionCount",
     "build_process_model",
     "check_sequence_conformance",
-    "render_process_model",
 ]

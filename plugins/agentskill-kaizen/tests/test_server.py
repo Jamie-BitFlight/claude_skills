@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import server as kaizen_server
+from process_model import ConformanceDiagnostics, ProcessModel
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -395,11 +396,11 @@ class TestDiscoverProcessModel:
     async def test_discovers_model_from_sequences(
         self, sample_sequences: dict[str, list[str]], mock_context: AsyncMock
     ) -> None:
-        """Heuristic miner returns a string representation."""
+        """Heuristic miner returns a structured process model."""
         result = await kaizen_server.discover_process_model("", sample_sequences, context=mock_context)
 
-        assert isinstance(result, str)
-        assert len(result) > 0
+        assert isinstance(result, ProcessModel)
+        assert result.event_count > 0
 
     @pytest.mark.asyncio
     async def test_discovers_model_from_glob(self, multi_session_jsonl: Path, mock_context: AsyncMock) -> None:
@@ -408,8 +409,8 @@ class TestDiscoverProcessModel:
 
         result = await kaizen_server.discover_process_model(glob_path, context=mock_context)
 
-        assert isinstance(result, str)
-        assert len(result) > 0
+        assert isinstance(result, ProcessModel)
+        assert result.event_count > 0
 
     @pytest.mark.asyncio
     async def test_raises_on_empty_sequences(self, mock_context: AsyncMock) -> None:
@@ -448,13 +449,10 @@ class TestCheckConformance:
         assert isinstance(result, list)
         assert len(result) == len(sample_sequences)
         for entry in result:
-            assert "session_id" in entry
-            assert "trace_is_fit" in entry
-            assert "trace_fitness" in entry
-            assert "missing_tokens" in entry
-            assert "remaining_tokens" in entry
-            assert "consumed_tokens" in entry
-            assert "produced_tokens" in entry
+            assert isinstance(entry, ConformanceDiagnostics)
+            assert entry.session_id
+            assert isinstance(entry.trace_is_fit, bool)
+            assert isinstance(entry.trace_fitness, float)
 
     @pytest.mark.asyncio
     async def test_self_conformance_is_fit(
@@ -465,7 +463,7 @@ class TestCheckConformance:
             sequences=sample_sequences, reference_sequences=sample_sequences, context=mock_context
         )
 
-        fit_count = sum(1 for entry in result if entry["trace_is_fit"])
+        fit_count = sum(1 for entry in result if entry.trace_is_fit)
         # Most traces should be fit when checked against the same model
         assert fit_count > 0
 
@@ -576,14 +574,12 @@ class TestClusterSessions:
     ) -> None:
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
-        assert "clusters" in result
-        assert "cluster_profiles" in result
-        assert len(result["clusters"]) == 2
-        assert len(result["cluster_profiles"]) == 2
+        assert len(result.clusters) == 2
+        assert len(result.cluster_profiles) == 2
 
         # All session IDs should be assigned to exactly one cluster
         all_sessions: set[str] = set()
-        for members in result["clusters"].values():
+        for members in result.clusters.values():
             all_sessions.update(members)
         assert all_sessions == set(sample_sequences.keys())
 
@@ -595,7 +591,7 @@ class TestClusterSessions:
         result = await kaizen_server.cluster_sessions(sequences=single_sequence, n_clusters=10, context=mock_context)
 
         # With 1 session, effective clusters = min(10, 1) = 1
-        assert len(result["clusters"]) == 1
+        assert len(result.clusters) == 1
 
     @pytest.mark.asyncio
     async def test_cluster_profiles_contain_top_tools(
@@ -604,7 +600,7 @@ class TestClusterSessions:
         """Cluster profiles list the most common tools."""
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
-        for profile in result["cluster_profiles"].values():
+        for profile in result.cluster_profiles.values():
             assert isinstance(profile, list)
             assert len(profile) <= kaizen_server._TOP_TOOLS_PER_CLUSTER
 
@@ -623,8 +619,7 @@ class TestClusterSessions:
 
         result = await kaizen_server.cluster_sessions(glob_path=glob_path, n_clusters=2, context=mock_context)
 
-        assert "clusters" in result
-        assert len(result["clusters"]) == 2
+        assert len(result.clusters) == 2
 
     @pytest.mark.asyncio
     async def test_cluster_keys_are_string_ids(
@@ -633,6 +628,6 @@ class TestClusterSessions:
         """Cluster keys are string representations of cluster IDs."""
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
-        for key in result["clusters"]:
+        for key in result.clusters:
             assert isinstance(key, str)
             assert key.isdigit()
