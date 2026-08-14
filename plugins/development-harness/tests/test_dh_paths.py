@@ -417,6 +417,59 @@ class TestInferProjectRoot:
         with pytest.raises(RuntimeError, match="Could not resolve the git project root"):
             infer_project_root(tmp_path)
 
+    def test_infer_fails_with_runtime_error_wrapping_git_timeout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """A hung git process (TimeoutExpired) is wrapped in RuntimeError, not left to escape raw.
+
+        Regression test: TimeoutExpired is a sibling of CalledProcessError (both
+        subclass SubprocessError), not a subclass of it, so a bare
+        ``except subprocess.CalledProcessError`` does not catch it.
+        """
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        mocker.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 10))
+
+        with pytest.raises(RuntimeError, match="did not respond within the timeout"):
+            infer_project_root(tmp_path)
+
+    def test_infer_falls_through_when_a_lower_priority_hint_times_out(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    ) -> None:
+        """A timed-out WORKSPACE_FOLDER_PATHS hint doesn't crash resolution when
+        walking up from cwd (a lower-priority strategy) can still succeed.
+
+        Regression test: infer_project_root's hint tuple is a literal, so all
+        three hint functions are evaluated eagerly before the loop picks the
+        first non-None result -- an uncaught TimeoutExpired from any of them
+        (even a lower-priority one) would crash the whole resolution and
+        discard an already-resolved higher-priority hint. With the fix, a
+        timeout is just a failed candidate, not a fatal error.
+        """
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        stalled_workspace = tmp_path / "stalled-network-mount"
+        stalled_workspace.mkdir()
+        monkeypatch.setenv("WORKSPACE_FOLDER_PATHS", json.dumps([str(stalled_workspace)]))
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        fake_git = repo / ".git"
+        fake_git.mkdir()
+
+        def _side_effect(args: list[str], **kwargs: object) -> object:
+            cwd = str(kwargs.get("cwd", ""))
+            if str(stalled_workspace) in cwd:
+                raise subprocess.TimeoutExpired("git", 10)
+            return type("CompletedProcess", (), {"stdout": str(fake_git) + "\n", "returncode": 0})()
+
+        mocker.patch("subprocess.run", side_effect=_side_effect)
+
+        assert infer_project_root(repo) == repo
+
 
 # ---------------------------------------------------------------------------
 # Path functions — given an explicit project_root
