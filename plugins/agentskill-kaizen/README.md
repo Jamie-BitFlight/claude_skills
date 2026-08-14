@@ -49,7 +49,7 @@ Generate fixes for the top anti-patterns:
 ```
 
 Runs the `transcript-analyst` agent across your session corpus. The agent queries JSONL files
-with DuckDB SQL and applies process-mining algorithms (prefix span, clustering) across ten
+with DuckDB SQL and applies process-mining algorithms (prefix span, clustering) across nine
 anti-pattern dimensions. Output is written to `.planning/kaizen/analysis-{YYYY-MM-DD}.md`.
 
 ### `/agentskill-kaizen:explore` — Interactive investigation

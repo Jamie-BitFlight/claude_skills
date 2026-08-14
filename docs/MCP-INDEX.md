@@ -114,8 +114,8 @@ Use this checklist when adding MCP to a plugin:
 ### Proven Example
 **Plugin:** agentskill-kaizen
 **Location:** `plugins/agentskill-kaizen/mcp/server.py`
-**Tools:** 7 (process mining, clustering, pattern detection)
-**Quality:** Production-ready, includes dashboard
+**Tools:** 6 (process mining, clustering, pattern detection)
+**Quality:** Production-ready
 
 **Key Features to Study:**
 - PEP 723 inline metadata

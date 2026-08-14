@@ -1,6 +1,6 @@
 ---
 name: transcript-analysis
-description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics. Provides JSONL schema (kaizen-analysis get_transcript_jsonl_schema or MCP resource kaizen://session-log/schema or references/jsonl-schema.md), arbitrary DuckDB SQL over JSONL via kaizen-duckdb execute_query, cookbook query patterns, nine analysis dimensions, and lightweight process mining methodology.
+description: This skill should be used when analyzing Claude Code session transcripts, reviewing agent performance, finding anti-patterns or tool misuse, mining workflow patterns, running kaizen analysis, debugging agent behavior, or performing session forensics.
 ---
 
 # Transcript Analysis
@@ -41,7 +41,7 @@ For full schema details including JSON structures for each record type, see [JSO
 
 ## Signal Catalog
 
-Ten analysis dimensions, each with extraction methodology.
+Nine analysis dimensions, each with extraction methodology.
 
 ### 1. Tool Misuse Detection
 
@@ -117,7 +117,7 @@ flowchart TD
     Project --> Discover[SQL — count sessions, date range, record types]
     Default --> Discover
     Discover --> Dimensions{Which dimensions?}
-    Dimensions -->|All| RunAll[Run all 10 dimensions]
+    Dimensions -->|All| RunAll[Run all 9 dimensions]
     Dimensions -->|Specified| RunSelected[Run selected dimensions]
     RunAll --> Aggregate[Aggregate findings]
     RunSelected --> Aggregate
