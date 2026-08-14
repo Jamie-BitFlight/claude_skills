@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import heapq
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -40,6 +41,7 @@ class _ClusterState:
     sizes: dict[ClusterId, int]
     active_ids: set[ClusterId]
     pair_sim: dict[PairKey, float]
+    heap: list[tuple[float, ClusterId, ClusterId]] = field(default_factory=list)
     next_id: int = field(default=0)
 
 
@@ -48,9 +50,12 @@ def cluster_tool_sequences(sequences: ToolSequences, n_clusters: int, top_tools_
 
     Uses average-linkage agglomeration with a Lance-Williams incremental
     similarity update: pairwise session similarities are computed once,
-    and cluster-to-cluster similarity is updated in O(1) per surviving
-    pair on each merge instead of being recomputed from raw session
-    vectors every merge step.
+    cluster-to-cluster similarity is updated in O(1) per surviving pair on
+    each merge instead of being recomputed from raw session vectors, and
+    the next merge candidate is found via a lazily-invalidated max-heap
+    instead of rescanning every active pair -- O(n^2 log n) overall
+    instead of the O(n^3) a full argmax rescan would still cost even with
+    similarity caching.
 
     Returns:
         Cluster assignments and representative tools for each cluster.
@@ -83,24 +88,38 @@ def _initial_cluster_state(session_ids: tuple[str, ...], vectors: Mapping[str, T
         )
         for left_index, right_index in combinations(range(len(session_ids)), 2)
     }
+    heap = [(-similarity, left_id, right_id) for (left_id, right_id), similarity in pair_sim.items()]
+    heapq.heapify(heap)
     return _ClusterState(
         members=members,
         sizes=dict.fromkeys(members, 1),
         active_ids=set(members),
         pair_sim=pair_sim,
+        heap=heap,
         next_id=len(session_ids),
     )
 
 
 def _most_similar_active_pair(state: _ClusterState) -> tuple[ClusterId, ClusterId]:
-    best_pair = (0, 0)
-    best_score = -1.0
-    for left_id, right_id in combinations(sorted(state.active_ids), 2):
-        score = state.pair_sim[_pair_key(left_id, right_id)]
-        if score > best_score:
-            best_score = score
-            best_pair = (left_id, right_id)
-    return best_pair
+    """Pop and return the globally most-similar active cluster pair.
+
+    Lazily discards stale heap entries left behind by earlier merges
+    (pairs referencing a cluster id that has since been retired) instead
+    of rescanning every active pair on each call -- each merge step
+    becomes O(log n) amortized heap work instead of an O(active_clusters^2)
+    full rescan, which was still cubic overall even after the pairwise
+    similarity itself was cached.
+
+    Returns:
+        The (left_id, right_id) pair with the highest cached similarity
+        among currently active clusters.
+    """
+    while state.heap:
+        _, left_id, right_id = heapq.heappop(state.heap)
+        if left_id in state.active_ids and right_id in state.active_ids:
+            return left_id, right_id
+    msg = "no active cluster pairs remain to merge"
+    raise RuntimeError(msg)
 
 
 def _lance_williams_average_linkage(
@@ -123,12 +142,15 @@ def _merge_most_similar_pair(state: _ClusterState) -> None:
     state.next_id += 1
 
     for other_id in state.active_ids - {left_id, right_id}:
-        state.pair_sim[_pair_key(merged_id, other_id)] = _lance_williams_average_linkage(
+        new_similarity = _lance_williams_average_linkage(
             left_similarity=state.pair_sim[_pair_key(left_id, other_id)],
             right_similarity=state.pair_sim[_pair_key(right_id, other_id)],
             left_size=state.sizes[left_id],
             right_size=state.sizes[right_id],
         )
+        new_key = _pair_key(merged_id, other_id)
+        state.pair_sim[new_key] = new_similarity
+        heapq.heappush(state.heap, (-new_similarity, *new_key))
 
     state.members[merged_id] = tuple(sorted((*state.members[left_id], *state.members[right_id])))
     state.sizes[merged_id] = state.sizes[left_id] + state.sizes[right_id]
