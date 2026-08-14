@@ -20,21 +20,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-
-def pytest_configure(config: pytest.Config) -> None:
-    """Disable pytest-xdist parallelism for this test suite.
-
-    Measured overhead for 120 tests: xdist worker startup costs ~27s and CPU
-    contention from parallel k-means clustering workers slows those tests 2-3x.
-    Sequential execution (8.5s) is 4x faster than -n auto (35.8s).
-    xdist reads numprocesses/dist in pytest_sessionstart, after this hook runs.
-    """
-    if hasattr(config.option, "numprocesses"):
-        config.option.numprocesses = 0
-    if hasattr(config.option, "dist"):
-        config.option.dist = "no"
-
-
 # Ensure `import server` resolves to plugins/agentskill-kaizen/mcp/server.py
 _MCP_DIR = str(Path(__file__).resolve().parent.parent / "mcp")
 if _MCP_DIR not in sys.path:
