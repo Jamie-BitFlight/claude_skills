@@ -18,13 +18,27 @@ if TYPE_CHECKING:
     from fastmcp import FastMCP
 
 
-async def call_mcp_tool(mcp: FastMCP, tool_name: str, params: dict | None = None) -> dict:
+async def call_mcp_tool(
+    mcp: FastMCP, tool_name: str, params: dict | None = None, *, timeout_seconds: float = 30.0
+) -> dict:
     """Call a tool through the in-memory FastMCP transport and parse the result.
 
     Args:
         mcp: The FastMCP server instance to connect to.
         tool_name: Registered MCP tool name (e.g. ``"backlog_list"``).
         params: Optional parameter dict to pass to the tool.
+        timeout_seconds: Seconds to wait for the client handshake and tool call
+            before raising ``McpError``. Defaults to 30s, matching
+            ``run_cli_subprocess``'s default in this module. FastMCP's ``Client``
+            defaults ``timeout`` to ``None`` (no limit — see ``Client.__init__``
+            in ``fastmcp/client/client.py``), so a blocking server-side tool
+            handler would otherwise hang this call (and the test using it)
+            forever with zero diagnostics. Named ``timeout_seconds`` rather than
+            ``timeout`` to avoid ruff ASYNC109 (async function with a bare
+            ``timeout`` parameter) — see that rule's docs for the same rename
+            guidance: this helper forwards to ``Client``'s own timeout
+            mechanism rather than reimplementing timeout/cancellation logic
+            itself, so ``asyncio.timeout()`` is not the right tool here.
 
     Returns:
         Parsed JSON response dict from the tool.
@@ -34,7 +48,7 @@ async def call_mcp_tool(mcp: FastMCP, tool_name: str, params: dict | None = None
     """
     from fastmcp.client import Client
 
-    async with Client(mcp) as client:
+    async with Client(mcp, timeout=timeout_seconds) as client:
         result = await client.call_tool(tool_name, params or {})
     return json.loads(result.content[0].text)
 

@@ -75,6 +75,9 @@ def _git_rev_parse_root(resolved_cwd: Path) -> Path:
         FileNotFoundError: If the ``git`` binary is not found.
         subprocess.CalledProcessError: If the directory is not inside a
             git repository.
+        subprocess.TimeoutExpired: If ``git`` does not complete within 10
+            seconds (e.g. blocked on a lock file or an unreachable network
+            filesystem).
     """
     cwd_key = str(resolved_cwd.resolve())
     if cwd_key in _root_cache:
@@ -86,6 +89,12 @@ def _git_rev_parse_root(resolved_cwd: Path) -> Path:
         text=True,
         check=True,
         cwd=cwd_key,
+        # A hung git process (e.g. blocked on an index/pack lock, or a repo on an
+        # unreachable network filesystem) would otherwise block forever with no
+        # diagnostics. The per-cwd _root_cache above means this call normally runs
+        # once per worker process, so a generous timeout does not add per-call cost
+        # to the common path.
+        timeout=10,
     )
     # Strip trailing whitespace / newline from git output.
     git_common_dir = Path(result.stdout.strip())
@@ -250,6 +259,8 @@ def git_project_root(cwd: Path | None = None) -> Path:
         FileNotFoundError: If the ``git`` binary is not found.
         subprocess.CalledProcessError: If *cwd* was explicit and is not inside a
             git repository.
+        subprocess.TimeoutExpired: If *cwd* was explicit and ``git`` does not
+            complete within the 10-second timeout in :func:`_git_rev_parse_root`.
         RuntimeError: If *cwd* was ``None`` and all resolution strategies failed.
     """
     if cwd is not None:

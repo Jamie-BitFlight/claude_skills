@@ -308,7 +308,10 @@ class TestConcurrency:
         barrier = threading.Barrier(n_threads)
 
         def writer(_thread_id: int) -> None:
-            barrier.wait()  # synchronise all threads to start simultaneously
+            # timeout=30 so a thread that never reaches the barrier (e.g. a bug
+            # under test that raises before the wait() call) fails this test with
+            # a clear threading.BrokenBarrierError instead of hanging the suite.
+            barrier.wait(timeout=30)  # synchronise all threads to start simultaneously
             entry = _make_entry()
             manifest = ArtifactManifest(issue_number=99, artifacts=[entry])
             provider.set_manifest(99, manifest)
