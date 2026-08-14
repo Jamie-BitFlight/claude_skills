@@ -20,6 +20,30 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Disable pytest-xdist parallelism only when this suite runs standalone.
+
+    xdist worker startup overhead (~8 processes) exceeds this directory's
+    actual test runtime (~1-2s of combined CPU time across 64 tests),
+    making a standalone kaizen-only invocation slower under -n auto than
+    serial (measured: 14.39s parallel vs 6.34s serial for the same tests).
+    A full-repo run amortizes that startup cost across thousands of other
+    tests, so this must not disable xdist globally -- only when every
+    collection target on the command line resolves under this directory.
+    xdist reads numprocesses/dist in pytest_sessionstart, after this hook runs.
+    """
+    this_dir = Path(__file__).resolve().parent
+    targets = [Path(arg.split("::")[0]).resolve() for arg in config.args]
+    kaizen_only = bool(targets) and all(target == this_dir or this_dir in target.parents for target in targets)
+    if not kaizen_only:
+        return
+    if hasattr(config.option, "numprocesses"):
+        config.option.numprocesses = 0
+    if hasattr(config.option, "dist"):
+        config.option.dist = "no"
+
+
 # Ensure `import server` resolves to plugins/agentskill-kaizen/mcp/server.py
 _MCP_DIR = str(Path(__file__).resolve().parent.parent / "mcp")
 if _MCP_DIR not in sys.path:
