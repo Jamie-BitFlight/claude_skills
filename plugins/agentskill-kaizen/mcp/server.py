@@ -351,9 +351,9 @@ async def check_conformance(
         context: FastMCP context for progress reporting.
 
     Returns:
-        List of per-trace conformance dicts with keys including
+        List of per-trace conformance diagnostics with fields including
         ``trace_is_fit``, ``trace_fitness``, ``missing_tokens``,
-        ``remaining_tokens``, and the ``session_id``.
+        ``uncovered_model_transitions``, and the ``session_id``.
 
     Raises:
         ToolError: If required inputs are missing or sequences are empty.

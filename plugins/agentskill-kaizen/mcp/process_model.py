@@ -13,7 +13,15 @@ ToolSequences: TypeAlias = Mapping[str, Sequence[str]]
 
 
 class ConformanceDiagnostics(BaseModel):
-    """Per-session conformance metrics for a target trace."""
+    """Per-session conformance metrics for a target trace.
+
+    ``uncovered_model_transitions`` is model-edge coverage, not token-replay
+    residue: it counts every reference-model transition this trace didn't
+    exercise, including transitions that belong to a different valid branch
+    the trace was never expected to take. A fully conforming trace through
+    one branch of a multi-path reference model can still have a nonzero
+    count here.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -21,7 +29,7 @@ class ConformanceDiagnostics(BaseModel):
     trace_is_fit: bool
     trace_fitness: float
     missing_tokens: int
-    remaining_tokens: int
+    uncovered_model_transitions: int
     consumed_tokens: int
     produced_tokens: int
 
@@ -57,7 +65,13 @@ class ProcessModel(BaseModel):
     start_counts: tuple[ActivityCount, ...]
     end_counts: tuple[ActivityCount, ...]
     activity_set: frozenset[str]
-    transition_set: frozenset[Transition]
+    # Ordered tuple, not frozenset[Transition]: a frozenset of 2-item tuples
+    # round-trips through FastMCP's JSON structured-output validation as a
+    # list of lists, and Pydantic's generic schema-derived reconstruction on
+    # the client side fails with "Set items should be hashable" (lists are
+    # not hashable) before any tuple coercion runs. Plain strings (str-only
+    # frozensets below) don't have this problem -- only tuple-of-str does.
+    transition_set: tuple[Transition, ...]
     start_set: frozenset[str]
     end_set: frozenset[str]
 
@@ -89,7 +103,7 @@ def build_process_model(sequences: ToolSequences) -> ProcessModel:
         start_counts=_activity_counts(start_counter),
         end_counts=_activity_counts(end_counter),
         activity_set=frozenset(activity_counter),
-        transition_set=frozenset(transition_counter),
+        transition_set=tuple(sorted(transition_counter)),
         start_set=frozenset(start_counter),
         end_set=frozenset(end_counter),
     )
@@ -118,14 +132,14 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
     missing_tokens = unexpected_transition_count + int(start_mismatch) + int(end_mismatch) + int(empty_trace_mismatch)
     produced_tokens = len(tools)
     consumed_tokens = max(0, produced_tokens - missing_tokens)
-    remaining_tokens = len(model.transition_set - frozenset(observed_transitions))
+    uncovered_model_transitions = len(frozenset(model.transition_set) - frozenset(observed_transitions))
 
     return ConformanceDiagnostics(
         session_id=session_id,
         trace_is_fit=missing_tokens == 0,
         trace_fitness=_trace_fitness(missing_tokens, tools),
         missing_tokens=missing_tokens,
-        remaining_tokens=remaining_tokens,
+        uncovered_model_transitions=uncovered_model_transitions,
         consumed_tokens=consumed_tokens,
         produced_tokens=produced_tokens,
     )
