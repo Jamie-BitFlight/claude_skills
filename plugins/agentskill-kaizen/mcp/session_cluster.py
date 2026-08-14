@@ -157,9 +157,17 @@ def _merge_most_similar_pair(state: _ClusterState) -> None:
     state.active_ids -= {left_id, right_id}
     state.active_ids.add(merged_id)
 
-    retired = {left_id, right_id}
-    for key in [key for key in state.pair_sim if key[0] in retired or key[1] in retired]:
-        del state.pair_sim[key]
+    # Deliberately not cleaning up retired left_id/right_id entries from
+    # pair_sim: once a cluster id leaves active_ids, no future merge step
+    # ever looks up a pair_sim key involving it again (Lance-Williams only
+    # reads pairs between the two clusters *currently* being merged against
+    # still-active others), so eager cleanup is pure memory hygiene, not a
+    # correctness requirement. A full-dict sweep to find retired keys costs
+    # O(current pair_sim size) on every merge -- negating the heap-based
+    # argmax fix's own complexity improvement (measured: ~27s for 1000
+    # sessions with the sweep, matching an independent report of ~35s).
+    # pair_sim's worst-case O(n^2) size matches the algorithm's existing
+    # memory floor from the initial full pairwise precompute either way.
 
 
 def _cosine_similarity(left: ToolCounter, right: ToolCounter) -> float:

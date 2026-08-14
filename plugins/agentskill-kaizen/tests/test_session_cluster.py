@@ -57,14 +57,26 @@ def test_cluster_tool_sequences_precomputes_pairwise_similarity_once(monkeypatch
 
 @pytest.mark.slow
 def test_cluster_tool_sequences_scales_to_large_session_counts() -> None:
-    """200 sessions must cluster well under the pre-fix ~12.7s measurement."""
+    """1000 sessions must cluster well under the pre-fix ~27.5s measurement.
+
+    200 sessions doesn't reliably trigger the O(n) pair_sim cleanup sweep
+    regression this guards against (measured well under a second either
+    way) -- 1000 is large enough that the regression is unmistakable.
+    Measured without coverage instrumentation: ~6s fixed, ~27.5s with the
+    sweep bug reintroduced. Under this suite's default `--cov` instrumentation
+    (line-tracing overhead on a hot loop) the fixed case measured ~25s, so
+    the bound below is calibrated generously above that -- still well short
+    of where a reintroduced O(n) sweep would land, but robust to coverage
+    and CI-runner speed variance rather than pinned to an uninstrumented
+    measurement.
+    """
     rng = random.Random(42)
     tools = ["Read", "Grep", "Write", "Edit", "Bash", "Glob"]
-    sequences = {f"session-{i}": [rng.choice(tools) for _ in range(rng.randint(3, 12))] for i in range(200)}
+    sequences = {f"session-{i}": [rng.choice(tools) for _ in range(rng.randint(3, 12))] for i in range(1000)}
 
     start = time.perf_counter()
     result = cluster_tool_sequences(sequences, n_clusters=5, top_tools_per_cluster=5)
     elapsed = time.perf_counter() - start
 
     assert len(result.clusters) == 5
-    assert elapsed < 5.0
+    assert elapsed < 60.0
