@@ -122,6 +122,35 @@ def test_check_sequence_conformance_prefix_trace_consumes_every_matched_token() 
     assert diagnostics.consumed_tokens == 2
 
 
+def test_check_sequence_conformance_wrong_single_token_scores_zero_fitness() -> None:
+    """A single-token trace that matches nothing in the reference fails both
+    the start check and the end check -- it should not get 0.5 credit just
+    because both checks examine the same one physical walk position.
+
+    Regression test: reference is the single-activity session "A", target is
+    the single-activity session "B". Before the fix, missing_tokens capped
+    at 1 (the trie walk can only mark one position unmatched) while the
+    denominator counted 2 checks (start + end), yielding a misleading 0.5.
+    """
+    reference_model = build_process_model({"reference": ["A"]})
+
+    result = check_sequence_conformance({"target": ["B"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
+    assert diagnostics.trace_fitness == pytest.approx(0.0)
+
+
+def test_check_sequence_conformance_matching_single_token_is_fully_fit() -> None:
+    reference_model = build_process_model({"reference": ["A"]})
+
+    result = check_sequence_conformance({"target": ["A"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is True
+    assert diagnostics.trace_fitness == pytest.approx(1.0)
+
+
 def test_check_sequence_conformance_empty_trace_against_nonempty_reference() -> None:
     reference_model = build_process_model({"reference": ["Read", "Write"]})
 

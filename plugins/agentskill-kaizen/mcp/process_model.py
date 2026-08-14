@@ -291,10 +291,20 @@ def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transitio
     from a denominator that counted transitions alone. An empty trace has
     exactly one check (empty_trace_mismatch).
 
+    A single-token trace is the one case where the start check and the end
+    check both examine the same physical walk position: the trie walk can
+    only mark that position unmatched once (missing_tokens caps at 1), but a
+    wrong single token genuinely fails both checks independently -- so it
+    scores against both, not one against a denominator of two.
+
     Returns:
         Fitness in [0.0, 1.0]: the fraction of checks that passed.
     """
-    checks = len(observed_transitions) + 2 if tools else 1
+    if not tools:
+        return round(max(0.0, 1.0 - (missing_tokens / 1)), 6)
+    checks = len(observed_transitions) + 2
+    if len(tools) == 1 and missing_tokens > 0:
+        missing_tokens = 2
     return round(max(0.0, 1.0 - (missing_tokens / checks)), 6)
 
 
