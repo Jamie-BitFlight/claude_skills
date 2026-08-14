@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from base64 import b64encode
 from pathlib import Path
-from types import SimpleNamespace
 from typing import TypeAlias
 from unittest.mock import MagicMock
 
@@ -50,9 +48,36 @@ class _Tree(BaseModel):
     truncated: bool = False
 
 
+class _FakeRequester:
+    """Simulates PyGithub's requester.graphql_query for the aliased blob-batch query.
+
+    Only understands the shape _fetch_blobs_graphql actually sends ($sha0,
+    $sha1, ... variables aliased b0, b1, ...) -- not a general GraphQL engine.
+    """
+
+    def __init__(self, repository: _Repository) -> None:
+        self._repository = repository
+        self.call_count = 0
+        self.override: dict[str, object] | None = None
+
+    def graphql_query(self, query: str, variables: dict[str, object]) -> tuple[dict[str, object], dict[str, object]]:
+        self.call_count += 1
+        if self.override is not None:
+            return {}, self.override
+        sha_keys = sorted((key for key in variables if key.startswith("sha")), key=lambda key: int(key[3:]))
+        repository_data: dict[str, object] = {}
+        for index, key in enumerate(sha_keys):
+            sha = str(variables[key])
+            self._repository.blob_requests.append(sha)
+            content = self._repository._blobs.get(sha)
+            repository_data[f"b{index}"] = None if content is None else {"text": content, "isBinary": False}
+        return {}, {"data": {"repository": repository_data}}
+
+
 class _Repository:
     def __init__(self) -> None:
         self.default_branch = "main"
+        self.full_name = "owner/repo"
         self.files: dict[str, _File] = {}
         self.create_race = False
         self.conflict_update = False
@@ -65,6 +90,7 @@ class _Repository:
         self.blob_requests: list[str] = []
         self._blobs: dict[str, str] = {}
         self._next_sha = 0
+        self.requester = _FakeRequester(self)
 
     def get_contents(self, path: str, ref: str) -> _File:
         self.branches.append(ref)
@@ -119,10 +145,6 @@ class _Repository:
         return _Tree(
             tree=[_TreeEntry(path=path, sha=file.sha) for path, file in snapshot.items()], truncated=self.tree_truncated
         )
-
-    def get_git_blob(self, sha: str) -> SimpleNamespace:
-        self.blob_requests.append(sha)
-        return SimpleNamespace(content=b64encode(self._blobs[sha].encode()).decode())
 
     def _sha(self) -> str:
         self._next_sha += 1
@@ -267,37 +289,35 @@ def test_malformed_native_content_does_not_fall_back_to_legacy(
 
 def test_malformed_native_blob_fails_closed(store: _GitHubContentsStore, repository: _Repository) -> None:
     store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
-    repository.get_git_blob = MagicMock(return_value=SimpleNamespace(content="not-base64!"))
+    repository.requester.override = {"data": {"repository": {"b0": {"text": "not-json", "isBinary": False}}}}
 
     with pytest.raises(ContentUnavailableError, match="envelope"):
         store.list(ContentQuery(kind=ContentKind.PLAN))
 
 
-def test_line_wrapped_native_blob_is_accepted(store: _GitHubContentsStore, repository: _Repository) -> None:
+def test_binary_native_blob_fails_closed(store: _GitHubContentsStore, repository: _Repository) -> None:
     store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
-    original_get_blob = repository.get_git_blob
+    repository.requester.override = {"data": {"repository": {"b0": {"text": None, "isBinary": True}}}}
 
-    def line_wrapped_blob(sha: str) -> SimpleNamespace:
-        encoded = original_get_blob(sha).content
-        return SimpleNamespace(content="\n".join(encoded[index : index + 8] for index in range(0, len(encoded), 8)))
-
-    repository.get_git_blob = MagicMock(side_effect=line_wrapped_blob)
-
-    [record] = store.list(ContentQuery(kind=ContentKind.PLAN))
-
-    assert record.content == "body"
+    with pytest.raises(ContentUnavailableError, match="invalid or missing"):
+        store.list(ContentQuery(kind=ContentKind.PLAN))
 
 
-def test_native_blob_rejects_non_whitespace_base64_garbage(
+def test_missing_native_blob_fails_closed(store: _GitHubContentsStore, repository: _Repository) -> None:
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+    repository.requester.override = {"data": {"repository": {"b0": None}}}
+
+    with pytest.raises(ContentUnavailableError, match="invalid or missing"):
+        store.list(ContentQuery(kind=ContentKind.PLAN))
+
+
+def test_blob_batch_graphql_transport_failure_fails_closed(
     store: _GitHubContentsStore, repository: _Repository
 ) -> None:
     store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
-    original_get_blob = repository.get_git_blob
-    repository.get_git_blob = MagicMock(
-        side_effect=lambda sha: SimpleNamespace(content=f"{original_get_blob(sha).content}!")
-    )
+    repository.requester.override = {"errors": [{"message": "rate limited"}]}
 
-    with pytest.raises(ContentUnavailableError, match="envelope"):
+    with pytest.raises(ContentUnavailableError, match="discovery failed"):
         store.list(ContentQuery(kind=ContentKind.PLAN))
 
 
@@ -433,6 +453,10 @@ def test_backend_native_pagination_fetches_each_blob_once(
 
     assert [record.reference.name for record in records] == ["P100"]
     assert len(repository.blob_requests) == 101
+    # Regression guard for the N+1 fix: 101 blobs must reach the server as 5
+    # batched GraphQL requests (ceil(101/_BLOB_BATCH_SIZE)=ceil(101/25)), not
+    # 101 individual round trips.
+    assert repository.requester.call_count == 5
 
 
 def test_backend_lists_native_content_when_legacy_migration_is_unavailable(

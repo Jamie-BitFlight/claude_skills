@@ -15,7 +15,7 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from github import Auth, Github, GithubException
 from typing_extensions import TypedDict
@@ -53,6 +53,24 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from github.Repository import Repository
+
+
+class _GraphQLRequester(Protocol):
+    def graphql_query(self, query: str, variables: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]: ...
+
+
+class _GraphQLCapable(Protocol):
+    """Structural minimum _graphql_request needs -- narrower than the full Repository surface.
+
+    Lets callers outside gh_client (e.g. github_contents.py's _ContentsRepository Protocol,
+    used for test-fake substitution) pass their own repository stand-in without depending on
+    PyGithub's concrete Repository type -- any object exposing .requester.graphql_query(...)
+    satisfies this, including a real Repository.
+    """
+
+    @property
+    def requester(self) -> _GraphQLRequester: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -463,7 +481,7 @@ def _parse_search_pr_node(raw: dict[str, Any]) -> SearchPRNode | None:
 # ---------------------------------------------------------------------------
 
 
-def _graphql_request(repo: Repository, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
+def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
     """Execute a raw GraphQL query using PyGithub's requester.
 
     Follows the same pattern as ``_resolve_labels_graphql``.  Raises
@@ -472,7 +490,9 @@ def _graphql_request(repo: Repository, query: str, variables: dict[str, object] 
     ``UnknownObjectException`` for NOT_FOUND / 404 responses).
 
     Args:
-        repo: PyGithub Repository object (provides requester access).
+        repo: Any object exposing ``.requester.graphql_query(...)`` -- a real
+            PyGithub Repository, or a narrower structural stand-in (e.g. a
+            test fake) satisfying just that surface.
         query: GraphQL query or mutation string.
         variables: Optional dict of GraphQL variables.
 

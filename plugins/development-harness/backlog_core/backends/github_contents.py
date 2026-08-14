@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import json
-from base64 import b64decode
-from binascii import Error as Base64Error
 from collections.abc import Callable, Mapping, Sequence as SequenceABC, Sequence as SequenceType
 from typing import Protocol, TypeAlias, runtime_checkable
 from urllib.parse import quote
 
 from github import GithubException
 
+from backlog_core import gh_client
 from backlog_core.models import (
+    BacklogError,
     ContentConflictError,
     ContentNotFoundError,
     ContentQuery,
@@ -27,7 +27,12 @@ _NOT_FOUND = 404
 _CONFLICT_STATUSES = frozenset({409, 422})
 _MAX_CONTENT_BYTES = 1_000_000
 _WRITE_ATTEMPTS = 3
-_BASE64_WHITESPACE = str.maketrans("", "", " \t\r\n\v\f")
+# Bounded aliased GraphQL batch size for blob fetches, matching the
+# gh_client._BATCH_CHUNK_SIZE precedent for batches that carry full text
+# bodies (not just small metadata fields like _TARGET_BATCH_SIZE=100's
+# issue-node batches) -- content records can be up to _MAX_CONTENT_BYTES
+# each, so a smaller chunk keeps a single GraphQL response bounded.
+_BLOB_BATCH_SIZE = 25
 ContentRecords: TypeAlias = list[ContentRecord]
 
 
@@ -63,20 +68,26 @@ class _GitTree(Protocol):
     def truncated(self) -> bool: ...
 
 
-class _GitBlob(Protocol):
-    @property
-    def content(self) -> str: ...
+class _Requester(Protocol):
+    def graphql_query(
+        self, query: str, variables: dict[str, object]
+    ) -> tuple[dict[str, object], dict[str, object]]: ...
 
 
 class _ContentsRepository(Protocol):
     @property
     def default_branch(self) -> str: ...
 
+    @property
+    def full_name(self) -> str: ...
+
+    @property
+    def requester(self) -> _Requester: ...
+
     def get_contents(self, path: str, ref: str) -> _ContentsFile | SequenceType[_ContentsFile]: ...
     def create_file(self, path: str, message: str, content: str, branch: str) -> Mapping[str, object]: ...
     def update_file(self, path: str, message: str, content: str, sha: str, branch: str) -> Mapping[str, object]: ...
     def get_git_tree(self, sha: str, recursive: bool) -> _GitTree: ...
-    def get_git_blob(self, sha: str) -> _GitBlob: ...
 
 
 class _GitHubContentsStore:
@@ -95,11 +106,13 @@ class _GitHubContentsStore:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
         if tree.truncated:
             raise _GitHubContentIntegrityError("GitHub content discovery tree was truncated")
-        records = [
-            self._from_blob(repository, entry.path, entry.sha)
+        matching = [
+            entry
             for entry in tree.tree
             if entry.type == "blob" and entry.path.startswith(self._kind_prefix(query.kind.value))
         ]
+        blobs = self._fetch_blobs_graphql(repository, [entry.sha for entry in matching])
+        records = [self._parse(entry.path, blobs[entry.sha], entry.sha) for entry in matching]
         filtered = [
             record
             for record in records
@@ -125,11 +138,9 @@ class _GitHubContentsStore:
         if tree.truncated:
             raise _GitHubContentIntegrityError("GitHub content discovery tree was truncated")
         paths = {self._path(reference) for reference in references}
-        return [
-            self._from_blob(repository, entry.path, entry.sha)
-            for entry in tree.tree
-            if entry.type == "blob" and entry.path in paths
-        ]
+        matching = [entry for entry in tree.tree if entry.type == "blob" and entry.path in paths]
+        blobs = self._fetch_blobs_graphql(repository, [entry.sha for entry in matching])
+        return [self._parse(entry.path, blobs[entry.sha], entry.sha) for entry in matching]
 
     def get(self, reference: ContentRef) -> ContentRecord:
         repository = self._repository()
@@ -222,16 +233,59 @@ class _GitHubContentsStore:
             raise _GitHubContentIntegrityError(f"GitHub content path is not a file: {path}")
         return self._parse(path, file.decoded_content, file.sha)
 
-    def _from_blob(self, repository: _ContentsRepository, path: str, sha: str) -> ContentRecord:
-        try:
-            encoded = repository.get_git_blob(sha).content
-        except GithubException as exc:
-            raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
-        try:
-            content = b64decode(encoded.translate(_BASE64_WHITESPACE), validate=True)
-        except (Base64Error, ValueError) as exc:
-            raise _GitHubContentIntegrityError(f"GitHub content envelope is invalid: {path}") from exc
-        return self._parse(path, content, sha)
+    def _fetch_blobs_graphql(self, repository: _ContentsRepository, shas: SequenceType[str]) -> dict[str, bytes]:
+        """Fetch blob content for every sha in one bounded aliased GraphQL request per chunk.
+
+        Replaces one get_git_blob REST call per blob (N+1 against the tree
+        listing) with _BLOB_BATCH_SIZE blobs per GraphQL round trip, mirroring
+        _GitHubBackend._fetch_targeted_issues's bounded aliased-query pattern.
+        GraphQL's Blob.text returns already-decoded UTF8 content directly (no
+        base64 step, unlike the REST get_git_blob response).
+
+        Returns:
+            Mapping of blob sha to its decoded content bytes.
+
+        Raises:
+            ContentUnavailableError: On GraphQL transport failure.
+            _GitHubContentIntegrityError: If a requested blob is missing,
+                binary, or otherwise not decodable text.
+        """
+        unique_shas = list(dict.fromkeys(shas))
+        if not unique_shas:
+            return {}
+        owner, repo_name = repository.full_name.split("/", 1)
+        blobs: dict[str, bytes] = {}
+        for offset in range(0, len(unique_shas), _BLOB_BATCH_SIZE):
+            chunk = unique_shas[offset : offset + _BLOB_BATCH_SIZE]
+            declarations = ", ".join(f"$sha{index}: GitObjectID!" for index in range(len(chunk)))
+            aliases = "\n".join(
+                f"      b{index}: object(oid: $sha{index}) {{ ... on Blob {{ text isBinary }} }}"
+                for index in range(len(chunk))
+            )
+            query = (
+                f"query BlobBatch($owner: String!, $repo: String!, {declarations}) {{\n"
+                f"  repository(owner: $owner, name: $repo) {{\n{aliases}\n  }}\n}}"
+            )
+            variables: dict[str, object] = {"owner": owner, "repo": repo_name}
+            variables.update({f"sha{index}": sha for index, sha in enumerate(chunk)})
+            try:
+                data = gh_client._graphql_request(repository, query, variables)
+            except BacklogError as exc:
+                raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
+            repository_data = data.get("repository")
+            if not isinstance(repository_data, dict):
+                raise ContentUnavailableError("GraphQL blob batch response omitted repository data")
+            for index, sha in enumerate(chunk):
+                alias = f"b{index}"
+                node = repository_data.get(alias)
+                if (
+                    not isinstance(node, dict)
+                    or node.get("isBinary") is not False
+                    or not isinstance(node.get("text"), str)
+                ):
+                    raise _GitHubContentIntegrityError(f"GitHub content blob is invalid or missing: {sha}")
+                blobs[sha] = node["text"].encode()
+        return blobs
 
     def _parse(self, path: str, content: bytes, revision: str) -> ContentRecord:
         try:
