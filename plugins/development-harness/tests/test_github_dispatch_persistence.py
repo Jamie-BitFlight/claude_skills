@@ -190,7 +190,7 @@ def test_github_gist_provider_lists_matching_gist_files(monkeypatch: pytest.Monk
         "sam-plan--other.yaml": SimpleNamespace(content="other"),
     }
     monkeypatch.setattr(provider, "_get_gist", lambda item_id, body: gist)
-    monkeypatch.setattr("backlog_core.artifact_provider.get_github", lambda repo: MagicMock())
+    monkeypatch.setattr("backlog_core.artifact_provider.get_github", lambda repo: MagicMock(full_name="owner/repo"))
     monkeypatch.setattr("backlog_core.artifact_provider._fetch_issue_graphql", lambda *args: {"body": ""})
 
     files = provider.list_artifact_content_from_remote(42, "dispatch-plan", "dispatch-plan/")
