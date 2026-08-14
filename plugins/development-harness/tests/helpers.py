@@ -29,16 +29,21 @@ async def call_mcp_tool(
         params: Optional parameter dict to pass to the tool.
         timeout_seconds: Seconds to wait for the client handshake and tool call
             before raising ``McpError``. Defaults to 30s, matching
-            ``run_cli_subprocess``'s default in this module. FastMCP's ``Client``
-            defaults ``timeout`` to ``None`` (no limit — see ``Client.__init__``
-            in ``fastmcp/client/client.py``), so a blocking server-side tool
-            handler would otherwise hang this call (and the test using it)
-            forever with zero diagnostics. Named ``timeout_seconds`` rather than
-            ``timeout`` to avoid ruff ASYNC109 (async function with a bare
-            ``timeout`` parameter) — see that rule's docs for the same rename
-            guidance: this helper forwards to ``Client``'s own timeout
-            mechanism rather than reimplementing timeout/cancellation logic
-            itself, so ``asyncio.timeout()`` is not the right tool here.
+            ``run_cli_subprocess``'s default in this module. Passed as both
+            ``timeout`` (per-request read timeout) and ``init_timeout`` --
+            these are two separate FastMCP ``Client`` parameters, and
+            ``init_timeout`` falls back to ``fastmcp.settings.client_init_timeout``
+            (default ``None``, meaning disabled per that setting's own
+            docstring) when not given explicitly. Passing ``timeout`` alone
+            bounds tool calls but leaves the initialization handshake
+            unbounded, so a stalled handshake would still hang this call (and
+            the test using it) forever despite the documented bound. Named
+            ``timeout_seconds`` rather than ``timeout`` to avoid ruff ASYNC109
+            (async function with a bare ``timeout`` parameter) — see that
+            rule's docs for the same rename guidance: this helper forwards to
+            ``Client``'s own timeout mechanism rather than reimplementing
+            timeout/cancellation logic itself, so ``asyncio.timeout()`` is not
+            the right tool here.
 
     Returns:
         Parsed JSON response dict from the tool.
@@ -48,7 +53,7 @@ async def call_mcp_tool(
     """
     from fastmcp.client import Client
 
-    async with Client(mcp, timeout=timeout_seconds) as client:
+    async with Client(mcp, timeout=timeout_seconds, init_timeout=timeout_seconds) as client:
         result = await client.call_tool(tool_name, params or {})
     return json.loads(result.content[0].text)
 

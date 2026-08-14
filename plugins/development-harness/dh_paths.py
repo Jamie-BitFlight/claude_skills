@@ -124,14 +124,19 @@ def _git_root_if_directory(path: Path) -> Path | None:
     """Run git common-dir resolution for *path* if it is a directory.
 
     Returns:
-        The resolved project root, or ``None`` if *path* is not a directory or
-        git rev-parse fails.
+        The resolved project root, or ``None`` if *path* is not a directory,
+        git rev-parse fails, or git times out (a hung git process is treated
+        as a failed candidate, not a fatal error -- resolution falls through
+        to the next hint instead of raising ``subprocess.TimeoutExpired``
+        through callers that eagerly evaluate every hint, including
+        lower-priority ones that run after a higher-priority hint already
+        resolved successfully).
     """
     if not path.is_dir():
         return None
     try:
         return _git_rev_parse_root(path)
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
 
 
@@ -236,6 +241,14 @@ def infer_project_root(cwd: Path | None = None) -> Path:
             "is merged from config that expands ${workspaceFolder} (see .cursor/mcp.json or "
             "plugin .mcp.json env). Otherwise set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, "
             "CURSOR_PROJECT_ROOT, or CLAUDE_PROJECT_DIR, or pass --project-dir."
+        )
+        raise RuntimeError(msg) from exc
+    except subprocess.TimeoutExpired as exc:
+        msg = (
+            "Could not resolve the git project root: git did not respond within the timeout "
+            "(e.g. blocked on an index/pack lock, or the repository is on an unreachable network "
+            "filesystem). Set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, CURSOR_PROJECT_ROOT, or "
+            "CLAUDE_PROJECT_DIR, or pass --project-dir, to bypass git resolution entirely."
         )
         raise RuntimeError(msg) from exc
 
