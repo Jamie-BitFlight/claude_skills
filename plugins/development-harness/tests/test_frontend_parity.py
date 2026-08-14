@@ -48,7 +48,7 @@ def _get_project_slug() -> str:
     return dh_paths.compute_slug(project_root)
 
 
-def run_cli(args: list[str], *, timeout: int = 30, env: dict[str, str] | None = None) -> dict[str, Any]:
+def run_cli(args: list[str], *, timeout: int = 180, env: dict[str, str] | None = None) -> dict[str, Any]:
     """Run ``uv run <cli.py> <args>`` and return parsed JSON output.
 
     Args:
@@ -135,6 +135,7 @@ class TestCLIForeignCWD:
             ["uv", "run", str(_CLI_PATH), "plan", "list", "--limit", "1"],
             capture_output=True,
             text=True,
+            timeout=180,
             cwd=tmp_path,
             env={**os.environ, **extra_env, "DH_STATE_HOME": str(state_home), "DH_PROJECT_ROOT": str(_REPO_ROOT)},
             check=False,

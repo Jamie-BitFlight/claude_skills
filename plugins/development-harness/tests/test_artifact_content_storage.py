@@ -75,10 +75,17 @@ def _make_mock_repo() -> MagicMock:
     """Return a minimal MagicMock suitable as a PyGithub Repository object.
 
     Returns:
-        MagicMock with no pre-configured attributes — _graphql_request is
-        mocked at the module level, so the repo object is only passed through.
+        MagicMock with ``full_name`` configured to match the ``owner/repo``
+        slug used across these tests -- artifact_provider.py derives owner
+        and repo name from ``repo.full_name`` (the established convention
+        throughout gh_client.py), not from the provider's stored repo
+        string, so an unconfigured mock's auto-generated ``full_name``
+        attribute would fail to unpack. ``_graphql_request`` is mocked at
+        the module level; only ``full_name`` needs a real value here.
     """
-    return MagicMock()
+    repo = MagicMock()
+    repo.full_name = "owner/repo"
+    return repo
 
 
 def _manifest_record(manifest: ArtifactManifest) -> ContentRecord:

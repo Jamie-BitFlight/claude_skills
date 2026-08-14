@@ -483,7 +483,7 @@ class GitHubGistArtifactProvider:
         item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
         try:
             repo = get_github(self._repo)
-            owner, repo_name = self._repo.split("/", 1)
+            owner, repo_name = repo.full_name.split("/", 1)
             issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
             body = issue.get("body") or ""
 
@@ -528,7 +528,7 @@ class GitHubGistArtifactProvider:
         item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
         try:
             repo = get_github(self._repo)
-            owner, repo_name = self._repo.split("/", 1)
+            owner, repo_name = repo.full_name.split("/", 1)
             issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
             body = issue.get("body") or ""
 
@@ -593,7 +593,7 @@ class GitHubGistArtifactProvider:
         item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
         try:
             repo = get_github(self._repo)
-            owner, repo_name = self._repo.split("/", 1)
+            owner, repo_name = repo.full_name.split("/", 1)
             issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
             body = issue.get("body") or ""
 
@@ -625,7 +625,7 @@ class GitHubGistArtifactProvider:
         """
         item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
         repo = get_github(self._repo)
-        owner, repo_name = self._repo.split("/", 1)
+        owner, repo_name = repo.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
         body = issue.get("body") or ""
 
@@ -659,7 +659,7 @@ class GitHubGistArtifactProvider:
         """
         item_id = _require_int_item_id("GitHubGistArtifactProvider", item_id)
         repo = get_github(self._repo)
-        owner, repo_name = self._repo.split("/", 1)
+        owner, repo_name = repo.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repo, owner, repo_name, item_id)
         gist = self._get_gist(item_id, issue.get("body") or "")
         if gist is None:
