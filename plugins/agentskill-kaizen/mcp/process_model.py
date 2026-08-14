@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TypeAlias
+from typing import NamedTuple, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -113,19 +113,20 @@ class ProcessModel(BaseModel):
 
     # Internal only -- private attrs are never part of the public schema or
     # model_dump()/JSON output, so this never reaches MCP callers. Always
-    # set by build_process_model(); missing_tokens_for_trace() raises if a
+    # set by build_process_model(); walk_trace() raises if a
     # ProcessModel reaches it without one (e.g. constructed directly by a
     # caller that bypassed build_process_model()).
     _reference_trie: _TrieNode | None = PrivateAttr(default=None)
 
-    def missing_tokens_for_trace(self, tools: Sequence[str]) -> int:
-        """Count trace positions that break the reference path, path-aware.
+    def walk_trace(self, tools: Sequence[str]) -> _TrieWalkResult:
+        """Walk tools against the reference path, path-aware.
 
         Walks tools against the connected reference sessions (a trie), not
         independent transition/start/end sets -- see _walk_reference_trie.
 
         Returns:
-            Count of positions that broke the reference path.
+            missing_tokens (for fitness/is_fit) and unmatched_positions (for
+            consumed_tokens -- see _walk_reference_trie for why these differ).
 
         Raises:
             ValueError: If this model wasn't built via build_process_model().
@@ -141,7 +142,7 @@ class ProcessModel(BaseModel):
 
         Returns:
             Process model with activity, transition, start, end counts, and
-            the reference trie missing_tokens_for_trace() needs.
+            the reference trie walk_trace() needs.
         """
         activity_counter: Counter[str] = Counter()
         transition_counter: Counter[Transition] = Counter()
@@ -208,9 +209,14 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
             produced_tokens=0,
         )
 
-    missing_tokens = model.missing_tokens_for_trace(tools)
+    walk = model.walk_trace(tools)
+    missing_tokens = walk.missing_tokens
     produced_tokens = len(tools)
-    consumed_tokens = max(0, produced_tokens - missing_tokens)
+    # Subtract only positions that actually broke the path, not the extra
+    # endpoint-mismatch penalty folded into missing_tokens -- a trace that is
+    # a valid prefix of a longer reference path (e.g. A->B against A->B->C)
+    # matched every token it produced even though it never reached is_end.
+    consumed_tokens = max(0, produced_tokens - walk.unmatched_positions)
 
     return ConformanceDiagnostics(
         session_id=session_id,
@@ -223,7 +229,25 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
     )
 
 
-def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> int:
+class _TrieWalkResult(NamedTuple):
+    """Result of walking a trace against the reference trie.
+
+    ``missing_tokens`` and ``unmatched_positions`` differ by exactly the
+    endpoint-mismatch penalty: a trace that is a valid *prefix* of a longer
+    reference path (target A->B against reference A->B->C) never breaks the
+    path, so unmatched_positions is 0, but it also never reaches a genuine
+    reference-session ending, so missing_tokens is 1. Use missing_tokens for
+    trace_is_fit/trace_fitness (an incomplete trace should score below a
+    complete one); use unmatched_positions for consumed_tokens (every token
+    the trace produced was still validly on-path, so none of them should be
+    subtracted out just because the walk stopped short of an ending).
+    """
+
+    missing_tokens: int
+    unmatched_positions: int
+
+
+def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> _TrieWalkResult:
     """Walk tools against the reference trie, counting steps that break the path.
 
     Each position is only a match if the *entire path so far* also matched
@@ -236,22 +260,25 @@ def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> int:
     rejoin, so re-syncing would just be a different kind of guess.
 
     Returns:
-        Count of positions that failed to match the reference trie, plus
-        one more if the walk stayed on-path throughout but ended at a
-        position that isn't a genuine reference-session ending.
+        missing_tokens: unmatched_positions, plus one more if the walk
+            stayed on-path throughout but ended at a position that isn't a
+            genuine reference-session ending.
+        unmatched_positions: count of positions that failed to match the
+            reference trie (excludes the endpoint-mismatch penalty).
     """
     node = root
     on_path = True
-    missing = 0
+    unmatched_positions = 0
     for tool in tools:
         if on_path and tool in node.children:
             node = node.children[tool]
         else:
-            missing += 1
+            unmatched_positions += 1
             on_path = False
+    missing_tokens = unmatched_positions
     if on_path and not node.is_end:
-        missing += 1
-    return missing
+        missing_tokens += 1
+    return _TrieWalkResult(missing_tokens=missing_tokens, unmatched_positions=unmatched_positions)
 
 
 def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transition], tools: Sequence[str]) -> float:

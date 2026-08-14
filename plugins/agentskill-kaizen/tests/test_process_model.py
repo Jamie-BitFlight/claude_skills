@@ -100,6 +100,28 @@ def test_check_sequence_conformance_rejects_a_spliced_path_across_branches() -> 
     assert diagnostics.trace_fitness == pytest.approx(0.75)
 
 
+def test_check_sequence_conformance_prefix_trace_consumes_every_matched_token() -> None:
+    """A trace that is a valid prefix of a longer reference path matched
+    every token it produced -- it should not lose a consumed_tokens credit
+    just because it stopped short of a genuine reference-session ending.
+
+    Regression test: reference A->B->C, target A->B follows the reference
+    path exactly for both tokens, failing only the endpoint check. Before
+    the fix, consumed_tokens subtracted missing_tokens (which folds in that
+    endpoint penalty) from produced_tokens, undercounting to 1 even though
+    both A and B were validly on-path.
+    """
+    reference_model = build_process_model({"reference": ["A", "B", "C"]})
+
+    result = check_sequence_conformance({"target": ["A", "B"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
+    assert diagnostics.missing_tokens == 1
+    assert diagnostics.produced_tokens == 2
+    assert diagnostics.consumed_tokens == 2
+
+
 def test_check_sequence_conformance_empty_trace_against_nonempty_reference() -> None:
     reference_model = build_process_model({"reference": ["Read", "Write"]})
 
