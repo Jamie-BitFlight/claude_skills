@@ -37,18 +37,75 @@ def test_check_sequence_conformance_flags_unseen_transition() -> None:
     assert diagnostics["drifted"].trace_fitness == pytest.approx(0.5)
 
 
-def test_check_sequence_conformance_fitness_counts_start_and_end_checks() -> None:
-    """A trace with every transition correct but a start mismatch shouldn't
-    score 0.0 just because the fitness denominator only counted transitions.
+def test_check_sequence_conformance_partial_credit_for_a_late_deviation() -> None:
+    """A trace that diverges only at its last step shouldn't score 0.0 just
+    because the fitness denominator undercounted the total checks.
 
-    Regression test: reference model X->A->B, target A->B has a perfectly
-    conforming transition and end activity, failing only the start check.
+    Regression test: reference model X->A->B, target X->A->C matches the
+    start and first transition exactly, failing only the final step.
+    """
+    reference_model = build_process_model({"reference": ["X", "A", "B"]})
+
+    result = check_sequence_conformance({"target": ["X", "A", "C"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
+    assert diagnostics.missing_tokens == 1
+    # 1 of 4 checks fails (2 transition positions + start + end) -- not 1 of 1.
+    assert diagnostics.trace_fitness == pytest.approx(0.75)
+
+
+def test_check_sequence_conformance_bad_start_diverges_the_whole_trace() -> None:
+    """A trace that never lands on a valid reference start can't be "mostly
+    right" -- it was never on any reference path, so every position after
+    it is unaccounted for too.
+
+    This is intentionally stricter than a naive "count the failed checks
+    independently" model: reference X->A->B, target A->B has a transition
+    (A->B) and an end activity (B) that both occur *somewhere* in the
+    reference, but starting from A means the trace was never following the
+    X->A->B path in the first place.
     """
     reference_model = build_process_model({"reference": ["X", "A", "B"]})
 
     result = check_sequence_conformance({"target": ["A", "B"]}, reference_model)
 
     diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
+    assert diagnostics.missing_tokens == 2
+    assert diagnostics.trace_fitness == pytest.approx(1 / 3)
+
+
+def test_check_sequence_conformance_rejects_a_spliced_path_across_branches() -> None:
+    """A trace that combines a transition from one reference branch with an
+    endpoint from a different, unrelated branch must not be marked as fully
+    conforming just because each fragment is independently valid somewhere
+    in the aggregate reference model.
+
+    Regression test for the path-splicing bug: reference sessions A->B->D
+    and C->B->E share activity B but are otherwise disjoint branches.
+    Target A->B->E combines A->B (from the first branch) with B->E (from
+    the second) into a path neither reference session actually contains.
+    Independent transition/start/end checks would all pass (A is a valid
+    start, A->B and B->E both occur somewhere, E is a valid end) -- the
+    reference trie catches it because A->B only ever leads to D, never E.
+    """
+    reference_model = build_process_model({"ref-1": ["A", "B", "D"], "ref-2": ["C", "B", "E"]})
+
+    result = check_sequence_conformance({"spliced": ["A", "B", "E"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
     assert diagnostics.missing_tokens == 1
-    # 1 of 3 checks (1 transition + start + end) fails -- not 1 of 1.
-    assert diagnostics.trace_fitness == pytest.approx(2 / 3)
+    assert diagnostics.trace_fitness == pytest.approx(0.75)
+
+
+def test_check_sequence_conformance_empty_trace_against_nonempty_reference() -> None:
+    reference_model = build_process_model({"reference": ["Read", "Write"]})
+
+    result = check_sequence_conformance({"empty": []}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
+    assert diagnostics.missing_tokens == 1
+    assert diagnostics.produced_tokens == 0

@@ -4,23 +4,59 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import TypeAlias
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 Transition: TypeAlias = tuple[str, str]
 ToolSequences: TypeAlias = Mapping[str, Sequence[str]]
 
 
+@dataclass
+class _TrieNode:
+    """Reference-path trie node -- internal only, never MCP output.
+
+    Tracks connected reference paths (one root-to-leaf path per reference
+    session) rather than independent per-transition/start/end sets, so
+    conformance checking can't treat a "spliced" trace -- one that combines
+    a valid transition from one reference branch with a valid endpoint from
+    an unrelated branch -- as fully conforming just because each fragment
+    is independently valid somewhere in the aggregate model.
+    """
+
+    children: dict[str, _TrieNode] = field(default_factory=dict)
+    is_end: bool = False
+
+
+def _build_reference_trie(sequences: ToolSequences) -> _TrieNode:
+    root = _TrieNode()
+    for tools in sequences.values():
+        if not tools:
+            continue
+        node = root
+        for tool in tools:
+            node = node.children.setdefault(tool, _TrieNode())
+        node.is_end = True
+    return root
+
+
 class ConformanceDiagnostics(BaseModel):
     """Per-session conformance metrics for a target trace.
 
-    ``uncovered_model_transitions`` is model-edge coverage, not token-replay
-    residue: it counts every reference-model transition this trace didn't
-    exercise, including transitions that belong to a different valid branch
-    the trace was never expected to take. A fully conforming trace through
-    one branch of a multi-path reference model can still have a nonzero
-    count here.
+    ``missing_tokens`` is path-aware: it walks the trace against the actual
+    connected reference sessions (a trie), not independent transition/start/
+    end sets, so a trace that combines a transition from one reference
+    branch with an endpoint from an unrelated branch is correctly flagged
+    -- it can't pass just because each fragment happens to be valid
+    somewhere in the aggregate model.
+
+    ``uncovered_model_transitions`` is a separate, looser metric -- model-
+    edge coverage, not token-replay residue: it counts every reference-model
+    transition this trace didn't exercise, including transitions that
+    belong to a different valid branch the trace was never expected to
+    take. A fully conforming trace through one branch of a multi-path
+    reference model can still have a nonzero count here.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -75,6 +111,66 @@ class ProcessModel(BaseModel):
     start_set: frozenset[str]
     end_set: frozenset[str]
 
+    # Internal only -- private attrs are never part of the public schema or
+    # model_dump()/JSON output, so this never reaches MCP callers. Always
+    # set by build_process_model(); missing_tokens_for_trace() raises if a
+    # ProcessModel reaches it without one (e.g. constructed directly by a
+    # caller that bypassed build_process_model()).
+    _reference_trie: _TrieNode | None = PrivateAttr(default=None)
+
+    def missing_tokens_for_trace(self, tools: Sequence[str]) -> int:
+        """Count trace positions that break the reference path, path-aware.
+
+        Walks tools against the connected reference sessions (a trie), not
+        independent transition/start/end sets -- see _walk_reference_trie.
+
+        Returns:
+            Count of positions that broke the reference path.
+
+        Raises:
+            ValueError: If this model wasn't built via build_process_model().
+        """
+        if self._reference_trie is None:
+            msg = "ProcessModel.reference_trie is unset; build the model via build_process_model()"
+            raise ValueError(msg)
+        return _walk_reference_trie(self._reference_trie, tools)
+
+    @classmethod
+    def from_sequences(cls, sequences: ToolSequences) -> ProcessModel:
+        """Build a ProcessModel, including its internal reference trie.
+
+        Returns:
+            Process model with activity, transition, start, end counts, and
+            the reference trie missing_tokens_for_trace() needs.
+        """
+        activity_counter: Counter[str] = Counter()
+        transition_counter: Counter[Transition] = Counter()
+        start_counter: Counter[str] = Counter()
+        end_counter: Counter[str] = Counter()
+
+        for tools in sequences.values():
+            if not tools:
+                continue
+            activity_counter.update(tools)
+            transition_counter.update(_transitions(tools))
+            start_counter[tools[0]] += 1
+            end_counter[tools[-1]] += 1
+
+        model = cls(
+            session_count=len(sequences),
+            event_count=sum(activity_counter.values()),
+            activity_counts=_activity_counts(activity_counter),
+            transition_counts=_transition_counts(transition_counter),
+            start_counts=_activity_counts(start_counter),
+            end_counts=_activity_counts(end_counter),
+            activity_set=frozenset(activity_counter),
+            transition_set=tuple(sorted(transition_counter)),
+            start_set=frozenset(start_counter),
+            end_set=frozenset(end_counter),
+        )
+        model._reference_trie = _build_reference_trie(sequences)
+        return model
+
 
 def build_process_model(sequences: ToolSequences) -> ProcessModel:
     """Build a transition model from session tool-call sequences.
@@ -82,31 +178,7 @@ def build_process_model(sequences: ToolSequences) -> ProcessModel:
     Returns:
         Process model with activity, transition, start, and end counts.
     """
-    activity_counter: Counter[str] = Counter()
-    transition_counter: Counter[Transition] = Counter()
-    start_counter: Counter[str] = Counter()
-    end_counter: Counter[str] = Counter()
-
-    for tools in sequences.values():
-        if not tools:
-            continue
-        activity_counter.update(tools)
-        transition_counter.update(_transitions(tools))
-        start_counter[tools[0]] += 1
-        end_counter[tools[-1]] += 1
-
-    return ProcessModel(
-        session_count=len(sequences),
-        event_count=sum(activity_counter.values()),
-        activity_counts=_activity_counts(activity_counter),
-        transition_counts=_transition_counts(transition_counter),
-        start_counts=_activity_counts(start_counter),
-        end_counts=_activity_counts(end_counter),
-        activity_set=frozenset(activity_counter),
-        transition_set=tuple(sorted(transition_counter)),
-        start_set=frozenset(start_counter),
-        end_set=frozenset(end_counter),
-    )
+    return ProcessModel.from_sequences(sequences)
 
 
 def check_sequence_conformance(
@@ -122,17 +194,23 @@ def check_sequence_conformance(
 
 def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessModel) -> ConformanceDiagnostics:
     observed_transitions = _transitions(tools)
-    unexpected_transition_count = sum(
-        1 for transition in observed_transitions if transition not in model.transition_set
-    )
-    start_mismatch = bool(tools) and tools[0] not in model.start_set
-    end_mismatch = bool(tools) and tools[-1] not in model.end_set
-    empty_trace_mismatch = not tools and model.event_count > 0
+    uncovered_model_transitions = len(frozenset(model.transition_set) - frozenset(observed_transitions))
 
-    missing_tokens = unexpected_transition_count + int(start_mismatch) + int(end_mismatch) + int(empty_trace_mismatch)
+    if not tools:
+        missing_tokens = 1 if model.event_count > 0 else 0
+        return ConformanceDiagnostics(
+            session_id=session_id,
+            trace_is_fit=missing_tokens == 0,
+            trace_fitness=_trace_fitness(missing_tokens, observed_transitions, tools),
+            missing_tokens=missing_tokens,
+            uncovered_model_transitions=uncovered_model_transitions,
+            consumed_tokens=0,
+            produced_tokens=0,
+        )
+
+    missing_tokens = model.missing_tokens_for_trace(tools)
     produced_tokens = len(tools)
     consumed_tokens = max(0, produced_tokens - missing_tokens)
-    uncovered_model_transitions = len(frozenset(model.transition_set) - frozenset(observed_transitions))
 
     return ConformanceDiagnostics(
         session_id=session_id,
@@ -143,6 +221,37 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
         consumed_tokens=consumed_tokens,
         produced_tokens=produced_tokens,
     )
+
+
+def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> int:
+    """Walk tools against the reference trie, counting steps that break the path.
+
+    Each position is only a match if the *entire path so far* also matched
+    a reference session, not just the individual activity in isolation --
+    this is what stops "A" (a valid start elsewhere) followed by "B" (a
+    valid next-step elsewhere) from passing when no single reference
+    session actually contains that A->B path. Once a step fails to match,
+    every subsequent step also counts as missing: there is no principled
+    way to guess which reference branch, if any, the trace meant to
+    rejoin, so re-syncing would just be a different kind of guess.
+
+    Returns:
+        Count of positions that failed to match the reference trie, plus
+        one more if the walk stayed on-path throughout but ended at a
+        position that isn't a genuine reference-session ending.
+    """
+    node = root
+    on_path = True
+    missing = 0
+    for tool in tools:
+        if on_path and tool in node.children:
+            node = node.children[tool]
+        else:
+            missing += 1
+            on_path = False
+    if on_path and not node.is_end:
+        missing += 1
+    return missing
 
 
 def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transition], tools: Sequence[str]) -> float:
