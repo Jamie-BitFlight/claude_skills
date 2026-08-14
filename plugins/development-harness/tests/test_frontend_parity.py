@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,6 +34,8 @@ import pytest
 _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
+
+from tests.helpers import run_cli_subprocess
 
 _CLI_PATH = _plugin_root / "sam_schema" / "cli.py"
 _REPO_ROOT = _plugin_root.parent.parent  # claude_skills repo root (for DH_PROJECT_ROOT in subprocess tests)
@@ -67,9 +68,7 @@ def run_cli(args: list[str], *, timeout: int = 180, env: dict[str, str] | None =
     run_env = os.environ.copy()
     if env:
         run_env.update(env)
-    result = subprocess.run(
-        ["uv", "run", str(_CLI_PATH), *args], capture_output=True, text=True, timeout=timeout, env=run_env, check=False
-    )
+    result = run_cli_subprocess(["uv", "run", str(_CLI_PATH), *args], timeout=timeout, env=run_env)
     if result.returncode != 0:
         raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:500]}")
     return json.loads(result.stdout)
@@ -131,14 +130,11 @@ class TestCLIForeignCWD:
         state_home = tmp_path / label / "dh_state"
         plan_dir = state_home / "projects" / _get_project_slug() / "plan"
         plan_dir.mkdir(parents=True, exist_ok=True)
-        result = subprocess.run(
+        result = run_cli_subprocess(
             ["uv", "run", str(_CLI_PATH), "plan", "list", "--limit", "1"],
-            capture_output=True,
-            text=True,
             timeout=180,
             cwd=tmp_path,
             env={**os.environ, **extra_env, "DH_STATE_HOME": str(state_home), "DH_PROJECT_ROOT": str(_REPO_ROOT)},
-            check=False,
         )
         assert result.returncode == 0, f"label={label} {result.stderr[:500]}"
         json.loads(result.stdout)
