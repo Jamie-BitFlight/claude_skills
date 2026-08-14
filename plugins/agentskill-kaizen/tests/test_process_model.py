@@ -32,4 +32,23 @@ def test_check_sequence_conformance_flags_unseen_transition() -> None:
     assert diagnostics["matching"].trace_fitness == pytest.approx(1.0)
     assert diagnostics["drifted"].trace_is_fit is False
     assert diagnostics["drifted"].missing_tokens == 2
-    assert diagnostics["drifted"].trace_fitness == pytest.approx(0.0)
+    # 2 of 4 checks (2 transitions + start + end) fail: both transitions are
+    # wrong, but start/end still match -- see the denominator fix below.
+    assert diagnostics["drifted"].trace_fitness == pytest.approx(0.5)
+
+
+def test_check_sequence_conformance_fitness_counts_start_and_end_checks() -> None:
+    """A trace with every transition correct but a start mismatch shouldn't
+    score 0.0 just because the fitness denominator only counted transitions.
+
+    Regression test: reference model X->A->B, target A->B has a perfectly
+    conforming transition and end activity, failing only the start check.
+    """
+    reference_model = build_process_model({"reference": ["X", "A", "B"]})
+
+    result = check_sequence_conformance({"target": ["A", "B"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.missing_tokens == 1
+    # 1 of 3 checks (1 transition + start + end) fails -- not 1 of 1.
+    assert diagnostics.trace_fitness == pytest.approx(2 / 3)

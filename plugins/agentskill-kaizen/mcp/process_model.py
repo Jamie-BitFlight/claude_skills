@@ -137,7 +137,7 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
     return ConformanceDiagnostics(
         session_id=session_id,
         trace_is_fit=missing_tokens == 0,
-        trace_fitness=_trace_fitness(missing_tokens, tools),
+        trace_fitness=_trace_fitness(missing_tokens, observed_transitions, tools),
         missing_tokens=missing_tokens,
         uncovered_model_transitions=uncovered_model_transitions,
         consumed_tokens=consumed_tokens,
@@ -145,8 +145,20 @@ def _diagnose_sequence(session_id: str, tools: Sequence[str], model: ProcessMode
     )
 
 
-def _trace_fitness(missing_tokens: int, tools: Sequence[str]) -> float:
-    checks = max(1, len(tools) - 1)
+def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transition], tools: Sequence[str]) -> float:
+    """Fitness as a fraction of the checks missing_tokens actually draws from.
+
+    A non-empty trace is scored on len(observed_transitions) transition
+    checks plus one start check and one end check -- matching exactly what
+    missing_tokens counts, so a trace that only fails a start/end check
+    (with every transition correct) doesn't get an artificially low score
+    from a denominator that counted transitions alone. An empty trace has
+    exactly one check (empty_trace_mismatch).
+
+    Returns:
+        Fitness in [0.0, 1.0]: the fraction of checks that passed.
+    """
+    checks = len(observed_transitions) + 2 if tools else 1
     return round(max(0.0, 1.0 - (missing_tokens / checks)), 6)
 
 
