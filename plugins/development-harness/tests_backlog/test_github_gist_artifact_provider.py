@@ -75,10 +75,13 @@ def mock_github_repo(mocker: MockerFixture) -> MagicMock:
     How: Patch backlog_core.artifact_provider.get_github; configure graphql_query
          to return a valid 2-tuple.
     Why: Provider uses _fetch_issue_graphql / _update_issue_graphql which unpack
-         (headers, data) from repo.requester.graphql_query.
+         (headers, data) from repo.requester.graphql_query. The owner/repo split
+         reads repo.full_name (the established gh_client.py convention), which
+         must be configured for the same reason.
     """
     mock = mocker.patch("backlog_core.artifact_provider.get_github")
     repo = MagicMock()
+    repo.full_name = "owner/repo"
     repo.requester.graphql_query.return_value = _make_graphql_return()
     mock.return_value = repo
     return repo

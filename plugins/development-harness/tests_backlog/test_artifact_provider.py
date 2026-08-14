@@ -68,10 +68,13 @@ def mock_repo(mocker: MockerFixture) -> MagicMock:
     Why: Provider tests must not make real HTTP calls. The artifact_provider calls
          _fetch_issue_graphql (query) and _update_issue_graphql (mutation), both of
          which unpack repo.requester.graphql_query() as (headers, response). A bare
-         MagicMock() unpacks to 0 values and raises ValueError.
+         MagicMock() unpacks to 0 values and raises ValueError. Likewise, the owner/
+         repo split reads repo.full_name (the established gh_client.py convention),
+         which must be configured for the same reason.
     """
     mock = mocker.patch("backlog_core.artifact_provider.get_github")
     repo = MagicMock()
+    repo.full_name = "owner/repo"
     repo.requester.graphql_query.return_value = (
         {},
         {
@@ -142,6 +145,7 @@ def _make_mock_github_provider(worktree: Path, mocker: MockerFixture) -> Artifac
     """Construct a mocked GitHubGistArtifactProvider for protocol testing."""
     mock = mocker.patch("backlog_core.artifact_provider.get_github")
     repo = MagicMock()
+    repo.full_name = "owner/test-repo"
     repo.requester.graphql_query.return_value = (
         {},
         {
