@@ -18,6 +18,15 @@ SessionCluster: TypeAlias = tuple[str, ...]
 ClusterId: TypeAlias = int
 PairKey: TypeAlias = tuple[ClusterId, ClusterId]
 
+# Average-linkage agglomeration requires an O(n^2) pairwise similarity
+# matrix by construction (see _initial_cluster_state and the pair_sim
+# growth note in _merge_most_similar_pair) -- no change to this algorithm
+# family avoids that memory floor, only a different clustering algorithm
+# would. 2000 sessions measured ~1GB RSS / ~28s in review testing; 1500
+# keeps worst-case memory to roughly half that while still covering any
+# realistic single clustering call.
+_MAX_SESSIONS: int = 1500
+
 
 class ClusterResult(BaseModel):
     """Cluster assignments and per-cluster representative tools."""
@@ -59,8 +68,21 @@ def cluster_tool_sequences(sequences: ToolSequences, n_clusters: int, top_tools_
 
     Returns:
         Cluster assignments and representative tools for each cluster.
+
+    Raises:
+        ValueError: If sequences contains more than _MAX_SESSIONS sessions
+            -- average-linkage agglomeration's O(n^2) pairwise similarity
+            matrix would risk exhausting the host process's memory.
     """
     session_ids = tuple(sorted(sequences))
+    if len(session_ids) > _MAX_SESSIONS:
+        msg = (
+            f"cluster_tool_sequences received {len(session_ids)} sessions, exceeding the "
+            f"{_MAX_SESSIONS}-session safe bound for average-linkage agglomeration. This algorithm "
+            "requires an O(n^2) pairwise similarity matrix by construction -- pre-filter or sample "
+            "the session set before clustering."
+        )
+        raise ValueError(msg)
     effective_clusters = min(max(1, n_clusters), len(session_ids))
     vectors = {session_id: Counter(sequences[session_id]) for session_id in session_ids}
 

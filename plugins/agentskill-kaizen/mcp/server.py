@@ -449,6 +449,10 @@ async def cluster_sessions(
     Raises:
         ToolError: If neither glob_path nor sequences is provided, or if
             there are no sessions to cluster.
+        ValueError: If the resolved session count exceeds
+            session_cluster._MAX_SESSIONS -- average-linkage agglomeration's
+            O(n^2) pairwise similarity matrix risks exhausting the host
+            process's memory beyond that bound.
     """
     await context.info("Resolving tool sequences...")
     resolved = await asyncio.to_thread(_resolve_sequences, glob_path, sequences, target_name="target")

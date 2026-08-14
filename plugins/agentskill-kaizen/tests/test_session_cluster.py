@@ -55,6 +55,29 @@ def test_cluster_tool_sequences_precomputes_pairwise_similarity_once(monkeypatch
     assert call_count == session_count * (session_count - 1) // 2
 
 
+def test_cluster_tool_sequences_rejects_a_corpus_over_the_safe_session_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Average-linkage agglomeration's O(n^2) pairwise similarity matrix
+    (see the pair_sim growth note in _merge_most_similar_pair) risks
+    exhausting the host process's memory for very large corpora -- a P1
+    review finding measured ~1GB RSS clustering 2000 sessions. Guard the
+    bound directly rather than generating thousands of real sessions here.
+    """
+    monkeypatch.setattr(session_cluster, "_MAX_SESSIONS", 3)
+    sequences = {f"session-{i}": ["Read", "Write"] for i in range(4)}
+
+    with pytest.raises(ValueError, match="exceeding the 3-session safe bound"):
+        session_cluster.cluster_tool_sequences(sequences, n_clusters=2, top_tools_per_cluster=3)
+
+
+def test_cluster_tool_sequences_allows_a_corpus_at_the_safe_session_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(session_cluster, "_MAX_SESSIONS", 3)
+    sequences = {f"session-{i}": ["Read", "Write"] for i in range(3)}
+
+    result = session_cluster.cluster_tool_sequences(sequences, n_clusters=2, top_tools_per_cluster=3)
+
+    assert sum(len(members) for members in result.clusters.values()) == 3
+
+
 @pytest.mark.slow
 def test_cluster_tool_sequences_scales_to_large_session_counts() -> None:
     """1000 sessions must cluster well under the pre-fix ~27.5s measurement.
