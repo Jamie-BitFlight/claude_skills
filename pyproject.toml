@@ -358,6 +358,9 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
+# GitHubContentsStore batches blob fetches via a bounded aliased GraphQL query (avoiding an N+1
+# REST call per blob) — SLF001 protocol-delegation justification matches github_backend.py above
+"**/backlog_core/backends/github_contents.py" = ["private-member-access"]
 # InMemoryBackend implements the full BacklogBackend Protocol surface — PLR0904 and DOC201 do not apply
 # DOC201 — single-line docstrings already state the return value; formal Returns sections add no information
 "**/backlog_core/backends/memory_backend.py" = [
