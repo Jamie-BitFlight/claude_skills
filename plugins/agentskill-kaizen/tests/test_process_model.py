@@ -38,11 +38,15 @@ def test_check_sequence_conformance_flags_unseen_transition() -> None:
 
 
 def test_check_sequence_conformance_partial_credit_for_a_late_deviation() -> None:
-    """A trace that diverges only at its last step shouldn't score 0.0 just
-    because the fitness denominator undercounted the total checks.
+    """A trace that diverges only at its last step gets credit for the
+    matched prefix, but the final step itself fails two independent checks
+    -- the transition into it, and the trace's end check, since the trace
+    also terminates there -- not just one.
 
     Regression test: reference model X->A->B, target X->A->C matches the
-    start and first transition exactly, failing only the final step.
+    start and first transition exactly. The final token "C" both breaks the
+    A->? transition (A->B is the only valid one) and fails to land on a
+    genuine reference ending, so missing_tokens counts that position twice.
     """
     reference_model = build_process_model({"reference": ["X", "A", "B"]})
 
@@ -50,9 +54,13 @@ def test_check_sequence_conformance_partial_credit_for_a_late_deviation() -> Non
 
     diagnostics = result[0]
     assert diagnostics.trace_is_fit is False
-    assert diagnostics.missing_tokens == 1
-    # 1 of 4 checks fails (2 transition positions + start + end) -- not 1 of 1.
-    assert diagnostics.trace_fitness == pytest.approx(0.75)
+    assert diagnostics.missing_tokens == 2
+    # 2 of 4 checks fail (2 transition positions + start + end): the start
+    # and first transition (X->A) pass, but the final transition (A->C) and
+    # the end check both fail at the same, final position.
+    assert diagnostics.trace_fitness == pytest.approx(0.5)
+    # Both X and A were still genuinely consumed along the reference path.
+    assert diagnostics.consumed_tokens == 2
 
 
 def test_check_sequence_conformance_bad_start_diverges_the_whole_trace() -> None:
@@ -89,6 +97,8 @@ def test_check_sequence_conformance_rejects_a_spliced_path_across_branches() -> 
     Independent transition/start/end checks would all pass (A is a valid
     start, A->B and B->E both occur somewhere, E is a valid end) -- the
     reference trie catches it because A->B only ever leads to D, never E.
+    The break happens at the trace's final token, so it fails both the
+    transition-in check and the end check at that one position.
     """
     reference_model = build_process_model({"ref-1": ["A", "B", "D"], "ref-2": ["C", "B", "E"]})
 
@@ -96,8 +106,10 @@ def test_check_sequence_conformance_rejects_a_spliced_path_across_branches() -> 
 
     diagnostics = result[0]
     assert diagnostics.trace_is_fit is False
-    assert diagnostics.missing_tokens == 1
-    assert diagnostics.trace_fitness == pytest.approx(0.75)
+    assert diagnostics.missing_tokens == 2
+    assert diagnostics.trace_fitness == pytest.approx(0.5)
+    # A and B were still genuinely consumed along the A->B->D reference path.
+    assert diagnostics.consumed_tokens == 2
 
 
 def test_check_sequence_conformance_prefix_trace_consumes_every_matched_token() -> None:
@@ -139,6 +151,28 @@ def test_check_sequence_conformance_wrong_single_token_scores_zero_fitness() -> 
     diagnostics = result[0]
     assert diagnostics.trace_is_fit is False
     assert diagnostics.trace_fitness == pytest.approx(0.0)
+
+
+def test_check_sequence_conformance_multi_token_terminal_break_counts_double() -> None:
+    """The double-failure-at-the-final-position rule generalizes beyond the
+    single-token case: any trace whose sole break lands on its last token
+    fails both the transition into it and the end check simultaneously.
+
+    Regression test: reference A->B, target A->C matches the start exactly
+    but diverges on the only transition, which is also the final position.
+    Before the fix this scored 0.666667 (1 of 3 checks failing); the correct
+    score counts both the failed transition and the failed end check: 2 of 3.
+    """
+    reference_model = build_process_model({"reference": ["A", "B"]})
+
+    result = check_sequence_conformance({"target": ["A", "C"]}, reference_model)
+
+    diagnostics = result[0]
+    assert diagnostics.trace_is_fit is False
+    assert diagnostics.missing_tokens == 2
+    assert diagnostics.trace_fitness == pytest.approx(1 / 3)
+    # A was still genuinely consumed as the matching start token.
+    assert diagnostics.consumed_tokens == 1
 
 
 def test_check_sequence_conformance_matching_single_token_is_fully_fit() -> None:

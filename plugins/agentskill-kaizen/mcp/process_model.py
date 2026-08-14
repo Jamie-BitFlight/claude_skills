@@ -259,12 +259,23 @@ def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> _TrieWalkResu
     way to guess which reference branch, if any, the trace meant to
     rejoin, so re-syncing would just be a different kind of guess.
 
+    A break that lands on the trace's final token fails two independent
+    checks at that one position -- the transition leading into it, and the
+    trace's end check -- since the trace also terminates there. That is
+    exactly the case where unmatched_positions == 1 while the walk ended
+    off-path: once a break happens, every later position is also counted
+    (see above), so unmatched_positions can only equal 1 if the break itself
+    occurred at the last token. missing_tokens counts that position twice;
+    unmatched_positions (used for consumed_tokens) still counts it once,
+    since only one token was actually produced there.
+
     Returns:
         missing_tokens: unmatched_positions, plus one more if the walk
             stayed on-path throughout but ended at a position that isn't a
-            genuine reference-session ending.
+            genuine reference-session ending, or if the sole break landed on
+            the trace's final token (see above).
         unmatched_positions: count of positions that failed to match the
-            reference trie (excludes the endpoint-mismatch penalty).
+            reference trie (excludes both endpoint-mismatch penalties).
     """
     node = root
     on_path = True
@@ -276,7 +287,7 @@ def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> _TrieWalkResu
             unmatched_positions += 1
             on_path = False
     missing_tokens = unmatched_positions
-    if on_path and not node.is_end:
+    if (on_path and not node.is_end) or (not on_path and unmatched_positions == 1):
         missing_tokens += 1
     return _TrieWalkResult(missing_tokens=missing_tokens, unmatched_positions=unmatched_positions)
 
@@ -291,11 +302,10 @@ def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transitio
     from a denominator that counted transitions alone. An empty trace has
     exactly one check (empty_trace_mismatch).
 
-    A single-token trace is the one case where the start check and the end
-    check both examine the same physical walk position: the trie walk can
-    only mark that position unmatched once (missing_tokens caps at 1), but a
-    wrong single token genuinely fails both checks independently -- so it
-    scores against both, not one against a denominator of two.
+    missing_tokens already carries the double-count for a break landing on
+    the trace's final token (transition-in check and end check both fail at
+    that one position) -- see _walk_reference_trie -- so this denominator
+    only needs the plain check count, not any further adjustment.
 
     Returns:
         Fitness in [0.0, 1.0]: the fraction of checks that passed.
@@ -303,8 +313,6 @@ def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transitio
     if not tools:
         return round(max(0.0, 1.0 - (missing_tokens / 1)), 6)
     checks = len(observed_transitions) + 2
-    if len(tools) == 1 and missing_tokens > 0:
-        missing_tokens = 2
     return round(max(0.0, 1.0 - (missing_tokens / checks)), 6)
 
 
