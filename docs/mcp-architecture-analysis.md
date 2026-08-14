@@ -34,10 +34,10 @@ From the Warp documentation and agentskill-kaizen implementation:
 #### 1. **agentskill-kaizen** ✅ (Complete)
 **Status:** Has comprehensive MCP server
 - **MCP:** `kaizen-analysis` (FastMCP, Python)
-- **Tools:** 7 tools for process mining, pattern detection, clustering
+- **Tools:** 6 tools for process mining, pattern detection, clustering
 - **Location:** `plugins/agentskill-kaizen/mcp/server.py`
 - **Transport:** stdio via `uv --script`
-- **Quality:** Production-ready, includes dashboard
+- **Quality:** Production-ready
 
 #### 2. **plugin-creator** 🔴 (Needs MCP)
 **Purpose:** Plugin development, validation, refactoring

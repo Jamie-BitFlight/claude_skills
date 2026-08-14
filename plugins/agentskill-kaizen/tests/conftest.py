@@ -3,7 +3,6 @@
 Provides reusable test fixtures for:
 - Sample JSONL transcript files on disk
 - Pre-extracted tool sequence dicts
-- Frustration-signal test data
 - FastMCP Context mock factory
 
 ``mcp/`` is prepended to ``sys.path`` so ``import server`` resolves to
@@ -23,13 +22,22 @@ import pytest
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Disable pytest-xdist parallelism for this test suite.
+    """Disable pytest-xdist parallelism only when this suite runs standalone.
 
-    Measured overhead for 120 tests: xdist worker startup costs ~27s and CPU
-    contention from parallel k-means clustering workers slows those tests 2-3x.
-    Sequential execution (8.5s) is 4x faster than -n auto (35.8s).
+    xdist worker startup overhead (~8 processes) exceeds this directory's
+    actual test runtime (~1-2s of combined CPU time across 64 tests),
+    making a standalone kaizen-only invocation slower under -n auto than
+    serial (measured: 14.39s parallel vs 6.34s serial for the same tests).
+    A full-repo run amortizes that startup cost across thousands of other
+    tests, so this must not disable xdist globally -- only when every
+    collection target on the command line resolves under this directory.
     xdist reads numprocesses/dist in pytest_sessionstart, after this hook runs.
     """
+    this_dir = Path(__file__).resolve().parent
+    targets = [Path(arg.split("::")[0]).resolve() for arg in config.args]
+    kaizen_only = bool(targets) and all(target == this_dir or this_dir in target.parents for target in targets)
+    if not kaizen_only:
+        return
     if hasattr(config.option, "numprocesses"):
         config.option.numprocesses = 0
     if hasattr(config.option, "dist"):
@@ -49,22 +57,6 @@ if _MCP_DIR not in sys.path:
 def _make_assistant_tool_use(tool_name: str) -> dict[str, Any]:
     """Build a minimal assistant record containing a single tool_use block."""
     return {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": tool_name, "input": {}}]}}
-
-
-def _make_user_message(text: str, *, timestamp: str = "") -> dict[str, Any]:
-    """Build a minimal user record with string content."""
-    record: dict[str, Any] = {"type": "user", "message": {"content": text}}
-    if timestamp:
-        record["timestamp"] = timestamp
-    return record
-
-
-def _make_user_message_blocks(blocks: list[dict[str, str]], *, timestamp: str = "") -> dict[str, Any]:
-    """Build a user record with list-of-blocks content."""
-    record: dict[str, Any] = {"type": "user", "message": {"content": blocks}}
-    if timestamp:
-        record["timestamp"] = timestamp
-    return record
 
 
 # ---------------------------------------------------------------------------
@@ -121,35 +113,6 @@ def multi_session_jsonl(jsonl_dir: Path) -> Path:
         records = [_make_assistant_tool_use(t) for t in tools]
         fpath = jsonl_dir / f"{name}.jsonl"
         fpath.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
-    return jsonl_dir
-
-
-@pytest.fixture
-def frustration_jsonl(jsonl_dir: Path) -> Path:
-    """Write JSONL files containing user messages with frustration signals.
-
-    Returns:
-        Path to the directory containing the JSONL files.
-    """
-    jsonl_dir.mkdir(parents=True, exist_ok=True)
-
-    records = [
-        _make_user_message("no, that's wrong", timestamp="2026-01-01T00:00:00Z"),
-        _make_user_message("looks good to me", timestamp="2026-01-01T00:01:00Z"),
-        _make_user_message("wait, hold on a second", timestamp="2026-01-01T00:02:00Z"),
-        _make_user_message("why did you do that again?", timestamp="2026-01-01T00:03:00Z"),
-        # toolUseResult records should be skipped
-        {
-            "type": "user",
-            "toolUseResult": True,
-            "message": {"content": "no this is wrong"},
-            "timestamp": "2026-01-01T00:04:00Z",
-        },
-        # assistant record should be skipped
-        _make_assistant_tool_use("Read"),
-    ]
-    fpath = jsonl_dir / "frustration-session.jsonl"
-    fpath.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
     return jsonl_dir
 
 

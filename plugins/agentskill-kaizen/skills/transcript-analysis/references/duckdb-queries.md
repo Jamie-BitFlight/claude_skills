@@ -130,7 +130,7 @@ SOURCE: Verified against live JSONL at `~/.claude/projects/{your-project-slug}/`
 2. Compose **any** DuckDB SQL against `read_ndjson_auto('ABSOLUTE/GLOB/*.jsonl')` (Mode A — auto-parse). Use direct column names (`type`, `sessionId`, `timestamp`, `message`, etc.) and dot notation for structs (`message.usage.input_tokens`). For `message.content` array extraction use `LATERAL (SELECT unnest(from_json(message.content, '["json"]')) AS tool_item)`. **Do not use** `columns={line: 'JSON'}` (Mode B) — verified to return all nulls on claude-skills session files (2026-03-29).
 3. Run SQL via **`kaizen-duckdb` MCP** `execute_query`.
 
-The sections below are **examples** (tool misuse, frustration, etc.), not an exhaustive list of what you may select or filter.
+The sections below are **examples** (tool misuse, errors, delegation, etc.), not an exhaustive list of what you may select or filter.
 
 ## Loading JSONL Data
 
@@ -263,33 +263,6 @@ WHERE type = 'user'
   AND json_extract_string(message.content::VARCHAR, '$[0].is_error') = 'true'
 GROUP BY sessionId, error_type
 ORDER BY occurrences DESC;
-```
-
-## User Frustration Detection
-
-### Interrupts and corrections
-
-```sql
-SELECT
-  sessionId,
-  timestamp as ts,
-  CASE
-    WHEN message.content::VARCHAR LIKE '%Request interrupted by user for tool use%' THEN 'tool_denial'
-    WHEN message.content::VARCHAR LIKE '%Request interrupted by user%' THEN 'interrupt'
-    WHEN message.content::VARCHAR LIKE '%User denied%' THEN 'denied'
-    WHEN message.content::VARCHAR ~ '^(No,|Don''t|Stop |Why did you|Why would)' THEN 'correction'
-    WHEN message.content::VARCHAR ~ '(wrong|incorrect|that''s not|you should not)' THEN 'correction'
-  END as signal_type
-FROM read_ndjson_auto('/path/to/*.jsonl')
-WHERE type = 'user'
-  AND toolUseResult IS NULL
-  AND (
-    message.content::VARCHAR LIKE '%Request interrupted by user%'
-    OR message.content::VARCHAR LIKE '%User denied%'
-    OR message.content::VARCHAR ~ '^(No,|Don''t|Stop |Why did you|Why would)'
-    OR message.content::VARCHAR ~ '(wrong|incorrect|that''s not|you should not)'
-  )
-ORDER BY sessionId, ts;
 ```
 
 ## Subagent Delegation Analysis

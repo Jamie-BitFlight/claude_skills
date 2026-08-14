@@ -69,7 +69,7 @@ Comprehensive frameworks with multiple skills, commands, and specialized agents.
 | [clang-format](./plugins/clang-format) | `clang-format-configuration` | Stop clang-format from reformatting your existing C/C++ style — analyzes your code's patterns first and shows the impact before applying any changes. |
 | [holistic-linting](./plugins/holistic-linting) | `holistic-linting` | Automatic code quality enforcement — Claude won't say "done" until code passes all configured linters with root-cause fixing. Covers ruff, mypy, and bandit. |
 | [summarizer](./plugins/summarizer) | `summarizer` | Faithful information summarization with anti-hallucination methodology, structured output templates, and autonomous agents for file, URL, and image summarization. |
-| [agentskill-kaizen](./plugins/agentskill-kaizen) | `agentskill-kaizen` | Analyze Claude Code session transcripts to find inefficiencies, anti-patterns, and repeated mistakes with DuckDB process-mining and live sentiment dashboard. Two MCP servers included. |
+| [agentskill-kaizen](./plugins/agentskill-kaizen) | `agentskill-kaizen` | Analyze Claude Code session transcripts to find inefficiencies, anti-patterns, and repeated mistakes with DuckDB process-mining. Two MCP servers included. |
 | [dasel](./plugins/dasel) | `dasel` | Query, transform, and convert structured data files (JSON, YAML, TOML, XML, CSV, HCL, INI) using dasel v3 with exploration agents. |
 | [the-rewrite-room](./plugins/the-rewrite-room) | `rwr` | Documentation workflow router — routes tasks like drift audits, doc sync, prompt optimization, and summarization to canonical workflows with validation. Includes MCP file-reader server. |
 | [process-siren](./plugins/process-siren) | `process-siren` | Converts bullet steps, ASCII art, markdown tables, and prose workflows into precise Mermaid diagrams for AI-facing documents, with process quality methodology for improving ambiguous or incomplete processes before conversion. |
@@ -188,7 +188,7 @@ These hooks structurally prevent the investigation escalation anti-pattern: the 
 Two MCP servers surface transcript analysis directly in your session:
 
 - **kaizen-duckdb** — DuckDB read-only access to the session transcript database for SQL-based process mining
-- **kaizen-analysis** — analysis server for anti-pattern detection, sentiment signals, and improvement recommendations
+- **kaizen-analysis** — analysis server for anti-pattern detection and improvement recommendations
 
 Run after sessions to identify what went wrong, what tooling Claude was missing, and where repeated mistakes occurred.
 

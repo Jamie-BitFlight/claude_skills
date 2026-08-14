@@ -24,7 +24,7 @@ Start an interactive transcript exploration session. Present initial findings fr
 
 3. **Present findings to user.** Display the survey results and suggest investigation directions:
    - "I found {N} sessions with {M} tool misuse violations. Want to dig into those?"
-   - "There are {K} user corrections. Want to see the frustration signals?"
+   - "I found {K} repeated workflow deviations. Want to compare those sessions?"
    - "The most common error is {type} ({count} times). Want to trace those sessions?"
 
 4. **Follow user direction.** Based on user response, run targeted queries:

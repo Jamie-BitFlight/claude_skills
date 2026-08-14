@@ -41,22 +41,14 @@ from sam_schema.core.context_config import ContextConfig, reset_context_config, 
 from sam_schema.server import mcp as _sam_mcp
 from typer.testing import CliRunner
 
-from tests.helpers import call_mcp_tool
+from tests.helpers import call_mcp_tool, run_cli_subprocess
 
 
 def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
     """Run the supported direct CLI script and return compact stdout JSON."""
     import json
-    import subprocess
 
-    result = subprocess.run(
-        ["uv", "run", str(_plugin_root / "sam_schema" / "cli.py"), *args],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        env=env,
-        check=False,
-    )
+    result = run_cli_subprocess(["uv", "run", str(_plugin_root / "sam_schema" / "cli.py"), *args], timeout=30, env=env)
     if result.returncode != 0:
         raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:5000]}")
     assert result.stdout.endswith("\n")

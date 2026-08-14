@@ -73,41 +73,6 @@ with the caller's own asyncio event loop. Suppress banner/log noise with the `FA
 above rather than redirecting stderr to `/dev/null`, which would also hide real errors. `--json`
 output is wrapped: unwrap with `json.loads(json.loads(stdout)["content"][0]["text"])`.
 
-## Directory Structure
-
-```
-claude_skills/
-├── .claude/                    # Claude Code local config
-│   ├── skills/                 # Symlinked skill directories
-│   ├── commands/               # Command markdown files
-│   ├── agents/                 # Agent markdown files
-│   ├── hooks/                  # Session hooks (JS/CJS)
-│   ├── backlog/                # Local backlog cache
-│   ├── plan/                   # Plan artifacts (architect/, tasks-*, feature-context-*)
-│   └── settings.json           # Permissions and hook config
-├── .claude-plugin/
-│   └── marketplace.json        # Plugin registry manifest
-├── plugins/                    # All 22+ plugins
-│   └── {plugin-name}/
-│       ├── .claude-plugin/
-│       │   └── plugin.json     # Required: plugin manifest
-│       ├── skills/             # Skill directories (SKILL.md + references/)
-│       ├── commands/           # Optional: slash command definitions
-│       ├── agents/             # Optional: agent definitions
-│       ├── scripts/            # Python scripts (PEP 723 or modules)
-│       └── README.md
-├── scripts/                    # Root-level utility scripts
-├── tests/                      # Root-level tests
-├── plan/                       # Task/plan artifacts (YAML, markdown)
-├── research/                   # Research artifacts
-├── sessions/                   # cc-sessions framework
-├── docs/                       # Documentation (MCP docs, etc.)
-├── pyproject.toml              # Python config (linting, type checking, test config)
-├── .pre-commit-config.yaml     # prek hook configuration
-├── .mcp.json                   # MCP server definitions
-└── biome.json                  # JS/TS formatter config
-```
-
 ## Plugin Structure
 
 Every plugin follows this pattern:
@@ -276,18 +241,8 @@ unexpected prompts or extra steps.
 
 ## Commit Conventions
 
-This repo enforces **Conventional Commits** with `--strict --force-scope` (scope is **required**):
-
-```
-type(scope): description
-
-feat(auth): add user authentication
-fix(parser): handle null pointer exception
-docs(claude): update skills documentation
-refactor(api): extract validation logic
-```
-
-Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+This repo enforces **Conventional Commits** with `--strict --force-scope` (scope is **required**) via
+the `conventional-pre-commit` hook in `.pre-commit-config.yaml`.
 
 **NEVER use `--no-verify` or flags that bypass git hooks.** If a hook fails, fix the underlying issue.
 

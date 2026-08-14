@@ -1,33 +1,13 @@
-"""Unit and direct-call tests for the kaizen-analysis MCP server module.
-
-Covers helpers and tools invoked on the imported module. MCP protocol coverage
-(list_tools, call_tool, read_resource) lives in ``test_server_mcp.py`` using
-``Client(mcp)`` in-memory transport.
-
-Tests cover:
-- Helper functions: _read_jsonl, _extract_tools_from_records, _resolve_glob,
-  _build_event_log, _extract_user_text, _extract_tool_sequences_impl,
-  _resolve_sequences
-- Session log schema helpers and resource function
-- Async MCP tools (direct call): get_transcript_jsonl_schema, extract_tool_sequences,
-  discover_process_model, check_conformance, find_frequent_patterns,
-  detect_frustration_signals, cluster_sessions
-- Edge cases: empty globs, malformed JSONL, zero tool calls,
-  n_clusters > sessions, empty sequences
-"""
-
 from __future__ import annotations
 
 import json
-import sys
 from typing import TYPE_CHECKING
 
-import pandas as pd
 import pytest
 import server as kaizen_server
+from process_model import ConformanceDiagnostics, ProcessModel
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from pathlib import Path
     from unittest.mock import AsyncMock
 
@@ -218,109 +198,28 @@ class TestResolveGlob:
         assert "nested.jsonl" in result[0]
 
 
-# ===================================================================
-# Helper: _build_event_log
-# ===================================================================
+class TestBuildProcessModel:
+    def test_builds_model_from_sequences(self, sample_sequences: dict[str, list[str]]) -> None:
+        model = kaizen_server._build_process_model(sample_sequences)
 
+        assert model.session_count == 3
+        assert model.event_count == 9
+        assert "Read" in model.activity_set
+        assert ("Read", "Grep") in model.transition_set
 
-class TestBuildEventLog:
-    """Tests for _build_event_log -- PM4Py DataFrame construction."""
+    def test_returns_empty_model_for_empty_sequences(self) -> None:
+        model = kaizen_server._build_process_model({})
 
-    def test_builds_dataframe_from_sequences(self, sample_sequences: dict[str, list[str]]) -> None:
-        """Produces DataFrame with expected columns and row count."""
-        df = kaizen_server._build_event_log(sample_sequences)
+        assert model.session_count == 0
+        assert model.event_count == 0
+        assert not model.activity_set
+        assert not model.transition_set
 
-        assert isinstance(df, pd.DataFrame)
-        assert not df.empty
-        # Total rows: 3 + 2 + 4 = 9
-        assert len(df) == 9
-        assert "case:concept:name" in df.columns
-        assert "concept:name" in df.columns
-        assert "time:timestamp" in df.columns
+    def test_preserves_start_and_end_tools(self) -> None:
+        model = kaizen_server._build_process_model({"s1": ["Read", "Write"]})
 
-    def test_returns_empty_dataframe_for_empty_sequences(self) -> None:
-        """Empty sequences dict yields empty DataFrame."""
-        df = kaizen_server._build_event_log({})
-
-        assert isinstance(df, pd.DataFrame)
-        assert df.empty
-
-    def test_preserves_session_ids(self, sample_sequences: dict[str, list[str]]) -> None:
-        """Session IDs appear in the case:concept:name column."""
-        df = kaizen_server._build_event_log(sample_sequences)
-
-        session_ids = set(df["case:concept:name"].unique())
-        assert session_ids == {"session-one", "session-two", "session-three"}
-
-    def test_preserves_tool_names(self) -> None:
-        """Tool names appear in the concept:name column."""
-        sequences = {"s1": ["Read", "Write"]}
-
-        df = kaizen_server._build_event_log(sequences)
-
-        tool_names = list(df["concept:name"])
-        assert tool_names == ["Read", "Write"]
-
-    def test_timestamps_are_monotonically_increasing_within_session(self) -> None:
-        """Timestamps within a session increase by 1 second per event."""
-        sequences = {"s1": ["A", "B", "C"]}
-
-        df = kaizen_server._build_event_log(sequences)
-
-        timestamps = list(df["time:timestamp"])
-        for i in range(1, len(timestamps)):
-            assert timestamps[i] > timestamps[i - 1]
-
-
-# ===================================================================
-# Helper: _extract_user_text
-# ===================================================================
-
-
-class TestExtractUserText:
-    """Tests for _extract_user_text -- user message text extraction."""
-
-    def test_extracts_string_content(self) -> None:
-        """String content is returned directly."""
-        message = {"content": "hello world"}
-
-        result = kaizen_server._extract_user_text(message)
-
-        assert result == "hello world"
-
-    def test_extracts_text_from_block_list(self) -> None:
-        """Text blocks in list content are joined with spaces."""
-        message = {
-            "content": [
-                {"type": "text", "text": "hello"},
-                {"type": "image", "url": "x"},
-                {"type": "text", "text": "world"},
-            ]
-        }
-
-        result = kaizen_server._extract_user_text(message)
-
-        assert result == "hello world"
-
-    def test_handles_string_items_in_list(self) -> None:
-        """Plain strings in the content list are included."""
-        message = {"content": ["hello", "world"]}
-
-        result = kaizen_server._extract_user_text(message)
-
-        assert result == "hello world"
-
-    def test_returns_empty_for_missing_content(self) -> None:
-        """Missing content key returns empty string."""
-        result = kaizen_server._extract_user_text({})
-
-        assert result == ""
-
-    def test_returns_empty_for_non_string_non_list_content(self) -> None:
-        """Non-string, non-list content returns empty string."""
-        result = kaizen_server._extract_user_text({"content": 42})
-
-        assert result == ""
+        assert model.start_set == frozenset({"Read"})
+        assert model.end_set == frozenset({"Write"})
 
 
 # ===================================================================
@@ -497,11 +396,11 @@ class TestDiscoverProcessModel:
     async def test_discovers_model_from_sequences(
         self, sample_sequences: dict[str, list[str]], mock_context: AsyncMock
     ) -> None:
-        """Heuristic miner returns a string representation."""
+        """Heuristic miner returns a structured process model."""
         result = await kaizen_server.discover_process_model("", sample_sequences, context=mock_context)
 
-        assert isinstance(result, str)
-        assert len(result) > 0
+        assert isinstance(result, ProcessModel)
+        assert result.event_count > 0
 
     @pytest.mark.asyncio
     async def test_discovers_model_from_glob(self, multi_session_jsonl: Path, mock_context: AsyncMock) -> None:
@@ -510,8 +409,8 @@ class TestDiscoverProcessModel:
 
         result = await kaizen_server.discover_process_model(glob_path, context=mock_context)
 
-        assert isinstance(result, str)
-        assert len(result) > 0
+        assert isinstance(result, ProcessModel)
+        assert result.event_count > 0
 
     @pytest.mark.asyncio
     async def test_raises_on_empty_sequences(self, mock_context: AsyncMock) -> None:
@@ -550,13 +449,10 @@ class TestCheckConformance:
         assert isinstance(result, list)
         assert len(result) == len(sample_sequences)
         for entry in result:
-            assert "session_id" in entry
-            assert "trace_is_fit" in entry
-            assert "trace_fitness" in entry
-            assert "missing_tokens" in entry
-            assert "remaining_tokens" in entry
-            assert "consumed_tokens" in entry
-            assert "produced_tokens" in entry
+            assert isinstance(entry, ConformanceDiagnostics)
+            assert entry.session_id
+            assert isinstance(entry.trace_is_fit, bool)
+            assert isinstance(entry.trace_fitness, float)
 
     @pytest.mark.asyncio
     async def test_self_conformance_is_fit(
@@ -567,7 +463,7 @@ class TestCheckConformance:
             sequences=sample_sequences, reference_sequences=sample_sequences, context=mock_context
         )
 
-        fit_count = sum(1 for entry in result if entry["trace_is_fit"])
+        fit_count = sum(1 for entry in result if entry.trace_is_fit)
         # Most traces should be fit when checked against the same model
         assert fit_count > 0
 
@@ -665,126 +561,6 @@ class TestFindFrequentPatterns:
 
 
 # ===================================================================
-# MCP Tool: detect_frustration_signals
-# ===================================================================
-
-
-class TestDetectFrustrationSignals:
-    """Tests for the detect_frustration_signals async MCP tool."""
-
-    @pytest.mark.asyncio
-    async def test_detects_known_frustration_signals(self, frustration_jsonl: Path) -> None:
-        """Known frustration patterns are detected in user messages."""
-        glob_path = str(frustration_jsonl / "*.jsonl")
-
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        assert isinstance(result, list)
-        # "no, that's wrong" -> correction
-        # "wait, hold on a second" -> interrupt
-        # "why did you do that again?" -> frustration
-        assert len(result) == 3
-
-        signal_types = {s["signal_type"] for s in result}
-        assert "correction" in signal_types
-        assert "interrupt" in signal_types
-        assert "frustration" in signal_types
-
-    @pytest.mark.asyncio
-    async def test_skips_tool_use_result_messages(self, frustration_jsonl: Path) -> None:
-        """Messages with toolUseResult are not scanned."""
-        glob_path = str(frustration_jsonl / "*.jsonl")
-
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        # The toolUseResult message contains "no this is wrong" which matches
-        # correction, but should be filtered out
-        session_timestamps = [s["timestamp"] for s in result]
-        assert "2026-01-01T00:04:00Z" not in session_timestamps
-
-    @pytest.mark.asyncio
-    async def test_skips_non_frustration_messages(self, frustration_jsonl: Path) -> None:
-        """Neutral messages like 'looks good to me' produce no signal."""
-        glob_path = str(frustration_jsonl / "*.jsonl")
-
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        messages = [s["message_text"] for s in result]
-        assert not any("looks good" in m for m in messages)
-
-    @pytest.mark.asyncio
-    async def test_returns_empty_for_no_files(self, empty_jsonl_dir: Path) -> None:
-        """No matching JSONL files returns empty list."""
-        glob_path = str(empty_jsonl_dir / "*.jsonl")
-
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        assert result == []
-
-    @pytest.mark.asyncio
-    async def test_preserves_full_message_text(self, tmp_path: Path) -> None:
-        """Full message text is preserved without truncation."""
-        long_text = "no " + "x" * 300
-        records = [{"type": "user", "message": {"content": long_text}, "timestamp": "2026-01-01T00:00:00Z"}]
-        fpath = tmp_path / "long-msg.jsonl"
-        fpath.write_text(json.dumps(records[0]), encoding="utf-8")
-
-        glob_path = str(tmp_path / "*.jsonl")
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        assert len(result) == 1
-        assert result[0]["message_text"] == long_text
-
-    @pytest.mark.asyncio
-    async def test_one_signal_per_message(self, tmp_path: Path) -> None:
-        """Only one signal per message even if multiple patterns match."""
-        # "no, wait, why did you do that" matches correction, interrupt, frustration
-        records = [
-            {
-                "type": "user",
-                "message": {"content": "no, wait, why did you do that"},
-                "timestamp": "2026-01-01T00:00:00Z",
-            }
-        ]
-        fpath = tmp_path / "multi-match.jsonl"
-        fpath.write_text(json.dumps(records[0]), encoding="utf-8")
-
-        glob_path = str(tmp_path / "*.jsonl")
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        assert len(result) == 1
-
-    @pytest.mark.asyncio
-    async def test_handles_list_of_blocks_content(self, tmp_path: Path) -> None:
-        """User messages with list-of-blocks content are scanned."""
-        records = [
-            {
-                "type": "user",
-                "message": {"content": [{"type": "text", "text": "no, that's wrong"}]},
-                "timestamp": "2026-01-01T00:00:00Z",
-            }
-        ]
-        fpath = tmp_path / "blocks-content.jsonl"
-        fpath.write_text(json.dumps(records[0]), encoding="utf-8")
-
-        glob_path = str(tmp_path / "*.jsonl")
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        assert len(result) == 1
-        assert result[0]["signal_type"] == "correction"
-
-    @pytest.mark.asyncio
-    async def test_result_schema(self, frustration_jsonl: Path) -> None:
-        """Each result dict has the expected keys."""
-        glob_path = str(frustration_jsonl / "*.jsonl")
-
-        result = await kaizen_server.detect_frustration_signals(glob_path)
-
-        for entry in result:
-            assert set(entry.keys()) == {"session_id", "timestamp", "signal_type", "message_text"}
-
-
-# ===================================================================
 # MCP Tool: cluster_sessions
 # ===================================================================
 
@@ -796,17 +572,14 @@ class TestClusterSessions:
     async def test_clusters_sessions_from_sequences(
         self, sample_sequences: dict[str, list[str]], mock_context: AsyncMock
     ) -> None:
-        """KMeans clustering returns clusters and profiles."""
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
-        assert "clusters" in result
-        assert "cluster_profiles" in result
-        assert len(result["clusters"]) == 2
-        assert len(result["cluster_profiles"]) == 2
+        assert len(result.clusters) == 2
+        assert len(result.cluster_profiles) == 2
 
         # All session IDs should be assigned to exactly one cluster
         all_sessions: set[str] = set()
-        for members in result["clusters"].values():
+        for members in result.clusters.values():
             all_sessions.update(members)
         assert all_sessions == set(sample_sequences.keys())
 
@@ -818,7 +591,7 @@ class TestClusterSessions:
         result = await kaizen_server.cluster_sessions(sequences=single_sequence, n_clusters=10, context=mock_context)
 
         # With 1 session, effective clusters = min(10, 1) = 1
-        assert len(result["clusters"]) == 1
+        assert len(result.clusters) == 1
 
     @pytest.mark.asyncio
     async def test_cluster_profiles_contain_top_tools(
@@ -827,7 +600,7 @@ class TestClusterSessions:
         """Cluster profiles list the most common tools."""
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
-        for profile in result["cluster_profiles"].values():
+        for profile in result.cluster_profiles.values():
             assert isinstance(profile, list)
             assert len(profile) <= kaizen_server._TOP_TOOLS_PER_CLUSTER
 
@@ -846,8 +619,7 @@ class TestClusterSessions:
 
         result = await kaizen_server.cluster_sessions(glob_path=glob_path, n_clusters=2, context=mock_context)
 
-        assert "clusters" in result
-        assert len(result["clusters"]) == 2
+        assert len(result.clusters) == 2
 
     @pytest.mark.asyncio
     async def test_cluster_keys_are_string_ids(
@@ -856,143 +628,6 @@ class TestClusterSessions:
         """Cluster keys are string representations of cluster IDs."""
         result = await kaizen_server.cluster_sessions(sequences=sample_sequences, n_clusters=2, context=mock_context)
 
-        for key in result["clusters"]:
+        for key in result.clusters:
             assert isinstance(key, str)
             assert key.isdigit()
-
-
-# ===================================================================
-# Frustration patterns unit tests
-# ===================================================================
-
-
-class TestFrustrationPatterns:
-    """Direct unit tests for the compiled frustration regex patterns."""
-
-    @pytest.mark.parametrize(
-        ("text", "expected_type"),
-        [
-            ("no, that's not right", "correction"),
-            ("don't do that", "correction"),
-            ("wrong approach", "correction"),
-            ("incorrect result", "correction"),
-            ("stop doing that", "correction"),
-            ("undo the last change", "correction"),
-            ("revert that please", "correction"),
-            ("that's not what I wanted", "denial"),
-            ("I didn't ask for that", "denial"),
-            ("never do that again", "denial"),
-            ("absolutely not", "denial"),
-            ("wait a moment", "interrupt"),
-            ("hold on please", "interrupt"),
-            ("cancel that", "interrupt"),
-            ("abort the operation", "interrupt"),
-            ("forget it", "interrupt"),
-            ("nevermind", "interrupt"),
-            ("why did you change that", "frustration"),
-            ("you keep making errors", "frustration"),
-            ("is it broken again?", "frustration"),
-            # "still wrong" contains \bwrong\b so correction matches first
-            ("still wrong after fixing", "correction"),
-        ],
-    )
-    def test_pattern_matches_expected_type(self, text: str, expected_type: str) -> None:
-        """Frustration pattern matches the expected signal type."""
-        matched_type = None
-        for signal_type, pattern in kaizen_server._FRUSTRATION_PATTERNS:
-            if pattern.search(text):
-                matched_type = signal_type
-                break
-
-        assert matched_type == expected_type, f"Expected '{expected_type}' for text '{text}', got '{matched_type}'"
-
-    @pytest.mark.parametrize(
-        "text",
-        [
-            "looks great, thank you",
-            "perfect, exactly what I needed",
-            "that works well",
-            "please continue with the implementation",
-            "yes, proceed",
-        ],
-    )
-    def test_pattern_does_not_match_positive_text(self, text: str) -> None:
-        """Positive/neutral text does not trigger frustration patterns."""
-        for _, pattern in kaizen_server._FRUSTRATION_PATTERNS:
-            assert not pattern.search(text), f"Text '{text}' should not match any frustration pattern"
-
-
-# ===================================================================
-# MCP Tool: open_dashboard
-# ===================================================================
-
-
-class TestOpenDashboard:
-    """Tests for the open_dashboard synchronous MCP tool.
-
-    Covers URL-return behavior and not-running error path. Each test
-    stubs the deferred ``dashboard.get_dashboard_url`` import.
-    """
-
-    @pytest.fixture(autouse=True)
-    def _stub_dashboard_module(self) -> Generator[None, None, None]:
-        """Insert a stub ``dashboard`` module into sys.modules.
-
-        The open_dashboard tool performs a deferred import:
-        ``from dashboard import get_dashboard_url``. The real
-        dashboard module pulls in heavy third-party dependencies
-        (panel, holoviews, bokeh). This fixture inserts a
-        lightweight stub so the import succeeds without those deps.
-
-        The stub's ``get_dashboard_url`` is overwritten per-test
-        via ``unittest.mock.patch``.
-        """
-        import types as _types
-
-        stub = _types.ModuleType("dashboard")
-        vars(stub).update({"get_dashboard_url": lambda: None})
-        prev = sys.modules.get("dashboard")
-        sys.modules["dashboard"] = stub
-        yield
-        if prev is not None:
-            sys.modules["dashboard"] = prev
-        else:
-            sys.modules.pop("dashboard", None)
-
-    def test_open_dashboard_first_call(self) -> None:
-        """Invocation returns the URL with opened_browser=False.
-
-        Tests: open_dashboard MCP tool behavior
-        How: Mock get_dashboard_url to return a URL, call open_dashboard,
-            verify URL and opened_browser=False in the response.
-        Why: The tool returns a URL for the user to copy; it does not
-            open a browser (opening during Tornado init causes IOLoop
-            exhaustion and a blank page).
-        """
-        from unittest.mock import patch
-
-        test_url = "http://localhost:49152/"
-
-        with patch("dashboard.get_dashboard_url", return_value=test_url):
-            result = kaizen_server.open_dashboard()
-
-        assert result["url"] == test_url
-        assert result["opened_browser"] is False
-        assert test_url in str(result["message"])
-
-    def test_open_dashboard_when_not_running(self) -> None:
-        """Raises ToolError when the dashboard is not running.
-
-        Tests: open_dashboard MCP tool error path
-        How: Mock get_dashboard_url to return None (dashboard not started),
-            call open_dashboard, verify ToolError is raised with a message
-            containing "not running".
-        Why: The tool must give a clear error when the dashboard thread
-            failed to start, rather than returning a None URL.
-        """
-        from unittest.mock import patch
-
-        from fastmcp.exceptions import ToolError
-
-        with patch("dashboard.get_dashboard_url", return_value=None), pytest.raises(ToolError, match="not running"):
-            kaizen_server.open_dashboard()

@@ -8,7 +8,11 @@ pytest configuration in pyproject.toml.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import signal
+import subprocess
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -56,6 +60,66 @@ async def call_mcp_tool(
     async with Client(mcp, timeout=timeout_seconds, init_timeout=timeout_seconds) as client:
         result = await client.call_tool(tool_name, params or {})
     return json.loads(result.content[0].text)
+
+
+def run_cli_subprocess(
+    args: list[str], *, timeout: int = 30, env: dict[str, str] | None = None, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run a CLI subprocess (e.g. ``uv run <script>``) with whole-process-group timeout kill.
+
+    Root cause this works around: ``subprocess.run(timeout=...)`` kills only the
+    immediate child on timeout (``Popen.kill()`` signals ``self.pid`` alone — see the
+    "Note" on ``Popen.kill()`` in the stdlib docs). When that immediate child is a
+    launcher such as ``uv run`` that forks its own child process to actually execute
+    the target script, SIGKILL to the launcher terminates it instantly (SIGKILL cannot
+    be caught, so the launcher never gets a chance to forward the signal) while its
+    grandchild is orphaned and keeps running. The orphan still holds the write end of
+    the ``capture_output`` stdout/stderr pipes open, so ``Popen.communicate()``'s read
+    loop blocks forever waiting for EOF that will never arrive until the orphan exits
+    on its own — this is indistinguishable from a permanent hang under load (e.g. many
+    concurrent ``uv run`` invocations under pytest-xdist competing for CPU/interpreter
+    startup, which routinely pushes an individual invocation past a 30s timeout).
+
+    Running the child in its own session (``start_new_session=True`` -> a new POSIX
+    process group) and killing that whole group on timeout ensures the grandchild is
+    also signalled, so the pipes actually close and ``communicate()`` can return.
+
+    Args:
+        args: Full argv, e.g. ``["uv", "run", str(cli_path), "plan", "list"]``.
+        timeout: Seconds to wait before killing the process group.
+        env: Environment for the subprocess; defaults to the current environment.
+        cwd: Working directory for the subprocess.
+
+    Returns:
+        A ``CompletedProcess`` with captured text stdout/stderr.
+
+    Raises:
+        subprocess.TimeoutExpired: If the process group does not exit within timeout.
+    """
+    # POSIX only: os.killpg/os.getpgid have no Windows equivalent, and CI
+    # (ubuntu-latest) is the only enforced target for this helper. On Windows
+    # start_new_session is a no-op default (False) and the except branch below
+    # falls back to a plain proc.kill().
+    proc: subprocess.Popen[str] = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+        cwd=cwd,
+        start_new_session=os.name != "nt",
+    )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if os.name != "nt":
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        else:
+            proc.kill()
+        stdout, stderr = proc.communicate()
+        raise subprocess.TimeoutExpired(args, timeout, output=stdout, stderr=stderr) from None
+    return subprocess.CompletedProcess(args, proc.returncode, stdout, stderr)
 
 
 def make_dh_paths_mock(project_root: Path, user_dh_root: Path | None = None) -> MagicMock:

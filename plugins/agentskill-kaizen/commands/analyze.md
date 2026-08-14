@@ -11,7 +11,7 @@ Run the autonomous transcript analysis pipeline. Spawn the @transcript-analyst a
 <user_arguments>$ARGUMENTS</user_arguments>
 
 - `--project {project}` — Scope analysis to a specific project. The project key is the path with hyphens replacing slashes. Default: current project (derived from cwd).
-- `--dimensions {dimensions}` — Comma-separated list of dimensions to analyze. Options: tool-misuse, errors, frustration, tooling-gaps, delegation, shortest-path, red-herrings, interruptions, missing-hooks, all. Default: all.
+- `--dimensions {dimensions}` — Comma-separated list of dimensions to analyze. Options: tool-misuse, errors, tooling-gaps, delegation, shortest-path, red-herrings, interruptions, missing-hooks, all. Default: all.
 
 ## Execution Steps
 
