@@ -18,6 +18,7 @@ Strategy:
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -665,6 +666,21 @@ class _InMemoryArtifactBackend:
         """Initialise with empty storage."""
         self._manifests: dict[int, ArtifactManifest] = {}
         self._files: dict[str, str] = {}
+        self._revisions: dict[str, str] = {}
+
+    @staticmethod
+    def _revision_key(reference: ContentRef) -> str:
+        """Canonical CAS key for a reference, matching the get/put storage split.
+
+        Args:
+            reference: Logical content identity to key revisions by.
+
+        Returns:
+            "manifest:{issue_number}" for ARTIFACT_MANIFEST, "content:{path}" otherwise.
+        """
+        if reference.kind == ContentKind.ARTIFACT_MANIFEST:
+            return f"manifest:{reference.namespace}"
+        return f"content:{reference.name}"
 
     def get_manifest(self, issue_number: int) -> ArtifactManifest:
         """Return stored manifest or empty manifest.
@@ -678,22 +694,24 @@ class _InMemoryArtifactBackend:
         return self._manifests.get(issue_number, ArtifactManifest(issue_number=issue_number))
 
     def set_manifest(self, issue_number: int, manifest: ArtifactManifest) -> None:
-        """Store the manifest.
+        """Store the manifest, stamping a fresh revision like a real put_content would.
 
         Args:
             issue_number: GitHub issue number.
             manifest: Manifest to store.
         """
         self._manifests[issue_number] = manifest
+        self._revisions[f"manifest:{issue_number}"] = uuid.uuid4().hex
 
     def add_file(self, path: str, content: str) -> None:
-        """Register in-memory file content.
+        """Register in-memory file content, stamping a fresh revision like a real put_content would.
 
         Args:
             path: Path to register.
             content: File content string.
         """
         self._files[path] = content
+        self._revisions[f"content:{path}"] = uuid.uuid4().hex
 
     def get_content(self, reference: ContentRef) -> ContentRecord:
         """Resolve a manifest or artifact-content record by logical reference.
@@ -716,34 +734,59 @@ class _InMemoryArtifactBackend:
             if manifest is None:
                 raise ContentNotFoundError(f"No manifest registered for issue {reference.namespace}")
             return ContentRecord(
-                reference=reference, owner_reference=reference.namespace, content=manifest.model_dump_json()
+                reference=reference,
+                owner_reference=reference.namespace,
+                content=manifest.model_dump_json(),
+                revision=self._revisions[self._revision_key(reference)],
             )
         content = self._files.get(reference.name)
         if content is None:
             raise ContentNotFoundError(f"File not found in test backend: {reference.name}")
-        return ContentRecord(reference=reference, owner_reference=reference.namespace, content=content)
+        return ContentRecord(
+            reference=reference,
+            owner_reference=reference.namespace,
+            content=content,
+            revision=self._revisions[self._revision_key(reference)],
+        )
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
-        """Persist a manifest or artifact-content record by logical reference.
+        """Persist a manifest or artifact-content record by logical reference, enforcing CAS.
+
+        Mirrors ``backlog_core.backends.memory_backend.InMemoryBackend.put_content``'s
+        revision-safe update contract: a ``create_only`` write against an existing
+        record, or a write whose ``expected_revision`` no longer matches the stored
+        revision, is rejected rather than silently overwriting.
 
         Args:
             request: Logical content write issued by the server.
 
         Returns:
-            The persisted ContentRecord.
+            The persisted ContentRecord, stamped with a fresh revision.
 
         Raises:
-            ContentConflictError: When the reference kind is unsupported —
-                this double only models the two kinds artifact tools use.
+            ContentConflictError: When the reference kind is unsupported, when
+                ``create_only`` targets an existing record, or when
+                ``expected_revision`` no longer matches the stored revision.
         """
         reference = request.reference
+        key = self._revision_key(reference)
+        current_revision = self._revisions.get(key, "")
+        if request.create_only and key in self._revisions:
+            raise ContentConflictError(f"Content already exists: {key}")
+        if request.expected_revision and request.expected_revision != current_revision:
+            raise ContentConflictError(f"Content revision no longer matches: {key}")
+        new_revision = uuid.uuid4().hex
         if reference.kind == ContentKind.ARTIFACT_MANIFEST:
             self._manifests[int(reference.namespace)] = ArtifactManifest.model_validate_json(request.content)
+            self._revisions[key] = new_revision
         elif reference.kind == ContentKind.ARTIFACT_CONTENT:
             self._files[reference.name] = request.content
+            self._revisions[key] = new_revision
         else:
             raise ContentConflictError(f"Unsupported content kind for test backend: {reference.kind}")
-        return ContentRecord(reference=reference, owner_reference=reference.namespace, content=request.content)
+        return ContentRecord(
+            reference=reference, owner_reference=reference.namespace, content=request.content, revision=new_revision
+        )
 
 
 @pytest.fixture
