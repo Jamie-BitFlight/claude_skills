@@ -200,14 +200,14 @@ from rope.base.project import Project
 from rope.refactor.rename import Rename
 
 # Initialize project from filesystem
-project = Project('.')
+project = Project(".")
 
 # Get a Python module
-mod = project.get_file('mymodule.py')
+mod = project.get_file("mymodule.py")
 
 # Perform rename refactoring
 renamer = Rename(project, mod, offset=42)  # offset = char position of symbol
-changes = renamer.get_changes('new_name')  # Generate change set
+changes = renamer.get_changes("new_name")  # Generate change set
 
 # Apply changes atomically
 project.do(changes)
@@ -230,8 +230,8 @@ SOURCE: README.rst "How to use Rope in my IDE or Text editor?" link, rope/refact
 ```python
 # rope configuration
 set_prefer_modern_dialect = True
-python_path = ['src', 'vendor']
-ignored_resources = ['*.pyc', '__pycache__', '.git']
+python_path = ["src", "vendor"]
+ignored_resources = ["*.pyc", "__pycache__", ".git"]
 ```
 
 SOURCE: rope/base/prefs.py behavior (accessed 2026-03-29)

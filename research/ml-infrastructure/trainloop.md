@@ -101,6 +101,7 @@ TrainLoop operates as a managed service (no self-hosted installation). Access is
 ```python
 # 3-line SDK integration for data collection
 import trainloop
+
 trainloop.init("api_key")
 trainloop.log_preference(prompt, response, score)
 ```
@@ -111,15 +112,9 @@ trainloop.log_preference(prompt, response, score)
 import openai
 
 # Point to TrainLoop's fine-tuned model endpoint
-client = openai.OpenAI(
-    api_key="trainloop_api_key",
-    base_url="https://api.trainloop.ai/v1"
-)
+client = openai.OpenAI(api_key="trainloop_api_key", base_url="https://api.trainloop.ai/v1")
 
-response = client.chat.completions.create(
-    model="your-fine-tuned-model",
-    messages=[{"role": "user", "content": "..."}]
-)
+response = client.chat.completions.create(model="your-fine-tuned-model", messages=[{"role": "user", "content": "..."}])
 ```
 
 **Current Access**: Limited beta — application required at <https://app.trainloop.ai/auth>

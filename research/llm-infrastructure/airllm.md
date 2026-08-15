@@ -62,6 +62,7 @@ The `AutoModel` class detects the model architecture automatically and instantia
 
 ```python
 from airllm import AutoModel
+
 model = AutoModel.from_pretrained("garage-bAInd/Platypus2-70B-instruct")
 ```
 
@@ -204,22 +205,19 @@ from airllm import AutoModel
 model = AutoModel.from_pretrained("garage-bAInd/Platypus2-70B-instruct")
 
 # Tokenize
-input_text = ['What is the capital of United States?']
+input_text = ["What is the capital of United States?"]
 input_tokens = model.tokenizer(
     input_text,
     return_tensors="pt",
     return_attention_mask=False,
     truncation=True,
     max_length=128,
-    padding=False  # Some models require padding=False
+    padding=False,  # Some models require padding=False
 )
 
 # Generate
 generation_output = model.generate(
-    input_tokens['input_ids'].cuda(),
-    max_new_tokens=20,
-    use_cache=True,
-    return_dict_in_generate=True
+    input_tokens["input_ids"].cuda(), max_new_tokens=20, use_cache=True, return_dict_in_generate=True
 )
 
 # Decode
@@ -270,13 +268,13 @@ An MCP server wrapping AirLLM inference could expose LLM completion as a tool to
 ```python
 # Hypothetical AirLLM MCP server
 class AirLLMCompletionServer:
-    def __init__(self, model_id, compression='4bit'):
+    def __init__(self, model_id, compression="4bit"):
         self.model = AutoModel.from_pretrained(model_id, compression=compression)
 
     @mcp_tool
     def complete(self, prompt: str, max_tokens: int = 100) -> str:
         tokens = self.model.tokenizer(prompt, return_tensors="pt")
-        output = self.model.generate(tokens['input_ids'].cuda(), max_new_tokens=max_tokens)
+        output = self.model.generate(tokens["input_ids"].cuda(), max_new_tokens=max_tokens)
         return self.model.tokenizer.decode(output.sequences[0])
 ```
 

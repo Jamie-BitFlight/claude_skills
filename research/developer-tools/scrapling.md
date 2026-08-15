@@ -160,25 +160,27 @@ docker pull pyd4vinci/scrapling
 # HTTP request with TLS impersonation
 from scrapling.fetchers import Fetcher, FetcherSession
 
-with FetcherSession(impersonate='chrome') as session:
-    page = session.get('https://quotes.toscrape.com/', stealthy_headers=True)
-    quotes = page.css('.quote .text::text').getall()
+with FetcherSession(impersonate="chrome") as session:
+    page = session.get("https://quotes.toscrape.com/", stealthy_headers=True)
+    quotes = page.css(".quote .text::text").getall()
 
 # Stealth mode: bypass Cloudflare Turnstile
 from scrapling.fetchers import StealthyFetcher
 
-page = StealthyFetcher.fetch('https://nopecha.com/demo/cloudflare', headless=True)
-data = page.css('#padded_content a').getall()
+page = StealthyFetcher.fetch("https://nopecha.com/demo/cloudflare", headless=True)
+data = page.css("#padded_content a").getall()
 
 # Adaptive scraping: survive page redesigns
 from scrapling.fetchers import StealthyFetcher
+
 StealthyFetcher.adaptive = True
-page = StealthyFetcher.fetch('https://example.com', headless=True)
-products = page.css('.product', auto_save=True)   # store signatures
-products = page.css('.product', adaptive=True)    # later: find even after redesign
+page = StealthyFetcher.fetch("https://example.com", headless=True)
+products = page.css(".product", auto_save=True)  # store signatures
+products = page.css(".product", adaptive=True)  # later: find even after redesign
 
 # Full crawler with pause/resume
 from scrapling.spiders import Spider, Response
+
 
 class QuotesSpider(Spider):
     name = "quotes"
@@ -186,14 +188,12 @@ class QuotesSpider(Spider):
     concurrent_requests = 10
 
     async def parse(self, response: Response):
-        for quote in response.css('.quote'):
-            yield {
-                "text": quote.css('.text::text').get(),
-                "author": quote.css('.author::text').get(),
-            }
-        next_page = response.css('.next a')
+        for quote in response.css(".quote"):
+            yield {"text": quote.css(".text::text").get(), "author": quote.css(".author::text").get()}
+        next_page = response.css(".next a")
         if next_page:
-            yield response.follow(next_page[0].attrib['href'])
+            yield response.follow(next_page[0].attrib["href"])
+
 
 result = QuotesSpider(crawldir="./crawl_data").start()
 result.items.to_json("quotes.json")

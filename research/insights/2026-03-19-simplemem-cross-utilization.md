@@ -25,6 +25,7 @@ The context-gathering agent reads task files and performs expensive codebase res
 from cross.orchestrator import create_orchestrator
 import asyncio
 
+
 async def gather_context(task_file_path):
     # Initialize SimpleMem-Cross orchestrator (once per feature)
     orch = create_orchestrator(project="claude-skills", tenant_id="context-gathering")
@@ -34,8 +35,7 @@ async def gather_context(task_file_path):
 
     # Start session: auto-inject relevant prior findings
     result = await orch.start_session(
-        content_session_id=task_info["task_id"],
-        user_prompt=f"Gather context for: {task_info['name']}"
+        content_session_id=task_info["task_id"], user_prompt=f"Gather context for: {task_info['name']}"
     )
 
     # Prior context automatically injected in result["context"]
@@ -48,7 +48,7 @@ async def gather_context(task_file_path):
     # Record discoveries as messages (SimpleMem-Cross heuristic extractor will identify "discovered", "found", etc.)
     await orch.record_message(
         result["memory_session_id"],
-        f"Discovered patterns in {discovered_context['modules']}: {discovered_context['patterns']}"
+        f"Discovered patterns in {discovered_context['modules']}: {discovered_context['patterns']}",
     )
 
     # Finalize session: observations extracted, stored, vectorized
@@ -99,21 +99,17 @@ The implement-feature skill loops through ready tasks, delegates each to an agen
 from cross.orchestrator import create_orchestrator
 import asyncio
 
+
 async def implement_feature_loop(task_file_path):
     plan_id = extract_plan_id(task_file_path)  # e.g., "P3"
     feature_slug = extract_feature_slug(task_file_path)  # e.g., "integrate-sam"
 
     # Initialize SimpleMem-Cross for this feature
-    orch = create_orchestrator(
-        project="claude-skills",
-        tenant_id=f"feature-{feature_slug}",
-        max_context_tokens=3000
-    )
+    orch = create_orchestrator(project="claude-skills", tenant_id=f"feature-{feature_slug}", max_context_tokens=3000)
 
     # Start session: auto-inject patterns from similar past features
     result = await orch.start_session(
-        content_session_id=f"implement-{feature_slug}",
-        user_prompt=f"Execute feature: {feature_slug}"
+        content_session_id=f"implement-{feature_slug}", user_prompt=f"Execute feature: {feature_slug}"
     )
 
     prior_patterns = result["context"]  # e.g., "Prior features used python-cli-architect for similar tasks"
@@ -137,9 +133,9 @@ async def implement_feature_loop(task_file_path):
                     "task_id": task_id,
                     "agent": agent_name,
                     "skills": task.get("skills", []),
-                    "dependencies": task.get("dependencies", [])
+                    "dependencies": task.get("dependencies", []),
                 },
-                tool_output={"status": "delegated"}
+                tool_output={"status": "delegated"},
             )
 
             # Delegate task (existing logic: Skill(skill="start-task", args=...))
@@ -152,8 +148,7 @@ async def implement_feature_loop(task_file_path):
             task_result = get_task_result(task_id)
             if task_result.decision or task_result.learning:
                 await orch.record_message(
-                    result["memory_session_id"],
-                    f"Agent {agent_name} decided: {task_result.decision}"
+                    result["memory_session_id"], f"Agent {agent_name} decided: {task_result.decision}"
                 )
 
     # Finalize: observations extracted (decisions, learnings, discoveries)
@@ -165,10 +160,7 @@ async def implement_feature_loop(task_file_path):
     # }
 
     # Search for similar prior implementations (optional post-feature analysis)
-    similar = await orch.search(
-        query=f"features with pattern={prior_patterns}",
-        max_results=3
-    )
+    similar = await orch.search(query=f"features with pattern={prior_patterns}", max_results=3)
 
     await orch.end_session(result["memory_session_id"])
     orch.close()
@@ -221,15 +213,15 @@ from datetime import datetime, UTC
 # Global orchestrator (singleton per session)
 _memory_orch = None
 
+
 def get_memory_orchestrator():
     global _memory_orch
     if not _memory_orch:
         _memory_orch = create_orchestrator(
-            project="claude-skills",
-            tenant_id="task-execution",
-            db_path="~/.simplemem-cross/task_execution.db"
+            project="claude-skills", tenant_id="task-execution", db_path="~/.simplemem-cross/task_execution.db"
         )
     return _memory_orch
+
 
 async def handle_subagent_stop(hook_input):
     """Handle SubagentStop event: task completed."""
@@ -247,10 +239,7 @@ async def handle_subagent_stop(hook_input):
     # Record task completion
     orch = get_memory_orchestrator()
     if memory_session_id:
-        await orch.record_message(
-            memory_session_id,
-            f"Task {task_id} completed at {datetime.now(UTC).isoformat()}"
-        )
+        await orch.record_message(memory_session_id, f"Task {task_id} completed at {datetime.now(UTC).isoformat()}")
 
     # Update task status in sam (existing logic)
     sam_update_status(task_file_path, task_id, SamTaskStatus.COMPLETE)
@@ -259,6 +248,7 @@ async def handle_subagent_stop(hook_input):
     if memory_session_id:
         report = await orch.stop_session(memory_session_id)
         # observations_count includes auto-detected task completion insights
+
 
 async def handle_post_tool_use(hook_input):
     """Handle PostToolUse event: Write/Edit/Bash used during task."""
@@ -278,11 +268,12 @@ async def handle_post_tool_use(hook_input):
             memory_session_id,
             tool_name=hook_input["tool_name"],  # "Write", "Edit", "Bash"
             tool_input=hook_input["tool_input"],  # auto-redacted by SimpleMem-Cross
-            tool_output=hook_input.get("tool_output", "")
+            tool_output=hook_input.get("tool_output", ""),
         )
 
         # Update LastActivity in task (existing logic)
         update_last_activity(...)
+
 
 # Async wrapper for hook entry point
 def handle_hook(hook_input):

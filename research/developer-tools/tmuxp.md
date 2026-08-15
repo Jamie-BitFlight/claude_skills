@@ -128,17 +128,12 @@ from tmuxp.workspace import loader
 from tmuxp.workspace.builder import WorkspaceBuilder
 
 # Load config from file
-session_config = config_reader.ConfigReader._from_file(
-    pathlib.Path("./mysession.yaml")
-)
+session_config = config_reader.ConfigReader._from_file(pathlib.Path("./mysession.yaml"))
 
 # Or from a dict directly
 session_config = {
     "session_name": "orchestrator",
-    "windows": [
-        {"window_name": "agent-1", "panes": ["bash"]},
-        {"window_name": "agent-2", "panes": ["bash"]},
-    ],
+    "windows": [{"window_name": "agent-1", "panes": ["bash"]}, {"window_name": "agent-2", "panes": ["bash"]}],
 }
 
 # Build the session
@@ -148,8 +143,8 @@ builder.build()
 
 # Access the created session object
 session = builder.session
-print(session.name)         # "orchestrator"
-print(session.windows)      # list of libtmux.Window objects
+print(session.name)  # "orchestrator"
+print(session.windows)  # list of libtmux.Window objects
 ```
 
 `WorkspaceBuilder.build()` accepts optional parameters:
@@ -166,6 +161,7 @@ Plugins hook into the session lifecycle via a base class with four extension poi
 
 ```python
 from tmuxp.plugin import TmuxpPlugin
+
 
 class MyPlugin(TmuxpPlugin):
     def before_workspace_builder(self, session):

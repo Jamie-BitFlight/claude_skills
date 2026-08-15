@@ -38,7 +38,7 @@ The `detect_changes` tool (line 134-144 in research entry) maps git diffs to aff
 # Pseudo-code showing tool call pattern from research entry line 133-143
 impact_result = gitnexus_impact({
     "target": "function_or_class_name",
-    "direction": "upstream"  # Find all callers
+    "direction": "upstream",  # Find all callers
 })
 
 # Returns depth-grouped results:
@@ -57,10 +57,7 @@ impact_result = gitnexus_impact({
 
 ```python
 # From research entry line 144, detect_changes maps diffs to execution flows
-changed_impact = gitnexus_detect_changes({
-    "scope": "staged",
-    "repo": repo_name
-})
+changed_impact = gitnexus_detect_changes({"scope": "staged", "repo": repo_name})
 
 # Returns: {
 #   "changed_symbols": ["validateUser", "authCache.clear"],

@@ -191,7 +191,7 @@ sc.settings.verbosity = 3
 sc.settings.set_figure_params(dpi=80)
 
 # Load 10X data
-adata = sc.read_10x_h5('path/to/data.h5')
+adata = sc.read_10x_h5("path/to/data.h5")
 
 # QC and preprocessing
 sc.pp.calculate_qc_metrics(adata)

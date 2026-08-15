@@ -33,6 +33,7 @@ This moves research-context-agent from a transactional search-and-match workflow
 ```python
 # Pseudo-code: research-context-agent enhanced with tolaria MCP
 
+
 def phase_1_absorb(research_file_path):
     research_content = read_file(research_file_path)
 
@@ -45,17 +46,19 @@ def phase_1_absorb(research_file_path):
 
     return research_content
 
+
 def phase_2_search_and_match(research_content):
     opportunities = find_integration_opportunities_in_repo()  # existing: Grep/Glob search
 
     # NEW: Also search tolaria vault for patterns and prior integrations
     vault_context = mcp_call("vault_context")
     for opportunity in opportunities:
-        related_notes = mcp_call("search_notes", query=opportunity['skill_name'])
+        related_notes = mcp_call("search_notes", query=opportunity["skill_name"])
         if related_notes:
-            opportunity['vault_references'] = related_notes  # link to vault
+            opportunity["vault_references"] = related_notes  # link to vault
 
     return opportunities
+
 
 def write_integration_opportunities_section(opportunities):
     # NEW: Before writing to research file, create/update tolaria notes
@@ -63,22 +66,21 @@ def write_integration_opportunities_section(opportunities):
         note_data = {
             "type": "opportunity",
             "belongs_to": extract_tool_name(research_file_path),
-            "related_to": opportunity['skill_name'],
+            "related_to": opportunity["skill_name"],
             "status": "proposed",
-            "links": opportunity.get('vault_references', [])
+            "links": opportunity.get("vault_references", []),
         }
 
         # Register the opportunity as a note in tolaria vault
-        mcp_call("create_note",
-                 title=f"Integration: {opportunity['skill_name']} + {tool_name}",
-                 frontmatter=note_data,
-                 content=opportunity['description'])
+        mcp_call(
+            "create_note",
+            title=f"Integration: {opportunity['skill_name']} + {tool_name}",
+            frontmatter=note_data,
+            content=opportunity["description"],
+        )
 
         # Link the research entry to the opportunity
-        mcp_call("link_notes",
-                 from_note="research.md",
-                 to_note=f"opportunity-{opportunity['id']}",
-                 relationship="has")
+        mcp_call("link_notes", from_note="research.md", to_note=f"opportunity-{opportunity['id']}", relationship="has")
 ```
 
 **Grounding in Research**: Lines 82-88 of tolaria.md document the MCP server's 14 tools. Lines 22-30 of tolaria.md describe the Semantic Field Names (type, status, belongs_to, related_to) that enable relationships. Lines 287-304 of ARCHITECTURE.md in tolaria repo specify tool names and signatures. Lines 419-435 of tolaria.md sketch "Integration Opportunities" including "AI Skill Development: Use Tolaria as a test environment for multi-agent orchestration. Store agent specifications as Type documents, log agent interactions as activity records, use the MCP server to coordinate agent handoffs."
@@ -128,11 +130,13 @@ A tolaria vault preloaded with these reusable components would allow context-gat
 ```python
 # Pseudo-code: context-gathering enhanced with tolaria MCP
 
+
 def step_1_understand_task(task_file_path):
     task = read_file(task_file_path)
     modules_involved = extract_modules_from_task(task)
 
     return task, modules_involved
+
 
 def step_2_research_everything_with_vault(task, modules_involved):
     context = {}
@@ -145,22 +149,25 @@ def step_2_research_everything_with_vault(task, modules_involved):
             # Context already documented in vault; link to it
             context[module] = {
                 "source": "tolaria_vault",
-                "note_title": vault_note['title'],
-                "note_status": vault_note['status'],
-                "snippet": vault_note['snippet'],
-                "wikilink": f"[[{vault_note['filename']}]]"
+                "note_title": vault_note["title"],
+                "note_status": vault_note["status"],
+                "snippet": vault_note["snippet"],
+                "wikilink": f"[[{vault_note['filename']}]]",
             }
         else:
             # Context not in vault; research from codebase (existing behavior)
             context[module] = research_module_in_codebase(module)
 
             # NEW: After researching, store in tolaria vault for future reuse
-            mcp_call("create_note",
-                     title=f"Module: {module}",
-                     frontmatter={"type": "module", "status": "documented"},
-                     content=context[module]['full_description'])
+            mcp_call(
+                "create_note",
+                title=f"Module: {module}",
+                frontmatter={"type": "module", "status": "documented"},
+                content=context[module]["full_description"],
+            )
 
     return context
+
 
 def step_3_write_context_manifest(context_manifest):
     # Include vault references in the manifest
@@ -168,7 +175,7 @@ def step_3_write_context_manifest(context_manifest):
     manifest_section += "### Modules and Dependencies\n"
 
     for module, info in context.items():
-        if info.get('source') == 'tolaria_vault':
+        if info.get("source") == "tolaria_vault":
             manifest_section += f"- {module}: [[{info['note_title']}]] (cached in vault)\n"
         else:
             manifest_section += f"- {module}: (researched from codebase; consider archiving to vault)\n"

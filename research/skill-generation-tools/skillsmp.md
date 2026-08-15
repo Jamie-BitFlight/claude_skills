@@ -114,9 +114,7 @@ import requests
 
 headers = {"Authorization": f"Bearer {api_key}"}
 resp = requests.get(
-    "https://skillsmp.com/api/skills",
-    params={"query": "code review", "category": "development"},
-    headers=headers,
+    "https://skillsmp.com/api/skills", params={"query": "code review", "category": "development"}, headers=headers
 )
 skills = resp.json()
 ```

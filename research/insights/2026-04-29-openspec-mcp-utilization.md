@@ -29,11 +29,9 @@ with open(f"plan/tasks/{task_id}.yaml") as f:
     # write back
 
 # OpenSpec MCP pattern: agent calls MCP tool directly
-mcp_client.call_tool("openspec_update_task", {
-    "task_id": task_id,
-    "status": "complete",
-    "output": "implementation details"
-})
+mcp_client.call_tool(
+    "openspec_update_task", {"task_id": task_id, "status": "complete", "output": "implementation details"}
+)
 
 # Get progress for status report
 progress = mcp_client.call_tool("openspec_get_progress_summary", {})

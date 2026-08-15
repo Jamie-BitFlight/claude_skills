@@ -121,13 +121,13 @@ uvx mcp-server-motherduck  # or: pip install mcp-server-motherduck
 import duckdb
 
 # Browser-based auth (interactive sessions)
-con = duckdb.connect('md:')
+con = duckdb.connect("md:")
 
 # Token-based auth (automated scripts / CI)
-con = duckdb.connect('md:?motherduck_token=<your_token>')
+con = duckdb.connect("md:?motherduck_token=<your_token>")
 
 # Connect to a specific database
-con = duckdb.connect('md:my_db')
+con = duckdb.connect("md:my_db")
 
 # Dual Execution: join local file with cloud table
 con.sql("ATTACH 'md:my_db'")

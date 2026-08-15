@@ -190,9 +190,11 @@ import ray
 
 ray.init()
 
+
 @ray.remote
 def process_data(x):
     return x * 2
+
 
 # Execute in parallel
 futures = [process_data.remote(i) for i in range(10)]
@@ -211,6 +213,7 @@ class Counter:
         self.value += 1
         return self.value
 
+
 counter = Counter.remote()
 ray.get([counter.increment.remote() for _ in range(10)])
 ```
@@ -222,15 +225,8 @@ from ray import serve
 from ray.serve.llm import LLMConfig, build_openai_app
 
 llm_config = LLMConfig(
-    model_loading_config=dict(
-        model_id="meta-llama/Llama-2-7b-chat-hf",
-    ),
-    deployment_config=dict(
-        autoscaling_config=dict(
-            min_replicas=1,
-            max_replicas=4,
-        )
-    ),
+    model_loading_config=dict(model_id="meta-llama/Llama-2-7b-chat-hf"),
+    deployment_config=dict(autoscaling_config=dict(min_replicas=1, max_replicas=4)),
 )
 
 app = build_openai_app(llm_config)
@@ -242,6 +238,7 @@ serve.run(app)
 ```python
 from ray import serve
 
+
 @serve.deployment
 class MCPToolServer:
     async def handle_tool_call(self, tool_name: str, arguments: dict):
@@ -249,6 +246,7 @@ class MCPToolServer:
         if tool_name == "search":
             return await self.search(arguments["query"])
         return {"error": "Unknown tool"}
+
 
 # Deploy with autoscaling
 serve.run(MCPToolServer.bind())
@@ -275,16 +273,15 @@ ds.write_parquet("s3://bucket/output/")
 from ray.train.torch import TorchTrainer
 from ray.train import ScalingConfig
 
+
 def train_func():
     # Training loop with automatic DDP
     model = ...
     for epoch in range(10):
         train_epoch(model)
 
-trainer = TorchTrainer(
-    train_func,
-    scaling_config=ScalingConfig(num_workers=4, use_gpu=True),
-)
+
+trainer = TorchTrainer(train_func, scaling_config=ScalingConfig(num_workers=4, use_gpu=True))
 result = trainer.fit()
 ```
 

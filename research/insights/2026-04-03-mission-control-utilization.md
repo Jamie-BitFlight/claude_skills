@@ -34,9 +34,9 @@ async def spawn_convoy_with_cost_tracking(team_config, agents_to_spawn, mission_
         payload={
             "title": team_config["team_name"],
             "cost_cap_usd": 50.0,  # from swarm config
-            "agents": len(agents_to_spawn)
+            "agents": len(agents_to_spawn),
         },
-        headers={"Authorization": f"Bearer {MC_API_TOKEN}"}
+        headers={"Authorization": f"Bearer {MC_API_TOKEN}"},
     )
 
     # 2. Spawn agents locally, tagging them with task_id
@@ -46,15 +46,14 @@ async def spawn_convoy_with_cost_tracking(team_config, agents_to_spawn, mission_
             name=agent["name"],
             subagent_type=agent["type"],
             prompt=agent["prompt"],
-            env={"MC_TASK_ID": task_id, "MC_URL": mission_control_url}
+            env={"MC_TASK_ID": task_id, "MC_URL": mission_control_url},
         )
 
     # 3. Periodically check cost cap
     async def poll_cost():
         while team_active:
             cost_resp = await get_from_mission_control(
-                f"{mission_control_url}/api/tasks/{task_id}",
-                headers={"Authorization": f"Bearer {MC_API_TOKEN}"}
+                f"{mission_control_url}/api/tasks/{task_id}", headers={"Authorization": f"Bearer {MC_API_TOKEN}"}
             )
             if cost_resp["cost_usd"] > cost_resp["cost_cap_usd"]:
                 SendMessage(type="broadcast", content="Cost cap exceeded — shutting down")

@@ -184,15 +184,18 @@ pip install anyio[trio]
 ```python
 from anyio import run, create_task_group, sleep
 
+
 async def worker(name: str, delay: float) -> None:
     await sleep(delay)
     print(f"{name} complete")
+
 
 async def main() -> None:
     async with create_task_group() as tg:
         tg.start_soon(worker, "A", 1.0)
         tg.start_soon(worker, "B", 0.5)
     print("All workers done")
+
 
 # Run on asyncio (default)
 run(main)
@@ -210,10 +213,12 @@ run(main, backend="asyncio", backend_options={"use_uvloop": True})
 from anyio import create_task_group, create_tcp_listener, TASK_STATUS_IGNORED
 from anyio.abc import TaskStatus
 
+
 async def server(port: int, *, task_status: TaskStatus[None] = TASK_STATUS_IGNORED):
     async with await create_tcp_listener(local_port=port) as listener:
         task_status.started()  # Signal ready
         await listener.serve(handler)
+
 
 async def main():
     async with create_task_group() as tg:
@@ -225,6 +230,7 @@ async def main():
 
 ```python
 from anyio import move_on_after, sleep
+
 
 async def with_timeout():
     with move_on_after(5.0) as scope:
@@ -240,15 +246,18 @@ async def with_timeout():
 from anyio import create_task_group
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
+
 async def producer(send: MemoryObjectSendStream[int]):
     async with send:
         for i in range(10):
             await send.send(i)
 
+
 async def consumer(receive: MemoryObjectReceiveStream[int]):
     async with receive:
         async for item in receive:
             print(item)
+
 
 async def main():
     send, receive = create_memory_object_stream[int](max_buffer_size=10)

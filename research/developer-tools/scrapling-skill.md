@@ -124,7 +124,7 @@ SOURCE: troubleshooting.md "Cloudflare 403 + Just a moment" section and "cf_clea
 FetcherSession template enables login workflows with automatic cookie persistence:
 
 ```python
-with FetcherSession(impersonate='chrome') as s:
+with FetcherSession(impersonate="chrome") as s:
     login_resp = s.post(LOGIN_URL, data=LOGIN_DATA)
     for url in TARGET_URLS:
         page = s.get(url)  # Cookies from login automatically sent
@@ -281,8 +281,9 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 
    ```python
    from scrapling.fetchers import Fetcher
-   page = Fetcher.get("https://example.com/blog", impersonate='chrome', timeout=30)
-   results = page.css('article h1::text').getall()
+
+   page = Fetcher.get("https://example.com/blog", impersonate="chrome", timeout=30)
+   results = page.css("article h1::text").getall()
    ```
 
 ### Example 2: Cloudflare-Protected Site
@@ -297,12 +298,9 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 
    ```python
    from scrapling.fetchers import StealthyFetcher
+
    page = StealthyFetcher.fetch(
-       "https://protected.example.com",
-       headless=True,
-       solve_cloudflare=True,
-       timeout=60000,
-       network_idle=True
+       "https://protected.example.com", headless=True, solve_cloudflare=True, timeout=60000, network_idle=True
    )
    ```
 
@@ -318,8 +316,9 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 
    ```python
    from scrapling.fetchers import FetcherSession
-   with FetcherSession(impersonate='chrome') as s:
-       s.post(LOGIN_URL, data={'username': '...', 'password': '...'})
+
+   with FetcherSession(impersonate="chrome") as s:
+       s.post(LOGIN_URL, data={"username": "...", "password": "..."})
        for url in TARGET_URLS:
            page = s.get(url)
    ```
@@ -336,8 +335,9 @@ SOURCE: SKILL.md frontmatter, README.md "Usage" section (accessed 2026-03-13)
 
    ```python
    from scrapling.parser import Selector
+
    page = Selector(html_string)
-   links = page.css('a::attr(href)').getall()
+   links = page.css("a::attr(href)").getall()
    ```
 
 SOURCE: README.md "Examples" and all templates (accessed 2026-03-13)

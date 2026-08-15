@@ -187,10 +187,15 @@ import asyncio
 from main import run_agent
 
 # task_name used for output filenames; prompt defines agent role and task
-asyncio.run(run_agent("code_analysis", """
+asyncio.run(
+    run_agent(
+        "code_analysis",
+        """
 You are a code analyst. Examine the project structure, identify main modules,
 analyze dependencies, and generate a structured report.
-"""))
+""",
+    )
+)
 # Output: visualization/code_analysis_record.json
 #         visualization/code_analysis.html
 ```

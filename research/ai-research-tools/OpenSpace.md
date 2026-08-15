@@ -205,12 +205,14 @@ openspace --model "anthropic/claude-sonnet-4-5" --query "Create a monitoring das
 import asyncio
 from openspace import OpenSpace
 
+
 async def main():
     async with OpenSpace() as cs:
         result = await cs.execute("Analyze GitHub trending repos and create a report")
         print(result["response"])
         for skill in result.get("evolved_skills", []):
             print(f"  Evolved: {skill['name']} ({skill['origin']})")
+
 
 asyncio.run(main())
 ```

@@ -204,15 +204,9 @@ from agno.agent import Agent
 from agno.knowledge.pdf import PDFKnowledge
 from agno.vectordb.pgvector import PgVector
 
-knowledge = PDFKnowledge(
-    path="./documents/",
-    vector_db=PgVector(table_name="documents"),
-)
+knowledge = PDFKnowledge(path="./documents/", vector_db=PgVector(table_name="documents"))
 
-agent = Agent(
-    knowledge=knowledge,
-    search_knowledge=True,
-)
+agent = Agent(knowledge=knowledge, search_knowledge=True)
 ```
 
 ---

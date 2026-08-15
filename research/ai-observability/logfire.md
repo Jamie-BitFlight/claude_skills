@@ -195,12 +195,12 @@ logfire auth
 import logfire
 
 logfire.configure()
-logfire.info('Hello, {name}!', name='world')
+logfire.info("Hello, {name}!", name="world")
 
 # Manual spans
-with logfire.span('Processing {item}', item='data'):
+with logfire.span("Processing {item}", item="data"):
     # ... processing code ...
-    logfire.debug('Step completed')
+    logfire.debug("Step completed")
 ```
 
 ### OpenAI Instrumentation
@@ -213,10 +213,7 @@ client = openai.Client()
 logfire.configure()
 logfire.instrument_openai()
 
-response = client.chat.completions.create(
-    model='gpt-4',
-    messages=[{'role': 'user', 'content': 'Hello!'}],
-)
+response = client.chat.completions.create(model="gpt-4", messages=[{"role": "user", "content": "Hello!"}])
 ```
 
 ### Anthropic Instrumentation
@@ -231,9 +228,9 @@ logfire.instrument_anthropic()
 
 response = client.messages.create(
     max_tokens=1000,
-    model='claude-3-haiku-20240307',
-    system='You are a helpful assistant.',
-    messages=[{'role': 'user', 'content': 'Hello!'}],
+    model="claude-3-haiku-20240307",
+    system="You are a helpful assistant.",
+    messages=[{"role": "user", "content": "Hello!"}],
 )
 ```
 
@@ -260,8 +257,8 @@ import logfire
 logfire.configure()
 logfire.instrument_pydantic_ai()
 
-agent = Agent('openai:gpt-4', system_prompt='You are helpful.')
-result = agent.run_sync('Hello!')
+agent = Agent("openai:gpt-4", system_prompt="You are helpful.")
+result = agent.run_sync("Hello!")
 ```
 
 ### MCP Server Configuration (Claude Code)

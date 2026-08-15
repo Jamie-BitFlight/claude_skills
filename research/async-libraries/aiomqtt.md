@@ -166,9 +166,11 @@ pip install git+https://github.com/empicano/aiomqtt
 import asyncio
 import aiomqtt
 
+
 async def main():
     async with aiomqtt.Client("test.mosquitto.org") as client:
         await client.publish("temperature/outside", payload=28.4)
+
 
 asyncio.run(main())
 ```
@@ -179,11 +181,13 @@ asyncio.run(main())
 import asyncio
 import aiomqtt
 
+
 async def main():
     async with aiomqtt.Client("test.mosquitto.org") as client:
         await client.subscribe("temperature/#")
         async for message in client.messages:
             print(message.payload)
+
 
 asyncio.run(main())
 ```
@@ -193,6 +197,7 @@ asyncio.run(main())
 ```python
 import asyncio
 import aiomqtt
+
 
 async def main():
     client = aiomqtt.Client("test.mosquitto.org")
@@ -207,6 +212,7 @@ async def main():
             print(f"Connection lost; Reconnecting in {interval} seconds ...")
             await asyncio.sleep(interval)
 
+
 asyncio.run(main())
 ```
 
@@ -219,14 +225,18 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 import aiomqtt
 
+
 async def listen(client):
     async for message in client.messages:
         print(message.payload)
 
+
 client = None
+
 
 async def get_mqtt():
     yield client
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -242,6 +252,7 @@ async def lifespan(app: FastAPI):
             await task
         except asyncio.CancelledError:
             pass
+
 
 app = FastAPI(lifespan=lifespan)
 ```

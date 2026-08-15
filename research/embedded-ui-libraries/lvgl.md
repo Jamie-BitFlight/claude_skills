@@ -270,10 +270,12 @@ import lvgl as lv
 
 # Register display driver (ILI9341)
 from ili9XXX import ili9341
+
 disp = ili9341()
 
 # Register touch driver (XPT2046)
 from xpt2046 import xpt2046
+
 touch = xpt2046()
 
 # Create UI
@@ -284,9 +286,11 @@ btn.align(lv.ALIGN.CENTER, 0, 0)
 label = lv.label(btn)
 label.set_text("Press me")
 
+
 # Event callback
 def on_click(evt):
     label.set_text("Clicked!")
+
 
 btn.add_event_cb(on_click, lv.EVENT.CLICKED, None)
 ```

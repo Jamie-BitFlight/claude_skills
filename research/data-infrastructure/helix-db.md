@@ -284,16 +284,10 @@ pip install helix-db  # or: pip install -e sdks/python
 from helixdb import Client, Predicate, g, param, define_params, read_batch, write_batch
 
 add_user_params = define_params({"name": param.string()})
-add_user = (
-    write_batch()
-    .var_as("user", g().add_n("User", {"name": add_user_params.name}))
-    .returning(["user"])
-)
+add_user = write_batch().var_as("user", g().add_n("User", {"name": add_user_params.name})).returning(["user"])
 
 client = Client("http://localhost:6969")
-new_user = client.query().dynamic(
-    add_user.to_dynamic_request(add_user_params, {"name": "John Doe"})
-).send()
+new_user = client.query().dynamic(add_user.to_dynamic_request(add_user_params, {"name": "John Doe"})).send()
 print("new user:", new_user)
 ```
 

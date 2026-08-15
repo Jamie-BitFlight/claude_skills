@@ -120,8 +120,8 @@ Execution: `python app.py --native` spawns a native window (GTK on Linux, Cocoa 
 From README theme families and app initialization:
 
 ```python
-app = vl.App(theme='cyberpunk')  # Set at init
-app.set_theme('ocean')            # Change at runtime
+app = vl.App(theme="cyberpunk")  # Set at init
+app.set_theme("ocean")  # Change at runtime
 ```
 
 Theme families documented in `doc/LLM_REFERENCE.md` (lines 316-323):
@@ -169,21 +169,22 @@ The reactive foundation consists of two primary classes:
 STATIC_STORE = {}  # Static components (built once at app init)
 GLOBAL_STORE = TTLCache(maxsize=1000, ttl=1800)  # User sessions (1800s TTL)
 
+
 def get_session_store():
     sid = session_ctx.get()
     if sid is None:
         return STATIC_STORE
     if sid not in GLOBAL_STORE:
         GLOBAL_STORE[sid] = {
-            'states': {},
-            'tracker': DependencyTracker(),  # Maps state names → component IDs
-            'builders': {},
-            'actions': {},
-            'component_count': 0,
-            'fragment_components': {},
-            'order': [],
-            'sidebar_order': [],
-            'theme': Theme(initial_theme)
+            "states": {},
+            "tracker": DependencyTracker(),  # Maps state names → component IDs
+            "builders": {},
+            "actions": {},
+            "component_count": 0,
+            "fragment_components": {},
+            "order": [],
+            "sidebar_order": [],
+            "theme": Theme(initial_theme),
         }
     return GLOBAL_STORE[sid]
 ```
@@ -342,21 +343,21 @@ python app.py --reload
 **State Creation and Reactivity** (from `doc/LLM_REFERENCE.md`, lines 78-96):
 
 ```python
-count = app.state(0)           # Create with default value
+count = app.state(0)  # Create with default value
 name = app.state("", key="user_name")  # With explicit key
 
 # Reading
-count.value    # → 0
-count()        # Shorthand
+count.value  # → 0
+count()  # Shorthand
 
 # Writing
-count.set(5)       # Preferred in callbacks
-count.value = 5    # Also works
+count.set(5)  # Preferred in callbacks
+count.value = 5  # Also works
 
 # Reactivity rules:
-app.text(count)                   # ✅ Reactive (State object)
-app.text(count.value)             # ❌ Not reactive (frozen value)
-app.text("Count: " + count)       # ✅ Reactive (operator overload)
+app.text(count)  # ✅ Reactive (State object)
+app.text(count.value)  # ❌ Not reactive (frozen value)
+app.text("Count: " + count)  # ✅ Reactive (operator overload)
 app.text(lambda: f"Count: {count.value}")  # ✅ Reactive (lambda)
 ```
 
@@ -397,8 +398,8 @@ with app.sidebar:
 ```python
 # All input widgets return State objects
 name = app.text_input("Name", value="Alice")  # State[str]
-age = app.number_input("Age", value=25)        # State[int]
-tags = app.multiselect("Tags", ["A", "B"])    # State[List[str]]
+age = app.number_input("Age", value=25)  # State[int]
+tags = app.multiselect("Tags", ["A", "B"])  # State[List[str]]
 
 # Access current values in callbacks
 app.button("Greet", on_click=lambda: app.toast(f"Hello {name.value}!"))
@@ -444,6 +445,7 @@ Dash requires callback registration with `@callback` decorators specifying Input
 def update(n):
     return f"Value: {n}"
 
+
 # Violit (automatic reactivity)
 count = app.state(0)
 app.button("Click", on_click=lambda: count.set(count.value + 1))
@@ -456,7 +458,7 @@ Panel uses Param for state binding, NiceGUI uses Vue.js binding syntax. Both req
 
 ```python
 # NiceGUI (explicit binding)
-ui.label().bind_text_from(count, 'val', backward=lambda x: f'Value: {x}')
+ui.label().bind_text_from(count, "val", backward=lambda x: f"Value: {x}")
 
 # Violit (implicit reactivity)
 app.text("Value: " + count)  # No binding declaration
@@ -470,8 +472,11 @@ Reflex compiles Python to JavaScript, requiring class-based state and a build st
 # Reflex (class + compile)
 class State(rx.State):
     count: int = 0
+
     def increment(self):
         self.count += 1
+
+
 # Requires: reflex init, reflex run
 
 # Violit (pure Python, no compile)

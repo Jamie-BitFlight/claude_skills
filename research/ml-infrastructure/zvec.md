@@ -140,10 +140,7 @@ pip install zvec
 import zvec
 
 # Define collection schema
-schema = zvec.CollectionSchema(
-    name="example",
-    vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 4),
-)
+schema = zvec.CollectionSchema(name="example", vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 4))
 
 # Create and open collection
 collection = zvec.create_and_open(path="./zvec_example", schema=schema)
@@ -155,10 +152,7 @@ collection.insert([
 ])
 
 # Query the collection
-results = collection.query(
-    zvec.VectorQuery(field_name="embedding", vector=[0.4, 0.3, 0.3, 0.1]),
-    topk=10
-)
+results = collection.query(zvec.VectorQuery(field_name="embedding", vector=[0.4, 0.3, 0.3, 0.1]), topk=10)
 ```
 
 **Source**: GitHub README.md — Python API examples (accessed 2026-08-10)

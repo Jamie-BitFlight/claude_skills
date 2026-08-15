@@ -144,10 +144,7 @@ from google import genai
 
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents="Explain how AI works in a few words",
-)
+response = client.models.generate_content(model="gemini-2.5-flash", contents="Explain how AI works in a few words")
 print(response.text)
 ```
 
@@ -157,13 +154,11 @@ print(response.text)
 from openai import OpenAI
 
 client = OpenAI(
-    api_key=os.environ["GEMINI_API_KEY"],
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    api_key=os.environ["GEMINI_API_KEY"], base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
 response = client.chat.completions.create(
-    model="gemini-2.5-flash",
-    messages=[{"role": "user", "content": "Explain how AI works"}],
+    model="gemini-2.5-flash", messages=[{"role": "user", "content": "Explain how AI works"}]
 )
 print(response.choices[0].message.content)
 ```
@@ -179,9 +174,7 @@ client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 response = client.models.generate_content(
     model="gemini-2.5-flash",
     contents="What are the latest AI news today?",
-    config=types.GenerateContentConfig(
-        tools=[types.Tool(google_search=types.GoogleSearch())]
-    ),
+    config=types.GenerateContentConfig(tools=[types.Tool(google_search=types.GoogleSearch())]),
 )
 print(response.text)
 ```

@@ -134,8 +134,8 @@ Jobs, events, and notifications are INSERTs into caller's open transaction:
 
 ```python
 with db.transaction() as tx:
-    tx.execute("INSERT INTO orders (user_id) VALUES (?)", [42])           # business write
-    queue.enqueue({"to": "alice@example.com"}, tx=tx)                     # enqueue in same tx
+    tx.execute("INSERT INTO orders (user_id) VALUES (?)", [42])  # business write
+    queue.enqueue({"to": "alice@example.com"}, tx=tx)  # enqueue in same tx
     # COMMIT: both rows committed, or neither
     # ROLLBACK: both dropped
 ```
@@ -186,6 +186,7 @@ Task decorators:
 def send_email(to: str, subject: str) -> dict:
     ...
     return {"sent_at": time.time()}
+
 
 # Caller
 r = send_email("alice@example.com", "Hi")
@@ -282,16 +283,20 @@ from sqlalchemy import event, create_engine, text
 
 engine = create_engine("sqlite:///app.db")
 
+
 @event.listens_for(engine, "connect")
 def _load_honker(conn, _):
     conn.enable_load_extension(True)
     conn.load_extension("/path/to/libhonker_ext")
     conn.execute("SELECT honker_bootstrap()")
 
+
 with Session(engine) as s, s.begin():
     s.add(Order(user_id=42))
-    s.execute(text("SELECT honker_enqueue(:q, :p, NULL, NULL, 0, 3, NULL)"),
-              {"q": "emails", "p": '{"to":"alice@example.com"}'})
+    s.execute(
+        text("SELECT honker_enqueue(:q, :p, NULL, NULL, 0, 3, NULL)"),
+        {"q": "emails", "p": '{"to":"alice@example.com"}'},
+    )
 
 # Workers run as separate process
 # honker.open("app.db")

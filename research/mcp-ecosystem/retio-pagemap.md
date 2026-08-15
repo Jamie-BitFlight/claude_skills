@@ -188,6 +188,7 @@ from pagemap.browser_session import BrowserSession
 from pagemap.page_map_builder import build_page_map_live, build_page_map_offline
 from pagemap.serializer import to_agent_prompt, to_json
 
+
 async def main():
     async with BrowserSession() as session:
         page_map = await build_page_map_live(session, "https://example.com/product/123")
@@ -199,11 +200,12 @@ async def main():
         print(to_json(page_map))
 
         # Direct field access
-        print(page_map.page_type)        # "product_detail"
-        print(page_map.interactables)    # [Interactable(ref=1, role="button", ...)]
-        print(page_map.pruned_context)   # compressed HTML
-        print(page_map.images)           # ["https://cdn.example.com/img.jpg"]
-        print(page_map.metadata)         # {"name": "...", "price": "..."}
+        print(page_map.page_type)  # "product_detail"
+        print(page_map.interactables)  # [Interactable(ref=1, role="button", ...)]
+        print(page_map.pruned_context)  # compressed HTML
+        print(page_map.images)  # ["https://cdn.example.com/img.jpg"]
+        print(page_map.metadata)  # {"name": "...", "price": "..."}
+
 
 # Offline processing without browser
 html = open("page.html").read()

@@ -224,8 +224,8 @@ The reverse tunnel pattern for Claude Code orchestration:
 ### SSHListener Lifecycle
 
 ```python
-async with await conn.forward_remote_port('', 0, 'localhost', 8080) as listener:
-    port = listener.get_port()   # OS-assigned dynamic port
+async with await conn.forward_remote_port("", 0, "localhost", 8080) as listener:
+    port = listener.get_port()  # OS-assigned dynamic port
     # All connections to server:port are forwarded to localhost:8080
 # listener.close() called automatically on context exit
 ```
@@ -254,15 +254,14 @@ Core dependency: `cryptography>=39.0` (PyCA).
 import asyncio
 import asyncssh
 
+
 async def run_command():
     async with asyncssh.connect(
-        'example.com',
-        username='deploy',
-        client_keys=['~/.ssh/id_ed25519'],
-        known_hosts='~/.ssh/known_hosts'
+        "example.com", username="deploy", client_keys=["~/.ssh/id_ed25519"], known_hosts="~/.ssh/known_hosts"
     ) as conn:
-        result = await conn.run('uname -a', check=True)
+        result = await conn.run("uname -a", check=True)
         print(result.stdout)
+
 
 asyncio.run(run_command())
 ```
@@ -273,31 +272,31 @@ asyncio.run(run_command())
 import asyncio
 import asyncssh
 
+
 class MySSHServer(asyncssh.SSHServer):
     def connection_made(self, conn):
-        print(f'Connection from {conn.get_extra_info("peername")}')
+        print(f"Connection from {conn.get_extra_info('peername')}")
 
     def password_auth_supported(self):
         return True
 
     def validate_password(self, username, password):
-        return username == 'agent' and password == 'secret'
+        return username == "agent" and password == "secret"
 
     def session_requested(self):
         return asyncssh.SSHServerProcess(handle_session)
 
+
 async def handle_session(process):
-    process.stdout.write('Hello from server\n')
+    process.stdout.write("Hello from server\n")
     await process.stdout.drain()
     process.exit(0)
 
+
 async def start_server():
-    await asyncssh.listen(
-        host='0.0.0.0', port=2222,
-        server_factory=MySSHServer,
-        server_host_keys=['server_key']
-    )
+    await asyncssh.listen(host="0.0.0.0", port=2222, server_factory=MySSHServer, server_host_keys=["server_key"])
     await asyncio.get_event_loop().create_future()  # run forever
+
 
 asyncio.run(start_server())
 ```
@@ -308,13 +307,15 @@ asyncio.run(start_server())
 import asyncio
 import asyncssh
 
+
 async def setup_reverse_tunnel():
-    async with asyncssh.connect('relay.example.com', username='tunnel') as conn:
+    async with asyncssh.connect("relay.example.com", username="tunnel") as conn:
         # Forward relay:8080 → local:3000
-        async with await conn.forward_remote_port('', 8080, 'localhost', 3000) as listener:
+        async with await conn.forward_remote_port("", 8080, "localhost", 3000) as listener:
             actual_port = listener.get_port()
-            print(f'Listening on relay port {actual_port}')
+            print(f"Listening on relay port {actual_port}")
             await asyncio.sleep(3600)  # hold tunnel open
+
 
 asyncio.run(setup_reverse_tunnel())
 ```
@@ -325,36 +326,38 @@ asyncio.run(setup_reverse_tunnel())
 import asyncio
 import asyncssh
 
+
 # --- On the controller (publicly reachable) ---
 async def on_agent_connected(conn: asyncssh.SSHClientConnection):
     """Called when a firewalled agent dials in."""
-    result = await conn.run('hostname')
-    print(f'Agent hostname: {result.stdout.strip()}')
+    result = await conn.run("hostname")
+    print(f"Agent hostname: {result.stdout.strip()}")
     async with await conn.start_sftp_client() as sftp:
-        await sftp.get('/remote/result.json', '/local/result.json')
+        await sftp.get("/remote/result.json", "/local/result.json")
+
 
 async def run_controller():
     acceptor = asyncssh.listen_reverse(
-        host='0.0.0.0',
+        host="0.0.0.0",
         port=9922,
         acceptor=on_agent_connected,
         options=asyncssh.SSHClientConnectionOptions(
             known_hosts=None,  # Accept any host key for demo
-            username='controller'
-        )
+            username="controller",
+        ),
     )
     async with await acceptor:
         await asyncio.get_event_loop().create_future()
 
+
 # --- On the firewalled agent ---
 async def run_agent():
     async with asyncssh.connect_reverse(
-        'controller.example.com',
+        "controller.example.com",
         9922,
         options=asyncssh.SSHServerConnectionOptions(
-            server_host_keys=['agent_host_key'],
-            authorized_client_keys='authorized_keys'
-        )
+            server_host_keys=["agent_host_key"], authorized_client_keys="authorized_keys"
+        ),
     ):
         await asyncio.get_event_loop().create_future()  # hold open
 ```
@@ -365,23 +368,25 @@ async def run_agent():
 import asyncio
 import asyncssh
 
+
 async def sftp_example():
-    async with asyncssh.connect('fileserver.example.com', username='deploy') as conn:
+    async with asyncssh.connect("fileserver.example.com", username="deploy") as conn:
         async with await conn.start_sftp_client() as sftp:
             # Upload
-            await sftp.put('local_file.txt', '/remote/path/file.txt')
+            await sftp.put("local_file.txt", "/remote/path/file.txt")
 
             # Download
-            await sftp.get('/remote/path/result.json', 'local_result.json')
+            await sftp.get("/remote/path/result.json", "local_result.json")
 
             # Directory operations
-            await sftp.makedirs('/remote/new/nested/dir')
-            files = await sftp.listdir('/remote/path')
+            await sftp.makedirs("/remote/new/nested/dir")
+            files = await sftp.listdir("/remote/path")
             print(files)
 
             # Metadata
-            attrs = await sftp.stat('/remote/path/file.txt')
-            print(f'Size: {attrs.size}')
+            attrs = await sftp.stat("/remote/path/file.txt")
+            print(f"Size: {attrs.size}")
+
 
 asyncio.run(sftp_example())
 ```
@@ -392,16 +397,18 @@ asyncio.run(sftp_example())
 import asyncio
 import asyncssh
 
+
 async def jump_host():
     # Connect to bastion, then tunnel to internal host through it
-    async with asyncssh.connect('bastion.corp.com', username='user') as bastion:
+    async with asyncssh.connect("bastion.corp.com", username="user") as bastion:
         async with asyncssh.connect(
-            '10.0.1.50',        # internal host, not internet-reachable
-            username='deploy',
-            tunnel=bastion      # route through bastion connection
+            "10.0.1.50",  # internal host, not internet-reachable
+            username="deploy",
+            tunnel=bastion,  # route through bastion connection
         ) as internal:
-            result = await internal.run('ls /var/app')
+            result = await internal.run("ls /var/app")
             print(result.stdout)
+
 
 asyncio.run(jump_host())
 ```
@@ -412,15 +419,15 @@ asyncio.run(jump_host())
 import asyncssh
 
 # Generate Ed25519 key
-key = asyncssh.generate_private_key('ssh-ed25519', comment='agent-key')
-key.write_private_key('agent_key')
-key.write_public_key('agent_key.pub')
+key = asyncssh.generate_private_key("ssh-ed25519", comment="agent-key")
+key.write_private_key("agent_key")
+key.write_public_key("agent_key.pub")
 
 # Generate RSA 4096-bit key
-rsa_key = asyncssh.generate_private_key('ssh-rsa', key_size=4096)
+rsa_key = asyncssh.generate_private_key("ssh-rsa", key_size=4096)
 
 # Import existing key from string/bytes
-imported = asyncssh.import_private_key(open('~/.ssh/id_ed25519').read())
+imported = asyncssh.import_private_key(open("~/.ssh/id_ed25519").read())
 ```
 
 ---

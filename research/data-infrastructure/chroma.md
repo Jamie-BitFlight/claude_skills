@@ -55,17 +55,11 @@ From README: "The core API is only 4 functions" — `create_collection()`, `add(
 
 ```python
 import chromadb
+
 client = chromadb.Client()
 collection = client.create_collection("all-my-documents")
-collection.add(
-    documents=["This is document1"],
-    metadatas=[{"source": "notion"}],
-    ids=["doc1"]
-)
-results = collection.query(
-    query_texts=["This is a query"],
-    n_results=2
-)
+collection.add(documents=["This is document1"], metadatas=[{"source": "notion"}], ids=["doc1"])
+results = collection.query(query_texts=["This is a query"], n_results=2)
 ```
 
 ### 2. Automatic Embedding

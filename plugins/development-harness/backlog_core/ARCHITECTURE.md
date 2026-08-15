@@ -450,14 +450,18 @@ implementation details.
   class ContentProviderError(Exception):
       """Base error for logical content capability failures."""
 
+
   class ContentUnavailableError(ContentProviderError):
       """Requested content is not available from the selected backend."""
+
 
   class ContentConflictError(ContentProviderError):
       """The expected revision no longer matches provider state."""
 
+
   class UnsupportedCapabilityError(ContentProviderError):
       """The selected backend does not implement logical content storage."""
+
 
   class ContentKind(StrEnum):
       PLAN = "plan"
@@ -465,11 +469,13 @@ implementation details.
       ARTIFACT_MANIFEST = "artifact_manifest"
       ARTIFACT_CONTENT = "artifact_content"
 
+
   class ContentRef(BaseModel):
       kind: ContentKind
       namespace: str = ""
       artifact_type: str = ""
       name: str
+
 
   class ContentQuery(BaseModel):
       kind: ContentKind
@@ -477,6 +483,7 @@ implementation details.
       search: str = ""
       offset: int = Field(default=0, ge=0)
       limit: int = Field(default=100, ge=1, le=100)
+
 
   class ContentRecord(BaseModel):
       reference: ContentRef
@@ -486,11 +493,13 @@ implementation details.
       stale: bool = False
       pending: bool = False
 
+
   class ContentWrite(BaseModel):
       reference: ContentRef
       content: str
       owner_reference: str | None = None
       expected_revision: str = ""
+
 
   @runtime_checkable
   class ContentProvider(Protocol):

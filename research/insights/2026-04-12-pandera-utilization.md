@@ -21,20 +21,29 @@ The python-pytest-architect agent (lines 3, 22, 40-42 of its agent file) explici
 # Before (manual hypothesis strategy)
 from hypothesis import given, strategies as st
 
-@given(st.lists(st.dictionaries({
-    'customer_id': st.integers(min_value=1),
-    'purchase_amount': st.floats(min_value=0.01, max_value=10000),
-    'purchase_date': st.dates(min_value=date(2020, 1, 1))
-}), min_size=1, max_size=100))
+
+@given(
+    st.lists(
+        st.dictionaries({
+            "customer_id": st.integers(min_value=1),
+            "purchase_amount": st.floats(min_value=0.01, max_value=10000),
+            "purchase_date": st.dates(min_value=date(2020, 1, 1)),
+        }),
+        min_size=1,
+        max_size=100,
+    )
+)
 def test_transaction_processing(transactions_list):
     df = pd.DataFrame(transactions_list)
     result = process_transactions(df)
     assert result.shape[0] > 0
 
+
 # After (Pandera schema-driven)
 import pandera as pa
 from pandera.typing import Series
 from hypothesis import given
+
 
 class TransactionSchema(pa.DataFrameModel):
     customer_id: int = pa.Field(gt=0)
@@ -43,6 +52,7 @@ class TransactionSchema(pa.DataFrameModel):
 
     class Config:
         strict = True
+
 
 @given(TransactionSchema.strategy(size=10))
 def test_transaction_processing(df):

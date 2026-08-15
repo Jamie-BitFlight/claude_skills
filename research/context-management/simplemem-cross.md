@@ -202,14 +202,14 @@ This compositional architecture ensures SimpleMem's core algorithm (semantic str
 import asyncio
 from cross.orchestrator import create_orchestrator
 
+
 async def main():
     # Create orchestrator
     orch = create_orchestrator(project="my-project")
 
     # Start session with automatic context injection
     result = await orch.start_session(
-        content_session_id="session-001",
-        user_prompt="Continue building the REST API authentication",
+        content_session_id="session-001", user_prompt="Continue building the REST API authentication"
     )
     memory_session_id = result["memory_session_id"]
     print(result["context"])  # Previous context automatically injected
@@ -217,10 +217,7 @@ async def main():
     # Record events during session
     await orch.record_message(memory_session_id, "User asked about JWT auth")
     await orch.record_tool_use(
-        memory_session_id,
-        tool_name="read_file",
-        tool_input="auth/jwt.py",
-        tool_output="class JWTHandler: ...",
+        memory_session_id, tool_name="read_file", tool_input="auth/jwt.py", tool_output="class JWTHandler: ..."
     )
 
     # Finalize and persist observations
@@ -229,6 +226,7 @@ async def main():
 
     await orch.end_session(memory_session_id)
     orch.close()
+
 
 asyncio.run(main())
 ```
@@ -265,11 +263,11 @@ FastAPI REST server with 8 endpoints:
 
 ```python
 orch = create_orchestrator(
-    project="my-project",          # Project identifier
-    tenant_id="team-alpha",        # Multi-tenant isolation
+    project="my-project",  # Project identifier
+    tenant_id="team-alpha",  # Multi-tenant isolation
     db_path="~/.simplemem-cross/cross_memory.db",  # SQLite location
     lancedb_path="~/.simplemem-cross/lancedb_cross",  # Vector DB location
-    max_context_tokens=2000,       # Token budget for injection
+    max_context_tokens=2000,  # Token budget for injection
 )
 ```
 

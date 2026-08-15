@@ -40,6 +40,7 @@ def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
 ```python
 import msgspec
 
+
 def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
     """Read a JSONL file and return a list of parsed records."""
     records: list[dict[str, Any]] = []
@@ -53,6 +54,7 @@ def _read_jsonl(file_path: str) -> list[dict[str, Any]]:
 ```python
 import msgspec
 
+
 class SessionRecord(msgspec.Struct):
     sessionId: str
     timestamp: str
@@ -60,15 +62,12 @@ class SessionRecord(msgspec.Struct):
     message: dict[str, object] | None = None
     toolUseResult: dict[str, object] | None = None
 
+
 def _read_jsonl(file_path: str) -> list[SessionRecord]:
     """Read a JSONL file and return a list of validated session records."""
     records: list[SessionRecord] = []
     with pathlib.Path(file_path).open(encoding="utf-8") as fh:
-        records.extend(
-            msgspec.json.decode(stripped, type=SessionRecord)
-            for line in fh
-            if (stripped := line.strip())
-        )
+        records.extend(msgspec.json.decode(stripped, type=SessionRecord) for line in fh if (stripped := line.strip()))
     return records
 ```
 
@@ -132,8 +131,10 @@ text = _extract_text(content)
 ```python
 import msgspec
 
+
 class Message(msgspec.Struct):
     content: str | list[dict[str, object]]
+
 
 class SessionRecord(msgspec.Struct):
     sessionId: str
@@ -141,6 +142,7 @@ class SessionRecord(msgspec.Struct):
     type: str
     message: Message | None = None
     toolUseResult: dict[str, object] | None = None
+
 
 def _iter_user_messages(path: Path, *, min_length: int, session_filter: str | None):
     """Yield (session_id, timestamp, index, text) for user messages in *path*."""

@@ -132,14 +132,10 @@ from pandera import Column, DataFrameSchema
 schema = DataFrameSchema({
     "column1": Column(int, checks=pa.Check.gt(0)),
     "column2": Column(str),
-    "column3": Column(float, nullable=True)
+    "column3": Column(float, nullable=True),
 })
 
-df = pd.DataFrame({
-    "column1": [1, 2, 3],
-    "column2": ["a", "b", "c"],
-    "column3": [1.5, 2.5, None]
-})
+df = pd.DataFrame({"column1": [1, 2, 3], "column2": ["a", "b", "c"], "column3": [1.5, 2.5, None]})
 
 validated_df = schema.validate(df)
 ```
@@ -150,6 +146,7 @@ validated_df = schema.validate(df)
 import pandera as pa
 from pandera.typing import Series
 
+
 class MySchema(pa.DataFrameModel):
     column1: int = pa.Field(gt=0)
     column2: str
@@ -157,6 +154,7 @@ class MySchema(pa.DataFrameModel):
 
     class Config:
         strict = True
+
 
 validated_df = MySchema.validate(df)
 ```
@@ -166,6 +164,7 @@ validated_df = MySchema.validate(df)
 ```python
 import pytest
 from hypothesis import given
+
 
 @given(MySchema.strategy(size=10))
 def test_data_processing_function(df):
@@ -179,11 +178,14 @@ def test_data_processing_function(df):
 from fastapi import FastAPI, UploadFile
 from pandera.typing.fastapi import UploadFile as PanderaUploadFile
 
+
 class MySchema(pa.DataFrameModel):
     column1: int
     column2: str
 
+
 app = FastAPI()
+
 
 @app.post("/validate")
 async def validate_data(file: PanderaUploadFile[MySchema]):

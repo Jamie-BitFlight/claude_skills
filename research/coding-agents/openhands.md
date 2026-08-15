@@ -110,10 +110,7 @@ The core Python library powering all OpenHands products.
 from openhands import Agent, Tool
 
 # Define custom agent
-agent = Agent(
-    model="claude-3-5-sonnet",
-    tools=[Tool.bash, Tool.file_edit, Tool.web_browse]
-)
+agent = Agent(model="claude-3-5-sonnet", tools=[Tool.bash, Tool.file_edit, Tool.web_browse])
 
 # Run on code task
 result = agent.run("Fix the authentication bug in login.py")

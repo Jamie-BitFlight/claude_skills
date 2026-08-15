@@ -122,9 +122,9 @@ task_complexity = classify_task(task_content)
 # Returns: "low" (boilerplate, docs), "medium" (feature impl), "high" (architecture)
 
 effort_level = {
-    "low": "low",        # Fast, cheap, deterministic
+    "low": "low",  # Fast, cheap, deterministic
     "medium": "medium",
-    "high": "high",      # Deep reasoning, slower
+    "high": "high",  # Deep reasoning, slower
 }[task_complexity]
 ```
 

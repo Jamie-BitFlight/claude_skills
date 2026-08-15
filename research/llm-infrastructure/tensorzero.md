@@ -193,11 +193,7 @@ with TensorZeroGateway.build_embedded(...) as t0:
     response = t0.inference(
         model_name="openai::gpt-4o-mini",
         # Switch providers easily: "anthropic::claude-sonnet-4-5"
-        input={
-            "messages": [
-                {"role": "user", "content": "Write a haiku about TensorZero."}
-            ]
-        },
+        input={"messages": [{"role": "user", "content": "Write a haiku about TensorZero."}]},
     )
 ```
 
@@ -211,8 +207,7 @@ client = OpenAI()
 patch_openai_client(client, ...)
 
 response = client.chat.completions.create(
-    model="tensorzero::model_name::openai::gpt-4o-mini",
-    messages=[{"role": "user", "content": "Hello!"}],
+    model="tensorzero::model_name::openai::gpt-4o-mini", messages=[{"role": "user", "content": "Hello!"}]
 )
 ```
 
@@ -220,11 +215,7 @@ response = client.chat.completions.create(
 
 ```python
 # Record feedback for optimization
-t0.feedback(
-    inference_id=response.inference_id,
-    metric_name="user_rating",
-    value=5,
-)
+t0.feedback(inference_id=response.inference_id, metric_name="user_rating", value=5)
 ```
 
 ### Running Evaluations (CLI)

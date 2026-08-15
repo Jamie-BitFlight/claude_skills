@@ -23,6 +23,7 @@ import honker
 db = honker.open("~/.dh/projects/{slug}/dispatch.db")
 queue = db.queue("dispatch-items")
 
+
 # Current: INSERT into custom items table
 # Proposed: enqueue as honker job
 @queue.task(retries=3, timeout_s=3600)
@@ -30,6 +31,7 @@ def execute_dispatch_item(milestone: int, wave_num: int, issue: int):
     # Spawn claude session for this item
     pid = spawn_claude_worker(...)
     return {"pid": pid, "started_at": now_iso()}
+
 
 # Caller: task_id = execute_dispatch_item(5, 1, 42)
 # result = task_id.get(timeout=10)  # blocks until worker runs it
@@ -73,12 +75,9 @@ pipeline_stream = db.stream("pipeline-lifecycle")
 # Publish stage transition event atomically with artifact
 with db.transaction() as tx:
     artifact_registry.register(issue, "architect", path, tx=tx)
-    pipeline_stream.publish({
-        "stage": "S2",
-        "event": "architect-complete",
-        "issue": issue,
-        "timestamp": now_iso()
-    }, tx=tx)
+    pipeline_stream.publish(
+        {"stage": "S2", "event": "architect-complete", "issue": issue, "timestamp": now_iso()}, tx=tx
+    )
 
 # Consumer: code-reviewer agent subscribes
 async for event in pipeline_stream.subscribe(consumer="code-reviewer"):

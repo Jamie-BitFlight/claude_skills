@@ -66,14 +66,15 @@ The tmux hierarchy maps exactly to Python classes, each a dataclass with live st
 ```python
 import libtmux
 
-server = libtmux.Server()                          # connects to default tmux socket
-server = libtmux.Server(socket_name="my-server")   # isolated socket
+server = libtmux.Server()  # connects to default tmux socket
+server = libtmux.Server(socket_name="my-server")  # isolated socket
 
 session: libtmux.Session = server.new_session(
     session_name="dev",
     start_directory="/home/user/project",
-    attach=False,                                   # background, no attach
-    x=220, y=50,                                   # explicit dimensions for headless
+    attach=False,  # background, no attach
+    x=220,
+    y=50,  # explicit dimensions for headless
 )
 window: libtmux.Window = session.new_window(window_name="editor", attach=False)
 pane: libtmux.Pane = window.split(direction=libtmux.PaneDirection.Below, shell="bash")
@@ -86,12 +87,12 @@ SOURCE: [libtmux README](https://raw.githubusercontent.com/tmux-python/libtmux/m
 ### Pane.send_keys — Keystroke Injection
 
 ```python
-pane.send_keys("echo 'hello world'")           # sends text + Enter
-pane.send_keys("echo hey", enter=False)        # sends text without Enter
-pane.send_keys("q", literal=True)             # sends literal key, not tmux key binding
-pane.enter()                                   # sends Enter alone
-pane.clear()                                   # sends Ctrl-L (clear screen)
-pane.reset()                                   # sends 'reset' command
+pane.send_keys("echo 'hello world'")  # sends text + Enter
+pane.send_keys("echo hey", enter=False)  # sends text without Enter
+pane.send_keys("q", literal=True)  # sends literal key, not tmux key binding
+pane.enter()  # sends Enter alone
+pane.clear()  # sends Ctrl-L (clear screen)
+pane.reset()  # sends 'reset' command
 ```
 
 `suppress_history=True` prepends a space to avoid writing to shell history (default: False since v0.14).
@@ -129,6 +130,7 @@ new_pane = window.split()
 
 # Split with direction
 from libtmux.constants import PaneDirection
+
 right_pane = window.split(direction=PaneDirection.Right)
 
 # Split with specific size (percentage or cells)
@@ -139,10 +141,7 @@ pane = window.split(size=20)
 pane = window.split(shell="python3 -m http.server 8080")
 
 # Split with working directory and environment
-pane = window.split(
-    start_directory="/home/user/project",
-    environment={"VIRTUAL_ENV": "/home/user/.venv"}
-)
+pane = window.split(start_directory="/home/user/project", environment={"VIRTUAL_ENV": "/home/user/.venv"})
 ```
 
 SOURCE: [src/libtmux/pane.py split](https://raw.githubusercontent.com/tmux-python/libtmux/master/src/libtmux/pane.py) (accessed 2026-03-01)
@@ -166,9 +165,9 @@ active_pane = window.active_pane
 active_window = session.active_window
 
 # Traverse hierarchy bidirectionally
-pane.window        # Window containing this pane
-pane.session       # Session containing this pane
-window.session     # Session containing this window
+pane.window  # Window containing this pane
+pane.session  # Session containing this pane
+window.session  # Session containing this window
 ```
 
 Supported lookup operators: exact (default), `__startswith`, `__endswith`, `__contains`, `__regex`, `__icontains`, `__in`.
@@ -208,8 +207,8 @@ session.cmd("send-keys", "-t", f"{session.name}:0", "ls", "Enter")
 
 # On Pane
 result = pane.cmd("capture-pane", "-p")
-print(result.stdout)   # list[str]
-print(result.stderr)   # list[str]
+print(result.stdout)  # list[str]
+print(result.stderr)  # list[str]
 ```
 
 `.cmd()` properly passes the socket name/path so commands always target the correct tmux server.
@@ -241,6 +240,7 @@ Register by installing libtmux; fixtures are auto-discovered via the `Framework 
 from libtmux.server import Server
 from libtmux.session import Session
 
+
 def test_tool_creates_windows(session: Session) -> None:
     """Receives a fresh, isolated tmux session."""
     window = session.new_window(window_name="test-window")
@@ -250,6 +250,7 @@ def test_tool_creates_windows(session: Session) -> None:
     lines = pane.capture_pane()
     assert any("test output" in line for line in lines)
     # Cleanup is automatic — session and server torn down after test
+
 
 def test_multi_server(server: Server) -> None:
     """Receives a fresh tmux server on an isolated socket."""
@@ -265,13 +266,13 @@ SOURCE: [src/libtmux/pytest_plugin.py](https://raw.githubusercontent.com/tmux-py
 ### Pane Position Introspection
 
 ```python
-pane.at_top     # bool — pane is at top edge of window
+pane.at_top  # bool — pane is at top edge of window
 pane.at_bottom  # bool — pane is at bottom edge of window
-pane.at_left    # bool — pane is at left edge of window
-pane.at_right   # bool — pane is at right edge of window
-pane.height     # str — height in rows
-pane.width      # str — columns
-pane.index      # str — pane index within window
+pane.at_left  # bool — pane is at left edge of window
+pane.at_right  # bool — pane is at right edge of window
+pane.height  # str — height in rows
+pane.width  # str — columns
+pane.index  # str — pane index within window
 ```
 
 SOURCE: [src/libtmux/pane.py properties](https://raw.githubusercontent.com/tmux-python/libtmux/master/src/libtmux/pane.py) (accessed 2026-03-01)
@@ -343,10 +344,10 @@ SOURCE: [src/libtmux/exc.py](https://raw.githubusercontent.com/tmux-python/libtm
 ```python
 from libtmux.common import get_version, has_version, has_gt_version
 
-get_version()           # LooseVersion of running tmux binary
-has_version("3.2")      # bool — exact match
-has_gt_version("3.0")   # bool — strictly greater
-has_gte_version("3.2a") # bool — greater or equal
+get_version()  # LooseVersion of running tmux binary
+has_version("3.2")  # bool — exact match
+has_gt_version("3.0")  # bool — strictly greater
+has_gte_version("3.2a")  # bool — greater or equal
 ```
 
 ---
@@ -385,13 +386,7 @@ from libtmux.constants import PaneDirection
 server = libtmux.Server(socket_name="claude-agent")
 
 # Create a session with explicit dimensions (needed in headless/TTY-less environments)
-session = server.new_session(
-    session_name="workspace",
-    start_directory="/home/user/project",
-    attach=False,
-    x=220,
-    y=50,
-)
+session = server.new_session(session_name="workspace", start_directory="/home/user/project", attach=False, x=220, y=50)
 
 # Get the initial window and pane
 window = session.active_window
@@ -406,6 +401,7 @@ main_pane.send_keys("python run_agent.py --task build")
 
 # Capture output from monitor pane
 import time
+
 time.sleep(2)  # wait for command to produce output
 output_lines = monitor_pane.capture_pane(start=-100, end="-")
 errors = [line for line in output_lines if "ERROR" in line]
@@ -426,8 +422,8 @@ server = libtmux.Server(socket_name="headless-test")
 session = server.new_session(
     session_name="ci-run",
     attach=False,
-    x=200,   # explicit width required without TTY
-    y=50,    # explicit height required without TTY
+    x=200,  # explicit width required without TTY
+    y=50,  # explicit height required without TTY
 )
 ```
 
@@ -437,11 +433,7 @@ Without `x`/`y`, tmux in headless mode may default to 80x24 or fail to start. Th
 
 ```python
 # Pass environment variables to new sessions/panes
-session = server.new_session(
-    session_name="env-test",
-    attach=False,
-    environment={"API_KEY": "secret", "DEBUG": "1"},
-)
+session = server.new_session(session_name="env-test", attach=False, environment={"API_KEY": "secret", "DEBUG": "1"})
 pane = window.split(environment={"NODE_ENV": "test"})
 ```
 
@@ -460,6 +452,7 @@ subprocess.run(["tmux", "capture-pane", "-t", "mysession", "-p"])
 
 # libtmux equivalent (typed, no parsing)
 import libtmux
+
 server = libtmux.Server(socket_name="claude-pty")
 with server.new_session("tool-run", attach=False, x=160, y=50) as session:
     pane = session.active_window.active_pane
@@ -487,11 +480,7 @@ def create_dev_workspace(project_path: str) -> dict:
     # Test pane (bottom, 30% height)
     test_pane = window.split(direction=libtmux.PaneDirection.Below, size="30%")
 
-    return {
-        "session": session,
-        "server_pane": server_pane,
-        "test_pane": test_pane,
-    }
+    return {"session": session, "server_pane": server_pane, "test_pane": test_pane}
 ```
 
 ### Application: Output Polling for Long-Running Processes
@@ -500,6 +489,7 @@ Agents running shell commands need to monitor output. libtmux's `capture_pane()`
 
 ```python
 import time
+
 
 def wait_for_output(pane: libtmux.Pane, pattern: str, timeout: float = 30.0) -> list[str]:
     """Poll pane output until pattern appears or timeout."""

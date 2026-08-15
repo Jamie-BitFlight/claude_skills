@@ -62,6 +62,7 @@ The Python client exposes two primary entry points:
 
 ```python
 import duckdb
+
 duckdb.sql("SELECT 42").show()
 ```
 
@@ -70,7 +71,7 @@ Executes queries on an in-memory database stored globally within the Python modu
 **Persistent database connections** (via `duckdb.connect()`):
 
 ```python
-conn = duckdb.connect('my_database.duckdb')
+conn = duckdb.connect("my_database.duckdb")
 result = conn.execute("SELECT * FROM my_table").fetchall()
 ```
 
@@ -100,6 +101,7 @@ The `@duckdb.create_function` decorator allows users to define custom functions 
 @duckdb.create_function
 def my_custom_function(x):
     return x * 2
+
 
 conn.execute("SELECT my_custom_function(10)").fetchall()
 ```
@@ -215,7 +217,7 @@ duckdb.sql("SELECT 42 AS answer").show()
 **2. Persistent database:**
 
 ```python
-conn = duckdb.connect('my_database.duckdb')
+conn = duckdb.connect("my_database.duckdb")
 conn.execute("CREATE TABLE numbers (id INTEGER, value DOUBLE)")
 conn.execute("INSERT INTO numbers VALUES (1, 3.14), (2, 2.71)")
 conn.execute("SELECT * FROM numbers WHERE value > 3").show()
@@ -234,9 +236,7 @@ print(result)
 **4. Reading remote Parquet files:**
 
 ```python
-result = duckdb.sql(
-    "SELECT COUNT(*) FROM 's3://my-bucket/data.parquet'"
-)
+result = duckdb.sql("SELECT COUNT(*) FROM 's3://my-bucket/data.parquet'")
 ```
 
 **5. User-defined function:**
@@ -245,6 +245,7 @@ result = duckdb.sql(
 @duckdb.create_function
 def double(x):
     return x * 2
+
 
 duckdb.sql("SELECT double(5)").show()
 ```
@@ -271,11 +272,7 @@ Common connection parameters:
 - `timeout=30000`: Query timeout in milliseconds
 
 ```python
-conn = duckdb.connect(
-    'my_db.duckdb',
-    read_only=False,
-    config={'memory_limit': '2GB', 'threads': 8}
-)
+conn = duckdb.connect("my_db.duckdb", read_only=False, config={"memory_limit": "2GB", "threads": 8})
 ```
 
 ---
@@ -334,7 +331,7 @@ Claude Code workflows can use DuckDB's in-memory mode for:
 Agents can build validation pipelines:
 
 ```python
-conn = duckdb.connect(':memory:')
+conn = duckdb.connect(":memory:")
 conn.execute("CREATE TABLE raw_data AS SELECT * FROM 'input.csv'")
 conn.execute("SELECT COUNT(*) FROM raw_data WHERE id IS NULL")  # null checks
 ```

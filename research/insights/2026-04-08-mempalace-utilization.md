@@ -33,8 +33,8 @@ session_data = json.load(open(".claude/context/active-task-{session_id}.json"))
 
 # Prepare a session record for storage
 session_record = f"""
-Session: {session_data.get('session_id')}
-Task: {session_data.get('task_id')}
+Session: {session_data.get("session_id")}
+Task: {session_data.get("task_id")}
 Agent Type: [extracted from task file]
 Completed: {datetime.now().isoformat()}
 Outcome: [status from task file]
@@ -44,12 +44,13 @@ Skills Loaded: [parsed from task frontmatter]
 # Store via MemPalace Python API or MCP call
 # Using Python SDK (no API calls):
 from mempalace.palace_graph import add_to_room
+
 add_to_room(
     wing=project_slug,
     room="session-metadata",
     hall="hall_events",
     content=session_record,
-    metadata={"session_id": session_id, "task_id": task_id}
+    metadata={"session_id": session_id, "task_id": task_id},
 )
 
 # Then delete the ephemeral file as normal
@@ -80,18 +81,13 @@ MemPalace's `search_memories()` API and `mempalace_search` MCP tool enable this 
 from mempalace.searcher import search_memories
 
 # Step 2: Research Everything
-files_to_research = [
-    "backlog_core/server.py",
-    "backlog_core/models.py",
-    "plugins/development-harness/hooks/"
-]
+files_to_research = ["backlog_core/server.py", "backlog_core/models.py", "plugins/development-harness/hooks/"]
 
 # Before reading fresh docs, query what prior agents discovered
 discoveries = {}
 for file_path in files_to_research:
     prior_findings = search_memories(
-        query=f"gotcha constraint issue discovered in {file_path}",
-        palace_path="~/.mempalace/palace"
+        query=f"gotcha constraint issue discovered in {file_path}", palace_path="~/.mempalace/palace"
     )
     if prior_findings:
         discoveries[file_path] = prior_findings
@@ -141,7 +137,7 @@ kg.add_triple(
     subject=f"agent:{reviewed_agent_name}",
     predicate="produces_pattern",
     object=pattern_name,
-    valid_from=datetime.now().isoformat()
+    valid_from=datetime.now().isoformat(),
 )
 
 # Also write agent diary with specific example

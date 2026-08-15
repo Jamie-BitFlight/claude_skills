@@ -252,6 +252,7 @@ def compute(n):
         total += i
     return total
 
+
 # Enable JIT for this function
 compute.__jit__()
 
