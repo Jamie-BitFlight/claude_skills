@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING, Any
 
 from backlog_core.backends.github_content_migration import _GitHubContentMigration
 from backlog_core.models import ContentKind, ContentNotFoundError, ContentQuery, ContentRecord, ContentRef
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class _FakeLegacyStore:
@@ -39,7 +41,7 @@ class _EmptyContentsStore:
         raise NotImplementedError
 
 
-def test_read_legacy_resolves_plan_persistence_at_call_time_not_construction_time() -> None:
+def test_read_legacy_resolves_plan_persistence_at_call_time_not_construction_time(mocker: MockerFixture) -> None:
     """A plan_persistence swap after construction must take effect on the next read.
 
     Regression test for a Codex review finding on PR 2894: _GitHubContentMigration
@@ -58,7 +60,7 @@ def test_read_legacy_resolves_plan_persistence_at_call_time_not_construction_tim
         contents=_EmptyContentsStore,
         plan_persistence=lambda: container["plan_persistence"],
         dispatch_persistence=lambda: original,
-        artifact_provider=MagicMock,
+        artifact_provider=mocker.MagicMock,
     )
 
     assert migration.read(reference).content == "original"
@@ -68,7 +70,7 @@ def test_read_legacy_resolves_plan_persistence_at_call_time_not_construction_tim
     assert migration.read(reference).content == "replacement"
 
 
-def test_with_legacy_content_resolves_dispatch_persistence_at_call_time() -> None:
+def test_with_legacy_content_resolves_dispatch_persistence_at_call_time(mocker: MockerFixture) -> None:
     """The list-side legacy fallback must also resolve dispatch_persistence live."""
     reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name="D1")
     original = _FakeLegacyStore(ContentRecord(reference=reference, content="original", revision="r1"))
@@ -79,7 +81,7 @@ def test_with_legacy_content_resolves_dispatch_persistence_at_call_time() -> Non
         contents=_EmptyContentsStore,
         plan_persistence=lambda: original,
         dispatch_persistence=lambda: container["dispatch_persistence"],
-        artifact_provider=MagicMock,
+        artifact_provider=mocker.MagicMock,
     )
 
     query = ContentQuery(kind=ContentKind.DISPATCH_PLAN)
@@ -92,7 +94,7 @@ def test_with_legacy_content_resolves_dispatch_persistence_at_call_time() -> Non
     assert record.content == "replacement"
 
 
-def test_read_legacy_resolves_artifact_provider_at_call_time() -> None:
+def test_read_legacy_resolves_artifact_provider_at_call_time(mocker: MockerFixture) -> None:
     """The artifact-manifest legacy path must also resolve artifact_provider live."""
     reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
 
@@ -112,8 +114,8 @@ def test_read_legacy_resolves_artifact_provider_at_call_time() -> None:
     container: dict[str, Any] = {"provider": _FakeArtifactProvider("original")}
     migration = _GitHubContentMigration(
         contents=_EmptyContentsStore,
-        plan_persistence=MagicMock,
-        dispatch_persistence=MagicMock,
+        plan_persistence=mocker.MagicMock,
+        dispatch_persistence=mocker.MagicMock,
         artifact_provider=lambda: container["provider"],
     )
 
