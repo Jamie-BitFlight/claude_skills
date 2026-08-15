@@ -563,7 +563,19 @@ provider-specific APIs or file-cache operations.
 protocols.
 
 - `backends/github_backend.py` — remote-capable `GitHubBackend`: delegates to GitHub adapters and
-  privately owns the injected `FileCache`. Requires `GITHUB_TOKEN`. Default backend.
+  privately owns the injected `FileCache`. Requires `GITHUB_TOKEN`. Default backend. It is the
+  composition root for the collaborators below and delegates each protocol method to one of them;
+  the collaborators reach GitHub and the injected stores back through narrow protocols it satisfies,
+  so every seam stays substitutable on the backend instance.
+  - `backends/github_contents.py` — `_GitHubContentsStore`: the authoritative Contents API store.
+  - `backends/github_content_stores.py` — the legacy Gist-backed plan and dispatch stores that
+    remain readable for migration, plus the shared content-store protocol and revision helpers.
+  - `backends/github_content_migration.py` — `_GitHubContentMigration` resolves content across the
+    Contents API and the legacy stores and owns the migration compare-and-swap;
+    `_GitHubContentCache` wraps it in the offline, replay, and staleness policy.
+  - `backends/github_work_items.py` — `_GitHubWorkItemSync` translates issues into provider
+    snapshots and applies provider patches; `_GitHubReconciliation` drives the reconciliation cycle
+    against the provider-private `FileCache`.
 - Future GitLab, Linear, Jira, and equivalent network backends follow the same remote-provider
   composition: provider API plus a private `FileCache`.
 - `backends/sqlite_backend.py` — local `SQLiteBackend`: native SQLite storage. No `FileCache` and no

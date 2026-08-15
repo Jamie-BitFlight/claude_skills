@@ -1,75 +1,69 @@
-"""GitHubBackend — concrete backend delegating to gh_client, github_sync, github_branches.
+"""GitHubBackend — the composition root for the GitHub work-item provider.
 
-This module provides a thin wrapper class that implements the backlog
-backend Protocols (WorkItemBackend, GitHubExtras, BranchBackend) by
-delegating every method to the corresponding module-level function in
-gh_client, github_sync, or github_branches.  No business logic lives here.
+This module owns two things and nothing else:
+
+1. The GitHub API surface — thin delegations to ``gh_client``, ``github_sync``,
+   ``github_branches``, and ``rendering``, plus the bounded aliased GraphQL query
+   that resolves targeted issues.
+2. Composition — wiring the collaborators that hold the provider's behaviour and
+   delegating each Protocol-facing method to the collaborator that owns it:
+
+   - :class:`_GitHubContentsStore` (``github_contents``) — the authoritative
+     Contents API store.
+   - :class:`_GitHubPlanPersistence` / :class:`_GitHubDispatchPersistence`
+     (``github_content_stores``) — the legacy Gist-backed stores.
+   - :class:`_GitHubContentMigration` / :class:`_GitHubContentCache`
+     (``github_content_migration``) — content resolution across those stores,
+     and the offline/replay policy wrapped around it.
+   - :class:`_GitHubWorkItemSync` / :class:`_GitHubReconciliation`
+     (``github_work_items``) — provider snapshot and patch translation, and the
+     reconciliation cycle driven against the provider-private cache.
+
+The collaborators reach back through narrow Protocols this class satisfies
+structurally, so every GitHub call and every injected store stays substitutable
+on the backend instance itself.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
-from collections.abc import Sequence
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal, Protocol, assert_never, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal
 
 import dh_paths as _dh_paths
-from sam_schema.core.artifact_registry_client import (
-    ArtifactRegistryClient,
-    PlanContentUnavailableError,
-    PlanIndexUnavailableError,
-)
-from sam_schema.core.exceptions import ArtifactWriteError, PlanIndexError
-from sam_schema.core.plan_id_index import PlanIndexEntry, create_plan_id_index
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
-from backlog_core.backends._github_work_item_versions import (
-    WorkItemHead,
-    WorkItemVersion,
-    is_work_item_head_ref,
-    parse_work_item_comment,
-    parse_work_item_head,
-    render_work_item_comment,
-    root_revision,
-    work_item_head_ref,
+from backlog_core.backends.github_content_migration import (
+    _GitHubContentCache,
+    _GitHubContentMigration,
+    _PlanPersistence,
 )
-from backlog_core.backends.github_contents import _GitHubContentIntegrityError, _GitHubContentsStore
-from backlog_core.file_cache import FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
+from backlog_core.backends.github_content_stores import (
+    _content_revision as _compute_content_revision,
+    _ContentPersistence,
+    _GitHubDispatchPersistence,
+    _GitHubPlanPersistence,
+)
+from backlog_core.backends.github_contents import _GitHubContentsStore
+from backlog_core.backends.github_work_items import _TARGET_BATCH_SIZE, _GitHubReconciliation, _GitHubWorkItemSync
+from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
-    ContentConflictError,
-    ContentKind,
-    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
-    ContentUnavailableError,
     ContentWrite,
     PatchResult,
-    ProviderItem,
     ProviderPatch,
     ProviderSnapshot,
     ReconcileRequest,
     ReconcileResult,
-    ReconcileScope,
-    UnsupportedCapabilityError,
     parse_issue_number,
-)
-from backlog_core.reconciliation import (
-    ActionResult,
-    LogicalCacheRecord,
-    ReconcileExecution,
-    ReconcileOutcome,
-    finalize_reconciliation,
-    reconcile_backlog,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
+    from datetime import datetime
 
     from github.Repository import Repository
 
@@ -87,255 +81,18 @@ if TYPE_CHECKING:
         SamTask,
         ViewItemResult,
     )
+    from backlog_core.reconciliation import LogicalCacheRecord
 
 __all__ = ["GitHubBackend"]
 
-_NativeContentsStore = _GitHubContentsStore
-
-
-class _PlanPersistence(Protocol):
-    def list(self, query: ContentQuery) -> Sequence[ContentRecord]: ...
-    def get(self, reference: ContentRef) -> ContentRecord: ...
-    def put(self, request: ContentWrite) -> ContentRecord: ...
-
-
-class _ContentPersistence(Protocol):
-    def list(self, query: ContentQuery) -> Sequence[ContentRecord]: ...
-    def get(self, reference: ContentRef) -> ContentRecord: ...
-    def put(self, request: ContentWrite) -> ContentRecord: ...
-
-
-@runtime_checkable
-class _ReferenceContentPersistence(Protocol):
-    def get_many(self, references: Sequence[ContentRef]) -> list[ContentRecord]: ...
-
-
-@runtime_checkable
-class _RemoteArtifactContentLister(Protocol):
-    def list_artifact_content_from_remote(
-        self, item_id: int, artifact_type: str, path_prefix: str
-    ) -> dict[str, str]: ...
-
-
-class _GitHubPlanPersistence:
-    def __init__(self, provider: ArtifactBackend) -> None:
-        client = ArtifactRegistryClient(provider)
-        self._index = create_plan_id_index(client)
-        self._sentinel_issue = self._index._sentinel_issue
-        self._client = client
-        self._provider = provider
-
-    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
-        entries = [
-            entry
-            for entry in self._entries()
-            if (query.owner_reference is None or self._owner(entry) == query.owner_reference)
-            and query.search.casefold() in f"{entry.plan_id} {entry.slug}".casefold()
-        ]
-        return [self._record(entry) for entry in entries[query.offset : query.offset + query.limit]]
-
-    def get(self, reference: ContentRef) -> ContentRecord:
-        entry = next((entry for entry in self._entries() if entry.plan_id == reference.name), None)
-        if entry is None:
-            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
-        return self._record(entry)
-
-    def put(self, request: ContentWrite) -> ContentRecord:
-        entry = next((entry for entry in self._entries() if entry.plan_id == request.reference.name), None)
-        current = self._record(entry) if entry is not None else None
-        owner = (
-            request.owner_reference
-            if request.owner_reference is not None
-            else current.owner_reference
-            if current is not None
-            else ""
-        )
-        if current is not None and current.content == request.content and current.owner_reference == owner:
-            return current
-        if request.expected_revision:
-            raise ContentConflictError("Content revision no longer matches")
-        raise UnsupportedCapabilityError("GitHub plan writes require a compare-and-swap revision")
-
-    def _entries(self) -> Sequence[PlanIndexEntry]:
-        try:
-            return self._index.list_all()
-        except PlanIndexUnavailableError as exc:
-            raise BacklogError(str(exc)) from exc
-        except (ArtifactWriteError, PlanIndexError) as exc:
-            raise BacklogError(str(exc)) from exc
-
-    def _record(self, entry: PlanIndexEntry) -> ContentRecord:
-        try:
-            content = (
-                self._client.read(entry.issue, plan_id=entry.plan_id)
-                if entry.issue is not None
-                else self._provider.read_artifact_content_from_remote(
-                    self._sentinel_issue, "plan", self._unlinked_path(entry.plan_id)
-                )
-            )
-        except PlanContentUnavailableError as exc:
-            raise BacklogError(str(exc)) from exc
-        reference = ContentRef(kind=ContentKind.PLAN, name=entry.plan_id)
-        if content is None:
-            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
-        return ContentRecord(
-            reference=reference,
-            owner_reference=self._owner(entry),
-            content=content,
-            revision=GitHubBackend._content_revision(content),
-        )
-
-    @staticmethod
-    def _owner(entry: PlanIndexEntry) -> str:
-        return f"#{entry.issue}" if entry.issue is not None else ""
-
-    @staticmethod
-    def _unlinked_path(plan_id: str) -> str:
-        return f"sam-plan/unlinked/{plan_id}.yaml"
-
-
-class _GitHubDispatchPersistence:
-    _CONTENT_TYPE = "dispatch-plan"
-    _INDEX_TYPE = "dispatch-plan-index"
-    _INDEX_PATH = "dispatch-plan/index.json"
-    _ENVELOPE_VERSION_KEY = "dispatch-content-version"
-
-    def __init__(self, provider: ArtifactBackend) -> None:
-        self._provider = provider
-        self._sentinel_issue = create_plan_id_index(ArtifactRegistryClient(provider))._sentinel_issue
-
-    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
-        entries = [
-            entry
-            for entry in self._entries()
-            if (query.owner_reference is None or entry.owner_reference == query.owner_reference)
-            and query.search.casefold() in entry.name.casefold()
-        ]
-        records = [self._record(entry) for entry in entries]
-        return records[query.offset : query.offset + query.limit]
-
-    def get(self, reference: ContentRef) -> ContentRecord:
-        entry = next((entry for entry in self._entries() if entry.name == reference.name), None)
-        if entry is None:
-            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
-        return self._record(entry)
-
-    def put(self, request: ContentWrite) -> ContentRecord:
-        entries = self._entries()
-        entry = next((entry for entry in entries if entry.name == request.reference.name), None)
-        current = self._record(entry) if entry is not None else None
-        owner_reference = (
-            request.owner_reference if request.owner_reference is not None else current and current.owner_reference
-        )
-        if current is not None and current.content == request.content and current.owner_reference == owner_reference:
-            return current
-        raise UnsupportedCapabilityError("GitHub dispatch writes are not supported")
-
-    def _record(self, entry: _DispatchIndexEntry) -> ContentRecord:
-        stored_content = self._provider.read_artifact_content_from_remote(
-            self._sentinel_issue, self._CONTENT_TYPE, self._content_path(entry.name)
-        )
-        if stored_content is None:
-            reference = ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name)
-            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
-        envelope = self._parse_envelope(stored_content)
-        if entry.legacy:
-            content = stored_content
-        else:
-            if envelope is None:
-                raise ContentUnavailableError("Dispatch content envelope is invalid")
-            content = envelope[2]
-        return ContentRecord(
-            reference=ContentRef(kind=ContentKind.DISPATCH_PLAN, name=entry.name),
-            owner_reference=entry.owner_reference,
-            content=content,
-            revision=GitHubBackend._content_revision(content),
-        )
-
-    def _entries(self) -> Sequence[_DispatchIndexEntry]:
-        provider = self._provider
-        if not isinstance(provider, _RemoteArtifactContentLister):
-            raise ContentUnavailableError("GitHub artifact provider cannot enumerate dispatch plans")
-        current_entries: list[_DispatchIndexEntry] = []
-        for stored_content in provider.list_artifact_content_from_remote(
-            self._sentinel_issue, self._CONTENT_TYPE, "dispatch-plan/"
-        ).values():
-            envelope = self._parse_envelope(stored_content)
-            if envelope is not None:
-                current_entries.append(_DispatchIndexEntry(name=envelope[0], owner_reference=envelope[1]))
-
-        current_names = {entry.name for entry in current_entries}
-        return [*current_entries, *(entry for entry in self._legacy_entries() if entry.name not in current_names)]
-
-    def _legacy_entries(self) -> Sequence[_DispatchIndexEntry]:
-        content = self._provider.read_artifact_content_from_remote(
-            self._sentinel_issue, self._INDEX_TYPE, self._INDEX_PATH
-        )
-        if content is None:
-            return []
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise ContentUnavailableError("Dispatch content index is invalid") from exc
-        if isinstance(data, list) and all(isinstance(name, str) for name in data):
-            return [_DispatchIndexEntry(name=name, owner_reference="", legacy=True) for name in data]
-        if not isinstance(data, dict) or data.get("version") != 1:
-            raise ContentUnavailableError("Dispatch content index is invalid")
-        raw_entries = data.get("entries")
-        if not isinstance(raw_entries, list):
-            raise ContentUnavailableError("Dispatch content index is invalid")
-        entries: list[_DispatchIndexEntry] = []
-        for raw_entry in raw_entries:
-            if not isinstance(raw_entry, dict):
-                raise ContentUnavailableError("Dispatch content index is invalid")
-            name = raw_entry.get("name")
-            owner_reference = raw_entry.get("owner_reference")
-            if not isinstance(name, str) or not isinstance(owner_reference, str):
-                raise ContentUnavailableError("Dispatch content index is invalid")
-            entries.append(_DispatchIndexEntry(name=name, owner_reference=owner_reference, legacy=True))
-        return entries
-
-    @classmethod
-    def _serialize_envelope(cls, name: str, owner_reference: str, content: str) -> str:
-        return json.dumps(
-            {cls._ENVELOPE_VERSION_KEY: 1, "name": name, "owner_reference": owner_reference, "content": content},
-            separators=(",", ":"),
-        )
-
-    @classmethod
-    def _parse_envelope(cls, stored_content: str) -> tuple[str, str, str] | None:
-        try:
-            data = json.loads(stored_content)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(data, dict) or cls._ENVELOPE_VERSION_KEY not in data:
-            return None
-        if data[cls._ENVELOPE_VERSION_KEY] != 1:
-            raise ContentUnavailableError("Dispatch content envelope is invalid")
-        name = data.get("name")
-        owner_reference = data.get("owner_reference")
-        content = data.get("content")
-        if not isinstance(name, str) or not isinstance(owner_reference, str) or not isinstance(content, str):
-            raise ContentUnavailableError("Dispatch content envelope is invalid")
-        return name, owner_reference, content
-
-    @staticmethod
-    def _content_path(name: str) -> str:
-        return f"dispatch-plan/{name}.json"
-
-
-@dataclass(frozen=True, slots=True)
-class _DispatchIndexEntry:
-    name: str
-    owner_reference: str
-    legacy: bool = False
-
 
 class GitHubBackend:
-    """Backend implementation delegating to gh_client, github_sync, and github_branches.
+    """Backend implementation composing the GitHub provider collaborators.
 
-    Each method is a 1-3 line delegation.  The constructor accepts an optional
-    default repo string that is used when callers pass an empty ``repo`` argument.
+    Every method is either a delegation to a module-level GitHub function or a
+    delegation to the collaborator that owns the behaviour.  The constructor
+    accepts an optional default repo string that is used when callers pass an
+    empty ``repo`` argument.
 
     Capability flags:
 
@@ -351,9 +108,6 @@ class GitHubBackend:
     supports_batch_issue_update: bool = True
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
-
-    _TARGET_BATCH_SIZE = 100
-    _CONTENT_PAGE_SIZE = 100
 
     def __init__(
         self,
@@ -379,6 +133,15 @@ class GitHubBackend:
         self._plan_persistence = plan_persistence or _GitHubPlanPersistence(self._artifact_provider)
         self._dispatch_persistence = _GitHubDispatchPersistence(self._artifact_provider)
         self._contents = contents or _GitHubContentsStore(self.get_github)
+        self._content_migration = _GitHubContentMigration(
+            contents=lambda: self._contents,
+            plan_persistence=lambda: self._plan_persistence,
+            dispatch_persistence=lambda: self._dispatch_persistence,
+            artifact_provider=lambda: self._artifact_provider,
+        )
+        self._content_cache = _GitHubContentCache(self._cache, self)
+        self._work_items = _GitHubWorkItemSync(self, lambda: self._contents)
+        self._reconciliation = _GitHubReconciliation(self._cache, self)
 
     # ------------------------------------------------------------------
     # Repository access
@@ -408,13 +171,17 @@ class GitHubBackend:
         """
         return gh_client.probe_backend_status(repo or self._repo)
 
+    # ------------------------------------------------------------------
+    # Work items — delegated to the reconciliation collaborator
+    # ------------------------------------------------------------------
+
     def list_work_items(self) -> list[BacklogItem]:
         """List work items from the provider-private cache.
 
         Returns:
             Persisted work items.
         """
-        return [record.item for record in self._load_reconcile_records()]
+        return self._reconciliation.list_work_items()
 
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
@@ -422,15 +189,45 @@ class GitHubBackend:
         Returns:
             The matching work item.
         """
-        for record in self._load_reconcile_records():
-            if reference == record.item.reference:
-                return record.item
-        raise KeyError(reference)
+        return self._reconciliation.get_work_item(reference)
 
     def put_work_item(self, item: BacklogItem) -> None:
         """Persist a work-item intent for provider reconciliation."""
-        reference = item.reference or item.issue or hashlib.sha256(item.title.encode()).hexdigest()
-        self._cache._queue_work_item(reference, item.model_copy(update={"reference": reference}))
+        self._reconciliation.put_work_item(item)
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+        """Reconcile provider state through the pure engine and private cache.
+
+        Returns:
+            Completed reconciliation counts with changed logical references.
+        """
+        return self._reconciliation.reconcile(request)
+
+    def _load_reconcile_records(
+        self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
+    ) -> list[LogicalCacheRecord]:
+        """Merge cached work-item snapshots with queued mutations.
+
+        Returns:
+            One logical cache record per work-item reference.
+        """
+        return self._reconciliation.load_records(pending_work_items)
+
+    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+        """Fetch one normalized bounded GitHub snapshot for reconciliation.
+
+        Returns:
+            Provider snapshot whose pagination remains private to this adapter.
+        """
+        return self._work_items.fetch_snapshot(request)
+
+    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
+        """Apply optimistic GitHub body patches and return one outcome per patch.
+
+        Returns:
+            Patch results indexed by the stable provider reference.
+        """
+        return self._work_items.apply_patches(patches)
 
     # ------------------------------------------------------------------
     # GraphQL utilities
@@ -526,8 +323,8 @@ class GitHubBackend:
                 numbered_references.append((canonical_reference, number))
 
         resolved: dict[str, IssueNode | None] = {}
-        for offset in range(0, len(numbered_references), self._TARGET_BATCH_SIZE):
-            chunk = numbered_references[offset : offset + self._TARGET_BATCH_SIZE]
+        for offset in range(0, len(numbered_references), _TARGET_BATCH_SIZE):
+            chunk = numbered_references[offset : offset + _TARGET_BATCH_SIZE]
             declarations = ", ".join(f"$number{index}: Int!" for index in range(len(chunk)))
             aliases = "\n".join(
                 "      "
@@ -560,391 +357,17 @@ class GitHubBackend:
                     raise BacklogError(f"GraphQL targeted issue response was invalid for {reference}")
         return resolved
 
-    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
-        """Fetch one normalized bounded GitHub snapshot for reconciliation.
-
-        Returns:
-            Provider snapshot whose pagination remains private to this adapter.
-        """
-        sync_started_at = datetime.now(UTC).isoformat()
-        repo = self.get_github()
-        owner, repo_name = repo.full_name.split("/", 1)
-        labels = [request.label] if request.label else None
-        match request.scope:
-            case ReconcileScope.INITIAL:
-                issues = self._fetch_issues_graphql(repo, owner, repo_name, state="OPEN", labels=labels, first=100)
-            case ReconcileScope.INCREMENTAL:
-                issues = self._fetch_issues_graphql(
-                    repo, owner, repo_name, state="OPEN,CLOSED", labels=labels, first=100, since=request.since or None
-                )
-            case ReconcileScope.LINKED | ReconcileScope.TARGETED:
-                issues = []
-
-        listed_references = {f"#{issue['number']}" for issue in issues}
-        target_references = [reference for reference in request.references if reference not in listed_references]
-        targeted = self._fetch_targeted_issues(repo, owner, repo_name, target_references)
-        existing_issues = [*issues, *(issue for issue in targeted.values() if issue is not None)]
-        heads, comments = self._work_item_contexts(repo, existing_issues)
-        items_by_identity: dict[tuple[str, str], ProviderItem] = {}
-        for issue in issues:
-            item = self._provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
-            items_by_identity[item.reference, item.revision] = item
-        for reference, issue in targeted.items():
-            if issue is None:
-                item = ProviderItem(
-                    provider_id="",
-                    reference=reference,
-                    title="",
-                    body="",
-                    state="",
-                    labels=[],
-                    revision="",
-                    exists=False,
-                )
-            else:
-                item = self._provider_item_from_issue(repo, owner, repo_name, issue, heads, comments)
-            items_by_identity[item.reference, item.revision] = item
-        return ProviderSnapshot(
-            items=list(items_by_identity.values()), sync_started_at=sync_started_at, pages_fetched=1
-        )
-
-    def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
-        """Apply optimistic GitHub body patches and return one outcome per patch.
-
-        Returns:
-            Patch results indexed by the stable provider reference.
-        """
-        if not patches:
-            return []
-        repo = self.get_github()
-        owner, repo_name = repo.full_name.split("/", 1)
-        try:
-            current_by_reference = self._fetch_targeted_issues(
-                repo, owner, repo_name, [patch.reference for patch in patches]
-            )
-        except BacklogError as exc:
-            return [
-                PatchResult(provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc))
-                for patch in patches
-            ]
-
-        results: list[PatchResult] = []
-        for patch in patches:
-            issue = current_by_reference.get(patch.reference)
-            if issue is None:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id,
-                        reference=patch.reference,
-                        status="error",
-                        message="Issue not found",
-                    )
-                )
-                continue
-            try:
-                current, head_record, root = self._work_item_version(repo, owner, repo_name, issue)
-            except ContentConflictError as exc:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id, reference=patch.reference, status="conflict", message=str(exc)
-                    )
-                )
-                continue
-            except (BacklogError, ContentUnavailableError) as exc:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
-                    )
-                )
-                continue
-            if current.revision != patch.expected_revision:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id,
-                        reference=patch.reference,
-                        status="conflict",
-                        revision=current.revision,
-                    )
-                )
-                continue
-            if current.body.replace("\r\n", "\n") == patch.body.replace("\r\n", "\n"):
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id,
-                        reference=patch.reference,
-                        status="applied",
-                        revision=current.revision,
-                    )
-                )
-                continue
-            try:
-                comment_id = self._add_comment_graphql(
-                    repo, issue["id"], render_work_item_comment(current.revision, patch.body)
-                )
-                if not comment_id:
-                    results.append(
-                        PatchResult(
-                            provider_id=patch.provider_id,
-                            reference=patch.reference,
-                            status="error",
-                            message="GitHub work-item audit comment response was invalid",
-                        )
-                    )
-                    continue
-                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, comment_id)
-                written = self._contents.put(
-                    ContentWrite(
-                        reference=work_item_head_ref(patch.reference),
-                        content=head.model_dump_json(),
-                        expected_revision=head_record.revision if head_record is not None else "",
-                        create_only=head_record is None,
-                    )
-                )
-            except ContentConflictError as exc:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id, reference=patch.reference, status="conflict", message=str(exc)
-                    )
-                )
-                continue
-            except (BacklogError, ContentUnavailableError) as exc:
-                results.append(
-                    PatchResult(
-                        provider_id=patch.provider_id, reference=patch.reference, status="error", message=str(exc)
-                    )
-                )
-                continue
-            results.append(
-                PatchResult(
-                    provider_id=patch.provider_id,
-                    reference=patch.reference,
-                    status="applied",
-                    revision=written.revision,
-                )
-            )
-        return results
-
-    def _provider_item_from_issue(
-        self,
-        repo: Repository,
-        owner: str,
-        repo_name: str,
-        issue: IssueNode,
-        heads: dict[str, ContentRecord] | None = None,
-        comments: dict[str, IssueCommentNode] | None = None,
-    ) -> ProviderItem:
-        version, _head_record, _root = self._work_item_version(repo, owner, repo_name, issue, heads, comments)
-        return ProviderItem(
-            provider_id=issue["id"],
-            reference=f"#{issue['number']}",
-            title=issue["title"],
-            body=version.body,
-            state=issue["state"],
-            labels=[label["name"] for label in issue["labels"]],
-            revision=version.revision,
-        )
-
-    def _work_item_version(
-        self,
-        repo: Repository,
-        owner: str,
-        repo_name: str,
-        issue: IssueNode,
-        heads: dict[str, ContentRecord] | None = None,
-        comments: dict[str, IssueCommentNode] | None = None,
-    ) -> tuple[WorkItemVersion, ContentRecord | None, str]:
-        reference = f"#{issue['number']}"
-        root = root_revision(reference, issue["id"], issue["body"])
-        if heads is None:
-            try:
-                head_record = self._contents.get(work_item_head_ref(reference))
-            except ContentNotFoundError:
-                return WorkItemVersion(revision=root, body=issue["body"]), None, root
-        else:
-            head_record = heads.get(reference)
-            if head_record is None:
-                return WorkItemVersion(revision=root, body=issue["body"]), None, root
-        head = parse_work_item_head(head_record.content)
-        if head.issue_reference != reference or head.root_revision != root:
-            return WorkItemVersion(revision=root, body=issue["body"]), head_record, root
-        comment = (
-            comments.get(head.comment_id)
-            if comments is not None
-            else self._fetch_comment_by_id_graphql(repo, head.comment_id)
-        )
-        return (
-            WorkItemVersion(revision=head_record.revision, body=parse_work_item_comment(head, comment)),
-            head_record,
-            root,
-        )
-
-    def _work_item_contexts(
-        self, repo: Repository, issues: list[IssueNode]
-    ) -> tuple[dict[str, ContentRecord], dict[str, IssueCommentNode]]:
-        namespaces = {f"#{issue['number']}" for issue in issues}
-        if isinstance(self._contents, _ReferenceContentPersistence):
-            records = self._contents.get_many([work_item_head_ref(reference) for reference in namespaces])
-        else:
-            records = self._list_all_content(
-                self._contents,
-                ContentQuery(kind=ContentKind.ARTIFACT_CONTENT, search="head", limit=self._CONTENT_PAGE_SIZE),
-            )
-        heads = {
-            record.reference.namespace: record
-            for record in records
-            if record.reference.namespace in namespaces and is_work_item_head_ref(record.reference)
-        }
-        issue_by_reference = {f"#{issue['number']}": issue for issue in issues}
-        comment_ids = [
-            head.comment_id
-            for reference, record in heads.items()
-            if (head := parse_work_item_head(record.content)).root_revision
-            == root_revision(reference, issue_by_reference[reference]["id"], issue_by_reference[reference]["body"])
-        ]
-        comments: dict[str, IssueCommentNode] = {}
-        for offset in range(0, len(comment_ids), self._TARGET_BATCH_SIZE):
-            ids = comment_ids[offset : offset + self._TARGET_BATCH_SIZE]
-            response = self._graphql_request(
-                repo,
-                "query AuditComments($ids: [ID!]!) { nodes(ids: $ids) { "
-                "... on IssueComment { id body url author { login } createdAt updatedAt } } }",
-                {"ids": ids},
-            )
-            nodes = response.get("nodes")
-            if not isinstance(nodes, list) or len(nodes) != len(ids):
-                raise ContentUnavailableError("GitHub work-item audit comment response was invalid")
-            for node in nodes:
-                if not isinstance(node, dict):
-                    raise ContentUnavailableError("GitHub work-item audit comment response was invalid")
-                comment = gh_client._parse_comment_node(node)
-                comments[comment["id"]] = comment
-        return heads, comments
-
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
-        """Reconcile provider state through the pure engine and private cache.
-
-        Returns:
-            Completed reconciliation counts with changed logical references.
-        """
-        effective_request = self._with_snapshot_checkpoint(request)
-        snapshot = self._fetch_snapshot(effective_request)
-        pending_work_items = self._cache._pending_work_item_mutations()
-        plan = reconcile_backlog(self._load_reconcile_records(pending_work_items), snapshot, effective_request)
-        cache_results: list[ActionResult] = []
-        for action in (entry for entry in plan.cache_actions if entry.phase == "before_provider"):
-            try:
-                self._cache._save_work_item_snapshot(action.key, action.record.item)
-            except OSError:
-                cache_results.append(ActionResult(key=action.key, phase=action.phase, status="error"))
-            else:
-                cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
-
-        patch_results = self._apply_patches(plan.provider_patches)
-        applied_revisions = {
-            result.reference: result.revision for result in patch_results if result.status == "applied"
-        }
-        for action in (entry for entry in plan.cache_actions if entry.phase == "checkpoint"):
-            revision = applied_revisions.get(action.requires_patch)
-            if revision is None:
-                continue
-            metadata = action.record.item.metadata.model_copy(update={"updated_at": revision})
-            item = action.record.item.model_copy(update={"metadata": metadata})
-            try:
-                self._cache._save_work_item_snapshot(action.key, item)
-            except OSError:
-                cache_results.append(ActionResult(key=action.key, phase=action.phase, status="error"))
-            else:
-                cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
-
-        outcome = finalize_reconciliation(
-            plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
-        )
-        self._advance_snapshot_checkpoint(effective_request.scope, plan.snapshot_checkpoint, outcome)
-        if not effective_request.dry_run:
-            snapshot_by_reference = {item.reference: item for item in snapshot.items}
-            patch_statuses = {patch.reference: "pending" for patch in plan.provider_patches}
-            patch_statuses.update({result.reference: result.status for result in patch_results})
-            failed_cache_references = {
-                action.record.item.metadata.issue
-                for action in plan.cache_actions
-                for result in cache_results
-                if (action.key, action.phase) == (result.key, result.phase) and result.status == "error"
-            }
-            self._cache._acknowledge_work_items({
-                mutation.idempotency_key
-                for mutation in pending_work_items
-                if mutation.item.metadata.issue in snapshot_by_reference
-                and mutation.item.title == snapshot_by_reference[mutation.item.metadata.issue].title
-                and mutation.item.metadata.issue not in failed_cache_references
-                and (patch_statuses.get(mutation.item.metadata.issue, "no_patch") in {"no_patch", "applied"})
-            })
-        pending_mutations = len(self._cache.pending_mutations()) + len(self._cache._pending_work_item_mutations())
-        return outcome.result.model_copy(update={"pending_mutations": pending_mutations})
-
-    def _with_snapshot_checkpoint(self, request: ReconcileRequest) -> ReconcileRequest:
-        match request.scope:
-            case ReconcileScope.INCREMENTAL:
-                if request.since:
-                    return request
-                checkpoint = self._cache._get_snapshot_checkpoint()
-                if checkpoint is None:
-                    return request.model_copy(update={"scope": ReconcileScope.INITIAL})
-                return request.model_copy(update={"since": checkpoint.watermark})
-            case ReconcileScope.INITIAL | ReconcileScope.LINKED | ReconcileScope.TARGETED:
-                return request
-
-    def _advance_snapshot_checkpoint(self, scope: ReconcileScope, watermark: str, outcome: ReconcileOutcome) -> None:
-        if (
-            outcome.advance_snapshot_checkpoint
-            and outcome.result.conflicts == 0
-            and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
-        ):
-            self._cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark=watermark))
-
-    def _load_reconcile_records(
-        self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
-    ) -> list[LogicalCacheRecord]:
-        records_by_reference = {
-            item.reference: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
-        }
-        for mutation in (
-            pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
-        ):
-            snapshot = records_by_reference.get(mutation.item.reference)
-            records_by_reference[mutation.item.reference] = LogicalCacheRecord(
-                key=snapshot.key if snapshot is not None else mutation.key, item=mutation.item
-            )
-        return list(records_by_reference.values())
+    # ------------------------------------------------------------------
+    # Logical content — delegated to the content collaborators
+    # ------------------------------------------------------------------
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
-        """Return a bounded cache-backed discovery page for GitHub content."""
-        online = self.try_get_github() is not None
-        if online:
-            self._replay_pending_content()
-            try:
-                records = self._list_all_content(self._contents, query)
-                records = [record for record in records if not is_work_item_head_ref(record.reference)]
-                records = self._with_legacy_content(query, records)
-            except _GitHubContentIntegrityError:
-                raise
-            except (BacklogError, ContentUnavailableError, OSError):
-                online = False
-            else:
-                for record in records:
-                    self._cache.cache_content(record)
-                return records[query.offset : query.offset + query.limit]
-        records = [
-            record.model_copy(update={"stale": not online})
-            for record in self._cache._load_state().records
-            if record.reference.kind == query.kind
-            and not is_work_item_head_ref(record.reference)
-            and (query.owner_reference is None or record.owner_reference == query.owner_reference)
-            and query.search.casefold() in record.reference.name.casefold()
-        ]
-        records.sort(
-            key=lambda record: (record.reference.namespace, record.reference.artifact_type, record.reference.name)
-        )
-        return records[query.offset : query.offset + query.limit]
+        """Return a bounded cache-backed discovery page for GitHub content.
+
+        Returns:
+            The requested page of content records.
+        """
+        return self._content_cache.list_content(query)
 
     def get_content(self, reference: ContentRef) -> ContentRecord:
         """Read authoritative GitHub content or an explicitly stale cached copy.
@@ -952,22 +375,7 @@ class GitHubBackend:
         Returns:
             The provider or cached logical content record.
         """
-        if is_work_item_head_ref(reference):
-            raise UnsupportedCapabilityError("Content reference is provider-private")
-        if self.try_get_github() is None:
-            return self._cache.get_content(reference, stale=True)
-        self._replay_pending_content()
-        cached = self._cached_content(reference)
-        try:
-            record = self._read_online_content(reference, cached)
-        except ContentNotFoundError:
-            raise
-        except _GitHubContentIntegrityError:
-            raise
-        except (BacklogError, ContentUnavailableError, OSError):
-            return self._cache.get_content(reference, stale=True)
-        self._cache.cache_content(record)
-        return record
+        return self._content_cache.get_content(reference)
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Write GitHub content, durably queueing it while GitHub is offline.
@@ -975,176 +383,48 @@ class GitHubBackend:
         Returns:
             The applied or pending logical content record.
         """
-        if is_work_item_head_ref(request.reference):
-            raise UnsupportedCapabilityError("Content reference is provider-private")
-        cached = self._cached_content(request.reference)
-        if self.try_get_github() is None:
-            if request.create_only and cached is not None:
-                raise ContentConflictError("Content already exists")
-            if request.expected_revision and (cached is None or cached.revision != request.expected_revision):
-                raise ContentConflictError("Content revision no longer matches")
-            base = cached or ContentRecord(
-                reference=request.reference,
-                owner_reference=request.reference.namespace,
-                content="",
-                revision=request.expected_revision,
-            )
-            self._cache.queue_write(base, request)
-            return self._cache.get_content(request.reference)
-        self._replay_pending_content()
-        cached = self._cached_content(request.reference)
-        try:
-            record = self._write_online_content(request, cached)
-        except ContentNotFoundError:
-            raise
-        except _GitHubContentIntegrityError:
-            raise
-        except (BacklogError, ContentUnavailableError, OSError):
-            base = cached or ContentRecord(
-                reference=request.reference,
-                owner_reference=request.reference.namespace,
-                content="",
-                revision=request.expected_revision,
-            )
-            self._cache.queue_write(base, request)
-            return self._cache.get_content(request.reference)
-        self._cache.cache_content(record)
-        return record
-
-    def _cached_content(self, reference: ContentRef) -> ContentRecord | None:
-        try:
-            return self._cache.get_content(reference)
-        except ContentUnavailableError:
-            return None
-
-    def _read_online_content(self, reference: ContentRef, cached: ContentRecord | None) -> ContentRecord:
-        try:
-            return self._contents.get(reference)
-        except ContentNotFoundError:
-            pass
-        return self._read_legacy_content(reference)
-
-    def _read_legacy_content(self, reference: ContentRef) -> ContentRecord:
-        match reference.kind:
-            case ContentKind.PLAN:
-                return self._plan_persistence.get(reference)
-            case ContentKind.DISPATCH_PLAN:
-                return self._dispatch_persistence.get(reference)
-            case ContentKind.ARTIFACT_MANIFEST:
-                manifest = self._artifact_provider.get_manifest(self._owner_number(reference.namespace))
-                content = manifest.model_dump_json(by_alias=True)
-            case ContentKind.ARTIFACT_CONTENT:
-                content = self._artifact_provider.read_artifact_content_from_remote(
-                    self._owner_number(reference.namespace),
-                    reference.artifact_type,
-                    f"{reference.artifact_type}/{reference.name}",
-                )
-        if content is None:
-            raise ContentNotFoundError(f"Content was not found: {reference.model_dump_json()}")
-        return ContentRecord(
-            reference=reference,
-            owner_reference=reference.namespace,
-            content=content,
-            revision=self._content_revision(content),
-        )
-
-    def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
-        if not request.expected_revision and not request.create_only:
-            return self._contents.put(request)
-        try:
-            self._contents.get(request.reference)
-        except ContentNotFoundError as exc:
-            try:
-                legacy = self._read_legacy_content(request.reference)
-            except ContentNotFoundError:
-                return self._contents.put(request)
-            if request.create_only:
-                raise ContentConflictError("Content already exists") from exc
-            if legacy.revision != request.expected_revision:
-                raise ContentConflictError("Content revision no longer matches") from exc
-            return self._contents.put(
-                request.model_copy(
-                    update={
-                        "owner_reference": (
-                            request.owner_reference if request.owner_reference is not None else legacy.owner_reference
-                        ),
-                        "expected_revision": "",
-                        "create_only": True,
-                    }
-                )
-            )
-        return self._contents.put(request)
-
-    def _with_legacy_content(self, query: ContentQuery, current: list[ContentRecord]) -> list[ContentRecord]:
-        try:
-            match query.kind:
-                case ContentKind.PLAN:
-                    legacy = self._list_all_content(self._plan_persistence, query)
-                case ContentKind.DISPATCH_PLAN:
-                    legacy = self._list_all_content(self._dispatch_persistence, query)
-                case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
-                    legacy = []
-                case unreachable:
-                    assert_never(unreachable)
-        except (BacklogError, ContentUnavailableError, OSError):
-            if current:
-                return current
-            raise
-        current_references = {record.reference.model_dump_json() for record in current}
-        records = [
-            *current,
-            *(record for record in legacy if record.reference.model_dump_json() not in current_references),
-        ]
-        records.sort(
-            key=lambda record: (record.reference.namespace, record.reference.artifact_type, record.reference.name)
-        )
-        return records
-
-    @staticmethod
-    def _list_all_content(persistence: _ContentPersistence, query: ContentQuery) -> list[ContentRecord]:
-        if isinstance(persistence, _NativeContentsStore):
-            return persistence.list_all(query)
-        records: list[ContentRecord] = []
-        offset = 0
-        while True:
-            page = list(
-                persistence.list(query.model_copy(update={"offset": offset, "limit": GitHubBackend._CONTENT_PAGE_SIZE}))
-            )
-            records.extend(page)
-            if len(page) < GitHubBackend._CONTENT_PAGE_SIZE:
-                return records
-            offset += len(page)
+        return self._content_cache.put_content(request)
 
     def _replay_pending_content(self) -> None:
-        acknowledgements: list[ReplayAcknowledgement] = []
-        for mutation in self._cache.pending_mutations():
-            cached = self._cached_content(mutation.write.reference)
-            try:
-                record = self._write_online_content(mutation.write, cached)
-            except (ContentConflictError, UnsupportedCapabilityError):
-                continue
-            except (BacklogError, ContentUnavailableError, OSError):
-                break
-            acknowledgements.append(
-                ReplayAcknowledgement(
-                    idempotency_key=mutation.idempotency_key,
-                    record=record,
-                    fingerprint=self._content_revision(record.content),
-                )
-            )
-        if acknowledgements:
-            self._cache.acknowledge_replay(acknowledgements)
+        """Replay durably queued content writes against GitHub."""
+        self._content_cache.replay_pending()
 
-    @staticmethod
-    def _owner_number(reference: str) -> int:
-        number = parse_issue_number(reference)
-        if number is None:
-            raise ContentUnavailableError(f"Invalid GitHub owner reference: {reference!r}")
-        return number
+    def _list_online_content(self, query: ContentQuery) -> list[ContentRecord]:
+        """Enumerate authoritative content merged with the legacy stores.
+
+        Returns:
+            Every discoverable record, excluding provider-private work-item heads.
+        """
+        return self._content_migration.list_online(query)
+
+    def _read_online_content(self, reference: ContentRef, cached: ContentRecord | None) -> ContentRecord:
+        """Read authoritative content, falling back to the legacy stores.
+
+        Returns:
+            The resolved content record.
+        """
+        return self._content_migration.read(reference)
+
+    def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        """Write content, migrating a legacy record into the Contents API when needed.
+
+        Returns:
+            The written content record.
+        """
+        return self._content_migration.write(request)
 
     @staticmethod
     def _content_revision(content: str) -> str:
-        return hashlib.sha256(content.encode()).hexdigest()
+        """Return the content-addressed revision for a logical content body.
+
+        Returns:
+            Hex SHA-256 digest of the UTF-8 encoded content.
+        """
+        return _compute_content_revision(content)
+
+    # ------------------------------------------------------------------
+    # Issue synchronisation
+    # ------------------------------------------------------------------
 
     def sync_issues_graphql(
         self,
