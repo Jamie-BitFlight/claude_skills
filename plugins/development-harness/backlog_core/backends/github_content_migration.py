@@ -83,19 +83,24 @@ class _GitHubContentMigration:
     def __init__(
         self,
         contents: Callable[[], _ContentPersistence],
-        plan_persistence: _PlanPersistence,
-        dispatch_persistence: _ContentPersistence,
-        artifact_provider: ArtifactBackend,
+        plan_persistence: Callable[[], _PlanPersistence],
+        dispatch_persistence: Callable[[], _ContentPersistence],
+        artifact_provider: Callable[[], ArtifactBackend],
     ) -> None:
         """Compose the stores that back logical GitHub content.
 
         Args:
-            contents: Resolver for the authoritative Contents API store. Kept as
-                a callable so a substituted store on the composing backend takes
-                effect for calls made after construction.
-            plan_persistence: Legacy plan-index store.
-            dispatch_persistence: Legacy dispatch-plan store.
-            artifact_provider: Gist persistence adapter backing legacy artifacts.
+            contents: Resolver for the authoritative Contents API store.
+            plan_persistence: Resolver for the legacy plan-index store.
+            dispatch_persistence: Resolver for the legacy dispatch-plan store.
+            artifact_provider: Resolver for the Gist persistence adapter backing
+                legacy artifacts.
+
+        All four are kept as callables, not captured values, so a store
+        substituted on the composing backend after construction (e.g.
+        ``backend._plan_persistence = ...``) takes effect for calls made
+        after the substitution -- matching the substitutable backend-instance
+        seam documented in ARCHITECTURE.md.
         """
         self._contents = contents
         self._plan_persistence = plan_persistence
@@ -135,14 +140,14 @@ class _GitHubContentMigration:
         """
         match reference.kind:
             case ContentKind.PLAN:
-                return self._plan_persistence.get(reference)
+                return self._plan_persistence().get(reference)
             case ContentKind.DISPATCH_PLAN:
-                return self._dispatch_persistence.get(reference)
+                return self._dispatch_persistence().get(reference)
             case ContentKind.ARTIFACT_MANIFEST:
-                manifest = self._artifact_provider.get_manifest(_owner_number(reference.namespace))
+                manifest = self._artifact_provider().get_manifest(_owner_number(reference.namespace))
                 content = manifest.model_dump_json(by_alias=True)
             case ContentKind.ARTIFACT_CONTENT:
-                content = self._artifact_provider.read_artifact_content_from_remote(
+                content = self._artifact_provider().read_artifact_content_from_remote(
                     _owner_number(reference.namespace),
                     reference.artifact_type,
                     f"{reference.artifact_type}/{reference.name}",
@@ -201,9 +206,9 @@ class _GitHubContentMigration:
         try:
             match query.kind:
                 case ContentKind.PLAN:
-                    legacy = _list_all_content(self._plan_persistence, query)
+                    legacy = _list_all_content(self._plan_persistence(), query)
                 case ContentKind.DISPATCH_PLAN:
-                    legacy = _list_all_content(self._dispatch_persistence, query)
+                    legacy = _list_all_content(self._dispatch_persistence(), query)
                 case ContentKind.ARTIFACT_MANIFEST | ContentKind.ARTIFACT_CONTENT:
                     legacy = []
                 case unreachable:

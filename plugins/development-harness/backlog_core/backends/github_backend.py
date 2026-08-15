@@ -135,9 +135,9 @@ class GitHubBackend:
         self._contents = contents or _GitHubContentsStore(self.get_github)
         self._content_migration = _GitHubContentMigration(
             contents=lambda: self._contents,
-            plan_persistence=self._plan_persistence,
-            dispatch_persistence=self._dispatch_persistence,
-            artifact_provider=self._artifact_provider,
+            plan_persistence=lambda: self._plan_persistence,
+            dispatch_persistence=lambda: self._dispatch_persistence,
+            artifact_provider=lambda: self._artifact_provider,
         )
         self._content_cache = _GitHubContentCache(self._cache, self)
         self._work_items = _GitHubWorkItemSync(self, lambda: self._contents)
