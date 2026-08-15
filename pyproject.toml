@@ -358,9 +358,19 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
+# Content collaborators extracted from GitHubBackend reach the provider through _-prefixed online
+# seams and FileCache's _-prefixed storage operations — SLF001 justification matches github_backend.py
+"**/backlog_core/backends/github_content_migration.py" = [
+    "private-member-access",
+]
+# Legacy Gist-backed stores read the plan index's _-prefixed sentinel issue — SLF001 as above
+"**/backlog_core/backends/github_content_stores.py" = ["private-member-access"]
 # GitHubContentsStore batches blob fetches via a bounded aliased GraphQL query (avoiding an N+1
 # REST call per blob) — SLF001 protocol-delegation justification matches github_backend.py above
 "**/backlog_core/backends/github_contents.py" = ["private-member-access"]
+# Work-item collaborators extracted from GitHubBackend call the _-prefixed GitHub gateway, provider
+# snapshot/patch seams, and FileCache operations — SLF001 as above
+"**/backlog_core/backends/github_work_items.py" = ["private-member-access"]
 # InMemoryBackend implements the full BacklogBackend Protocol surface — PLR0904 and DOC201 do not apply
 # DOC201 — single-line docstrings already state the return value; formal Returns sections add no information
 "**/backlog_core/backends/memory_backend.py" = [
