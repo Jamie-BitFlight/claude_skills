@@ -259,23 +259,26 @@ def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> _TrieWalkResu
     way to guess which reference branch, if any, the trace meant to
     rejoin, so re-syncing would just be a different kind of guess.
 
-    A break that lands on the trace's final token fails two independent
-    checks at that one position -- the transition leading into it, and the
-    trace's end check -- since the trace also terminates there. That is
-    exactly the case where unmatched_positions == 1 while the walk ended
-    off-path: once a break happens, every later position is also counted
-    (see above), so unmatched_positions can only equal 1 if the break itself
-    occurred at the last token. missing_tokens counts that position twice;
-    unmatched_positions (used for consumed_tokens) still counts it once,
-    since only one token was actually produced there.
+    The end check is independent of the transition/start checks that
+    unmatched_positions already counts: it fails whenever the walk did not
+    stay on-path for its entire length AND land on a genuine reference-
+    session ending, regardless of how many earlier positions also broke.
+    A trace whose sole break lands on its final token therefore fails two
+    independent checks at that one position -- the transition leading into
+    it, and the end check -- since the trace also terminates there; a trace
+    that goes off-path earlier and never re-syncs still independently fails
+    the end check, on top of every off-path position already counted by
+    unmatched_positions. missing_tokens counts the final position (or the
+    off-path ending) up to twice; unmatched_positions (used for
+    consumed_tokens) still counts each token once, since only one token was
+    actually produced there.
 
     Returns:
-        missing_tokens: unmatched_positions, plus one more if the walk
-            stayed on-path throughout but ended at a position that isn't a
-            genuine reference-session ending, or if the sole break landed on
-            the trace's final token (see above).
+        missing_tokens: unmatched_positions, plus one more unless the walk
+            stayed on-path for its entire length and landed on a genuine
+            reference-session ending (see above).
         unmatched_positions: count of positions that failed to match the
-            reference trie (excludes both endpoint-mismatch penalties).
+            reference trie (excludes the endpoint-mismatch penalty).
     """
     node = root
     on_path = True
@@ -287,7 +290,7 @@ def _walk_reference_trie(root: _TrieNode, tools: Sequence[str]) -> _TrieWalkResu
             unmatched_positions += 1
             on_path = False
     missing_tokens = unmatched_positions
-    if (on_path and not node.is_end) or (not on_path and unmatched_positions == 1):
+    if not (on_path and node.is_end):
         missing_tokens += 1
     return _TrieWalkResult(missing_tokens=missing_tokens, unmatched_positions=unmatched_positions)
 
@@ -302,10 +305,13 @@ def _trace_fitness(missing_tokens: int, observed_transitions: Sequence[Transitio
     from a denominator that counted transitions alone. An empty trace has
     exactly one check (empty_trace_mismatch).
 
-    missing_tokens already carries the double-count for a break landing on
-    the trace's final token (transition-in check and end check both fail at
-    that one position) -- see _walk_reference_trie -- so this denominator
-    only needs the plain check count, not any further adjustment.
+    missing_tokens already carries the independent end-check penalty for any
+    walk that didn't stay on-path for its entire length and land on a
+    genuine reference-session ending -- including a double-count when that
+    failure coincides with the trace's final token (transition-in check and
+    end check both fail at that one position) -- see _walk_reference_trie --
+    so this denominator only needs the plain check count, not any further
+    adjustment.
 
     Returns:
         Fitness in [0.0, 1.0]: the fraction of checks that passed.
