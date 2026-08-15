@@ -93,10 +93,7 @@ The core query engine is implemented in Rust, providing:
 Polars offers "Lazy & eager execution: with query optimization out of the box" (SOURCE: <https://github.com/pola-rs/polars> README, accessed 2026-08-11). The eager `DataFrame` API executes operations immediately; the lazy `LazyFrame` API (entered via `scan_*` readers or `.lazy()`) defers execution until `.collect()` so the optimizer can rewrite the plan. The API emphasizes method chaining and expression-based operations:
 
 ```python
-df.select([
-    pl.col("column_name").cast(pl.Float64),
-    (pl.col("amount") * 1.10).alias("increased_amount")
-])
+df.select([pl.col("column_name").cast(pl.Float64), (pl.col("amount") * 1.10).alias("increased_amount")])
 ```
 
 ---
@@ -126,13 +123,7 @@ import polars as pl
 df = pl.read_csv("data.csv")
 
 # Filter and select
-result = df.filter(
-    pl.col("age") > 25
-).select([
-    "name",
-    "salary",
-    (pl.col("salary") * 1.1).alias("projected_salary")
-])
+result = df.filter(pl.col("age") > 25).select(["name", "salary", (pl.col("salary") * 1.1).alias("projected_salary")])
 
 print(result)
 ```

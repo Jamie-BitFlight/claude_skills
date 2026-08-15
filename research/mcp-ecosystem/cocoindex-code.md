@@ -230,17 +230,17 @@ Returns:
     "success": bool,
     "results": [
         {
-            "file_path": str,      # Relative file path
-            "language": str,       # Detected language
-            "content": str,        # Code snippet
-            "start_line": int,     # 1-indexed start line
-            "end_line": int,       # 1-indexed end line
-            "score": float         # Similarity score (0-1)
+            "file_path": str,  # Relative file path
+            "language": str,  # Detected language
+            "content": str,  # Code snippet
+            "start_line": int,  # 1-indexed start line
+            "end_line": int,  # 1-indexed end line
+            "score": float,  # Similarity score (0-1)
         }
     ],
     "total_returned": int,
     "offset": int,
-    "message": str | None
+    "message": str | None,
 }
 ```
 

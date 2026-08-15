@@ -82,17 +82,11 @@ client = CodeGraphContextClient()
 client.add_code_to_graph(repo_path=task_file["project_path"])
 
 # When task requires modifying a function, get complete impact:
-impact = client.analyze_code_relationships(
-    query_type="callers",
-    target="process_payment"
-)
+impact = client.analyze_code_relationships(query_type="callers", target="process_payment")
 # Returns exact list: [{name: "order_handler", file: "...", line: ...}, ...]
 
 # Get what the function calls (to understand dependencies):
-callees = client.analyze_code_relationships(
-    query_type="callees",
-    target="process_payment"
-)
+callees = client.analyze_code_relationships(query_type="callees", target="process_payment")
 
 # Include in context manifest:
 context_manifest = f"""

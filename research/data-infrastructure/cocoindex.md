@@ -135,15 +135,11 @@ pip install -U cocoindex
 ```python
 import cocoindex
 
+
 @cocoindex.flow_def(name="TextEmbedding")
-def text_embedding_flow(
-    flow_builder: cocoindex.FlowBuilder,
-    data_scope: cocoindex.DataScope,
-):
+def text_embedding_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoindex.DataScope):
     # 1. Add a data source
-    data_scope["documents"] = flow_builder.add_source(
-        cocoindex.sources.LocalFile(path="markdown_files")
-    )
+    data_scope["documents"] = flow_builder.add_source(cocoindex.sources.LocalFile(path="markdown_files"))
 
     # 2. Add a collector for vector index output
     doc_embeddings = data_scope.add_collector()
@@ -152,23 +148,15 @@ def text_embedding_flow(
     with data_scope["documents"].row() as doc:
         # Split into chunks
         doc["chunks"] = doc["content"].transform(
-            cocoindex.functions.SplitRecursively(),
-            language="markdown",
-            chunk_size=2000,
-            chunk_overlap=500,
+            cocoindex.functions.SplitRecursively(), language="markdown", chunk_size=2000, chunk_overlap=500
         )
         with doc["chunks"].row() as chunk:
             # Embed each chunk
             chunk["embedding"] = chunk["text"].transform(
-                cocoindex.functions.SentenceTransformerEmbed(
-                    model="sentence-transformers/all-MiniLM-L6-v2"
-                )
+                cocoindex.functions.SentenceTransformerEmbed(model="sentence-transformers/all-MiniLM-L6-v2")
             )
             doc_embeddings.collect(
-                filename=doc["filename"],
-                location=chunk["location"],
-                text=chunk["text"],
-                embedding=chunk["embedding"],
+                filename=doc["filename"], location=chunk["location"], text=chunk["text"], embedding=chunk["embedding"]
             )
 
     # 4. Export to Postgres vector index
@@ -177,10 +165,7 @@ def text_embedding_flow(
         cocoindex.targets.Postgres(),
         primary_key_fields=["filename", "location"],
         vector_indexes=[
-            cocoindex.VectorIndexDef(
-                field_name="embedding",
-                metric=cocoindex.VectorSimilarityMetric.COSINE_SIMILARITY,
-            )
+            cocoindex.VectorIndexDef(field_name="embedding", metric=cocoindex.VectorSimilarityMetric.COSINE_SIMILARITY)
         ],
     )
 ```

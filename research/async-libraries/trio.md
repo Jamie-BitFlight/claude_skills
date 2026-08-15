@@ -170,8 +170,10 @@ conda install -c conda-forge trio
 ```python
 import trio
 
+
 async def main():
     print("Hello from Trio!")
+
 
 trio.run(main)
 ```
@@ -181,10 +183,12 @@ trio.run(main)
 ```python
 import trio
 
+
 async def fetch_page(url):
     print(f"Fetching {url}")
     await trio.sleep(1)  # Simulate I/O
     print(f"Done with {url}")
+
 
 async def main():
     async with trio.open_nursery() as nursery:
@@ -194,6 +198,7 @@ async def main():
     # All three fetches complete before reaching here
     print("All pages fetched!")
 
+
 trio.run(main)
 ```
 
@@ -202,9 +207,11 @@ trio.run(main)
 ```python
 import trio
 
+
 async def slow_operation():
     await trio.sleep(10)
     return "completed"
+
 
 async def main():
     with trio.move_on_after(5) as cancel_scope:
@@ -214,6 +221,7 @@ async def main():
     if cancel_scope.cancelled_caught:
         print("Operation timed out after 5 seconds")
 
+
 trio.run(main)
 ```
 
@@ -222,12 +230,15 @@ trio.run(main)
 ```python
 import trio
 
+
 async def echo_server(server_stream):
     async for data in server_stream:
         await server_stream.send_all(data)
 
+
 async def main():
     await trio.serve_tcp(echo_server, 8000)
+
 
 trio.run(main)
 ```
@@ -237,21 +248,25 @@ trio.run(main)
 ```python
 import trio
 
+
 async def producer(send_channel):
     async with send_channel:
         for i in range(10):
             await send_channel.send(i)
+
 
 async def consumer(receive_channel):
     async with receive_channel:
         async for value in receive_channel:
             print(f"Received: {value}")
 
+
 async def main():
     send_channel, receive_channel = trio.open_memory_channel(0)
     async with trio.open_nursery() as nursery:
         nursery.start_soon(producer, send_channel)
         nursery.start_soon(consumer, receive_channel)
+
 
 trio.run(main)
 ```

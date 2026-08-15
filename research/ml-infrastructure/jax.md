@@ -130,22 +130,27 @@ pip install -U "jax[tpu]"
 import jax
 import jax.numpy as jnp
 
+
 # Define a simple function
 def f(x):
-    return x ** 2 + 2 * x + 1
+    return x**2 + 2 * x + 1
+
 
 # Automatic differentiation
 x = 3.0
 print(jax.grad(f)(x))  # Output: 8.0 (derivative of f at x=3)
+
 
 # Compile with JIT for performance
 @jax.jit
 def compiled_f(x):
     return jnp.sin(x) + jnp.cos(x)
 
+
 # Vectorize over batch dimension
 def loss_fn(params, x, y):
     return jnp.mean((params * x - y) ** 2)
+
 
 # Compute gradients efficiently across batches
 batched_grad = jax.vmap(jax.grad(loss_fn), in_axes=(None, 0, 0))
@@ -161,9 +166,11 @@ from jax import grad, jit
 # Initialize parameters
 params = jnp.array([1.0, 2.0, 3.0])
 
+
 # Define loss function
 def loss(params, x, y):
     return jnp.mean((params @ x - y) ** 2)
+
 
 # Compiled gradient function
 grad_loss = jit(grad(loss))

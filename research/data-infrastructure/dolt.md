@@ -315,13 +315,7 @@ The recommended Python approach is to use any MySQL client library against a run
 import mysql.connector
 
 # Connect to Dolt like any MySQL database
-conn = mysql.connector.connect(
-    host="127.0.0.1",
-    port=3306,
-    user="root",
-    password="",
-    database="myapp"
-)
+conn = mysql.connector.connect(host="127.0.0.1", port=3306, user="root", password="", database="myapp")
 cursor = conn.cursor()
 
 # Version control operations via stored procedures
@@ -347,10 +341,10 @@ pip install doltpy
 from doltpy.cli import Dolt
 
 # CLI-wrapper approach (wraps dolt binary)
-db = Dolt.init('/path/to/mydb')
+db = Dolt.init("/path/to/mydb")
 db.sql("INSERT INTO tasks VALUES (...)")
-db.add('tasks')
-db.commit(message='Add task via Python')
+db.add("tasks")
+db.commit(message="Add task via Python")
 ```
 
 Note: doltpy is in low-maintenance mode as of 2024. New projects should use `mysql.connector`, `pymysql`, or `sqlalchemy` with `dolt sql-server`.

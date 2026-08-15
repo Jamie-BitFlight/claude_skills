@@ -87,6 +87,7 @@ vibe.go('https://example.com')
 
 ```python
 from vibium.async_api import browser
+
 bro = await browser.start()
 vibe = await bro.page()
 await vibe.go("https://example.com")

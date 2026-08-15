@@ -142,27 +142,18 @@ print(response)
 # Search agent pattern with tool calls
 from ollama import chat, web_fetch, web_search
 
-available_tools = {'web_search': web_search, 'web_fetch': web_fetch}
-messages = [{'role': 'user', 'content': "research the postgres 18 release notes"}]
+available_tools = {"web_search": web_search, "web_fetch": web_fetch}
+messages = [{"role": "user", "content": "research the postgres 18 release notes"}]
 
 while True:
-    response = chat(
-        model='minimax-m2.5:cloud',
-        messages=messages,
-        tools=[web_search, web_fetch],
-        think=True
-    )
+    response = chat(model="minimax-m2.5:cloud", messages=messages, tools=[web_search, web_fetch], think=True)
     messages.append(response.message)
     if response.message.tool_calls:
         for tool_call in response.message.tool_calls:
             fn = available_tools.get(tool_call.function.name)
             if fn:
                 result = fn(**tool_call.function.arguments)
-                messages.append({
-                    'role': 'tool',
-                    'content': str(result)[:8000],
-                    'tool_name': tool_call.function.name
-                })
+                messages.append({"role": "tool", "content": str(result)[:8000], "tool_name": tool_call.function.name})
     else:
         break
 ```

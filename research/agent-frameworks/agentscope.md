@@ -214,7 +214,7 @@ All agent communication is async-native:
 
 ```python
 msg = await agent(msg)  # Calling convention
-await hub.add(agent4)    # MsgHub operations
+await hub.add(agent4)  # MsgHub operations
 ```
 
 This enables concurrent multi-agent execution, realtime voice streaming, and human-in-the-loop interruption without blocking.
@@ -279,6 +279,7 @@ from agentscope.memory import InMemoryMemory
 from agentscope.tool import Toolkit, execute_python_code, execute_shell_command
 import os, asyncio
 
+
 async def main():
     toolkit = Toolkit()
     toolkit.register_tool_function(execute_python_code)
@@ -287,11 +288,7 @@ async def main():
     agent = ReActAgent(
         name="Friday",
         sys_prompt="You're a helpful assistant named Friday.",
-        model=DashScopeChatModel(
-            model_name="qwen-max",
-            api_key=os.environ["DASHSCOPE_API_KEY"],
-            stream=True,
-        ),
+        model=DashScopeChatModel(model_name="qwen-max", api_key=os.environ["DASHSCOPE_API_KEY"], stream=True),
         memory=InMemoryMemory(),
         formatter=DashScopeChatFormatter(),
         toolkit=toolkit,
@@ -305,6 +302,7 @@ async def main():
         msg = await user(msg)
         if msg.get_text_content() == "exit":
             break
+
 
 asyncio.run(main())
 ```
@@ -342,11 +340,10 @@ Fine-grained MCP control:
 from agentscope.mcp import HttpStatelessClient
 from agentscope.tool import Toolkit
 
+
 async def fine_grained_mcp_control():
     client = HttpStatelessClient(
-        name="gaode_mcp",
-        transport="streamable_http",
-        url=f"https://mcp.amap.com/mcp?key={os.environ['GAODE_API_KEY']}",
+        name="gaode_mcp", transport="streamable_http", url=f"https://mcp.amap.com/mcp?key={os.environ['GAODE_API_KEY']}"
     )
 
     # Obtain MCP tool as local callable

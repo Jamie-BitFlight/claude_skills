@@ -295,10 +295,8 @@ from trustgraph.api import Api
 api = Api(url="http://localhost:8088/")
 
 # Execute a GraphRAG query
-response = api.flow().id("default").graph_rag(
-    query="What are the main topics?",
-    user="trustgraph",
-    collection="default"
+response = (
+    api.flow().id("default").graph_rag(query="What are the main topics?", user="trustgraph", collection="default")
 )
 
 # Use async variant for concurrent requests

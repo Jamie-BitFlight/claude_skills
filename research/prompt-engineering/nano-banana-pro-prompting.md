@@ -162,9 +162,7 @@ client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 response = client.models.generate_content(
     model="gemini-3-pro-image-preview",
     contents="A cinematic wide shot of a futuristic sports car speeding through a rainy Tokyo street at night.",
-    config=types.GenerateContentConfig(
-        response_modalities=["IMAGE", "TEXT"],
-    ),
+    config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
 )
 
 for part in response.candidates[0].content.parts:

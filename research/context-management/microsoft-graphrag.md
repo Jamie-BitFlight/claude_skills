@@ -179,16 +179,10 @@ from graphrag.api import build_index, local_search, global_search
 await build_index(root="./graphrag_project")
 
 # Local search for entity questions
-result = await local_search(
-    root="./graphrag_project",
-    query="What are the healing properties of chamomile?"
-)
+result = await local_search(root="./graphrag_project", query="What are the healing properties of chamomile?")
 
 # Global search for thematic questions
-result = await global_search(
-    root="./graphrag_project",
-    query="What are the main themes across all documents?"
-)
+result = await global_search(root="./graphrag_project", query="What are the main themes across all documents?")
 ```
 
 ### Azure OpenAI Configuration

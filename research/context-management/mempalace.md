@@ -145,6 +145,7 @@ MemPalace includes a temporal entity-relationship graph for tracking facts with 
 
 ```python
 from mempalace.knowledge_graph import KnowledgeGraph
+
 kg = KnowledgeGraph()
 kg.add_triple("Kai", "works_on", "Orion", valid_from="2025-06-01")
 kg.invalidate("Kai", "works_on", "Orion", ended="2026-03-01")

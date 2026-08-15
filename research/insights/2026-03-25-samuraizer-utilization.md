@@ -51,24 +51,20 @@ SOURCE: `research/ai-research-tools/samuraizer.md` §API Reference, §Architectu
 # With Samuraizer as backend:
 # 1. POST /analyze — Samuraizer fetches, extracts, summarizes, stores
 import httpx
+
 response = httpx.post(
-    f"{SAMURAIZER_URL}/analyze",
-    json={"url": "https://github.com/zomry1/Samuraizer", "tags": ["ai-research-tools"]}
+    f"{SAMURAIZER_URL}/analyze", json={"url": "https://github.com/zomry1/Samuraizer", "tags": ["ai-research-tools"]}
 )
 entry_id = response.json()["id"]
 
 # 2. GET /search/semantic — replace Grep/Glob cross-referencing
 results = httpx.get(
-    f"{SAMURAIZER_URL}/search/semantic",
-    params={"q": "vector search knowledge base security research", "limit": 8}
+    f"{SAMURAIZER_URL}/search/semantic", params={"q": "vector search knowledge base security research", "limit": 8}
 ).json()
 # Returns semantically similar entries without keyword matching
 
 # 3. POST /chat — RAG over full corpus (no current equivalent)
-answer = httpx.post(
-    f"{SAMURAIZER_URL}/chat",
-    json={"message": "Which entries cover RAG architecture patterns?"}
-).json()
+answer = httpx.post(f"{SAMURAIZER_URL}/chat", json={"message": "Which entries cover RAG architecture patterns?"}).json()
 ```
 
 API endpoints are documented in `research/ai-research-tools/samuraizer.md` §API Reference.

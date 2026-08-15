@@ -180,8 +180,9 @@ config = {
     "type": "event",
     "subscribes": ["message.sent"],
     "emits": ["message.processed"],
-    "flows": ["messaging"]
+    "flows": ["messaging"],
 }
+
 
 async def handler(input_data, context):
     text = input_data.get("text")

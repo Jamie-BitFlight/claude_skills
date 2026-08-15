@@ -187,12 +187,11 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://localhost:8080/v1",
-    api_key="not-needed"  # LocalAI doesn't require an API key by default
+    api_key="not-needed",  # LocalAI doesn't require an API key by default
 )
 
 response = client.chat.completions.create(
-    model="llama-3.2-1b-instruct",
-    messages=[{"role": "user", "content": "Hello, LocalAI!"}]
+    model="llama-3.2-1b-instruct", messages=[{"role": "user", "content": "Hello, LocalAI!"}]
 )
 print(response.choices[0].message.content)
 ```
@@ -201,10 +200,7 @@ print(response.choices[0].message.content)
 
 ```python
 response = client.images.generate(
-    prompt="A beautiful sunset over mountains",
-    model="stablediffusion",
-    n=1,
-    size="512x512"
+    prompt="A beautiful sunset over mountains", model="stablediffusion", n=1, size="512x512"
 )
 print(response.data[0].url)
 ```
@@ -213,10 +209,7 @@ print(response.data[0].url)
 
 ```python
 with open("audio.mp3", "rb") as f:
-    transcript = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=f
-    )
+    transcript = client.audio.transcriptions.create(model="whisper-1", file=f)
 print(transcript.text)
 ```
 

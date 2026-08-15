@@ -140,15 +140,9 @@ curl https://api.jina.ai/v1/embeddings \
 ```python
 from openai import OpenAI
 
-client = OpenAI(
-    api_key="<YOUR_JINA_API_KEY>",
-    base_url="https://api.jina.ai/v1"
-)
+client = OpenAI(api_key="<YOUR_JINA_API_KEY>", base_url="https://api.jina.ai/v1")
 
-response = client.embeddings.create(
-    model="jina-embeddings-v3",
-    input=["Your text here"]
-)
+response = client.embeddings.create(model="jina-embeddings-v3", input=["Your text here"])
 ```
 
 ### Reranker API

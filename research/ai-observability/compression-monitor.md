@@ -129,8 +129,11 @@ ghost_terms (first 30): ["schema", "immutable", "constraint", ...]
 
 ```python
 from negative_space_log import NegativeSpaceLog
+
 log = NegativeSpaceLog("agent_skips.jsonl")
-skip_id = log.log_skip(cycle_id="turn_42", option_considered="rewrite_module", criterion="time_budget_exceeded", significance="medium")
+skip_id = log.log_skip(
+    cycle_id="turn_42", option_considered="rewrite_module", criterion="time_budget_exceeded", significance="medium"
+)
 # Later, after outcome observed:
 log.log_resolution(skip_id, outcome="option_taken")
 ```
@@ -253,6 +256,7 @@ python semantic_drift.py --pre outputs_before.jsonl --post outputs_after.jsonl
 
 ```python
 from negative_space_log import NegativeSpaceLog
+
 log = NegativeSpaceLog("agent_skips.jsonl")
 skip_id = log.log_skip(cycle_id="t42", option_considered="rewrite", criterion="time_budget", significance="medium")
 # Later: log.log_resolution(skip_id, outcome="option_taken")

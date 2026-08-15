@@ -55,6 +55,7 @@ Loguru is a drop-in replacement for Python's standard `logging` module that elim
 
 ```python
 from loguru import logger
+
 logger.debug("Works immediately, outputs to stderr")
 ```
 
@@ -96,6 +97,7 @@ Custom levels via `logger.level("AGENT_STEP", no=25)`.
 @logger.catch(default=None)
 def risky(a, b):
     return a / b
+
 
 result = risky(10, 0)  # Returns None, error logged with full traceback
 
@@ -142,11 +144,11 @@ logger.opt(depth=1).info("Use parent stack frame")
 ### File Rotation, Retention, and Compression
 
 ```python
-logger.add("app.log", rotation="500 MB")      # Size-based
-logger.add("app.log", rotation="12:00")        # Time-based (daily at noon)
-logger.add("app.log", rotation="1 week")       # Duration-based
-logger.add("app.log", retention="10 days")     # Auto-cleanup old files
-logger.add("app.log", compression="gz")        # Compress on rotation
+logger.add("app.log", rotation="500 MB")  # Size-based
+logger.add("app.log", rotation="12:00")  # Time-based (daily at noon)
+logger.add("app.log", rotation="1 week")  # Duration-based
+logger.add("app.log", retention="10 days")  # Auto-cleanup old files
+logger.add("app.log", compression="gz")  # Compress on rotation
 ```
 
 ### stdlib Compatibility
@@ -161,9 +163,9 @@ Three integration patterns:
 
 ```python
 # In library code:
-logger.disable("my_library")   # All logging becomes no-op
+logger.disable("my_library")  # All logging becomes no-op
 # In application code:
-logger.enable("my_library")    # Re-enable
+logger.enable("my_library")  # Re-enable
 ```
 
 ### Environment Variable Configuration
@@ -173,8 +175,8 @@ Default stderr handler configurable via: `LOGURU_FORMAT`, `LOGURU_LEVEL`, `LOGUR
 ### Multiprocess-Safe Enqueue
 
 ```python
-logger.add("file.log", enqueue=True)   # Messages via multiprocessing-safe queue
-await logger.complete()                  # Wait for all enqueued messages
+logger.add("file.log", enqueue=True)  # Messages via multiprocessing-safe queue
+await logger.complete()  # Wait for all enqueued messages
 ```
 
 ---
@@ -254,6 +256,7 @@ logger.add(sys.stderr, level="WARNING", colorize=True)
 with logger.contextualize(request_id="abc-123"):
     logger.info("Processing request")
 
+
 # Catch exceptions
 @logger.catch
 def main():
@@ -266,6 +269,7 @@ def main():
 import logging
 import inspect
 
+
 class InterceptHandler(logging.Handler):
     def emit(self, record):
         try:
@@ -275,12 +279,14 @@ class InterceptHandler(logging.Handler):
         frame, depth = inspect.currentframe(), 0
         while frame:
             filename = frame.f_code.co_filename
-            if depth > 0 and not (filename == logging.__file__ or
-                ("importlib" in filename and "_bootstrap" in filename)):
+            if depth > 0 and not (
+                filename == logging.__file__ or ("importlib" in filename and "_bootstrap" in filename)
+            ):
                 break
             frame = frame.f_back
             depth += 1
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
+
 
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 ```

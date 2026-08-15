@@ -30,19 +30,17 @@ from typing import List
 
 # Initialize once during agent startup
 schema = zvec.CollectionSchema(
-    name="codebase_semantic_index",
-    vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 1536)
+    name="codebase_semantic_index", vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 1536)
 )
 code_index = zvec.create_and_open(path="./codebase_index", schema=schema)
+
 
 # Step 2 enhancement: After identifying files to research
 def find_related_code(query: str, top_k: int = 10) -> List[dict]:
     """Semantic search for related code files/snippets."""
-    results = code_index.query(
-        zvec.VectorQuery("embedding", vector=embed(query)),
-        topk=top_k
-    )
+    results = code_index.query(zvec.VectorQuery("embedding", vector=embed(query)), topk=top_k)
     return results  # [{'id': file_path, 'score': relevance, ...}]
+
 
 # Agent usage: Instead of pure grep/glob fallback
 file_matches = find_related_code("authentication and authorization flows")
@@ -82,31 +80,24 @@ import zvec
 research_index = zvec.create_and_open(
     path="./research_vector_index",
     schema=zvec.CollectionSchema(
-        name="research_entries",
-        vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 1536)
-    )
+        name="research_entries", vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 1536)
+    ),
 )
+
 
 # On new research entry creation
 def index_research_entry(filepath: str, entry_title: str, entry_text: str):
     """Add entry to semantic index."""
     entry_embedding = embed_text(entry_text)  # Embed problem + features + use cases
-    research_index.insert([
-        zvec.Doc(
-            id=filepath,
-            vectors={"embedding": entry_embedding}
-        )
-    ])
+    research_index.insert([zvec.Doc(id=filepath, vectors={"embedding": entry_embedding})])
+
 
 # Cross-referencer query pattern
 def find_related_entries(query_text: str, topk: int = 8) -> List[str]:
     """Find semantically related research entries."""
     query_embedding = embed_text(query_text)
-    results = research_index.query(
-        zvec.VectorQuery("embedding", vector=query_embedding),
-        topk=topk
-    )
-    return [result['id'] for result in results]  # File paths
+    results = research_index.query(zvec.VectorQuery("embedding", vector=query_embedding), topk=topk)
+    return [result["id"] for result in results]  # File paths
 ```
 
 ---
@@ -145,32 +136,27 @@ memory_index_path = f"./.claude/agent-memory/{agent_name}/vector_index"
 memory_index = zvec.create_and_open(
     path=memory_index_path,
     schema=zvec.CollectionSchema(
-        name=f"{agent_name}_memory",
-        vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 1536)
-    )
+        name=f"{agent_name}_memory", vectors=zvec.VectorSchema("embedding", zvec.DataType.VECTOR_FP32, 1536)
+    ),
 )
+
 
 # When agent updates memory file
 def index_memory_entry(memory_text: str, source_file: str, timestamp: str):
     """Add or update memory entry in semantic index."""
-    entry_id = hashlib.md5(
-        f"{source_file}:{timestamp}".encode()
-    ).hexdigest()
+    entry_id = hashlib.md5(f"{source_file}:{timestamp}".encode()).hexdigest()
 
     embedding = embed_text(memory_text)
-    memory_index.insert([
-        zvec.Doc(id=entry_id, vectors={"embedding": embedding})
-    ])
+    memory_index.insert([zvec.Doc(id=entry_id, vectors={"embedding": embedding})])
+
 
 # Agent query pattern: retrieve relevant past memories
 def retrieve_memory(query: str, topk: int = 5) -> List[dict]:
     """Find semantically relevant memory entries."""
     query_embedding = embed_text(query)
-    results = memory_index.query(
-        zvec.VectorQuery("embedding", vector=query_embedding),
-        topk=topk
-    )
+    results = memory_index.query(zvec.VectorQuery("embedding", vector=query_embedding), topk=topk)
     return results  # [{id, score, ...}]
+
 
 # Usage in agent: Before writing new memory, check similarity
 similar_memories = retrieve_memory("error handling in async functions")

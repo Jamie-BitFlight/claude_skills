@@ -55,10 +55,7 @@ Source: architecture.md lines 41–54, examples/openai-python.py.
 ```python
 from openai import OpenAI
 
-client = OpenAI(
-    base_url="http://127.0.0.1:4000/v1",
-    api_key="local-dev",
-)
+client = OpenAI(base_url="http://127.0.0.1:4000/v1", api_key="local-dev")
 
 response = client.chat.completions.create(
     model="opencode/deepseek-v4-flash-free",

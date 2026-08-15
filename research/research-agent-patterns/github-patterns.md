@@ -599,6 +599,7 @@ User ─▶ System ─▶ LeadResearcher ─▶ Subagents (A,B,...) ─▶ Memor
 ```python
 class Synthesis(BaseModel):
     """LeadResearcher synthesis output from findings."""
+
     executive_summary: str
     findings: list[Finding]
     gaps_or_open_questions: list[str] = Field(default_factory=list)
@@ -615,29 +616,28 @@ class Finding(BaseModel):
 
 class Plan(BaseModel):
     """Plan created by LeadResearcher for this iteration."""
+
     steps: list[Subtask] = Field(default_factory=list, description="Sub-tasks to execute now.")
-    continue_research: bool = Field(
-        description="True to continue iterative loop after current steps are done."
-    )
+    continue_research: bool = Field(description="True to continue iterative loop after current steps are done.")
     rationale: str
 
 
 class Subtask(BaseModel):
     id: str = Field(description="Unique ID for the sub-task, short (e.g. 'A' or 'B').")
     aspect: str = Field(description="What this sub-agent should research.")
-    target_depth: str = Field(
-        description="Depth like 'quick scan', 'deep dive', 'verify claims'."
-    )
+    target_depth: str = Field(description="Depth like 'quick scan', 'deep dive', 'verify claims'.")
 
 
 class CitationRequest(BaseModel):
     """What we give the CitationAgent."""
+
     draft_report_markdown: str
     bibliography: dict[str, str]  # (url -> "Author, Title, Year" etc.)
 
 
 class FinalReport(BaseModel):
     """What the CitationAgent returns after inserting citations."""
+
     markdown_with_citations: str
 ```
 
@@ -662,9 +662,7 @@ async def research_pipeline(user_query: str) -> str:
         iteration += 1
 
         # --- Plan the next iteration
-        plan_res = await planner.run(
-            f"User query:\n{user_query}\n\nMemory:\n{json.dumps(deps.memory.all(), indent=2)}"
-        )
+        plan_res = await planner.run(f"User query:\n{user_query}\n\nMemory:\n{json.dumps(deps.memory.all(), indent=2)}")
         plan = plan_res.output
         # Persist the plan to memory for traceability
         deps.memory.save(f"plan_iter_{iteration}", plan.model_dump_json())
@@ -706,13 +704,7 @@ async def research_pipeline(user_query: str) -> str:
             break
 
     # --- Final drafting
-    draft_md_lines: list[str] = [
-        f"# Research report",
-        "",
-        f"**User query**: {user_query}",
-        "",
-        "## Executive summary",
-    ]
+    draft_md_lines: list[str] = [f"# Research report", "", f"**User query**: {user_query}", "", "## Executive summary"]
 
     # Aggregate the last synthesis
     last_synth_json = deps.memory.recall(f"synthesis_iter_{iteration}") or ""
@@ -739,9 +731,7 @@ async def research_pipeline(user_query: str) -> str:
     cite_req = CitationRequest(draft_report_markdown=draft_md, bibliography=biblio)
     final = (
         await citation.run(
-            "Insert citations into the draft and add a 'References' section at the end.",
-            deps=deps,
-            input=cite_req,
+            "Insert citations into the draft and add a 'References' section at the end.", deps=deps, input=cite_req
         )
     ).output
 
@@ -758,7 +748,7 @@ def make_subagent() -> Agent[Deps, Finding]:
     It must return a structured Finding.
     """
     sub = Agent[Deps, Finding](
-        'openai:gpt-4o-mini',
+        "openai:gpt-4o-mini",
         instructions=(
             "You are a precise research sub-agent. "
             "Goal: research the requested aspect, collect a few high-quality sources, "
@@ -791,7 +781,7 @@ def make_subagent() -> Agent[Deps, Finding]:
 ```python
 def make_citation_agent() -> Agent[Deps, FinalReport]:
     cite = Agent[Deps, FinalReport](
-        'openai:gpt-4o-mini',
+        "openai:gpt-4o-mini",
         instructions=(
             "You are a precise citation agent. "
             "Given a draft markdown and a bibliography mapping citation keys to URLs, "
@@ -1108,7 +1098,7 @@ ctx.deps.memory.save(cite_key, str(url))
 # Final pass: CitationAgent receives
 CitationRequest(
     draft_report_markdown=draft_md,
-    bibliography=biblio  # { "[cite:12345]": "https://..." }
+    bibliography=biblio,  # { "[cite:12345]": "https://..." }
 )
 
 # CitationAgent inserts citations and builds References section

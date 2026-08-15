@@ -191,19 +191,21 @@ pip install pycares
 import asyncio
 import tornado.web
 
+
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.write("Hello, world")
 
+
 def make_app():
-    return tornado.web.Application([
-        (r"/", MainHandler),
-    ])
+    return tornado.web.Application([(r"/", MainHandler)])
+
 
 async def main():
     app = make_app()
     app.listen(8888)
     await asyncio.Event().wait()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -214,6 +216,7 @@ if __name__ == "__main__":
 ```python
 import tornado.web
 import tornado.httpclient
+
 
 class AsyncHandler(tornado.web.RequestHandler):
     async def get(self):
@@ -228,6 +231,7 @@ class AsyncHandler(tornado.web.RequestHandler):
 import tornado.websocket
 import tornado.web
 
+
 class ChatHandler(tornado.websocket.WebSocketHandler):
     connections = set()
 
@@ -241,9 +245,8 @@ class ChatHandler(tornado.websocket.WebSocketHandler):
     def on_close(self):
         self.connections.discard(self)
 
-app = tornado.web.Application([
-    (r"/ws", ChatHandler),
-])
+
+app = tornado.web.Application([(r"/ws", ChatHandler)])
 ```
 
 ### Running Blocking Code
@@ -255,12 +258,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 executor = ThreadPoolExecutor(max_workers=4)
 
+
 class BlockingHandler(tornado.web.RequestHandler):
     async def get(self):
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            executor, self.blocking_operation
-        )
+        result = await loop.run_in_executor(executor, self.blocking_operation)
         self.write(result)
 
     def blocking_operation(self):
@@ -273,11 +275,10 @@ class BlockingHandler(tornado.web.RequestHandler):
 ```python
 import tornado.web
 
+
 class TemplateHandler(tornado.web.RequestHandler):
     def get(self):
-        self.render("template.html",
-                    title="My Page",
-                    items=["a", "b", "c"])
+        self.render("template.html", title="My Page", items=["a", "b", "c"])
 ```
 
 ```html

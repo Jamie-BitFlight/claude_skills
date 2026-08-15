@@ -212,7 +212,7 @@ root_agent = Agent(
     model="gemini-2.5-flash",
     instruction="You are a helpful assistant. Answer user questions using Google Search when needed.",
     description="An assistant that can search the web.",
-    tools=[google_search]
+    tools=[google_search],
 )
 ```
 
@@ -221,22 +221,14 @@ root_agent = Agent(
 ```python
 from google.adk.agents import LlmAgent
 
-greeter = LlmAgent(
-    name="greeter",
-    model="gemini-2.5-flash",
-    instruction="Greet users warmly."
-)
-task_executor = LlmAgent(
-    name="task_executor",
-    model="gemini-2.5-flash",
-    instruction="Execute user tasks."
-)
+greeter = LlmAgent(name="greeter", model="gemini-2.5-flash", instruction="Greet users warmly.")
+task_executor = LlmAgent(name="task_executor", model="gemini-2.5-flash", instruction="Execute user tasks.")
 
 coordinator = LlmAgent(
     name="Coordinator",
     model="gemini-2.5-flash",
     description="I coordinate greetings and tasks.",
-    sub_agents=[greeter, task_executor]
+    sub_agents=[greeter, task_executor],
 )
 ```
 
@@ -249,11 +241,7 @@ from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 agent = LlmAgent(
     name="mcp_agent",
     model="gemini-2.5-flash",
-    tools=[
-        McpToolset(
-            connection_params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem"]},
-        )
-    ]
+    tools=[McpToolset(connection_params={"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem"]})],
 )
 ```
 
@@ -262,15 +250,13 @@ agent = LlmAgent(
 ```python
 from google.adk.agents import LlmAgent
 
+
 def get_weather(city: str) -> dict:
     """Get current weather for a city."""
     return {"city": city, "temperature": 22, "unit": "celsius"}
 
-agent = LlmAgent(
-    name="weather_agent",
-    model="gemini-2.5-flash",
-    tools=[get_weather]
-)
+
+agent = LlmAgent(name="weather_agent", model="gemini-2.5-flash", tools=[get_weather])
 ```
 
 ### Evaluation

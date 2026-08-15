@@ -65,7 +65,7 @@ bro = await browser.start()
 vibe = await bro.page()
 await vibe.go("https://example.com")
 snapshot = await vibe.map()  # Returns @e1, @e2, etc.
-await vibe.click("@e1")      # Use reference directly
+await vibe.click("@e1")  # Use reference directly
 await vibe.screenshot("page.png")
 ```
 

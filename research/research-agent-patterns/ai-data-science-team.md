@@ -136,17 +136,9 @@ llm = ChatOpenAI(model_name="gpt-4o-mini")
 
 df = pd.read_csv("data/sales.csv")
 
-agent = DataWranglingAgent(
-    model=llm,
-    n_samples=50,
-    log=True,
-    log_path="logs/",
-)
+agent = DataWranglingAgent(model=llm, n_samples=50, log=True, log_path="logs/")
 
-result = agent.invoke_agent(
-    user_instructions="Group by region and calculate total revenue per region",
-    data_raw=df,
-)
+result = agent.invoke_agent(user_instructions="Group by region and calculate total revenue per region", data_raw=df)
 
 df_wrangled = agent.get_data_wrangled()
 code = agent.get_data_wrangling_function()  # retrieve the generated Python function
@@ -165,7 +157,9 @@ llm = ChatOllama(model="llama3.1:8b")
 from ai_data_science_team.multiagents import DataScienceTeam
 
 team = DataScienceTeam(model=llm)
-response = team.invoke({"messages": [{"role": "user", "content": "Load data.csv, clean it, and show a correlation heatmap"}]})
+response = team.invoke({
+    "messages": [{"role": "user", "content": "Load data.csv, clean it, and show a correlation heatmap"}]
+})
 ```
 
 ---

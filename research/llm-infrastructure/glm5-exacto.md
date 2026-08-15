@@ -156,16 +156,11 @@ pip install openai
 ```python
 from openai import OpenAI
 
-client = OpenAI(
-    api_key="sk-or-...",
-    base_url="https://openrouter.ai/api/v1"
-)
+client = OpenAI(api_key="sk-or-...", base_url="https://openrouter.ai/api/v1")
 
 # Basic completion
 response = client.chat.completions.create(
-    model="z-ai/glm-5:exacto",
-    messages=[{"role": "user", "content": "Explain agentic workflows"}],
-    max_tokens=4000
+    model="z-ai/glm-5:exacto", messages=[{"role": "user", "content": "Explain agentic workflows"}], max_tokens=4000
 )
 
 # With tool use
@@ -178,11 +173,11 @@ response = client.chat.completions.create(
             "function": {
                 "name": "run_code",
                 "description": "Execute Python code",
-                "parameters": {"type": "object", "properties": {...}}
-            }
+                "parameters": {"type": "object", "properties": {...}},
+            },
         }
     ],
-    max_tokens=8000
+    max_tokens=8000,
 )
 
 # With reasoning enabled
@@ -190,7 +185,7 @@ response = client.chat.completions.create(
     model="z-ai/glm-5:exacto",
     messages=[{"role": "user", "content": "Solve this math problem..."}],
     reasoning={"type": "enabled", "budget_tokens": 5000},
-    max_tokens=4000
+    max_tokens=4000,
 )
 ```
 

@@ -198,9 +198,11 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
 
 @app.get("/items/{item_id}")
 def read_item(item_id: int, q: str | None = None):
@@ -228,14 +230,17 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+
 class Item(BaseModel):
     name: str
     price: float
     is_offer: bool | None = None
 
+
 @app.post("/items/")
 def create_item(item: Item):
     return {"item_name": item.name, "price": item.price}
+
 
 @app.put("/items/{item_id}")
 def update_item(item_id: int, item: Item):
@@ -250,12 +255,14 @@ from typing import Annotated
 
 app = FastAPI()
 
+
 async def get_db():
     db = DatabaseSession()
     try:
         yield db
     finally:
         db.close()
+
 
 @app.get("/users/{user_id}")
 async def read_user(user_id: int, db: Annotated[Database, Depends(get_db)]):
@@ -272,10 +279,12 @@ from typing import Annotated
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+
 @app.post("/token")
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     # Validate credentials, return JWT
     return {"access_token": token, "token_type": "bearer"}
+
 
 @app.get("/users/me")
 async def read_users_me(token: Annotated[str, Depends(oauth2_scheme)]):
@@ -290,9 +299,11 @@ from fastapi import FastAPI, BackgroundTasks
 
 app = FastAPI()
 
+
 def send_notification(email: str, message: str):
     # Send email in background
     pass
+
 
 @app.post("/notify/{email}")
 async def notify(email: str, background_tasks: BackgroundTasks):
@@ -306,6 +317,7 @@ async def notify(email: str, background_tasks: BackgroundTasks):
 from fastapi import FastAPI, WebSocket
 
 app = FastAPI()
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

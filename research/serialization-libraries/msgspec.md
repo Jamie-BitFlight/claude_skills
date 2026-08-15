@@ -84,12 +84,15 @@ conda install -c conda-forge msgspec
 ```python
 import msgspec
 
+
 # Define schema using type annotations
 class User(msgspec.Struct):
     """A user account"""
+
     name: str
     groups: set[str] = set()
     email: str | None = None
+
 
 # Encode
 alice = User("alice", groups={"admin", "engineering"})
@@ -127,6 +130,7 @@ msgspec.toml.encode(alice)
 ```python
 class Config(msgspec.Struct, frozen=True, order=True, kw_only=True):
     """An immutable, orderable configuration"""
+
     timeout: int
     retries: int = 3
 ```
@@ -296,8 +300,10 @@ SOURCE: README.md validation example
 ```python
 import msgspec
 
+
 class User(msgspec.Struct):
     """A user account"""
+
     name: str
     groups: set[str] = set()
     email: str | None = None
@@ -344,6 +350,7 @@ SOURCE: API documentation and format module listing
 ```python
 class Config(msgspec.Struct, frozen=True, order=True, kw_only=True):
     """An immutable, orderable configuration"""
+
     timeout: int
     retries: int = 3
 ```

@@ -31,11 +31,15 @@ open_issues = backlog_list_issues(milestone=title, state="open")
 for issue in open_issues:
     # One subprocess per issue
     subprocess.run([
-        "uv", "run",
+        "uv",
+        "run",
         ".claude/skills/gh/scripts/github_project_setup.py",
-        "issue", "set-milestone",
-        "--issue", str(issue.number),
-        "--milestone", chosen_milestone_number
+        "issue",
+        "set-milestone",
+        "--issue",
+        str(issue.number),
+        "--milestone",
+        chosen_milestone_number,
     ])
 ```
 

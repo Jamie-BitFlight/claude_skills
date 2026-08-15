@@ -165,19 +165,13 @@ curl -H 'Accept: application/json' 'https://s.jina.ai/What%20is%20Claude%20Code%
 import httpx
 
 # Read a URL
-response = httpx.get(
-    f"https://r.jina.ai/{url}",
-    headers={"Authorization": "Bearer <YOUR_JINA_API_KEY>"}
-)
+response = httpx.get(f"https://r.jina.ai/{url}", headers={"Authorization": "Bearer <YOUR_JINA_API_KEY>"})
 markdown_content = response.text
 
 # Search the web
 response = httpx.get(
     "https://s.jina.ai/claude+code+plugins",
-    headers={
-        "Accept": "application/json",
-        "Authorization": "Bearer <YOUR_JINA_API_KEY>"
-    }
+    headers={"Accept": "application/json", "Authorization": "Bearer <YOUR_JINA_API_KEY>"},
 )
 results = response.json()  # list of {title, content, url}
 ```
