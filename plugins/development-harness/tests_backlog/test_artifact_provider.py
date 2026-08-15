@@ -9,7 +9,7 @@ Strategy:
       and the issue object. No real network calls are made.
     - MCP tool integration tests use the FastMCP in-memory client to call tools
       through the full request/response pipeline, with an injected mock provider
-      via monkeypatching the server module's _artifact_provider singleton.
+      via monkeypatching the server module's _get_artifact_provider() function.
     - Security tests verify path traversal and non-plan path rejection.
     - All tests follow AAA and are independently isolated with function-scoped fixtures.
     - TestArtifactBackendProtocol is parametrized over github, linear, and gitlab
@@ -18,6 +18,7 @@ Strategy:
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock
 
@@ -31,7 +32,19 @@ from backlog_core.artifact_provider import (
     create_artifact_provider,
 )
 from backlog_core.artifact_registry import ArtifactRegistry, render_manifest_section
-from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactStatus, ArtifactType, BacklogError
+from backlog_core.models import (
+    ArtifactEntry,
+    ArtifactManifest,
+    ArtifactStatus,
+    ArtifactType,
+    BacklogError,
+    ContentConflictError,
+    ContentKind,
+    ContentNotFoundError,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+)
 from github.AuthenticatedUser import AuthenticatedUser
 
 if TYPE_CHECKING:
@@ -631,22 +644,43 @@ class TestGitHubArtifactProviderReadArtifactContent:
 # ---------------------------------------------------------------------------
 
 # The integration tests use FastMCP's in-memory transport. The server module
-# instantiates _artifact_provider as a module-level singleton. Tests inject a
-# MockArtifactBackend via monkeypatch to avoid real GitHub calls while testing
-# the full tool request/response pipeline.
+# resolves the artifact provider via the _get_artifact_provider() function. Tests
+# inject a MockArtifactBackend via monkeypatch to avoid real GitHub calls while
+# testing the full tool request/response pipeline.
 
 
 class _InMemoryArtifactBackend:
-    """Minimal in-memory ArtifactBackend for MCP integration tests.
+    """Minimal in-memory ContentProvider double for MCP integration tests.
 
-    Stores manifests in a dict keyed by issue_number.  Provides file content
-    via an in-memory dict rather than the filesystem.
+    Implements the ``get_content``/``put_content`` surface that
+    ``backlog_core.server`` calls through ``_get_artifact_provider()`` —
+    ``ContentKind.ARTIFACT_MANIFEST`` resolves to a manifest keyed by
+    issue_number; ``ContentKind.ARTIFACT_CONTENT`` resolves to file content
+    keyed by the artifact's repo-relative path (``ContentRef.name``), matching
+    the ``artifact_content_reference()`` scheme in
+    ``backlog_core.artifact_manifest_store`` for entries with no
+    ``content_revision`` (the tests never set one).
     """
 
     def __init__(self) -> None:
         """Initialise with empty storage."""
         self._manifests: dict[int, ArtifactManifest] = {}
         self._files: dict[str, str] = {}
+        self._revisions: dict[str, str] = {}
+
+    @staticmethod
+    def _revision_key(reference: ContentRef) -> str:
+        """Canonical CAS key for a reference, matching the get/put storage split.
+
+        Args:
+            reference: Logical content identity to key revisions by.
+
+        Returns:
+            "manifest:{issue_number}" for ARTIFACT_MANIFEST, "content:{path}" otherwise.
+        """
+        if reference.kind == ContentKind.ARTIFACT_MANIFEST:
+            return f"manifest:{reference.namespace}"
+        return f"content:{reference.name}"
 
     def get_manifest(self, issue_number: int) -> ArtifactManifest:
         """Return stored manifest or empty manifest.
@@ -660,72 +694,99 @@ class _InMemoryArtifactBackend:
         return self._manifests.get(issue_number, ArtifactManifest(issue_number=issue_number))
 
     def set_manifest(self, issue_number: int, manifest: ArtifactManifest) -> None:
-        """Store the manifest.
+        """Store the manifest, stamping a fresh revision like a real put_content would.
 
         Args:
             issue_number: GitHub issue number.
             manifest: Manifest to store.
         """
         self._manifests[issue_number] = manifest
-
-    def read_artifact_content(self, path: str) -> str:
-        """Return in-memory file content or raise FileNotFoundError.
-
-        Args:
-            path: Repo-relative file path.
-
-        Returns:
-            File content string.
-
-        Raises:
-            FileNotFoundError: When path is not registered in _files.
-        """
-        if path not in self._files:
-            raise FileNotFoundError(f"File not found in test backend: {path}")
-        return self._files[path]
+        self._revisions[f"manifest:{issue_number}"] = uuid.uuid4().hex
 
     def add_file(self, path: str, content: str) -> None:
-        """Register in-memory file content.
+        """Register in-memory file content, stamping a fresh revision like a real put_content would.
 
         Args:
             path: Path to register.
             content: File content string.
         """
         self._files[path] = content
+        self._revisions[f"content:{path}"] = uuid.uuid4().hex
 
-    def read_local_artifact_content(self, path: str) -> str | None:
-        """Return in-memory file content or None when absent.
+    def get_content(self, reference: ContentRef) -> ContentRecord:
+        """Resolve a manifest or artifact-content record by logical reference.
 
         Args:
-            path: Repo-relative file path.
+            reference: Logical content identity requested by the server.
 
         Returns:
-            File content string or None.
-        """
-        return self._files.get(path)
+            The matching ContentRecord.
 
-    def read_artifact_content_from_remote(self, issue_number: int, artifact_type: str, path: str) -> str | None:
-        """Return None — in-memory backend has no GitHub comment storage.
+        Raises:
+            ContentNotFoundError: When no manifest or file is registered for
+                the requested reference — mirrors the real ContentProvider
+                contract (see ``backlog_core.backends.memory_backend.InMemoryBackend``),
+                and propagates as ``fastmcp.exceptions.ToolError`` since
+                ``ContentNotFoundError`` is not a ``BacklogError``.
+        """
+        if reference.kind == ContentKind.ARTIFACT_MANIFEST:
+            manifest = self._manifests.get(int(reference.namespace))
+            if manifest is None:
+                raise ContentNotFoundError(f"No manifest registered for issue {reference.namespace}")
+            return ContentRecord(
+                reference=reference,
+                owner_reference=reference.namespace,
+                content=manifest.model_dump_json(),
+                revision=self._revisions[self._revision_key(reference)],
+            )
+        content = self._files.get(reference.name)
+        if content is None:
+            raise ContentNotFoundError(f"File not found in test backend: {reference.name}")
+        return ContentRecord(
+            reference=reference,
+            owner_reference=reference.namespace,
+            content=content,
+            revision=self._revisions[self._revision_key(reference)],
+        )
+
+    def put_content(self, request: ContentWrite) -> ContentRecord:
+        """Persist a manifest or artifact-content record by logical reference, enforcing CAS.
+
+        Mirrors ``backlog_core.backends.memory_backend.InMemoryBackend.put_content``'s
+        revision-safe update contract: a ``create_only`` write against an existing
+        record, or a write whose ``expected_revision`` no longer matches the stored
+        revision, is rejected rather than silently overwriting.
 
         Args:
-            issue_number: GitHub issue number (unused).
-            artifact_type: Artifact type string (unused).
-            path: Repo-relative path (unused).
+            request: Logical content write issued by the server.
 
         Returns:
-            Always None.
-        """
-        return None
+            The persisted ContentRecord, stamped with a fresh revision.
 
-    def store_artifact_content(self, issue_number: int, artifact_type: str, path: str, content: str) -> None:
-        """No-op — in-memory backend stores content only via add_file.
-
-        Args:
-            issue_number: GitHub issue number (unused).
-            artifact_type: Artifact type string (unused).
-            path: Repo-relative path (unused).
-            content: Content string (unused).
+        Raises:
+            ContentConflictError: When the reference kind is unsupported, when
+                ``create_only`` targets an existing record, or when
+                ``expected_revision`` no longer matches the stored revision.
         """
+        reference = request.reference
+        key = self._revision_key(reference)
+        current_revision = self._revisions.get(key, "")
+        if request.create_only and key in self._revisions:
+            raise ContentConflictError(f"Content already exists: {key}")
+        if request.expected_revision and request.expected_revision != current_revision:
+            raise ContentConflictError(f"Content revision no longer matches: {key}")
+        new_revision = uuid.uuid4().hex
+        if reference.kind == ContentKind.ARTIFACT_MANIFEST:
+            self._manifests[int(reference.namespace)] = ArtifactManifest.model_validate_json(request.content)
+            self._revisions[key] = new_revision
+        elif reference.kind == ContentKind.ARTIFACT_CONTENT:
+            self._files[reference.name] = request.content
+            self._revisions[key] = new_revision
+        else:
+            raise ContentConflictError(f"Unsupported content kind for test backend: {reference.kind}")
+        return ContentRecord(
+            reference=reference, owner_reference=reference.namespace, content=request.content, revision=new_revision
+        )
 
 
 @pytest.fixture
@@ -744,16 +805,15 @@ def patched_mcp_server(monkeypatch: pytest.MonkeyPatch, in_memory_backend: _InMe
     """Patch the backlog MCP server to use the in-memory backend.
 
     Tests: MCP tool integration setup
-    How: Monkeypatch _artifact_provider and _get_artifact_provider in server module.
-    Why: MCP tools call _get_artifact_provider(); patching the singleton ensures
-         all tool calls use the in-memory backend throughout each test.
+    How: Monkeypatch _get_artifact_provider in server module.
+    Why: MCP tools call _get_artifact_provider(); patching it ensures all tool
+         calls use the in-memory backend throughout each test.
 
     Returns:
         The FastMCP server instance for use with Client.
     """
     import backlog_core.server as server_module
 
-    monkeypatch.setattr(server_module, "_artifact_provider", in_memory_backend)
     monkeypatch.setattr(server_module, "_get_artifact_provider", lambda: in_memory_backend)
     return server_module.mcp
 
@@ -785,6 +845,7 @@ class TestMCPToolArtifactRegister:
                     "item_id": 965,
                     "artifact_type": "feature-context",
                     "artifact_id": "plan/feature-context-foo.md",
+                    "content": "# Feature Context\n\nFoo.",
                     "status": "current",
                     "agent": "feature-researcher",
                 },
@@ -816,6 +877,7 @@ class TestMCPToolArtifactRegister:
                     "item_id": 965,
                     "artifact_type": "architect",
                     "artifact_id": "plan/architect-foo.md",
+                    "content": "# Architect Spec\n\nDraft.",
                     "status": "draft",
                     "agent": "agent",
                 },
@@ -828,6 +890,7 @@ class TestMCPToolArtifactRegister:
                     "item_id": 965,
                     "artifact_type": "architect",
                     "artifact_id": "plan/architect-foo.md",
+                    "content": "# Architect Spec\n\nCurrent.",
                     "status": "current",
                     "agent": "updated-agent",
                 },
@@ -852,7 +915,12 @@ class TestMCPToolArtifactRegister:
         async with Client(patched_mcp_server) as client:
             result = await client.call_tool(
                 "artifact_register",
-                {"item_id": 100, "artifact_type": "not-a-real-type", "artifact_id": "plan/something.md"},
+                {
+                    "item_id": 100,
+                    "artifact_type": "not-a-real-type",
+                    "artifact_id": "plan/something.md",
+                    "content": "irrelevant — invalid type is rejected before content is used",
+                },
             )
 
         # Assert
@@ -875,6 +943,7 @@ class TestMCPToolArtifactRegister:
                     "item_id": 100,
                     "artifact_type": "architect",
                     "artifact_id": "plan/architect-foo.md",
+                    "content": "irrelevant — invalid status is rejected before content is used",
                     "status": "not-a-real-status",
                 },
             )
@@ -1105,15 +1174,16 @@ class TestMCPToolArtifactRead:
 
         Tests: Cache miss — file not present in worktree (architect spec 7.3 scenario 8)
         How: Register artifact in manifest but do NOT add file to backend;
-             call artifact_read; assert ToolError is raised (FileNotFoundError is not
-             caught by the tool's error handling and propagates as ToolError).
+             call artifact_read; assert ToolError is raised (ContentNotFoundError is
+             not caught by the tool's error handling and propagates as ToolError).
         Why: The registered artifact may not yet be committed in the current worktree.
              FastMCP surfaces unhandled exceptions as ToolError to the caller.
 
-        Note: The server's artifact_read catches ValueError, KeyError, and BacklogError
-              but not FileNotFoundError. This is the actual server contract — callers
-              must handle ToolError for cache-miss scenarios. This test documents the
-              existing behaviour as a specification test.
+        Note: The server's artifact_read catches ValueError, KeyError, and BacklogError.
+              ContentNotFoundError is a ContentProviderError, not a BacklogError, so it
+              is not caught. This is the actual server contract — callers must handle
+              ToolError for cache-miss scenarios. This test documents the existing
+              behaviour as a specification test.
         """
         from fastmcp.client import Client
         from fastmcp.exceptions import ToolError
