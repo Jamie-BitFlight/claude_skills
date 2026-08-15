@@ -31,10 +31,12 @@ def test_check_sequence_conformance_flags_unseen_transition() -> None:
     assert diagnostics["matching"].trace_is_fit is True
     assert diagnostics["matching"].trace_fitness == pytest.approx(1.0)
     assert diagnostics["drifted"].trace_is_fit is False
-    assert diagnostics["drifted"].missing_tokens == 2
-    # 2 of 4 checks (2 transitions + start + end) fail: both transitions are
-    # wrong, but start/end still match -- see the denominator fix below.
-    assert diagnostics["drifted"].trace_fitness == pytest.approx(0.5)
+    # 3 of 4 checks (2 transitions + start + end) fail: the start (Read)
+    # passes, but both transitions are off-path once Bash breaks the walk,
+    # and the end check independently fails too since Write is only reached
+    # by an off-path token, not a genuine on-path reference-session ending.
+    assert diagnostics["drifted"].missing_tokens == 3
+    assert diagnostics["drifted"].trace_fitness == pytest.approx(0.25)
 
 
 def test_check_sequence_conformance_partial_credit_for_a_late_deviation() -> None:
@@ -80,8 +82,12 @@ def test_check_sequence_conformance_bad_start_diverges_the_whole_trace() -> None
 
     diagnostics = result[0]
     assert diagnostics.trace_is_fit is False
-    assert diagnostics.missing_tokens == 2
-    assert diagnostics.trace_fitness == pytest.approx(1 / 3)
+    # All 3 checks fail (start + 1 transition + end): the start check fails
+    # immediately (A is never a valid reference start), and since the walk
+    # is off-path from position 0, neither the A->B transition nor the end
+    # check gets independent credit for being valid elsewhere in isolation.
+    assert diagnostics.missing_tokens == 3
+    assert diagnostics.trace_fitness == pytest.approx(0.0)
 
 
 def test_check_sequence_conformance_rejects_a_spliced_path_across_branches() -> None:
