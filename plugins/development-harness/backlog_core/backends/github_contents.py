@@ -25,6 +25,15 @@ _ROOT = ".dh/content/v1"
 _VERSION = 1
 _NOT_FOUND = 404
 _CONFLICT_STATUSES = frozenset({409, 422})
+# create_git_ref's documented "Reference already exists" status. Distinct
+# from _CONFLICT_STATUSES on purpose: content-write conflicts (create_file /
+# update_file) have a revision to re-read and diff, so 409 and 422 both
+# route through the same retry-on-current-state logic in put(). A ref
+# conflict has no revision -- only re-reading whether the branch now exists
+# tells us if the 422 corresponded to a genuine race or an unrelated
+# failure (see _content_branch). Treating an undocumented 409 the same way
+# would silently accept a failure that never actually created the branch.
+_REF_ALREADY_EXISTS = 422
 _MAX_CONTENT_BYTES = 1_000_000
 _WRITE_ATTEMPTS = 3
 # Dedicated, unprotected branch for all .dh/content/v1/ record reads and writes.
@@ -121,9 +130,11 @@ class _GitHubContentsStore:
 
         Checked and created at most once per store instance: subsequent
         calls return the cached name without another round trip. Creation
-        races against a concurrent bootstrapper are resolved by treating a
-        ``422`` ("Reference already exists") from ``create_git_ref`` as
-        success rather than an error -- the branch is ready either way.
+        races against a concurrent bootstrapper are resolved by re-reading
+        actual branch state after a ``422`` ("Reference already exists")
+        from ``create_git_ref`` -- mirroring ``put()``'s ``_existing()``
+        re-read on a write conflict -- rather than assuming the conflict
+        proves the branch exists.
 
         Args:
             repository: The resolved PyGithub repository.
@@ -133,8 +144,10 @@ class _GitHubContentsStore:
 
         Raises:
             ContentUnavailableError: If branch existence cannot be
-                determined or created due to an unexpected GitHub API
-                failure.
+                determined, if branch creation fails for a reason other
+                than the branch already existing, or if a reported
+                "already exists" conflict cannot be confirmed by
+                re-reading the branch afterward.
         """
         if self._branch_ready:
             return _CONTENT_BRANCH
@@ -147,12 +160,40 @@ class _GitHubContentsStore:
                 base = repository.get_branch(repository.default_branch)
                 repository.create_git_ref(ref=f"refs/heads/{_CONTENT_BRANCH}", sha=base.commit.sha)
             except GithubException as create_exc:
-                if create_exc.status not in _CONFLICT_STATUSES:
+                if create_exc.status != _REF_ALREADY_EXISTS:
                     raise ContentUnavailableError(
                         f"GitHub content branch creation failed: {create_exc}"
                     ) from create_exc
+                self._verify_branch_exists_after_conflict(repository, create_exc)
         self._branch_ready = True
         return _CONTENT_BRANCH
+
+    @staticmethod
+    def _verify_branch_exists_after_conflict(repository: _ContentsRepository, create_exc: GithubException) -> None:
+        """Confirm the content branch actually exists after a reported ref conflict.
+
+        A ``422`` from ``create_git_ref`` is not proof the branch exists --
+        it could be a transient ref-lock or another failure GitHub happens
+        to surface as ``422``. Re-reading the branch is the only way to
+        distinguish a genuine concurrent-bootstrap race from a failure that
+        never created the branch at all.
+
+        Args:
+            repository: The resolved PyGithub repository.
+            create_exc: The ``GithubException`` raised by ``create_git_ref``.
+
+        Raises:
+            ContentUnavailableError: If the branch still cannot be found,
+                meaning the reported conflict did not correspond to a
+                genuine pre-existing branch.
+        """
+        try:
+            repository.get_branch(_CONTENT_BRANCH)
+        except GithubException as verify_exc:
+            raise ContentUnavailableError(
+                f"GitHub content branch creation reported a conflict ({create_exc}) but the "
+                f"branch could not be confirmed to exist: {verify_exc}"
+            ) from verify_exc
 
     def list(self, query: ContentQuery) -> SequenceType[ContentRecord]:
         records = self.list_all(query)

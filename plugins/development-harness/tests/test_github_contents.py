@@ -93,11 +93,27 @@ class _Repository:
         self.requester = _FakeRequester(self)
         self.existing_branches: set[str] = {"main"}
         self.branch_create_conflict = False
+        self.branch_create_false_conflict = False
+        self.branch_create_false_conflict_status = 422
         self.branch_lookup_calls: list[str] = []
         self.tree_shas: list[str] = []
 
+    def _require_branch(self, branch: str) -> None:
+        """Reject an operation against a branch this fake never created.
+
+        Mirrors real GitHub: content and tree operations against a
+        nonexistent ref fail. Without this check, the fake accepted content
+        operations against any branch string regardless of
+        ``existing_branches``, which would mask a false-positive
+        ``_GitHubContentsStore._branch_ready`` bootstrap (see
+        ``test_content_branch_creation_false_conflict_fails_closed``).
+        """
+        if branch not in self.existing_branches:
+            raise GithubException(404, {"message": f"Branch not found: {branch}"}, {})
+
     def get_contents(self, path: str, ref: str) -> _File:
         self.branches.append(ref)
+        self._require_branch(ref)
         try:
             return self.files[path]
         except KeyError as exc:
@@ -105,6 +121,7 @@ class _Repository:
 
     def create_file(self, path: str, message: str, content: str, branch: str) -> dict[str, object]:
         self.branches.append(branch)
+        self._require_branch(branch)
         if self.branch_contention:
             self.branch_contention -= 1
             raise GithubException(409, {"message": "branch moved"}, {})
@@ -125,6 +142,7 @@ class _Repository:
 
     def update_file(self, path: str, message: str, content: str, sha: str, branch: str) -> dict[str, object]:
         self.branches.append(branch)
+        self._require_branch(branch)
         if self.branch_contention:
             self.branch_contention -= 1
             raise GithubException(409, {"message": "branch moved"}, {})
@@ -142,6 +160,7 @@ class _Repository:
 
     def get_git_tree(self, sha: str, recursive: bool) -> _Tree:
         self.tree_shas.append(sha)
+        self._require_branch(sha)
         snapshot = dict(self.files.items())
         self._blobs = {file.sha: file.content for file in snapshot.values()}
         if self.mutate_after_tree:
@@ -162,9 +181,21 @@ class _Repository:
         return _FakeBranch(commit=_FakeCommit(sha="base-sha"))
 
     def create_git_ref(self, ref: str, sha: str) -> None:
+        name = ref.removeprefix("refs/heads/")
+        if self.branch_create_false_conflict:
+            # A conflict status that does NOT correspond to a real,
+            # pre-existing branch -- e.g. a transient ref-lock, a
+            # secondary-rate-limit response surfaced as 422, or an
+            # undocumented 409. The branch is deliberately left absent from
+            # existing_branches so re-verification (Finding 1 fix) fails.
+            raise GithubException(self.branch_create_false_conflict_status, {"message": "conflict"}, {})
         if self.branch_create_conflict:
+            # Simulates a concurrent bootstrapper winning the race: the
+            # branch genuinely exists by the time we ask, even though our
+            # own create_git_ref call still reports 422.
+            self.existing_branches.add(name)
             raise GithubException(422, {"message": "Reference already exists"}, {})
-        self.existing_branches.add(ref.removeprefix("refs/heads/"))
+        self.existing_branches.add(name)
 
 
 class _FakeCommit(BaseModel):
@@ -418,6 +449,53 @@ def test_content_branch_creation_race_is_idempotent(store: _GitHubContentsStore,
 
     assert record.content == "body"
     assert set(repository.branches) == {_CONTENT_BRANCH}
+
+
+def test_content_branch_creation_false_conflict_fails_closed(
+    store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    """A 422 from create_git_ref that is NOT a genuine 'already exists' --
+    e.g. a transient ref-lock or a secondary-rate-limit response surfaced as
+    422 -- must not be silently accepted as 'branch is ready'. Regression
+    guard for Finding 1: pre-fix, _content_branch fell through to
+    self._branch_ready = True without verifying the branch actually exists.
+    """
+    repository.branch_create_false_conflict = True
+
+    with pytest.raises(ContentUnavailableError, match="branch"):
+        store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+
+    assert _CONTENT_BRANCH not in repository.existing_branches
+
+
+def test_content_branch_creation_undocumented_conflict_status_fails_closed(
+    store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    """create_git_ref's documented 'already exists' status is 422, not 409.
+
+    A 409 must surface as an error rather than being tolerated as a
+    successful race -- regression guard for the _CONFLICT_STATUSES /
+    _REF_ALREADY_EXISTS conflation fixed for Finding 3 (create_git_ref's
+    'ref already exists' now has a distinct constant from the content-write
+    conflict statuses).
+    """
+    repository.branch_create_false_conflict = True
+    repository.branch_create_false_conflict_status = 409
+
+    with pytest.raises(ContentUnavailableError, match="branch"):
+        store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+
+
+def test_fake_repository_rejects_content_ops_against_unbootstrapped_branch(repository: _Repository) -> None:
+    """Regression guard for the test double itself (Finding 2): if
+    _content_branch ever again marked _branch_ready=True without the branch
+    actually existing, the fake must fail the same way real GitHub would --
+    not silently accept content operations against a nonexistent ref.
+    """
+    assert _CONTENT_BRANCH not in repository.existing_branches
+
+    with pytest.raises(GithubException):
+        repository.get_contents("any/path", ref=_CONTENT_BRANCH)
 
 
 def test_store_never_targets_the_repository_default_branch_for_content(
