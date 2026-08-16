@@ -1,6 +1,6 @@
 ---
 name: dh-content-store-live-verification-pollutes-real-plan-list
-description: Live-writing a ContentKind.PLAN record with non-plan content through _GitHubContentsStore against the real repo breaks the live `sam plan list` for everyone until deleted
+description: Live-writing a ContentKind.PLAN record with non-plan content through _GitHubContentsStore against the real repo breaks the live `plan list` CLI command for everyone until deleted
 metadata:
   type: project
 ---
@@ -8,7 +8,9 @@ metadata:
 Writing a live-verification `.dh/content/v1/` record through
 `_GitHubContentsStore` (`plugins/development-harness/backlog_core/backends/github_contents.py`)
 against the real `Jamie-BitFlight/claude_skills` repo with `kind=ContentKind.PLAN` and
-arbitrary string content (e.g. `"live-verification-test"`) is not inert. `sam plan list`
+arbitrary string content (e.g. `"live-verification-test"`) is not inert. The `plan list`
+subcommand of `sam_schema/cli.py` — invoked as `uv run plugins/development-harness/sam_schema/cli.py
+plan list ...`; there is no `sam` binary, see [[project_sam_console_script_cwd_dependence]] —
 (`sam_schema/sam_plan.py::_backend()` -> `ContentTaskProvider.__init__` ->
 `parse_plan_content`) eagerly lists and parses *every* `ContentKind.PLAN` record in the
 configured backend on every invocation. A record whose `content` is not valid Plan YAML
@@ -24,7 +26,7 @@ against the real repo, either (a) use `ContentKind.ARTIFACT_CONTENT` with a dist
 `artifact_type` instead of `PLAN`/`DISPATCH_PLAN` (kinds that real tooling eagerly parses and
 validates), or (b) if `PLAN` must be used for the test, write content that round-trips through
 `parse_plan_content` (a minimal valid Plan YAML shape), or (c) delete the record immediately
-after the read-back assertion, before any other real invocation of `sam plan list`/`dispatch`
+after the read-back assertion, before any other real invocation of `plan list`/`dispatch`
 tooling can observe it. Always verify cleanup by re-listing the target path/branch's tree
 afterward (`gh api repos/.../git/trees/<branch>?recursive=true`) rather than assuming the
 delete call succeeded.
