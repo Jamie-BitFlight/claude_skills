@@ -618,17 +618,41 @@ GitHub uses two provider-native, lossless write representations because its APIs
 concurrency guarantees:
 
 - Plans, artifact manifests, artifact content, dispatch plans, and work-item heads are deterministic
-  files beneath `.dh/content/v1/` on the repository's resolved default branch. Every GitHub request
-  names that branch. Each file stores a compact versioned envelope containing its complete logical identity,
-  owner metadata, and content. Identity fields use one injective URL-safe encoding; the decoded
-  envelope must match its path. Malformed, duplicate, oversized, or mismatched records fail closed.
-  The GitHub Contents API blob SHA is the opaque revision: updates send the observed SHA and creates
-  omit SHA. On `409` or `422`, the provider re-reads the target. A path that appeared, disappeared,
-  or changed SHA is `ContentConflictError`; an unchanged target permits only a bounded retry for an
-  unrelated branch-head race. `403` and protected-branch failures are unavailable, not conflicts.
-  Discovery resolves one branch tree, rejects truncated results, validates every envelope, sorts by
-  logical identity, then applies `ContentQuery` filtering and bounds. Native records take precedence
-  over read-only Gist/index migration records; a malformed native record never falls back.
+  files beneath `.dh/content/v1/` on a dedicated, unprotected `dh-content` branch
+  (`_GitHubContentsStore._CONTENT_BRANCH`) — never the repository's default branch. Every GitHub
+  request names that branch. A repository's default branch commonly carries a ruleset requiring PR
+  review and status checks; a direct Contents API commit against it is then a permanent policy
+  rejection (`409`, required status checks cannot be satisfied outside a PR), not a transient
+  conflict. GitHub's `~DEFAULT_BRANCH` ruleset condition matches only the branch currently
+  configured as default, so a differently named branch sits entirely outside that ruleset's scope.
+  `_GitHubContentsStore` bootstraps `dh-content` on first use per store instance: it looks up the
+  branch, and on `404` creates it from the default branch's current HEAD via `create_git_ref`. A
+  `422` ("Reference already exists") from that create is not, by itself, treated as success: the
+  store re-reads the branch afterward (mirroring `put()`'s conflict re-read) and only proceeds once
+  that read confirms the branch genuinely exists, so two sessions racing to bootstrap the branch for
+  the first time cannot corrupt state or raise — whichever one wins the race, both proceed against
+  the same now-existing branch. A `422`/`409` that does not correspond to a real pre-existing branch
+  (a transient ref-lock, a secondary-rate-limit response surfaced as `422`, a malformed-sha `422`)
+  fails closed with `ContentUnavailableError` instead of silently marking the store ready. `409` is
+  not part of `create_git_ref`'s documented "already exists" contract, so only `422` is tolerated as
+  a possible race at all — an undocumented `409` fails closed immediately without a re-read. `dh-content`
+  is an ordinary, unprotected, never-merged-back branch — the same shape most stale/merged-branch
+  cleanup automation targets for deletion. Any branch-cleanup automation this repo or its CI adds
+  must exclude `dh-content` by name; deleting it would silently reintroduce the "content branch
+  missing" failure class this bootstrap logic exists to avoid. Each file stores a
+  compact versioned envelope containing its complete logical identity, owner metadata, and content.
+  Identity fields use one injective URL-safe encoding; the decoded envelope must match its path.
+  Malformed, duplicate, oversized, or mismatched records fail closed. The GitHub Contents API blob
+  SHA is the opaque revision: updates send the observed SHA and creates omit SHA. On `409` or `422`,
+  the provider re-reads the target. A path that appeared, disappeared, or changed SHA is
+  `ContentConflictError`; an unchanged target permits only a bounded retry for an unrelated
+  branch-head race. `403` and protected-branch failures are unavailable, not conflicts — this no
+  longer describes content writes generally, since `dh-content` is deliberately unprotected; it now
+  applies only to the one-time read of the default branch's HEAD inside bootstrap (which may itself
+  carry branch protection, since it is only ever read, never written). Discovery
+  resolves one branch tree, rejects truncated results, validates every envelope, sorts by logical
+  identity, then applies `ContentQuery` filtering and bounds. Native records take precedence over
+  read-only Gist/index migration records; a malformed native record never falls back.
 - Work-item issue bodies remain human-owned GitHub content and are never overwritten after a
   preflight-only revision check. The authoritative agent-managed head is a Contents record bound to
   the issue identity. Its root revision is the digest of the canonical Issue body plus Issue node
