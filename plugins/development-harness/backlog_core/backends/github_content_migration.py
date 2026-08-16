@@ -279,13 +279,18 @@ class _GitHubContentCache:
         A reference whose queued write is still pending after
         :meth:`replay_pending` (e.g. blocked by a branch-protection ruleset
         that rejects direct Contents API commits) is served from the cache
-        instead of being re-read online. Some legacy fallback readers (the
-        artifact-manifest Gist reader in particular) never raise
-        ``ContentNotFoundError`` for a reference with no remote data yet —
-        they return an empty-but-valid record instead — so a successful
-        online read cannot be trusted to mean "this write landed". Trusting
-        it anyway would silently overwrite the cache with that empty record,
-        discarding the caller's own unacknowledged write.
+        instead of trusting the online read's returned content. Some legacy
+        fallback readers (the artifact-manifest Gist reader in particular)
+        never raise ``ContentNotFoundError`` for a reference with no remote
+        data yet — they return an empty-but-valid record instead — so a
+        successful online read cannot be trusted to mean "this write landed".
+        Trusting it anyway would silently overwrite the cache with that empty
+        record, discarding the caller's own unacknowledged write. The online
+        read is still attempted for its own sake in this case, because a
+        genuine ``_GitHubContentIntegrityError`` (corrupt remote data) is a
+        signal callers must still see even while a write for the same
+        reference is stuck pending -- only the read's *content* is untrusted,
+        not evidence that the remote copy is broken.
 
         Returns:
             The provider or cached logical content record.
@@ -300,6 +305,12 @@ class _GitHubContentCache:
         self.replay_pending()
         cached = self.cached_content(reference)
         if cached is not None and cached.pending:
+            try:
+                self._provider._read_online_content(reference, cached)
+            except _GitHubContentIntegrityError:
+                raise
+            except (ContentNotFoundError, BacklogError, ContentUnavailableError, OSError):
+                pass
             return self._cache.get_content(reference, stale=True)
         try:
             record = self._provider._read_online_content(reference, cached)
@@ -345,6 +356,7 @@ class _GitHubContentCache:
             self._cache.queue_write(self._queue_base(request, cached), request)
             return self._cache.get_content(request.reference)
         self._cache.cache_content(record)
+        self._cache.discard_pending(request.reference)
         return record
 
     def replay_pending(self) -> None:

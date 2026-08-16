@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactManifest,
@@ -167,9 +168,7 @@ def test_pending_artifact_manifest_write_is_not_clobbered_by_empty_legacy_read(t
     contents = MagicMock()
     contents.get.side_effect = ContentNotFoundError("not in contents api")
     provider = MagicMock()
-    empty_manifest = MagicMock()
-    empty_manifest.model_dump_json.return_value = '{"issue_number":1,"artifacts":[]}'
-    provider.get_manifest.return_value = empty_manifest
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
     backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=contents)
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
@@ -178,6 +177,94 @@ def test_pending_artifact_manifest_write_is_not_clobbered_by_empty_legacy_read(t
     assert (record.content, record.pending) == (manifest_with_entry, True)
     provider.get_manifest.assert_called()
     assert len(backend._cache.pending_mutations()) == 1
+
+
+def test_pending_write_still_surfaces_integrity_error_on_underlying_reference(tmp_path: Path) -> None:
+    """A stuck pending write must not mask a genuine remote integrity error.
+
+    Regression test for a visibility gap introduced by the pending-guard fix
+    above: routing straight to the stale cache once ``cached.pending`` is
+    True skips ``_read_online_content`` entirely, so a real
+    ``_GitHubContentIntegrityError`` on that same reference (e.g. a truncated
+    or malformed Contents API blob) never runs and is silently withheld from
+    every ``get_content`` caller for as long as the write stays stuck.
+    """
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
+    base = ContentRecord(reference=reference, content="", revision="")
+    cache = FileCache(tmp_path / "github-cache")
+    cache.queue_write(base, ContentWrite(reference=reference, content="queued", create_only=True))
+
+    contents = MagicMock()
+    contents.get.side_effect = _GitHubContentIntegrityError("corrupt blob")
+    provider = MagicMock()
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
+    backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=contents)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    with pytest.raises(_GitHubContentIntegrityError):
+        backend.get_content(reference)
+
+
+def test_fresh_online_write_discards_stale_pending_mutation_for_same_reference(tmp_path: Path) -> None:
+    """A landed direct write must dequeue any stale pending write for its reference.
+
+    Regression test: ``put_content``'s online-write success path previously
+    never touched ``state.pending``, so a queued create-only write that lost
+    its first replay attempt (e.g. against a legacy record) stayed queued
+    forever. Using a persistence double that -- unlike the real
+    ``_GitHubContentsStore`` -- performs no create-only/revision
+    self-validation on ``put`` isolates the offline-mutation-cache contract
+    itself: on the *next* replay this stale write would silently land and
+    clobber content that a fresh, unconditional write had already
+    superseded, unless the cache dequeues it as soon as that fresh write
+    lands.
+    """
+
+    class _NaiveContentsStore:
+        """Minimal, non-validating ``_ContentPersistence`` double.
+
+        The `_ContentPersistence` Protocol's ``put`` contract does not itself
+        require create-only/revision validation -- only the concrete
+        production `_GitHubContentsStore` happens to add it. This double
+        omits that defense-in-depth deliberately, to prove the offline cache
+        contract stays safe without relying on it.
+        """
+
+        def __init__(self) -> None:
+            self._record: ContentRecord | None = None
+
+        def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+            return [self._record] if self._record is not None else []
+
+        def get(self, reference: ContentRef) -> ContentRecord:
+            if self._record is None:
+                raise ContentNotFoundError(str(reference))
+            return self._record
+
+        def put(self, request: ContentWrite) -> ContentRecord:
+            self._record = ContentRecord(reference=request.reference, content=request.content, revision="rev")
+            return self._record
+
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
+    cache = FileCache(tmp_path / "github-cache")
+    provider = MagicMock()
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
+    naive_store = _NaiveContentsStore()
+    backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=naive_store)
+
+    backend.try_get_github = MagicMock(return_value=None)
+    backend.put_content(ContentWrite(reference=reference, content="A", create_only=True))
+    assert len(backend._cache.pending_mutations()) == 1
+
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    written = backend.put_content(ContentWrite(reference=reference, content="B"))
+
+    assert written.content == "B"
+    assert backend._cache.pending_mutations() == []
+
+    record = backend.get_content(reference)
+
+    assert record.content == "B"
 
 
 class _UnavailablePlanPersistence:
