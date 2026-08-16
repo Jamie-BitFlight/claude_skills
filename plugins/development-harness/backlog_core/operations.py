@@ -58,6 +58,7 @@ from .models import (
     ValidationError,
     ViewItemResult,
     parse_issue_number,
+    reference_is_title_derived,
 )
 from .parsing import (
     find_fuzzy_duplicates,
@@ -3084,7 +3085,11 @@ def _apply_non_in_progress_status(
     """
     if status == "blocked":
         if is_string_id_backend:
-            if item.reference:
+            # item.reference self-heals to a title-hash placeholder at construction
+            # (see BacklogItem's class docstring), so it is never empty here even
+            # for a genuinely unissued item — reference_is_title_derived() is the
+            # correct "no real backend reference yet" check instead of `not item.reference`.
+            if not reference_is_title_derived(item):
                 update_item_metadata(item.reference, {"metadata": {"status": "blocked"}}, output=output)
                 result["status"] = "blocked"
             else:
