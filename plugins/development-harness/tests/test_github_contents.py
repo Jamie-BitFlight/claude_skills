@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from backlog_core.artifact_manifest_store import publish_artifact
 from backlog_core.backends.github_backend import GitHubBackend
-from backlog_core.backends.github_contents import _GitHubContentsStore
+from backlog_core.backends.github_contents import _CONTENT_BRANCH, _GitHubContentsStore
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactEntry,
@@ -91,6 +91,10 @@ class _Repository:
         self._blobs: dict[str, str] = {}
         self._next_sha = 0
         self.requester = _FakeRequester(self)
+        self.existing_branches: set[str] = {"main"}
+        self.branch_create_conflict = False
+        self.branch_lookup_calls: list[str] = []
+        self.tree_shas: list[str] = []
 
     def get_contents(self, path: str, ref: str) -> _File:
         self.branches.append(ref)
@@ -137,6 +141,7 @@ class _Repository:
         return {"content": written}
 
     def get_git_tree(self, sha: str, recursive: bool) -> _Tree:
+        self.tree_shas.append(sha)
         snapshot = dict(self.files.items())
         self._blobs = {file.sha: file.content for file in snapshot.values()}
         if self.mutate_after_tree:
@@ -149,6 +154,25 @@ class _Repository:
     def _sha(self) -> str:
         self._next_sha += 1
         return f"sha-{self._next_sha}"
+
+    def get_branch(self, branch: str) -> _FakeBranch:
+        self.branch_lookup_calls.append(branch)
+        if branch not in self.existing_branches:
+            raise GithubException(404, {"message": "Branch not found"}, {})
+        return _FakeBranch(commit=_FakeCommit(sha="base-sha"))
+
+    def create_git_ref(self, ref: str, sha: str) -> None:
+        if self.branch_create_conflict:
+            raise GithubException(422, {"message": "Reference already exists"}, {})
+        self.existing_branches.add(ref.removeprefix("refs/heads/"))
+
+
+class _FakeCommit(BaseModel):
+    sha: str
+
+
+class _FakeBranch(BaseModel):
+    commit: _FakeCommit
 
 
 class _PagedContent:
@@ -188,7 +212,7 @@ def test_round_trip_uses_compact_lossless_envelope(store: _GitHubContentsStore, 
         == '{"version":1,"reference":{"kind":"plan","namespace":"","artifact_type":"","name":"P/one%two"},"owner_reference":"#7","content":"body"}'
     )
     assert store.get(reference) == created
-    assert set(repository.branches) == {"main"}
+    assert set(repository.branches) == {_CONTENT_BRANCH}
 
 
 def test_stale_update_raises_conflict(store: _GitHubContentsStore, repository: _Repository) -> None:
@@ -370,6 +394,45 @@ def test_two_plans_for_one_owner_remain_distinct(store: _GitHubContentsStore) ->
     records = store.list(ContentQuery(kind=ContentKind.PLAN, owner_reference="#1"))
 
     assert [(record.reference.name, record.content) for record in records] == [("P1", "one"), ("P2", "two")]
+
+
+def test_content_branch_is_bootstrapped_from_default_branch_when_missing(
+    store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    assert _CONTENT_BRANCH not in repository.existing_branches
+
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+
+    assert _CONTENT_BRANCH in repository.existing_branches
+    assert repository.branch_lookup_calls == [_CONTENT_BRANCH, "main"]
+    assert set(repository.branches) == {_CONTENT_BRANCH}
+
+
+def test_content_branch_creation_race_is_idempotent(store: _GitHubContentsStore, repository: _Repository) -> None:
+    # Simulates a concurrent bootstrapper winning the create-branch race: our
+    # lookup observes the branch missing, but by the time we attempt to
+    # create it, GitHub already has it (422 "Reference already exists").
+    repository.branch_create_conflict = True
+
+    record = store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+
+    assert record.content == "body"
+    assert set(repository.branches) == {_CONTENT_BRANCH}
+
+
+def test_store_never_targets_the_repository_default_branch_for_content(
+    store: _GitHubContentsStore, repository: _Repository
+) -> None:
+    repository.default_branch = "totally-different-default"
+    repository.existing_branches = {"totally-different-default"}
+
+    store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="body"))
+    store.list(ContentQuery(kind=ContentKind.PLAN))
+
+    assert "totally-different-default" not in repository.branches
+    assert "totally-different-default" not in repository.tree_shas
+    assert set(repository.branches) == {_CONTENT_BRANCH}
+    assert set(repository.tree_shas) == {_CONTENT_BRANCH}
 
 
 def test_publish_keeps_body_when_manifest_update_conflicts(

@@ -27,6 +27,15 @@ _NOT_FOUND = 404
 _CONFLICT_STATUSES = frozenset({409, 422})
 _MAX_CONTENT_BYTES = 1_000_000
 _WRITE_ATTEMPTS = 3
+# Dedicated, unprotected branch for all .dh/content/v1/ record reads and writes.
+# The repository's default branch typically carries a ruleset requiring PR +
+# status checks, which permanently rejects direct Contents API commits (409,
+# "N of N required status checks are expected") -- a policy failure, not a
+# transient conflict. GitHub's "~DEFAULT_BRANCH" ruleset condition only
+# matches the branch actually configured as default, so a differently named
+# branch sits entirely outside that ruleset's scope. Bootstrapped from the
+# default branch HEAD on first use per store instance; see _content_branch.
+_CONTENT_BRANCH = "dh-content"
 # Bounded aliased GraphQL batch size for blob fetches, matching the
 # gh_client._BATCH_CHUNK_SIZE precedent for batches that carry full text
 # bodies (not just small metadata fields like _TARGET_BATCH_SIZE=100's
@@ -47,6 +56,16 @@ class _ContentsFile(Protocol):
 
     @property
     def sha(self) -> str: ...
+
+
+class _Commit(Protocol):
+    @property
+    def sha(self) -> str: ...
+
+
+class _Branch(Protocol):
+    @property
+    def commit(self) -> _Commit: ...
 
 
 class _GitTreeEntry(Protocol):
@@ -88,11 +107,52 @@ class _ContentsRepository(Protocol):
     def create_file(self, path: str, message: str, content: str, branch: str) -> Mapping[str, object]: ...
     def update_file(self, path: str, message: str, content: str, sha: str, branch: str) -> Mapping[str, object]: ...
     def get_git_tree(self, sha: str, recursive: bool) -> _GitTree: ...
+    def get_branch(self, branch: str) -> _Branch: ...
+    def create_git_ref(self, ref: str, sha: str) -> object: ...
 
 
 class _GitHubContentsStore:
     def __init__(self, repository: Callable[[], _ContentsRepository]) -> None:
         self._repository = repository
+        self._branch_ready = False
+
+    def _content_branch(self, repository: _ContentsRepository) -> str:
+        """Return the dedicated content branch, bootstrapping it if missing.
+
+        Checked and created at most once per store instance: subsequent
+        calls return the cached name without another round trip. Creation
+        races against a concurrent bootstrapper are resolved by treating a
+        ``422`` ("Reference already exists") from ``create_git_ref`` as
+        success rather than an error -- the branch is ready either way.
+
+        Args:
+            repository: The resolved PyGithub repository.
+
+        Returns:
+            The dedicated content branch name (``_CONTENT_BRANCH``).
+
+        Raises:
+            ContentUnavailableError: If branch existence cannot be
+                determined or created due to an unexpected GitHub API
+                failure.
+        """
+        if self._branch_ready:
+            return _CONTENT_BRANCH
+        try:
+            repository.get_branch(_CONTENT_BRANCH)
+        except GithubException as exc:
+            if exc.status != _NOT_FOUND:
+                raise ContentUnavailableError(f"GitHub content branch lookup failed: {exc}") from exc
+            try:
+                base = repository.get_branch(repository.default_branch)
+                repository.create_git_ref(ref=f"refs/heads/{_CONTENT_BRANCH}", sha=base.commit.sha)
+            except GithubException as create_exc:
+                if create_exc.status not in _CONFLICT_STATUSES:
+                    raise ContentUnavailableError(
+                        f"GitHub content branch creation failed: {create_exc}"
+                    ) from create_exc
+        self._branch_ready = True
+        return _CONTENT_BRANCH
 
     def list(self, query: ContentQuery) -> SequenceType[ContentRecord]:
         records = self.list_all(query)
@@ -100,8 +160,9 @@ class _GitHubContentsStore:
 
     def list_all(self, query: ContentQuery) -> ContentRecords:
         repository = self._repository()
+        branch = self._content_branch(repository)
         try:
-            tree = repository.get_git_tree(repository.default_branch, recursive=True)
+            tree = repository.get_git_tree(branch, recursive=True)
         except GithubException as exc:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
         if tree.truncated:
@@ -131,8 +192,9 @@ class _GitHubContentsStore:
         if not references:
             return []
         repository = self._repository()
+        branch = self._content_branch(repository)
         try:
-            tree = repository.get_git_tree(repository.default_branch, recursive=True)
+            tree = repository.get_git_tree(branch, recursive=True)
         except GithubException as exc:
             raise ContentUnavailableError(f"GitHub content discovery failed: {exc}") from exc
         if tree.truncated:
@@ -144,14 +206,14 @@ class _GitHubContentsStore:
 
     def get(self, reference: ContentRef) -> ContentRecord:
         repository = self._repository()
-        return self._get(repository, self._path(reference), repository.default_branch)
+        return self._get(repository, self._path(reference), self._content_branch(repository))
 
     def get_content(self, reference: ContentRef) -> ContentRecord:
         return self.get(reference)
 
     def put(self, request: ContentWrite) -> ContentRecord:
         repository = self._repository()
-        branch = repository.default_branch
+        branch = self._content_branch(repository)
         path = self._path(request.reference)
         for _ in range(_WRITE_ATTEMPTS):
             current = self._existing(repository, path, branch)
