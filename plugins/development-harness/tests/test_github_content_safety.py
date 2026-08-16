@@ -12,6 +12,7 @@ from backlog_core.models import (
     ArtifactManifest,
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
@@ -141,6 +142,42 @@ def test_online_artifact_read_remains_available(tmp_path: Path) -> None:
     assert (record.content, record.pending, record.stale) == ("stored", False, False)
     contents.get.assert_called_once_with(reference)
     provider.store_artifact_content.assert_not_called()
+
+
+def test_pending_artifact_manifest_write_is_not_clobbered_by_empty_legacy_read(tmp_path: Path) -> None:
+    """A queued manifest write that cannot land yet must stay visible to readers.
+
+    Regression test for backlog item #2899: ``artifact_register`` reported
+    success but the artifact was invisible to ``artifact_list``/``artifact_get``
+    immediately after. Root cause -- ``GitHubGistArtifactProvider.get_manifest``
+    (the legacy fallback ``read_legacy`` uses for ``ARTIFACT_MANIFEST``) never
+    raises ``ContentNotFoundError`` for an item with no manifest data yet; it
+    returns a valid, empty manifest instead. Before the fix, ``get_content``
+    trusted that empty read as authoritative and cached it over the top of the
+    still-pending queued write (e.g. one blocked by a branch-protection ruleset
+    that rejects direct Contents API commits), erasing the just-registered
+    artifact from view.
+    """
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
+    base = ContentRecord(reference=reference, content="", revision="")
+    manifest_with_entry = '{"issue_number":1,"artifacts":[{"artifact_type":"feature-context","artifact_id":"x.md"}]}'
+    cache = FileCache(tmp_path / "github-cache")
+    cache.queue_write(base, ContentWrite(reference=reference, content=manifest_with_entry, create_only=True))
+
+    contents = MagicMock()
+    contents.get.side_effect = ContentNotFoundError("not in contents api")
+    provider = MagicMock()
+    empty_manifest = MagicMock()
+    empty_manifest.model_dump_json.return_value = '{"issue_number":1,"artifacts":[]}'
+    provider.get_manifest.return_value = empty_manifest
+    backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=contents)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    record = backend.get_content(reference)
+
+    assert (record.content, record.pending) == (manifest_with_entry, True)
+    provider.get_manifest.assert_called()
+    assert len(backend._cache.pending_mutations()) == 1
 
 
 class _UnavailablePlanPersistence:
