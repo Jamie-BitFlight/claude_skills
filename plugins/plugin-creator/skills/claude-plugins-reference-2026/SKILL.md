@@ -183,6 +183,13 @@ skills/
 - Claude can invoke them automatically based on task context
 - Skills can include supporting files alongside SKILL.md
 
+**Subdirectory Warning**: Skill directories nested under `skills/` silently fail to register — only `skills/<name>/SKILL.md` is discovered, not `skills/<group>/<name>/SKILL.md`. Subdirectory colon-namespacing (`plugin:group:skill-name`) is a `commands/` feature only; it does not extend to `skills/`.
+
+- `skills/testing/foo/SKILL.md` → **DEAD — not registered**
+- `skills/foo/SKILL.md` → `/plugin:foo` — **correct**
+
+All skill directories must sit directly under `skills/` — one level deep only. Do not create grouping subdirectories.
+
 ### Agents
 
 Plugins can provide specialized subagents for specific tasks that Claude can invoke automatically when appropriate.

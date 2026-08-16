@@ -227,6 +227,15 @@ skill-name/
 
 Supporting files can also live at the skill root (e.g., `reference.md`, `forms.md`). Reference them from SKILL.md so Claude knows what each file contains and when to load it.
 
+### Subdirectory Warning — Skills Must Be One Level Deep
+
+Skill directories nested under `skills/` silently fail to register — Claude Code only discovers `skills/<name>/SKILL.md`, not `skills/<group>/<name>/SKILL.md`. Subdirectory colon-namespacing (`plugin:group:skill-name`) is a `commands/` feature only; it does not extend to `skills/`.
+
+- `skills/testing/foo/SKILL.md` → **DEAD — not registered**
+- `skills/foo/SKILL.md` → `/plugin:foo` — **correct**
+
+All skill directories must sit directly under `skills/`. Do not create grouping subdirectories to organize related skills — this is unrelated to the "Automatic Discovery from Nested Directories" behavior below, which discovers separate `.claude/skills/` roots in subdirectories of your project, not grouping folders inside a single `skills/` directory.
+
 ### Location Priority (Highest to Lowest)
 
 1. **Managed/Enterprise** - System-level (see [managed settings](/en/permissions#managed-settings))
