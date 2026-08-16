@@ -3054,6 +3054,7 @@ def _apply_non_in_progress_status(
     item: BacklogItem,
     status: str,
     is_string_id_backend: bool,
+    has_integer_issue: bool,
     repo: str,
     result: dict[str, str | int | bool | list[str]],
     output: Output,
@@ -3061,11 +3062,16 @@ def _apply_non_in_progress_status(
     """Handle every status value other than "in-progress" for _apply_issue_status_labels.
 
     Extracted to keep _apply_issue_status_labels' cyclomatic complexity within limit.
+    Runs regardless of whether the item has a backend issue reference — the
+    terminal-status and unrecognized-value rejections below are pure input
+    validation that need no backend target; "blocked" reports a clear error
+    instead of silently no-op'ing when there is genuinely nothing to write to.
 
     Args:
         item: Resolved BacklogItem.
         status: Status string to set (non-empty, not "in-progress").
         is_string_id_backend: Whether the active backend uses string issue IDs (e.g. beads).
+        has_integer_issue: Whether ``item.issue`` parses as a numeric GitHub-style issue.
         repo: GitHub repo slug (e.g. ``"owner/repo"``).
         result: Partial result dict mutated in place with ``"status"`` / ``"error"`` keys.
         output: Output aggregator for info/warning messages.
@@ -3074,9 +3080,18 @@ def _apply_non_in_progress_status(
         if is_string_id_backend:
             if item.reference:
                 update_item_metadata(item.reference, {"metadata": {"status": "blocked"}}, output=output)
+                result["status"] = "blocked"
+            else:
+                result["error"] = "Cannot set status='blocked': item has no backend reference"
+        elif has_integer_issue:
+            try:
+                apply_status_blocked(item, repo, output=output)
+            except GithubException as e:
+                result["error"] = str(e)
+                return
+            result["status"] = "blocked"
         else:
-            apply_status_blocked(item, repo, output=output)
-        result["status"] = "blocked"
+            result["error"] = "Cannot set status='blocked': item has no issue reference"
     elif status in _TERMINAL_STATUSES:
         # done/resolved/closed are owned by resolve_item()/close_item(), which
         # record an evidence trail and actually close the backend issue.
@@ -3125,12 +3140,12 @@ def _apply_issue_status_labels(
     """
     has_integer_issue = parse_issue_number(item.issue) is not None
     is_string_id_backend = get_config().backend.issue_id_type == "string"
-
-    if not item.issue and not is_string_id_backend:
-        # No issue on an integer-ID backend — nothing to do.
-        return
+    no_backend_target = not item.issue and not is_string_id_backend
 
     if status == "in-progress":
+        if no_backend_target:
+            # No issue on an integer-ID backend — nothing to do.
+            return
         if is_string_id_backend:
             # Backend call: claim the item (e.g. bd update <id-or-title> --claim).
             apply_status_in_progress(item, repo, output=output)
@@ -3142,7 +3157,12 @@ def _apply_issue_status_labels(
             apply_status_in_progress(item, repo, output=output)
         result["status"] = "in-progress"
     elif status:
-        _apply_non_in_progress_status(item, status, is_string_id_backend, repo, result, output)
+        # Unlike "in-progress" above, these outcomes don't all require a
+        # backend target — terminal-status/unrecognized-value rejection is
+        # pure validation, so run it even when no_backend_target is True.
+        _apply_non_in_progress_status(item, status, is_string_id_backend, has_integer_issue, repo, result, output)
+    elif no_backend_target:
+        return
 
     if verified:
         if not has_integer_issue:

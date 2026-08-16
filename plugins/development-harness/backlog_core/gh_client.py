@@ -1683,10 +1683,9 @@ def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = 
         if lb.startswith("priority:"):
             result.priority = lb.split(":", 1)[1].upper()
             break
-    for lb in result.labels:
-        if lb.startswith("status:"):
-            result.status = lb.split(":", 1)[1]
-            break
+    status_labels = [lb for lb in result.labels if lb.startswith("status:")]
+    if primary_status := _pick_primary_status_label(status_labels):
+        result.status = primary_status.split(":", 1)[1]
     return True
 
 
