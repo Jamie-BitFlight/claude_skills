@@ -1395,9 +1395,26 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
             status_labels = [lbl["name"] for lbl in gh_issue["labels"] if lbl["name"].startswith("status:")]
             ms = gh_issue["milestone"]
             result[num] = IssueStatus(
-                status=status_labels[0] if status_labels else "", milestone=ms["title"] if ms else ""
+                status=_pick_primary_status_label(status_labels), milestone=ms["title"] if ms else ""
             )
     return result
+
+
+def _pick_primary_status_label(status_labels: list[str]) -> str:
+    """Pick the status label to display when an issue carries multiple ``status:*`` labels.
+
+    ``status:blocked`` is an overlay (an item can be both in-progress and
+    blocked), not a lifecycle replacement — but it must win display priority
+    over the underlying lifecycle label so a blocked item doesn't silently
+    keep showing as its prior status.
+
+    Returns:
+        ``"status:blocked"`` if present, else the first label in ``status_labels``,
+        else ``""``.
+    """
+    if "status:blocked" in status_labels:
+        return "status:blocked"
+    return status_labels[0] if status_labels else ""
 
 
 def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
@@ -1418,7 +1435,7 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         owner, repo_name = repository.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith("status:")]
-        return labels[0] if labels else ""
+        return _pick_primary_status_label(labels)
     except (BacklogError, GithubException):
         return ""
 
@@ -1553,6 +1570,59 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
         desired_ids = [id_map[n] for n in desired_names if n in id_map]
         _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
         out.info("  Status: groomed")
+    except BacklogError as e:
+        out.warn(f"  WARNING: Could not set status: {e}")
+
+
+def apply_status_blocked(item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
+    """Set GitHub issue label to status:blocked.
+
+    Adds the ``status:blocked`` label without removing other ``status:*``
+    labels (blocked is an overlay state, not a lifecycle replacement — e.g.
+    an item can be both in-progress and blocked). Auto-creates the label
+    when it does not exist (REST per ADR-004). Uses fetch-then-update
+    pattern (ADR-003) for label replacement via GraphQL. Skips gracefully
+    when the item has no issue number.
+
+    Args:
+        item: BacklogItem to mark blocked. No-op when ``item.issue`` is empty.
+        repo: Repository in ``owner/repo`` format.
+        output: Optional Output collector for status/warning messages.
+
+    Raises:
+        GithubException: On GitHub API failure other than label-not-found (404)
+            during label creation. GraphQL label-update failures emit a warning
+            via ``output`` instead of raising.
+    """
+    if not item.issue:
+        return
+    out = output or Output()
+    repository = get_github(repo)
+    if (num := parse_issue_number(item.issue)) is None:
+        msg = f"Invalid issue ref: {item.issue!r}"
+        raise ValueError(msg)
+    owner, repo_name = repository.full_name.split("/", 1)
+    issue = _fetch_issue_graphql(repository, owner, repo_name, num)
+    current_names = [lbl["name"] for lbl in issue["labels"]]
+    if "status:blocked" in current_names:
+        out.info("  Status: already blocked")
+        return
+    # Ensure status:blocked label exists — label creation stays REST (ADR-004)
+    try:
+        repository.get_label("status:blocked")
+    except GithubException as e:
+        if e.status != _HTTP_NOT_FOUND:
+            raise
+        repository.create_label(
+            name="status:blocked", color="d93f0b", description="Blocked — missing information or a decision"
+        )
+    # Add blocked without removing other status:* labels (overlay, not a transition)
+    try:
+        desired_names = [*current_names, "status:blocked"]
+        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
+        desired_ids = [id_map[n] for n in desired_names if n in id_map]
+        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
+        out.info("  Status: blocked")
     except BacklogError as e:
         out.warn(f"  WARNING: Could not set status: {e}")
 

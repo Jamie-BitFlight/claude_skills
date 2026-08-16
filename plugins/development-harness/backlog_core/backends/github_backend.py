@@ -609,6 +609,10 @@ class GitHubBackend:
         """Transition an item to groomed state on the backend."""
         gh_client.apply_status_groomed(item, repo or self._repo, output)
 
+    def apply_status_blocked(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
+        """Transition an item to blocked state on the backend."""
+        gh_client.apply_status_blocked(item, repo or self._repo, output)
+
     def sync_groomed_to_github_issue(
         self,
         repo_obj: Repository,
