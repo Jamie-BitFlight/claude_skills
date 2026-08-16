@@ -495,6 +495,9 @@ class InMemoryBackend:
     def apply_status_groomed(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """No-op — status is tracked via item metadata in this backend."""
 
+    def apply_status_blocked(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
+        """No-op — status is tracked via item metadata in this backend."""
+
     def sync_groomed_to_github_issue(
         self,
         repo_obj: Repository,

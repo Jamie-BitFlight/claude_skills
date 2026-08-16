@@ -46,6 +46,7 @@ from backlog_core.operations import (
     view_item,
 )
 from backlog_core.reconciliation import LogicalCacheRecord, ReconcilePlan, reconcile_backlog, synchronized_fingerprint
+from github import GithubException
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -902,6 +903,223 @@ class TestApplyIssueStatusLabelsBeads:
         mock_apply.assert_called_once_with(item, "", output=out)
         mock_update.assert_not_called()
         assert result.get("status") == "in-progress"
+
+    def test_status_blocked_applies_github_label_instead_of_silent_noop(self, mocker: MockerFixture) -> None:
+        """status="blocked" on a GitHub-backend item calls apply_status_blocked, not a no-op.
+
+        Tests: regression for #2905 — only "in-progress" had a dedicated branch;
+               every other status value (including "blocked") fell through with
+               no action and no error.
+        Why: work-backlog-item's RT-ICA gate calls
+             backlog_update(selector=item_ref, status='blocked') expecting it to
+             actually mark the issue blocked (via a status:blocked label) —
+             it was silently doing nothing.
+        """
+        from backlog_core.operations import _apply_issue_status_labels
+
+        mock_blocked = mocker.patch("backlog_core.operations.apply_status_blocked")
+        mock_update = mocker.patch("backlog_core.operations.update_item_metadata")
+
+        item = BacklogItem(
+            title="Blocked Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue="#9"),
+            reference="#9",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "blocked", False, "", result, out)
+
+        mock_blocked.assert_called_once_with(item, "", output=out)
+        mock_update.assert_not_called()
+        assert result.get("status") == "blocked"
+
+    def test_status_blocked_beads_writes_local_metadata(self, mocker: MockerFixture) -> None:
+        """status="blocked" on a string-ID (beads) backend writes local metadata, not a GitHub label call."""
+        from backlog_core.operations import _apply_issue_status_labels
+
+        self._make_beads_config(mocker)
+        mock_blocked = mocker.patch("backlog_core.operations.apply_status_blocked")
+        mock_update = mocker.patch("backlog_core.operations.update_item_metadata")
+
+        item = BacklogItem(
+            title="Beads Blocked Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue=""),
+            reference="bd-blocked-task",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "blocked", False, "", result, out)
+
+        mock_update.assert_called_once_with("bd-blocked-task", {"metadata": {"status": "blocked"}}, output=out)
+        mock_blocked.assert_not_called()
+        assert result.get("status") == "blocked"
+
+    def test_status_done_rejected_directs_to_resolve(self, mocker: MockerFixture) -> None:
+        """status="done" is rejected with a clear error, not silently accepted or no-op'd.
+
+        Tests: regression for #2905's original title — terminal states (done/
+               resolved/closed) are owned by resolve_item()/close_item(), which
+               record an evidence trail and actually close the backend issue.
+               Silently writing status=done here would desync local state from
+               the real (still-open) issue.
+        """
+        from backlog_core.operations import _apply_issue_status_labels
+
+        mock_update = mocker.patch("backlog_core.operations.update_item_metadata")
+
+        item = BacklogItem(
+            title="Done Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue="#9"),
+            reference="#9",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "done", False, "", result, out)
+
+        mock_update.assert_not_called()
+        error = result.get("error")
+        assert isinstance(error, str)
+        assert "backlog resolve" in error
+        assert result.get("status") is None
+
+    def test_status_unrecognized_value_reports_error(self, mocker: MockerFixture) -> None:
+        """An unrecognized status string reports an error rather than silently no-op'ing."""
+        from backlog_core.operations import _apply_issue_status_labels
+
+        mocker.patch("backlog_core.operations.update_item_metadata")
+
+        item = BacklogItem(
+            title="Bogus Status Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue="#9"),
+            reference="#9",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "bogus-status", False, "", result, out)
+
+        assert result.get("error") == "Unrecognized status value: 'bogus-status'"
+        assert result.get("status") is None
+
+    def test_status_blocked_beads_no_reference_reports_error_not_false_success(self, mocker: MockerFixture) -> None:
+        """status="blocked" on a beads item with no reference reports an error, not a false success.
+
+        Tests: regression — with item.reference falsy on a string-ID backend, no write
+               happens (update_item_metadata is never called), but the code previously
+               set result["status"] = "blocked" unconditionally anyway, silently
+               claiming success for a no-op. Same silent-failure class this PR fixes.
+        """
+        from backlog_core.operations import _apply_issue_status_labels
+
+        self._make_beads_config(mocker)
+        mock_update = mocker.patch("backlog_core.operations.update_item_metadata")
+
+        item = BacklogItem(
+            title="Beads No Reference Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue=""),
+            reference="",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "blocked", False, "", result, out)
+
+        mock_update.assert_not_called()
+        assert "error" in result
+        assert result.get("status") is None
+
+    def test_status_rejection_reached_even_with_no_backend_target(self, mocker: MockerFixture) -> None:
+        """Terminal/unrecognized status rejection fires even for a GitHub item with no issue yet.
+
+        Tests: regression — the pre-existing "no issue on an integer-ID backend" early
+               return used to exit _apply_issue_status_labels before status validation
+               ever ran, so status="done" (or any bogus value) on an unsynced item
+               silently produced no result at all — the exact silent-no-op class this
+               PR claims to fix, just gated on a different precondition than the tests
+               originally covered.
+        """
+        from backlog_core.operations import _apply_issue_status_labels
+
+        mocker.patch("backlog_core.operations.update_item_metadata")
+
+        item = BacklogItem(
+            title="Unsynced Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue=""),
+            reference="",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "done", False, "", result, out)
+
+        assert (
+            result.get("error")
+            == "status='done' must be set via 'backlog resolve' or 'backlog close', not 'backlog update'"
+        )
+
+    def test_status_blocked_no_issue_github_backend_reports_error(self, mocker: MockerFixture) -> None:
+        """status="blocked" on a GitHub-backend item with no issue reports an error, not a silent no-op."""
+        from backlog_core.operations import _apply_issue_status_labels
+
+        mock_blocked = mocker.patch("backlog_core.operations.apply_status_blocked")
+
+        item = BacklogItem(
+            title="Unsynced Blocked Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue=""),
+            reference="",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "blocked", False, "", result, out)
+
+        mock_blocked.assert_not_called()
+        assert result.get("error") == "Cannot set status='blocked': item has no issue reference"
+        assert result.get("status") is None
+
+    def test_status_blocked_github_exception_reports_error_not_uncaught(self, mocker: MockerFixture) -> None:
+        """A GithubException raised while applying the blocked label surfaces as result["error"].
+
+        Tests: regression — apply_status_blocked was called with no exception guard,
+               unlike the sibling apply_status_verified call site, so a transient
+               GitHub API failure would crash the whole backlog_update call instead
+               of degrading gracefully like every other status mutation in this file.
+        """
+        from backlog_core.operations import _apply_issue_status_labels
+
+        mocker.patch("backlog_core.operations.apply_status_blocked", side_effect=GithubException(500, "boom", None))
+
+        item = BacklogItem(
+            title="Flaky GitHub Task",
+            section="P1",
+            skip=False,
+            metadata=BacklogItemMetadata(source="test", added="2026-01-01", priority="P1", status="open", issue="#9"),
+            reference="#9",
+        )
+        result: dict[str, str | int | bool | list[str]] = {"title": item.title}
+        out = Output()
+
+        _apply_issue_status_labels(item, "blocked", False, "", result, out)
+
+        assert "error" in result
+        assert result.get("status") is None
 
 
 # ---------------------------------------------------------------------------

@@ -954,6 +954,22 @@ class SQLiteBackend:
         self._conn.commit()
 
     @_serialized_connection_operation
+    def apply_status_blocked(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
+        """Store a blocked tag on the item's issue row.
+
+        Args:
+            item: BacklogItem to update.
+            repo: Ignored.
+            output: Ignored.
+        """
+        raw_issue = getattr(item.metadata, "issue", "") or ""
+        if not raw_issue:
+            return
+        num = int(str(raw_issue).lstrip("#"))
+        self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'blocked')", (num,))
+        self._conn.commit()
+
+    @_serialized_connection_operation
     def sync_groomed_to_github_issue(
         self,
         repo_obj: Repository,

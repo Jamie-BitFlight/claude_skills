@@ -765,6 +765,18 @@ class BeadsBackend:
             output: Ignored.
         """
 
+    def apply_status_blocked(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
+        """No-op — string-ID backends get blocked status written locally.
+
+        ``operations._apply_issue_status_labels`` writes blocked status
+        directly via ``update_item_metadata`` for string-ID backends.
+
+        Args:
+            item: Ignored.
+            repo: Ignored.
+            output: Ignored.
+        """
+
     # ------------------------------------------------------------------
     # Sync / serialisation
     # ------------------------------------------------------------------
