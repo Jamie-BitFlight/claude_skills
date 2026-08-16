@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING
 
 from backlog_core.models import BacklogItem, Entry, Section, ViewItemResult
 from backlog_core.operations import _render_section_index, view_item
+from backlog_core.tests._view_test_helpers import _configure_memory_view
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -133,17 +134,22 @@ class TestRenderSectionIndex:
 class TestViewItemSectionsIndex:
     """Integration tests for sections_index via view_item(include_content=False).
 
-    Mocks parse_backlog and find_item so no filesystem or GitHub access is needed.
-    The sections_index generation path (_assemble_view_content → _render_section_index)
-    is NOT mocked — it must run against real BacklogItem.sections data to reproduce the bug.
+    Uses ``_configure_memory_view`` to back ``view_item`` with an ``InMemoryBackend``
+    seeded with the item under test, so no filesystem or GitHub access is needed. This
+    is the established pattern shared by the rest of the #2495 view test suite (see
+    ``backlog_core/tests/_view_test_helpers.py``); it patches only ``get_config`` (and
+    the backend's ``view_enrich_from_github``), letting the real ``find_item`` and
+    ``parse_issue_selector`` run against the seeded backend. The sections_index
+    generation path (_assemble_view_content → _render_section_index) is NOT mocked —
+    it must run against real BacklogItem.sections data to reproduce the bug.
     """
 
     def test_rt_ica_section_appears_in_sections_index_after_groom(self, mocker: MockerFixture) -> None:
         """sections_index from view_item must contain ``RT-ICA`` when section key is ``"RT-ICA"``.
 
         Tests: End-to-end sections_index accuracy for RT-ICA section (data loss bug).
-        How: Construct BacklogItem with sections[\"RT-ICA\"] set; mock parse_backlog and
-             find_item to return it; call view_item(include_content=False);
+        How: Construct BacklogItem with sections[\"RT-ICA\"] set; seed an InMemoryBackend
+             with it via _configure_memory_view; call view_item(include_content=False);
              assert \"RT-ICA\" in result.sections_index.
         Why: This is the exact agent-facing path. Agents call backlog_view(summary=True)
              which calls view_item(include_content=False). When sections_index lacks
@@ -152,9 +158,7 @@ class TestViewItemSectionsIndex:
         """
         # Arrange — item as the groomer would leave it
         item = _make_item_with_section("RT-ICA", content="RT-ICA analysis content")
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
-        mocker.patch("backlog_core.operations.find_item", return_value=item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=None)
+        _configure_memory_view(mocker, item=item)
 
         # Act
         result: ViewItemResult = view_item(selector="Test Backlog Item", include_content=False)
@@ -177,9 +181,7 @@ class TestViewItemSectionsIndex:
         """
         # Arrange
         item = _make_item_with_section("Reproducibility", content="Steps to reproduce the issue")
-        mocker.patch("backlog_core.operations.parse_backlog", return_value=[item])
-        mocker.patch("backlog_core.operations.find_item", return_value=item)
-        mocker.patch("backlog_core.operations.parse_issue_selector", return_value=None)
+        _configure_memory_view(mocker, item=item)
 
         # Act
         result: ViewItemResult = view_item(selector="Test Backlog Item", include_content=False)
