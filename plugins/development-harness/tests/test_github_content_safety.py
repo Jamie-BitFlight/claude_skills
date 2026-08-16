@@ -267,6 +267,59 @@ def test_fresh_online_write_discards_stale_pending_mutation_for_same_reference(t
     assert record.content == "B"
 
 
+class _LegacyPlanStore:
+    """Minimal ``_PlanPersistence`` double exposing one legacy PLAN record."""
+
+    def __init__(self, record: ContentRecord) -> None:
+        self._record = record
+
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+        return [self._record]
+
+    def get(self, reference: ContentRef) -> ContentRecord:
+        return self._record
+
+    def put(self, request: ContentWrite) -> ContentRecord:
+        raise NotImplementedError
+
+
+def test_list_content_does_not_clobber_pending_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A queued PLAN write stuck behind a conflicting legacy record must survive ``list_content()``.
+
+    Regression test for a review finding on PR #2906: ``list_content()``'s per-record
+    cache-refresh loop called ``FileCache.cache_content()`` unconditionally for every
+    legacy/online record, with no pending guard -- unlike ``get_content()``'s guarded
+    read path. A create-only write queued for a PLAN reference that conflicts with an
+    existing legacy plan-index record can never land through replay
+    (``ContentConflictError`` on every attempt), so the reference stays pending
+    forever. Before the fix, the very next ``list_content()`` call clobbered that
+    cached pending record with the older legacy content and reset ``pending`` back to
+    ``False`` -- silently discarding the caller's own unacknowledged write and
+    reopening the exact clobber bug PR #2906 fixed for ``get_content()``.
+    """
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    legacy = ContentRecord(reference=reference, content="legacy content", revision="legacy-rev")
+    contents = MagicMock()
+    contents.get.side_effect = ContentNotFoundError("not in contents api")
+    contents.list.return_value = []
+    cache = FileCache(tmp_path / "github-cache")
+    base = ContentRecord(reference=reference, content="", revision="")
+    cache.queue_write(base, ContentWrite(reference=reference, content="pending write", create_only=True))
+    backend = GitHubBackend(cache=cache, plan_persistence=_LegacyPlanStore(legacy), contents=contents)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(
+        backend,
+        "_write_online_content",
+        lambda request, cached: (_ for _ in ()).throw(ContentConflictError("stuck behind legacy record")),
+    )
+
+    backend.list_content(ContentQuery(kind=ContentKind.PLAN))
+
+    cached = backend._cache.get_content(reference)
+    assert (cached.content, cached.pending) == ("pending write", True)
+    assert len(backend._cache.pending_mutations()) == 1
+
+
 class _UnavailablePlanPersistence:
     def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
         raise OSError("GitHub unavailable")

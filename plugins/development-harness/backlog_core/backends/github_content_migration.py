@@ -355,7 +355,11 @@ class _GitHubContentCache:
         except (BacklogError, ContentUnavailableError, OSError):
             self._cache.queue_write(self._queue_base(request, cached), request)
             return self._cache.get_content(request.reference)
-        self._cache.cache_content(record)
+        # This write just landed directly against the provider for this exact
+        # reference, so it is authoritative over whatever pending mutation the
+        # cache may still be holding for it -- acknowledge_pending=True lets it
+        # supersede that entry instead of being silently refused.
+        self._cache.cache_content(record, acknowledge_pending=True)
         self._cache.discard_pending(request.reference)
         return record
 

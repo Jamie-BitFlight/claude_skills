@@ -46,11 +46,33 @@ class FileCache:
                 return record.model_copy(update={"stale": stale})
         raise ContentUnavailableError(str(reference.model_dump(mode="json")))
 
-    def cache_content(self, record: ContentRecord) -> None:
-        """Durably replace one provider-observed content record."""
-        self._state.transaction(
-            lambda state: (state.model_copy(update={"records": self._replace_record(state.records, record)}), None)
-        )
+    def cache_content(self, record: ContentRecord, *, acknowledge_pending: bool = False) -> None:
+        """Durably replace one provider-observed content record.
+
+        A cached record already marked ``pending`` represents a queued mutation
+        whose content and ``pending`` flag must survive routine online reads
+        (``list_content``, ``get_content``) until that mutation is acknowledged
+        -- otherwise a discovery read can silently clobber an unacknowledged
+        write with older provider content. This method enforces that invariant
+        directly so every caller gets it for free instead of duplicating a
+        guard clause.
+
+        Args:
+            record: The provider-observed content record to store.
+            acknowledge_pending: Pass ``True`` only when this call itself is
+                landing the authoritative write for ``record.reference`` (a
+                direct foreground write that supersedes whatever was queued).
+                Defaults to ``False`` so a routine cache-refresh read never
+                overwrites a still-pending reference.
+        """
+
+        def replace(state: _CacheState) -> tuple[_CacheState, None]:
+            existing = next((entry for entry in state.records if entry.reference == record.reference), None)
+            if existing is not None and existing.pending and not acknowledge_pending:
+                return state, None
+            return state.model_copy(update={"records": self._replace_record(state.records, record)}), None
+
+        self._state.transaction(replace)
 
     def queue_write(self, record: ContentRecord, write: ContentWrite) -> PendingMutation:
         """Atomically cache an offline write and append its deduplicated mutation.
@@ -100,7 +122,7 @@ class FileCache:
         """Return pending mutations in durable insertion order."""
         return list(self._load_state().pending)
 
-    def discard_pending(self, reference: ContentRef) -> None:
+    def discard_pending(self, reference: ContentRef) -> bool:
         """Drop any queued mutation for a reference without touching cached content.
 
         Called after a direct online write for a reference lands successfully --
@@ -108,15 +130,17 @@ class FileCache:
         reference (``put_content`` always calls ``replay_pending`` first), so a
         mutation still queued for it afterward is stale, superseded intent that
         must never be replayed against the fresher record it would land on top of.
+
+        Returns:
+            ``True`` if a queued mutation for ``reference`` was found and
+            removed, ``False`` if nothing was queued for it.
         """
-        self._state.transaction(
-            lambda state: (
-                state.model_copy(
-                    update={"pending": [entry for entry in state.pending if entry.write.reference != reference]}
-                ),
-                None,
-            )
-        )
+
+        def discard(state: _CacheState) -> tuple[_CacheState, bool]:
+            remaining = [entry for entry in state.pending if entry.write.reference != reference]
+            return state.model_copy(update={"pending": remaining}), len(remaining) != len(state.pending)
+
+        return self._state.transaction(discard)
 
     def _queue_work_item(self, key: str, item: BacklogItem) -> _PendingWorkItemMutation:
         payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
