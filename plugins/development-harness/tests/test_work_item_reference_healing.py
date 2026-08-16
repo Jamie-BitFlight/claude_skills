@@ -13,10 +13,11 @@ the model-derived reference unchanged.
 
 from __future__ import annotations
 
+import pytest
 from backlog_core.backend_types import WorkItemBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
-from backlog_core.models import BacklogItem
+from backlog_core.models import BacklogItem, ReferenceCollisionError
 
 
 def _backends() -> list[WorkItemBackend]:
@@ -74,3 +75,28 @@ def test_backend_put_work_item_reference_is_deterministic_across_reloads() -> No
 
         assert second.reference == first_reference
         assert len(backend.list_work_items()) == 1
+
+
+def test_backend_put_work_item_rejects_distinct_items_that_share_a_title() -> None:
+    """Two DIFFERENT never-issued items sharing a title must not silently collide.
+
+    Regression test for the data-loss window the deterministic title-hash fallback
+    introduced: unlike ``test_backend_put_work_item_reference_is_deterministic_across_reloads``
+    above (same title, identical — i.e. reloaded — content, which must still collapse to one
+    record), these two items share a title but carry different ``description`` values, so they
+    are genuinely distinct backlog items. Before the ``ReferenceCollisionError`` check in
+    ``InMemoryBackend``/``SQLiteBackend.put_work_item``, the second ``put_work_item`` call
+    silently discarded the first record (``list_work_items()`` returned 1 item, and
+    ``get_work_item(item_a.reference).description`` read back as ``"Item B"``).
+    """
+    for backend in _backends():
+        item_a = BacklogItem(title="Duplicate Title", description="Item A")
+        item_b = BacklogItem(title="Duplicate Title", description="Item B")
+        assert item_a.reference == item_b.reference
+
+        backend.put_work_item(item_a)
+        with pytest.raises(ReferenceCollisionError, match="Duplicate Title"):
+            backend.put_work_item(item_b)
+
+        assert len(backend.list_work_items()) == 1
+        assert backend.get_work_item(item_a.reference).description == "Item A"

@@ -2944,6 +2944,9 @@ def close_item(
     today()
 
     reference = item.reference
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
@@ -3019,6 +3022,9 @@ def resolve_item(
     today()
 
     reference = item.reference
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
@@ -3225,6 +3231,9 @@ def _apply_groomed_update(
         BacklogError: If item has no file_path.
         ValidationError: If resolved single-section content is empty.
     """
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not item.reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
@@ -3484,6 +3493,9 @@ def strike_entry(
     item = find_item(items, selector)
     if not item:
         raise ItemNotFoundError(selector)
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not item.reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)

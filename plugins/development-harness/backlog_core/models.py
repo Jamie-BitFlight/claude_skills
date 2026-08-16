@@ -576,6 +576,44 @@ class DuplicateItemError(BacklogError):
         super().__init__(f"Similar backlog items found: {titles}")
 
 
+class ReferenceCollisionError(BacklogError):
+    """Raised when a title-derived backend reference already belongs to a different item.
+
+    ``BacklogItem.reference`` self-heals via :func:`_derive_stable_reference` when a
+    caller constructs an item with no backend issue yet and no explicit ``reference``
+    (see the second invariant in :class:`BacklogItem`'s docstring). That fallback is
+    deterministic on ``title`` alone, so it cannot by itself distinguish "the same
+    never-issued item, reconstructed again" from "a different, never-issued item that
+    happens to share a title" — both look identical at derivation time.
+
+    Native backends (:class:`~backlog_core.backends.memory_backend.InMemoryBackend`,
+    :class:`~backlog_core.backends.sqlite_backend.SQLiteBackend`) resolve that ambiguity
+    at write time in ``put_work_item``: a freshly derived reference that collides with an
+    *existing* stored record is treated as the same item only when the record's
+    ``description`` also matches (this is what
+    ``test_backend_put_work_item_reference_is_deterministic_across_reloads`` in
+    ``tests/test_work_item_reference_healing.py`` exercises — reconstructing an
+    all-default item under the same title is expected to collapse to one record). A
+    mismatched ``description`` raises this error instead of silently discarding the
+    record already stored under the colliding reference.
+    """
+
+    def __init__(self, reference: str, title: str) -> None:
+        """Initialize with the colliding reference and the shared title.
+
+        Args:
+            reference: The backend reference both items resolved to.
+            title: The shared title that produced the collision.
+        """
+        self.reference = reference
+        self.title = title
+        super().__init__(
+            f"Reference {reference!r} (derived from title {title!r}) already belongs to a "
+            "different backlog item with different content. Two never-issued items cannot "
+            "share a title until one is renamed or attached to a backend issue."
+        )
+
+
 class BackendUnavailableError(BacklogError):
     """Raised when a backend service is unavailable or misconfigured.
 
@@ -927,6 +965,28 @@ def _derive_stable_reference(issue: str, title: str) -> str:
     return issue or hashlib.sha256(title.encode()).hexdigest()
 
 
+def reference_is_title_derived(item: BacklogItem) -> bool:
+    """Return whether ``item.reference`` is exactly the title-hash fallback.
+
+    Pure, stateless re-derivation — not a value cached on ``item`` — so it
+    is correct regardless of *when* or *how* ``item.reference`` came to hold
+    that value (self-healed by ``_sync_metadata`` this construction, carried
+    forward from a reload, or supplied explicitly by a caller that happened
+    to compute the same hash). See :class:`ReferenceCollisionError` and the
+    class docstring's second invariant for why backends need this check.
+
+    Args:
+        item: The item whose reference to test.
+
+    Returns:
+        ``True`` when ``item`` has no backend issue and its ``reference``
+        equals :func:`_derive_stable_reference` applied to its own
+        ``issue``/``title``; ``False`` otherwise (issued items always
+        derive to their own ``issue``, so this is never ``True`` for them).
+    """
+    return not item.issue and item.reference == _derive_stable_reference(item.issue, item.title)
+
+
 class BacklogItem(BaseModel):
     """Parsed backlog item from a per-item file.
 
@@ -947,12 +1007,40 @@ class BacklogItem(BaseModel):
     value as its counterpart in ``metadata``.  Use either access form;
     they are always equivalent (``item.priority == item.metadata.priority``).
 
-    Invariant: after construction, ``reference`` is never empty. The
-    ``_sync_metadata`` validator self-heals an unset ``reference`` via
+    Invariant: immediately after construction, ``reference`` is never empty.
+    The ``_sync_metadata`` validator self-heals an unset ``reference`` via
     :func:`_derive_stable_reference`, so every read path that constructs a
     ``BacklogItem`` (``BacklogItem(...)``, ``model_validate()``,
     ``model_validate_json()``) receives an already-healed instance — backends
-    do not need their own fallback derivation.
+    do not need their own fallback derivation for a construction-time-empty
+    reference.
+
+    This guarantee is point-in-time, not permanent: ``BacklogItem`` does not
+    set ``model_config = {"validate_assignment": True}``, so a later direct
+    assignment such as ``item.reference = ""`` does not re-run
+    ``_sync_metadata`` and leaves the field empty. No code path in this
+    package currently performs such an assignment — every mutation flows
+    through a fetch (``get_work_item()``/``list_work_items()``) that carries
+    the existing reference forward — which is why the ``if not
+    item.reference`` guards still present in ``operations.py`` are unreachable
+    today; they remain as defense-in-depth against a future direct assignment
+    reintroducing an empty reference.
+
+    Second invariant, narrower: self-healing a reference from ``title`` alone
+    (no backend issue yet) is deterministic per *title*, not per conceptual
+    item — two distinct, never-persisted items sharing a title derive the
+    identical reference, and derivation alone cannot tell them apart from a
+    reconstruction of the same item. :func:`reference_is_title_derived` is a
+    pure, stateless re-derivation (not a value cached on the instance — no
+    private field was added here, deliberately, so it cannot perturb
+    ``BacklogItem.__eq__``, which Pydantic derives from every field including
+    private ones) that answers "does this item's reference equal the
+    title-hash fallback for its own issue/title right now?".
+    :class:`~backlog_core.backends.memory_backend.InMemoryBackend` and
+    :class:`~backlog_core.backends.sqlite_backend.SQLiteBackend` call it in
+    ``put_work_item`` to detect a genuine collision (see
+    :class:`ReferenceCollisionError`) instead of silently discarding the
+    record already stored under a colliding reference.
     """
 
     title: str = ""

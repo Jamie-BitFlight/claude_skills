@@ -50,7 +50,9 @@ from backlog_core.models import (
     IssueStatus,
     MergeResult,
     PullRequestRef,
+    ReferenceCollisionError,
     ViewItemResult,
+    reference_is_title_derived,
 )
 
 __all__ = ["InMemoryBackend"]
@@ -152,7 +154,18 @@ class InMemoryBackend:
         ``reference`` at construction time, so ``model_validate()`` below
         already guarantees a non-empty, deterministic key — no fallback
         derivation is needed here.
+
+        Raises:
+            ReferenceCollisionError: When ``item.reference`` is the title-hash
+                fallback (no backend issue yet — see
+                :func:`~backlog_core.models.reference_is_title_derived`) and a
+                different, already-stored item occupies that reference. See
+                :class:`~backlog_core.models.ReferenceCollisionError` for why
+                the check is scoped to derived references only.
         """
+        existing = self._work_items.get(item.reference)
+        if existing is not None and reference_is_title_derived(item) and existing.description != item.description:
+            raise ReferenceCollisionError(item.reference, item.title)
         canonical = BacklogItem.model_validate(item.model_dump())
         canonical.file_path = item.file_path
         canonical.skip = item.skip
