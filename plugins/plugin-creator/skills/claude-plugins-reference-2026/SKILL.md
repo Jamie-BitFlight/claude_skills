@@ -183,6 +183,8 @@ skills/
 - Claude can invoke them automatically based on task context
 - Skills can include supporting files alongside SKILL.md
 
+[Skill subdirectory warning](../../docs/skill-subdirectory-warning.md) — nested skill directories silently fail to register, with a wrong/right example; read before organizing related skills into grouping subdirectories.
+
 ### Agents
 
 Plugins can provide specialized subagents for specific tasks that Claude can invoke automatically when appropriate.

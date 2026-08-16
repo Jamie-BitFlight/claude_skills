@@ -227,6 +227,10 @@ skill-name/
 
 Supporting files can also live at the skill root (e.g., `reference.md`, `forms.md`). Reference them from SKILL.md so Claude knows what each file contains and when to load it.
 
+### Subdirectory Warning — Skills Must Be One Level Deep
+
+[Skill subdirectory warning](../../docs/skill-subdirectory-warning.md) — nested skill directories silently fail to register, with a wrong/right example; read before organizing related skills into grouping subdirectories. Unrelated to the "Automatic Discovery from Nested Directories" behavior below, which discovers separate `.claude/skills/` roots in subdirectories of your project, not grouping folders inside a single `skills/` directory.
+
 ### Location Priority (Highest to Lowest)
 
 1. **Managed/Enterprise** - System-level (see [managed settings](/en/permissions#managed-settings))
