@@ -419,6 +419,10 @@ Load these documents based on what you are doing. They contain the system design
 - Load [Backlog Item Lifecycle](./docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation through closure
 - Load [Backend Providers](./docs/backend-providers.md) — pluggable backend abstractions, GitHub/GitLab/Linear capabilities
 
+**Modifying `backlog_core/` internals — any backend implementation, GitHub content/CAS storage, offline queueing, or collaborator boundaries within `GitHubBackend`:**
+
+- Load [backlog_core/ARCHITECTURE.md](./backlog_core/ARCHITECTURE.md) — the authoritative module design doc: per-collaborator responsibilities, the GitHub writable-records design (CAS-on-blob-SHA, envelope validation, fail-closed semantics, why this replaced an earlier Gist-backed store), offline/replay policy, and the reasoning behind decisions that read as arbitrary without it. Read this BEFORE diagnosing a bug or proposing a fix anywhere in `backlog_core/models.py`, `backlog_core/operations.py`, or `backlog_core/backends/*.py` — this file already answers "why does it work this way" for most of what looks, from the code alone, like an odd or missing design choice. A recurring failure shape across independently-diagnosed bugs (e.g. "a queued mutation never gets acknowledged after the thing it was waiting for already happened," seen 3 times in one session before this doc was read) is itself a signal to stop and read this file rather than keep patching instances.
+
 **Modifying artifact handling, divergence detection, or plan management:**
 
 - Load [Plan Artifact Lifecycle](./docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence classification, annotation rules
