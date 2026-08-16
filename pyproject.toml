@@ -68,6 +68,7 @@ addopts = [
 ]
 asyncio_mode = "auto"
 markers = [
+    "critical: marks tests covering critical-path code requiring stronger correctness guarantees (e.g. round-trip property tests)",
     "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "demos: marks tests as demonstration tests",
     "e2e: marks tests as end-to-end tests",
