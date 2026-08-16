@@ -422,6 +422,28 @@ class _GitHubWorkItemSync:
         return heads, comments
 
 
+def _stable_reference(item: BacklogItem) -> str:
+    """Return the opaque backend reference an item should carry.
+
+    ``BacklogItem.reference`` is not kept in sync with ``metadata.issue`` by
+    the model's ``_sync_metadata`` validator (unlike ``priority``/``issue``
+    and the other backward-compatible flat fields) — nothing guarantees the
+    two stay aligned once a record is persisted. A record written before this
+    field was populated consistently (or one round-tripped through a code
+    path that never set it) can reach disk with ``reference=""`` while
+    ``metadata.issue`` is a real GitHub issue reference. Every write already
+    self-heals through this exact fallback (see ``put_work_item``); reads
+    must apply it identically so a stale on-disk record recovers on next
+    load instead of tripping every ``reference``-gated write forever.
+
+    Returns:
+        ``item.reference`` when set, else ``item.issue``, else a stable hash
+        of the title as a last-resort opaque key for an item never linked to
+        a provider issue.
+    """
+    return item.reference or item.issue or hashlib.sha256(item.title.encode()).hexdigest()
+
+
 class _GitHubReconciliation:
     """Drive the reconciliation cycle between the private cache and the provider."""
 
@@ -459,7 +481,7 @@ class _GitHubReconciliation:
 
     def put_work_item(self, item: BacklogItem) -> None:
         """Persist a work-item intent for provider reconciliation."""
-        reference = item.reference or item.issue or hashlib.sha256(item.title.encode()).hexdigest()
+        reference = _stable_reference(item)
         self._cache._queue_work_item(reference, item.model_copy(update={"reference": reference}))
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
@@ -528,12 +550,23 @@ class _GitHubReconciliation:
     ) -> list[LogicalCacheRecord]:
         """Merge cached work-item snapshots with queued mutations.
 
+        Snapshot items are healed through :func:`_stable_reference` before
+        being keyed. Without this, a snapshot persisted with
+        ``reference=""`` (see :func:`_stable_reference` docstring) collides
+        with every other unhealed snapshot under the same empty-string key —
+        silently dropping all but the last one loaded — and separately
+        leaves ``reference``-gated writes (groom, resolve) permanently
+        broken for that item, since nothing else ever revisits an
+        already-cached record to repair it.
+
         Returns:
             One logical cache record per work-item reference.
         """
-        records_by_reference = {
-            item.reference: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
-        }
+        records_by_reference: dict[str, LogicalCacheRecord] = {}
+        for key, item in self._cache._work_item_snapshots():
+            reference = _stable_reference(item)
+            healed_item = item if reference == item.reference else item.model_copy(update={"reference": reference})
+            records_by_reference[reference] = LogicalCacheRecord(key=key, item=healed_item)
         for mutation in (
             pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
         ):
