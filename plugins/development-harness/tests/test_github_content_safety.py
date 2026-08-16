@@ -7,11 +7,13 @@ from unittest.mock import MagicMock
 
 import pytest
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     ArtifactManifest,
     ContentConflictError,
     ContentKind,
+    ContentNotFoundError,
     ContentQuery,
     ContentRecord,
     ContentRef,
@@ -141,6 +143,181 @@ def test_online_artifact_read_remains_available(tmp_path: Path) -> None:
     assert (record.content, record.pending, record.stale) == ("stored", False, False)
     contents.get.assert_called_once_with(reference)
     provider.store_artifact_content.assert_not_called()
+
+
+def test_pending_artifact_manifest_write_is_not_clobbered_by_empty_legacy_read(tmp_path: Path) -> None:
+    """A queued manifest write that cannot land yet must stay visible to readers.
+
+    Regression test for backlog item #2899: ``artifact_register`` reported
+    success but the artifact was invisible to ``artifact_list``/``artifact_get``
+    immediately after. Root cause -- ``GitHubGistArtifactProvider.get_manifest``
+    (the legacy fallback ``read_legacy`` uses for ``ARTIFACT_MANIFEST``) never
+    raises ``ContentNotFoundError`` for an item with no manifest data yet; it
+    returns a valid, empty manifest instead. Before the fix, ``get_content``
+    trusted that empty read as authoritative and cached it over the top of the
+    still-pending queued write (e.g. one blocked by a branch-protection ruleset
+    that rejects direct Contents API commits), erasing the just-registered
+    artifact from view.
+    """
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
+    base = ContentRecord(reference=reference, content="", revision="")
+    manifest_with_entry = '{"issue_number":1,"artifacts":[{"artifact_type":"feature-context","artifact_id":"x.md"}]}'
+    cache = FileCache(tmp_path / "github-cache")
+    cache.queue_write(base, ContentWrite(reference=reference, content=manifest_with_entry, create_only=True))
+
+    contents = MagicMock()
+    contents.get.side_effect = ContentNotFoundError("not in contents api")
+    provider = MagicMock()
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
+    backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=contents)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    record = backend.get_content(reference)
+
+    assert (record.content, record.pending) == (manifest_with_entry, True)
+    provider.get_manifest.assert_called()
+    assert len(backend._cache.pending_mutations()) == 1
+
+
+def test_pending_write_still_surfaces_integrity_error_on_underlying_reference(tmp_path: Path) -> None:
+    """A stuck pending write must not mask a genuine remote integrity error.
+
+    Regression test for a visibility gap introduced by the pending-guard fix
+    above: routing straight to the stale cache once ``cached.pending`` is
+    True skips ``_read_online_content`` entirely, so a real
+    ``_GitHubContentIntegrityError`` on that same reference (e.g. a truncated
+    or malformed Contents API blob) never runs and is silently withheld from
+    every ``get_content`` caller for as long as the write stays stuck.
+    """
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
+    base = ContentRecord(reference=reference, content="", revision="")
+    cache = FileCache(tmp_path / "github-cache")
+    cache.queue_write(base, ContentWrite(reference=reference, content="queued", create_only=True))
+
+    contents = MagicMock()
+    contents.get.side_effect = _GitHubContentIntegrityError("corrupt blob")
+    provider = MagicMock()
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
+    backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=contents)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+
+    with pytest.raises(_GitHubContentIntegrityError):
+        backend.get_content(reference)
+
+
+def test_fresh_online_write_discards_stale_pending_mutation_for_same_reference(tmp_path: Path) -> None:
+    """A landed direct write must dequeue any stale pending write for its reference.
+
+    Regression test: ``put_content``'s online-write success path previously
+    never touched ``state.pending``, so a queued create-only write that lost
+    its first replay attempt (e.g. against a legacy record) stayed queued
+    forever. Using a persistence double that -- unlike the real
+    ``_GitHubContentsStore`` -- performs no create-only/revision
+    self-validation on ``put`` isolates the offline-mutation-cache contract
+    itself: on the *next* replay this stale write would silently land and
+    clobber content that a fresh, unconditional write had already
+    superseded, unless the cache dequeues it as soon as that fresh write
+    lands.
+    """
+
+    class _NaiveContentsStore:
+        """Minimal, non-validating ``_ContentPersistence`` double.
+
+        The `_ContentPersistence` Protocol's ``put`` contract does not itself
+        require create-only/revision validation -- only the concrete
+        production `_GitHubContentsStore` happens to add it. This double
+        omits that defense-in-depth deliberately, to prove the offline cache
+        contract stays safe without relying on it.
+        """
+
+        def __init__(self) -> None:
+            self._record: ContentRecord | None = None
+
+        def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+            return [self._record] if self._record is not None else []
+
+        def get(self, reference: ContentRef) -> ContentRecord:
+            if self._record is None:
+                raise ContentNotFoundError(str(reference))
+            return self._record
+
+        def put(self, request: ContentWrite) -> ContentRecord:
+            self._record = ContentRecord(reference=request.reference, content=request.content, revision="rev")
+            return self._record
+
+    reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
+    cache = FileCache(tmp_path / "github-cache")
+    provider = MagicMock()
+    provider.get_manifest.return_value = ArtifactManifest(issue_number=1)
+    naive_store = _NaiveContentsStore()
+    backend = GitHubBackend(cache=cache, artifact_provider=provider, contents=naive_store)
+
+    backend.try_get_github = MagicMock(return_value=None)
+    backend.put_content(ContentWrite(reference=reference, content="A", create_only=True))
+    assert len(backend._cache.pending_mutations()) == 1
+
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    written = backend.put_content(ContentWrite(reference=reference, content="B"))
+
+    assert written.content == "B"
+    assert backend._cache.pending_mutations() == []
+
+    record = backend.get_content(reference)
+
+    assert record.content == "B"
+
+
+class _LegacyPlanStore:
+    """Minimal ``_PlanPersistence`` double exposing one legacy PLAN record."""
+
+    def __init__(self, record: ContentRecord) -> None:
+        self._record = record
+
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+        return [self._record]
+
+    def get(self, reference: ContentRef) -> ContentRecord:
+        return self._record
+
+    def put(self, request: ContentWrite) -> ContentRecord:
+        raise NotImplementedError
+
+
+def test_list_content_does_not_clobber_pending_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A queued PLAN write stuck behind a conflicting legacy record must survive ``list_content()``.
+
+    Regression test for a review finding on PR #2906: ``list_content()``'s per-record
+    cache-refresh loop called ``FileCache.cache_content()`` unconditionally for every
+    legacy/online record, with no pending guard -- unlike ``get_content()``'s guarded
+    read path. A create-only write queued for a PLAN reference that conflicts with an
+    existing legacy plan-index record can never land through replay
+    (``ContentConflictError`` on every attempt), so the reference stays pending
+    forever. Before the fix, the very next ``list_content()`` call clobbered that
+    cached pending record with the older legacy content and reset ``pending`` back to
+    ``False`` -- silently discarding the caller's own unacknowledged write and
+    reopening the exact clobber bug PR #2906 fixed for ``get_content()``.
+    """
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    legacy = ContentRecord(reference=reference, content="legacy content", revision="legacy-rev")
+    contents = MagicMock()
+    contents.get.side_effect = ContentNotFoundError("not in contents api")
+    contents.list.return_value = []
+    cache = FileCache(tmp_path / "github-cache")
+    base = ContentRecord(reference=reference, content="", revision="")
+    cache.queue_write(base, ContentWrite(reference=reference, content="pending write", create_only=True))
+    backend = GitHubBackend(cache=cache, plan_persistence=_LegacyPlanStore(legacy), contents=contents)
+    backend.try_get_github = MagicMock(return_value=MagicMock())
+    monkeypatch.setattr(
+        backend,
+        "_write_online_content",
+        lambda request, cached: (_ for _ in ()).throw(ContentConflictError("stuck behind legacy record")),
+    )
+
+    backend.list_content(ContentQuery(kind=ContentKind.PLAN))
+
+    cached = backend._cache.get_content(reference)
+    assert (cached.content, cached.pending) == ("pending write", True)
+    assert len(backend._cache.pending_mutations()) == 1
 
 
 class _UnavailablePlanPersistence:
