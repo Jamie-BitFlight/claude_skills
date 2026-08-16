@@ -37,8 +37,8 @@ which silently dropped unknown top-level keys (e.g. a historical `scope:` field 
 never a real `Task`/`TaskDefinition` field, even before the migration).
 
 Canonical invocation prefix used throughout `docs/TASK_FILE_FORMAT.md`:
-`uv run plugins/development-harness/sam_schema/cli.py` — not a bare `sam` console script
-(the plugin's own `pyproject.toml` console-script entry is a pre-existing, unverified
-artifact; don't rely on `uv run sam` resolving).
+`uv run plugins/development-harness/sam_schema/cli.py` — not a bare `sam` console script.
+There is no `sam` binary at all anymore (deliberately removed 2026-08-06, see
+[[project_sam_console_script_cwd_dependence]]) — always invoke by path to `cli.py`.
 
 See also [[feedback-sam-task-create-hits-live-github]].

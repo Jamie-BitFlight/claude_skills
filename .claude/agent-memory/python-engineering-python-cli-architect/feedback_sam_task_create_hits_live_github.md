@@ -5,8 +5,9 @@ metadata:
   type: feedback
 ---
 
-`sam plan sam-task-create` (`sam_plan.sam_task_create` → `dh_core.operations.create_sam_task`
-→ `backlog_core.operations.create_sam_task`) is not a pure/local command — it calls the
+`sam_schema/cli.py plan sam-task-create` (`sam_plan.sam_task_create` →
+`dh_core.operations.create_sam_task` → `backlog_core.operations.create_sam_task`) is not a
+pure/local command — it calls the
 GitHub REST/GraphQL API to create a real issue and link it as a sub-issue as soon as it's
 invoked, with no dry-run or local-backend flag. This repo's sessions have `GITHUB_TOKEN`
 set in the environment by convention (see AGENTS.md "GitHub CLI Conventions"), so a
