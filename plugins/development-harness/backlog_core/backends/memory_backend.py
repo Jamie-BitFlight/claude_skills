@@ -146,12 +146,17 @@ class InMemoryBackend:
             raise KeyError(reference) from None
 
     def put_work_item(self, item: BacklogItem) -> None:
-        """Upsert a work item under its stable reference."""
-        item.reference = item.reference or item.issue or uuid.uuid4().hex
+        """Upsert a work item under its stable reference.
+
+        ``BacklogItem``'s ``_sync_metadata`` validator self-heals an unset
+        ``reference`` at construction time, so ``model_validate()`` below
+        already guarantees a non-empty, deterministic key — no fallback
+        derivation is needed here.
+        """
         canonical = BacklogItem.model_validate(item.model_dump())
         canonical.file_path = item.file_path
         canonical.skip = item.skip
-        self._work_items[item.reference] = canonical
+        self._work_items[canonical.reference] = canonical
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return the requested bounded page from in-memory content."""

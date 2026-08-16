@@ -21,7 +21,6 @@ remains the single composition root and the substitutable seam.
 
 from __future__ import annotations
 
-import hashlib
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -458,9 +457,16 @@ class _GitHubReconciliation:
         raise KeyError(reference)
 
     def put_work_item(self, item: BacklogItem) -> None:
-        """Persist a work-item intent for provider reconciliation."""
-        reference = item.reference or item.issue or hashlib.sha256(item.title.encode()).hexdigest()
-        self._cache._queue_work_item(reference, item.model_copy(update={"reference": reference}))
+        """Persist a work-item intent for provider reconciliation.
+
+        ``item.reference`` is guaranteed non-empty by
+        :class:`~backlog_core.models.BacklogItem`'s ``_sync_metadata``
+        validator, which self-heals it at construction time — no fallback
+        derivation is needed here. A copy is queued (rather than ``item``
+        itself) so a caller mutating its own ``item`` after this call cannot
+        retroactively alter the queued mutation.
+        """
+        self._cache._queue_work_item(item.reference, item.model_copy())
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.

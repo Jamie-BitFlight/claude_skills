@@ -218,13 +218,16 @@ class SQLiteBackend:
 
     @_serialized_connection_operation
     def put_work_item(self, item: BacklogItem) -> None:
-        """Upsert a work item under its stable reference."""
-        item.reference = item.reference or item.issue or uuid.uuid4().hex
-        reference = item.reference
+        """Upsert a work item under its stable reference.
+
+        ``item.reference`` is guaranteed non-empty by ``BacklogItem``'s
+        ``_sync_metadata`` validator, which self-heals it at construction
+        time — no fallback derivation is needed here.
+        """
         self._conn.execute(
             "INSERT INTO work_item_records (reference, content) VALUES (?, ?) "
             "ON CONFLICT(reference) DO UPDATE SET content = excluded.content",
-            (reference, item.model_dump_json()),
+            (item.reference, item.model_dump_json()),
         )
         self._conn.commit()
 

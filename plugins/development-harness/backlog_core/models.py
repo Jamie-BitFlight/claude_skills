@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import hashlib
 import logging
 import os
 import re
@@ -893,6 +894,39 @@ class BacklogItemMetadata(BaseModel):
         return v
 
 
+def _derive_stable_reference(issue: str, title: str) -> str:
+    """Return the stable backend reference a work item should carry.
+
+    ``BacklogItem.reference`` is the opaque key every backend (GitHub cache
+    records, SQLite primary keys, in-memory dict keys) uses to identify a
+    work item. Unlike ``priority``/``issue`` and the other backward-compatible
+    flat fields, ``reference`` has no metadata counterpart to synchronise
+    with — a raw record can reach construction with ``reference=""`` (a
+    freshly created item with no backend issue yet, or a stale on-disk
+    record written before this field was populated consistently).
+
+    The fallback must be deterministic, not random (e.g. not ``uuid4()``):
+    a stable key ensures the same conceptual item — same title, reloaded or
+    reconstructed independently — always resolves to the same reference. A
+    random fallback would mint a new, unmatched key on every reload of a
+    persisted record, permanently orphaning it from reference-gated
+    operations (groom, resolve) that expect repeated loads of the same
+    record to agree on its key. This is the shared root cause behind a
+    production incident where a GitHub-backend record's cached reference
+    went stale as empty, breaking every subsequent groom/resolve call for
+    that item.
+
+    Args:
+        issue: The item's resolved backend issue identifier, if any.
+        title: The item's title, used as a last-resort deterministic key
+            when no issue identifier is available.
+
+    Returns:
+        ``issue`` when set, else a SHA-256 hex digest of ``title``.
+    """
+    return issue or hashlib.sha256(title.encode()).hexdigest()
+
+
 class BacklogItem(BaseModel):
     """Parsed backlog item from a per-item file.
 
@@ -912,6 +946,13 @@ class BacklogItem(BaseModel):
     Invariant: after construction, every flat accessor field has the same
     value as its counterpart in ``metadata``.  Use either access form;
     they are always equivalent (``item.priority == item.metadata.priority``).
+
+    Invariant: after construction, ``reference`` is never empty. The
+    ``_sync_metadata`` validator self-heals an unset ``reference`` via
+    :func:`_derive_stable_reference`, so every read path that constructs a
+    ``BacklogItem`` (``BacklogItem(...)``, ``model_validate()``,
+    ``model_validate_json()``) receives an already-healed instance — backends
+    do not need their own fallback derivation.
     """
 
     title: str = ""
@@ -1038,6 +1079,13 @@ class BacklogItem(BaseModel):
         self.files = self.metadata.files
         self.suggested_location = self.metadata.suggested_location
         self.topic = self.metadata.topic
+
+        # reference has no metadata counterpart to sync with (see class
+        # docstring) — self-heal it from the now-finalised issue, or a
+        # deterministic title hash, so every constructed BacklogItem carries
+        # a non-empty reference regardless of caller.
+        if not self.reference:
+            self.reference = _derive_stable_reference(self.issue, self.title)
 
         return self
 
