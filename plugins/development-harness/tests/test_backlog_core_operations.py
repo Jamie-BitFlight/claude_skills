@@ -986,8 +986,9 @@ class TestApplyIssueStatusLabelsBeads:
         _apply_issue_status_labels(item, "done", False, "", result, out)
 
         mock_update.assert_not_called()
-        assert "error" in result
-        assert "backlog resolve" in result["error"]
+        error = result.get("error")
+        assert isinstance(error, str)
+        assert "backlog resolve" in error
         assert result.get("status") is None
 
     def test_status_unrecognized_value_reports_error(self, mocker: MockerFixture) -> None:
