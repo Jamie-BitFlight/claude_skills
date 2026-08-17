@@ -13,7 +13,10 @@
         "run",
         "--script",
         "${CLAUDE_PLUGIN_ROOT}/mcp/experiment-registry/server.py"
-      ]
+      ],
+      "env": {
+        "CLAUDE_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}"
+      }
     }
   }
 }
