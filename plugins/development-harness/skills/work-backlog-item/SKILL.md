@@ -117,7 +117,7 @@ When invoked with no arguments, shows an interactive browser. When invoked with 
 
 ## Arguments
 
-**Agent Preflight:** Run `node plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.mjs "<invocation_args/>"` to receive a structured JSON payload with the exact `mode`, `route`, `flags`, `item_ref`, and `user_text` to follow, rather than manually parsing the rules below. Pipeline, output shape, and extension steps: [parser-guide.md](./scripts/parser/parser-guide.md).
+**Agent Preflight:** The `<input/>` block above already ran this parser automatically against the raw invocation — its JSON output is the `mode`/`route`/`flags`/`item_ref`/`user_text` to follow; do not re-derive them by manually parsing the rules below. Only re-run `parse.mjs` yourself if `<input/>` is genuinely unavailable (e.g. shell execution disabled) — if so, pipe the raw text through stdin (`node .../parse.mjs <<'EOF' ... EOF`), never as a shell-quoted positional argument: free text containing quotes, `#`, or backticks is not safe to splice into a quoted shell string. Pipeline, output shape, and extension steps: [parser-guide.md](./scripts/parser/parser-guide.md).
 
 Parser `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
 

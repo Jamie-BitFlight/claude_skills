@@ -21,11 +21,20 @@ Paths in `command-routes.json` are relative to the **skill root** (parent of `sc
 
 ## Invocation: argv shape
 
-The shell often passes multiple argv tokens. For skill preflight, the typical pattern is a **single quoted argument** so `#` is not treated as a comment:
+The shell often passes multiple argv tokens. When you're typing a command yourself in a terminal
+(manual/dev testing, both shown below), a **single quoted argument** so `#` is not treated as a
+comment is fine — you author both the quotes and the content together:
 
 ```bash
 node plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.mjs "groom #50 --auto extra words"
 ```
+
+**Do not construct this same form programmatically from text you didn't author** (agent-supplied
+free text, a backlog item description, anything from `$ARGUMENTS`). `SKILL.md`'s own `<input/>`
+block used to splice `$ARGUMENTS` into exactly this quoted-positional-arg shape and broke on any
+embedded `"`, `#`, or backtick — see the `<input/>` bang-exec line for the fix (a quoted-delimiter
+heredoc piped via stdin). When argv is empty, `parse.mjs` reads stdin instead (unless stdin is a
+TTY), reusing the same quote-aware splitting logic described below.
 
 When `process.argv.slice(2).length === 1`, the script **re-splits** that string on whitespace using a regex that preserves quoted segments (`"..."`, `'...'`). This is a deliberate tradeoff: good enough for agent-provided strings; it is not a full POSIX shell lexer.
 
