@@ -105,7 +105,6 @@ testpaths = [
     "plugins/development-harness/backlog_core/tests",
     "plugins/frustration-analyzer/tests",
     "plugins/plugin-creator/tests",
-    "plugins/development-harness/skills/implementation-manager/tests",
     "plugins/summarizer/tests",
     "tests",
     "examples/solid-review-ab/tests",
