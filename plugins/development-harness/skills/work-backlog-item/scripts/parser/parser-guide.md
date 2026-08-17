@@ -1,12 +1,12 @@
 # Work-backlog invocation parser
 
-Guide to **`parse.mjs`** in this directory: how it turns skill arguments into machine-readable JSON, and how to extend routes, flags, item-ref token shapes, and schemas.
+Architecture doc for **`parse.mjs`**: internals, and how to extend routes, flags, item-ref token shapes, and schemas. Not for routine skill invocation — `SKILL.md`'s `<input/>` block already runs this parser automatically; use its output.
 
 Co-located files: **`parse.mjs`**, **`command-routes.json`**, **`command-routes.schema.json`**, **`parse.schema.json`**, and this guide.
 
 ## Why this exists
 
-Claude (or any agent) receives `<invocation_args/>` as unstructured text. The parser normalizes that string into a single JSON object on stdout: `mode`, `route`, optional `reference`, `flags`, `item_ref`, and `user_text`. Agents MUST treat that object as the source of truth for which workflow file to load and what parameters apply.
+`<input/>` pipes the raw invocation through this parser and treats its stdout JSON (`mode`, `route`, optional `reference`, `flags`, `item_ref`, `user_text`) as the source of truth for routing. This doc covers how that JSON gets built, for extending or debugging it.
 
 ## Files
 
