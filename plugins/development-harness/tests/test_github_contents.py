@@ -331,6 +331,7 @@ def test_malformed_native_content_does_not_fall_back_to_legacy(
     cache.cache_content(ContentRecord(reference=reference, content="cached"))
     backend = GitHubBackend(cache=cache, artifact_provider=MagicMock(), plan_persistence=legacy, contents=store)
     backend._cache.cache_content = MagicMock()
+    backend._cache.cache_content_many = MagicMock()
     backend.try_get_github = MagicMock(return_value=MagicMock())
 
     with pytest.raises(ContentUnavailableError, match="envelope"):
@@ -633,7 +634,7 @@ def _paged_backend(tmp_path: Path, native: list[ContentRecord], legacy: list[Con
         plan_persistence=_PagedContent(legacy),
         contents=_PagedContent(native),
     )
-    backend._cache.cache_content = MagicMock()
+    backend._cache.cache_content_many = MagicMock(return_value=0)
     backend.try_get_github = MagicMock(return_value=MagicMock())
     return backend
 

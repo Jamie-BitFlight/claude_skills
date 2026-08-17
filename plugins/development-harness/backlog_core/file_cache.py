@@ -8,6 +8,7 @@ import json
 import os
 import tempfile
 import warnings
+from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
 
@@ -73,6 +74,44 @@ class FileCache:
             return state.model_copy(update={"records": self._replace_record(state.records, record)}), None
 
         self._state.transaction(replace)
+
+    def cache_content_many(self, records: Iterable[ContentRecord], *, acknowledge_pending: bool = False) -> int:
+        """Durably replace many provider-observed content records in one transaction.
+
+        Applies the same per-record pending-guard invariant as :meth:`cache_content`
+        to every record, but performs a single locked read-modify-write for the
+        whole batch instead of one transaction per record. A caller looping over
+        ``cache_content`` pays a full state load, validate, and durable dump on
+        every call -- O(n) work repeated n times. Folding the batch into one
+        transaction collapses that to a single O(n) load/dump/fsync, and is
+        strictly more durable than the loop it replaces: the batch either lands
+        in full or not at all, where a mid-loop process death previously left a
+        partially-refreshed cache.
+
+        Args:
+            records: Provider-observed content records to store.
+            acknowledge_pending: Pass ``True`` only when this batch itself is
+                landing the authoritative write for every reference in it.
+                Defaults to ``False`` so a routine cache-refresh read never
+                overwrites a still-pending reference.
+
+        Returns:
+            The count of records actually stored -- excludes records skipped
+            because a pending mutation still owns that reference.
+        """
+
+        def replace(state: _CacheState) -> tuple[_CacheState, int]:
+            current = state.records
+            stored = 0
+            for record in records:
+                existing = next((entry for entry in current if entry.reference == record.reference), None)
+                if existing is not None and existing.pending and not acknowledge_pending:
+                    continue
+                current = self._replace_record(current, record)
+                stored += 1
+            return state.model_copy(update={"records": current}), stored
+
+        return self._state.transaction(replace)
 
     def queue_write(self, record: ContentRecord, write: ContentWrite) -> PendingMutation:
         """Atomically cache an offline write and append its deduplicated mutation.
