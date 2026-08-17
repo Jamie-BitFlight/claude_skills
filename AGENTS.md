@@ -73,6 +73,22 @@ with the caller's own asyncio event loop. Suppress banner/log noise with the `FA
 above rather than redirecting stderr to `/dev/null`, which would also hide real errors. `--json`
 output is wrapped: unwrap with `json.loads(json.loads(stdout)["content"][0]["text"])`.
 
+Two further PEP 723 wrappers let the development-harness plugin run standalone, without the
+per-plugin `pyproject.toml`/project env this repo intentionally removed:
+
+```bash
+uv run plugins/development-harness/scripts/run_sam_cli.py --help    # SAM CLI, self-resolving
+uv run plugins/development-harness/tests/run_pytest.py              # Run plugin test suites
+```
+
+`run_sam_cli.py` is a thin wrapper around `sam_schema.cli:app`. `run_pytest.py` `os.chdir`s to the
+plugin root and forwards to `pytest.main()`, defaulting to `["tests", "tests_sam",
+"sam_schema/tests", "backlog_core/tests"]` when no paths are given, and always injecting
+`--asyncio-mode=auto` and `--strict-config` — a standalone bundle has no parent `pyproject.toml` to
+supply `asyncio_mode = "auto"`, so pytest's strict default would otherwise silently skip this
+repo's intentionally-undecorated async tests, and `--strict-config` turns invalid or unavailable
+pytest configuration into a hard failure instead of a silently degraded warning.
+
 ## Plugin Structure
 
 Every plugin follows this pattern:
