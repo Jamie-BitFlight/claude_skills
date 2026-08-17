@@ -121,6 +121,7 @@ class TestSingletonSyncLaunch:
     call, which would start multiple concurrent sync loops.
     """
 
+    @pytest.mark.allow_startup_sync
     async def test_startup_sync_loop_called_exactly_once_on_lifespan_start(self, mocker: MockerFixture) -> None:
         """Background sync starts exactly once when the lifespan initialises.
 
@@ -128,6 +129,10 @@ class TestSingletonSyncLaunch:
         its lifespan context.  The sync function is patched to count calls.
         Requires backlog_core.server.mcp to have lifespan=_backlog_lifespan
         configured -- this will fail with AttributeError until implemented.
+
+        Marked ``allow_startup_sync`` because it depends on the real
+        ``_startup_sync_enabled`` gate returning True; the plugin-root
+        autouse fixture disables it by default for every other test.
         """
         reset_sync_state()
 
@@ -166,12 +171,17 @@ class TestSingletonSyncLaunch:
 class TestInFlightSyncGuard:
     """A sync_now call while a sync is running must not start a second sync."""
 
+    @pytest.mark.allow_startup_sync
     async def test_second_sync_now_while_running_returns_progress_not_new_sync(self, mocker: MockerFixture) -> None:
         """sync_now while RUNNING: triggered=False, progress fields present, no second start.
 
         Arrange: patch _startup_sync_loop so it holds state=RUNNING without completing.
         Act: call sync_now twice while the lock is held.
         Assert: second call returns triggered=False with percent/started_at fields.
+
+        Marked ``allow_startup_sync`` because it depends on the real
+        ``_startup_sync_enabled`` gate returning True; the plugin-root
+        autouse fixture disables it by default for every other test.
         """
         reset_sync_state()
 
@@ -654,8 +664,14 @@ class TestSyncStatusTool:
         data = response.data if hasattr(response, "data") else response
         assert data["status"] == "idle", f"After successful sync, status must be 'idle'. Got {data['status']!r}."
 
+    @pytest.mark.allow_startup_sync
     async def test_sync_status_offline_after_non_retryable_error(self, mocker: MockerFixture) -> None:
-        """After a non-retryable error, sync_status returns status='offline'."""
+        """After a non-retryable error, sync_status returns status='offline'.
+
+        Marked ``allow_startup_sync`` because it depends on the real
+        ``_startup_sync_enabled`` gate returning True; the plugin-root
+        autouse fixture disables it by default for every other test.
+        """
         reset_sync_state()
 
         from backlog_core.models import GitHubUnavailableError
@@ -794,6 +810,7 @@ class TestSyncTaskDoneCallback:
     callback must call the module logger when the task raises an unexpected error.
     """
 
+    @pytest.mark.allow_startup_sync
     async def test_unexpected_exception_from_sync_task_is_logged(self, mocker: MockerFixture) -> None:
         """An unexpected exception escaping the sync task triggers logger.error.
 
@@ -802,6 +819,10 @@ class TestSyncTaskDoneCallback:
         Act: enter the server lifespan so the background task is launched.
         Assert: the module-level logger in server.py receives an error() call
         containing the exception message.
+
+        Marked ``allow_startup_sync`` because it depends on the real
+        ``_startup_sync_enabled`` gate returning True; the plugin-root
+        autouse fixture disables it by default for every other test.
         """
         reset_sync_state()
 
