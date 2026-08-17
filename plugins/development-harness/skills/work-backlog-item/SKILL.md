@@ -117,7 +117,7 @@ When invoked with no arguments, shows an interactive browser. When invoked with 
 
 ## Arguments
 
-**Agent Preflight:** `<input/>` already has the parsed JSON — use it, don't re-derive. If you must re-run `parse.mjs` yourself, pipe via stdin, never a shell-quoted positional arg (see parser-guide.md). Pipeline, output shape, and extension steps: [parser-guide.md](./scripts/parser/parser-guide.md).
+**Agent Preflight:** `<input/>` already carries the parsed JSON — treat it as source of truth. Re-running `parse.mjs` yourself: pipe via stdin, not a shell-quoted positional arg. Pipeline, output shape, extension steps: [parser-guide.md](./scripts/parser/parser-guide.md).
 
 Parser `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
 

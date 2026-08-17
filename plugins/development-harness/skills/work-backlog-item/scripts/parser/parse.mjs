@@ -4,10 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// SKILL.md's bang-exec line pipes $ARGUMENTS in via a quoted-delimiter heredoc (<<'EOF') rather
-// than as a shell-quoted positional arg, so arbitrary free text (embedded quotes, apostrophes,
-// #, parens, backticks, $()) reaches us as inert literal bytes instead of being parsed as shell
-// syntax. A TTY means we're invoked interactively with no piped input — don't block on stdin.
+// Falls back to stdin when invoked with no argv, unless stdin is a TTY (avoids blocking on a
+// bare interactive invocation).
 function readStdinArg() {
   if (process.stdin.isTTY) return null;
   try {
