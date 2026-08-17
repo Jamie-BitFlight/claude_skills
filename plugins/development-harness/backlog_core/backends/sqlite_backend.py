@@ -926,6 +926,20 @@ class SQLiteBackend:
     # Status mutations
     # ------------------------------------------------------------------
 
+    def _tag_issue(self, item: BacklogItem, tag: str) -> None:
+        """Insert a status tag for the item's issue row, ignoring duplicates.
+
+        Args:
+            item: BacklogItem carrying the issue reference in ``item.metadata.issue``.
+            tag: Status tag to record, e.g. ``"verified"`` or ``"blocked"``.
+        """
+        raw_issue = getattr(item.metadata, "issue", "") or ""
+        if not raw_issue:
+            return
+        num = int(str(raw_issue).lstrip("#"))
+        self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, ?)", (num, tag))
+        self._conn.commit()
+
     @_serialized_connection_operation
     def apply_status_in_progress(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """Store an in-progress tag on the item's issue row.
@@ -935,12 +949,7 @@ class SQLiteBackend:
             repo: Ignored.
             output: Ignored.
         """
-        raw_issue = getattr(item.metadata, "issue", "") or ""
-        if not raw_issue:
-            return
-        num = int(str(raw_issue).lstrip("#"))
-        self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'in-progress')", (num,))
-        self._conn.commit()
+        self._tag_issue(item, "in-progress")
 
     @_serialized_connection_operation
     def apply_status_verified(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
@@ -951,12 +960,7 @@ class SQLiteBackend:
             repo: Ignored.
             output: Ignored.
         """
-        raw_issue = getattr(item.metadata, "issue", "") or ""
-        if not raw_issue:
-            return
-        num = int(str(raw_issue).lstrip("#"))
-        self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'verified')", (num,))
-        self._conn.commit()
+        self._tag_issue(item, "verified")
 
     @_serialized_connection_operation
     def apply_status_groomed(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
@@ -967,12 +971,7 @@ class SQLiteBackend:
             repo: Ignored.
             output: Ignored.
         """
-        raw_issue = getattr(item.metadata, "issue", "") or ""
-        if not raw_issue:
-            return
-        num = int(str(raw_issue).lstrip("#"))
-        self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'groomed')", (num,))
-        self._conn.commit()
+        self._tag_issue(item, "groomed")
 
     @_serialized_connection_operation
     def apply_status_blocked(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
@@ -983,12 +982,7 @@ class SQLiteBackend:
             repo: Ignored.
             output: Ignored.
         """
-        raw_issue = getattr(item.metadata, "issue", "") or ""
-        if not raw_issue:
-            return
-        num = int(str(raw_issue).lstrip("#"))
-        self._conn.execute("INSERT OR IGNORE INTO item_tags (issue_number, tag) VALUES (?, 'blocked')", (num,))
-        self._conn.commit()
+        self._tag_issue(item, "blocked")
 
     @_serialized_connection_operation
     def sync_groomed_to_github_issue(
