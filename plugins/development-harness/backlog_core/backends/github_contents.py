@@ -58,6 +58,24 @@ class _GitHubContentIntegrityError(ContentUnavailableError):
     pass
 
 
+# PyGithub (>=2.9.0) is PEP 561-compliant and ships real, correctly-typed
+# classes for every one of these -- github.ContentFile.ContentFile,
+# github.Commit.Commit, github.Branch.Branch, github.GitTree.GitTree, and
+# github.GitTreeElement.GitTreeElement each declare concrete typed
+# properties (verified via inspect.signature against the installed
+# package). These five Protocols do NOT exist to compensate for missing
+# PyGithub stubs. They exist because the real classes have private,
+# requester-bound constructors that only PyGithub itself can call, so the
+# lightweight fakes in tests/test_github_contents.py (_File, _FakeCommit,
+# _FakeBranch, _TreeEntry, _Tree -- plain Pydantic models) cannot subclass
+# or otherwise become nominal instances of them. `ty` proves this: swapping
+# any one of these Protocols for its real-class equivalent makes
+# `_GitHubContentsStore(lambda: repository)` in the test fixture fail
+# `invalid-argument-type` because the fake's return value is not
+# assignable to the concrete class. `_ContentsFile` is additionally
+# `@runtime_checkable` because `put()` isinstance-checks the write
+# response against it -- a real `isinstance(x, ContentFile)` check would
+# also reject every test double at runtime, not just at type-check time.
 @runtime_checkable
 class _ContentsFile(Protocol):
     @property
