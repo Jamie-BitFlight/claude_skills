@@ -1440,6 +1440,67 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         return ""
 
 
+def _apply_status_label(
+    repository: Repository,
+    owner: str,
+    repo_name: str,
+    num: int,
+    *,
+    label: str,
+    colour: str = "",
+    description: str = "",
+    removes: tuple[str, ...] = (),
+    create_if_missing: bool = True,
+    already_message: str,
+    applied_message: str,
+    output: Output,
+) -> None:
+    """Fetch an issue's labels and add ``label``, optionally removing others.
+
+    Shared by all four ``apply_status_*`` public functions — see ADR-003 for
+    the fetch-then-update pattern and ADR-004 for why label creation stays REST.
+
+    Args:
+        repository: PyGithub Repository to operate on.
+        owner: Repository owner login, from ``repository.full_name.split("/", 1)``.
+        repo_name: Repository name, from ``repository.full_name.split("/", 1)``.
+        num: Issue number.
+        label: Status label to add, e.g. ``"status:verified"``.
+        colour: Hex colour for label auto-creation. Required when ``create_if_missing``.
+        description: Description for label auto-creation. Required when ``create_if_missing``.
+        removes: Label names to drop from the desired set (e.g. the prior lifecycle state).
+        create_if_missing: Whether to auto-create ``label`` via REST when absent (ADR-004).
+        already_message: Info message when ``label`` is already present.
+        applied_message: Info message after the label update succeeds.
+        output: Output collector for status/warning messages.
+
+    Raises:
+        GithubException: On GitHub API failure other than label-not-found (404)
+            during label creation. GraphQL label-update failures emit a warning
+            via ``output`` instead of raising.
+    """
+    issue = _fetch_issue_graphql(repository, owner, repo_name, num)
+    current_names = [lbl["name"] for lbl in issue["labels"]]
+    if label in current_names:
+        output.info(already_message)
+        return
+    if create_if_missing:
+        try:
+            repository.get_label(label)
+        except GithubException as e:
+            if e.status != _HTTP_NOT_FOUND:
+                raise
+            repository.create_label(name=label, color=colour, description=description)
+    try:
+        desired_names = [n for n in current_names if n not in removes] + [label]
+        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
+        desired_ids = [id_map[n] for n in desired_names if n in id_map]
+        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
+        output.info(applied_message)
+    except BacklogError as e:
+        output.warn(f"  WARNING: Could not set status: {e}")
+
+
 def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
     """Set GitHub issue label to status:in-progress.
 
@@ -1454,17 +1515,18 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
             msg = f"Invalid issue ref: {item.issue!r}"
             raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
-        issue = _fetch_issue_graphql(repository, owner, repo_name, num)
-        current_names = [lbl["name"] for lbl in issue["labels"]]
-        if "status:in-progress" in current_names:
-            out.info("  Status: already in-progress")
-            return
-        # Compute desired label set: add in-progress, remove needs-grooming
-        desired_names = [n for n in current_names if n != "status:needs-grooming"] + ["status:in-progress"]
-        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
-        desired_ids = [id_map[n] for n in desired_names if n in id_map]
-        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
-        out.info("  Status: in-progress")
+        _apply_status_label(
+            repository,
+            owner,
+            repo_name,
+            num,
+            label="status:in-progress",
+            removes=("status:needs-grooming",),
+            create_if_missing=False,
+            already_message="  Status: already in-progress",
+            applied_message="  Status: in-progress",
+            output=out,
+        )
     except BacklogError as e:
         out.warn(f"  WARNING: Could not set status: {e}")
 
@@ -1496,29 +1558,19 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
         msg = f"Invalid issue ref: {item.issue!r}"
         raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
-    issue = _fetch_issue_graphql(repository, owner, repo_name, num)
-    current_names = [lbl["name"] for lbl in issue["labels"]]
-    if "status:verified" in current_names:
-        out.info("  Status: already verified")
-        return
-    # Ensure status:verified label exists — label creation stays REST (ADR-004)
-    try:
-        repository.get_label("status:verified")
-    except GithubException as e:
-        if e.status != _HTTP_NOT_FOUND:
-            raise
-        repository.create_label(
-            name="status:verified", color="0e8a16", description="Quality gates passed via /complete-implementation"
-        )
-    # Compute desired label set: add verified, remove in-progress
-    try:
-        desired_names = [n for n in current_names if n != "status:in-progress"] + ["status:verified"]
-        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
-        desired_ids = [id_map[n] for n in desired_names if n in id_map]
-        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
-        out.info("  Status: verified")
-    except BacklogError as e:
-        out.warn(f"  WARNING: Could not set status: {e}")
+    _apply_status_label(
+        repository,
+        owner,
+        repo_name,
+        num,
+        label="status:verified",
+        colour="0e8a16",
+        description="Quality gates passed via /complete-implementation",
+        removes=("status:in-progress",),
+        already_message="  Status: already verified",
+        applied_message="  Status: verified",
+        output=out,
+    )
 
 
 def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
@@ -1549,29 +1601,19 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
         msg = f"Invalid issue ref: {item.issue!r}"
         raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
-    issue = _fetch_issue_graphql(repository, owner, repo_name, num)
-    current_names = [lbl["name"] for lbl in issue["labels"]]
-    if "status:groomed" in current_names:
-        out.info("  Status: already groomed")
-        return
-    # Ensure status:groomed label exists — label creation stays REST (ADR-004)
-    try:
-        repository.get_label("status:groomed")
-    except GithubException as e:
-        if e.status != _HTTP_NOT_FOUND:
-            raise
-        repository.create_label(
-            name="status:groomed", color="0075ca", description="Grooming complete — all sections written and approved"
-        )
-    # Compute desired label set: add groomed, remove needs-grooming
-    try:
-        desired_names = [n for n in current_names if n != "status:needs-grooming"] + ["status:groomed"]
-        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
-        desired_ids = [id_map[n] for n in desired_names if n in id_map]
-        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
-        out.info("  Status: groomed")
-    except BacklogError as e:
-        out.warn(f"  WARNING: Could not set status: {e}")
+    _apply_status_label(
+        repository,
+        owner,
+        repo_name,
+        num,
+        label="status:groomed",
+        colour="0075ca",
+        description="Grooming complete — all sections written and approved",
+        removes=("status:needs-grooming",),
+        already_message="  Status: already groomed",
+        applied_message="  Status: groomed",
+        output=out,
+    )
 
 
 def apply_status_blocked(item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
@@ -1602,29 +1644,19 @@ def apply_status_blocked(item: BacklogItem, repo: str = "", output: Output | Non
         msg = f"Invalid issue ref: {item.issue!r}"
         raise ValueError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
-    issue = _fetch_issue_graphql(repository, owner, repo_name, num)
-    current_names = [lbl["name"] for lbl in issue["labels"]]
-    if "status:blocked" in current_names:
-        out.info("  Status: already blocked")
-        return
-    # Ensure status:blocked label exists — label creation stays REST (ADR-004)
-    try:
-        repository.get_label("status:blocked")
-    except GithubException as e:
-        if e.status != _HTTP_NOT_FOUND:
-            raise
-        repository.create_label(
-            name="status:blocked", color="d93f0b", description="Blocked — missing information or a decision"
-        )
-    # Add blocked without removing other status:* labels (overlay, not a transition)
-    try:
-        desired_names = [*current_names, "status:blocked"]
-        id_map = _resolve_label_ids_graphql(repository, owner, repo_name, desired_names)
-        desired_ids = [id_map[n] for n in desired_names if n in id_map]
-        _update_issue_graphql(repository, issue["id"], label_ids=desired_ids)
-        out.info("  Status: blocked")
-    except BacklogError as e:
-        out.warn(f"  WARNING: Could not set status: {e}")
+    # Blocked is an overlay: no removes — other status:* labels stay in place.
+    _apply_status_label(
+        repository,
+        owner,
+        repo_name,
+        num,
+        label="status:blocked",
+        colour="d93f0b",
+        description="Blocked — missing information or a decision",
+        already_message="  Status: already blocked",
+        applied_message="  Status: blocked",
+        output=out,
+    )
 
 
 # ---------------------------------------------------------------------------

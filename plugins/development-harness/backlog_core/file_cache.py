@@ -122,7 +122,7 @@ class FileCache:
         """Return pending mutations in durable insertion order."""
         return list(self._load_state().pending)
 
-    def discard_pending(self, reference: ContentRef) -> bool:
+    def discard_pending(self, reference: ContentRef) -> None:
         """Drop any queued mutation for a reference without touching cached content.
 
         Called after a direct online write for a reference lands successfully --
@@ -130,17 +130,13 @@ class FileCache:
         reference (``put_content`` always calls ``replay_pending`` first), so a
         mutation still queued for it afterward is stale, superseded intent that
         must never be replayed against the fresher record it would land on top of.
-
-        Returns:
-            ``True`` if a queued mutation for ``reference`` was found and
-            removed, ``False`` if nothing was queued for it.
         """
 
-        def discard(state: _CacheState) -> tuple[_CacheState, bool]:
+        def discard(state: _CacheState) -> tuple[_CacheState, None]:
             remaining = [entry for entry in state.pending if entry.write.reference != reference]
-            return state.model_copy(update={"pending": remaining}), len(remaining) != len(state.pending)
+            return state.model_copy(update={"pending": remaining}), None
 
-        return self._state.transaction(discard)
+        self._state.transaction(discard)
 
     def _queue_work_item(self, key: str, item: BacklogItem) -> _PendingWorkItemMutation:
         payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
