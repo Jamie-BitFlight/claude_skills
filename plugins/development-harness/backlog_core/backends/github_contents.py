@@ -164,36 +164,17 @@ class _GitHubContentsStore:
                     raise ContentUnavailableError(
                         f"GitHub content branch creation failed: {create_exc}"
                     ) from create_exc
-                self._verify_branch_exists_after_conflict(repository, create_exc)
+                # A 422 here is not proof the branch exists -- re-read it to distinguish
+                # a genuine concurrent-bootstrap race from a failure that never created it.
+                try:
+                    repository.get_branch(_CONTENT_BRANCH)
+                except GithubException as verify_exc:
+                    raise ContentUnavailableError(
+                        f"GitHub content branch creation reported a conflict ({create_exc}) but the "
+                        f"branch could not be confirmed to exist: {verify_exc}"
+                    ) from verify_exc
         self._branch_ready = True
         return _CONTENT_BRANCH
-
-    @staticmethod
-    def _verify_branch_exists_after_conflict(repository: _ContentsRepository, create_exc: GithubException) -> None:
-        """Confirm the content branch actually exists after a reported ref conflict.
-
-        A ``422`` from ``create_git_ref`` is not proof the branch exists --
-        it could be a transient ref-lock or another failure GitHub happens
-        to surface as ``422``. Re-reading the branch is the only way to
-        distinguish a genuine concurrent-bootstrap race from a failure that
-        never created the branch at all.
-
-        Args:
-            repository: The resolved PyGithub repository.
-            create_exc: The ``GithubException`` raised by ``create_git_ref``.
-
-        Raises:
-            ContentUnavailableError: If the branch still cannot be found,
-                meaning the reported conflict did not correspond to a
-                genuine pre-existing branch.
-        """
-        try:
-            repository.get_branch(_CONTENT_BRANCH)
-        except GithubException as verify_exc:
-            raise ContentUnavailableError(
-                f"GitHub content branch creation reported a conflict ({create_exc}) but the "
-                f"branch could not be confirmed to exist: {verify_exc}"
-            ) from verify_exc
 
     def list(self, query: ContentQuery) -> SequenceType[ContentRecord]:
         records = self.list_all(query)
