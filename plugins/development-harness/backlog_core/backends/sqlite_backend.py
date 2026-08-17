@@ -240,6 +240,8 @@ class SQLiteBackend:
             ).fetchone()
             if row is not None:
                 existing = BacklogItem.model_validate_json(row["content"])
+                # ponytail: description-only equality; compare full model_dump if
+                # same-title/same-description distinct items appear
                 if existing.description != item.description:
                     raise ReferenceCollisionError(item.reference, item.title)
         self._conn.execute(

@@ -164,6 +164,8 @@ class InMemoryBackend:
                 the check is scoped to derived references only.
         """
         existing = self._work_items.get(item.reference)
+        # ponytail: description-only equality; compare full model_dump if
+        # same-title/same-description distinct items appear
         if existing is not None and reference_is_title_derived(item) and existing.description != item.description:
             raise ReferenceCollisionError(item.reference, item.title)
         canonical = BacklogItem.model_validate(item.model_dump())

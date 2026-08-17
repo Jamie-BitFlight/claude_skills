@@ -579,23 +579,10 @@ class DuplicateItemError(BacklogError):
 class ReferenceCollisionError(BacklogError):
     """Raised when a title-derived backend reference already belongs to a different item.
 
-    ``BacklogItem.reference`` self-heals via :func:`_derive_stable_reference` when a
-    caller constructs an item with no backend issue yet and no explicit ``reference``
-    (see the second invariant in :class:`BacklogItem`'s docstring). That fallback is
-    deterministic on ``title`` alone, so it cannot by itself distinguish "the same
-    never-issued item, reconstructed again" from "a different, never-issued item that
-    happens to share a title" — both look identical at derivation time.
-
-    Native backends (:class:`~backlog_core.backends.memory_backend.InMemoryBackend`,
-    :class:`~backlog_core.backends.sqlite_backend.SQLiteBackend`) resolve that ambiguity
-    at write time in ``put_work_item``: a freshly derived reference that collides with an
-    *existing* stored record is treated as the same item only when the record's
-    ``description`` also matches (this is what
-    ``test_backend_put_work_item_reference_is_deterministic_across_reloads`` in
-    ``tests/test_work_item_reference_healing.py`` exercises — reconstructing an
-    all-default item under the same title is expected to collapse to one record). A
-    mismatched ``description`` raises this error instead of silently discarding the
-    record already stored under the colliding reference.
+    Two never-issued items can derive the identical reference from a shared title (see
+    :class:`BacklogItem`'s docstring, second invariant). Native backends raise this
+    instead of silently discarding the record already stored under the colliding
+    reference when the existing record's ``description`` does not also match.
     """
 
     def __init__(self, reference: str, title: str) -> None:
@@ -935,24 +922,8 @@ class BacklogItemMetadata(BaseModel):
 def _derive_stable_reference(issue: str, title: str) -> str:
     """Return the stable backend reference a work item should carry.
 
-    ``BacklogItem.reference`` is the opaque key every backend (GitHub cache
-    records, SQLite primary keys, in-memory dict keys) uses to identify a
-    work item. Unlike ``priority``/``issue`` and the other backward-compatible
-    flat fields, ``reference`` has no metadata counterpart to synchronise
-    with — a raw record can reach construction with ``reference=""`` (a
-    freshly created item with no backend issue yet, or a stale on-disk
-    record written before this field was populated consistently).
-
-    The fallback must be deterministic, not random (e.g. not ``uuid4()``):
-    a stable key ensures the same conceptual item — same title, reloaded or
-    reconstructed independently — always resolves to the same reference. A
-    random fallback would mint a new, unmatched key on every reload of a
-    persisted record, permanently orphaning it from reference-gated
-    operations (groom, resolve) that expect repeated loads of the same
-    record to agree on its key. This is the shared root cause behind a
-    production incident where a GitHub-backend record's cached reference
-    went stale as empty, breaking every subsequent groom/resolve call for
-    that item.
+    Deterministic, not ``uuid4()``: a reloaded record must key the same on every
+    read. See :class:`BacklogItem`'s class docstring for the full rationale.
 
     Args:
         issue: The item's resolved backend issue identifier, if any.
@@ -968,12 +939,10 @@ def _derive_stable_reference(issue: str, title: str) -> str:
 def reference_is_title_derived(item: BacklogItem) -> bool:
     """Return whether ``item.reference`` is exactly the title-hash fallback.
 
-    Pure, stateless re-derivation — not a value cached on ``item`` — so it
-    is correct regardless of *when* or *how* ``item.reference`` came to hold
-    that value (self-healed by ``_sync_metadata`` this construction, carried
-    forward from a reload, or supplied explicitly by a caller that happened
-    to compute the same hash). See :class:`ReferenceCollisionError` and the
-    class docstring's second invariant for why backends need this check.
+    Pure, stateless re-derivation, correct regardless of when or how
+    ``item.reference`` came to hold that value. See
+    :class:`ReferenceCollisionError` and :class:`BacklogItem`'s docstring
+    (second invariant) for why backends need this check.
 
     Args:
         item: The item whose reference to test.
