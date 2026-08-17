@@ -3058,13 +3058,7 @@ def resolve_item(
 
 
 def _apply_non_in_progress_status(
-    item: BacklogItem,
-    status: str,
-    is_string_id_backend: bool,
-    has_integer_issue: bool,
-    repo: str,
-    result: dict[str, str | int | bool | list[str]],
-    output: Output,
+    item: BacklogItem, status: str, repo: str, result: dict[str, str | int | bool | list[str]], output: Output
 ) -> None:
     """Handle every status value other than "in-progress" for _apply_issue_status_labels.
 
@@ -3077,12 +3071,13 @@ def _apply_non_in_progress_status(
     Args:
         item: Resolved BacklogItem.
         status: Status string to set (non-empty, not "in-progress").
-        is_string_id_backend: Whether the active backend uses string issue IDs (e.g. beads).
-        has_integer_issue: Whether ``item.issue`` parses as a numeric GitHub-style issue.
         repo: GitHub repo slug (e.g. ``"owner/repo"``).
         result: Partial result dict mutated in place with ``"status"`` / ``"error"`` keys.
         output: Output aggregator for info/warning messages.
     """
+    is_string_id_backend = get_config().backend.issue_id_type == "string"
+    has_integer_issue = parse_issue_number(item.issue) is not None
+
     if status == "blocked":
         if is_string_id_backend:
             # item.reference self-heals to a title-hash placeholder at construction
@@ -3171,8 +3166,10 @@ def _apply_issue_status_labels(
         # Unlike "in-progress" above, these outcomes don't all require a
         # backend target — terminal-status/unrecognized-value rejection is
         # pure validation, so run it even when no_backend_target is True.
-        _apply_non_in_progress_status(item, status, is_string_id_backend, has_integer_issue, repo, result, output)
+        _apply_non_in_progress_status(item, status, repo, result, output)
     elif no_backend_target:
+        # No status change requested and nothing to write to: skip the
+        # verified check below too, rather than reporting a no-op "verified".
         return
 
     if verified:
