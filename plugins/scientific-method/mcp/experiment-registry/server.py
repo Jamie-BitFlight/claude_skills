@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from project_root import resolve_project_root
 from pydantic import Field
 
 from models import StepExtension
@@ -36,17 +37,17 @@ _loader = RegistryLoader()
 
 
 def _make_state_manager(project_root: str | None) -> StateManager:
-    """Return a StateManager rooted at *project_root* (defaults to cwd).
+    """Return a StateManager rooted at the resolved project root.
 
     Args:
-        project_root: Optional project root path. Falls back to the current
-            working directory when ``None`` or empty.
+        project_root: Optional project root path. See
+            :func:`project_root.resolve_project_root` for fallback order when
+            ``None`` or empty.
 
     Returns:
         A configured ``StateManager`` instance.
     """
-    root = Path(project_root) if project_root else Path(Path.cwd())
-    return StateManager(project_root=root, loader=_loader)
+    return StateManager(project_root=resolve_project_root(project_root), loader=_loader)
 
 
 # ---------------------------------------------------------------------------
