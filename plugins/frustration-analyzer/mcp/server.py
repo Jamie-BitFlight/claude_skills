@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv --quiet run --active --script
 # /// script
-# requires-python = ">=3.11,<3.14"
+# requires-python = ">=3.11,<3.15"
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
 #     "duckdb>=0.10.0",
