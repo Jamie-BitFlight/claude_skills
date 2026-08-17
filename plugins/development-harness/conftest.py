@@ -185,6 +185,44 @@ def pytest_unconfigure(config: pytest.Config) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _disable_startup_sync(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Disable the background startup sync loop for all non-e2e tests.
+
+    Patches ``backlog_core.server._startup_sync_enabled`` to return ``False``
+    so that ``_backlog_lifespan`` never calls ``asyncio.create_task`` during
+    in-process MCP test invocations.  Without this fixture every tool call that
+    exercises the MCP server starts a live GitHub sync task, which dominates
+    wall-clock time and causes the CI timeout.
+
+    Lives at the pytest rootdir (rather than ``tests/conftest.py``) so it
+    applies to every sibling test directory in the plugin subtree --
+    ``tests``, ``tests_sam``, ``sam_schema/tests``, ``backlog_core/tests``,
+    and any directory added later (e.g. ``tests_backlog``, once it joins
+    ``testpaths``) -- not just ``tests/``. A test that needs the real gate
+    opts back in with ``@pytest.mark.allow_startup_sync``.
+
+    Skips for tests marked ``@pytest.mark.e2e`` so that live end-to-end tests
+    exercise the real startup path, and for tests marked
+    ``@pytest.mark.allow_startup_sync`` (e.g. the startup-sync behaviour
+    tests themselves, which assert on the real gate).
+
+    TODO: remove when #2573 lands (permanent backend-level gating in the
+    in-memory and SQLite backends).
+    """
+    if request.node.get_closest_marker("e2e") or request.node.get_closest_marker("allow_startup_sync"):
+        return
+    # Deliberately lazy: backlog_core.server pulls in FastMCP and the full tool
+    # surface, a multi-second import. A module-level import here would pay that
+    # cost for every pytest process that merely collects this rootdir conftest --
+    # including the lightweight nested pytest subprocesses that
+    # tests/test_network_guard.py spawns to probe guard behaviour in isolation,
+    # which run with tight wall-clock timeouts. See per-file-ignore below.
+    import backlog_core.server as _server
+
+    monkeypatch.setattr(_server, "_startup_sync_enabled", lambda: False)
+
+
+@pytest.fixture(autouse=True)
 def _network_policy(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Compute the per-test network policy from the e2e marker + env var.
 

@@ -68,6 +68,7 @@ addopts = [
 ]
 asyncio_mode = "auto"
 markers = [
+    "allow_startup_sync: marks tests that must exercise the real backlog_core.server._startup_sync_enabled gate instead of the autouse override",
     "critical: marks tests covering critical-path code requiring stronger correctness guarantees (e.g. round-trip property tests)",
     "cross_backend: marks tests that run only in the test-cross-backend CI matrix job",
     "demos: marks tests as demonstration tests",
@@ -486,6 +487,10 @@ max-complexity = 12
     "PLR", # Complexity flags from intentional god-object patterns
     "SLF", # Private-access patterns seeded intentionally
 ]
+# Lazy import of backlog_core.server (pulls in FastMCP + full tool surface) so
+# collecting this rootdir conftest stays cheap for nested pytest subprocesses
+# spawned by test_network_guard.py's guard probes, which run under tight timeouts
+"plugins/development-harness/conftest.py" = ["import-outside-top-level"]
 # live_validation_step: S105 false-positive (enum value "PASS" ≠ password),
 # S602 shell=True intentional (command run verbatim as manifest declares),
 # PLR0911 exceeds 6-return limit — early-return guard clauses are intentional
