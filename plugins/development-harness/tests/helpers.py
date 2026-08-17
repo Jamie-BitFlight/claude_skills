@@ -63,9 +63,28 @@ async def call_mcp_tool(
 
 
 def run_cli_subprocess(
-    args: list[str], *, timeout: int = 30, env: dict[str, str] | None = None, cwd: Path | None = None
+    args: list[str],
+    *,
+    timeout: int = 30,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+    sanitize_env: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     """Run a CLI subprocess (e.g. ``uv run <script>``) with whole-process-group timeout kill.
+
+    Fail-closed network guard: a subprocess is a fresh interpreter and inherits none of
+    ``conftest.py``'s in-process socket-patching network guard (that guard monkeypatches
+    ``socket.connect``/``connect_ex``/``getaddrinfo`` in the pytest process only). Left
+    unsanitized, a subprocess that inherits the caller's real ``GITHUB_TOKEN``/``GH_TOKEN``
+    resolves the CLI's default ``github`` backlog backend and makes live, authenticated GitHub
+    API calls from inside a test -- a correctness bug (results depend on whether the developer
+    happens to have a token exported), not merely a slowdown (measured ~28x: a real round trip
+    adds ~65-80s versus ~2.5s for the local ``sqlite`` backend). ``sanitize_env=True`` (the
+    default) closes this at the one place every subprocess-spawning test routes through, by
+    blanking both token vars and defaulting ``BACKLOG_BACKEND`` to ``sqlite`` (without
+    overriding a caller-supplied ``BACKLOG_BACKEND``). Pass ``sanitize_env=False`` -- with a
+    comment explaining why -- only for a test that genuinely needs to exercise the live
+    ``github`` backend.
 
     Root cause this works around: ``subprocess.run(timeout=...)`` kills only the
     immediate child on timeout (``Popen.kill()`` signals ``self.pid`` alone — see the
@@ -87,8 +106,11 @@ def run_cli_subprocess(
     Args:
         args: Full argv, e.g. ``["uv", "run", str(cli_path), "plan", "list"]``.
         timeout: Seconds to wait before killing the process group.
-        env: Environment for the subprocess; defaults to the current environment.
+        env: Environment for the subprocess; defaults to a copy of the current environment.
         cwd: Working directory for the subprocess.
+        sanitize_env: When True (default), blank ``GITHUB_TOKEN``/``GH_TOKEN`` and default
+            ``BACKLOG_BACKEND`` to ``sqlite`` in the effective environment before launching.
+            Set False only when a test must exercise the live ``github`` backend.
 
     Returns:
         A ``CompletedProcess`` with captured text stdout/stderr.
@@ -96,6 +118,12 @@ def run_cli_subprocess(
     Raises:
         subprocess.TimeoutExpired: If the process group does not exit within timeout.
     """
+    run_env = dict(env) if env is not None else os.environ.copy()
+    if sanitize_env:
+        run_env.pop("GITHUB_TOKEN", None)
+        run_env.pop("GH_TOKEN", None)
+        run_env.setdefault("BACKLOG_BACKEND", "sqlite")
+
     # POSIX only: os.killpg/os.getpgid have no Windows equivalent, and CI
     # (ubuntu-latest) is the only enforced target for this helper. On Windows
     # start_new_session is a no-op default (False) and the except branch below
@@ -105,7 +133,7 @@ def run_cli_subprocess(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env=env,
+        env=run_env,
         cwd=cwd,
         start_new_session=os.name != "nt",
     )
