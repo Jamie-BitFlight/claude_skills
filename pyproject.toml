@@ -122,7 +122,16 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-omit = ["tests/*", "*/tests/*", "**/test_*.py"]
+core = "sysmon"
+omit = [
+    "tests/*",
+    "*/tests/*",
+    "**/test_*.py",
+    "tests_sam/*",
+    "*/tests_sam/*",
+    "tests_backlog/*",
+    "*/tests_backlog/*",
+]
 source = ["**/scripts"]
 
 [tool.ty.environment]
