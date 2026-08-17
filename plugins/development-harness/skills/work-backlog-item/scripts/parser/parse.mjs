@@ -4,6 +4,18 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Falls back to stdin when invoked with no argv, unless stdin is a TTY (avoids blocking on a
+// bare interactive invocation).
+function readStdinArg() {
+  if (process.stdin.isTTY) return null;
+  try {
+    const text = readFileSync(0, 'utf-8').replace(/\n$/, '');
+    return text.length > 0 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 function printErrorAndExit(message) {
   console.error(message);
   process.exit(1);
@@ -27,6 +39,10 @@ try {
   // If the user passes the entire invocation as a single quoted string (e.g., to prevent bash from treating # as a comment),
   // we need to split it back into an array of arguments, respecting quotes.
   let rawArgv = process.argv.slice(2);
+  if (rawArgv.length === 0) {
+    const stdinArg = readStdinArg();
+    if (stdinArg !== null) rawArgv = [stdinArg];
+  }
   if (rawArgv.length === 1) {
     // Basic split by space, but this doesn't handle internal quotes well.
     // However, for this specific CLI, we mostly care about splitting by spaces.

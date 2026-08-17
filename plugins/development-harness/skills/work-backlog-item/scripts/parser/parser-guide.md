@@ -1,12 +1,12 @@
 # Work-backlog invocation parser
 
-Guide to **`parse.mjs`** in this directory: how it turns skill arguments into machine-readable JSON, and how to extend routes, flags, item-ref token shapes, and schemas.
+Architecture doc for **`parse.mjs`**: internals, and how to extend routes, flags, item-ref token shapes, and schemas. Invoking the skill never needs this doc — `SKILL.md`'s `<input/>` block already runs the parser and gives you its JSON. Read this only to extend or debug `parse.mjs` itself.
 
 Co-located files: **`parse.mjs`**, **`command-routes.json`**, **`command-routes.schema.json`**, **`parse.schema.json`**, and this guide.
 
 ## Why this exists
 
-Claude (or any agent) receives `<invocation_args/>` as unstructured text. The parser normalizes that string into a single JSON object on stdout: `mode`, `route`, optional `reference`, `flags`, `item_ref`, and `user_text`. Agents MUST treat that object as the source of truth for which workflow file to load and what parameters apply.
+`<input/>` pipes the raw invocation through this parser and treats its stdout JSON (`mode`, `route`, optional `reference`, `flags`, `item_ref`, `user_text`) as the source of truth for routing. This doc covers how that JSON gets built, for extending or debugging it.
 
 ## Files
 
@@ -21,13 +21,13 @@ Paths in `command-routes.json` are relative to the **skill root** (parent of `sc
 
 ## Invocation: argv shape
 
-The shell often passes multiple argv tokens. For skill preflight, the typical pattern is a **single quoted argument** so `#` is not treated as a comment:
+Manual terminal use (you author both quotes and content) — a single quoted argument, so `#` isn't a comment:
 
 ```bash
 node plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.mjs "groom #50 --auto extra words"
 ```
 
-When `process.argv.slice(2).length === 1`, the script **re-splits** that string on whitespace using a regex that preserves quoted segments (`"..."`, `'...'`). This is a deliberate tradeoff: good enough for agent-provided strings; it is not a full POSIX shell lexer.
+Don't build this shape from unauthored, caller-supplied text — pipe via stdin instead; `parse.mjs` reads stdin when argv is empty and it isn't a TTY.
 
 ## Pipeline (order matters)
 
