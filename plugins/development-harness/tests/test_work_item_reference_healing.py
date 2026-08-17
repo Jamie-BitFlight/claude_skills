@@ -60,10 +60,8 @@ def test_memory_and_sqlite_backends_derive_the_same_reference_for_the_same_title
 def test_backend_put_work_item_reference_is_deterministic_across_reloads() -> None:
     """Reconstructing the same conceptual item twice resolves to the same backend key.
 
-    This is the property the deterministic (SHA-256) fallback exists to guarantee: a
-    stale on-disk or in-database record with no explicit reference must resolve to the
-    same key every time it is reloaded, or reference-gated operations (groom, resolve)
-    permanently orphan it. See backlog item #2900/#2902 for the incident this prevents.
+    See ``models.py::BacklogItem``'s class docstring for why the reference fallback
+    must be deterministic rather than random.
     """
     for backend in _backends():
         first = BacklogItem(title="Reloaded item")
@@ -80,14 +78,11 @@ def test_backend_put_work_item_reference_is_deterministic_across_reloads() -> No
 def test_backend_put_work_item_rejects_distinct_items_that_share_a_title() -> None:
     """Two DIFFERENT never-issued items sharing a title must not silently collide.
 
-    Regression test for the data-loss window the deterministic title-hash fallback
-    introduced: unlike ``test_backend_put_work_item_reference_is_deterministic_across_reloads``
-    above (same title, identical — i.e. reloaded — content, which must still collapse to one
-    record), these two items share a title but carry different ``description`` values, so they
-    are genuinely distinct backlog items. Before the ``ReferenceCollisionError`` check in
-    ``InMemoryBackend``/``SQLiteBackend.put_work_item``, the second ``put_work_item`` call
-    silently discarded the first record (``list_work_items()`` returned 1 item, and
-    ``get_work_item(item_a.reference).description`` read back as ``"Item B"``).
+    Unlike ``test_backend_put_work_item_reference_is_deterministic_across_reloads``
+    above (same title, identical content — a reload, which must collapse to one
+    record), these two items share a title but carry different ``description``
+    values, so they are genuinely distinct. See ``models.py::ReferenceCollisionError``
+    for the data-loss window this guards against.
     """
     for backend in _backends():
         item_a = BacklogItem(title="Duplicate Title", description="Item A")
