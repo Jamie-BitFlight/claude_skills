@@ -6,6 +6,7 @@ IssueLocalFields, exception hierarchy, and module-level constants.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import backlog_core.models as _bc_models
@@ -176,6 +177,60 @@ class TestBacklogItemModelDump:
     def test_model_dump_skip_accessible_directly(self) -> None:
         item = BacklogItem()
         assert item.skip is False
+
+
+class TestBacklogItemReferenceHealing:
+    """BacklogItem.reference self-heals at construction time (backlog item #2909).
+
+    ``reference`` is the opaque key every backend (GitHub cache, SQLite
+    primary key, in-memory dict key) uses to identify a work item. Unlike
+    ``priority``/``issue``, it has no metadata counterpart — these tests
+    guard the ``_sync_metadata`` model validator's derivation instead.
+    """
+
+    def test_reference_healed_from_issue_when_unset(self) -> None:
+        """An item constructed with an issue but no reference adopts the issue."""
+        item = BacklogItem(title="Tracked item", issue="#42")
+        assert item.reference == "#42"
+
+    def test_reference_healed_from_title_hash_when_no_issue(self) -> None:
+        """With neither reference nor issue set, reference is a SHA-256 of the title."""
+        item = BacklogItem(title="Untracked item")
+        assert item.reference == hashlib.sha256(b"Untracked item").hexdigest()
+
+    def test_reference_healing_is_never_empty(self) -> None:
+        """Even a fully-default BacklogItem() ends up with a non-empty reference."""
+        item = BacklogItem()
+        assert item.reference != ""
+
+    def test_reference_healing_is_deterministic_across_constructions(self) -> None:
+        """Two independent constructions of the same title resolve to the same key.
+
+        This is the load-bearing property distinguishing the deterministic
+        SHA-256 fallback from a random one (e.g. ``uuid4()``): a backend
+        that persists items keyed by reference must resolve the same
+        conceptual item to the same key on every reload, or reference-gated
+        operations (groom, resolve) permanently orphan the record.
+        """
+        first = BacklogItem(title="Same title")
+        second = BacklogItem(title="Same title")
+        assert first.reference == second.reference
+
+    def test_reference_explicit_value_is_preserved(self) -> None:
+        """An explicitly supplied reference is never overwritten by healing."""
+        item = BacklogItem(title="X", reference="explicit-ref")
+        assert item.reference == "explicit-ref"
+
+    def test_reference_survives_model_validate_round_trip(self) -> None:
+        """A healed reference is stable under a model_dump/model_validate round-trip.
+
+        Read paths across every backend (SQLite's ``model_validate_json``,
+        YAML's ``model_validate``) reconstruct BacklogItem from a dump — the
+        healed value must not change on reconstruction.
+        """
+        original = BacklogItem(title="Round trip item")
+        reloaded = BacklogItem.model_validate(original.model_dump())
+        assert reloaded.reference == original.reference
 
 
 # ---------------------------------------------------------------------------

@@ -58,6 +58,7 @@ from .models import (
     ValidationError,
     ViewItemResult,
     parse_issue_number,
+    reference_is_title_derived,
 )
 from .parsing import (
     find_fuzzy_duplicates,
@@ -2944,6 +2945,9 @@ def close_item(
     today()
 
     reference = item.reference
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
@@ -3019,6 +3023,9 @@ def resolve_item(
     today()
 
     reference = item.reference
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
@@ -3078,7 +3085,11 @@ def _apply_non_in_progress_status(
     """
     if status == "blocked":
         if is_string_id_backend:
-            if item.reference:
+            # item.reference self-heals to a title-hash placeholder at construction
+            # (see BacklogItem's class docstring), so it is never empty here even
+            # for a genuinely unissued item — reference_is_title_derived() is the
+            # correct "no real backend reference yet" check instead of `not item.reference`.
+            if not reference_is_title_derived(item):
                 update_item_metadata(item.reference, {"metadata": {"status": "blocked"}}, output=output)
                 result["status"] = "blocked"
             else:
@@ -3225,6 +3236,9 @@ def _apply_groomed_update(
         BacklogError: If item has no file_path.
         ValidationError: If resolved single-section content is empty.
     """
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not item.reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
@@ -3484,6 +3498,9 @@ def strike_entry(
     item = find_item(items, selector)
     if not item:
         raise ItemNotFoundError(selector)
+    # Unreachable under BacklogItem's current invariant (see models.py class docstring) —
+    # `reference` self-heals to non-empty at construction and no code path assigns it back
+    # to "" afterward. Kept as defense-in-depth against a future direct assignment.
     if not item.reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)

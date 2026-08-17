@@ -50,7 +50,9 @@ from backlog_core.models import (
     IssueStatus,
     MergeResult,
     PullRequestRef,
+    ReferenceCollisionError,
     ViewItemResult,
+    reference_is_title_derived,
 )
 
 __all__ = ["InMemoryBackend"]
@@ -146,12 +148,28 @@ class InMemoryBackend:
             raise KeyError(reference) from None
 
     def put_work_item(self, item: BacklogItem) -> None:
-        """Upsert a work item under its stable reference."""
-        item.reference = item.reference or item.issue or uuid.uuid4().hex
+        """Upsert a work item under its stable reference.
+
+        ``BacklogItem``'s ``_sync_metadata`` validator self-heals an unset
+        ``reference`` at construction time, so ``model_validate()`` below
+        already guarantees a non-empty, deterministic key — no fallback
+        derivation is needed here.
+
+        Raises:
+            ReferenceCollisionError: When ``item.reference`` is the title-hash
+                fallback (no backend issue yet — see
+                :func:`~backlog_core.models.reference_is_title_derived`) and a
+                different, already-stored item occupies that reference. See
+                :class:`~backlog_core.models.ReferenceCollisionError` for why
+                the check is scoped to derived references only.
+        """
+        existing = self._work_items.get(item.reference)
+        if existing is not None and reference_is_title_derived(item) and existing.description != item.description:
+            raise ReferenceCollisionError(item.reference, item.title)
         canonical = BacklogItem.model_validate(item.model_dump())
         canonical.file_path = item.file_path
         canonical.skip = item.skip
-        self._work_items[item.reference] = canonical
+        self._work_items[canonical.reference] = canonical
 
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return the requested bounded page from in-memory content."""

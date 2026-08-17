@@ -18,7 +18,7 @@ import pytest
 from backlog_core.backend_protocol import get_config, set_config
 from backlog_core.backend_types import BacklogConfig as ProviderConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogConfig, BacklogError, BacklogItem, Output, ReconcileRequest, ReconcileResult
+from backlog_core.models import BacklogConfig, BacklogItem, Output, ReconcileRequest, ReconcileResult
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -108,9 +108,29 @@ def _isolate_backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 class TestHandleBatchGroomedLocalWrites:
-    def test_raises_when_item_has_no_reference(self) -> None:
+    def test_item_reference_is_self_healed_not_empty(self) -> None:
+        """BacklogItem.reference self-heals at construction time (see models.py).
+
+        A never-explicitly-referenced item can no longer reach
+        ``_handle_batch_groomed``'s own ``if not item.reference`` guard —
+        every ``BacklogItem`` construction now carries a deterministic,
+        non-empty reference. The operative failure mode for an item that was
+        never persisted is a backend lookup miss, covered by
+        ``test_raises_key_error_when_item_not_in_backend`` below.
+        """
         item = BacklogItem(title="No File Item")
-        with pytest.raises(BacklogError, match="no backend reference"):
+        assert item.reference != ""
+
+    def test_raises_key_error_when_item_not_in_backend(self) -> None:
+        """An item with a healed but never-persisted reference surfaces a KeyError.
+
+        This is the backend's standard "reference not found" contract (see
+        ``InMemoryBackend.get_work_item`` / ``SQLiteBackend.get_work_item``),
+        unchanged by reference self-healing — the item now always has a
+        valid reference, but nothing was ever stored under it.
+        """
+        item = BacklogItem(title="No File Item")
+        with pytest.raises(KeyError):
             ops._handle_batch_groomed(item, {"Plan": "Some content."}, repo="owner/repo")
 
     def test_returns_list_of_written_section_names(self, tmp_path: Path, mocker: MockerFixture) -> None:

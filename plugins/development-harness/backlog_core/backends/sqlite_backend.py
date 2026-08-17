@@ -61,7 +61,9 @@ from backlog_core.models import (
     IssueStatus,
     MergeResult,
     PullRequestRef,
+    ReferenceCollisionError,
     ViewItemResult,
+    reference_is_title_derived,
 )
 
 __all__ = ["SQLiteBackend"]
@@ -218,13 +220,32 @@ class SQLiteBackend:
 
     @_serialized_connection_operation
     def put_work_item(self, item: BacklogItem) -> None:
-        """Upsert a work item under its stable reference."""
-        item.reference = item.reference or item.issue or uuid.uuid4().hex
-        reference = item.reference
+        """Upsert a work item under its stable reference.
+
+        ``item.reference`` is guaranteed non-empty by ``BacklogItem``'s
+        ``_sync_metadata`` validator, which self-heals it at construction
+        time — no fallback derivation is needed here.
+
+        Raises:
+            ReferenceCollisionError: When ``item.reference`` is the title-hash
+                fallback (no backend issue yet — see
+                :func:`~backlog_core.models.reference_is_title_derived`) and a
+                different, already-stored item occupies that reference. See
+                :class:`~backlog_core.models.ReferenceCollisionError` for why
+                the check is scoped to derived references only.
+        """
+        if reference_is_title_derived(item):
+            row = self._conn.execute(
+                "SELECT content FROM work_item_records WHERE reference = ?", (item.reference,)
+            ).fetchone()
+            if row is not None:
+                existing = BacklogItem.model_validate_json(row["content"])
+                if existing.description != item.description:
+                    raise ReferenceCollisionError(item.reference, item.title)
         self._conn.execute(
             "INSERT INTO work_item_records (reference, content) VALUES (?, ?) "
             "ON CONFLICT(reference) DO UPDATE SET content = excluded.content",
-            (reference, item.model_dump_json()),
+            (item.reference, item.model_dump_json()),
         )
         self._conn.commit()
 
