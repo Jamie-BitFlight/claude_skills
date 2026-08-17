@@ -1,6 +1,6 @@
 # Work-backlog invocation parser
 
-Architecture doc for **`parse.mjs`**: internals, and how to extend routes, flags, item-ref token shapes, and schemas. Not for routine skill invocation — `SKILL.md`'s `<input/>` block already runs this parser automatically; use its output.
+Architecture doc for **`parse.mjs`**: internals, and how to extend routes, flags, item-ref token shapes, and schemas. Invoking the skill never needs this doc — `SKILL.md`'s `<input/>` block already runs the parser and gives you its JSON. Read this only to extend or debug `parse.mjs` itself.
 
 Co-located files: **`parse.mjs`**, **`command-routes.json`**, **`command-routes.schema.json`**, **`parse.schema.json`**, and this guide.
 
