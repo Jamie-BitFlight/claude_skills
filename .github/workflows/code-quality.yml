@@ -243,6 +243,30 @@ jobs:
         run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v -m cross_backend
 
   # =============================================================================
+  # Python: Integration tests (real-subprocess CLI/network-guard behavior)
+  # Deselected from the default `test-python` addopts filter because each test
+  # spawns a real `uv run` or `pytest` subprocess (~2-30s each vs sub-second
+  # in-process tests) — see -m "not e2e and not cross_backend and not
+  # integration" in pyproject.toml. No live external credentials required
+  # (network-guard probes are self-contained; CLI subprocess tests sanitize
+  # BACKLOG_BACKEND/GITHUB_TOKEN), so unlike test-e2e this runs as a required
+  # quality-gate job rather than advisory.
+  # =============================================================================
+  test-integration:
+    name: Python / Integration tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+
+      - name: Run integration tests
+        run: uv run -q pytest -m integration -v plugins/development-harness/tests/
+
+  # =============================================================================
   # Python: End-to-end live validation tests
   # Runs only on main push and manual dispatch — not on PRs.
   # Creates real GitHub issues in a test sandbox repo and cleans up after.
@@ -294,6 +318,7 @@ jobs:
       - file-hygiene
       - test-python
       - test-cross-backend
+      - test-integration
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

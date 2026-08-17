@@ -122,6 +122,7 @@ class TestParityInfrastructure:
         assert TaskBackend is not None
 
 
+@pytest.mark.integration
 class TestCLIForeignCWD:
     """Regression: the plugin folder is never the CWD in real use."""
 

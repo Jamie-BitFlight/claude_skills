@@ -64,7 +64,7 @@ addopts = [
     "--dist",
     "loadgroup",
     "-m",
-    "not e2e and not cross_backend",
+    "not e2e and not cross_backend and not integration",
 ]
 asyncio_mode = "auto"
 markers = [

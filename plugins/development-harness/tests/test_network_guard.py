@@ -207,6 +207,7 @@ def test_guard_restores_sockets_after_session() -> None:
         server.close()
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("testpath", ["tests", "tests_sam", "tests_backlog", "sam_schema/tests"])
 def test_guard_covers_testpath(testpath: str) -> None:
     """The root conftest guard applies to every configured testpath.
