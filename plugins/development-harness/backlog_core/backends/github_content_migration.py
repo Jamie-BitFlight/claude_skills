@@ -22,6 +22,7 @@ together and remains the seam callers substitute.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Protocol, assert_never
 
 from backlog_core.backends._github_work_item_versions import is_work_item_head_ref
@@ -53,6 +54,8 @@ if TYPE_CHECKING:
 
     from backlog_core.artifact_provider import ArtifactBackend
     from backlog_core.file_cache import FileCache
+
+_log = logging.getLogger(__name__)
 
 
 class _PlanPersistence(Protocol):
@@ -257,8 +260,14 @@ class _GitHubContentCache:
             except (BacklogError, ContentUnavailableError, OSError):
                 online = False
             else:
-                for record in records:
-                    self._cache.cache_content(record)
+                stored = self._cache.cache_content_many(records)
+                if stored != len(records):
+                    _log.info(
+                        "list_content refresh stored %d/%d records (%d skipped -- pending mutation owns those references)",
+                        stored,
+                        len(records),
+                        len(records) - stored,
+                    )
                 return records[query.offset : query.offset + query.limit]
         records = [
             record.model_copy(update={"stale": not online})
