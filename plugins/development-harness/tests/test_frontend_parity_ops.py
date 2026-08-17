@@ -91,6 +91,7 @@ def dh_env(tmp_path: Path, request: pytest.FixtureRequest):
     _reset_bp_config()
 
 
+@pytest.mark.integration
 async def test_memory_provider_is_process_local(dh_env: dict[str, str]) -> None:
     """A memory-backed CLI item is absent from the fresh MCP provider."""
     memory_env = {**dh_env, "BACKLOG_BACKEND": "memory"}
@@ -117,6 +118,7 @@ def test_sqlite_round_trip_restores_section_from_priority(tmp_path: Path) -> Non
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 async def test_backlog_list_parity(dh_env: dict[str, str]) -> None:
     """A backlog item added via CLI is visible through both list transports."""
     _run_cli(["backlog", "add", "--title", "Parity Item", "--description", "test", "--priority", "P1"], env=dh_env)
