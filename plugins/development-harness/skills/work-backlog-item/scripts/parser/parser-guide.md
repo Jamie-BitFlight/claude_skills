@@ -29,7 +29,7 @@ node plugins/development-harness/skills/work-backlog-item/scripts/parser/parse.m
 
 Don't build this shape from unauthored, caller-supplied text — pipe via stdin instead; `parse.mjs` reads stdin when argv is empty and it isn't a TTY.
 
-When `process.argv.slice(2).length === 1`, the script **re-splits** that string on whitespace using a regex that preserves quoted segments (`"..."`, `'...'`). This is a deliberate tradeoff: good enough for agent-provided strings; it is not a full POSIX shell lexer.
+When `process.argv.slice(2).length === 1`, the script **re-splits** that string on whitespace using a regex that preserves quoted segments (`"..."`, `'...'`) — see Limitations below.
 
 ## Pipeline (order matters)
 
