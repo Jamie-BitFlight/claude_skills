@@ -37,7 +37,7 @@ uvx skilllint@latest check <path>          # Validate skill/agent/plugin frontma
 ```bash
 uv run pytest                              # Run full test suite (parallel via xdist)
 uv run pytest -m "not slow"                # Skip slow tests
-uv run pytest --cov=scripts                # With coverage
+uv run pytest --cov=scripts                # Coverage is always on (addopts); this flag is redundant
 uv run pytest plugins/development-harness/tests/  # Specific test directory
 uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py  # Specific test file
 ```
