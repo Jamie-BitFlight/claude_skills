@@ -269,8 +269,12 @@ class _GitHubContentCache:
                         len(records) - stored,
                     )
                 return records[query.offset : query.offset + query.limit]
+        # A stored record's own `pending` field is never trusted (FileCache normalises it
+        # to False on write) -- the durable mutation queue is the sole source of truth, so
+        # it is recomputed here the same way FileCache.get_content() derives it live.
+        pending_references = [mutation.write.reference for mutation in self._cache.pending_mutations()]
         records = [
-            record.model_copy(update={"stale": not online})
+            record.model_copy(update={"stale": not online, "pending": record.reference in pending_references})
             for record in self._cache._load_state().records
             if record.reference.kind == query.kind
             and not is_work_item_head_ref(record.reference)

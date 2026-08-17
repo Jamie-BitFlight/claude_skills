@@ -40,26 +40,39 @@ class FileCache:
         self._state = _CacheStateStore(root)
 
     def get_content(self, reference: ContentRef, *, stale: bool = False) -> ContentRecord:
-        """Return cached content, distinguishing an offline miss from stale data."""
+        """Return cached content, distinguishing an offline miss from stale data.
+
+        ``pending`` is derived live from the durable mutation queue
+        (``state.pending``) rather than trusted from the stored record --
+        that queue is the sole source of truth for whether a reference has
+        unreplayed intent. See :meth:`_is_pending`.
+        """
         state = self._load_state()
         for record in state.records:
             if record.reference == reference:
-                return record.model_copy(update={"stale": stale})
+                return record.model_copy(update={"stale": stale, "pending": self._is_pending(state, reference)})
         raise ContentUnavailableError(str(reference.model_dump(mode="json")))
 
     def cache_content(self, record: ContentRecord, *, acknowledge_pending: bool = False) -> None:
         """Durably replace one provider-observed content record.
 
-        A cached record already marked ``pending`` represents a queued mutation
-        whose content and ``pending`` flag must survive routine online reads
-        (``list_content``, ``get_content``) until that mutation is acknowledged
-        -- otherwise a discovery read can silently clobber an unacknowledged
-        write with older provider content. This method enforces that invariant
-        directly so every caller gets it for free instead of duplicating a
-        guard clause.
+        A reference with a mutation still outstanding in the durable queue
+        (``state.pending``) must survive routine online reads
+        (``list_content``, ``get_content``) until that mutation is
+        acknowledged -- otherwise a discovery read can silently clobber an
+        unacknowledged write with older provider content. This method
+        enforces that invariant directly, checked live against the queue, so
+        every caller gets it for free instead of duplicating a guard clause.
 
         Args:
-            record: The provider-observed content record to store.
+            record: The provider-observed content record to store. Its own
+                ``pending`` field is ignored -- ``state.records`` never
+                independently tracks pending status. The durable mutation
+                queue (``state.pending``) is the sole source of truth, and
+                every reader (:meth:`get_content`) recomputes ``pending``
+                live from it. This method always normalises the stored
+                record to ``pending=False`` so the on-disk cache never
+                carries a second, potentially stale, copy of that fact.
             acknowledge_pending: Pass ``True`` only when this call itself is
                 landing the authoritative write for ``record.reference`` (a
                 direct foreground write that supersedes whatever was queued).
@@ -68,10 +81,10 @@ class FileCache:
         """
 
         def replace(state: _CacheState) -> tuple[_CacheState, None]:
-            existing = next((entry for entry in state.records if entry.reference == record.reference), None)
-            if existing is not None and existing.pending and not acknowledge_pending:
+            if not acknowledge_pending and self._is_pending(state, record.reference):
                 return state, None
-            return state.model_copy(update={"records": self._replace_record(state.records, record)}), None
+            stored = record.model_copy(update={"pending": False})
+            return state.model_copy(update={"records": self._replace_record(state.records, stored)}), None
 
         self._state.transaction(replace)
 
@@ -104,10 +117,9 @@ class FileCache:
             current = state.records
             stored = 0
             for record in records:
-                existing = next((entry for entry in current if entry.reference == record.reference), None)
-                if existing is not None and existing.pending and not acknowledge_pending:
+                if not acknowledge_pending and self._is_pending(state, record.reference):
                     continue
-                current = self._replace_record(current, record)
+                current = self._replace_record(current, record.model_copy(update={"pending": False}))
                 stored += 1
             return state.model_copy(update={"records": current}), stored
 
@@ -141,12 +153,14 @@ class FileCache:
             if not inserted:
                 pending.append(mutation)
             owner_reference = record.owner_reference if write.owner_reference is None else write.owner_reference
+            # "pending" is never stored True on the record itself -- the queue entry just
+            # appended above is the sole durable fact; get_content() derives the flag live.
             cached = record.model_copy(
                 update={
                     "reference": write.reference,
                     "owner_reference": owner_reference,
                     "content": write.content,
-                    "pending": True,
+                    "pending": False,
                     "stale": False,
                 }
             )
@@ -169,6 +183,10 @@ class FileCache:
         reference (``put_content`` always calls ``replay_pending`` first), so a
         mutation still queued for it afterward is stale, superseded intent that
         must never be replayed against the fresher record it would land on top of.
+        No companion update to ``state.records`` is needed here: a stored record
+        never independently tracks pending status, so removing the queue entry
+        alone is sufficient -- the next :meth:`get_content` call derives
+        ``pending=False`` from this queue's absence of an entry.
         """
 
         def discard(state: _CacheState) -> tuple[_CacheState, None]:
@@ -261,6 +279,11 @@ class FileCache:
                         fingerprint=acknowledgement.fingerprint,
                     )
                 )
+                # Only replace the cached record when no newer write was queued for this
+                # reference after this acknowledgement was computed (a race guarded by
+                # re-reading fresh state at the top of this transaction). "pending" is
+                # forced False on every record stored in state.records -- it is never
+                # independently trusted; get_content() derives it live from state.pending.
                 if not any(entry.write.reference == acknowledgement.record.reference for entry in remaining):
                     record = acknowledgement.record.model_copy(update={"pending": False, "stale": False})
                     records = self._replace_record(records, record)
@@ -378,3 +401,16 @@ class FileCache:
     @staticmethod
     def _replace_record(records: list[ContentRecord], replacement: ContentRecord) -> list[ContentRecord]:
         return [*[record for record in records if record.reference != replacement.reference], replacement]
+
+    @staticmethod
+    def _is_pending(state: _CacheState, reference: ContentRef) -> bool:
+        """Return whether the durable mutation queue still targets ``reference``.
+
+        The queue (``state.pending``) is the single source of truth for
+        whether a reference is pending. No stored ``ContentRecord.pending``
+        flag is ever independently trusted; every record written into
+        ``state.records`` is normalised to ``pending=False`` on write
+        (:meth:`cache_content`, :meth:`queue_write`, :meth:`acknowledge_replay`)
+        and this method recomputes the true value on every read.
+        """
+        return any(entry.write.reference == reference for entry in state.pending)
