@@ -65,7 +65,14 @@ def run_cli(args: list[str], *, timeout: int = 180, env: dict[str, str] | None =
         json.JSONDecodeError: If stdout is not valid JSON.
         RuntimeError: If the CLI exits with a non-zero code.
     """
+    # Sanitize before applying caller overrides: these tests assert returncode/JSON shape only
+    # and never depend on the live github backend, so a real network round trip here is a
+    # correctness bug (results depend on whether GITHUB_TOKEN happens to be exported), not just
+    # slower (measured ~28x: ~70-85s live vs ~2.5s sqlite). run_cli_subprocess's own
+    # sanitize_env default would also catch this; setting it here too keeps the behavior visible
+    # at the call site, matching the dh_env fixture pattern in test_frontend_parity_ops.py.
     run_env = os.environ.copy()
+    run_env.update({"BACKLOG_BACKEND": "sqlite", "GITHUB_TOKEN": "", "GH_TOKEN": ""})
     if env:
         run_env.update(env)
     result = run_cli_subprocess(["uv", "run", str(_CLI_PATH), *args], timeout=timeout, env=run_env)
@@ -130,11 +137,22 @@ class TestCLIForeignCWD:
         state_home = tmp_path / label / "dh_state"
         plan_dir = state_home / "projects" / _get_project_slug() / "plan"
         plan_dir.mkdir(parents=True, exist_ok=True)
+        # BACKLOG_BACKEND/GITHUB_TOKEN/GH_TOKEN sanitized: this test verifies foreign-CWD and
+        # contaminated-PYTHONPATH behavior, not backend selection -- a live github round trip
+        # here is unrelated to what it asserts and was making the run 28x slower.
         result = run_cli_subprocess(
             ["uv", "run", str(_CLI_PATH), "plan", "list", "--limit", "1"],
             timeout=180,
             cwd=tmp_path,
-            env={**os.environ, **extra_env, "DH_STATE_HOME": str(state_home), "DH_PROJECT_ROOT": str(_REPO_ROOT)},
+            env={
+                **os.environ,
+                **extra_env,
+                "DH_STATE_HOME": str(state_home),
+                "DH_PROJECT_ROOT": str(_REPO_ROOT),
+                "BACKLOG_BACKEND": "sqlite",
+                "GITHUB_TOKEN": "",
+                "GH_TOKEN": "",
+            },
         )
         assert result.returncode == 0, f"label={label} {result.stderr[:500]}"
         json.loads(result.stdout)
