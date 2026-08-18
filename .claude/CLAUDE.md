@@ -91,7 +91,6 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 - Files: `Read`, `Write`, `Edit` — not `cat`, `sed`, `echo >`
 - Search: `Grep`, `Glob` — not `find`, `ls -R`
 - Python: `Bash(uv run script.py)`
-- Large File Write Strategy: [Large File Write Strategy](./rules/large-file-write-strategy.md)
 
 **Reference notation the user may mention, or when you want to tell the user about a command or agent:**
 
@@ -156,10 +155,6 @@ flowchart TD
 
 ---
 
-- Proactive Fix Gate (required before any self-initiated fix): [Proactive Fix Gate](./rules/proactive-fix-gate.md)
-
----
-
 ## Skill Creator Activation Triggers
 
 <skill_activation_triggers>
@@ -187,12 +182,6 @@ Activate `/plugin-creator:skill-creator` when ANY condition matches:
 
 Follow Delegation Template in agent-orchestration:agent-orchestration skill when invoking Agent tool.
 
-- Path Conventions and Agent Selection: [Agent Delegation](./rules/agent-delegation.md)
-
----
-
-- Scratch Directory Convention: [Scratch Directory Convention](./rules/scratch-directory.md)
-
 ---
 
 - Language Conventions: [Language Conventions](./rules/language-conventions.md)
@@ -200,10 +189,6 @@ Follow Delegation Template in agent-orchestration:agent-orchestration skill when
 ---
 
 - Script Invocation: [Script Invocation](./rules/script-invocation.md)
-
----
-
-- Interactive Terminal Workarounds: [Interactive Terminal Workarounds](./rules/interactive-terminal-workarounds.md)
 
 ---
 
