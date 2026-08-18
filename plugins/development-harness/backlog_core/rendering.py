@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .models import Section
+
 if TYPE_CHECKING:
     from .models import GroomedData
 
@@ -22,6 +24,7 @@ __all__ = [
     "GROOMED_SUBSECTION_ORDER",
     "SECTION_HEADING",
     "heading_to_unknown_key",
+    "normalize_unknown_sections",
     "render_groomed_section",
     "section_display_title",
     "unknown_key_to_heading",
@@ -144,6 +147,48 @@ def heading_to_unknown_key(heading_text: str) -> str:
     """
     normalised = heading_text.strip().lower().replace(" ", "_")
     return f"unknown__{normalised}"
+
+
+def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> dict[str, Section | GroomedData]:
+    """Fold ``unknown__{key}`` entries into ``{key}`` when now canonical.
+
+    A local YAML cache written before a name was registered in
+    :data:`SECTION_HEADING` stores it as ``unknown__{key}`` (e.g.
+    ``unknown__story``).  Once that name becomes canonical, a freshly parsed
+    GitHub body produces the same logical section under the plain key
+    (``story``) instead — two different dict keys for one heading, which
+    survive :func:`github_sync.merge_item`'s key-union merge and render as a
+    duplicated ``## Story`` heading (#2956 follow-up). Resolving legacy
+    ``unknown__`` keys against the current registry at load time — before
+    reconciliation ever sees the item — makes both sides collide on one key.
+
+    When both ``unknown__{key}`` and ``{key}`` are present in the same
+    ``sections`` dict (e.g. a manually edited cache file), their entries are
+    concatenated, deduplicating by entry ``id``.
+
+    Args:
+        sections: Raw ``BacklogItem.sections`` mapping as loaded from storage.
+
+    Returns:
+        A new mapping with legacy ``unknown__{key}`` keys folded into their
+        now-canonical counterparts. Keys that are not legacy, or whose
+        ``unknown__`` name is still uncanonical, are returned unchanged.
+    """
+    normalized: dict[str, Section | GroomedData] = {}
+    for key, value in sections.items():
+        target = key
+        if key.startswith("unknown__") and isinstance(value, Section):
+            candidate = key.removeprefix("unknown__")
+            if candidate in SECTION_HEADING:
+                target = candidate
+        existing = normalized.get(target)
+        if isinstance(existing, Section) and isinstance(value, Section):
+            seen_ids = {e.id for e in existing.entries}
+            merged_entries = [*existing.entries, *(e for e in value.entries if e.id not in seen_ids)]
+            normalized[target] = Section(entries=merged_entries)
+        else:
+            normalized[target] = value
+    return normalized
 
 
 # ---------------------------------------------------------------------------

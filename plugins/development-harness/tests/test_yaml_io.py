@@ -11,7 +11,7 @@ import warnings
 from pathlib import Path
 
 import pytest
-from backlog_core.models import BacklogItem, GroomedData, Section
+from backlog_core.models import BacklogItem, Entry, GroomedData, Section
 from backlog_core.yaml_io import detect_format, load_item, load_item_text, save_item
 
 # ---------------------------------------------------------------------------
@@ -317,6 +317,71 @@ class TestLoadItemYaml:
         assert isinstance(sec, Section)
         struck = next(e for e in sec.entries if e.struck)
         assert struck.struck_at == "2026-02-02T14:00:00Z"
+
+    def test_load_item_folds_legacy_unknown_key_into_now_canonical_key(self, tmp_path: Path) -> None:
+        """load_item folds a legacy ``unknown__story`` key into ``story``.
+
+        Regression guard for #2956 follow-up: a cache file written before
+        "Story" was registered in SECTION_HEADING stored it as
+        ``unknown__story``. Loading it must expose the canonical ``story``
+        key so a subsequent merge against a freshly-parsed GitHub body (which
+        always produces ``story``) collides on one key instead of rendering
+        the section twice.
+        """
+        # Arrange
+        item = BacklogItem(sections={"unknown__story": Section(entries=[])})
+        dest = tmp_path / "item.yaml"
+        save_item(item, dest)
+
+        # Act
+        result = load_item(dest)
+
+        # Assert
+        assert "story" in result.sections
+        assert "unknown__story" not in result.sections
+
+    def test_load_item_leaves_genuinely_unknown_key_unchanged(self, tmp_path: Path) -> None:
+        """load_item does not rename an ``unknown__`` key that is still uncanonical.
+
+        Only keys that have since been registered in SECTION_HEADING are
+        folded — a custom section name with no canonical entry must survive
+        unchanged.
+        """
+        # Arrange
+        item = BacklogItem(sections={"unknown__custom_analysis": Section(entries=[])})
+        dest = tmp_path / "item.yaml"
+        save_item(item, dest)
+
+        # Act
+        result = load_item(dest)
+
+        # Assert
+        assert "unknown__custom_analysis" in result.sections
+
+    def test_load_item_merges_entries_when_both_legacy_and_canonical_keys_present(self, tmp_path: Path) -> None:
+        """load_item merges entries when both ``unknown__story`` and ``story`` exist.
+
+        A manually edited or partially migrated cache file could contain both
+        keys for the same section; folding must not silently drop entries
+        from either side.
+        """
+        # Arrange
+        item = BacklogItem(
+            sections={
+                "unknown__story": Section(entries=[Entry(id="2026-01-01T00:00:00", content="legacy entry")]),
+                "story": Section(entries=[Entry(id="2026-01-02T00:00:00", content="canonical entry")]),
+            }
+        )
+        dest = tmp_path / "item.yaml"
+        save_item(item, dest)
+
+        # Act
+        result = load_item(dest)
+
+        # Assert
+        sec = result.sections["story"]
+        assert isinstance(sec, Section)
+        assert {e.content for e in sec.entries} == {"legacy entry", "canonical entry"}
 
 
 # ---------------------------------------------------------------------------
