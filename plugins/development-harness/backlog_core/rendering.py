@@ -31,11 +31,48 @@ __all__ = [
 # Constants
 # ---------------------------------------------------------------------------
 
-# Section key (used in BacklogItem.sections) -> markdown heading text
+# Section key (used in BacklogItem.sections) -> markdown heading text.
+#
+# The first three entries (fact_check, rt_ica, issue_classification) need an
+# explicit mapping because their correct display form cannot be derived by
+# the generic unknown-section fallback (title-casing "rt_ica" produces "Rt
+# Ica", not the acronym-cased "RT-ICA"; "fact_check" needs a hyphen, not a
+# space). Every entry below this point DOES already round-trip correctly
+# through the generic unknown__ fallback (#2956's write-path/parse-path fix
+# makes that true for ANY section name, registered or not) — registering
+# them here is a display-quality improvement only, not a correctness fix:
+# it gives grooming's most commonly observed sections a clean canonical
+# storage key (e.g. "files") instead of the "unknown__" prefix. Sourced from
+# a full grep of the real corrupted local cache for #2953/#2955 (the
+# ground-truth evidence for #2956) plus every literal `section=` value found
+# across plugins/development-harness/agents/*.md and skill references
+# (2026-08-18) — not a guessed or partial list.
 SECTION_HEADING: dict[str, str] = {
     "fact_check": "Fact-Check",
     "rt_ica": "RT-ICA",
     "issue_classification": "Issue Classification",
+    "files": "Files",
+    "resources": "Resources",
+    "impact": "Impact",
+    "impact_radius": "Impact Radius",
+    "dependencies": "Dependencies",
+    "priority": "Priority",
+    "benefits": "Benefits",
+    "research": "Research",
+    "design_intent_alignment": "Design Intent Alignment",
+    "acceptance_criteria": "Acceptance Criteria",
+    "expected_behavior": "Expected Behavior",
+    "effort": "Effort",
+    "reproducibility": "Reproducibility",
+    "story": "Story",
+    "context": "Context",
+    "working_register": "Working Register",
+    "suggested_location": "Suggested Location",
+    "concerns": "Concerns",
+    "divergence_notes": "Divergence Notes",
+    "execution_results": "Execution Results",
+    "grooming_notes": "Grooming Notes",
+    "root_cause_analysis": "Root-Cause Analysis",
 }
 
 # Frozenset of the display values in SECTION_HEADING.
