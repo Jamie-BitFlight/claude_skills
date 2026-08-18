@@ -21,9 +21,9 @@ directly — go straight to producing the coerced result; there is nothing in <p
 you don't already know, and no reason to route it through anything else.
 
 Coerce <provided_arguments/> to match this schema yourself, then treat the result as `<input/>`:
-[parse.schema.json](./scripts/parser/parse.schema.json). `parse.mjs` in the same directory implements
-the identical rule set as a script — never run it or embed <provided_arguments/> in a `` !`...` ``
-line to produce `<input/>`; reasoning it out against the vocabulary below is the only path.
+[parse.schema.json](./scripts/parser/parse.schema.json). Never embed <provided_arguments/> in a
+`` !`...` `` line or any other shell-interpreted string to produce `<input/>` — reasoning it out
+against the vocabulary below is the only safe path.
 
 Argument vocabulary:
 
@@ -139,7 +139,7 @@ When invoked with no arguments, shows an interactive browser. When invoked with 
 
 `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
 
-On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_text`, not `item_ref` — see [parser-guide.md](./scripts/parser/parser-guide.md) Limitations for why this still resolves.
+On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_text`, not `item_ref` — `find_item()` still resolves it via its string-ID exact-match branch, so this is a routing detail, not a functional gap.
 
 **Optional flags** (when `route` is `title_substring`, `issue`, or a pipeline route): `--language <lang>` selects language plugin (default: python); `--stack <profile>` selects stack profile (e.g., python-fastapi, python-cli). See [sdlc-layers](../../docs/sdlc-layers/).
 
