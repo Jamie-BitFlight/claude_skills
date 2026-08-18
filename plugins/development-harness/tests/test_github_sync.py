@@ -12,6 +12,8 @@ if str(_PLUGIN_ROOT) not in sys.path:
 
 from backlog_core.github_sync import merge_item, parse_issue_body, render_issue_body
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
+from backlog_core.operations import _normalize_section_key
+from backlog_core.parsing import extract_sections
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -830,3 +832,112 @@ class TestUnknownSectionPreservation:
         # Space-separated key must not appear
         assert "my_custom_section" not in result.sections
         assert "unknown__my_custom_section" in result.sections
+
+
+# ---------------------------------------------------------------------------
+# Regression: #2956 — local-write / GitHub-parse key-space mismatch
+# ---------------------------------------------------------------------------
+
+
+class TestSectionKeyRoundTripRegression:
+    """#2956: local writes and GitHub-parsed sections must converge on one key.
+
+    Before the fix, ``operations._normalize_section_key`` passed unrecognised
+    section names through verbatim (e.g. ``"Files"``) while
+    ``github_sync.parse_issue_body`` normalised the same heading, once parsed
+    back from a rendered GitHub body, to ``"unknown__files"``. The two keys
+    never collided, so every groom + reconcile cycle accumulated a duplicate
+    section under the ``unknown__`` prefix.
+    """
+
+    def test_normalize_section_key_matches_parse_side_for_custom_names(self) -> None:
+        """_normalize_section_key produces the same key parse_issue_body would.
+
+        Reproduces the exact mismatch reported in #2956 at the unit level:
+        before the fix, ``_normalize_section_key("Files") == "Files"`` while
+        a GitHub round-trip of the same heading produced
+        ``"unknown__files"`` — two different dict keys for one section.
+        """
+        for display_name, expected_key in [
+            ("Files", "unknown__files"),
+            ("Impact Radius", "unknown__impact_radius"),
+            ("Resources", "unknown__resources"),
+            ("Design Intent Alignment", "unknown__design_intent_alignment"),
+        ]:
+            assert _normalize_section_key(display_name) == expected_key
+
+    def test_normalize_section_key_still_resolves_canonical_aliases(self) -> None:
+        """Canonical sections (RT-ICA, Fact-Check, Issue Classification) are unaffected."""
+        assert _normalize_section_key("RT-ICA") == "rt_ica"
+        assert _normalize_section_key("Fact-Check") == "fact_check"
+        assert _normalize_section_key("Issue Classification") == "issue_classification"
+
+    def test_custom_section_write_then_github_round_trip_does_not_duplicate(self) -> None:
+        """A locally-written custom section survives render+parse+merge under one key.
+
+        End-to-end reproduction of the #2956 duplication: write "Files" via the
+        same normalisation `backlog_groom` uses, render to a GitHub body, parse
+        that body back (simulating a reconcile), and merge. Only one section
+        key must exist afterward.
+        """
+        key = _normalize_section_key("Files")
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="src/app.py")])})
+
+        rendered = render_issue_body(item)
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key]
+
+    def test_fact_checker_verdict_with_embedded_claim_headings_stays_one_section(self) -> None:
+        """A Fact-Check verdict quoting per-claim '## Claim N' headings does not fragment.
+
+        Reproduces the #2956 per-claim fragmentation: a fact-checker verdict
+        legitimately embeds ``## Claim N: "..."`` headings inside its own
+        content. Before the fix, ``extract_sections`` could not tell those
+        apart from real section boundaries, so a GitHub round-trip shattered
+        one Fact-Check entry into N spurious ``unknown__claim_n...`` sections.
+        """
+        key = _normalize_section_key("Fact-Check")
+        verdict = (
+            '## Claim 1: "some claim"\n\nVERDICT: VERIFIED\n\n---\n\n## Claim 2: "another claim"\n\nVERDICT: REFUTED'
+        )
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content=verdict)])})
+
+        rendered = render_issue_body(item)
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key]
+        sec = merged.sections[key]
+        assert isinstance(sec, Section)
+        assert len(sec.entries) == 1
+        assert "Claim 1" in sec.entries[0].content
+        assert "Claim 2" in sec.entries[0].content
+
+
+class TestExtractSectionsEntryBoundary:
+    """#2956: extract_sections must not split on '## ' lines inside an entry div."""
+
+    def test_embedded_heading_inside_entry_div_is_not_a_new_section(self) -> None:
+        """A '## ' line inside <div>...</div> entry content stays part of the section."""
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+            '## Claim 1: "something"\n\nVERDICT: VERIFIED\n'
+            "</div>\n"
+        )
+        sections = extract_sections(body)
+        assert list(sections.keys()) == ["## Fact-Check"]
+        assert 'Claim 1: "something"' in sections["## Fact-Check"]
+
+    def test_heading_after_entry_div_closes_is_still_a_new_section(self) -> None:
+        """A '## ' line after the entry div closes is correctly treated as a boundary."""
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\ncontent\n</div>\n\n"
+            "## Resources\n\n"
+            "<div><sub>2026-01-01T00:00:01Z</sub>\n\nmore content\n</div>\n"
+        )
+        sections = extract_sections(body)
+        assert set(sections.keys()) == {"## Fact-Check", "## Resources"}

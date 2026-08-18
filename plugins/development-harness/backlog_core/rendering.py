@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 __all__ = [
     "GROOMED_SUBSECTION_ORDER",
     "SECTION_HEADING",
+    "heading_to_unknown_key",
     "render_groomed_section",
     "section_display_title",
     "unknown_key_to_heading",
@@ -74,6 +75,31 @@ def unknown_key_to_heading(key: str) -> str:
     """
     stripped = key.removeprefix("unknown__")
     return stripped.replace("_", " ").title()
+
+
+def heading_to_unknown_key(heading_text: str) -> str:
+    """Convert an arbitrary section heading/name to its canonical storage key.
+
+    Inverse of :func:`unknown_key_to_heading`. Normalises by lowercasing and
+    replacing spaces with underscores, then prepends the ``"unknown__"``
+    prefix so unknown section keys never collide with :data:`SECTION_HEADING`
+    keys (e.g. ``"fact_check"``).
+
+    This is the single normalisation used on both sides of the local-write /
+    GitHub-parse boundary: :mod:`operations` calls it when storing a section
+    under a caller-supplied display name, and :mod:`github_sync` calls it when
+    parsing an unrecognised ``## Heading`` from an issue body. Keeping both
+    call sites on one function is what makes the two round-trip to the same
+    key — see ``ARCHITECTURE.md`` for the incident this closed.
+
+    Args:
+        heading_text: Raw heading or section display name, whitespace trimmed.
+
+    Returns:
+        Storage key such as ``"unknown__custom_analysis"``.
+    """
+    normalised = heading_text.lower().replace(" ", "_")
+    return f"unknown__{normalised}"
 
 
 # ---------------------------------------------------------------------------

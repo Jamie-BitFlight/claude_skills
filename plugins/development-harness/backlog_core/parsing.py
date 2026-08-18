@@ -741,6 +741,14 @@ def extract_description_from_issue_body(body: str) -> str:
 def extract_sections(text: str) -> dict[str, str]:
     """Extract '## Section' content blocks from markdown text.
 
+    A ``## `` line is only treated as a section boundary while scanning is
+    outside every ``<div>...</div>`` entry block. Entry content (see
+    ``entry_blocks.py``) is free-form and may legitimately contain its own
+    ``## `` headings (e.g. a fact-checker verdict quoting one claim per
+    heading) — without this guard those embedded headings are indistinguishable
+    from real section boundaries and shatter one section into many spurious
+    ones on the next parse.
+
     Args:
         text: Markdown body text.
 
@@ -750,15 +758,17 @@ def extract_sections(text: str) -> dict[str, str]:
     sections: dict[str, str] = {}
     current_heading: str | None = None
     current_lines: list[str] = []
+    div_depth = 0
 
     for line in text.splitlines():
-        if line.startswith("## "):
+        if div_depth == 0 and line.startswith("## "):
             if current_heading is not None:
                 sections[current_heading] = "\n".join(current_lines).strip()
             current_heading = line.strip()
             current_lines = []
         elif current_heading is not None:
             current_lines.append(line)
+        div_depth = max(0, div_depth + line.count("<div>") - line.count("</div>"))
 
     if current_heading is not None:
         sections[current_heading] = "\n".join(current_lines).strip()

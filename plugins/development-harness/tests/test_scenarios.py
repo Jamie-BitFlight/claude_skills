@@ -352,8 +352,10 @@ class TestGroomBacklogItem:
 
         assert result["groomed_updated"] is True
         stored = _stored_item("Groom Section Test")
-        assert "Reproducibility" in stored.sections
-        assert stored.sections["Reproducibility"].entries[-1].content == "Steps to reproduce the issue."
+        # "Reproducibility" is not a canonical section name (see rendering.SECTION_HEADING), so
+        # it is stored under its normalised unknown-section key.
+        assert "unknown__reproducibility" in stored.sections
+        assert stored.sections["unknown__reproducibility"].entries[-1].content == "Steps to reproduce the issue."
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)

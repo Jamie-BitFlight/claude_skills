@@ -63,38 +63,11 @@ def heading_to_section_key(heading_text: str) -> str | None:
     return _HEADING_TO_KEY.get(heading_text.lower())
 
 
-def heading_to_unknown_key(heading_text: str) -> str:
-    """Convert an unknown section heading to a storage key.
-
-    Unknown headings are normalised by lowercasing and replacing spaces with
-    underscores.  The prefix ``"unknown__"`` is prepended so unknown section
-    keys never collide with known section keys (e.g. ``"fact_check"``).
-
-    Args:
-        heading_text: Raw heading text with ``##`` prefix stripped and whitespace
-            trimmed.
-
-    Returns:
-        Storage key such as ``"unknown__custom_analysis"``.
-    """
-    normalised = heading_text.lower().replace(" ", "_")
-    return f"unknown__{normalised}"
-
-
-def unknown_key_to_heading(key: str) -> str:
-    """Reconstruct a display heading from an unknown-section storage key.
-
-    Reverses :func:`heading_to_unknown_key`: strips the ``"unknown__"`` prefix,
-    replaces underscores with spaces, and title-cases the result.
-
-    Args:
-        key: Storage key such as ``"unknown__custom_analysis"``.
-
-    Returns:
-        Display heading such as ``"Custom Analysis"``.
-    """
-    stripped = key.removeprefix("unknown__")
-    return stripped.replace("_", " ").title()
+# Re-exported from rendering — canonical definitions live there so that the
+# local-write path (operations._normalize_section_key) and the GitHub-parse
+# path (parse_issue_body below) normalise unknown section names identically.
+heading_to_unknown_key = _rendering.heading_to_unknown_key
+unknown_key_to_heading = _rendering.unknown_key_to_heading
 
 
 # Canonical render order for GroomedData subsections (heading text as stored in the dict)

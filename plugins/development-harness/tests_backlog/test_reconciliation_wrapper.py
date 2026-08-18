@@ -216,7 +216,8 @@ def test_batch_grooming_reconciles_once(sync_provider) -> None:
     written = _handle_batch_groomed(item, {"Plan": "First", "Research": "Second"}, repo="unused")
 
     # Then: one targeted reconciliation covers the complete backend-owned mutation
-    assert written == ["Plan", "Research"]
+    # "Plan"/"Research" are not canonical section names, so they normalise to unknown__ keys.
+    assert written == ["unknown__plan", "unknown__research"]
     assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7"])]
 
 

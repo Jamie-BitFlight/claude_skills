@@ -140,7 +140,9 @@ class TestHandleBatchGroomedLocalWrites:
 
         result = ops._handle_batch_groomed(item, {"Plan": "Content A.", "Research": "Content B."}, repo="owner/repo")
 
-        assert result == ["Plan", "Research"]
+        # "Plan"/"Research" are not canonical section names (see rendering.SECTION_HEADING), so
+        # they are stored under their normalised unknown-section keys.
+        assert result == ["unknown__plan", "unknown__research"]
 
     def test_single_section_written_to_file_body(self, tmp_path: Path, mocker: MockerFixture) -> None:
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
@@ -276,7 +278,8 @@ class TestUpdateItemSectionsRouting:
             selector="Written Sections", sections={"Plan": "The plan.", "Research": "The research."}, repo="owner/repo"
         )
 
-        assert result["sections_written"] == ["Plan", "Research"]
+        # "Plan"/"Research" are not canonical section names, so they normalise to unknown__ keys.
+        assert result["sections_written"] == ["unknown__plan", "unknown__research"]
 
     def test_sections_with_content_returns_groomed_updated_true(self, mocker: MockerFixture) -> None:
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
@@ -301,8 +304,9 @@ class TestUpdateItemSectionsRouting:
         ("sections", "expected_written", "expected_groomed"),
         [
             ({}, [], False),
-            ({"Plan": "Plan content."}, ["Plan"], True),
-            ({"Plan": "P.", "Research": "R."}, ["Plan", "Research"], True),
+            # "Plan"/"Research" are not canonical section names, so they normalise to unknown__ keys.
+            ({"Plan": "Plan content."}, ["unknown__plan"], True),
+            ({"Plan": "P.", "Research": "R."}, ["unknown__plan", "unknown__research"], True),
         ],
     )
     def test_sections_routing_parametrized(
@@ -344,7 +348,8 @@ class TestGroomItemWithSections:
             repo="owner/repo",
         )
 
-        assert result["sections_written"] == ["Plan", "Decision"]
+        # "Plan"/"Decision" are not canonical section names, so they normalise to unknown__ keys.
+        assert result["sections_written"] == ["unknown__plan", "unknown__decision"]
         assert result["groomed_updated"] is True
 
     def test_empty_sections_is_noop_with_no_file_changes(self, mocker: MockerFixture) -> None:
