@@ -26,8 +26,10 @@ def test_full_entry_lifecycle(backlog_dir, mock_github):
     result = operations.view_item(selector="Lifecycle Test", output=out)
     sections = result.sections
     assert isinstance(sections, dict), f"sections should be dict, got {type(sections)}"
-    assert "Decision" in sections, f"Expected 'Decision' in sections, got: {list(sections.keys())}"
-    decision = cast("SectionEntryMetadata", sections["Decision"])
+    # "Decision" is not a canonical section name (see rendering.SECTION_HEADING), so it is
+    # stored under its normalised unknown-section key — see operations._normalize_section_key.
+    assert "unknown__decision" in sections, f"Expected 'unknown__decision' in sections, got: {list(sections.keys())}"
+    decision = cast("SectionEntryMetadata", sections["unknown__decision"])
     assert decision["num_entries"] == 2, f"Expected 2 active entries, got {decision['num_entries']}"
 
     # Strike the first entry
@@ -39,7 +41,7 @@ def test_full_entry_lifecycle(backlog_dir, mock_github):
     result = operations.view_item(selector="Lifecycle Test", output=out)
     sections = result.sections
     assert isinstance(sections, dict)
-    decision = cast("SectionEntryMetadata", sections["Decision"])
+    decision = cast("SectionEntryMetadata", sections["unknown__decision"])
     assert decision["num_entries"] == 1, f"Expected 1 active entry, got {decision['num_entries']}"
     assert decision["num_struck"] == 1, f"Expected 1 struck entry, got {decision['num_struck']}"
 
@@ -60,7 +62,7 @@ def test_full_entry_lifecycle(backlog_dir, mock_github):
     result = operations.view_item(selector="Lifecycle Test", output=out)
     sections = result.sections
     assert isinstance(sections, dict)
-    entries3 = list(cast("SectionEntryMetadata", sections["Decision"])["entries"])
+    entries3 = list(cast("SectionEntryMetadata", sections["unknown__decision"])["entries"])
     active = [e for e in entries3 if not e.get("struck")]
     assert len(active) == 1
     assert "Updated second decision." in active[0]["content"]

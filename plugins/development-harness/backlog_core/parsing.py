@@ -741,29 +741,24 @@ def extract_description_from_issue_body(body: str) -> str:
 def extract_sections(text: str) -> dict[str, str]:
     """Extract '## Section' content blocks from markdown text.
 
+    Delegates the actual boundary detection to :func:`_split_body_h2`, the
+    marko-AST-based splitter already used by the legacy ``.md`` body-parsing
+    path (see the "Legacy .md body section parsing" section of this module).
+    Both callers now share one structural section boundary decision instead
+    of independently maintaining their own hand-rolled line scanners that can
+    silently disagree — see :class:`_EntryDivBlock` for why a naive line-based
+    ``## `` scan (this function's previous implementation) misidentifies a
+    heading-shaped line inside entry-block content as a real section boundary.
+
     Args:
         text: Markdown body text.
 
     Returns:
         Dict mapping section heading (e.g. '## Story') to its content (not including heading).
+        When the same heading text appears more than once, the last occurrence wins —
+        matching this function's pre-existing (dict-based) contract.
     """
-    sections: dict[str, str] = {}
-    current_heading: str | None = None
-    current_lines: list[str] = []
-
-    for line in text.splitlines():
-        if line.startswith("## "):
-            if current_heading is not None:
-                sections[current_heading] = "\n".join(current_lines).strip()
-            current_heading = line.strip()
-            current_lines = []
-        elif current_heading is not None:
-            current_lines.append(line)
-
-    if current_heading is not None:
-        sections[current_heading] = "\n".join(current_lines).strip()
-
-    return sections
+    return {f"## {name}": content for name, content in _split_body_h2(text)}
 
 
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
@@ -819,7 +814,11 @@ def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
 # ---------------------------------------------------------------------------
 
 import marko
-from marko.block import Heading as _MarkoHeading
+from marko.block import BlockElement as _MarkoBlockElement, Heading as _MarkoHeading
+from marko.helpers import MarkoExtension as _MarkoExtension
+
+if TYPE_CHECKING:
+    from marko.source import Source as _MarkoSource
 
 # Heading levels used for body section splitting.
 _H2_LEVEL = 2
@@ -830,6 +829,105 @@ _GROOMED_DATE_RE = re.compile(r"^Groomed(?:\s*\((\d{4}-\d{2}-\d{2})\))?$", re.IG
 
 # ATX heading detector used when mapping AST positions back to source lines.
 _ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)")
+
+# Entry-block wrapper markers. Must match entry_blocks.wrap_entry()'s
+# "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see ENTRY_RE in
+# entry_blocks.py for the canonical parse-side pattern this mirrors).
+_ENTRY_DIV_OPEN = "<div><sub>"
+_ENTRY_DIV_OPEN_RE = re.compile(r" {0,3}" + re.escape(_ENTRY_DIV_OPEN))
+
+# Tag-boundary matchers for div-nesting depth tracking. A literal-substring count
+# (``line.count("<div>")``) misses an attributed opening tag like
+# ``<div class="note">`` while ``line.count("</div>")`` still matches its close
+# unconditionally — that asymmetry drives depth negative and ends entry-block
+# opacity early, letting a heading-lookalike line further down escape as a
+# spurious section (#2964 follow-up). Matching tag boundaries via regex keeps
+# opens and closes counted symmetrically regardless of attributes.
+_DIV_OPEN_TAG_RE = re.compile(r"<div\b")
+_DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>")
+
+
+def _div_depth_delta(line: str) -> int:
+    """Return the net change in ``<div>``/``</div>`` nesting depth for one line.
+
+    Args:
+        line: Source line to scan.
+
+    Returns:
+        Count of opening ``<div`` tags minus closing ``</div>`` tags on this line.
+    """
+    return len(_DIV_OPEN_TAG_RE.findall(line)) - len(_DIV_CLOSE_TAG_RE.findall(line))
+
+
+class _EntryDivBlock(_MarkoBlockElement):
+    """Marko block element matching this codebase's ``<div><sub>...</sub>...</div>`` entry wrapper.
+
+    CommonMark's HTML-block rules end a generic ``<div>`` block at the first
+    blank line. ``entry_blocks.wrap_entry()`` always emits a blank line right
+    after the opening ``<div><sub>{ts}</sub>`` tag (to separate the timestamp
+    from multi-paragraph content), so marko's built-in ``HTMLBlock`` element
+    would otherwise stop treating the entry as opaque at that first blank line
+    and reparse everything after it as ordinary markdown — including any
+    ``## ``/``### ``-looking line inside the entry's own content (e.g. a
+    fact-checker verdict quoting one claim per heading) as a real section
+    boundary (#2956).
+
+    This element is registered with higher priority than ``Heading``,
+    ``HTMLBlock``, and ``Paragraph`` (see :data:`_ENTRY_AWARE_MARKDOWN`), so
+    once a line opens an entry block the parser hands the *entire* block —
+    every line up to the point ``<div>``/``</div>`` nesting returns to zero,
+    regardless of blank lines, code fences, or heading-shaped text inside — to
+    this element instead of descending into it looking for block-level
+    structure. Depth is tracked (not "stop at the first ``</div>``") because
+    entry content may itself contain further, unrelated ``<div>``/``</div>``
+    text; a first-match stop would end the opaque region early and let a
+    heading-lookalike line *after* that inner close fragment the section
+    again. That makes "a heading-lookalike line inside entry content is
+    mistaken for a section boundary" structurally impossible rather than
+    special-cased: no line inside an entry block is ever offered to the
+    block-level parser as a heading candidate in the first place, at any
+    nesting depth.
+    """
+
+    priority = 9  # Above ThematicBreak(8)/FencedCode(7)/Heading(6)/HTMLBlock(5)/Paragraph(1).
+
+    def __init__(self, lines: str) -> None:
+        self.body = lines
+
+    @classmethod
+    def match(cls, source: _MarkoSource) -> bool:
+        """Return whether the current line opens an entry block.
+
+        Returns:
+            ``True`` when the line matches the entry-block open marker.
+        """
+        return bool(source.expect_re(_ENTRY_DIV_OPEN_RE))
+
+    @classmethod
+    def parse(cls, source: _MarkoSource) -> str:
+        """Consume every line until ``<div>``/``</div`` nesting returns to zero.
+
+        Returns:
+            The raw, verbatim source text of the entry block.
+        """
+        lines: list[str] = []
+        depth = 0
+        while not source.exhausted:
+            line = source.next_line()
+            if line is None:
+                break
+            lines.append(line)
+            source.consume()
+            depth += _div_depth_delta(line)
+            if depth <= 0:
+                break
+        return "".join(lines)
+
+
+# Single shared marko instance used by every AST-based split in this module so
+# entry-block opacity is enforced identically everywhere, rather than each
+# caller independently re-deciding what counts as a section boundary.
+_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[_MarkoExtension(elements=[_EntryDivBlock])])
 
 
 def _extract_heading_text(node: _MarkoHeading) -> str:
@@ -851,7 +949,8 @@ def _extract_heading_text(node: _MarkoHeading) -> str:
 def _ast_h2_headings(text: str) -> list[str]:
     """Return level-2 heading texts from the marko AST in document order.
 
-    marko correctly ignores ``##`` lines inside fenced code blocks.
+    Uses :data:`_ENTRY_AWARE_MARKDOWN` so ``##`` lines inside fenced code
+    blocks or entry-block content are never misidentified as headings.
 
     Args:
         text: Raw markdown body text.
@@ -859,7 +958,7 @@ def _ast_h2_headings(text: str) -> list[str]:
     Returns:
         Ordered list of heading text strings (after ``## ``).
     """
-    doc = marko.parse(text)
+    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
     return [
         _extract_heading_text(child)
         for child in doc.children
@@ -876,7 +975,7 @@ def _ast_h3_headings(text: str) -> list[str]:
     Returns:
         Ordered list of heading text strings (after ``### ``).
     """
-    doc = marko.parse(text)
+    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
     return [
         _extract_heading_text(child)
         for child in doc.children
@@ -887,9 +986,13 @@ def _ast_h3_headings(text: str) -> list[str]:
 def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target_level: int) -> list[tuple[int, str]]:
     """Map AST heading texts to their 0-indexed source line numbers.
 
-    Uses a code-fence state tracker to skip ``#`` lines inside fenced code
-    blocks, then matches AST heading entries in document order by level.  Line
-    numbers are 0-indexed (offsets into ``raw_lines``).
+    The AST decides *which* lines are real headings; this function only
+    locates *where* each one lives in the original source so its exact
+    verbatim content (including entry-block HTML) can be sliced out. Its
+    state tracking must therefore recognise the same block boundaries the
+    AST does — code fences and entry blocks — or it can misalign a heading
+    text with the wrong source line once any ``#``-prefixed text appears
+    inside one of those opaque regions.
 
     Args:
         ast_headings: Heading texts extracted from the marko AST, in order.
@@ -899,15 +1002,21 @@ def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target
     Returns:
         List of ``(line_index, heading_text_from_source)`` tuples.
     """
-    "#" * target_level + " "
     result: list[tuple[int, str]] = []
     ast_idx = 0
     in_fence = False
+    entry_depth = 0
 
     for idx, line in enumerate(raw_lines):
         if ast_idx >= len(ast_headings):
             break
         stripped = line.lstrip()
+        if entry_depth > 0:
+            entry_depth += _div_depth_delta(line)
+            continue
+        if _ENTRY_DIV_OPEN_RE.match(line):
+            entry_depth = _div_depth_delta(line)
+            continue
         if stripped.startswith(("```", "~~~")):
             in_fence = not in_fence
             continue

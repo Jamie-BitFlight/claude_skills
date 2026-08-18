@@ -18,6 +18,7 @@ from ruamel.yaml import YAML
 
 from .models import BacklogItem
 from .parsing import parse_item_file
+from .rendering import normalize_unknown_sections
 
 _log = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ def load_item(path: Path) -> BacklogItem:
         with path.open(encoding="utf-8") as fh:
             data = yaml.load(fh)
         item = BacklogItem.model_validate(data)
+        item.sections = normalize_unknown_sections(item.sections)
         item.file_path = str(path.resolve())
         return item
     # fmt == "legacy_md"
@@ -152,6 +154,7 @@ def load_item_text(text: str, path: Path) -> BacklogItem:
         yaml = YAML(typ="safe")
         data = yaml.load(StringIO(text))
         item = BacklogItem.model_validate(data)
+        item.sections = normalize_unknown_sections(item.sections)
         item.file_path = str(path)
         return item
     # fmt == "legacy_md"

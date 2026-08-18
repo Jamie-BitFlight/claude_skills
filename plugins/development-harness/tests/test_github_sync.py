@@ -10,8 +10,12 @@ _PLUGIN_ROOT = Path(__file__).parent.parent
 if str(_PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_ROOT))
 
+from backlog_core import rendering as _rendering
 from backlog_core.github_sync import merge_item, parse_issue_body, render_issue_body
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
+from backlog_core.operations import _normalize_section_key
+from backlog_core.parsing import extract_sections
+from hypothesis import HealthCheck, given, settings, strategies as st
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -528,7 +532,9 @@ class TestParseIssueBodyUnknownHeading:
         """parse_issue_body preserves ## headings that are not in _HEADING_TO_KEY.
 
         Unknown headings must not raise and must be stored under ``unknown__``
-        prefixed keys so content is not silently dropped.
+        prefixed keys so content is not silently dropped. Uses headings
+        confirmed absent from ``rendering.SECTION_HEADING`` (unlike "Story" and
+        "Acceptance Criteria", which are registered canonical sections).
         """
         # Arrange
         body = (
@@ -538,8 +544,8 @@ class TestParseIssueBodyUnknownHeading:
             "status: open\n"
             "added: 2026-01-01\n"
             "-->\n\n"
-            "## Story\n\nAs a developer.\n\n"
-            "## Acceptance Criteria\n\n- [ ] Done\n"
+            "## Migration Steps\n\nAs a developer.\n\n"
+            "## Custom Analysis\n\n- [ ] Done\n"
         )
 
         # Act
@@ -547,10 +553,10 @@ class TestParseIssueBodyUnknownHeading:
 
         # Assert — no bare key; sections stored under unknown__ prefix
         assert isinstance(result, BacklogItem)
-        assert "story" not in result.sections
-        assert "acceptance_criteria" not in result.sections
-        assert "unknown__story" in result.sections
-        assert "unknown__acceptance_criteria" in result.sections
+        assert "migration_steps" not in result.sections
+        assert "custom_analysis" not in result.sections
+        assert "unknown__migration_steps" in result.sections
+        assert "unknown__custom_analysis" in result.sections
 
     def test_parse_issue_body_existing_carries_non_body_fields(self) -> None:
         """parse_issue_body with existing carries over title, issue, source, plan.
@@ -794,21 +800,23 @@ class TestUnknownSectionPreservation:
         An unknown section present after the first parse must still be present
         (same key, same entry count) after re-rendering and re-parsing.
         """
-        # First parse: build from raw markdown
+        # First parse: build from raw markdown. "Custom Analysis" is confirmed
+        # absent from rendering.SECTION_HEADING (unlike "Impact Radius", now
+        # registered), so this genuinely exercises the unknown__ fallback path.
         body = (
             "<!-- backlog-metadata:\n"
             "priority: P1\ntype: Feature\nstatus: open\nadded: 2026-01-01\n-->\n\n"
-            "## Impact Radius\n\n<div><sub>2026-03-01T00:00:00Z</sub>\n\nContent.\n</div>\n"
+            "## Custom Analysis\n\n<div><sub>2026-03-01T00:00:00Z</sub>\n\nContent.\n</div>\n"
         )
         first_parsed = parse_issue_body(body)
-        assert "unknown__impact_radius" in first_parsed.sections
+        assert "unknown__custom_analysis" in first_parsed.sections
 
         # Re-render then re-parse
         rendered = render_issue_body(first_parsed)
         second_parsed = parse_issue_body(rendered, first_parsed)
 
-        assert "unknown__impact_radius" in second_parsed.sections
-        sec = second_parsed.sections["unknown__impact_radius"]
+        assert "unknown__custom_analysis" in second_parsed.sections
+        sec = second_parsed.sections["unknown__custom_analysis"]
         assert isinstance(sec, Section)
         assert len(sec.entries) == 1
 
@@ -830,3 +838,303 @@ class TestUnknownSectionPreservation:
         # Space-separated key must not appear
         assert "my_custom_section" not in result.sections
         assert "unknown__my_custom_section" in result.sections
+
+
+# ---------------------------------------------------------------------------
+# Regression: #2956 — local-write / GitHub-parse key-space mismatch
+# ---------------------------------------------------------------------------
+
+
+class TestSectionKeyRoundTripRegression:
+    """#2956: local writes and GitHub-parsed sections must converge on one key.
+
+    Before the fix, ``operations._normalize_section_key`` passed unrecognised
+    section names through verbatim (e.g. ``"Files"``) while
+    ``github_sync.parse_issue_body`` normalised the same heading, once parsed
+    back from a rendered GitHub body, to ``"unknown__files"``. The two keys
+    never collided, so every groom + reconcile cycle accumulated a duplicate
+    section under the ``unknown__`` prefix.
+    """
+
+    def test_normalize_section_key_matches_parse_side_for_unregistered_names(self) -> None:
+        """_normalize_section_key produces the same key parse_issue_body would.
+
+        Reproduces the exact mismatch reported in #2956 at the unit level for
+        names deliberately NOT registered in ``rendering.SECTION_HEADING``:
+        before the fix, ``_normalize_section_key("Files") == "Files"`` while a
+        GitHub round-trip of the same heading produced ``"unknown__files"`` —
+        two different dict keys for one section. This proves the underlying
+        write-path/parse-path fix works for ANY unregistered name, not just
+        the specific ones later added to the registry as a display-quality
+        improvement (see the next test).
+        """
+        for display_name, expected_key in [
+            ("Custom Analysis", "unknown__custom_analysis"),
+            ("Migration Steps", "unknown__migration_steps"),
+            ("Root Cause Investigation Notes", "unknown__root_cause_investigation_notes"),
+        ]:
+            assert _normalize_section_key(display_name) == expected_key
+
+    def test_normalize_section_key_resolves_registered_display_names(self) -> None:
+        """Sections registered in SECTION_HEADING resolve to their clean canonical key.
+
+        Canonical sections (the original 3, plus the commonly-observed set
+        added for #2956/#2964 — see rendering.SECTION_HEADING) resolve to a
+        clean snake_case key instead of falling through to the unknown__
+        fallback. This is a display-quality property (storage key cleanliness),
+        not the correctness fix — see the previous test for the property that
+        actually prevents data loss, which holds regardless of registration.
+        """
+        assert _normalize_section_key("RT-ICA") == "rt_ica"
+        assert _normalize_section_key("Fact-Check") == "fact_check"
+        assert _normalize_section_key("Issue Classification") == "issue_classification"
+        assert _normalize_section_key("Files") == "files"
+        assert _normalize_section_key("Impact Radius") == "impact_radius"
+        assert _normalize_section_key("Design Intent Alignment") == "design_intent_alignment"
+
+    def test_normalize_section_key_display_lookup_is_case_insensitive(self) -> None:
+        """The reverse display-value scan matches case-insensitively.
+
+        Regression guard: the parse-side lookup (github_sync._HEADING_TO_KEY,
+        keyed by ``heading.lower()``) is case-insensitive in both directions,
+        but the write-side reverse scan previously compared ``display == name``
+        exactly — so ``_normalize_section_key("Story")`` resolved to ``"story"``
+        while ``_normalize_section_key("story")`` fell through to
+        ``"unknown__story"``. Both casings of a registered display name must
+        resolve to the same canonical key.
+        """
+        assert _normalize_section_key("Story") == "story"
+        assert _normalize_section_key("story") == "story"
+        assert _normalize_section_key("STORY") == "story"
+        assert _normalize_section_key("rt-ica") == "rt_ica"
+
+    def test_custom_section_write_then_github_round_trip_does_not_duplicate(self) -> None:
+        """A locally-written custom section survives render+parse+merge under one key.
+
+        End-to-end reproduction of the #2956 duplication: write "Files" via the
+        same normalisation `backlog_groom` uses, render to a GitHub body, parse
+        that body back (simulating a reconcile), and merge. Only one section
+        key must exist afterward.
+        """
+        key = _normalize_section_key("Files")
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="src/app.py")])})
+
+        rendered = render_issue_body(item)
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key]
+
+    def test_unregistered_section_write_then_github_round_trip_preserves_content(self) -> None:
+        """A section name NOT in SECTION_HEADING still round-trips losslessly.
+
+        Explicit demonstration (requested for #2956/#2964) that the fix is a
+        general write-path/parse-path key-derivation guarantee, not something
+        that only works for the specific names later added to
+        rendering.SECTION_HEADING as a display-quality improvement. Uses
+        "Root Cause Investigation Notes" — confirmed absent from
+        SECTION_HEADING — for both the key AND the content round trip.
+        """
+        heading = "Root Cause Investigation Notes"
+        key = _normalize_section_key(heading)
+        assert key not in _rendering.SECTION_HEADING, f"{heading!r} must stay unregistered for this test to be valid"
+
+        content = "The root cause was traced to a stale cache entry."
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content=content)])})
+
+        rendered = render_issue_body(item)
+        assert "## Root Cause Investigation Notes" in rendered
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key]
+        sec = merged.sections[key]
+        assert isinstance(sec, Section)
+        assert len(sec.entries) == 1
+        assert sec.entries[0].content == content
+
+    def test_fact_checker_verdict_with_embedded_claim_headings_stays_one_section(self) -> None:
+        """A Fact-Check verdict quoting per-claim '## Claim N' headings does not fragment.
+
+        Reproduces the #2956 per-claim fragmentation: a fact-checker verdict
+        legitimately embeds ``## Claim N: "..."`` headings inside its own
+        content. Before the fix, ``extract_sections`` could not tell those
+        apart from real section boundaries, so a GitHub round-trip shattered
+        one Fact-Check entry into N spurious ``unknown__claim_n...`` sections.
+        """
+        key = _normalize_section_key("Fact-Check")
+        verdict = (
+            '## Claim 1: "some claim"\n\nVERDICT: VERIFIED\n\n---\n\n## Claim 2: "another claim"\n\nVERDICT: REFUTED'
+        )
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content=verdict)])})
+
+        rendered = render_issue_body(item)
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key]
+        sec = merged.sections[key]
+        assert isinstance(sec, Section)
+        assert len(sec.entries) == 1
+        assert "Claim 1" in sec.entries[0].content
+        assert "Claim 2" in sec.entries[0].content
+
+
+class TestExtractSectionsEntryBoundary:
+    """#2956: extract_sections must not split on '## ' lines inside an entry div."""
+
+    def test_embedded_heading_inside_entry_div_is_not_a_new_section(self) -> None:
+        """A '## ' line inside <div>...</div> entry content stays part of the section."""
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+            '## Claim 1: "something"\n\nVERDICT: VERIFIED\n'
+            "</div>\n"
+        )
+        sections = extract_sections(body)
+        assert list(sections.keys()) == ["## Fact-Check"]
+        assert 'Claim 1: "something"' in sections["## Fact-Check"]
+
+    def test_heading_after_entry_div_closes_is_still_a_new_section(self) -> None:
+        """A '## ' line after the entry div closes is correctly treated as a boundary."""
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\ncontent\n</div>\n\n"
+            "## Resources\n\n"
+            "<div><sub>2026-01-01T00:00:01Z</sub>\n\nmore content\n</div>\n"
+        )
+        sections = extract_sections(body)
+        assert set(sections.keys()) == {"## Fact-Check", "## Resources"}
+
+    def test_embedded_heading_after_nested_unrelated_div_stays_in_same_section(self) -> None:
+        """A '## ' line is not a boundary even after a nested, unrelated <div>...</div> closes.
+
+        Regression for a depth-tracking gap: stopping entry-block opacity at the
+        *first* bare '</div>' line (rather than tracking balanced <div>/</div>
+        nesting) would let this fake heading — which appears after an inner,
+        unrelated div fragment closes — escape back into ordinary markdown
+        parsing and fragment the section a second, different way.
+        """
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+            "before\n<div>\nnested\n</div>\n\n"
+            "## Claim 1: fake heading after inner div closes\n\nVERDICT: VERIFIED\n"
+            "</div>\n"
+        )
+        sections = extract_sections(body)
+        assert list(sections.keys()) == ["## Fact-Check"]
+        assert "fake heading after inner div closes" in sections["## Fact-Check"]
+
+    def test_embedded_heading_after_attributed_nested_div_stays_in_same_section(self) -> None:
+        """A nested div with attributes (e.g. ``<div class="note">``) does not escape opacity.
+
+        Regression for a literal-substring counting bug: ``line.count("<div>")``
+        does not match an attributed opening tag like ``<div class="note">``,
+        while ``line.count("</div>")`` still matches its close unconditionally.
+        That asymmetry drove the nesting-depth counter negative and ended entry
+        opacity one line early, letting a heading-lookalike line further down
+        escape as a spurious section (#2964 follow-up).
+        """
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+            'before\n<div class="note">inner note</div>\n\n'
+            "## Claim 1: fake heading after attributed div closes\n\nVERDICT: VERIFIED\n"
+            "</div>\n"
+        )
+        sections = extract_sections(body)
+        assert list(sections.keys()) == ["## Fact-Check"]
+        assert "fake heading after attributed div closes" in sections["## Fact-Check"]
+
+
+# ---------------------------------------------------------------------------
+# Property-based round trip: write -> render -> parse -> merge is lossless
+# ---------------------------------------------------------------------------
+
+# Balanced, individually well-formed adversarial fragments -- deliberately including
+# heading-lookalike lines, nested <div> content, and code fences (the exact bug
+# classes #2956 fixed). Each fragment keeps its own <div>/</div> tags balanced so a
+# generated example never trips the separate, out-of-scope entry_blocks.ENTRY_RE
+# greedy-match behavior on an unmatched tag -- this property targets section-boundary
+# detection, not entry-content regex matching. A "<div><sub>...</sub>...</div>"-shaped
+# fragment (mimicking a literal nested entry marker) is deliberately excluded: it
+# surfaced a real but distinct bug in entry_blocks.parse_entries's own ENTRY_RE
+# matching (filed as #2967), not in the section-boundary logic #2956 fixed.
+_ADVERSARIAL_FRAGMENTS = st.sampled_from([
+    "## Fake Heading Inside Content",
+    "### Fake Subheading",
+    "#### Even deeper fake heading",
+    "<div>\nnested content\n</div>",
+    "```python\nprint('fenced code fence lookalike')\n```",
+    "~~~\nfenced with tildes\n~~~",
+    "plain prose line",
+])
+
+_content_strategy = (
+    st.lists(_ADVERSARIAL_FRAGMENTS, min_size=1, max_size=8).map("\n\n".join).map(str.strip).filter(lambda s: s != "")
+)
+
+_section_name_strategy = st.text(
+    # Scoped to the realistic domain: printable ASCII letters/digits/punctuation,
+    # matching how agents and humans actually name sections ("Files", "Fact-Check",
+    # "Impact Radius"). Full-Unicode section names surfaced a real but narrow and
+    # unrelated defect during development of this test: rendering.py's display-title
+    # round trip (str.lower() / str.title()) is not idempotent for a handful of
+    # Unicode characters with special-case title mappings (e.g. MICRO SIGN U+00B5 ->
+    # title-cases to GREEK CAPITAL MU, a different codepoint) — filed separately as
+    # #2966 rather than fixed here, since it is a distinct bug class (a Unicode
+    # casing quirk) from what #2956 fixed (write-path vs. parse-path key mismatch).
+    # Requiring at least one alphanumeric character, and excluding literal
+    # underscores entirely, excludes another real but narrow and unrelated
+    # defect this test surfaced: any name containing a literal underscore
+    # (e.g. "_", "0_") round-trips through a different key each time, because
+    # heading_to_unknown_key's space<->underscore substitution cannot distinguish
+    # a literal underscore in the name from one it introduced itself — filed as
+    # #2968 rather than fixed here (a real display name is always a readable
+    # phrase and never contains a raw underscore, so this class of input is
+    # unrealistic for what this function is actually used for).
+    alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_characters="\n\r_"),
+    min_size=1,
+    max_size=40,
+).filter(lambda s: any(c.isalnum() for c in s))
+
+
+class TestSectionRoundTripProperty:
+    """Property: write -> render -> parse -> merge is lossless for arbitrary section names/content.
+
+    This is the guardrail #2956 exposed the absence of: nothing previously
+    enforced that the local-write key derivation (``_normalize_section_key``)
+    and the GitHub-parse key derivation (``parse_issue_body`` /
+    ``extract_sections``) actually agree — they were two independently
+    written functions that merely happened to be *expected* to match.
+    Adversarial content deliberately includes ``## ``-prefixed lines, nested
+    ``<div>`` fragments, and code fences so the property covers the exact bug
+    classes #2956 fixed, not just the originally reported symptom.
+    """
+
+    @given(section_name=_section_name_strategy, content=_content_strategy)
+    @settings(max_examples=200, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    def test_write_render_parse_round_trip_is_lossless(self, section_name: str, content: str) -> None:
+        """A section written locally survives a GitHub render -> parse -> merge cycle intact.
+
+        For any section name and any content (including adversarial content
+        that looks like markdown structure), the derived storage key must be
+        identical before and after the round trip, under one key only (no
+        ``unknown__`` duplicate), and the entry content must be preserved.
+        """
+        key = _normalize_section_key(section_name)
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content=content)])})
+
+        rendered = render_issue_body(item)
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key], (
+            f"Key did not round-trip for section_name={section_name!r}: "
+            f"expected [{key!r}], got {list(merged.sections.keys())!r}"
+        )
+        sec = merged.sections[key]
+        assert isinstance(sec, Section)
+        assert len(sec.entries) == 1
+        assert sec.entries[0].content == content

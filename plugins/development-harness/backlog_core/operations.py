@@ -73,7 +73,7 @@ from .parsing import (
     today,
     view_result_from_local_item,
 )
-from .rendering import SECTION_HEADING
+from .rendering import SECTION_HEADING, heading_to_unknown_key
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
@@ -882,31 +882,58 @@ def _apply_groomed_entries(
 
 
 def _normalize_section_key(name: str) -> str:
-    """Return the canonical snake_case storage key for a section name.
+    """Return the canonical storage key for a section name.
 
     Resolves display names (e.g. ``"RT-ICA"``) and aliases (e.g. ``"rt-ica"``) to
     the snake_case key used in ``SECTION_HEADING`` (e.g. ``"rt_ica"``).  Unknown
-    and custom section names are returned unchanged so they pass through as-is.
+    and custom section names (e.g. ``"Custom Analysis"``) are routed
+    through :func:`heading_to_unknown_key` — the same normaliser
+    ``github_sync.parse_issue_body`` applies to an unrecognised ``## Heading``
+    parsed back from a GitHub issue body.
+
+    Without this, a local write of e.g. ``"Files"`` stored the key verbatim
+    while a GitHub round-trip of the same rendered heading produced
+    ``"unknown__files"``: two different dict keys for one logical section,
+    so both survived every subsequent merge and the item accumulated a
+    duplicate under ``unknown__`` on every groom + reconcile cycle (#2956).
+    Routing both call sites through the same normaliser makes local writes
+    and GitHub-parsed sections collide on one key instead of two.
+
+    Leading/trailing whitespace on *name* is stripped before every lookup
+    below, so e.g. ``"RT-ICA "`` (trailing space) still resolves to the
+    canonical key rather than falling through to :func:`heading_to_unknown_key`
+    and producing a key that would not match a subsequent GitHub round trip
+    of the same (already-trimmed) heading text.
 
     Lookup order:
     1. ``SECTION_HEADING_ALIAS`` keyed by ``name.lower()`` — catches hyphened aliases.
-    2. Reverse scan of ``SECTION_HEADING`` for a matching display value — catches
-       display names stored verbatim (e.g. ``"RT-ICA"`` → ``"rt_ica"``).
-    3. Return *name* unchanged when no match is found.
+    2. Case-insensitive reverse scan of ``SECTION_HEADING`` for a matching display
+       value — catches display names stored verbatim (e.g. ``"RT-ICA"`` → ``"rt_ica"``),
+       matching case-insensitively for parity with the parse-side lookup
+       (``github_sync.py``'s ``_HEADING_TO_KEY.get(heading.lower())``) so a caller-supplied
+       ``"story"`` normalises the same as GitHub-parsed ``"Story"`` instead of falling
+       through to :func:`heading_to_unknown_key`.
+    3. Return *name* unchanged when it is already a normalised ``unknown__`` key
+       (idempotent re-normalisation of a key read back from storage).
+    4. Otherwise, normalise via :func:`heading_to_unknown_key`.
 
     Args:
-        name: Section name as provided by the caller (e.g. ``"RT-ICA"`` or ``"rt_ica"``).
+        name: Section name as provided by the caller (e.g. ``"RT-ICA"`` or ``"Custom Analysis"``).
 
     Returns:
-        Canonical snake_case key (e.g. ``"rt_ica"``), or *name* unchanged for unknown sections.
+        Canonical storage key, e.g. ``"rt_ica"`` for a canonical section or
+        ``"unknown__custom_analysis"`` for a custom one.
     """
+    name = name.strip()
     alias_key = SECTION_HEADING_ALIAS.get(name.lower())
     if alias_key is not None:
         return alias_key
     for snake_key, display in SECTION_HEADING.items():
-        if display == name:
+        if display.lower() == name.lower():
             return snake_key
-    return name
+    if name.startswith("unknown__"):
+        return name
+    return heading_to_unknown_key(name)
 
 
 def _write_groomed_to_item(
