@@ -22,7 +22,7 @@ from backlog_core.rendering import SECTION_HEADING, heading_to_unknown_key, norm
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
 _WRITE_RE = re.compile(r"""section=["']([^"']+)["']""")
-_READ_RE = re.compile(r"""sections(?:\[|\.get\()["']([^"']+)["']""")
+_READ_RE = re.compile(r"""["']?sections["']?(?:\]\[|\[|\.get\()["']([^"']+)["']""")
 
 
 def _iter_doc_files() -> list[Path]:

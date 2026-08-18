@@ -27,8 +27,8 @@ CLI's `backlog view` has no `summary` parameter — it always returns full secti
 
 Extract file paths using this priority order:
 
-1. Primary key: `response["sections"]["impact radius"]` (lowercase, as written by the impact-analyst swarm agent)
-2. Fallback key: `response["sections"]["resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius)
+1. Primary key: `response["sections"]["Impact Radius"]` (display-title key, as written by the impact-analyst swarm agent)
+2. Fallback key: `response["sections"]["Resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius)
 
 Use a regex to find all path-like tokens (e.g., `\S+\.\w+` patterns or lines beginning with a path segment) in whichever section is found.
 
