@@ -3157,6 +3157,61 @@ class TestViewItemUnknownSections:
         assert unknown_meta["num_entries"] == 2
         assert len(unknown_meta["entries"]) == 2
 
+    def test_display_title_collision_merges_instead_of_overwriting(self, mocker: MockerFixture) -> None:
+        """Two raw storage keys that display-title-collide are merged, not silently dropped.
+
+        Tests: _build_sections_from_yaml_item merges same-titled sections (mirroring
+               _build_sections_metadata's collision handling) instead of the second
+               entry overwriting the first in the result dict.
+        How: Write a YAML item with "unknown__issue_classification" (a custom section
+             that title-cases to "Issue Classification") and "issue_classification"
+             (the canonical section, same display title) as two distinct raw storage
+             keys. Both are guaranteed-unique storage keys but collide once passed
+             through _section_display_title. Call view_item and assert both sections'
+             entries are present under the single "Issue Classification" key.
+        Why: Before this fix, the second section silently overwrote the first in the
+             result dict — no error, no warning, entries from one section vanished.
+        """
+        import backlog_core.models as _m
+        from backlog_core.models import Entry, Section
+
+        mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+
+        backlog_dir = _m.get_backlog_dir()
+        filepath = backlog_dir / "p1-collision-item.yaml"
+
+        metadata = _m.BacklogItemMetadata(
+            source="test", added="2026-01-01", priority="P1", status="open", topic="collision-item"
+        )
+        item = _m.BacklogItem(
+            title="Collision Item",
+            description="Test display-title collision between distinct storage keys",
+            metadata=metadata,
+            file_path=str(filepath),
+            sections={
+                "unknown__issue_classification": Section(
+                    entries=[Entry(id="20260101T180000", content="Custom classification note")]
+                ),
+                "issue_classification": Section(
+                    entries=[Entry(id="20260101T180001", content="Canonical classification note")]
+                ),
+            },
+        )
+        _seed_items([item])
+
+        # Act
+        result = view_item("Collision Item")
+
+        # Assert: both sections' entries survive under the single collided display title
+        assert "Issue Classification" in result.sections
+        merged = cast("SectionEntryMetadata", result.sections["Issue Classification"])
+        contents = [e["content"] for e in merged["entries"]]
+        assert "Custom classification note" in contents, f"First section's content lost to overwrite, got: {contents}"
+        assert "Canonical classification note" in contents, (
+            f"Second section's content lost to overwrite, got: {contents}"
+        )
+        assert merged["num_entries"] == 2
+
 
 # ---------------------------------------------------------------------------
 # _rename_item_title — beads nanoid safe-skip (issue #2665)

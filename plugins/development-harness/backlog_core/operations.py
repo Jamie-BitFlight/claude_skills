@@ -1996,6 +1996,12 @@ def _build_sections_from_yaml_item(item: BacklogItem) -> dict[str, SectionEntryM
     for sec_name, sec_data in item.sections.items():
         if isinstance(sec_data, GroomedData):
             title = _section_display_title(sec_name, sec_data.date)
+            if title in result:
+                msg = (
+                    f"_build_sections_from_yaml_item collision: display title {title!r} already "
+                    f"holds a non-groomed section; cannot merge GroomedData into it"
+                )
+                raise TypeError(msg)
             result[title] = GroomedSectionMetadata(type="groomed", date=sec_data.date, subsections=sec_data.subsections)
         elif isinstance(sec_data, Section):
             entries = sec_data.entries
@@ -2005,7 +2011,17 @@ def _build_sections_from_yaml_item(item: BacklogItem) -> dict[str, SectionEntryM
             active_count = sum(1 for e in entries if not e.struck)
             struck_count = sum(1 for e in entries if e.struck)
             title = _section_display_title(sec_name)
-            result[title] = _SectionMetadata(num_entries=active_count, num_struck=struck_count, entries=entry_dicts)
+            if title in result:
+                existing = result[title]
+                if not _is_section_entry_metadata(existing):
+                    msg = (
+                        f"_build_sections_from_yaml_item collision: display title {title!r} already "
+                        f"holds a GroomedData section; cannot merge a Section into it"
+                    )
+                    raise TypeError(msg)
+                result[title] = _merge_section_entries(existing, entry_dicts)
+            else:
+                result[title] = _SectionMetadata(num_entries=active_count, num_struck=struck_count, entries=entry_dicts)
     return result
 
 
