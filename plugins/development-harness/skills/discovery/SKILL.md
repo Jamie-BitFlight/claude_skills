@@ -29,8 +29,8 @@ Note: the CLI's `backlog view` has no `summary`/`include_content` parameter (the
 progressive-disclosure compact-vs-full split) — it always returns the flat, full item content,
 which is the CLI equivalent of the MCP call's `summary=false` above.
 
-2. Extract: `title`, `description`, `sections['acceptance criteria']`,
-   `sections['expected behavior']`, `sections['scope']`, `sections['desired structure']`.
+2. Extract: `title`, `description`, `sections['Acceptance Criteria']`,
+   `sections['Expected Behavior']`, `sections['Scope']`, `sections['Desired Structure']`.
 3. Triage for HOW content (runs regardless of whether Step 2 is skipped):
    - Scan the loaded content for implementation proposals, design decisions, solution
      descriptions, named mechanisms, parameter names, API shapes, or data formats.

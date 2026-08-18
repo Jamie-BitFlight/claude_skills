@@ -59,10 +59,10 @@ If one or more qualifying commits exist → proceed to Phase 2.
 
 ```mermaid
 flowchart TD
-    Start(["Step 3.1: groomed=date confirmed"]) --> ExtractIR["Try sections['impact radius'] (lowercase key)"]
+    Start(["Step 3.1: groomed=date confirmed"]) --> ExtractIR["Try sections['Impact Radius'] (display-title key)"]
     ExtractIR --> IRPresent{"Key present<br>with file paths?"}
     IRPresent -->|"Yes"| HasFiles
-    IRPresent -->|"No — absent or empty"| Fallback["Try sections['resources'] as fallback<br>(older grooming template)"]
+    IRPresent -->|"No — absent or empty"| Fallback["Try sections['Resources'] as fallback<br>(older grooming template)"]
     Fallback --> HasFiles{"File paths found<br>in either section?"}
     HasFiles -->|"No files in either section"| Skip(["Skip staleness check<br>→ rt-ica-gate.md"])
     HasFiles -->|"Files found"| Phase1["Phase 1: git log --oneline<br>--after=groomed_date --diff-filter=AMRD<br>-- {impact_radius_files}"]
