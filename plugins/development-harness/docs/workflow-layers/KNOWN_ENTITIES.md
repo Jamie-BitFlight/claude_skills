@@ -264,19 +264,31 @@ Written via `backlog_groom(section="{name}", content=...)`, read via
 
 ### Body sections defined in item schema
 
-Canonical section order from `skills/backlog/references/item-schema.md`:
+Canonical top-level order from `skills/backlog/references/item-schema.md` / `skills/backlog/templates/item.md`:
 
 ```
-Description
-Acceptance Criteria
-Research First
-Suggested Location
+Description            ← not a `## ` section — creation-time template field, no sections[] key
+Acceptance Criteria     ← creation-time template field ("**Acceptance Criteria**:"); `acceptance_criteria`
+                           IS also a registered SECTION_HEADING key for `backlog_groom(section=...)` writes
+Research First          ← creation-time template field ("**Research first**:"), not a `## ` section
+Suggested Location      ← creation-time template field ("**Suggested location**:"); `suggested_location`
+                           is separately a registered SECTION_HEADING key
 Fact-Check
 RT-ICA
-Groomed
+Groomed                 ← special-cased in section_display_title(), not a plain SECTION_HEADING entry
+Acceptance Criteria Verification   ← written by `work-backlog-item close` via `backlog_resolve`;
+                                       detected by complete-milestone via raw header grep, not through
+                                       `sections[...]` or `_normalize_section_key` — no SECTION_HEADING
+                                       entry is needed for correctness (see #2979)
 ```
 
-Subsections under `Groomed` (written by `backlog-item-groomer`):
+`Fact-Check` and `RT-ICA` ARE registered `SECTION_HEADING` keys (`fact_check`, `rt_ica`) — they are
+both top-level `##` sections in the template AND written via `backlog_groom(section=...)`.
+
+Subsections under `## Groomed` (written as one block by `backlog-item-groomer` via `groomed_content`,
+parsed into `GroomedData.subsections` — **a separate namespace from `item.sections`/`SECTION_HEADING`**;
+looked up as `sections["Groomed"]["subsections"]["{name}"]`, never as a top-level `sections["{name}"]`,
+so these do not need — and as of this writing do not have — their own `SECTION_HEADING` entries):
 ```
 Reproducibility
 Priority
@@ -292,24 +304,56 @@ Files
 Decision
 ```
 
-Optional/context-dependent sections from `docs/backlog-item-groomed-schema.md`:
+Optional/context-dependent sections from `docs/backlog-item-groomed-schema.md`, cross-checked
+against `backlog_core/rendering.py`'s `SECTION_HEADING` (2026-08-18). Most of these are registered
+top-level `SECTION_HEADING` keys; three (`Human Input`, `Questions for Human`, `Blockers`) are not,
+and — per this reconciliation pass — have no current `section=` write-directive or `sections[...]`
+read evidence in `plugins/development-harness/{agents,skills}/**/*.md` either, so no registration
+was added for them (see note below; flagged per the Living Document Protocol, not silently
+dropped). `Acceptance Criteria Verification` is a separate case (see note above):
 ```
 Benefits
 Expected Behavior
 Desired Structure
-Human Input
-Questions for Human
+Human Input               ← no current section= write-directive or sections[] read evidence found;
+                              flagged, not removed (Living Document Protocol — do not silently drop)
+Questions for Human        ← same as Human Input: no current live-usage evidence found
 Resources
-Blockers
+Blockers                   ← no current section= write-directive or sections[] read evidence found;
+                              flagged, not removed
 Effort
 Issue Classification
 Root-Cause Analysis
 Acceptance Criteria Verification
 ```
 
-Source: `skills/backlog/references/item-schema.md` (L54–73),
+`Scope` and `Desired Structure` were added to `SECTION_HEADING` by #2979 — `discovery/SKILL.md`
+reads `sections['Scope']` / `sections['Desired Structure']` (Title Case) but neither key existed in
+the registry before. `Output / Evidence` was added to `SECTION_HEADING` by #2979 for the same
+reason: `groom/groom-drift.md` reads `sections["Output / Evidence"]` at the top level (distinct
+from the `## Groomed` subsection of the same display name) and the un-registered key previously
+round-tripped through the generic `unknown__` fallback with an embedded `/` character
+(`unknown__output_/_evidence`) instead of a clean canonical key.
+
+**Provenance note — `Story`, `Context`, `Working Register`, `Divergence Notes`:** these four keys
+are registered in `SECTION_HEADING` (added by #2964) but have NO current `section=` write-directive
+or `sections[...]` read evidence anywhere in `plugins/development-harness/{agents,skills}/**/*.md`
+as of this reconciliation (2026-08-18) — re-verified per #2979's finding, which remains accurate.
+Their registration is sourced from legacy production data (`unknown__story` × 352,
+`unknown__context` × 352 observed in the live `.dh` backlog cache during #2953/#2955/#2956
+investigation) — i.e. these display titles exist to give a clean, human-readable heading to
+sections that real historical backlog items already carry under those raw storage keys, not
+because any current doc instructs an agent to write or read them. `Divergence Notes` additionally
+appears as a live `## Divergence Notes` heading in **SAM task files** (`skills/start-task/SKILL.md`,
+`agents/context-refinement.md`) — a different artifact type from backlog items, parsed independently
+of `backlog_core`'s section mechanism entirely. Kept, not removed, per the Living Document Protocol
+below — flagging provenance is required before removal, and legacy data may still reference these
+keys.
+
+Source: `skills/backlog/references/item-schema.md` (L54–73), `skills/backlog/templates/item.md`,
 `docs/backlog-item-groomed-schema.md` (L64–81), `agents/impact-analyst.md`,
-`agents/fact-checker.md`, `agents/classifier.md`, `groom/finalize.md`.
+`agents/fact-checker.md`, `agents/classifier.md`, `agents/backlog-item-groomer.md`, `groom/finalize.md`,
+`backlog_core/rendering.py` `SECTION_HEADING` (full grep cross-check, 2026-08-18).
 
 ---
 
@@ -357,9 +401,12 @@ across corroborated workers, or escalates to a human if tied.
 
 ### Staleness
 
-This file was last generated on 2026-06-11 from source. If the plugin has changed
-since then, run an extraction pass — workers will discover and add missing entities
-as they trace each file.
+The Agents/Skills/MCP-tool/Registered-Artifacts sections were last generated on 2026-06-11 from
+source and have not been re-verified in this pass. The **Backlog Item Sections** section was
+reconciled on 2026-08-18 (#2979) against `backlog_core/rendering.py`'s `SECTION_HEADING` registry
+and a full `section=`/`sections[...]` grep of `plugins/development-harness/{agents,skills}/**/*.md`
+— see the provenance notes inline above. If the plugin has changed since either date, run an
+extraction pass — workers will discover and add missing entities as they trace each file.
 
 ---
 
