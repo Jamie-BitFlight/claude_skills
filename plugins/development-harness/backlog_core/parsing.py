@@ -834,7 +834,6 @@ _ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)")
 # "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see ENTRY_RE in
 # entry_blocks.py for the canonical parse-side pattern this mirrors).
 _ENTRY_DIV_OPEN = "<div><sub>"
-_ENTRY_DIV_CLOSE = "</div>"
 _ENTRY_DIV_OPEN_RE = re.compile(r" {0,3}" + re.escape(_ENTRY_DIV_OPEN))
 
 # Tag-boundary matchers for div-nesting depth tracking. A literal-substring count

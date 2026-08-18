@@ -36,46 +36,23 @@ __all__ = [
 
 # Section key (used in BacklogItem.sections) -> markdown heading text.
 #
-# The first three entries (fact_check, rt_ica, issue_classification) need an
-# explicit mapping because their correct display form cannot be derived by
-# the generic unknown-section fallback (title-casing "rt_ica" produces "Rt
-# Ica", not the acronym-cased "RT-ICA"; "fact_check" needs a hyphen, not a
-# space). Every entry below this point DOES already round-trip correctly
-# through the generic unknown__ fallback (#2956's write-path/parse-path fix
-# makes that true for ANY section name, registered or not) — registering
-# them here is a display-quality improvement only, not a correctness fix:
-# it gives grooming's most commonly observed sections a clean canonical
-# storage key (e.g. "files") instead of the "unknown__" prefix. Sourced from
-# a full grep of the real corrupted local cache for #2953/#2955 (the
-# ground-truth evidence for #2956) plus every literal `section=` value found
-# across plugins/development-harness/agents/*.md and skill references
-# (2026-08-18) — not a guessed or partial list.
+# These three need an explicit mapping because their correct display form
+# cannot be derived by the generic unknown-section fallback (title-casing
+# "rt_ica" produces "Rt Ica", not the acronym-cased "RT-ICA"; "fact_check"
+# needs a hyphen, not a space). Any OTHER section name already round-trips
+# correctly through the generic unknown__ fallback (#2956's write-path/
+# parse-path fix makes that true for ANY section name, registered or not) —
+# adding a name here is a display-quality improvement only (a clean
+# canonical key instead of an "unknown__" prefix), never a correctness
+# requirement. Extending this registry with more commonly-observed section
+# names belongs to #2970's normalize-on-read design (see
+# rendering.normalize_unknown_sections), not to this file in isolation —
+# see #2964 review discussion for why a broad batch of new entries here was
+# split out.
 SECTION_HEADING: dict[str, str] = {
     "fact_check": "Fact-Check",
     "rt_ica": "RT-ICA",
     "issue_classification": "Issue Classification",
-    "files": "Files",
-    "resources": "Resources",
-    "impact": "Impact",
-    "impact_radius": "Impact Radius",
-    "dependencies": "Dependencies",
-    "priority": "Priority",
-    "benefits": "Benefits",
-    "research": "Research",
-    "design_intent_alignment": "Design Intent Alignment",
-    "acceptance_criteria": "Acceptance Criteria",
-    "expected_behavior": "Expected Behavior",
-    "effort": "Effort",
-    "reproducibility": "Reproducibility",
-    "story": "Story",
-    "context": "Context",
-    "working_register": "Working Register",
-    "suggested_location": "Suggested Location",
-    "concerns": "Concerns",
-    "divergence_notes": "Divergence Notes",
-    "execution_results": "Execution Results",
-    "grooming_notes": "Grooming Notes",
-    "root_cause_analysis": "Root-Cause Analysis",
 }
 
 # Frozenset of the display values in SECTION_HEADING.
@@ -154,13 +131,15 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
 
     A local YAML cache written before a name was registered in
     :data:`SECTION_HEADING` stores it as ``unknown__{key}`` (e.g.
-    ``unknown__story``).  Once that name becomes canonical, a freshly parsed
-    GitHub body produces the same logical section under the plain key
-    (``story``) instead — two different dict keys for one heading, which
-    survive :func:`github_sync.merge_item`'s key-union merge and render as a
-    duplicated ``## Story`` heading (#2956 follow-up). Resolving legacy
-    ``unknown__`` keys against the current registry at load time — before
-    reconciliation ever sees the item — makes both sides collide on one key.
+    ``unknown__issue_classification``). Once that name becomes canonical, a
+    freshly parsed GitHub body produces the same logical section under the
+    plain key (``issue_classification``) instead — two different dict keys
+    for one heading, which survive :func:`github_sync.merge_item`'s
+    key-union merge and render as a duplicated heading (#2956 follow-up).
+    Resolving legacy ``unknown__`` keys against the current registry at load
+    time — before reconciliation ever sees the item — makes both sides
+    collide on one key. This same mechanism is what #2970's normalize-on-read
+    design needs when the registry is later extended.
 
     When both ``unknown__{key}`` and ``{key}`` are present in the same
     ``sections`` dict (e.g. a manually edited cache file), their entries are

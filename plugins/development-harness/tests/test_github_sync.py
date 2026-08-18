@@ -878,19 +878,16 @@ class TestSectionKeyRoundTripRegression:
     def test_normalize_section_key_resolves_registered_display_names(self) -> None:
         """Sections registered in SECTION_HEADING resolve to their clean canonical key.
 
-        Canonical sections (the original 3, plus the commonly-observed set
-        added for #2956/#2964 — see rendering.SECTION_HEADING) resolve to a
-        clean snake_case key instead of falling through to the unknown__
-        fallback. This is a display-quality property (storage key cleanliness),
-        not the correctness fix — see the previous test for the property that
-        actually prevents data loss, which holds regardless of registration.
+        Canonical sections (the original 3 — see rendering.SECTION_HEADING)
+        resolve to a clean snake_case key instead of falling through to the
+        unknown__ fallback. This is a display-quality property (storage key
+        cleanliness), not the correctness fix — see the previous test for the
+        property that actually prevents data loss, which holds regardless of
+        registration.
         """
         assert _normalize_section_key("RT-ICA") == "rt_ica"
         assert _normalize_section_key("Fact-Check") == "fact_check"
         assert _normalize_section_key("Issue Classification") == "issue_classification"
-        assert _normalize_section_key("Files") == "files"
-        assert _normalize_section_key("Impact Radius") == "impact_radius"
-        assert _normalize_section_key("Design Intent Alignment") == "design_intent_alignment"
 
     def test_normalize_section_key_display_lookup_is_case_insensitive(self) -> None:
         """The reverse display-value scan matches case-insensitively.
@@ -898,15 +895,17 @@ class TestSectionKeyRoundTripRegression:
         Regression guard: the parse-side lookup (github_sync._HEADING_TO_KEY,
         keyed by ``heading.lower()``) is case-insensitive in both directions,
         but the write-side reverse scan previously compared ``display == name``
-        exactly — so ``_normalize_section_key("Story")`` resolved to ``"story"``
-        while ``_normalize_section_key("story")`` fell through to
-        ``"unknown__story"``. Both casings of a registered display name must
-        resolve to the same canonical key.
+        exactly — so ``_normalize_section_key("Issue Classification")``
+        resolved to ``"issue_classification"`` while
+        ``_normalize_section_key("issue classification")`` fell through to
+        ``"unknown__issue_classification"``. "Issue Classification" (unlike
+        "RT-ICA"/"Fact-Check") has no entry in SECTION_HEADING_ALIAS, so this
+        exercises the reverse-scan branch specifically, not the alias-table
+        lookup that already normalises case via ``.lower()``.
         """
-        assert _normalize_section_key("Story") == "story"
-        assert _normalize_section_key("story") == "story"
-        assert _normalize_section_key("STORY") == "story"
-        assert _normalize_section_key("rt-ica") == "rt_ica"
+        assert _normalize_section_key("Issue Classification") == "issue_classification"
+        assert _normalize_section_key("issue classification") == "issue_classification"
+        assert _normalize_section_key("ISSUE CLASSIFICATION") == "issue_classification"
 
     def test_custom_section_write_then_github_round_trip_does_not_duplicate(self) -> None:
         """A locally-written custom section survives render+parse+merge under one key.

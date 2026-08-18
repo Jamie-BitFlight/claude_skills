@@ -319,17 +319,17 @@ class TestLoadItemYaml:
         assert struck.struck_at == "2026-02-02T14:00:00Z"
 
     def test_load_item_folds_legacy_unknown_key_into_now_canonical_key(self, tmp_path: Path) -> None:
-        """load_item folds a legacy ``unknown__story`` key into ``story``.
+        """load_item folds a legacy ``unknown__issue_classification`` key into ``issue_classification``.
 
-        Regression guard for #2956 follow-up: a cache file written before
-        "Story" was registered in SECTION_HEADING stored it as
-        ``unknown__story``. Loading it must expose the canonical ``story``
-        key so a subsequent merge against a freshly-parsed GitHub body (which
-        always produces ``story``) collides on one key instead of rendering
-        the section twice.
+        Regression guard for #2956 follow-up: a cache file written before a
+        name was registered in SECTION_HEADING stores it as an ``unknown__``
+        key. Loading it must expose the canonical key so a subsequent merge
+        against a freshly-parsed GitHub body (which always produces the
+        canonical key) collides on one key instead of rendering the section
+        twice.
         """
         # Arrange
-        item = BacklogItem(sections={"unknown__story": Section(entries=[])})
+        item = BacklogItem(sections={"unknown__issue_classification": Section(entries=[])})
         dest = tmp_path / "item.yaml"
         save_item(item, dest)
 
@@ -337,8 +337,8 @@ class TestLoadItemYaml:
         result = load_item(dest)
 
         # Assert
-        assert "story" in result.sections
-        assert "unknown__story" not in result.sections
+        assert "issue_classification" in result.sections
+        assert "unknown__issue_classification" not in result.sections
 
     def test_load_item_leaves_genuinely_unknown_key_unchanged(self, tmp_path: Path) -> None:
         """load_item does not rename an ``unknown__`` key that is still uncanonical.
@@ -359,7 +359,7 @@ class TestLoadItemYaml:
         assert "unknown__custom_analysis" in result.sections
 
     def test_load_item_merges_entries_when_both_legacy_and_canonical_keys_present(self, tmp_path: Path) -> None:
-        """load_item merges entries when both ``unknown__story`` and ``story`` exist.
+        """load_item merges entries when both ``unknown__issue_classification`` and ``issue_classification`` exist.
 
         A manually edited or partially migrated cache file could contain both
         keys for the same section; folding must not silently drop entries
@@ -368,8 +368,10 @@ class TestLoadItemYaml:
         # Arrange
         item = BacklogItem(
             sections={
-                "unknown__story": Section(entries=[Entry(id="2026-01-01T00:00:00", content="legacy entry")]),
-                "story": Section(entries=[Entry(id="2026-01-02T00:00:00", content="canonical entry")]),
+                "unknown__issue_classification": Section(
+                    entries=[Entry(id="2026-01-01T00:00:00", content="legacy entry")]
+                ),
+                "issue_classification": Section(entries=[Entry(id="2026-01-02T00:00:00", content="canonical entry")]),
             }
         )
         dest = tmp_path / "item.yaml"
@@ -379,7 +381,7 @@ class TestLoadItemYaml:
         result = load_item(dest)
 
         # Assert
-        sec = result.sections["story"]
+        sec = result.sections["issue_classification"]
         assert isinstance(sec, Section)
         assert {e.content for e in sec.entries} == {"legacy entry", "canonical entry"}
 
