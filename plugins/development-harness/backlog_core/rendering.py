@@ -78,6 +78,7 @@ SECTION_HEADING: dict[str, str] = {
     "root_cause_analysis": "Root-Cause Analysis",
     "scope": "Scope",
     "desired_structure": "Desired Structure",
+    "output_evidence": "Output / Evidence",
 }
 
 # Frozenset of the display values in SECTION_HEADING.
