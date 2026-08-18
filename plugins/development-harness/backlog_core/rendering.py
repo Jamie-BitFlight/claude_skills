@@ -13,6 +13,7 @@ Do not import from github_sync, operations, gh_client, or server.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from .models import Section
@@ -76,12 +77,28 @@ SECTION_HEADING: dict[str, str] = {
     "execution_results": "Execution Results",
     "grooming_notes": "Grooming Notes",
     "root_cause_analysis": "Root-Cause Analysis",
+    "scope": "Scope",
+    "desired_structure": "Desired Structure",
+    "output_evidence": "Output / Evidence",
 }
 
 # Frozenset of the display values in SECTION_HEADING.
 # Used by section_display_title to recognise display-name keys stored verbatim
 # (e.g. "RT-ICA") that bypass the snake_case lookup but are already correct.
 _SECTION_HEADING_VALUES: frozenset[str] = frozenset(SECTION_HEADING.values())
+
+# Reverse lookup: lowercased display title -> canonical snake_case key.
+# Used by normalize_unknown_sections to fold an unknown__ key into its
+# now-canonical counterpart by comparing display titles rather than raw
+# storage-key text, so a key produced under an older, less-sanitized
+# heading_to_unknown_key() (e.g. "unknown__output_/_evidence") still folds
+# once its title ("Output / Evidence") matches a registered entry.
+_SECTION_HEADING_BY_LOWER_TITLE: dict[str, str] = {v.lower(): k for k, v in SECTION_HEADING.items()}
+
+# Matches any run of characters that are not lowercase ASCII letters or
+# digits, so heading_to_unknown_key() collapses ALL punctuation (spaces,
+# slashes, etc.) to a single separator instead of only spaces.
+_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 
 # Canonical render order for GroomedData subsections (heading text as stored)
 GROOMED_SUBSECTION_ORDER: list[str] = [
@@ -121,9 +138,15 @@ def heading_to_unknown_key(heading_text: str) -> str:
     """Convert an arbitrary section heading/name to its canonical storage key.
 
     Inverse of :func:`unknown_key_to_heading`. Normalises by lowercasing and
-    replacing spaces with underscores, then prepends the ``"unknown__"``
+    collapsing every run of non-alphanumeric characters (spaces, slashes,
+    punctuation) to a single underscore, then prepends the ``"unknown__"``
     prefix so unknown section keys never collide with :data:`SECTION_HEADING`
-    keys (e.g. ``"fact_check"``).
+    keys (e.g. ``"fact_check"``). Sanitizing all punctuation — not just
+    spaces — keeps the derivation stable for any future name containing a
+    character like ``/`` (see #2979 follow-up: ``"Output / Evidence"``
+    previously produced ``"unknown__output_/_evidence"``, a key that could
+    never match a later-registered ``"output_evidence"`` SECTION_HEADING
+    entry via plain string equality).
 
     This is the single normalisation used on both sides of the local-write /
     GitHub-parse boundary: :mod:`operations` calls it when storing a section
@@ -145,7 +168,7 @@ def heading_to_unknown_key(heading_text: str) -> str:
     Returns:
         Storage key such as ``"unknown__custom_analysis"``.
     """
-    normalised = heading_text.strip().lower().replace(" ", "_")
+    normalised = _NON_ALNUM_RE.sub("_", heading_text.strip().lower()).strip("_")
     return f"unknown__{normalised}"
 
 
@@ -166,6 +189,13 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     ``sections`` dict (e.g. a manually edited cache file), their entries are
     concatenated, deduplicating by entry ``id``.
 
+    The fold matches by display title (:func:`unknown_key_to_heading` output),
+    not by raw key-string equality — so a legacy ``unknown__`` key produced
+    before :func:`heading_to_unknown_key` sanitized punctuation (e.g.
+    ``"unknown__output_/_evidence"``, whose title is ``"Output / Evidence"``)
+    still folds into a later-registered canonical key even though its raw
+    text never matches the key sanitized writes now produce.
+
     Args:
         sections: Raw ``BacklogItem.sections`` mapping as loaded from storage.
 
@@ -178,9 +208,9 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     for key, value in sections.items():
         target = key
         if key.startswith("unknown__") and isinstance(value, Section):
-            candidate = key.removeprefix("unknown__")
-            if candidate in SECTION_HEADING:
-                target = candidate
+            canonical = _SECTION_HEADING_BY_LOWER_TITLE.get(unknown_key_to_heading(key).lower())
+            if canonical is not None:
+                target = canonical
         existing = normalized.get(target)
         if isinstance(existing, Section) and isinstance(value, Section):
             seen_ids = {e.id for e in existing.entries}

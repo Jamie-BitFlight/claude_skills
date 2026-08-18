@@ -72,8 +72,8 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
 Note: the CLI's `backlog view` has no `summary` toggle (documented gap in the MCP↔CLI mapping,
 verified 2026-08-05) — it always returns the flatter, full-content equivalent of `summary=false`.
 
-2. Extract: `title`, `description`, `sections['acceptance criteria']`,
-   `sections['expected behavior']`, `sections['impact radius']`, and any other populated sections.
+2. Extract: `title`, `description`, `sections['Acceptance Criteria']`,
+   `sections['Expected Behavior']`, `sections['Impact Radius']`, and any other populated sections.
 3. Use the loaded content as the goal input for the RT-ICA procedure below.
 4. After completing the assessment, write the RT-ICA result back to the item:
 
