@@ -892,6 +892,22 @@ class TestSectionKeyRoundTripRegression:
         assert _normalize_section_key("Impact Radius") == "impact_radius"
         assert _normalize_section_key("Design Intent Alignment") == "design_intent_alignment"
 
+    def test_normalize_section_key_display_lookup_is_case_insensitive(self) -> None:
+        """The reverse display-value scan matches case-insensitively.
+
+        Regression guard: the parse-side lookup (github_sync._HEADING_TO_KEY,
+        keyed by ``heading.lower()``) is case-insensitive in both directions,
+        but the write-side reverse scan previously compared ``display == name``
+        exactly — so ``_normalize_section_key("Story")`` resolved to ``"story"``
+        while ``_normalize_section_key("story")`` fell through to
+        ``"unknown__story"``. Both casings of a registered display name must
+        resolve to the same canonical key.
+        """
+        assert _normalize_section_key("Story") == "story"
+        assert _normalize_section_key("story") == "story"
+        assert _normalize_section_key("STORY") == "story"
+        assert _normalize_section_key("rt-ica") == "rt_ica"
+
     def test_custom_section_write_then_github_round_trip_does_not_duplicate(self) -> None:
         """A locally-written custom section survives render+parse+merge under one key.
 
