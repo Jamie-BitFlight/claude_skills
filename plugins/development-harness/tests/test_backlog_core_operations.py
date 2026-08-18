@@ -254,6 +254,105 @@ class TestAddItemCreatesLocalFile:
 
         assert _stored_item(str(result["file_path"])).title == "Frontmatter Title Test"
 
+    def test_add_item_persists_type_prefixed_title_from_github_creation(self, mocker: MockerFixture) -> None:
+        """Verify add_item persists the type-prefixed title create_issue_for_item sends to GitHub.
+
+        Tests: item_to_write.title reuses item_data.title after GitHub issue creation (#2963).
+        How: Mock create_issue_for_item with a side_effect that mutates item.title in place
+             (matching gh_client.create_issue_for_item's real post-fix behavior) and returns
+             an issue number; assert the persisted item's title carries that same prefix.
+        Why: Before the fix, the persisted title was built from the raw, unprefixed local
+             `title` argument, permanently diverging from the live GitHub issue title (which
+             always carries a "{type}: " prefix). That divergence breaks the title-equality
+             check `_GitHubReconciliation.reconcile()` uses to acknowledge (dequeue) this
+             item's pending mutations, so they never drain on any later reconcile.
+        """
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
+
+        def fake_create_issue_for_item(
+            repository: object, item: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            item.title = f"refactor: {item.title}"
+            return 314
+
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        result = add_item(title="Split the parser module", description="desc", priority="P1", type_="Refactor")
+
+        stored = _stored_item(str(result["file_path"]))
+        assert stored.title == "refactor: Split the parser module"
+
+    def test_backfill_issue_creation_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
+        """Verify _create_issue_and_update_item persists the type-prefixed title too (#2963).
+
+        Tests: the "backfill a missing GitHub issue for an existing local-only item" path
+               (update_item's _create_issue_and_update_item, distinct from add_item's
+               creation path) also keeps the local title in sync with the live issue title.
+        How: Create a local-only item (no GitHub), then call _create_issue_and_update_item
+             directly with create_issue_for_item mocked to mutate item.title in place
+             (matching the real post-fix behavior) and return an issue number.
+        Why: update_item_metadata only received {"metadata": {"issue": ...}} before the fix
+             -- the title mutation on the in-memory item was silently discarded because
+             _apply_updates_to_item reloads a fresh copy from the backend by reference,
+             never seeing the caller's in-memory item.title change.
+        """
+        from backlog_core.operations import _create_issue_and_update_item
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        add_result = add_item(title="Backfill target item", description="desc", priority="P1", type_="Bug")
+        reference = str(add_result["reference"])
+        item = _stored_item(reference)
+
+        def fake_create_issue_for_item(
+            repository: object, target: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            target.title = f"fix: {target.title}"
+            return 271
+
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        issue_num = _create_issue_and_update_item(item, repo="owner/repo")
+
+        assert issue_num == 271
+        assert _stored_item(reference).title == "fix: Backfill target item"
+
+    def test_sync_create_missing_issues_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
+        """Verify sync_create_missing_issues persists the type-prefixed title too (#2963).
+
+        Tests: the bulk "create GitHub issues for all items missing them" sync path
+               (sync_create_missing_issues -> find_or_create_issue) also keeps the
+               local title in sync with the live issue title after creation.
+        How: Create a local-only item (no GitHub), then call sync_create_missing_issues
+             directly with create_issue_for_item mocked to mutate item.title in place.
+        Why: The persistence call here only carried {"metadata": {"issue": ...}} before
+             the fix, same defect class as add_item and _create_issue_and_update_item.
+        """
+        from backlog_core.operations import sync_create_missing_issues
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        add_result = add_item(title="Sync backfill item", description="desc", priority="P1", type_="Docs")
+        reference = str(add_result["reference"])
+        item = _stored_item(reference)
+
+        def fake_create_issue_for_item(
+            repository: object, target: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            target.title = f"docs: {target.title}"
+            return 512
+
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        result = sync_create_missing_issues(
+            [item], repo="owner/repo", dry_run=False, repository=mock_repo, existing_issues={}
+        )
+
+        assert result["created"] == 1
+        assert _stored_item(reference).title == "docs: Sync backfill item"
+
     def test_add_item_always_calls_github(self, mocker: MockerFixture) -> None:
         """Verify add_item always attempts GitHub issue creation via try_get_github.
 

@@ -1244,6 +1244,22 @@ def create_issue_for_item(
 
     Uses GraphQL createIssue mutation with resolved label IDs.
 
+    Mutates ``item.title`` in place to the type-prefixed title actually sent to
+    GitHub (e.g. ``"refactor: {title}"``) once creation succeeds. Without this,
+    the local record keeps the caller-supplied, unprefixed title forever while
+    the live GitHub issue carries the prefixed one — the two titles never
+    converge on any subsequent reconcile. `_GitHubReconciliation.reconcile()`
+    only acknowledges (dequeues) a locally-queued work-item mutation once the
+    live snapshot's title exactly matches the queued item's title, as a guard
+    against acknowledging stale intent against a since-renamed issue; a
+    permanent title mismatch introduced at creation time defeats that guard
+    every time, so the mutation queue for every GitHub-backend item never
+    drains and every reconcile re-applies the same "still pending" content,
+    producing new duplicate provider-comment "patches" on each subsequent
+    reconcile (#2963). Mutating here — the single place the prefixed title is
+    computed — keeps the local record and the live issue title identical from
+    the moment of creation, for every caller, with no signature change.
+
     Returns:
         Issue number if created, None otherwise.
     """
@@ -1265,6 +1281,7 @@ def create_issue_for_item(
         if name not in label_id_map:
             out.warn(f"  WARNING: label '{name}' not found")
     created = _create_issue_graphql(repo, _get_repo_node_id(repo), issue_title, body, list(label_id_map.values()))
+    item.title = issue_title
     out.info(f"  Created #{created['number']}: {issue_title[:60]}...")
     return created["number"]
 
