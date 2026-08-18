@@ -2017,20 +2017,32 @@ def _build_sections_from_yaml_item(item: BacklogItem) -> dict[str, SectionEntryM
     Used when the item has no raw markdown body (i.e. it was created as a ``.yaml``
     file) but its ``sections`` field carries structured ``Section`` objects.
 
+    Keys are display titles (via :func:`_section_display_title`), not the raw
+    storage keys in ``item.sections`` — a canonical section is stored under a
+    snake_case key (e.g. ``"rt_ica"``) and a custom one under an ``unknown__``
+    key (e.g. ``"unknown__decision"``); callers of this function (``view_item``'s
+    YAML-only fallback path) expect the same human-readable names that the
+    GitHub-body and ``## Sections`` index paths already show (#2962).
+
     Args:
         item: The BacklogItem whose sections to convert.
 
     Returns:
-        Mapping of section name to entry metadata.  ``Section`` entries follow the
+        Mapping of display title to entry metadata.  ``Section`` entries follow the
         :class:`SectionEntryMetadata` shape.  ``GroomedData`` entries follow the
         :class:`GroomedSectionMetadata` shape (``"type": "groomed"`` discriminator).
     """
     result: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {}
     for sec_name, sec_data in item.sections.items():
         if isinstance(sec_data, GroomedData):
-            result[sec_name] = GroomedSectionMetadata(
-                type="groomed", date=sec_data.date, subsections=sec_data.subsections
-            )
+            title = _section_display_title(sec_name, sec_data.date)
+            if title in result:
+                msg = (
+                    f"_build_sections_from_yaml_item collision: display title {title!r} already "
+                    f"holds a non-groomed section; cannot merge GroomedData into it"
+                )
+                raise TypeError(msg)
+            result[title] = GroomedSectionMetadata(type="groomed", date=sec_data.date, subsections=sec_data.subsections)
         elif isinstance(sec_data, Section):
             entries = sec_data.entries
             entry_dicts: list[SectionEntryDict] = [
@@ -2038,7 +2050,18 @@ def _build_sections_from_yaml_item(item: BacklogItem) -> dict[str, SectionEntryM
             ]
             active_count = sum(1 for e in entries if not e.struck)
             struck_count = sum(1 for e in entries if e.struck)
-            result[sec_name] = _SectionMetadata(num_entries=active_count, num_struck=struck_count, entries=entry_dicts)
+            title = _section_display_title(sec_name)
+            if title in result:
+                existing = result[title]
+                if not _is_section_entry_metadata(existing):
+                    msg = (
+                        f"_build_sections_from_yaml_item collision: display title {title!r} already "
+                        f"holds a GroomedData section; cannot merge a Section into it"
+                    )
+                    raise TypeError(msg)
+                result[title] = _merge_section_entries(existing, entry_dicts)
+            else:
+                result[title] = _SectionMetadata(num_entries=active_count, num_struck=struck_count, entries=entry_dicts)
     return result
 
 
