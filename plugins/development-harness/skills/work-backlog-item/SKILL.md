@@ -25,24 +25,13 @@ Coerce <provided_arguments/> to match this schema, then treat the result as `<in
 
 Argument vocabulary:
 
-- **Route** — the first positional word only, when it matches one of: `create`, `groom`, `work`, `close`, `resolve`, `setup-github`, `progress`, `resume`. The same word appearing later (e.g. inside a title) is not a route. No match on the first positional → `route` is `title_substring` (positionals or freetext remain) or `none` (nothing at all — no flags, no positionals, no freetext).
-- **item_ref discriminator** — any positional matching `#N`, bare digits, or a GitHub issue URL (`https://github.com/{owner}/{repo}/issues/N`) → normalize to `#N` (keep a URL verbatim). Checked across *all* positionals, not just the first. When it is the *only* discriminator found (no registry route word present), `route` is the literal string `issue` — not `title_substring` — and no `reference` key is set (verified: `#42` alone → `{"mode":"interactive","route":"issue","item_ref":"#42"}`). A route word and an item_ref may both be present (e.g. `groom #50`, `close #42`) — that is `route` + `item_ref` together (registry route wins as `route`, `reference` is set from the table below), not a conflict. Two of the same kind (two routes, or two item refs) is a genuine conflict.
+- **Route** — the first positional word only, when it matches one of the keys registered in [command-routes.json](./scripts/parser/command-routes.json): `create`, `groom`, `work`, `close`, `resolve`, `setup-github`, `progress`, `resume`. Because only the first positional is ever checked, at most one route keyword can ever be found in a single invocation — there is no such thing as a "two routes" conflict. The same word appearing later (e.g. inside a title) is not a route. No match on the first positional → `route` is `title_substring` (positionals or freetext remain) or `none` (nothing at all — no flags, no positionals, no freetext).
+- **item_ref discriminator** — any positional matching `#N`, bare digits, or a GitHub issue URL (`https://github.com/{owner}/{repo}/issues/N`) → normalize to `#N` (keep a URL verbatim). Checked across *all* positionals, not just the first — including one embedded inside an otherwise-ordinary title (verified: `Fix bug on line 42` → `{"route":"issue","item_ref":"#42","user_text":"Fix bug on line"}` — the "42" is consumed as `item_ref` and removed from `user_text`, and `route` becomes `issue` rather than `title_substring`; be alert to this when a title happens to end in a number). When it is the *only* discriminator found (no registry route word present), `route` is the literal string `issue` — not `title_substring` — and no `reference` key is set (verified: `#42` alone → `{"mode":"interactive","route":"issue","item_ref":"#42"}`). A route word and one item_ref may both be present (e.g. `groom #50`, `close #42`) — that is `route` + `item_ref` together (registry route wins as `route`, `reference` is set per the route table above), not a conflict. **Two or more item_ref discriminators** in one invocation (e.g. `close #42 #55`) is the one real conflict case — ask the user to disambiguate rather than picking one.
 - **Freetext delimiter** — `--`, or a bare `—`/`–` (em/en dash — a mobile-autocorrect artifact; normalize a leading `—`/`–` on any token to `--`). Everything after the delimiter is `user_text` verbatim, regardless of content (quotes, code, punctuation — do not further tokenize it). No delimiter → `user_text` is whatever positionals remain after removing the route/item_ref tokens, space-joined.
-- **Flags** — `--language <value>`, `--stack <value>` (both take the next token as their value — a missing value is a stop-and-ask condition), `--force`, `--auto`, `--quick` (boolean, no value). `mode` is `auto` only when `--auto` is present, otherwise `interactive`.
+- **Flags** — `--language <value>`, `--stack <value>`: both take the *next* token as their value, but only when that next token does not itself start with `-` — a next token starting with `-` (including no next token at all) means the value is missing, a stop-and-ask condition, not "consume the next flag as this flag's value" (verified: `--language --stack python-fastapi` treats `--language` as missing its value; it does not consume `--stack` as the value). `--force`, `--auto`, `--quick` (boolean, no value). `mode` is `auto` only when `--auto` is present, otherwise `interactive`.
 - `--help`/`-h` present → show usage (this vocabulary plus `argument-hint` in the frontmatter) and stop; do not route.
 
-Route → reference file:
-
-| route | reference |
-|---|---|
-| `create` | `references/workflows/create/start.md` |
-| `groom` | `references/workflows/groom/start.md` |
-| `work` | `references/workflows/work/start.md` |
-| `close` | `references/workflows/close/start.md` |
-| `resolve` | `references/workflows/close/start.md` |
-| `setup-github` | `references/workflows/setup-github/start.md` |
-| `progress` | `references/workflows/progress/start.md` |
-| `resume` | `references/workflows/resume/start.md` |
+Route → reference file: see [command-routes.json](./scripts/parser/command-routes.json) — one JSON object, `route` keyword to reference-file path, do not hand-copy it here; if it changes, this vocabulary section does not need to.
 
 For every placeholder in the form <key/>, substitute the value of that key from `<input/>`.
 
@@ -64,12 +53,14 @@ flowchart TD
     %% No subprocess, no shell — coerce provided_arguments directly against the vocabulary above.
     Coerce["Coerce provided_arguments to the<br>parse.schema.json shape using the vocabulary above"] --> ReqCheck{"mode and route both derivable?"}
     ReqCheck -->|"No"| ErrReq(["STOP — ask for clarification;<br>mode/route are always derivable from the<br>vocabulary above, a miss here means the<br>input didn't match any covered shape"])
-    ReqCheck -->|"Yes"| ConflictCheck{"two discriminators of the same<br>kind present (two routes, or two<br>item_refs), or a flag missing<br>its required value?"}
+    ReqCheck -->|"Yes"| ConflictCheck{"two or more item_ref<br>discriminators present, or a flag<br>missing its required value?"}
     ConflictCheck -->|"Yes"| ErrConflict(["STOP — ask the user to disambiguate"])
     ConflictCheck -->|"No"| RouteCheck{"route is one of the registry<br>keywords (create/groom/work/close/<br>resolve/setup-github/progress/resume)?"}
     RouteCheck -->|"No — route is none, title_substring, or issue"| Ready(["input ready — proceed to routing"])
-    RouteCheck -->|"Yes"| RefLookup["Set reference from the route table above"]
-    RefLookup --> Ready
+    RouteCheck -->|"Yes"| RefLookup["Set reference from<br>command-routes.json"]
+    RefLookup --> NeedRefCheck{"route is close or resolve,<br>and item_ref/user_text both absent?"}
+    NeedRefCheck -->|"Yes"| ErrNoTarget(["STOP — ask which item to<br>close/resolve; close/start.md's<br>Step 5.2 selector requires one"])
+    NeedRefCheck -->|"No"| Ready
 ```
 
 Input contract — keys available after coercion:
@@ -144,13 +135,13 @@ When invoked with no arguments, shows an interactive browser. When invoked with 
 
 ## Arguments
 
-**Agent Preflight:** `<input/>` is a value you derive by reasoning against the vocabulary above — see the coercion step near the top of this file. `parse.mjs` (referenced in [parser-guide.md](./scripts/parser/parser-guide.md)) is the standalone, scriptable equivalent of that same schema for non-agent callers (tests, other tooling) — it is not part of this skill's own execution path and this skill never shells out to it.
+**Agent Preflight:** `<input/>` is a value you derive by reasoning against the vocabulary above — see the coercion step near the top of this file. `parse.mjs` (referenced in [parser-guide.md](./scripts/parser/parser-guide.md)) is a deterministic reference implementation of the same schema, kept in sync with the vocabulary above by hand — it is not part of this skill's own execution path and this skill never shells out to it. It has at least one other real caller (`.claude/skills/example-argument-substitution/SKILL.md`); it does not currently have a test suite.
 
 Parser `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
 
 Full field derivation rules (route, item_ref, flags, delimiter, mode) are in the "Argument vocabulary" section near the top of this file — this section does not restate them.
 
-**Known gap, not yet implemented:** the vocabulary's item_ref discriminator recognizes `#N`, bare digits, and GitHub issue URLs only — a beads issue ID (e.g. `bd-a3f8`, relevant when `backend=beads`) is not recognized as an item_ref and falls through to `title_substring`. Verified against `parse.mjs`'s `issueRegex`, which has no beads-ID pattern.
+**Beads-ID handling, not a gap in practice:** the vocabulary's item_ref discriminator recognizes `#N`, bare digits, and GitHub issue URLs only — a beads issue ID (e.g. `bd-a3f8`, relevant when `backend=beads`) is not recognized as an item_ref and instead coerces to `route: "title_substring"`, `user_text: "bd-a3f8"` (verified against `parse.mjs`'s `issueRegex`, which has no beads-ID pattern). This still resolves correctly end-to-end: `backlog_core/parsing.py`'s `find_item()` has an explicit string-ID exact-match branch for non-integer selectors like beads nanoids, so passing `bd-a3f8` through as `user_text`/a `--selector` value finds the item. The only real gap is that `item_ref` itself is never set for a beads ID — downstream logic that specifically branches on `item_ref` being present (rather than treating `user_text` as a selector) would miss it.
 
 **Optional flags** (when `route` is `title_substring`, `issue`, or a pipeline route): `--language <lang>` selects language plugin (default: python); `--stack <profile>` selects stack profile (e.g., python-fastapi, python-cli). See [sdlc-layers](../../docs/sdlc-layers/).
 

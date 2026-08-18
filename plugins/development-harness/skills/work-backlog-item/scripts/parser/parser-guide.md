@@ -1,12 +1,12 @@
 # Work-backlog invocation parser
 
-Architecture doc for **`parse.mjs`**: internals, and how to extend routes, flags, item-ref token shapes, and schemas. Invoking the skill never needs this doc — `SKILL.md`'s `<input/>` block already runs the parser and gives you its JSON. Read this only to extend or debug `parse.mjs` itself.
+Architecture doc for **`parse.mjs`**: internals, and how to extend routes, flags, item-ref token shapes, and schemas. `SKILL.md` does not execute `parse.mjs` — it never shells out to anything; the agent coerces `<provided_arguments/>` to `parse.schema.json`'s shape directly, following the "Argument vocabulary" section in `SKILL.md` (a plain-English restatement of the rules documented here). `parse.mjs` remains the deterministic, scriptable reference implementation of those same rules — for extending/debugging the parsing contract itself, and for any other caller that still needs a real subprocess (see `.claude/skills/example-argument-substitution/SKILL.md`). Invoking the `work-backlog-item` skill never runs this script.
 
 Co-located files: **`parse.mjs`**, **`command-routes.json`**, **`command-routes.schema.json`**, **`parse.schema.json`**, and this guide.
 
 ## Why this exists
 
-`<input/>` pipes the raw invocation through this parser and treats its stdout JSON (`mode`, `route`, optional `reference`, `flags`, `item_ref`, `user_text`) as the source of truth for routing. This doc covers how that JSON gets built, for extending or debugging it.
+`SKILL.md`'s `<input/>` is the same JSON shape (`mode`, `route`, optional `reference`, `flags`, `item_ref`, `user_text`) this script emits on stdout — the agent derives it directly rather than running this script. This doc covers how the rules that shape produces work, for extending or debugging the parsing contract (in this script or in `SKILL.md`'s vocabulary section, which must be kept in sync with it).
 
 ## Files
 
