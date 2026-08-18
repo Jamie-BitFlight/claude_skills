@@ -1337,13 +1337,12 @@ class TestViewItem:
 
         sections = result.sections
         assert isinstance(sections, dict), "sections must be a dict"
-        # "Decision" is not a canonical section name (see rendering.SECTION_HEADING), so it is
-        # stored under its normalised unknown-section key — see operations._normalize_section_key.
-        assert "unknown__decision" in sections, (
-            f"Expected 'unknown__decision' in sections, got: {list(sections.keys())}"
-        )
+        # "Decision" is not a canonical section name (see rendering.SECTION_HEADING), so its raw
+        # storage key is "unknown__decision" — but view_item keys its output by display title
+        # (see operations._build_sections_from_yaml_item / #2971), not the raw storage key.
+        assert "Decision" in sections, f"Expected 'Decision' in sections, got: {list(sections.keys())}"
         # groom_item creates entry-block sections (SectionEntryMetadata shape).
-        decision = cast("SectionEntryMetadata", sections["unknown__decision"])
+        decision = cast("SectionEntryMetadata", sections["Decision"])
         assert decision["num_entries"] == 2
         assert len(decision["entries"]) == 2
 
