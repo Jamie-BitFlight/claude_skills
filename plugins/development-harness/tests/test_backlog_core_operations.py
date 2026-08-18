@@ -254,6 +254,105 @@ class TestAddItemCreatesLocalFile:
 
         assert _stored_item(str(result["file_path"])).title == "Frontmatter Title Test"
 
+    def test_add_item_persists_type_prefixed_title_from_github_creation(self, mocker: MockerFixture) -> None:
+        """Verify add_item persists the type-prefixed title create_issue_for_item sends to GitHub.
+
+        Tests: item_to_write.title reuses item_data.title after GitHub issue creation (#2963).
+        How: Mock create_issue_for_item with a side_effect that mutates item.title in place
+             (matching gh_client.create_issue_for_item's real post-fix behavior) and returns
+             an issue number; assert the persisted item's title carries that same prefix.
+        Why: Before the fix, the persisted title was built from the raw, unprefixed local
+             `title` argument, permanently diverging from the live GitHub issue title (which
+             always carries a "{type}: " prefix). That divergence breaks the title-equality
+             check `_GitHubReconciliation.reconcile()` uses to acknowledge (dequeue) this
+             item's pending mutations, so they never drain on any later reconcile.
+        """
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
+
+        def fake_create_issue_for_item(
+            repository: object, item: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            item.title = f"refactor: {item.title}"
+            return 314
+
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        result = add_item(title="Split the parser module", description="desc", priority="P1", type_="Refactor")
+
+        stored = _stored_item(str(result["file_path"]))
+        assert stored.title == "refactor: Split the parser module"
+
+    def test_backfill_issue_creation_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
+        """Verify _create_issue_and_update_item persists the type-prefixed title too (#2963).
+
+        Tests: the "backfill a missing GitHub issue for an existing local-only item" path
+               (update_item's _create_issue_and_update_item, distinct from add_item's
+               creation path) also keeps the local title in sync with the live issue title.
+        How: Create a local-only item (no GitHub), then call _create_issue_and_update_item
+             directly with create_issue_for_item mocked to mutate item.title in place
+             (matching the real post-fix behavior) and return an issue number.
+        Why: update_item_metadata only received {"metadata": {"issue": ...}} before the fix
+             -- the title mutation on the in-memory item was silently discarded because
+             _apply_updates_to_item reloads a fresh copy from the backend by reference,
+             never seeing the caller's in-memory item.title change.
+        """
+        from backlog_core.operations import _create_issue_and_update_item
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        add_result = add_item(title="Backfill target item", description="desc", priority="P1", type_="Bug")
+        reference = str(add_result["reference"])
+        item = _stored_item(reference)
+
+        def fake_create_issue_for_item(
+            repository: object, target: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            target.title = f"fix: {target.title}"
+            return 271
+
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        issue_num = _create_issue_and_update_item(item, repo="owner/repo")
+
+        assert issue_num == 271
+        assert _stored_item(reference).title == "fix: Backfill target item"
+
+    def test_sync_create_missing_issues_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
+        """Verify sync_create_missing_issues persists the type-prefixed title too (#2963).
+
+        Tests: the bulk "create GitHub issues for all items missing them" sync path
+               (sync_create_missing_issues -> find_or_create_issue) also keeps the
+               local title in sync with the live issue title after creation.
+        How: Create a local-only item (no GitHub), then call sync_create_missing_issues
+             directly with create_issue_for_item mocked to mutate item.title in place.
+        Why: The persistence call here only carried {"metadata": {"issue": ...}} before
+             the fix, same defect class as add_item and _create_issue_and_update_item.
+        """
+        from backlog_core.operations import sync_create_missing_issues
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        add_result = add_item(title="Sync backfill item", description="desc", priority="P1", type_="Docs")
+        reference = str(add_result["reference"])
+        item = _stored_item(reference)
+
+        def fake_create_issue_for_item(
+            repository: object, target: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            target.title = f"docs: {target.title}"
+            return 512
+
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        result = sync_create_missing_issues(
+            [item], repo="owner/repo", dry_run=False, repository=mock_repo, existing_issues={}
+        )
+
+        assert result["created"] == 1
+        assert _stored_item(reference).title == "docs: Sync backfill item"
+
     def test_add_item_always_calls_github(self, mocker: MockerFixture) -> None:
         """Verify add_item always attempts GitHub issue creation via try_get_github.
 
@@ -1238,15 +1337,43 @@ class TestViewItem:
 
         sections = result.sections
         assert isinstance(sections, dict), "sections must be a dict"
-        # "Decision" is not a canonical section name (see rendering.SECTION_HEADING), so it is
-        # stored under its normalised unknown-section key — see operations._normalize_section_key.
-        assert "unknown__decision" in sections, (
-            f"Expected 'unknown__decision' in sections, got: {list(sections.keys())}"
-        )
+        # "Decision" is not a canonical section name (see rendering.SECTION_HEADING), so its raw
+        # storage key is "unknown__decision" — but view_item keys its output by display title
+        # (see operations._build_sections_from_yaml_item / #2971), not the raw storage key.
+        assert "Decision" in sections, f"Expected 'Decision' in sections, got: {list(sections.keys())}"
         # groom_item creates entry-block sections (SectionEntryMetadata shape).
-        decision = cast("SectionEntryMetadata", sections["unknown__decision"])
+        decision = cast("SectionEntryMetadata", sections["Decision"])
         assert decision["num_entries"] == 2
         assert len(decision["entries"]) == 2
+
+    def test_view_item_yaml_fallback_shows_display_title_for_canonical_section(self, mocker: MockerFixture) -> None:
+        """view_item's YAML-only fallback shows the display title, not the raw storage key (#2962).
+
+        Tests: _build_sections_from_yaml_item keys its result by display title.
+        How: add_item then groom_item into the canonical "RT-ICA" section (no GitHub body
+             available, so view_item takes the YAML-only fallback path); call view_item.
+        Why: Before the fix, a canonical section groomed with no linked GitHub body was
+             stored under its snake_case key ("rt_ica") and view_item returned that raw
+             key verbatim instead of the documented display title ("RT-ICA") — confirmed
+             reproducible on unmodified main. Callers should never see internal storage
+             keys; every other section-display path (`## Sections` index,
+             `_render_section_index`) already resolves through the same
+             `_section_display_title` helper.
+        """
+        from backlog_core.models import Output
+
+        mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        out = Output()
+        ops.add_item(title="RT-ICA Display Title Test", priority="P1", description="Test", output=out)
+        ops.groom_item(selector="RT-ICA Display Title Test", section="RT-ICA", content="Verdict text.", output=out)
+        result = view_item(selector="RT-ICA Display Title Test", output=out)
+
+        sections = result.sections
+        assert isinstance(sections, dict), "sections must be a dict"
+        assert "rt_ica" not in sections, f"Raw storage key leaked into sections: {list(sections.keys())}"
+        assert "RT-ICA" in sections, f"Expected 'RT-ICA' in sections, got: {list(sections.keys())}"
 
 
 # ---------------------------------------------------------------------------
@@ -2827,21 +2954,29 @@ class TestGroomItemMarkGroomed:
 
 
 class TestViewItemUnknownSections:
-    """Unknown section keys (unknown__ prefix) survive through view_item into ViewItemResult.sections.
+    """Unknown-section content survives through view_item into ViewItemResult.sections,
+    keyed by display title rather than by its raw internal storage key.
 
-    These tests prove that `_build_sections_from_yaml_item` preserves freeform
-    `unknown__` prefixed keys — produced by `parse_issue_body` from GitHub issue
-    body headings not in `_HEADING_TO_KEY` — when assembling `ViewItemResult.sections`.
+    These tests prove that `_build_sections_from_yaml_item` preserves the content of
+    freeform `unknown__` prefixed keys — produced by `parse_issue_body` from GitHub
+    issue body headings not in `_HEADING_TO_KEY` — while presenting them to callers
+    under the same human-readable title `_section_display_title` produces for every
+    other section-display path (`## Sections` index, `_render_section_index`). Before
+    #2962, `_build_sections_from_yaml_item` returned the raw storage key verbatim
+    (e.g. ``"unknown__story"``, or ``"rt_ica"`` for a canonical section groomed with
+    no linked GitHub body) instead of the display title.
     """
 
     def test_unknown_section_key_present_in_view_result_sections(self, mocker: MockerFixture) -> None:
-        """Unknown-prefixed section key survives through view_item into ViewItemResult.sections.
+        """Unknown section's display title is present in ViewItemResult.sections.
 
-        Tests: _build_sections_from_yaml_item does not filter out unknown__ keys.
+        Tests: _build_sections_from_yaml_item does not filter out unknown__ keys, and
+               presents them under their display title, not the raw storage key.
         How: Write a YAML item with an unknown__impact_radius section; call view_item;
-             assert the key is present in result.sections.
-        Why: MCP clients receive result.sections as JSON — unknown section keys must
-             appear in the output or downstream consumers silently lose issue body content.
+             assert the display title "Impact Radius" is present in result.sections.
+        Why: MCP clients receive result.sections as JSON — unknown section content must
+             appear in the output, under a human-readable title, or downstream consumers
+             silently lose issue body content or see an internal storage key.
         """
         import backlog_core.models as _m
         from backlog_core.models import Entry, Section
@@ -2875,18 +3010,22 @@ class TestViewItemUnknownSections:
 
         # Assert
         assert isinstance(result, ViewItemResult)
-        assert "unknown__impact_radius" in result.sections, (
-            f"Expected 'unknown__impact_radius' in sections, got: {list(result.sections.keys())}"
+        assert "unknown__impact_radius" not in result.sections, (
+            f"Raw storage key leaked into sections: {list(result.sections.keys())}"
+        )
+        assert "Impact Radius" in result.sections, (
+            f"Expected 'Impact Radius' in sections, got: {list(result.sections.keys())}"
         )
         # Confirm value shape is SectionEntryMetadata (not groomed)
-        section_meta = cast("SectionEntryMetadata", result.sections["unknown__impact_radius"])
+        section_meta = cast("SectionEntryMetadata", result.sections["Impact Radius"])
         assert "num_entries" in section_meta
 
     def test_unknown_section_has_correct_section_entry_metadata_shape(self, mocker: MockerFixture) -> None:
         """Unknown section value has SectionEntryMetadata shape with num_entries, num_struck, entries.
 
         Tests: _build_sections_from_yaml_item wraps Section objects in SectionEntryMetadata.
-        How: Write YAML item with unknown__ section; call view_item; assert TypedDict shape.
+        How: Write YAML item with unknown__ section; call view_item; assert TypedDict shape
+             under the section's display title.
         Why: MCP clients read num_entries and entries — wrong shape breaks consumers.
         """
         import backlog_core.models as _m
@@ -2915,7 +3054,7 @@ class TestViewItemUnknownSections:
         result = view_item("Unknown Shape Item")
 
         # Assert
-        section_meta = cast("SectionEntryMetadata", result.sections["unknown__story"])
+        section_meta = cast("SectionEntryMetadata", result.sections["Story"])
         assert "num_entries" in section_meta
         assert "num_struck" in section_meta
         assert "entries" in section_meta
@@ -2926,7 +3065,7 @@ class TestViewItemUnknownSections:
 
         Tests: Entry content round-trips from BacklogItem.sections into ViewItemResult.sections.
         How: Write YAML item with known entry content in unknown__ section; call view_item;
-             assert entry content matches.
+             assert entry content matches under the section's display title.
         Why: Silent content loss would cause MCP clients to display empty section entries.
         """
         import backlog_core.models as _m
@@ -2961,7 +3100,7 @@ class TestViewItemUnknownSections:
         result = view_item("Unknown Content Item")
 
         # Assert
-        section_meta = cast("SectionEntryMetadata", result.sections["unknown__acceptance_criteria"])
+        section_meta = cast("SectionEntryMetadata", result.sections["Acceptance Criteria"])
         section_entries = section_meta["entries"]
         contents = [e["content"] for e in section_entries]
         assert expected_content in contents, f"Expected '{expected_content}' in entry contents, got: {contents}"
@@ -2971,7 +3110,8 @@ class TestViewItemUnknownSections:
         """num_entries in unknown section metadata equals the count of non-struck entries.
 
         Tests: active/struck entry counting for unknown__ prefixed keys.
-        How: Write item with 3 entries, 1 struck; assert num_entries=2, num_struck=1.
+        How: Write item with 3 entries, 1 struck; assert num_entries=2, num_struck=1
+             under the section's display title.
         Why: MCP clients display entry counts — must be accurate regardless of key prefix.
         """
         import backlog_core.models as _m
@@ -3008,16 +3148,17 @@ class TestViewItemUnknownSections:
         result = view_item("Unknown Count Item")
 
         # Assert
-        section_meta = cast("SectionEntryMetadata", result.sections["unknown__notes"])
+        section_meta = cast("SectionEntryMetadata", result.sections["Notes"])
         assert section_meta["num_entries"] == 2
         assert section_meta["num_struck"] == 1
 
     def test_unknown_section_coexists_with_known_section(self, mocker: MockerFixture) -> None:
         """Unknown and known sections coexist in ViewItemResult.sections with correct shapes.
 
-        Tests: _build_sections_from_yaml_item preserves both known and unknown__ keys simultaneously.
+        Tests: _build_sections_from_yaml_item preserves both known and unknown__ keys simultaneously,
+               presenting both under their display titles.
         How: Write YAML item with rt_ica (known) and unknown__story sections; call view_item;
-             assert both keys present with correct SectionEntryMetadata shapes.
+             assert both display titles are present with correct SectionEntryMetadata shapes.
         Why: Real GitHub issues have mixed headings — known and unknown must both survive.
         """
         import backlog_core.models as _m
@@ -3047,24 +3188,24 @@ class TestViewItemUnknownSections:
         result = view_item("Mixed Sections Item")
 
         # Assert
-        assert "rt_ica" in result.sections, f"Expected 'rt_ica' in sections, got: {list(result.sections.keys())}"
-        assert "unknown__story" in result.sections, (
-            f"Expected 'unknown__story' in sections, got: {list(result.sections.keys())}"
-        )
-        rt_ica_meta = cast("SectionEntryMetadata", result.sections["rt_ica"])
+        assert "RT-ICA" in result.sections, f"Expected 'RT-ICA' in sections, got: {list(result.sections.keys())}"
+        assert "Story" in result.sections, f"Expected 'Story' in sections, got: {list(result.sections.keys())}"
+        rt_ica_meta = cast("SectionEntryMetadata", result.sections["RT-ICA"])
         assert rt_ica_meta["num_entries"] == 1
         assert rt_ica_meta["entries"][0]["content"] == "Risk: breaking change in public API"
 
-        story_meta = cast("SectionEntryMetadata", result.sections["unknown__story"])
+        story_meta = cast("SectionEntryMetadata", result.sections["Story"])
         assert story_meta["num_entries"] == 1
         assert story_meta["entries"][0]["content"] == "As a user I want feature X"
 
     def test_unknown_section_coexists_with_groomed_section(self, mocker: MockerFixture) -> None:
         """Unknown section and groomed section coexist with their respective metadata shapes.
 
-        Tests: SectionEntryMetadata and GroomedSectionMetadata shapes both appear in sections.
+        Tests: SectionEntryMetadata and GroomedSectionMetadata shapes both appear in sections,
+               each keyed by its display title.
         How: Write YAML item with groomed (GroomedData) and unknown__ (Section) keys; call view_item;
-             assert groomed key has type=groomed and unknown key has num_entries shape.
+             assert the groomed display title has type=groomed and the unknown section's display
+             title has num_entries shape.
         Why: GroomedSectionMetadata and SectionEntryMetadata are discriminated by presence of
              the "type" key — MCP clients must receive both shapes correctly.
         """
@@ -3099,21 +3240,79 @@ class TestViewItemUnknownSections:
         # Act
         result = view_item("Groomed Unknown Item")
 
-        # Assert: groomed section has GroomedSectionMetadata shape
-        assert "groomed" in result.sections, f"Expected 'groomed' in sections, got: {list(result.sections.keys())}"
-        groomed_meta = cast("GroomedSectionMetadata", result.sections["groomed"])
+        # Assert: groomed section has GroomedSectionMetadata shape, keyed by its display title
+        groomed_title = "Groomed — 2026-01-15"
+        assert groomed_title in result.sections, (
+            f"Expected {groomed_title!r} in sections, got: {list(result.sections.keys())}"
+        )
+        groomed_meta = cast("GroomedSectionMetadata", result.sections[groomed_title])
         assert groomed_meta.get("type") == "groomed"
         assert "subsections" in groomed_meta
         assert groomed_meta["subsections"]["summary"] == "Feature is ready for review"
 
-        # Assert: unknown section has SectionEntryMetadata shape
-        assert "unknown__implementation_notes" in result.sections, (
-            f"Expected 'unknown__implementation_notes' in sections, got: {list(result.sections.keys())}"
+        # Assert: unknown section has SectionEntryMetadata shape, keyed by its display title
+        assert "Implementation Notes" in result.sections, (
+            f"Expected 'Implementation Notes' in sections, got: {list(result.sections.keys())}"
         )
-        unknown_meta = cast("SectionEntryMetadata", result.sections["unknown__implementation_notes"])
+        unknown_meta = cast("SectionEntryMetadata", result.sections["Implementation Notes"])
         assert "num_entries" in unknown_meta
         assert unknown_meta["num_entries"] == 2
         assert len(unknown_meta["entries"]) == 2
+
+    def test_display_title_collision_merges_instead_of_overwriting(self, mocker: MockerFixture) -> None:
+        """Two raw storage keys that display-title-collide are merged, not silently dropped.
+
+        Tests: _build_sections_from_yaml_item merges same-titled sections (mirroring
+               _build_sections_metadata's collision handling) instead of the second
+               entry overwriting the first in the result dict.
+        How: Write a YAML item with "unknown__issue_classification" (a custom section
+             that title-cases to "Issue Classification") and "issue_classification"
+             (the canonical section, same display title) as two distinct raw storage
+             keys. Both are guaranteed-unique storage keys but collide once passed
+             through _section_display_title. Call view_item and assert both sections'
+             entries are present under the single "Issue Classification" key.
+        Why: Before this fix, the second section silently overwrote the first in the
+             result dict — no error, no warning, entries from one section vanished.
+        """
+        import backlog_core.models as _m
+        from backlog_core.models import Entry, Section
+
+        mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+
+        backlog_dir = _m.get_backlog_dir()
+        filepath = backlog_dir / "p1-collision-item.yaml"
+
+        metadata = _m.BacklogItemMetadata(
+            source="test", added="2026-01-01", priority="P1", status="open", topic="collision-item"
+        )
+        item = _m.BacklogItem(
+            title="Collision Item",
+            description="Test display-title collision between distinct storage keys",
+            metadata=metadata,
+            file_path=str(filepath),
+            sections={
+                "unknown__issue_classification": Section(
+                    entries=[Entry(id="20260101T180000", content="Custom classification note")]
+                ),
+                "issue_classification": Section(
+                    entries=[Entry(id="20260101T180001", content="Canonical classification note")]
+                ),
+            },
+        )
+        _seed_items([item])
+
+        # Act
+        result = view_item("Collision Item")
+
+        # Assert: both sections' entries survive under the single collided display title
+        assert "Issue Classification" in result.sections
+        merged = cast("SectionEntryMetadata", result.sections["Issue Classification"])
+        contents = [e["content"] for e in merged["entries"]]
+        assert "Custom classification note" in contents, f"First section's content lost to overwrite, got: {contents}"
+        assert "Canonical classification note" in contents, (
+            f"Second section's content lost to overwrite, got: {contents}"
+        )
+        assert merged["num_entries"] == 2
 
 
 # ---------------------------------------------------------------------------

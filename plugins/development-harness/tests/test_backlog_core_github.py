@@ -765,6 +765,53 @@ class TestCreateIssueForItem:
         assert len(captured_vars) == 1
         assert captured_vars[0]["title"].startswith("fix: Fix null crash")
 
+    def test_create_issue_mutates_item_title_to_match_created_issue(self, mocker: MockerFixture) -> None:
+        """create_issue_for_item mutates item.title to the type-prefixed title sent to GitHub.
+
+        Tests: item.title in-place mutation on successful creation (#2963).
+        How: Create an item with an unprefixed title; call create_issue_for_item;
+             assert item.title now carries the same prefix sent to the GraphQL mutation.
+        Why: Without this, the local record keeps the unprefixed title forever while the
+             live GitHub issue carries the prefixed one. _GitHubReconciliation.reconcile()
+             only acknowledges (dequeues) a queued work-item mutation once the live
+             snapshot's title exactly matches the local item's title -- a permanent
+             mismatch introduced here means every reconcile re-applies the same "still
+             pending" content forever, producing duplicate provider comments each time.
+        """
+        # Arrange
+        repo = _make_mock_repo(mocker)
+        repo.requester.graphql_query.return_value = ({}, {"data": {"repository": {}}})
+        mocker.patch(
+            "backlog_core.gh_client._graphql_request",
+            return_value=make_create_issue_response(make_created_issue_node(number=99)),
+        )
+        item = BacklogItem(title="Refactor the parser", item_type="refactor", priority="P1")
+
+        # Act
+        result = create_issue_for_item(repo, item)
+
+        # Assert
+        assert result == 99
+        assert item.title == "refactor: Refactor the parser"
+
+    def test_create_issue_does_not_mutate_item_title_on_dry_run(self, mocker: MockerFixture) -> None:
+        """create_issue_for_item leaves item.title untouched when dry_run=True.
+
+        Tests: no title mutation on the dry-run early-return path.
+        How: Call with dry_run=True; assert item.title is unchanged.
+        Why: A dry-run must not have any observable side effect, including on the
+             passed-in item, since no issue was actually created to match against.
+        """
+        # Arrange
+        repo = _make_mock_repo(mocker)
+        item = BacklogItem(title="Preview only", item_type="feature", priority="P1")
+
+        # Act
+        create_issue_for_item(repo, item, dry_run=True)
+
+        # Assert
+        assert item.title == "Preview only"
+
 
 # ---------------------------------------------------------------------------
 # batch_fetch_statuses — GraphQL list query (Requirement: replaces N+1 REST)
