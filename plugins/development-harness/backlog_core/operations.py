@@ -695,7 +695,14 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
             return None
         reference = item.reference
         if reference:
-            update_item_metadata(reference, {"metadata": {"issue": f"#{issue_num}"}}, output=out)
+            # create_issue_for_item mutates item.title in place to the type-prefixed
+            # title actually sent to GitHub (e.g. "refactor: {title}"). Persist that
+            # here too ("name" -> item.title, see _apply_updates_to_item), not just the
+            # issue number — otherwise the local record keeps the pre-prefix title
+            # forever while the live issue carries the prefixed one, and every
+            # subsequent reconcile's title-equality acknowledge check fails, so this
+            # item's pending mutations never drain (#2963).
+            update_item_metadata(reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out)
         return issue_num
 
 
@@ -1359,9 +1366,15 @@ def add_item(
     issue_ref = _try_create_backend_issue_ref(item_data, repo, out)
     item_reference = issue_ref or _resolve_reference(priority, slug)
 
-    # Build and persist the backend-owned work item
+    # Build and persist the backend-owned work item. Reuse item_data.title, not the
+    # raw title argument: gh_client.create_issue_for_item mutates item_data.title in
+    # place to the type-prefixed title actually sent to GitHub (e.g. "refactor: {title}")
+    # when a real GitHub issue was created. Persisting the unprefixed title here instead
+    # would permanently diverge the local record from the live issue title, breaking the
+    # title-equality guard _GitHubReconciliation.reconcile() uses to acknowledge (dequeue)
+    # this item's pending mutations on every subsequent reconcile (#2963).
     item_to_write = BacklogItem(
-        title=title,
+        title=item_data.title,
         description=description,
         source=source,
         added=today_str,
@@ -2847,10 +2860,15 @@ def sync_create_missing_issues(
         new_normalized = normalize_issue_title(item.title)
         if new_normalized not in existing_issues:
             existing_issues[new_normalized] = issue_num
-        # Update backend-owned metadata with issue number
+        # Update backend-owned metadata with issue number. item.title has already
+        # been mutated in place by create_issue_for_item (via find_or_create_issue)
+        # to the type-prefixed title actually sent to GitHub when a NEW issue was
+        # created here -- persist it under "name" too, not just the issue number,
+        # or the local record permanently diverges from the live issue title and
+        # this item's pending mutations never drain on later reconciles (#2963).
         reference = item.reference
         if reference:
-            update_item_metadata(reference, {"metadata": {"issue": f"#{issue_num}"}}, output=out)
+            update_item_metadata(reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out)
 
     return {"created": created, **out.to_dict()}
 
