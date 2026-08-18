@@ -837,6 +837,28 @@ _ENTRY_DIV_OPEN = "<div><sub>"
 _ENTRY_DIV_CLOSE = "</div>"
 _ENTRY_DIV_OPEN_RE = re.compile(r" {0,3}" + re.escape(_ENTRY_DIV_OPEN))
 
+# Tag-boundary matchers for div-nesting depth tracking. A literal-substring count
+# (``line.count("<div>")``) misses an attributed opening tag like
+# ``<div class="note">`` while ``line.count("</div>")`` still matches its close
+# unconditionally — that asymmetry drives depth negative and ends entry-block
+# opacity early, letting a heading-lookalike line further down escape as a
+# spurious section (#2964 follow-up). Matching tag boundaries via regex keeps
+# opens and closes counted symmetrically regardless of attributes.
+_DIV_OPEN_TAG_RE = re.compile(r"<div\b")
+_DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>")
+
+
+def _div_depth_delta(line: str) -> int:
+    """Return the net change in ``<div>``/``</div>`` nesting depth for one line.
+
+    Args:
+        line: Source line to scan.
+
+    Returns:
+        Count of opening ``<div`` tags minus closing ``</div>`` tags on this line.
+    """
+    return len(_DIV_OPEN_TAG_RE.findall(line)) - len(_DIV_CLOSE_TAG_RE.findall(line))
+
 
 class _EntryDivBlock(_MarkoBlockElement):
     """Marko block element matching this codebase's ``<div><sub>...</sub>...</div>`` entry wrapper.
@@ -897,7 +919,7 @@ class _EntryDivBlock(_MarkoBlockElement):
                 break
             lines.append(line)
             source.consume()
-            depth += line.count("<div>") - line.count("</div>")
+            depth += _div_depth_delta(line)
             if depth <= 0:
                 break
         return "".join(lines)
@@ -991,10 +1013,10 @@ def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target
             break
         stripped = line.lstrip()
         if entry_depth > 0:
-            entry_depth += line.count("<div>") - line.count("</div>")
+            entry_depth += _div_depth_delta(line)
             continue
         if _ENTRY_DIV_OPEN_RE.match(line):
-            entry_depth = line.count("<div>") - line.count("</div>")
+            entry_depth = _div_depth_delta(line)
             continue
         if stripped.startswith(("```", "~~~")):
             in_fence = not in_fence

@@ -1010,6 +1010,27 @@ class TestExtractSectionsEntryBoundary:
         assert list(sections.keys()) == ["## Fact-Check"]
         assert "fake heading after inner div closes" in sections["## Fact-Check"]
 
+    def test_embedded_heading_after_attributed_nested_div_stays_in_same_section(self) -> None:
+        """A nested div with attributes (e.g. ``<div class="note">``) does not escape opacity.
+
+        Regression for a literal-substring counting bug: ``line.count("<div>")``
+        does not match an attributed opening tag like ``<div class="note">``,
+        while ``line.count("</div>")`` still matches its close unconditionally.
+        That asymmetry drove the nesting-depth counter negative and ended entry
+        opacity one line early, letting a heading-lookalike line further down
+        escape as a spurious section (#2964 follow-up).
+        """
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+            'before\n<div class="note">inner note</div>\n\n'
+            "## Claim 1: fake heading after attributed div closes\n\nVERDICT: VERIFIED\n"
+            "</div>\n"
+        )
+        sections = extract_sections(body)
+        assert list(sections.keys()) == ["## Fact-Check"]
+        assert "fake heading after attributed div closes" in sections["## Fact-Check"]
+
 
 # ---------------------------------------------------------------------------
 # Property-based round trip: write -> render -> parse -> merge is lossless
