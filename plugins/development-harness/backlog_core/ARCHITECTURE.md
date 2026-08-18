@@ -63,16 +63,17 @@ conversion, serialisation, and round-trip verification to `FileCache`. The scrip
 ## Module Dependency Graph
 
 ```text
+section_registry.py   ← standalone, no imports from other mcp modules; canonical section/subsection name registry
 models.py             ← standalone, no imports from other mcp modules
 backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
-parsing.py            ← imports from models; pure parsing, selection, and transformation helpers
+parsing.py            ← imports from models, section_registry; pure parsing, selection, and transformation helpers
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
 yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
 gh_client.py          ← imports from models, parsing
-rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imported by backend implementations
+rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imports section_registry; imported by backend implementations
 backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
 operations.py         ← imports from models, pure helpers, and backend_protocol only
@@ -226,6 +227,93 @@ All constants, all exception classes, all Pydantic models.
 
 ---
 
+## Module: section_registry.py
+
+**Responsibility**: The single canonical source of truth for backlog section and subsection names
+— one Python file holding one `StrEnum` (plus one alias map) per naming layer, so a name is
+registered once and every reader/writer resolves it the same way. This closed #2970: before this
+module existed, `SECTION_HEADING` (the section display-heading dict) lived in `rendering.py`,
+`SECTION_HEADING_ALIAS` lived in `models.py`, `backlog_groom`'s MCP `section=` parameter was an
+unvalidated plain `str`, and `GroomedData.subsections` had no registry at all — four independently
+evolving surfaces with no single place an agent could read to learn the valid section names, which
+is the direct root cause of the 126+ unregistered `unknown__` keys #2956/#2970 found accumulated in
+production backlog items.
+
+**Two independent naming layers, each with its own enum + alias map + resolver**:
+
+- **Sections** (`BacklogItem.sections` keys) — `SectionKey(StrEnum)` defines the canonical
+  `snake_case` storage key (e.g. `fact_check`); `SECTION_HEADING: dict[str, str]` pairs each key
+  with its display heading (e.g. `"Fact-Check"`); `SECTION_NAME_ALIASES: dict[str, str]` maps
+  deprecated/historic spellings (lowercased) to the canonical key, kept as a map distinct from
+  `SECTION_HEADING` — alias recovery, never a second registration surface.
+- **Subsections** (`GroomedData.subsections` keys) — `SubsectionKey(StrEnum)` defines the canonical
+  key, where the enum *value itself* is the display text used verbatim as the storage key (there is
+  no separate snake_case form for subsections, unlike sections); `SUBSECTION_NAME_ALIASES: dict[str,
+  str]` mirrors `SECTION_NAME_ALIASES` one level deeper.
+
+Both layers expose a `resolve_*_name(name: str) -> str | None` function (`resolve_section_name`,
+`resolve_subsection_name`) that is the *only* place either layer's alias-then-registry lookup logic
+lives. `SECTION_HEADING`'s runtime dict is deliberately typed `dict[str, str]` (never
+`dict[SectionKey, str]`) — a `StrEnum` instance used as a live `BacklogItem.sections` dict key would
+round-trip incorrectly through `ruamel.yaml`, which has no representer for a `str` subclass; every
+resolver function returns a plain `str` (`.value`/`str()`-converted) for the same reason. The enum
+exists to make the *set of valid names* one append-only, greppable list — not to change the runtime
+type carried through storage.
+
+**How to add a new canonical section**:
+
+1. Append a member to `SectionKey` — the value is the `snake_case` storage key (e.g.
+   `PROGRESS_NOTES = "progress_notes"`).
+2. Add a matching `(SectionKey.PROGRESS_NOTES, "Progress Notes")` entry to `_SECTION_DISPLAY` — the
+   display heading rendered in GitHub markdown.
+3. If a deprecated or historic alternate spelling exists (an agent doc previously wrote it
+   differently), add it to `SECTION_NAME_ALIASES` (lowercased key -> canonical value).
+
+**How to add a new canonical subsection** (`GroomedData.subsections`):
+
+1. Append a member to `SubsectionKey` — the value IS the display text used verbatim as the storage
+   key (e.g. `RISKS = "Risks"`).
+2. If a deprecated or historic alternate spelling exists, add it to `SUBSECTION_NAME_ALIASES` the
+   same way as section aliases.
+
+**Write-boundary enforcement**: `operations._normalize_section_key` resolves every caller-supplied
+section name (from `backlog_groom`'s `section=`/`sections={}` MCP parameters) through
+`resolve_section_name` before persisting — a resolvable alias or legacy `unknown__` form always
+persists under its resolved canonical key, never under the alias spelling and never under
+`unknown__`. A name that resolves to neither the registry nor the alias map falls back to
+`heading_to_unknown_key` (`rendering.py`) as before, but that fallback now also calls
+`operations._warn_unregistered_section`, which prints a diagnostic to stderr unconditionally (this
+is forensic output per AGENTS.md "CLI and script output — agent-only, never human-facing", not
+primary output) and records the same fact on the caller's `Output.warnings` when one is provided —
+so a new, permanently unregistered name is visible immediately instead of silently accumulating.
+`github_sync._parse_groomed_section` applies the identical `resolve_subsection_name` resolution to
+`### subsection` headings parsed from a GitHub issue body — the write boundary for subsections.
+
+**Read-time recovery**: `rendering.normalize_unknown_sections` (read boundary, called from
+`yaml_io.load_item`/`load_item_text`) folds a legacy `unknown__{key}` section into `{key}` once that
+name becomes canonical, and now also calls `rendering.normalize_groomed_subsections` on every
+`GroomedData` value to fold aliased/miscased subsection keys the same way. Both folds heal
+already-corrupted cache records on next load — no bulk migration script touches live GitHub issues.
+
+**Merge rule for a section that already has both `unknown__{key}` and `{key}` present** (possible
+once some items are re-groomed post-fix while others are not): `normalize_unknown_sections`
+concatenates the two `Section.entries` lists, deduplicating by entry `id`. This mirrors, rather than
+duplicates, `github_sync.merge_item`/`_merge_entries`'s per-id union approach — both sides hold
+genuinely distinct entries (each write generates a fresh timestamp `id`), not two competing versions
+of the same entry, so union is the correct rule and there is no "struck wins / longer content wins"
+conflict to resolve at this collision site. `normalize_groomed_subsections` uses the adjacent rule
+from `github_sync._merge_groomed` instead — "longer content wins" per key — because a subsection
+collision genuinely is two versions of one string value under two spellings, the same shape
+`_merge_groomed` already handles.
+
+**Exports** (`__all__`): `SectionKey`, `SECTION_HEADING`, `SECTION_NAME_ALIASES`, `SubsectionKey`,
+`SUBSECTION_KEY_ORDER`, `SUBSECTION_NAME_ALIASES`, `resolve_section_name`, `resolve_subsection_name`.
+
+**Imports from other modules**: None — this is a leaf module, even more foundational than
+`models.py`, so any module may import from it without risking a cycle.
+
+---
+
 ## Module: parsing.py
 
 **Responsibility**: Pure item parsing and transformation, item search, slug generation, body section
@@ -364,16 +452,16 @@ Operations layer never writes raw markdown body strings directly — they go thr
 - `merge_item(local, remote)` — merges remote into local; local metadata is authoritative; sections
   are merged per-entry (struck state wins over active; longer content wins on tie; unique entries
   from either side are preserved)
-- `SECTION_HEADING` — dict mapping section storage keys to GitHub markdown heading text (e.g. `"fact_check"` → `"Fact-Check"`)
+- `SECTION_HEADING` — re-exported from `rendering` (originally `section_registry` — see "Module: section_registry.py"); dict mapping section storage keys to GitHub markdown heading text (e.g. `"fact_check"` → `"Fact-Check"`)
 - `heading_to_section_key(heading_text)` — maps a `## Heading` text to its section storage key; returns `None` for unknown headings
 - `heading_to_unknown_key(heading_text)` — converts an unknown heading to an `"unknown__"` prefixed storage key
 - `unknown_key_to_heading(key)` — reverses `heading_to_unknown_key`; strips prefix, title-cases result
 
-**Known section keys** (BacklogItem.sections):
-- `"fact_check"` → `## Fact-Check`
-- `"rt_ica"` → `## RT-ICA`
-- `"issue_classification"` → `## Issue Classification`
-- `"groomed"` → `## Groomed (date)` (GroomedData type, not Section)
+**Known section keys** (BacklogItem.sections): the full, current list lives in
+`section_registry.SectionKey` — do not duplicate it here, it will drift (see "Module:
+section_registry.py"). The one structurally special key is `"groomed"` → `## Groomed (date)`
+(`GroomedData` type, not `Section`) — it has no `SectionKey` member because it is rendered by a
+dedicated branch in `render_issue_body`/`parse_issue_body`, not the generic `SECTION_HEADING` loop.
 
 **Dependency direction**: `models ← parsing ← entry_blocks ← github_sync` (must remain acyclic;
 do not import from `gh_client.py`, `operations.py`, or `server.py`)
@@ -390,17 +478,20 @@ do not import from `gh_client.py`, `operations.py`, or `server.py`)
 rendering logic from `github_sync` into a location `WorkItemBackend` implementations can import,
 ensuring identical logical section rendering where the provider representation requires it.
 
-**Dependency direction**: `models ← rendering` (must remain acyclic; do not import from `github_sync`, `operations`, `gh_client`, or `server`)
+**Dependency direction**: `section_registry ← models ← rendering` (must remain acyclic; do not import from `github_sync`, `operations`, `gh_client`, or `server`)
 
-**Public API** (`__all__`): `GROOMED_SUBSECTION_ORDER`, `SECTION_HEADING`, `render_groomed_section`, `section_display_title`, `unknown_key_to_heading`
+**Public API** (`__all__`): `GROOMED_SUBSECTION_ORDER`, `SECTION_HEADING`, `heading_to_unknown_key`, `normalize_groomed_subsections`, `normalize_unknown_sections`, `render_groomed_section`, `resolve_subsection_name`, `section_display_title`, `unknown_key_to_heading`
 
-- `SECTION_HEADING` — dict mapping known section storage keys to display heading text (e.g. `"fact_check"` → `"Fact-Check"`); shared constant used by all backends
-- `GROOMED_SUBSECTION_ORDER` — canonical render order for `GroomedData` subsections (heading text as stored)
+- `SECTION_HEADING` — re-exported from `section_registry` (the canonical registry — see "Module: section_registry.py"); dict mapping known section storage keys to display heading text (e.g. `"fact_check"` → `"Fact-Check"`); shared constant used by all backends
+- `GROOMED_SUBSECTION_ORDER` — re-exported from `section_registry.SUBSECTION_KEY_ORDER`; canonical render order for `GroomedData` subsections (heading text as stored), kept under its historic name so existing callers are unaffected
 - `render_groomed_section(groomed)` — renders a `GroomedData` as `## Groomed ({date})` with `### subsection` children in canonical order; extras appended alphabetically
 - `section_display_title(key, groomed_date)` — returns the human-readable title for a section storage key; handles known keys via `SECTION_HEADING`, `"unknown__"` prefix via `unknown_key_to_heading`, and the special `"groomed"` key with optional date
-- `unknown_key_to_heading(key)` — strips `"unknown__"` prefix, replaces underscores with spaces, and title-cases the result
+- `unknown_key_to_heading(key)` / `heading_to_unknown_key(heading_text)` — the local-write / GitHub-parse boundary normaliser pair (see "Module: section_registry.py" for why both sides must call the same function)
+- `normalize_unknown_sections(sections)` — read-boundary fold: legacy `unknown__{key}` sections fold into `{key}` once registered; also folds each `GroomedData` value's subsections via `normalize_groomed_subsections`
+- `normalize_groomed_subsections(subsections)` — the subsection-level counterpart of `normalize_unknown_sections`, via `section_registry.resolve_subsection_name`
+- `resolve_subsection_name(name)` — re-exported from `section_registry`; used directly by `github_sync._parse_groomed_section` (the subsection write boundary)
 
-**Imports from other modules**: `from .models import GroomedData` (type annotation only, under `TYPE_CHECKING`)
+**Imports from other modules**: `from .models import GroomedData, Section` (real imports — `Section`/`GroomedData` instances are constructed here, not only referenced in type annotations); `from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_subsection_name`
 
 ---
 
