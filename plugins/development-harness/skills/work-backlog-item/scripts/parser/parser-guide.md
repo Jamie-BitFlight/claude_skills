@@ -188,6 +188,13 @@ Optionally validate stdout against `parse.schema.json` with a small `ajv` or `js
 - Registry keys must not contain spaces; multi-word subcommands are not supported as one token.
 - A positional that equals both a registry key and is intended as a **title word** is always treated as registry when it matches `command-routes.json` (rare for real titles).
 - Two item-ref-shaped tokens or two registry tokens without a resolving rule still errors.
+- A beads issue ID (e.g. `bd-a3f8`, relevant only when `backend=beads`) does not match `issueRegex`
+  and is never recognized as an item_ref — it coerces to `route: "title_substring"`, `user_text:
+  "bd-a3f8"` instead. This still resolves downstream: `backlog_core/parsing.py`'s `find_item()` has
+  a string-ID exact-match branch for non-integer selectors, so a beads nanoid passed through as
+  `user_text`/a `--selector` value finds the item. The only real gap is that `item_ref` itself is
+  never set — logic that specifically branches on `item_ref` being present, rather than treating
+  `user_text` as a selector, would miss it.
 
 ---
 

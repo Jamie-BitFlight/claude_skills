@@ -20,8 +20,10 @@ decision you made in this session). In the self-initiated case you already know 
 directly — go straight to producing the coerced result; there is nothing in <provided_arguments/>
 you don't already know, and no reason to route it through anything else.
 
-Coerce <provided_arguments/> to match this schema, then treat the result as `<input/>`:
-[parse.schema.json](./scripts/parser/parse.schema.json)
+Coerce <provided_arguments/> to match this schema yourself, then treat the result as `<input/>`:
+[parse.schema.json](./scripts/parser/parse.schema.json). `parse.mjs` in the same directory implements
+the identical rule set as a script — never run it or embed <provided_arguments/> in a `` !`...` ``
+line to produce `<input/>`; reasoning it out against the vocabulary below is the only path.
 
 Argument vocabulary:
 
@@ -135,13 +137,9 @@ When invoked with no arguments, shows an interactive browser. When invoked with 
 
 ## Arguments
 
-**Agent Preflight:** `<input/>` is a value you derive by reasoning against the vocabulary above — see the coercion step near the top of this file. `parse.mjs` (referenced in [parser-guide.md](./scripts/parser/parser-guide.md)) is a deterministic reference implementation of the same schema, kept in sync with the vocabulary above by hand — it is not part of this skill's own execution path and this skill never shells out to it. It has at least one other real caller (`.claude/skills/example-argument-substitution/SKILL.md`); it does not currently have a test suite.
+`route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
 
-Parser `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
-
-Full field derivation rules (route, item_ref, flags, delimiter, mode) are in the "Argument vocabulary" section near the top of this file — this section does not restate them.
-
-**Beads-ID handling, not a gap in practice:** the vocabulary's item_ref discriminator recognizes `#N`, bare digits, and GitHub issue URLs only — a beads issue ID (e.g. `bd-a3f8`, relevant when `backend=beads`) is not recognized as an item_ref and instead coerces to `route: "title_substring"`, `user_text: "bd-a3f8"` (verified against `parse.mjs`'s `issueRegex`, which has no beads-ID pattern). This still resolves correctly end-to-end: `backlog_core/parsing.py`'s `find_item()` has an explicit string-ID exact-match branch for non-integer selectors like beads nanoids, so passing `bd-a3f8` through as `user_text`/a `--selector` value finds the item. The only real gap is that `item_ref` itself is never set for a beads ID — downstream logic that specifically branches on `item_ref` being present (rather than treating `user_text` as a selector) would miss it.
+On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_text`, not `item_ref` — see [parser-guide.md](./scripts/parser/parser-guide.md) Limitations for why this still resolves.
 
 **Optional flags** (when `route` is `title_substring`, `issue`, or a pipeline route): `--language <lang>` selects language plugin (default: python); `--stack <profile>` selects stack profile (e.g., python-fastapi, python-cli). See [sdlc-layers](../../docs/sdlc-layers/).
 
