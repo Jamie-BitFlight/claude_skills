@@ -899,6 +899,12 @@ def _normalize_section_key(name: str) -> str:
     Routing both call sites through the same normaliser makes local writes
     and GitHub-parsed sections collide on one key instead of two.
 
+    Leading/trailing whitespace on *name* is stripped before every lookup
+    below, so e.g. ``"RT-ICA "`` (trailing space) still resolves to the
+    canonical key rather than falling through to :func:`heading_to_unknown_key`
+    and producing a key that would not match a subsequent GitHub round trip
+    of the same (already-trimmed) heading text.
+
     Lookup order:
     1. ``SECTION_HEADING_ALIAS`` keyed by ``name.lower()`` — catches hyphened aliases.
     2. Reverse scan of ``SECTION_HEADING`` for a matching display value — catches
@@ -914,6 +920,7 @@ def _normalize_section_key(name: str) -> str:
         Canonical storage key, e.g. ``"rt_ica"`` for a canonical section or
         ``"unknown__files"`` for a custom one.
     """
+    name = name.strip()
     alias_key = SECTION_HEADING_ALIAS.get(name.lower())
     if alias_key is not None:
         return alias_key

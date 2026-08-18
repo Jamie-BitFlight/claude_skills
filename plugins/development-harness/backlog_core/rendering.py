@@ -92,13 +92,20 @@ def heading_to_unknown_key(heading_text: str) -> str:
     call sites on one function is what makes the two round-trip to the same
     key — see ``ARCHITECTURE.md`` for the incident this closed.
 
+    Strips leading/trailing whitespace before normalising, defensively —
+    :mod:`github_sync`'s caller already strips its extracted heading text
+    before calling this function, but a local write's caller-supplied name
+    was not guaranteed to be pre-trimmed; a trailing space surviving into the
+    key (``"unknown__files_"`` vs. ``"unknown__files"``) reproduces the exact
+    write-path/parse-path key divergence this function exists to prevent.
+
     Args:
-        heading_text: Raw heading or section display name, whitespace trimmed.
+        heading_text: Raw heading or section display name.
 
     Returns:
         Storage key such as ``"unknown__custom_analysis"``.
     """
-    normalised = heading_text.lower().replace(" ", "_")
+    normalised = heading_text.strip().lower().replace(" ", "_")
     return f"unknown__{normalised}"
 
 

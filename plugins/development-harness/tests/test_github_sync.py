@@ -14,6 +14,7 @@ from backlog_core.github_sync import merge_item, parse_issue_body, render_issue_
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
 from backlog_core.operations import _normalize_section_key
 from backlog_core.parsing import extract_sections
+from hypothesis import HealthCheck, given, settings, strategies as st
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -941,3 +942,115 @@ class TestExtractSectionsEntryBoundary:
         )
         sections = extract_sections(body)
         assert set(sections.keys()) == {"## Fact-Check", "## Resources"}
+
+    def test_embedded_heading_after_nested_unrelated_div_stays_in_same_section(self) -> None:
+        """A '## ' line is not a boundary even after a nested, unrelated <div>...</div> closes.
+
+        Regression for a depth-tracking gap: stopping entry-block opacity at the
+        *first* bare '</div>' line (rather than tracking balanced <div>/</div>
+        nesting) would let this fake heading — which appears after an inner,
+        unrelated div fragment closes — escape back into ordinary markdown
+        parsing and fragment the section a second, different way.
+        """
+        body = (
+            "## Fact-Check\n\n"
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+            "before\n<div>\nnested\n</div>\n\n"
+            "## Claim 1: fake heading after inner div closes\n\nVERDICT: VERIFIED\n"
+            "</div>\n"
+        )
+        sections = extract_sections(body)
+        assert list(sections.keys()) == ["## Fact-Check"]
+        assert "fake heading after inner div closes" in sections["## Fact-Check"]
+
+
+# ---------------------------------------------------------------------------
+# Property-based round trip: write -> render -> parse -> merge is lossless
+# ---------------------------------------------------------------------------
+
+# Balanced, individually well-formed adversarial fragments -- deliberately including
+# heading-lookalike lines, nested <div> content, and code fences (the exact bug
+# classes #2956 fixed). Each fragment keeps its own <div>/</div> tags balanced so a
+# generated example never trips the separate, out-of-scope entry_blocks.ENTRY_RE
+# greedy-match behavior on an unmatched tag -- this property targets section-boundary
+# detection, not entry-content regex matching. A "<div><sub>...</sub>...</div>"-shaped
+# fragment (mimicking a literal nested entry marker) is deliberately excluded: it
+# surfaced a real but distinct bug in entry_blocks.parse_entries's own ENTRY_RE
+# matching (filed as #2967), not in the section-boundary logic #2956 fixed.
+_ADVERSARIAL_FRAGMENTS = st.sampled_from([
+    "## Fake Heading Inside Content",
+    "### Fake Subheading",
+    "#### Even deeper fake heading",
+    "<div>\nnested content\n</div>",
+    "```python\nprint('fenced code fence lookalike')\n```",
+    "~~~\nfenced with tildes\n~~~",
+    "plain prose line",
+])
+
+_content_strategy = (
+    st.lists(_ADVERSARIAL_FRAGMENTS, min_size=1, max_size=8).map("\n\n".join).map(str.strip).filter(lambda s: s != "")
+)
+
+_section_name_strategy = st.text(
+    # Scoped to the realistic domain: printable ASCII letters/digits/punctuation,
+    # matching how agents and humans actually name sections ("Files", "Fact-Check",
+    # "Impact Radius"). Full-Unicode section names surfaced a real but narrow and
+    # unrelated defect during development of this test: rendering.py's display-title
+    # round trip (str.lower() / str.title()) is not idempotent for a handful of
+    # Unicode characters with special-case title mappings (e.g. MICRO SIGN U+00B5 ->
+    # title-cases to GREEK CAPITAL MU, a different codepoint) — filed separately as
+    # #2966 rather than fixed here, since it is a distinct bug class (a Unicode
+    # casing quirk) from what #2956 fixed (write-path vs. parse-path key mismatch).
+    # Requiring at least one alphanumeric character, and excluding literal
+    # underscores entirely, excludes another real but narrow and unrelated
+    # defect this test surfaced: any name containing a literal underscore
+    # (e.g. "_", "0_") round-trips through a different key each time, because
+    # heading_to_unknown_key's space<->underscore substitution cannot distinguish
+    # a literal underscore in the name from one it introduced itself — filed as
+    # #2968 rather than fixed here (a real display name is always a readable
+    # phrase and never contains a raw underscore, so this class of input is
+    # unrealistic for what this function is actually used for).
+    alphabet=st.characters(min_codepoint=32, max_codepoint=126, blacklist_characters="\n\r_"),
+    min_size=1,
+    max_size=40,
+).filter(lambda s: any(c.isalnum() for c in s))
+
+
+class TestSectionRoundTripProperty:
+    """Property: write -> render -> parse -> merge is lossless for arbitrary section names/content.
+
+    This is the guardrail #2956 exposed the absence of: nothing previously
+    enforced that the local-write key derivation (``_normalize_section_key``)
+    and the GitHub-parse key derivation (``parse_issue_body`` /
+    ``extract_sections``) actually agree — they were two independently
+    written functions that merely happened to be *expected* to match.
+    Adversarial content deliberately includes ``## ``-prefixed lines, nested
+    ``<div>`` fragments, and code fences so the property covers the exact bug
+    classes #2956 fixed, not just the originally reported symptom.
+    """
+
+    @given(section_name=_section_name_strategy, content=_content_strategy)
+    @settings(max_examples=200, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    def test_write_render_parse_round_trip_is_lossless(self, section_name: str, content: str) -> None:
+        """A section written locally survives a GitHub render -> parse -> merge cycle intact.
+
+        For any section name and any content (including adversarial content
+        that looks like markdown structure), the derived storage key must be
+        identical before and after the round trip, under one key only (no
+        ``unknown__`` duplicate), and the entry content must be preserved.
+        """
+        key = _normalize_section_key(section_name)
+        item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content=content)])})
+
+        rendered = render_issue_body(item)
+        remote = parse_issue_body(rendered, item)
+        merged = merge_item(item, remote)
+
+        assert list(merged.sections.keys()) == [key], (
+            f"Key did not round-trip for section_name={section_name!r}: "
+            f"expected [{key!r}], got {list(merged.sections.keys())!r}"
+        )
+        sec = merged.sections[key]
+        assert isinstance(sec, Section)
+        assert len(sec.entries) == 1
+        assert sec.entries[0].content == content
