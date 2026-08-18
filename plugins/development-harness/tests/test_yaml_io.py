@@ -428,10 +428,11 @@ class TestLoadItemFoldingCoversRealBacklogViewConsumers:
         loaded = load_item(dest)
         result_sections = ops._build_sections_from_yaml_item(loaded)
 
-        # Assert
-        assert "impact_radius" in result_sections
-        assert "files" in result_sections
+        # Assert — view_item keys its output by display title (#2971), not raw storage key.
+        assert "Impact Radius" in result_sections
+        assert "Files" in result_sections
         assert "unknown__impact_radius" not in result_sections
+        assert "impact_radius" not in result_sections
         assert "unknown__files" not in result_sections
 
     def test_stale_priority_key_resolves_after_load(self, tmp_path: Path) -> None:
@@ -453,9 +454,10 @@ class TestLoadItemFoldingCoversRealBacklogViewConsumers:
         loaded = load_item(dest)
         result_sections = ops._build_sections_from_yaml_item(loaded)
 
-        # Assert
-        assert "priority" in result_sections
+        # Assert — view_item keys its output by display title (#2971), not raw storage key.
+        assert "Priority" in result_sections
         assert "unknown__priority" not in result_sections
+        assert "priority" not in result_sections
 
 
 # ---------------------------------------------------------------------------
