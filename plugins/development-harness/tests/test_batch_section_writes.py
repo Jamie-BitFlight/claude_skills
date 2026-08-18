@@ -140,9 +140,9 @@ class TestHandleBatchGroomedLocalWrites:
 
         result = ops._handle_batch_groomed(item, {"Plan": "Content A.", "Research": "Content B."}, repo="owner/repo")
 
-        # "Plan"/"Research" are not canonical section names (see rendering.SECTION_HEADING), so
-        # they are stored under their normalised unknown-section keys.
-        assert result == ["unknown__plan", "unknown__research"]
+        # "Plan" is not a canonical section name (see rendering.SECTION_HEADING), so it is
+        # stored under its normalised unknown-section key. "Research" IS canonical.
+        assert result == ["unknown__plan", "research"]
 
     def test_single_section_written_to_file_body(self, tmp_path: Path, mocker: MockerFixture) -> None:
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
@@ -278,8 +278,9 @@ class TestUpdateItemSectionsRouting:
             selector="Written Sections", sections={"Plan": "The plan.", "Research": "The research."}, repo="owner/repo"
         )
 
-        # "Plan"/"Research" are not canonical section names, so they normalise to unknown__ keys.
-        assert result["sections_written"] == ["unknown__plan", "unknown__research"]
+        # "Plan" is not a canonical section name, so it normalises to an unknown__ key.
+        # "Research" IS canonical (see rendering.SECTION_HEADING).
+        assert result["sections_written"] == ["unknown__plan", "research"]
 
     def test_sections_with_content_returns_groomed_updated_true(self, mocker: MockerFixture) -> None:
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
@@ -304,9 +305,10 @@ class TestUpdateItemSectionsRouting:
         ("sections", "expected_written", "expected_groomed"),
         [
             ({}, [], False),
-            # "Plan"/"Research" are not canonical section names, so they normalise to unknown__ keys.
+            # "Plan" is not a canonical section name, so it normalises to an unknown__ key.
+            # "Research" IS canonical (see rendering.SECTION_HEADING).
             ({"Plan": "Plan content."}, ["unknown__plan"], True),
-            ({"Plan": "P.", "Research": "R."}, ["unknown__plan", "unknown__research"], True),
+            ({"Plan": "P.", "Research": "R."}, ["unknown__plan", "research"], True),
         ],
     )
     def test_sections_routing_parametrized(

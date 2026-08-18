@@ -10,6 +10,7 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+import backlog_core.operations as ops
 import pytest
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
 from backlog_core.yaml_io import detect_format, load_item, load_item_text, save_item
@@ -319,17 +320,17 @@ class TestLoadItemYaml:
         assert struck.struck_at == "2026-02-02T14:00:00Z"
 
     def test_load_item_folds_legacy_unknown_key_into_now_canonical_key(self, tmp_path: Path) -> None:
-        """load_item folds a legacy ``unknown__issue_classification`` key into ``issue_classification``.
+        """load_item folds a legacy ``unknown__story`` key into ``story``.
 
-        Regression guard for #2956 follow-up: a cache file written before a
-        name was registered in SECTION_HEADING stores it as an ``unknown__``
-        key. Loading it must expose the canonical key so a subsequent merge
-        against a freshly-parsed GitHub body (which always produces the
-        canonical key) collides on one key instead of rendering the section
-        twice.
+        Regression guard for #2956 follow-up: a cache file written before
+        "Story" was registered in SECTION_HEADING stored it as
+        ``unknown__story``. Loading it must expose the canonical ``story``
+        key so a subsequent merge against a freshly-parsed GitHub body (which
+        always produces ``story``) collides on one key instead of rendering
+        the section twice.
         """
         # Arrange
-        item = BacklogItem(sections={"unknown__issue_classification": Section(entries=[])})
+        item = BacklogItem(sections={"unknown__story": Section(entries=[])})
         dest = tmp_path / "item.yaml"
         save_item(item, dest)
 
@@ -337,8 +338,8 @@ class TestLoadItemYaml:
         result = load_item(dest)
 
         # Assert
-        assert "issue_classification" in result.sections
-        assert "unknown__issue_classification" not in result.sections
+        assert "story" in result.sections
+        assert "unknown__story" not in result.sections
 
     def test_load_item_leaves_genuinely_unknown_key_unchanged(self, tmp_path: Path) -> None:
         """load_item does not rename an ``unknown__`` key that is still uncanonical.
@@ -359,7 +360,7 @@ class TestLoadItemYaml:
         assert "unknown__custom_analysis" in result.sections
 
     def test_load_item_merges_entries_when_both_legacy_and_canonical_keys_present(self, tmp_path: Path) -> None:
-        """load_item merges entries when both ``unknown__issue_classification`` and ``issue_classification`` exist.
+        """load_item merges entries when both ``unknown__story`` and ``story`` exist.
 
         A manually edited or partially migrated cache file could contain both
         keys for the same section; folding must not silently drop entries
@@ -368,10 +369,8 @@ class TestLoadItemYaml:
         # Arrange
         item = BacklogItem(
             sections={
-                "unknown__issue_classification": Section(
-                    entries=[Entry(id="2026-01-01T00:00:00", content="legacy entry")]
-                ),
-                "issue_classification": Section(entries=[Entry(id="2026-01-02T00:00:00", content="canonical entry")]),
+                "unknown__story": Section(entries=[Entry(id="2026-01-01T00:00:00", content="legacy entry")]),
+                "story": Section(entries=[Entry(id="2026-01-02T00:00:00", content="canonical entry")]),
             }
         )
         dest = tmp_path / "item.yaml"
@@ -381,9 +380,82 @@ class TestLoadItemYaml:
         result = load_item(dest)
 
         # Assert
-        sec = result.sections["issue_classification"]
+        sec = result.sections["story"]
         assert isinstance(sec, Section)
         assert {e.content for e in sec.entries} == {"legacy entry", "canonical entry"}
+
+
+class TestLoadItemFoldingCoversRealBacklogViewConsumers:
+    """load_item's fold-on-read is what ``view_item``'s real consumers actually observe.
+
+    Regression guard for the round-2 #2964 review retraction: `groom-drift.md`
+    (Mode B, line ~81-83) and `feasibility-gate.md` (line ~23) both call
+    ``backlog view --selector "{title}"`` — a title selector, which makes
+    ``parse_issue_selector`` return ``None`` so GitHub-body enrichment never
+    runs (confirmed by tracing ``operations.view_item``). For that code path,
+    ``ViewItemResult.sections`` is built by
+    ``operations._build_sections_from_yaml_item``, which echoes the raw
+    in-memory ``BacklogItem.sections`` keys verbatim — the same snake_case/
+    ``unknown__`` keys ``load_item`` produces, never a Title-Case display
+    string. These tests chain the two real functions (``load_item`` then
+    ``_build_sections_from_yaml_item``) to prove the property that matters:
+    a stale ``unknown__impact_radius``/``unknown__files``/``unknown__priority``
+    cache entry (from before these names were registered) resolves to the
+    clean ``impact_radius``/``files``/``priority`` key after this PR — the
+    same key a freshly-groomed item produces — rather than staying invisible
+    under the pre-registration ``unknown__`` key.
+    """
+
+    def test_stale_impact_radius_and_files_keys_resolve_after_load(self, tmp_path: Path) -> None:
+        """A stale unknown__impact_radius/unknown__files cache resolves to canonical keys.
+
+        This is the exact scenario groom-drift.md's Mode B depends on: it
+        reads ``sections["Impact Radius"]``/``sections["Files"]`` from a
+        title-selector ``backlog view`` call against a locally-groomed item.
+        """
+        # Arrange
+        item = BacklogItem(
+            title="Groom Drift Consumer Check",
+            sections={
+                "unknown__impact_radius": Section(entries=[Entry(id="2026-01-01T00:00:00", content="plugins/foo.py")]),
+                "unknown__files": Section(entries=[Entry(id="2026-01-01T00:00:01", content="plugins/bar.py")]),
+            },
+        )
+        dest = tmp_path / "item.yaml"
+        save_item(item, dest)
+
+        # Act
+        loaded = load_item(dest)
+        result_sections = ops._build_sections_from_yaml_item(loaded)
+
+        # Assert
+        assert "impact_radius" in result_sections
+        assert "files" in result_sections
+        assert "unknown__impact_radius" not in result_sections
+        assert "unknown__files" not in result_sections
+
+    def test_stale_priority_key_resolves_after_load(self, tmp_path: Path) -> None:
+        """A stale unknown__priority cache resolves to the canonical ``priority`` key.
+
+        This is the exact scenario feasibility-gate.md line ~23 depends on: a
+        BLOCKED effort/priority-mismatch check reads ``sections['Priority']``
+        from a title-selector ``backlog view`` call.
+        """
+        # Arrange
+        item = BacklogItem(
+            title="Feasibility Gate Consumer Check",
+            sections={"unknown__priority": Section(entries=[Entry(id="2026-01-01T00:00:00", content="P1")])},
+        )
+        dest = tmp_path / "item.yaml"
+        save_item(item, dest)
+
+        # Act
+        loaded = load_item(dest)
+        result_sections = ops._build_sections_from_yaml_item(loaded)
+
+        # Assert
+        assert "priority" in result_sections
+        assert "unknown__priority" not in result_sections
 
 
 # ---------------------------------------------------------------------------
