@@ -9,15 +9,42 @@ shell: bash
 !`node "${CLAUDE_SKILL_DIR}/scripts/get-gate-token.mjs"`
 </gate_token>
 
-<input>
-!`node "${CLAUDE_SKILL_DIR}/scripts/parser/parse.mjs" <<'WORK_BACKLOG_ITEM_ARGS_EOF'
+<provided_arguments>
 $ARGUMENTS
-WORK_BACKLOG_ITEM_ARGS_EOF`
-</input>
+</provided_arguments>
 
-Execute the command in <input/> and parse its stdout as JSON. Treat that JSON as the normalized user input for this workflow.
+<provided_arguments/> is free-text — flags, positional values, and/or a freetext suffix — either
+typed by a human invoking `/dh:work-backlog-item ...` directly, or already known to you when you
+are initiating this action yourself (e.g. a "capture a backlog item" or "groom/work item #N"
+decision you made in this session). In the self-initiated case you already know every field below
+directly — go straight to producing the coerced result; there is nothing in <provided_arguments/>
+you don't already know, and no reason to route it through anything else.
 
-For every placeholder in the form <key/>, substitute the value of that key from the parsed JSON.
+Coerce <provided_arguments/> to match this schema, then treat the result as `<input/>`:
+[parse.schema.json](./scripts/parser/parse.schema.json)
+
+Argument vocabulary:
+
+- **Route** — the first positional word only, when it matches one of: `create`, `groom`, `work`, `close`, `resolve`, `setup-github`, `progress`, `resume`. The same word appearing later (e.g. inside a title) is not a route. No match on the first positional → `route` is `title_substring` (positionals or freetext remain) or `none` (nothing at all — no flags, no positionals, no freetext).
+- **item_ref discriminator** — any positional matching `#N`, bare digits, or a GitHub issue URL (`https://github.com/{owner}/{repo}/issues/N`) → normalize to `#N` (keep a URL verbatim). Checked across *all* positionals, not just the first. When it is the *only* discriminator found (no registry route word present), `route` is the literal string `issue` — not `title_substring` — and no `reference` key is set (verified: `#42` alone → `{"mode":"interactive","route":"issue","item_ref":"#42"}`). A route word and an item_ref may both be present (e.g. `groom #50`, `close #42`) — that is `route` + `item_ref` together (registry route wins as `route`, `reference` is set from the table below), not a conflict. Two of the same kind (two routes, or two item refs) is a genuine conflict.
+- **Freetext delimiter** — `--`, or a bare `—`/`–` (em/en dash — a mobile-autocorrect artifact; normalize a leading `—`/`–` on any token to `--`). Everything after the delimiter is `user_text` verbatim, regardless of content (quotes, code, punctuation — do not further tokenize it). No delimiter → `user_text` is whatever positionals remain after removing the route/item_ref tokens, space-joined.
+- **Flags** — `--language <value>`, `--stack <value>` (both take the next token as their value — a missing value is a stop-and-ask condition), `--force`, `--auto`, `--quick` (boolean, no value). `mode` is `auto` only when `--auto` is present, otherwise `interactive`.
+- `--help`/`-h` present → show usage (this vocabulary plus `argument-hint` in the frontmatter) and stop; do not route.
+
+Route → reference file:
+
+| route | reference |
+|---|---|
+| `create` | `references/workflows/create/start.md` |
+| `groom` | `references/workflows/groom/start.md` |
+| `work` | `references/workflows/work/start.md` |
+| `close` | `references/workflows/close/start.md` |
+| `resolve` | `references/workflows/close/start.md` |
+| `setup-github` | `references/workflows/setup-github/start.md` |
+| `progress` | `references/workflows/progress/start.md` |
+| `resume` | `references/workflows/resume/start.md` |
+
+For every placeholder in the form <key/>, substitute the value of that key from `<input/>`.
 
 <sam_cli>
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
@@ -30,30 +57,26 @@ The `references/workflows/*.md` files loaded by this skill are plain files, not 
 > A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
 > When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
 
-The following diagram is the authoritative procedure for input parsing and error gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram is the authoritative procedure for coercing <provided_arguments/> into `<input/>`. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
-    %% Run before any routing — parser normalizes all argument forms into structured JSON
-    Parse["Run parser script<br>node scripts/parser/parse.mjs with ARGUMENTS"] --> ExitCheck{"Parser exit code?"}
-    ExitCheck -->|"non-zero — script failed"| ErrExit(["STOP — return parser error to user"])
-    ExitCheck -->|"0 — script succeeded"| JsonCheck{"stdout is valid JSON?"}
-    JsonCheck -->|"No — malformed stdout"| ErrJson(["STOP — return JSON parse error to user"])
-    JsonCheck -->|"Yes — output parsed"| ErrField{"parsed JSON contains<br>non-empty 'error' field?"}
-    ErrField -->|"Yes — error present"| ErrVal(["STOP — return error value to user"])
-    ErrField -->|"No — clean payload"| KeyCheck{"required key for selected<br>route is missing from JSON?"}
-    KeyCheck -->|"Yes — required key absent"| ErrKey(["STOP — return missing key error to user"])
-    KeyCheck -->|"No — all required keys present"| ModeSet{"is mode field present<br>in parsed JSON?"}
-    ModeSet -->|"No — mode absent"| DefaultMode["Set mode = interactive"]
-    ModeSet -->|"Yes — mode explicit"| UseMode["Use mode value from JSON<br>interactive or auto"]
-    DefaultMode --> Ready(["Parsed JSON ready — proceed to routing"])
-    UseMode --> Ready
+    %% No subprocess, no shell — coerce provided_arguments directly against the vocabulary above.
+    Coerce["Coerce provided_arguments to the<br>parse.schema.json shape using the vocabulary above"] --> ReqCheck{"mode and route both derivable?"}
+    ReqCheck -->|"No"| ErrReq(["STOP — ask for clarification;<br>mode/route are always derivable from the<br>vocabulary above, a miss here means the<br>input didn't match any covered shape"])
+    ReqCheck -->|"Yes"| ConflictCheck{"two discriminators of the same<br>kind present (two routes, or two<br>item_refs), or a flag missing<br>its required value?"}
+    ConflictCheck -->|"Yes"| ErrConflict(["STOP — ask the user to disambiguate"])
+    ConflictCheck -->|"No"| RouteCheck{"route is one of the registry<br>keywords (create/groom/work/close/<br>resolve/setup-github/progress/resume)?"}
+    RouteCheck -->|"No — route is none, title_substring, or issue"| Ready(["input ready — proceed to routing"])
+    RouteCheck -->|"Yes"| RefLookup["Set reference from the route table above"]
+    RefLookup --> Ready
 ```
 
-Input contract — keys available after parsing:
+Input contract — keys available after coercion:
 
 - `mode`: optional; allowed values are `auto` or `interactive` (default when absent: `interactive`)
-- `route`: required; allowed values are `create`, `groom`, or `work`
+- `route`: required; allowed values are `none`, `title_substring`, `issue` (sole discriminator is an item_ref), or a registry keyword — `create`, `groom`, `work`, `close`, `resolve`, `setup-github`, `progress`, `resume`
+- `reference`: present only when `route` is a registry keyword — the file from the route table above
 - `user_text`: optional free text supplied by the user
 - `item_ref`: optional backlog reference such as `#887`
 
@@ -70,6 +93,10 @@ The following diagram is the authoritative procedure for pipeline stage executio
 ```mermaid
 flowchart TD
     %% Pipeline order: create -> groom -> work. Each earlier stage runs only if its output is missing.
+    %% Only reached for route in {create, groom, work} — the route-dispatch diagram above sends
+    %% `issue`/`title_substring` routes here as `work` (item_ref/user_text identifies the item);
+    %% every other route (close/resolve/setup-github/progress/resume/none) is terminal there and
+    %% never reaches this diagram.
     RouteIn(["route value from parsed JSON"]) --> RouteCheck{"route value?"}
 
     RouteCheck -->|"create"| CreateItemRef{"valid item_ref<br>already available?"}
@@ -117,25 +144,15 @@ When invoked with no arguments, shows an interactive browser. When invoked with 
 
 ## Arguments
 
-**Agent Preflight:** `<input/>` already carries the parsed JSON — treat it as source of truth. Re-running `parse.mjs` yourself: pipe via stdin, not a shell-quoted positional arg. Pipeline, output shape, extension steps: [parser-guide.md](./scripts/parser/parser-guide.md).
+**Agent Preflight:** `<input/>` is a value you derive by reasoning against the vocabulary above — see the coercion step near the top of this file. `parse.mjs` (referenced in [parser-guide.md](./scripts/parser/parser-guide.md)) is the standalone, scriptable equivalent of that same schema for non-agent callers (tests, other tooling) — it is not part of this skill's own execution path and this skill never shells out to it.
 
 Parser `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
 
-`<mode/>` selects the operating mode; remaining positional args form `<item_ref/>` (title or parameter):
+Full field derivation rules (route, item_ref, flags, delimiter, mode) are in the "Argument vocabulary" section near the top of this file — this section does not restate them.
 
-| `<mode/>` value | Remaining args meaning |
-|---|---|
-| (empty) | — |
-| `#N` / bare number / GitHub issue URL | issue number (`backend=github` only) |
-| beads ID (e.g. `bd-a3f8`) | beads issue ID (`backend=beads` only) |
-| `--auto` | `<item_ref/>`+ = title (or empty → auto-select first open P0/P1 item) |
-| `close` / `resolve` | `<item_ref/>`+ = title, `#N`, number, beads ID, or URL |
-| `setup-github` (**GitHub backend only**) | — |
-| `--quick` | `<item_ref/>`+ = title |
-| `progress` / `resume` | `<item_ref/>`+ = title or `#N` (optional for `resume`) |
-| (any other) | `<invocation_args/>` treated as title substring |
+**Known gap, not yet implemented:** the vocabulary's item_ref discriminator recognizes `#N`, bare digits, and GitHub issue URLs only — a beads issue ID (e.g. `bd-a3f8`, relevant when `backend=beads`) is not recognized as an item_ref and falls through to `title_substring`. Verified against `parse.mjs`'s `issueRegex`, which has no beads-ID pattern.
 
-**Optional flags** (when `<mode/>` is title substring or `--auto`): `--language <lang>` selects language plugin (default: python); `--stack <profile>` selects stack profile (e.g., python-fastapi, python-cli). See [sdlc-layers](../../docs/sdlc-layers/).
+**Optional flags** (when `route` is `title_substring`, `issue`, or a pipeline route): `--language <lang>` selects language plugin (default: python); `--stack <profile>` selects stack profile (e.g., python-fastapi, python-cli). See [sdlc-layers](../../docs/sdlc-layers/).
 
 ```text
 /work-backlog-item                                    # interactive browser
@@ -168,41 +185,41 @@ All interactive `AskUserQuestion` calls are replaced with evidence-derived decis
 
 ### Routing (evaluated first, before any step)
 
-The following diagram is the authoritative procedure for mode routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram is the authoritative procedure for route dispatch. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
-    %% Routing runs after input parsing completes. Dispatch on first argument word before any pipeline stage.
-    Start(["mode value from parsed JSON"]) --> Q1{"mode value?"}
-    Q1 -->|"empty or absent"| S0["Load references/workflows/work/interactive-browser.md<br>Step 1.1 — interactive browser"]
+    %% Dispatch runs once <input/> is ready. flags.quick takes priority over route.
+    %% Dispatch is entirely on the route field — never on flags.auto/flags.quick, which
+    %% are independent boolean modifiers, not route values (verified: `--auto` alone
+    %% produces route="title_substring", flags={auto:true} — never route="auto").
+    Start(["input ready"]) --> QuickCheck{"flags.quick present?"}
+    QuickCheck -->|"Yes"| SQ["Load references/workflows/quick/start.md<br>item_ref = item_ref field, or user_text as title"]
+    SQ --> SQEnd(["STOP — quick workflow handles session"])
+    QuickCheck -->|"No"| Q1{"route value?"}
+
+    Q1 -->|"none"| S0["Load references/workflows/work/interactive-browser.md<br>Step 1.1 — interactive browser"]
     S0 --> S0End(["STOP — interactive browser handles session"])
 
-    Q1 -->|"hash-N or bare number or GitHub issue URL"| S1b["Step 1.2 — issue-first path<br>title source: issue number extracted from input"]
-    S1b --> PipelineIssue(["Continue to pipeline execution with item_ref set"])
+    Q1 -->|"create"| PipelineCreate(["Continue to pipeline stage execution<br>(route = create)"])
+    Q1 -->|"groom"| PipelineGroom(["Continue to pipeline stage execution<br>(route = groom)"])
+    Q1 -->|"work"| PipelineWork(["Continue to pipeline stage execution<br>(route = work)"])
+    Q1 -->|"issue or title_substring"| PipelineEntry(["Continue to pipeline stage execution<br>as if route = work — item_ref or user_text<br>identifies the item; its own<br>create-if-missing / groom-if-incomplete<br>chain handles the rest"])
 
-    Q1 -->|"--auto"| AutoSet["mode is auto<br>title source: item_ref joined<br>if empty: auto-select first open P0/P1 item"]
-    AutoSet --> PipelineAuto(["Continue to pipeline execution with mode = auto"])
-
-    Q1 -->|"--quick"| SQ["Load references/workflows/quick/start.md<br>title source: item_ref joined"]
-    SQ --> SQEnd(["STOP — quick workflow handles session"])
-
-    Q1 -->|"progress"| SP["Load references/workflows/progress/start.md<br>title source: item_ref joined (optional)"]
+    Q1 -->|"progress"| SP["Load references/workflows/progress/start.md<br>item_ref = item_ref field, if present"]
     SP --> SPEnd(["STOP — progress report handles session"])
 
-    Q1 -->|"resume"| SR["Load references/workflows/resume/start.md<br>title source: item_ref joined (optional)"]
+    Q1 -->|"resume"| SR["Load references/workflows/resume/start.md<br>item_ref = item_ref field, if present"]
     SR --> SREnd(["STOP — resume workflow handles session"])
 
-    Q1 -->|"close"| S9c["Load references/workflows/close/start.md<br>title source: item_ref joined"]
+    Q1 -->|"close"| S9c["Load references/workflows/close/start.md<br>item_ref = item_ref field, or user_text as title"]
     S9c --> S9cEnd(["STOP — close workflow handles session"])
 
-    Q1 -->|"resolve"| S9r["Load references/workflows/close/start.md<br>title source: item_ref joined"]
+    Q1 -->|"resolve"| S9r["Load references/workflows/close/start.md<br>item_ref = item_ref field, or user_text as title"]
     S9r --> S9rEnd(["STOP — resolve workflow handles session"])
 
     Q1 -->|"setup-github"| SGH["Load references/workflows/setup-github/start.md"]
     SGH --> SGHEnd(["STOP — setup-github workflow handles session"])
-
-    Q1 -->|"any other string — title substring"| S1["Step 1.3 — interactive mode<br>title source: full invocation args as substring"]
-    S1 --> PipelineTitle(["Continue to pipeline execution with title substring"])
 ```
 
 **When <mode/> is `auto`**: all `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the substitution table. BLOCKED states (RT-ICA MISSING conditions, feasibility gate BLOCKED) require human resolution regardless of mode.
