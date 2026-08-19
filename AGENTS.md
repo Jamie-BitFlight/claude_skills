@@ -229,10 +229,8 @@ flat directives, not `Edit`-trimming words from its existing structure.
   `Skill(skill="...")` — that syntax is Claude-Code-only and this repo's plugin content also
   targets Codex and OpenCode. Existing `Skill(...)` blocks are pre-convention, not bugs.
 
-Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — string
-substitution happens at load time, including inside fenced code blocks, and gets the
-`${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` / `$ARGUMENTS` mechanics wrong in ways that corrupt
-the rendered skill.
+Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — load-time
+substitution can silently corrupt the rendered skill if unaccounted for.
 
 ### JavaScript/TypeScript
 
