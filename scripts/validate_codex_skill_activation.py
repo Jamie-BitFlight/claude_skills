@@ -52,7 +52,11 @@ class ActivationResult:
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Build the activation-harness command-line parser."""
+    """Build the activation-harness command-line parser.
+
+    Returns:
+        Configured argument parser for the activation harness CLI.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plugin", default="xdg-base-directory")
     parser.add_argument("--target", required=True, help="Matrix target: <plugin-id>:<skill>.")
@@ -74,7 +78,11 @@ def sha256_file(path: Path) -> str:
 
 
 def tree_sha256(root: Path) -> str:
-    """Hash the complete regular-file tree and reject every symbolic link."""
+    """Hash the complete regular-file tree and reject every symbolic link.
+
+    Returns:
+        Hex digest of the directory and file names and contents under root.
+    """
     if root.is_symlink() or not root.is_dir():
         raise HarnessError(f"Plugin tree is not a regular directory: {root.name}")
     digest = hashlib.sha256()
@@ -95,7 +103,11 @@ def tree_sha256(root: Path) -> str:
 
 
 def resolve_installed_skill(plugin_cache_root: Path, skill_name: str) -> InstalledSkill:
-    """Resolve one skill from exactly one installed plugin version."""
+    """Resolve one skill from exactly one installed plugin version.
+
+    Returns:
+        The verified, contained installed skill file and its digests.
+    """
     versions = [path for path in plugin_cache_root.iterdir() if path.is_dir() and not path.is_symlink()]
     if len(versions) != 1:
         raise HarnessError(f"Expected one installed plugin version, found {len(versions)}")
@@ -118,7 +130,11 @@ def resolve_installed_skill(plugin_cache_root: Path, skill_name: str) -> Install
 
 
 def load_matrix_target(target: str) -> dict[str, object]:
-    """Load a mapped task oracle without reading the tested skill instructions."""
+    """Load a mapped task oracle without reading the tested skill instructions.
+
+    Returns:
+        The matrix row for target, verified to carry a non-empty task_text.
+    """
     if not MATRIX_PATH.is_file():
         raise HarnessError("Activation matrix is missing")
     for line in MATRIX_PATH.read_text(encoding="utf-8").splitlines():
@@ -142,7 +158,11 @@ def ensure_no_mcp_configuration(plugin_root: Path) -> None:
 def build_turn_request(
     *, thread_id: str, skill_name: str, skill_path: Path, task_text: str, project_dir: Path
 ) -> dict[str, object]:
-    """Create the documented explicit-skill app-server turn request."""
+    """Create the documented explicit-skill app-server turn request.
+
+    Returns:
+        The turn/start JSON-RPC request payload.
+    """
     return {
         "method": "turn/start",
         "id": 3,
@@ -188,7 +208,12 @@ def observe_event(message: dict[str, object], *, observed_methods: list[str], re
 
 
 def pop_jsonl_message(buffer: bytes) -> tuple[dict[str, object] | None, bytes]:
-    """Decode one complete JSONL message while retaining any following bytes."""
+    """Decode one complete JSONL message while retaining any following bytes.
+
+    Returns:
+        The decoded message (or None if buffer holds no complete line) and
+        the unconsumed remainder of buffer.
+    """
     line, separator, remaining = buffer.partition(b"\n")
     if not separator:
         return None, buffer
@@ -198,32 +223,76 @@ def pop_jsonl_message(buffer: bytes) -> tuple[dict[str, object] | None, bytes]:
     return message, remaining
 
 
+@dataclass(frozen=True)
+class _StdoutReadError:
+    """Sentinel carrying a stdout read failure across the reader-thread boundary.
+
+    Distinguishes a genuine I/O failure (closed pipe, OS-level read error) from
+    a plain timeout so `AppServerClient.receive()` can surface the real cause
+    instead of a generic "timed out" message.
+    """
+
+    error: OSError | ValueError
+
+
 class AppServerClient:
     """Small JSONL client with request correlation and bounded reads."""
 
     def __init__(self, process: subprocess.Popen[bytes], deadline: float) -> None:
+        """Start the background stdout reader for one app-server subprocess.
+
+        Args:
+            process: The running app-server subprocess.
+            deadline: A `time.monotonic()` timestamp after which reads time out.
+
+        Raises:
+            HarnessError: If the process was not started with a stdout pipe.
+        """
         self.process = process
         self.deadline = deadline
         self.buffer = b""
         if process.stdout is None:
             raise HarnessError("App-server stdout is unavailable")
-        self._stdout_chunks: queue.Queue[bytes | None] = queue.Queue()
+        self._stdout_chunks: queue.Queue[bytes | _StdoutReadError | None] = queue.Queue()
         threading.Thread(target=self._read_stdout, daemon=True).start()
 
     def _read_stdout(self) -> None:
+        """Forward stdout lines (or a terminal read failure) to the receive queue."""
         if self.process.stdout is None:
             return
-        for line in iter(self.process.stdout.readline, b""):
-            self._stdout_chunks.put(line)
+        try:
+            for line in iter(self.process.stdout.readline, b""):
+                self._stdout_chunks.put(line)
+        except (OSError, ValueError) as error:
+            # A closed pipe or OS-level read failure must surface distinctly
+            # from a plain timeout — see receive()'s _StdoutReadError handling.
+            self._stdout_chunks.put(_StdoutReadError(error))
+            return
         self._stdout_chunks.put(None)
 
     def send(self, message: dict[str, object]) -> None:
+        """Write one JSON-RPC message to the app-server's stdin.
+
+        Args:
+            message: The JSON-RPC request or notification to send.
+
+        Raises:
+            HarnessError: If the process was not started with a stdin pipe.
+        """
         if self.process.stdin is None:
             raise HarnessError("App-server stdin is unavailable")
         self.process.stdin.write((json.dumps(message) + "\n").encode("utf-8"))
         self.process.stdin.flush()
 
     def receive(self) -> dict[str, object]:
+        """Block until the next complete JSONL app-server message is available.
+
+        Returns:
+            The next decoded JSONL message.
+
+        Raises:
+            HarnessError: On timeout, a stdout read failure, or early stdout closure.
+        """
         while True:
             message, self.buffer = pop_jsonl_message(self.buffer)
             if message is not None:
@@ -235,6 +304,8 @@ class AppServerClient:
                 chunk = self._stdout_chunks.get(timeout=remaining)
             except queue.Empty:
                 raise HarnessError("Timed out waiting for app-server") from None
+            if isinstance(chunk, _StdoutReadError):
+                raise HarnessError(f"App-server stdout read failed: {chunk.error}") from chunk.error
             if chunk is None:
                 raise HarnessError("App-server closed stdout before completing the turn")
             self.buffer += chunk
@@ -242,6 +313,20 @@ class AppServerClient:
     def request(
         self, message: dict[str, object], *, observed_methods: list[str], response_fragments: list[str]
     ) -> dict[str, object]:
+        """Send a JSON-RPC request and return its correlated result.
+
+        Args:
+            message: The JSON-RPC request to send; must include an "id".
+            observed_methods: Accumulator for every event method observed while waiting.
+            response_fragments: Accumulator for streamed agent-message text deltas.
+
+        Returns:
+            The response's "result" object.
+
+        Raises:
+            HarnessError: If the app-server rejects the request or returns a
+                non-object result.
+        """
         self.send(message)
         request_id = message["id"]
         while True:
@@ -262,7 +347,11 @@ class AppServerClient:
 def run_app_server(
     *, env: dict[str, str], project_dir: Path, skill_name: str, skill_path: Path, task_text: str, timeout_seconds: float
 ) -> ActivationResult:
-    """Run one explicit skill turn and reject any unsafe event category."""
+    """Run one explicit skill turn and reject any unsafe event category.
+
+    Returns:
+        The observed protocol methods and the completed turn's response text.
+    """
     process = subprocess.Popen(
         APP_SERVER_COMMAND,
         cwd=project_dir,
@@ -358,18 +447,91 @@ def write_evidence(path: Path, evidence: dict[str, object]) -> None:
     path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def resolve_skill_name(target: str, plugin_id: str) -> str:
+    """Derive and validate the skill name embedded in a matrix target.
+
+    Args:
+        target: Matrix target in "<plugin-id>:<skill>" form.
+        plugin_id: Plugin id resolved from the isolated installation.
+
+    Returns:
+        The validated skill name.
+
+    Raises:
+        HarnessError: If target's plugin id does not match plugin_id, or the
+            derived skill name is empty or contains a path separator.
+    """
+    if not target.startswith(f"{plugin_id}:"):
+        raise HarnessError("Target plugin id does not match the selected plugin directory")
+    skill_name = target.removeprefix(f"{plugin_id}:")
+    if not skill_name or "/" in skill_name:
+        raise HarnessError("Target skill name is invalid")
+    return skill_name
+
+
+def verify_cache_provenance(installed: InstalledSkill, source_digest: str) -> None:
+    """Verify the installed plugin cache tree matches the distributed source tree.
+
+    Args:
+        installed: The resolved installed skill and its cache tree digest.
+        source_digest: The digest computed directly from the distributed plugin tree.
+
+    Raises:
+        HarnessError: If the two digests differ.
+    """
+    if installed.tree_sha256 != source_digest:
+        raise HarnessError("Installed cache tree does not match the distributed plugin tree")
+
+
+def require_task_text(target: dict[str, object]) -> str:
+    """Extract the mapped task text, failing closed if it is missing.
+
+    Args:
+        target: A MAPPED activation-matrix row.
+
+    Returns:
+        The task text to inject into the app-server turn.
+
+    Raises:
+        HarnessError: If the row has no string task text.
+    """
+    task_text = target.get("task_text")
+    if not isinstance(task_text, str):
+        raise HarnessError("Mapped target has no task text")
+    return task_text
+
+
+def require_expected_tokens_matched(response_text: str, expect_contains: list[str]) -> list[str]:
+    """Verify every requested behavioral token is present in the skill's response.
+
+    Args:
+        response_text: The skill turn's redacted agent response text.
+        expect_contains: Case-insensitive substrings that must all be present.
+
+    Returns:
+        The matched subset of expect_contains (equals expect_contains on success).
+
+    Raises:
+        HarnessError: If any requested token is missing from response_text.
+    """
+    matched = [token for token in expect_contains if token.casefold() in response_text.casefold()]
+    if len(matched) != len(expect_contains):
+        raise HarnessError("Skill response did not meet the supplied behavioral assertion")
+    return matched
+
+
 def main() -> int:
-    """Install, provenance-check, and explicitly activate one mapped skill."""
+    """Install, provenance-check, and explicitly activate one mapped skill.
+
+    Returns:
+        0 if activation evidence was written successfully, 1 otherwise.
+    """
     args = create_parser().parse_args()
     workspace: isolated.ValidationWorkspace | None = None
     try:
         target = load_matrix_target(args.target)
         workspace = isolated.create_temp_workspace(args.plugin)
-        if not args.target.startswith(f"{workspace.plugin_id}:"):
-            raise HarnessError("Target plugin id does not match the selected plugin directory")
-        skill_name = args.target.removeprefix(f"{workspace.plugin_id}:")
-        if not skill_name or "/" in skill_name:
-            raise HarnessError("Target skill name is invalid")
+        skill_name = resolve_skill_name(args.target, workspace.plugin_id)
         ensure_no_mcp_configuration(workspace.plugin_dir)
         source_digest = tree_sha256(workspace.plugin_dir)
         env = isolated.build_env(args.path_prefix, workspace.codex_home)
@@ -387,13 +549,10 @@ def main() -> int:
         )
         cache_root = workspace.codex_home / "plugins" / "cache" / workspace.marketplace_name / workspace.plugin_id
         installed = resolve_installed_skill(cache_root, skill_name)
-        if installed.tree_sha256 != source_digest:
-            raise HarnessError("Installed cache tree does not match the distributed plugin tree")
+        verify_cache_provenance(installed, source_digest)
         if args.copy_auth_from_current_home:
             isolated.copy_auth_from_current_home(workspace)
-        task_text = target.get("task_text")
-        if not isinstance(task_text, str):
-            raise HarnessError("Mapped target has no task text")
+        task_text = require_task_text(target)
         result = run_app_server(
             env=env,
             project_dir=workspace.project_dir,
@@ -402,9 +561,7 @@ def main() -> int:
             task_text=task_text,
             timeout_seconds=args.timeout_seconds,
         )
-        matched = [token for token in args.expect_contains if token.casefold() in result.response_text.casefold()]
-        if len(matched) != len(args.expect_contains):
-            raise HarnessError("Skill response did not meet the supplied behavioral assertion")
+        matched = require_expected_tokens_matched(result.response_text, args.expect_contains)
         write_evidence(
             args.evidence_file,
             {
@@ -421,11 +578,12 @@ def main() -> int:
                 "target": args.target,
             },
         )
-        print(f"Activation evidence written to: {args.evidence_file}")
-        return 0
     except (HarnessError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
+    else:
+        print(f"Activation evidence written to: {args.evidence_file}")
+        return 0
     finally:
         if workspace is not None:
             isolated.cleanup_workspace(workspace)

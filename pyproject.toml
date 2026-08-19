@@ -499,14 +499,13 @@ max-complexity = 12
 ]
 # ruamel.yaml returns dynamically typed values; Any is the correct annotation here
 "research/knowledge-explorer.py" = ["any-type"]
-# Third-party type stubs authored here to keep typing consistent for packages that ship none.
-# A (builtin-shadowing) and N (naming) often must mirror the external module's real names
-# verbatim; ANN softening (e.g. Any) reflects that the systems below the stub aren't ours to
-# manage — we can't always express their real shape more precisely than upstream does.
+# Category 6 (maintenance burden): this harness exhaustively type-narrows and
+# validates every field of an untrusted external JSON-RPC protocol (Codex
+# app-server) before acting on it. The mccabe/branch-count limits assume
+# ordinary application logic; further splitting the per-field isinstance
+# guards here would fragment single-purpose protocol validation across more
+# functions without reducing the actual validation surface.
 "scripts/validate_codex_skill_activation.py" = [
-    "D",
-    "DOC",
-    "TRY",
     "complex-structure",
     "too-many-branches",
 ]
