@@ -1,8 +1,9 @@
 ---
 name: backlog-item-groomer
 description: Produce groomed content for a backlog item - discovers related skills, agents, prior work, artifact type, behavioral boundary, and dependency graph; performs RT-ICA assessment; outputs groomed item template for writing into .claude/backlog/{priority}-{slug}.md. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
-tools: Read, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam__sam_plan, mcp__plugin_dh_sam__sam_task, mcp__plugin_dh_sam__sam_active_task, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_add, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve
+tools: Read, Write, Edit, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam__sam_plan, mcp__plugin_dh_sam__sam_task, mcp__plugin_dh_sam__sam_active_task, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_add, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve
 model: sonnet
+memory: project
 skills:
   - dh:planner-rt-ica
 ---
@@ -510,3 +511,11 @@ When operating as a teammate spawned via `TeamCreate`, send your completion stat
 ```text
 SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")
 ```
+
+## Persistent Memory
+
+Your `memory: project` frontmatter field gives you a persistent, cross-session memory directory (see the platform's standard memory-directory conventions — do not hardcode its path here). Record durable grooming lessons, not session-specific item content:
+
+- A groomed output (artifact classification, acceptance criteria shape, effort estimate) that a human later corrected — what signal in the item description should have driven the different call
+- A recurring domain-rule gap you had to infer because no local source stated it explicitly
+- Do NOT record the content of any specific backlog item — only the generalizable judgment lesson
