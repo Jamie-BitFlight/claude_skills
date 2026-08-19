@@ -17,7 +17,7 @@ import re
 
 from . import rendering as _rendering
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
-from .entry_blocks import _render_entry_raw, parse_entries
+from .entry_blocks import _deduplicate_timestamps, _render_entry_raw, parse_entries
 from .models import BacklogItem, GroomedData, Section, parse_issue_number
 from .parsing import extract_sections
 
@@ -286,13 +286,23 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
         target_key = section_key if section_key is not None else heading_to_unknown_key(heading_name)
         entries = parse_entries(content, show="all")
         # A canonical heading and one of its aliases (e.g. "## Fact-Check" and
-        # "## Facts check") both resolve to the same target_key. Merge into
-        # any entries already parsed for that key instead of overwriting them
-        # outright, which would silently drop the earlier heading's content
-        # (#3015 Greptile review finding).
+        # "## Facts check") both resolve to the same target_key. Concatenate
+        # rather than overwrite, so the earlier heading's entries are not
+        # silently dropped (#3015 Greptile review finding) -- and use
+        # _deduplicate_timestamps, not merge_entries, to reconcile any id
+        # collision: unlike merge_item's local/remote reconciliation, these
+        # are two literal, physically distinct headings in one document, not
+        # two versions of the same logical entry, so an id-keyed "pick a
+        # winner" merge is the wrong tool even before considering collisions.
+        # A collision is also not a rare edge case here: unwrapped/legacy
+        # content with no leading timestamp always falls back to the same
+        # f"{added_date}T00:00:00Z" id (see entry_blocks.parse_entries), so
+        # two colliding headings' unwrapped content would otherwise share an
+        # id and merge_entries would keep only the struck/longer one.
         existing_section = parsed_sections.get(target_key)
         if isinstance(existing_section, Section):
-            entries = _merge_entries(existing_section.entries, entries)
+            entries = [*existing_section.entries, *entries]
+            _deduplicate_timestamps(entries)
         parsed_sections[target_key] = Section(entries=entries)
 
     return BacklogItem(

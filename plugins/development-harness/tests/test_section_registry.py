@@ -501,6 +501,28 @@ def test_parse_issue_body_canonical_heading_and_alias_merge_not_overwrite() -> N
     assert {e.content for e in section.entries} == {"First entry.", "Second entry."}
 
 
+def test_parse_issue_body_canonical_heading_and_alias_merge_survives_id_collision() -> None:
+    """Colliding headings whose entries share a fallback id both survive, not just one.
+
+    Tests: github_sync.parse_issue_body two-heading collision, unwrapped (legacy) content
+    Why: Content with no leading entry-block timestamp falls back to the same
+         ``f"{added_date}T00:00:00Z"`` id for every unwrapped entry
+         (``entry_blocks.parse_entries``), so two colliding headings' unwrapped
+         content produce entries sharing one id. An id-keyed reconciliation
+         merge (``merge_entries``) would treat those as two versions of the
+         same entry and keep only the struck/longer one, discarding the
+         other heading's content outright (#3015 Greptile review finding).
+    """
+    body = "## Fact-Check\n\nFirst legacy line.\n\n## Facts check\n\nSecond legacy line.\n"
+
+    item = github_sync.parse_issue_body(body)
+
+    section = item.sections["fact_check"]
+    assert isinstance(section, Section)
+    assert {e.content for e in section.entries} == {"First legacy line.", "Second legacy line."}
+    assert len({e.id for e in section.entries}) == len(section.entries)
+
+
 # ---------------------------------------------------------------------------
 # Write-back unknown__-prefix healing tries the reconstructed heading too
 # (post-#2987 Copilot pass finding: the write boundary's unknown__ recovery
