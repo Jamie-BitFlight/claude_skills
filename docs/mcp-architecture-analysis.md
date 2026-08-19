@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Current State:** Only agentskill-kaizen has MCP tooling (see `plugins/` for the full plugin roster)
+**Current State:** Multiple plugins already include MCP tooling; see `plugins/**/mcp/` for the authoritative list
 
 **Goal:** Each plugin should provide a universal MCP interface for its tooling, enabling agents to access plugin capabilities programmatically through standardized tools.
 
