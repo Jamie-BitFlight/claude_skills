@@ -135,7 +135,10 @@ jobs:
   # at all, so it always reports "no updates needed" regardless of what
   # actually changed. That gap (issue #3021) is what let PR #3005 merge a
   # plugin content change with zero plugin.json version bump. The second step
-  # below closes it with a real base-vs-head comparison.
+  # below closes it with a real base-vs-head comparison. --head-ref is passed
+  # explicitly as the PR's own branch tip: on a pull_request trigger,
+  # actions/checkout's default HEAD is a synthetic base+PR merge commit, so
+  # diffing against bare "HEAD" would mix in base-only changes.
   # =============================================================================
   manifest-sync:
     name: Local / Manifest sync
@@ -158,7 +161,7 @@ jobs:
           BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
           uv run -q --no-sync \
             plugins/plugin-creator/scripts/check_plugin_version_bump.py \
-            --check --base-ref "${BASE}"
+            --check --base-ref "${BASE}" --head-ref "origin/${GITHUB_HEAD_REF}"
 
   # =============================================================================
   # File hygiene: trailing whitespace, line endings, etc.

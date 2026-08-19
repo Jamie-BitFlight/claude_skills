@@ -16,7 +16,10 @@ Two modes:
     not a staged-index comparison) and fails when any plugin with a changed
     file did not also raise its ``plugin.json`` version relative to
     *base-ref*. Newly added or fully deleted plugins are exempt -- there is
-    no prior version to compare against.
+    no prior version to compare against. *head-ref* defaults to ``HEAD`` but
+    should be passed explicitly (e.g. ``origin/$GITHUB_HEAD_REF``) on a
+    GitHub Actions ``pull_request`` trigger, where the checked-out ``HEAD``
+    is a synthetic merge commit rather than the PR's actual head commit.
 
 ``--audit`` (retroactive, report-only)
     Scans every plugin currently on disk, finds the most recent commit that
@@ -29,6 +32,7 @@ Two modes:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -104,7 +108,10 @@ def find_last_version_bump_commit(plugin_json_relpath: str) -> str | None:
         if version is None:
             continue
 
-        parent_sha = run_git_command(["rev-parse", f"{commit}^"])
+        # --verify --quiet: a root commit has no parent, so this exits non-zero --
+        # --quiet suppresses git's "fatal: ... unknown revision" stderr for that
+        # expected case (run_git_command forwards stderr on any non-zero exit).
+        parent_sha = run_git_command(["rev-parse", "--verify", "--quiet", f"{commit}^"])
         if not parent_sha:
             return commit  # root commit -- version was set here, counts as the bump point
 
@@ -148,7 +155,7 @@ def audit_version_drift(plugins_root: Path) -> list[str]:
         rel_plugin_json = f"plugins/{plugin_name}/.claude-plugin/plugin.json"
         last_bump = find_last_version_bump_commit(rel_plugin_json)
         if last_bump is None:
-            continue  # never bumped -- no baseline to compare against
+            continue  # plugin.json has no commit history -- nothing to diff against
 
         changed = run_git_command(["diff", "--name-only", last_bump, "HEAD", "--", f"plugins/{plugin_name}"])
         if changed.strip():
@@ -157,12 +164,21 @@ def audit_version_drift(plugins_root: Path) -> list[str]:
     return drifted
 
 
-def _run_check(base_ref_arg: str | None) -> int:
+def _run_check(base_ref_arg: str | None, head_ref_arg: str | None = None) -> int:
     """Run the CI version-bump gate and print the result.
 
     Args:
         base_ref_arg: Explicit base ref to diff against, or None to
             auto-resolve via ``resolve_base()`` (``origin/main`` -> ``main``).
+        head_ref_arg: Explicit head ref to diff against, or None to use the
+            checked-out working tree's ``HEAD``. On a GitHub Actions
+            ``pull_request`` trigger, ``actions/checkout`` checks out a
+            synthetic merge commit (base tip merged with the PR head) by
+            default, not the PR's actual head commit -- diffing against that
+            ``HEAD`` mixes in base-only changes that landed after the PR
+            branch diverged. Callers on that trigger must pass the PR's real
+            head ref explicitly (e.g. ``origin/${GITHUB_HEAD_REF}``, or
+            ``github.event.pull_request.head.sha``).
 
     Returns:
         0 when every changed plugin bumped its version (or no base ref is
@@ -174,7 +190,7 @@ def _run_check(base_ref_arg: str | None) -> int:
         sys.stderr.write("Error: no base ref resolvable (origin/main or main) -- pass --base-ref explicitly\n")
         return 1
 
-    missing = check_version_bumps(base_ref)
+    missing = check_version_bumps(base_ref, head_ref_arg or "HEAD")
     if not missing:
         print(f"OK: all changed plugins bumped plugin.json's version relative to {base_ref}")
         return 0
@@ -191,7 +207,12 @@ def _run_check(base_ref_arg: str | None) -> int:
 
 
 def _run_audit() -> int:
-    """Run the retroactive drift audit and print results.
+    """Run the retroactive drift audit and print results as compact JSON.
+
+    This tool has no human operator -- every caller is an agent or CI script
+    (see AGENTS.md "CLI and script output -- agent-only, never human-facing").
+    JSON output lets a caller parse the result directly instead of scraping
+    prose.
 
     Returns:
         0 always -- this is a report-only mode (issue #3021 acceptance
@@ -204,13 +225,7 @@ def _run_audit() -> int:
         return 1
 
     drifted = audit_version_drift(plugins_root)
-    if not drifted:
-        print("No version drift detected -- every plugin's version reflects its latest content change.")
-        return 0
-
-    print("Plugins whose content changed after their last version bump:")
-    for name in drifted:
-        print(f"  - {name}")
+    print(json.dumps({"drifted_plugins": drifted}))
     return 0
 
 
@@ -227,10 +242,19 @@ def main() -> int:
         "--audit", action="store_true", help="Report plugins whose content changed after their last version bump"
     )
     parser.add_argument("--base-ref", default=None, help="Explicit base ref for --check (default: resolve_base())")
+    parser.add_argument(
+        "--head-ref",
+        default=None,
+        help=(
+            "Explicit head ref for --check (default: HEAD). Required on a GitHub Actions "
+            "pull_request trigger, since actions/checkout's default HEAD there is a synthetic "
+            "merge commit, not the PR's real head -- pass origin/$GITHUB_HEAD_REF instead."
+        ),
+    )
     args = parser.parse_args()
 
     if args.check:
-        return _run_check(args.base_ref)
+        return _run_check(args.base_ref, args.head_ref)
     return _run_audit()
 
 

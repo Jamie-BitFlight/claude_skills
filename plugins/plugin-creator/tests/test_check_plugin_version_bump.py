@@ -253,8 +253,8 @@ class TestFindLastVersionBumpCommit:
         """Route a monkeypatched run_git_command call to log-history or rev-parse-parent output."""
         if args[0] == "log":
             return "c3\nc2\nc1"
-        # args like ["rev-parse", "c3^"]
-        commit = args[1].removesuffix("^")
+        # args like ["rev-parse", "--verify", "--quiet", "c3^"]
+        commit = args[-1].removesuffix("^")
         return parents.get(commit, "")
 
     def test_returns_none_when_plugin_json_has_no_history(self, monkeypatch: Any) -> None:
@@ -291,7 +291,7 @@ class TestFindLastVersionBumpCommit:
         def _fake_run(args: list[str]) -> str:
             if args[0] == "log":
                 return "c2\nc1"
-            commit = args[1].removesuffix("^")
+            commit = args[-1].removesuffix("^")
             return parents.get(commit, "")
 
         monkeypatch.setattr(gate, "run_git_command", _fake_run)
@@ -382,17 +382,62 @@ class TestRunCheck:
         # Assert
         assert exit_code == 1
 
+    def test_passes_explicit_head_ref_through_to_check_version_bumps(self, monkeypatch: Any) -> None:
+        """An explicit --head-ref is forwarded verbatim, not silently replaced with HEAD.
+
+        Tests: _run_check
+        How: Capture the (base, head) pair check_version_bumps is called with.
+        Why: Greptile P1 / Copilot finding (PR #3022): on a GitHub Actions
+             pull_request trigger, actions/checkout's default HEAD is a
+             synthetic base+PR merge commit -- callers must be able to point
+             the diff at the PR's real head ref instead of the implicit HEAD.
+        """
+        # Arrange
+        seen: list[tuple[str, str]] = []
+        monkeypatch.setattr(gate, "check_version_bumps", lambda base, head: seen.append((base, head)) or [])
+
+        # Act
+        exit_code = gate._run_check("main", "origin/feature-branch")
+
+        # Assert
+        assert exit_code == 0
+        assert seen == [("main", "origin/feature-branch")]
+
+    def test_defaults_head_ref_to_head_when_not_given(self, monkeypatch: Any) -> None:
+        """Omitting --head-ref preserves the original HEAD-implicit behaviour.
+
+        Tests: _run_check
+        How: Call with head_ref_arg=None (the CLI default) and capture the
+             head ref check_version_bumps receives.
+        Why: Falsification check for the previous test -- proves the new
+             parameter is additive and does not break local/non-PR usage
+             (e.g. a developer running --check with just --base-ref).
+        """
+        # Arrange
+        seen: list[tuple[str, str]] = []
+        monkeypatch.setattr(gate, "check_version_bumps", lambda base, head: seen.append((base, head)) or [])
+
+        # Act
+        exit_code = gate._run_check("main", None)
+
+        # Assert
+        assert exit_code == 0
+        assert seen == [("main", "HEAD")]
+
 
 class TestRunAudit:
     """Tests for _run_audit -- the --audit CLI mode."""
 
     def test_reports_no_drift(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
-        """No drifted plugins -- reports a clean result and exits 0.
+        """No drifted plugins -- reports a clean JSON result and exits 0.
 
         Tests: _run_audit
         How: audit_version_drift monkeypatched to return [].
         Why: The audit is report-only (issue #3021 AC #2); a clean repo state
-             must print a clear confirmation, not silence.
+             must be machine-parseable, not silence. Per AGENTS.md's "CLI and
+             script output" convention, every caller of this repo's scripts
+             is an agent/CI process, never a human at a terminal, so the
+             result is compact JSON rather than prose (Greptile P2 finding).
         """
         # Arrange
         monkeypatch.chdir(tmp_path)
@@ -404,15 +449,16 @@ class TestRunAudit:
 
         # Assert
         assert exit_code == 0
-        assert "No version drift" in capsys.readouterr().out
+        assert json.loads(capsys.readouterr().out) == {"drifted_plugins": []}
 
     def test_reports_drifted_plugins(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
-        """Drifted plugins are listed on stdout; still exits 0 (report-only).
+        """Drifted plugins are reported as a JSON list; still exits 0 (report-only).
 
         Tests: _run_audit
         How: audit_version_drift monkeypatched to return ["dh"].
         Why: Report-only means CI never blocks on this mode -- it exists purely
-             to surface a gap like #3021's for manual/scripted follow-up.
+             to surface a gap like #3021's for manual/scripted follow-up, and
+             that follow-up tooling must be able to parse the result directly.
         """
         # Arrange
         monkeypatch.chdir(tmp_path)
@@ -424,7 +470,7 @@ class TestRunAudit:
 
         # Assert
         assert exit_code == 0
-        assert "dh" in capsys.readouterr().out
+        assert json.loads(capsys.readouterr().out) == {"drifted_plugins": ["dh"]}
 
 
 # ============================================================================
@@ -454,6 +500,58 @@ def _write_plugin_json(repo: Path, plugin_name: str, version: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"name": plugin_name, "version": version}) + "\n", encoding="utf-8")
     return path
+
+
+@pytest.mark.integration
+class TestFindLastVersionBumpCommitIntegration:
+    """End-to-end test for the root-commit stderr-noise fix (PR #3022 review)."""
+
+    def test_root_commit_produces_no_stderr_noise(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+        """A true git root commit's parent lookup must not leak "fatal: ..." to stderr.
+
+        Tests: find_last_version_bump_commit (real git subprocess, no mocking)
+        How: A one-commit repo -- the root commit's `<sha>^` does not exist.
+             Bare `git rev-parse <sha>^` exits non-zero with a "fatal: ..."
+             message for that case, and run_git_command() forwards any
+             non-zero-exit stderr straight to this process's stderr
+             (auto_sync_manifests.py run_git_command) -- so a plain --audit
+             run over a repo with a fresh plugin would print that noise even
+             though a root commit is an expected, non-error case.
+        Why: Falsification first -- confirm real git actually fails loudly for
+             this case (proves the reproduction is real), then confirm
+             find_last_version_bump_commit's own stderr is empty (proves the
+             ``rev-parse --verify --quiet`` fix suppresses it).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _git(tmp_path, "init")
+        _git(tmp_path, "config", "commit.gpgsign", "false")
+        _write_plugin_json(tmp_path, "dh", "1.0.0")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "root: dh at 1.0.0")
+        root_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+        # Falsification: confirm bare `git rev-parse <sha>^` really does fail
+        # loudly for a true root commit -- otherwise this test would not be
+        # exercising the bug the review comment described.
+        bare_attempt = subprocess.run(
+            ["git", "rev-parse", f"{root_sha}^"],
+            cwd=tmp_path,
+            capture_output=True,
+            env=_GIT_ENV,
+            text=True,
+            check=False,
+        )
+        assert bare_attempt.returncode != 0
+        assert bare_attempt.stderr.strip() != ""
+
+        # Act
+        result = gate.find_last_version_bump_commit("plugins/dh/.claude-plugin/plugin.json")
+
+        # Assert -- root commit is still returned as the bump point ...
+        assert result == root_sha
+        # ... and no "fatal: ..." noise reached this process's stderr getting there.
+        assert capsys.readouterr().err == ""
 
 
 @pytest.mark.integration
@@ -562,6 +660,130 @@ class TestCheckVersionBumpsIntegration:
 
         # Assert -- other-plugin never appears; it wasn't touched
         assert missing == []
+
+    def test_synthetic_merge_commit_head_false_flags_base_only_change(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Reproduction (Greptile P1 / Copilot, PR #3022): a base-only change after
+        divergence, diffed via the default HEAD, wrongly blocks a valid PR.
+
+        Tests: check_version_bumps (real git diff between two refs, mirroring the
+             workflow's actual base/head comparison)
+        How: 1) divergence commit -- pluginA and pluginB both at 1.0.0.
+             2) PR branch: bumps pluginB only (a real, correctly-bumped PR change).
+             3) base tip: after divergence, base's own history edits pluginA's
+                content with *no* version bump (unrelated to the PR).
+             4) a synthetic merge commit combining both, exactly as
+                actions/checkout produces by default for a pull_request
+                trigger (base tip as first parent, PR head merged in).
+        Why: Diffing base_sha...HEAD against that merge commit makes pluginA
+             look like it changed in "the PR" (it did not -- only the base
+             branch changed it), so the gate would fail a PR that never
+             touched pluginA. Falsification: the same check against the PR's
+             real head commit (the fix) must not flag it.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _git(tmp_path, "init")
+        _git(tmp_path, "config", "commit.gpgsign", "false")
+        plugin_a_file = tmp_path / "plugins" / "plugin-a" / "README.md"
+        plugin_a_file.parent.mkdir(parents=True, exist_ok=True)
+        plugin_a_file.write_text("v1\n", encoding="utf-8")
+        _write_plugin_json(tmp_path, "plugin-a", "1.0.0")
+        _write_plugin_json(tmp_path, "plugin-b", "1.0.0")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "divergence point")
+        divergence_sha = _git(tmp_path, "rev-parse", "HEAD")
+        base_branch = _git(tmp_path, "branch", "--show-current")
+
+        # PR branch: correctly bumps pluginB only.
+        _git(tmp_path, "checkout", "-b", "pr-branch")
+        _write_plugin_json(tmp_path, "plugin-b", "1.0.1")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "PR: bump plugin-b")
+        pr_head_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+        # Base tip: unrelated post-divergence change to pluginA, no bump.
+        _git(tmp_path, "checkout", base_branch)
+        plugin_a_file.write_text("v2 -- unrelated base drift\n", encoding="utf-8")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "base: unbumped plugin-a drift")
+        base_tip_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+        # Synthetic PR merge commit, as actions/checkout produces by default.
+        _git(tmp_path, "checkout", "-b", "synthetic-merge", base_tip_sha)
+        _git(tmp_path, "merge", "--no-ff", "--no-edit", pr_head_sha)
+        merge_sha = _git(tmp_path, "rev-parse", "HEAD")
+        _git(tmp_path, "checkout", merge_sha)  # detached HEAD == HEAD is the merge commit
+
+        # Act -- bug: default head_ref (implicit HEAD == the merge commit)
+        buggy_missing = gate.check_version_bumps(divergence_sha, "HEAD")
+        # Act -- fix: explicit head_ref pointing at the PR's real head
+        fixed_missing = gate.check_version_bumps(divergence_sha, pr_head_sha)
+
+        # Assert -- reproduction: plugin-a is wrongly flagged via the merge commit ...
+        assert buggy_missing == ["plugin-a"]
+        # ... but never flagged when diffed against the PR's actual head.
+        assert fixed_missing == []
+
+    def test_synthetic_merge_commit_head_masks_a_real_missing_bump(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Reproduction (Greptile P1 / Copilot, PR #3022): a base-side version bump
+        merged into HEAD can mask a genuinely unbumped PR change.
+
+        Tests: check_version_bumps (real git diff between two refs, mirroring the
+             workflow's actual base/head comparison)
+        How: 1) divergence commit -- pluginA at 1.0.0.
+             2) PR branch: edits pluginA's content but never bumps its version
+                (the actual bug the gate exists to catch).
+             3) base tip: after divergence, base independently bumps pluginA
+                to 2.0.0 for an unrelated reason.
+             4) synthetic merge commit combining both.
+        Why: Diffing base_sha...HEAD against that merge commit shows
+             plugin-a's version at "head" as 2.0.0 (inherited from base) even
+             though the PR's own commit never bumped it -- head > base passes
+             the gate, silently letting an unbumped PR change through.
+             Falsification: diffing against the PR's real head must catch it.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _git(tmp_path, "init")
+        _git(tmp_path, "config", "commit.gpgsign", "false")
+        plugin_a_file = tmp_path / "plugins" / "plugin-a" / "README.md"
+        plugin_a_file.parent.mkdir(parents=True, exist_ok=True)
+        plugin_a_file.write_text("v1\n", encoding="utf-8")
+        _write_plugin_json(tmp_path, "plugin-a", "1.0.0")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "divergence point")
+        divergence_sha = _git(tmp_path, "rev-parse", "HEAD")
+        base_branch = _git(tmp_path, "branch", "--show-current")
+
+        # PR branch: content change, no bump (the bug the gate must catch).
+        _git(tmp_path, "checkout", "-b", "pr-branch")
+        plugin_a_file.write_text("v2 -- PR change, unbumped\n", encoding="utf-8")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "PR: edits plugin-a, forgets the bump")
+        pr_head_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+        # Base tip: unrelated bump, landed on base after the PR diverged.
+        _git(tmp_path, "checkout", base_branch)
+        _write_plugin_json(tmp_path, "plugin-a", "2.0.0")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "base: unrelated plugin-a bump to 2.0.0")
+        base_tip_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+        # Synthetic PR merge commit, as actions/checkout produces by default.
+        _git(tmp_path, "checkout", "-b", "synthetic-merge", base_tip_sha)
+        _git(tmp_path, "merge", "--no-ff", "--no-edit", pr_head_sha)
+        merge_sha = _git(tmp_path, "rev-parse", "HEAD")
+        _git(tmp_path, "checkout", merge_sha)  # detached HEAD == HEAD is the merge commit
+
+        # Act -- bug: default head_ref (implicit HEAD == the merge commit)
+        buggy_missing = gate.check_version_bumps(divergence_sha, "HEAD")
+        # Act -- fix: explicit head_ref pointing at the PR's real head
+        fixed_missing = gate.check_version_bumps(divergence_sha, pr_head_sha)
+
+        # Assert -- reproduction: the merge commit's inherited base bump hides the gap ...
+        assert buggy_missing == []
+        # ... but diffing against the PR's real head catches the missing bump.
+        assert fixed_missing == ["plugin-a"]
 
 
 @pytest.mark.integration
