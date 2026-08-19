@@ -96,9 +96,9 @@ DH_LABELS: dict[str, str] = {
     "type:refactor": "2563eb",
     "type:chore": "6b7280",
     "type:docs": "0891b2",
-    StatusLabel.NEEDS_GROOMING: "f59e0b",
-    StatusLabel.IN_PROGRESS: "3b82f6",
-    StatusLabel.VERIFIED: "10b981",
+    StatusLabel.NEEDS_GROOMING.value: "f59e0b",
+    StatusLabel.IN_PROGRESS.value: "3b82f6",
+    StatusLabel.VERIFIED.value: "10b981",
 }
 
 
@@ -1430,8 +1430,8 @@ def _pick_primary_status_label(status_labels: list[str]) -> str:
         ``"status:blocked"`` if present, else the first label in ``status_labels``,
         else ``""``.
     """
-    if StatusLabel.BLOCKED in status_labels:
-        return StatusLabel.BLOCKED
+    if StatusLabel.BLOCKED.value in status_labels:
+        return StatusLabel.BLOCKED.value
     return status_labels[0] if status_labels else ""
 
 
