@@ -750,7 +750,7 @@ class TestCreateIssueForItem:
         repo.requester.graphql_query.return_value = ({}, {"data": {"repository": {}}})
         captured_vars: list[dict[str, Any]] = []
 
-        def capture_graphql(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        def capture_graphql(_repo_arg: Any, _query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
             if variables and "title" in variables:
                 captured_vars.append(variables)
             return make_create_issue_response(make_created_issue_node(number=7))
@@ -1306,7 +1306,7 @@ class TestApplyStatusInProgress:
 
         call_count = 0
 
-        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        def side_effect(_repo_arg: Any, _query: str, _variables: dict[str, Any] | None = None) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -1434,7 +1434,7 @@ class TestSyncGroomedToGithubIssue:
 
         call_count = 0
 
-        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        def side_effect(_repo_arg: Any, _query: str, _variables: dict[str, Any] | None = None) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -1523,7 +1523,7 @@ class TestApplyStatusGroomed:
 
         call_count = 0
 
-        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        def side_effect(_repo_arg: Any, _query: str, _variables: dict[str, Any] | None = None) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -1594,7 +1594,7 @@ class TestApplyStatusGroomed:
 
         call_count = 0
 
-        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        def side_effect(_repo_arg: Any, _query: str, _variables: dict[str, Any] | None = None) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
@@ -1643,7 +1643,7 @@ class TestApplyStatusGroomed:
 
         call_count = 0
 
-        def side_effect(repo_arg: Any, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
+        def side_effect(_repo_arg: Any, _query: str, _variables: dict[str, Any] | None = None) -> dict[str, Any]:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
