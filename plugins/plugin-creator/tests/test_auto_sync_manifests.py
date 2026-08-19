@@ -970,71 +970,71 @@ class TestParseVersionTuple:
 
 
 # ============================================================================
-# New behaviour: _extract_version_from_json helper
+# New behaviour: extract_version_from_json helper
 # ============================================================================
 
 
 class TestExtractVersionFromJson:
-    """Test the _extract_version_from_json helper for nested key traversal."""
+    """Test the extract_version_from_json helper for nested key traversal."""
 
     def test_top_level_version(self) -> None:
-        """Verify _extract_version_from_json extracts a top-level version.
+        """Verify extract_version_from_json extracts a top-level version.
 
-        Tests: _extract_version_from_json single-key path
+        Tests: extract_version_from_json single-key path
         How: Pass {"version": "1.2.3"} with key_path ["version"]
         Why: plugin.json stores version at top level
         """
         data: dict[str, object] = {"version": "1.2.3"}
-        assert auto_sync._extract_version_from_json(data, ["version"]) == (1, 2, 3)
+        assert auto_sync.extract_version_from_json(data, ["version"]) == (1, 2, 3)
 
     def test_nested_version(self) -> None:
-        """Verify _extract_version_from_json traverses nested keys.
+        """Verify extract_version_from_json traverses nested keys.
 
-        Tests: _extract_version_from_json multi-key path
+        Tests: extract_version_from_json multi-key path
         How: Pass {"metadata": {"version": "2.0.1"}} with key_path ["metadata", "version"]
         Why: marketplace.json stores version under metadata.version
         """
         data: dict[str, object] = {"metadata": {"version": "2.0.1"}}
-        assert auto_sync._extract_version_from_json(data, ["metadata", "version"]) == (2, 0, 1)
+        assert auto_sync.extract_version_from_json(data, ["metadata", "version"]) == (2, 0, 1)
 
     def test_missing_key_returns_none(self) -> None:
-        """Verify _extract_version_from_json returns None for missing key.
+        """Verify extract_version_from_json returns None for missing key.
 
-        Tests: _extract_version_from_json missing path
+        Tests: extract_version_from_json missing path
         How: Pass data without the requested key
         Why: Graceful handling when JSON structure differs from expected
         """
         data: dict[str, object] = {"name": "test"}
-        assert auto_sync._extract_version_from_json(data, ["version"]) is None
+        assert auto_sync.extract_version_from_json(data, ["version"]) is None
 
     def test_non_dict_intermediate_returns_none(self) -> None:
-        """Verify _extract_version_from_json returns None for non-dict intermediate.
+        """Verify extract_version_from_json returns None for non-dict intermediate.
 
-        Tests: _extract_version_from_json type mismatch in path
+        Tests: extract_version_from_json type mismatch in path
         How: Pass {"metadata": "not-a-dict"} with path ["metadata", "version"]
         Why: Cannot traverse into a string value
         """
         data: dict[str, object] = {"metadata": "not-a-dict"}
-        assert auto_sync._extract_version_from_json(data, ["metadata", "version"]) is None
+        assert auto_sync.extract_version_from_json(data, ["metadata", "version"]) is None
 
     def test_non_string_version_returns_none(self) -> None:
-        """Verify _extract_version_from_json returns None when version is not a string.
+        """Verify extract_version_from_json returns None when version is not a string.
 
-        Tests: _extract_version_from_json wrong value type
+        Tests: extract_version_from_json wrong value type
         How: Pass {"version": 123} with path ["version"]
         Why: Version must be a string to parse
         """
         data: dict[str, object] = {"version": 123}
-        assert auto_sync._extract_version_from_json(data, ["version"]) is None
+        assert auto_sync.extract_version_from_json(data, ["version"]) is None
 
     def test_non_dict_root_returns_none(self) -> None:
-        """Verify _extract_version_from_json returns None for non-dict root.
+        """Verify extract_version_from_json returns None for non-dict root.
 
-        Tests: _extract_version_from_json invalid root type
+        Tests: extract_version_from_json invalid root type
         How: Pass a list instead of dict
         Why: JSON root must be traversable as dict
         """
-        assert auto_sync._extract_version_from_json(["not", "a", "dict"], ["version"]) is None
+        assert auto_sync.extract_version_from_json(["not", "a", "dict"], ["version"]) is None
 
 
 # ============================================================================
@@ -1797,7 +1797,7 @@ class TestSyncMarketplaceMode:
 #   resolve_base() -> str | None
 #       Returns the best available base ref: "origin/main" → "main" → None
 #       (HEAD is the terminal fallback when None is returned).
-#   _read_ref_json(ref: str, filepath: str | Path) -> object | None
+#   read_ref_json(ref: str, filepath: str | Path) -> object | None
 #       Reads a JSON file at the given git ref. Replaces the HEAD-specific
 #       _read_head_json for base-version resolution.
 #
@@ -1827,7 +1827,7 @@ class TestWorkingBehindBase:
              branch B yields 1.2.6, not a collision at 1.2.2.
 
         Why RED: Current code bumps from current_version (1.2.1) → 1.2.2.
-                 The new seams resolve_base / _read_ref_json do not exist yet →
+                 The new seams resolve_base / read_ref_json do not exist yet →
                  AttributeError for seam-based path; wrong value for HEAD-fallback
                  path.  Either way the assertion 1.2.6 fails today.
         """
@@ -1842,10 +1842,10 @@ class TestWorkingBehindBase:
         # Base (origin/main) is at 1.2.5 — main advanced after branch B diverged
         base_data = {"name": "test-plugin", "version": "1.2.5", "skills": ["./skills/my-skill"]}
 
-        # Post-refactor seam: resolve_base returns "origin/main"; _read_ref_json
+        # Post-refactor seam: resolve_base returns "origin/main"; read_ref_json
         # returns the base version when asked to read at that ref.
         monkeypatch.setattr(auto_sync, "resolve_base", lambda: "origin/main")
-        monkeypatch.setattr(auto_sync, "_read_ref_json", lambda _ref, _fp: dict(base_data))
+        monkeypatch.setattr(auto_sync, "read_ref_json", lambda _ref, _fp: dict(base_data))
 
         changes = _changes_with_modified_skill()
 
@@ -1884,7 +1884,7 @@ class TestWorkingBehindBase:
         # Base (origin/main) is 1.2.0 — the branch diverged from 1.2.0
         base_data = {"name": "test-plugin", "version": "1.2.0", "skills": []}
         monkeypatch.setattr(auto_sync, "resolve_base", lambda: "origin/main")
-        monkeypatch.setattr(auto_sync, "_read_ref_json", lambda _ref, _fp: dict(base_data))
+        monkeypatch.setattr(auto_sync, "read_ref_json", lambda _ref, _fp: dict(base_data))
 
         changes = _changes_with_modified_skill()
 
@@ -1903,7 +1903,7 @@ class TestWorkingBehindBase:
         Why: Report line 60 confirms this case is unchanged (base+step == current+step).
              Included as a regression guard alongside the working < base fix.
 
-        Why RED: resolve_base / _read_ref_json not yet present → AttributeError.
+        Why RED: resolve_base / read_ref_json not yet present → AttributeError.
                  The assertion value (1.2.1) matches current output, but the test
                  fails because the seam attributes are absent.
         """
@@ -1916,7 +1916,7 @@ class TestWorkingBehindBase:
 
         base_data = {"name": "test-plugin", "version": "1.2.0", "skills": []}
         monkeypatch.setattr(auto_sync, "resolve_base", lambda: "main")
-        monkeypatch.setattr(auto_sync, "_read_ref_json", lambda _ref, _fp: dict(base_data))
+        monkeypatch.setattr(auto_sync, "read_ref_json", lambda _ref, _fp: dict(base_data))
 
         changes = _changes_with_modified_skill()
 
@@ -1936,7 +1936,7 @@ class TestWorkingBehindBase:
         Why: Adversarial.md challenge q1 confirms any manual bump makes
              working > base, which trips the guard.  This test locks that in.
 
-        Why RED: resolve_base / _read_ref_json not yet present → AttributeError.
+        Why RED: resolve_base / read_ref_json not yet present → AttributeError.
         """
         # Arrange
         monkeypatch.chdir(tmp_path)
@@ -1947,7 +1947,7 @@ class TestWorkingBehindBase:
 
         base_data = {"name": "test-plugin", "version": "1.2.0", "skills": []}
         monkeypatch.setattr(auto_sync, "resolve_base", lambda: "origin/main")
-        monkeypatch.setattr(auto_sync, "_read_ref_json", lambda _ref, _fp: dict(base_data))
+        monkeypatch.setattr(auto_sync, "read_ref_json", lambda _ref, _fp: dict(base_data))
 
         changes = _changes_with_modified_skill()
 
@@ -2093,7 +2093,7 @@ class TestGracefulFallbackNoBaseRef:
 
 
 # ============================================================================
-# Area N: _read_ref_json integration tests — real git subprocess
+# Area N: read_ref_json integration tests — real git subprocess
 # ============================================================================
 
 # integration: exercises real git subprocess
@@ -2154,21 +2154,21 @@ def _git_commit_file(repo: Path, rel_path: str, content: str, message: str = "up
 
 @pytest.mark.integration
 class TestReadRefJson:
-    """Integration tests for _read_ref_json — exercises the real git subprocess.
+    """Integration tests for read_ref_json — exercises the real git subprocess.
 
     These tests use tmp_path and real git repos so that the ``git show
     {ref}:{path}`` subprocess at line 360 of auto_sync_manifests.py is
     exercised against actual commits, not mocked return values.
 
-    Coverage target: lines 355-368 (the non-HEAD branch of _read_ref_json).
+    Coverage target: lines 355-368 (the non-HEAD branch of read_ref_json).
     """
 
     def test_read_ref_json_returns_content_at_ref(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Reading HEAD returns the committed JSON dict for that path.
 
-        Tests: _read_ref_json delegation to _read_head_json when ref == "HEAD"
+        Tests: read_ref_json delegation to _read_head_json when ref == "HEAD"
         How: Create a temp git repo with a committed plugin.json; call
-             _read_ref_json("HEAD", path) and assert the returned dict matches
+             read_ref_json("HEAD", path) and assert the returned dict matches
              the written content.
         Why: Verifies that the HEAD-delegation path produces the correct result
              so callers can rely on it when no historical ref is needed.
@@ -2180,7 +2180,7 @@ class TestReadRefJson:
         monkeypatch.chdir(tmp_path)
 
         # Act
-        result = auto_sync._read_ref_json("HEAD", rel_path)
+        result = auto_sync.read_ref_json("HEAD", rel_path)
 
         # Assert
         assert result == data
@@ -2188,9 +2188,9 @@ class TestReadRefJson:
     def test_read_ref_json_reads_historical_ref(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Reading HEAD~1 returns the committed JSON at that older commit.
 
-        Tests: _read_ref_json git-show subprocess for non-HEAD refs (line 360)
+        Tests: read_ref_json git-show subprocess for non-HEAD refs (line 360)
         How: Commit plugin.json with version "1.0.0", then commit again with
-             "2.0.0".  Call _read_ref_json("HEAD~1", path) and assert version
+             "2.0.0".  Call read_ref_json("HEAD~1", path) and assert version
              is "1.0.0" (historical state, not working tree or HEAD).
         Why: This is the core mechanism of the fix — reading base version from
              origin/main must return the *committed* content at that ref, not
@@ -2204,7 +2204,7 @@ class TestReadRefJson:
         monkeypatch.chdir(tmp_path)
 
         # Act — read the first commit, not HEAD
-        result = auto_sync._read_ref_json("HEAD~1", rel_path)
+        result = auto_sync.read_ref_json("HEAD~1", rel_path)
 
         # Assert — historical content, not current
         assert isinstance(result, dict)
@@ -2213,9 +2213,9 @@ class TestReadRefJson:
     def test_read_ref_json_returns_none_for_missing_file(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Returns None when the path does not exist at HEAD — no exception raised.
 
-        Tests: _read_ref_json HEAD delegation → _read_head_json non-zero exit
+        Tests: read_ref_json HEAD delegation → _read_head_json non-zero exit
         How: Initialise a temp git repo (no plugin.json committed) and call
-             _read_ref_json("HEAD", "nonexistent/path.json").
+             read_ref_json("HEAD", "nonexistent/path.json").
         Why: Callers depend on None-return-on-absence to detect an unversioned
              plugin; any exception here would crash the pre-commit hook.
         """
@@ -2224,7 +2224,7 @@ class TestReadRefJson:
         monkeypatch.chdir(tmp_path)
 
         # Act
-        result = auto_sync._read_ref_json("HEAD", "nonexistent/path.json")
+        result = auto_sync.read_ref_json("HEAD", "nonexistent/path.json")
 
         # Assert
         assert result is None
@@ -2232,8 +2232,8 @@ class TestReadRefJson:
     def test_read_ref_json_returns_none_for_invalid_ref(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Returns None when the git ref does not exist — no exception raised.
 
-        Tests: _read_ref_json git-show subprocess non-zero exit (line 361-362)
-        How: Initialise a temp git repo and call _read_ref_json with a branch
+        Tests: read_ref_json git-show subprocess non-zero exit (line 361-362)
+        How: Initialise a temp git repo and call read_ref_json with a branch
              name that was never created.
         Why: When origin/main does not exist (fresh clone, shallow fetch),
              git show exits non-zero.  The hook must treat this as "no base
@@ -2244,7 +2244,7 @@ class TestReadRefJson:
         monkeypatch.chdir(tmp_path)
 
         # Act
-        result = auto_sync._read_ref_json("nonexistent-branch", ".claude-plugin/plugin.json")
+        result = auto_sync.read_ref_json("nonexistent-branch", ".claude-plugin/plugin.json")
 
         # Assert
         assert result is None

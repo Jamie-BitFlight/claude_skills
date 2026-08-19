@@ -284,7 +284,7 @@ def _parse_version_tuple(version_str: str) -> tuple[int, int, int] | None:
     return (major, minor, patch)
 
 
-def _extract_version_from_json(data: object, key_path: list[str]) -> tuple[int, int, int] | None:
+def extract_version_from_json(data: object, key_path: list[str]) -> tuple[int, int, int] | None:
     """Traverse a JSON object by key path and parse the version string found.
 
     Args:
@@ -361,7 +361,7 @@ def resolve_base() -> str | None:
     return None
 
 
-def _read_ref_json(ref: str, filepath: str | Path) -> object | None:
+def read_ref_json(ref: str, filepath: str | Path) -> object | None:
     """Read and parse JSON content of a file at an arbitrary git ref.
 
     When ``ref`` is ``"HEAD"``, delegates to ``_read_head_json`` so that
@@ -409,11 +409,11 @@ def _is_ahead_of_ref(filepath: str | Path, version_key_path: list[str], ref: str
         version at ``ref``.  Returns False if versions are equal, the ref
         lacks the file, or any parsing error occurs.
     """
-    ref_data = _read_ref_json(ref, filepath)
+    ref_data = read_ref_json(ref, filepath)
     if ref_data is None:
         return False
 
-    ref_version = _extract_version_from_json(ref_data, version_key_path)
+    ref_version = extract_version_from_json(ref_data, version_key_path)
     if ref_version is None:
         return False
 
@@ -426,7 +426,7 @@ def _is_ahead_of_ref(filepath: str | Path, version_key_path: list[str], ref: str
     except (json.JSONDecodeError, ValueError, OSError):
         return False
 
-    current_version = _extract_version_from_json(current_data, version_key_path)
+    current_version = extract_version_from_json(current_data, version_key_path)
     if current_version is None:
         return False
 
@@ -729,7 +729,7 @@ def _update_from_base_ref(
         or ``None`` when the plugin is absent at *base_ref* (caller should
         fall back to HEAD-based logic).
     """
-    base_data = _read_ref_json(base_ref, str(plugin_json_path))
+    base_data = read_ref_json(base_ref, str(plugin_json_path))
     base_ver = _extract_str_version(base_data, "version") if base_data is not None else None
     if base_ver is None:
         return None
