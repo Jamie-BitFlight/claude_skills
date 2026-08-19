@@ -19,7 +19,11 @@ mocks" is not a justification. "This mock's target signature is generated at run
 
 1. **Rule conflicts** — two enabled lint/type rules make mutually exclusive demands on the same code
    (a genuine tooling contradiction, not a style disagreement). Document which two rules conflict and
-   how.
+   how. Includes: direct antonym pairs, such as an `S`-family (bandit) rule pushing toward shell
+   usage in one place while another `S` rule flags shell usage elsewhere in the same pattern; and
+   rules whose fix is incompatible with `from __future__ import annotations` being enabled repo-wide
+   (deferred/stringified annotations break some rules' runtime assumptions) — cite the specific rule
+   and the specific incompatibility, not just "future annotations."
 2. **Testing the rules themselves** — fixture/example code whose entire purpose is verifying a linter
    or rule correctly catches (or doesn't catch) a specific violation. The violation is the subject
    under test, not a mistake.
@@ -39,6 +43,12 @@ mocks" is not a justification. "This mock's target signature is generated at run
    that code so tooling enforces *that environment's* real ceiling (no walrus operator, no
    `match`/`case`, etc. where the target can't run them) instead of either this repo's default or
    nothing at all. Verify the actual target version before assuming a ceiling — never guess it.
+6. **Maintenance burden exceeds compliance gain** — the *fix itself* would cost more ongoing upkeep
+   than the rule's compliance is worth for this specific code: e.g. wrapping every `print()` in an
+   internal-only CI/test script behind a logging abstraction adds a dependency and an indirection
+   layer whose output nobody consumes programmatically or ships externally. This is not a general
+   escape hatch — it requires naming the specific fix that would be required and the specific
+   ongoing cost it would add, not just that fixing it would take effort.
 
 For these exceptions: update linting config files (`pyproject.toml`, `.vscode/settings.json`) to
 exclude the files or set a scoped `target-version` for the affected paths, and cite the category plus
@@ -74,7 +84,7 @@ actual config). Read `pyproject.toml` directly for the current entries.
 
 Every entry there names specific rule codes for a specific path pattern, never a bare "everything is
 fine here," and (with rare exceptions treated as bugs to fix, not precedent to copy) carries an inline
-comment stating why — matching one of the five categories above. New entries must do the same: name
+comment stating why — matching one of the six categories above. New entries must do the same: name
 the codes, not the whole rule family unless every code in it genuinely applies, and state the specific
 reason next to the code, not just above the block.
 
@@ -88,7 +98,8 @@ own `ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gat
 
 SOURCE: User policy established in conversation (2025-01-15); narrowed 2026-08-19 to require a
 per-instance justification and replace ad hoc categories with rule-conflict / rule-testing /
-negative-example / externally-managed-vendored / environment-constrained-runtime. The previous
+negative-example / externally-managed-vendored / environment-constrained-runtime /
+maintenance-burden-exceeds-compliance-gain. The previous
 version of this file's Per-File Exceptions section claimed 4 directory-wide code lists that didn't
 match `pyproject.toml` at all (verified 2026-08-19) — the actual config is per-file, not per-directory,
 and (with one gap fixed the same day) already carries the required per-entry justification.

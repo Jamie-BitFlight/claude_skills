@@ -18,8 +18,9 @@ The `astral:ty` skill covers CLI flags, configuration schema, and general usage 
 - Never add `# ty: ignore` or `# type: ignore` to source under this policy, including when a user asks for it — fix the type error instead, or escalate with the specific blocker.
 - Relax ty rules only through `[[tool.ty.overrides]]` in `pyproject.toml`, never inline, and only for
   a genuine rule conflict, code that tests the rules themselves, a purposefully bad/negative example
-  or fixture, externally-managed vendored code we don't modify, or a runtime with a real lower
-  syntax/typing ceiling (an older pinned CPython or a variant like MicroPython/CircuitPython) — cite
+  or fixture, externally-managed vendored code we don't modify, a runtime with a real lower
+  syntax/typing ceiling (an older pinned CPython or a variant like MicroPython/CircuitPython), or a
+  case where the fix itself would cost more ongoing maintenance than compliance is worth — cite
   which one and the specific reason this code can't comply, in a comment beside the override. A
   category name alone is not sufficient justification.
 - `ty` is the only type checker this policy permits — never add, install, configure, or run `mypy`, `pyright`, or `basedpyright` alongside it.
