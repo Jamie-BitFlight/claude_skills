@@ -45,62 +45,51 @@ MCP layout: **Claude Code** uses ``.claude-plugin/plugin.json`` (and may merge
 from __future__ import annotations
 
 import json
+import logging
 import os
-import subprocess
 from pathlib import Path
 
+import git
+
 # Module-level cache: maps cwd (as str) -> resolved project root Path.
-# _git_rev_parse_root() populates this on first call per cwd.
+# _git_common_root() populates this on first call per cwd.
 _root_cache: dict[str, Path] = {}
+
+_log = logging.getLogger(__name__)
 
 # IDE-specific env vars (after WORKSPACE_FOLDER_PATHS). Cursor before Claude so
 # competing hosts do not prefer the other's convention when both are present.
 _IDE_DISCOVERY_ENV_VARS: tuple[str, ...] = ("CURSOR_PROJECT_ROOT", "CLAUDE_PROJECT_DIR")
 
 
-def _git_rev_parse_root(resolved_cwd: Path) -> Path:
-    """Resolve the main worktree root via ``git rev-parse --git-common-dir``.
+def _git_common_root(resolved_cwd: Path) -> Path:
+    """Resolve the shared main-worktree root with GitPython.
 
-    Uses ``git rev-parse --path-format=absolute --git-common-dir`` which
-    returns the common git dir (identical to .git/ for main worktrees; the
-    shared ``../.git/`` parent for linked worktrees).  The project root is
-    the parent of that directory.
+    ``Repo.common_dir`` is the common Git directory: ``.git`` for a main
+    worktree and the shared ``.git`` directory for linked worktrees. Its
+    parent is intentionally used as the DH state root so all worktrees of one
+    repository share state. GitPython resolves this by walking the directory
+    tree and reading the small ``gitdir``/``commondir``/``HEAD`` marker files
+    directly — it never shells out to the ``git`` binary for this, so there is
+    no subprocess to hang and no dependency on ``git`` being on PATH.
 
     Args:
-        resolved_cwd: Directory from which to run git (absolute or relative).
+        resolved_cwd: Directory from which to discover a Git repository.
 
     Returns:
         Absolute path to the project root (main worktree root).
 
     Raises:
-        FileNotFoundError: If the ``git`` binary is not found.
-        subprocess.CalledProcessError: If the directory is not inside a
-            git repository.
-        subprocess.TimeoutExpired: If ``git`` does not complete within 10
-            seconds (e.g. blocked on a lock file or an unreachable network
-            filesystem).
+        git.exc.InvalidGitRepositoryError: If the directory is not inside a
+            Git repository.
+        git.exc.NoSuchPathError: If the directory does not exist.
     """
     cwd_key = str(resolved_cwd.resolve())
     if cwd_key in _root_cache:
         return _root_cache[cwd_key]
 
-    result = subprocess.run(
-        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-        capture_output=True,
-        text=True,
-        check=True,
-        cwd=cwd_key,
-        # A hung git process (e.g. blocked on an index/pack lock, or a repo on an
-        # unreachable network filesystem) would otherwise block forever with no
-        # diagnostics. The per-cwd _root_cache above means this call normally runs
-        # once per worker process, so a generous timeout does not add per-call cost
-        # to the common path.
-        timeout=10,
-    )
-    # Strip trailing whitespace / newline from git output.
-    git_common_dir = Path(result.stdout.strip())
-    # .git/ (or bare common dir) → parent is the project root.
-    project_root = git_common_dir.parent
+    repo = git.Repo(cwd_key, search_parent_directories=True)
+    project_root = Path(repo.common_dir).resolve().parent
     _root_cache[cwd_key] = project_root
     return project_root
 
@@ -122,22 +111,17 @@ def _first_git_ancestor(start: Path) -> Path | None:
 
 
 def _git_root_if_directory(path: Path) -> Path | None:
-    """Run git common-dir resolution for *path* if it is a directory.
+    """Resolve the shared Git root for *path* if it is a directory.
 
     Returns:
-        The resolved project root, or ``None`` if *path* is not a directory,
-        git rev-parse fails, or git times out (a hung git process is treated
-        as a failed candidate, not a fatal error -- resolution falls through
-        to the next hint instead of raising ``subprocess.TimeoutExpired``
-        through callers that eagerly evaluate every hint, including
-        lower-priority ones that run after a higher-priority hint already
-        resolved successfully).
+        The resolved project root, or ``None`` if *path* is not a directory or
+        GitPython cannot find a repository.
     """
     if not path.is_dir():
         return None
     try:
-        return _git_rev_parse_root(path)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return _git_common_root(path)
+    except (git.exc.InvalidGitRepositoryError, git.exc.NoSuchPathError):
         return None
 
 
@@ -221,8 +205,8 @@ def infer_project_root(cwd: Path | None = None) -> Path:
        sets them (Cursor before Claude when both are present).
     #. ``PWD`` — Codex agent cwd, only when ``CODEX_THREAD_ID`` is present.
     #. Walk upward from *cwd* (default ``Path.cwd()``) for a ``.git`` entry,
-       then git-resolve from that directory (preserves worktree semantics).
-    #. Run git from *cwd* itself.
+       then resolve its Git common directory (preserves worktree semantics).
+    #. Discover a Git repository from *cwd* itself.
 
     Args:
         cwd: Directory to use for walk-up and final git attempt.  Defaults to
@@ -232,9 +216,7 @@ def infer_project_root(cwd: Path | None = None) -> Path:
         Absolute path to the main worktree root.
 
     Raises:
-        FileNotFoundError: If the ``git`` binary is not found.
-        RuntimeError: If resolution fails; chained from
-            :exc:`subprocess.CalledProcessError` with an actionable message.
+        RuntimeError: If resolution fails.
     """
     start = (cwd or Path.cwd()).resolve()
 
@@ -254,8 +236,8 @@ def infer_project_root(cwd: Path | None = None) -> Path:
             return resolved
 
     try:
-        return _git_rev_parse_root(start)
-    except subprocess.CalledProcessError as exc:
+        return _git_common_root(start)
+    except (git.exc.InvalidGitRepositoryError, git.exc.NoSuchPathError) as exc:
         msg = (
             "Could not resolve the git project root: process cwd is not inside a repository "
             "and no project path was found. If you use Cursor, ensure the backlog MCP entry "
@@ -263,14 +245,7 @@ def infer_project_root(cwd: Path | None = None) -> Path:
             "plugin .mcp.json env). Otherwise set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, "
             "CURSOR_PROJECT_ROOT, or CLAUDE_PROJECT_DIR, or pass --project-dir."
         )
-        raise RuntimeError(msg) from exc
-    except subprocess.TimeoutExpired as exc:
-        msg = (
-            "Could not resolve the git project root: git did not respond within the timeout "
-            "(e.g. blocked on an index/pack lock, or the repository is on an unreachable network "
-            "filesystem). Set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, CURSOR_PROJECT_ROOT, or "
-            "CLAUDE_PROJECT_DIR, or pass --project-dir, to bypass git resolution entirely."
-        )
+        _log.info("%s", msg)
         raise RuntimeError(msg) from exc
 
 
@@ -283,22 +258,21 @@ def git_project_root(cwd: Path | None = None) -> Path:
     directory (stable for tests and callers that pin the working directory).
 
     Args:
-        cwd: Directory from which to run git.  ``None`` enables
-            :func:`infer_project_root`; a path uses git from that directory only.
+        cwd: Directory from which to discover Git. ``None`` enables
+            :func:`infer_project_root`; a path uses GitPython from that
+            directory only.
 
     Returns:
         Absolute path to the project root (main worktree root).
 
     Raises:
-        FileNotFoundError: If the ``git`` binary is not found.
-        subprocess.CalledProcessError: If *cwd* was explicit and is not inside a
-            git repository.
-        subprocess.TimeoutExpired: If *cwd* was explicit and ``git`` does not
-            complete within the 10-second timeout in :func:`_git_rev_parse_root`.
+        git.exc.InvalidGitRepositoryError: If *cwd* was explicit and is not
+            inside a Git repository.
+        git.exc.NoSuchPathError: If *cwd* was explicit and does not exist.
         RuntimeError: If *cwd* was ``None`` and all resolution strategies failed.
     """
     if cwd is not None:
-        return _git_rev_parse_root(Path(cwd))
+        return _git_common_root(Path(cwd))
     return infer_project_root()
 
 

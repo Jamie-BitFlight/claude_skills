@@ -2,7 +2,8 @@
 
 Tests cover:
 - compute_slug(): slug format for various path inputs
-- git_project_root(): subprocess mock for main repo and worktree scenarios
+- git_project_root(): real Git repositories and linked worktrees
+- infer_project_root(): env/workspace hints, including Codex's PWD forwarding
 - All *_dir() functions: correct absolute paths given a known project_root
 - ensure_dirs(): idempotent directory creation
 - DH_STATE_HOME override: env var changes base directory
@@ -14,11 +15,12 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import subprocess
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import dh_paths
+import git
 import pytest
 from dh_paths import (
     LEGACY_PATH_MAP,
@@ -45,20 +47,13 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _make_git_run_mock(common_dir: Path):
-    """Return a side-effect callable that simulates git rev-parse output.
-
-    Args:
-        common_dir: The fake .git common directory path to return in stdout.
-
-    Returns:
-        A callable suitable for use as mocker.patch side_effect.
-    """
-
-    def _side_effect(args, **kwargs):
-        return type("CompletedProcess", (), {"stdout": str(common_dir) + "\n", "returncode": 0})()
-
-    return _side_effect
+def _init_repo(path: Path) -> git.Repo:
+    """Create a commit-bearing repository suitable for linked-worktree tests."""
+    repo = git.Repo.init(path)
+    (path / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    repo.index.add(["tracked.txt"])
+    repo.index.commit("initial commit")
+    return repo
 
 
 # ---------------------------------------------------------------------------
@@ -177,50 +172,41 @@ class TestComputeSlug:
 
 
 class TestGitProjectRoot:
-    """Tests for git_project_root(): subprocess-mocked git rev-parse behaviour.
-
-    Strategy: Use mocker.patch to intercept subprocess.run and simulate git
-    output for main repo, worktree, error, and caching scenarios. Each test
-    clears the module-level cache to avoid inter-test interference.
-    """
+    """Tests for GitPython root discovery using real repositories."""
 
     def setup_method(self) -> None:
         """Clear module-level root cache before each test."""
         dh_paths._root_cache.clear()
 
-    def test_git_project_root_main_repo_returns_parent_of_git_dir(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_git_project_root_main_repo_returns_parent_of_git_dir(self, tmp_path: Path) -> None:
         """Verify main worktree root is the parent of the .git directory.
 
         Tests: git_project_root resolves the project root for a main worktree
-        How: Mock subprocess.run to return fake .git dir path; assert parent
+        How: Create a repository and resolve from its root; assert parent
         Why: Main repo .git parent is always the project root
         """
         # Arrange
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
+        repo = tmp_path / "repo"
+        _init_repo(repo)
 
         # Act
-        result = git_project_root(cwd=tmp_path)
+        result = git_project_root(cwd=repo)
 
         # Assert
-        assert result == tmp_path
+        assert result == repo
 
-    def test_git_project_root_worktree_returns_common_dir_parent(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_git_project_root_worktree_returns_common_dir_parent(self, tmp_path: Path) -> None:
         """Verify linked worktree resolves to the main repo root, not the worktree path.
 
         Tests: git_project_root handles worktrees via --git-common-dir
-        How: Simulate common dir pointing to main repo; call from worktree cwd
+        How: Create a linked worktree and resolve from it
         Why: All worktrees sharing a repo must produce the same state slug
         """
         # Arrange
         main_repo = tmp_path / "main-repo"
-        main_repo.mkdir()
-        common_git_dir = main_repo / ".git"
-        common_git_dir.mkdir()
+        main = _init_repo(main_repo)
         worktree_dir = tmp_path / "worktree"
-        worktree_dir.mkdir()
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(common_git_dir))
+        main.git.worktree("add", str(worktree_dir))
 
         # Act
         result = git_project_root(cwd=worktree_dir)
@@ -228,94 +214,48 @@ class TestGitProjectRoot:
         # Assert — resolves to main repo root, not worktree root
         assert result == main_repo
 
-    def test_git_project_root_not_a_git_repo_raises_called_process_error(
-        self, tmp_path: Path, mocker: MockerFixture
-    ) -> None:
-        """Verify CalledProcessError propagates when git reports non-zero exit.
+    def test_git_project_root_not_a_git_repo_raises_invalid_git_repository_error(self, tmp_path: Path) -> None:
+        """Verify GitPython propagates an invalid repository error outside Git.
 
-        Tests: git_project_root fails fast outside a git repo
-        How: Mock subprocess.run to raise CalledProcessError
+        Tests: git_project_root fails fast outside a Git repository
+        How: Resolve an ordinary directory
         Why: Fail-fast principle; callers must know when git is unavailable
         """
         # Arrange
-        mocker.patch("subprocess.run", side_effect=subprocess.CalledProcessError(128, "git"))
-
         # Act / Assert
-        with pytest.raises(subprocess.CalledProcessError):
+        with pytest.raises(git.exc.InvalidGitRepositoryError):
             git_project_root(cwd=tmp_path)
 
-    def test_git_project_root_uses_list_args_not_shell(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Verify subprocess.run is called with a list (not shell=True).
-
-        Tests: git_project_root subprocess call uses safe list args
-        How: Capture the args passed to subprocess.run and inspect them
-        Why: ADR-002 and security requirement: no shell injection via shell=True
-        """
-        # Arrange
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
-        captured: list[list[str]] = []
-
-        def _capture(args: list[str], **kwargs: object) -> object:
-            captured.append(args)
-            return type("CP", (), {"stdout": str(fake_git_dir) + "\n", "returncode": 0})()
-
-        mocker.patch("subprocess.run", side_effect=_capture)
-
-        # Act
-        git_project_root(cwd=tmp_path)
-
-        # Assert — args is a list; first element is "git"; --git-common-dir present
-        assert isinstance(captured[0], list)
-        assert captured[0][0] == "git"
-        assert "--git-common-dir" in captured[0]
-
     def test_git_project_root_caches_result_for_same_cwd(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Verify repeated calls with the same cwd invoke subprocess only once.
+        """Verify repeated calls with the same cwd construct GitPython Repo once.
 
         Tests: git_project_root caches result per cwd
-        How: Count subprocess.run calls; call git_project_root twice from same dir
-        Why: Per-process caching avoids repeated git subprocess overhead
+        How: Spy on GitPython Repo; call git_project_root twice from the same repo
+        Why: Per-process caching avoids repeated repository discovery
         """
         # Arrange
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
-        mock_run = mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
+        repo = tmp_path / "repo"
+        _init_repo(repo)
+        repo_constructor = mocker.spy(dh_paths.git, "Repo")
 
         # Act
-        git_project_root(cwd=tmp_path)
-        git_project_root(cwd=tmp_path)
+        git_project_root(cwd=repo)
+        git_project_root(cwd=repo)
 
-        # Assert — subprocess called only once; second call served from cache
-        assert mock_run.call_count == 1
+        assert repo_constructor.call_count == 1
 
-    def test_git_project_root_different_cwds_each_resolved_independently(
-        self, tmp_path: Path, mocker: MockerFixture
-    ) -> None:
+    def test_git_project_root_different_cwds_each_resolved_independently(self, tmp_path: Path) -> None:
         """Verify different cwd values each trigger an independent resolution.
 
         Tests: git_project_root resolves two distinct cwds to distinct roots
-        How: Call from dir_a then dir_b; verify results differ and call count is 2
+        How: Create two repositories and resolve each root
         Why: Cache is keyed by cwd so different dirs must not share cached results
         """
         # Arrange
         dir_a = tmp_path / "a"
         dir_b = tmp_path / "b"
-        dir_a.mkdir()
-        dir_b.mkdir()
-        git_a = dir_a / ".git"
-        git_b = dir_b / ".git"
-        git_a.mkdir()
-        git_b.mkdir()
-        call_count: dict[str, int] = {"n": 0}
-
-        def _tracking(args: list[str], **kwargs: object) -> object:
-            call_count["n"] += 1
-            cwd_used = str(kwargs.get("cwd", ""))
-            git_dir = git_a if str(dir_a) in cwd_used else git_b
-            return type("CP", (), {"stdout": str(git_dir) + "\n", "returncode": 0})()
-
-        mocker.patch("subprocess.run", side_effect=_tracking)
+        _init_repo(dir_a)
+        _init_repo(dir_b)
 
         # Act
         result_a = git_project_root(cwd=dir_a)
@@ -323,7 +263,6 @@ class TestGitProjectRoot:
 
         # Assert — two distinct roots resolved
         assert result_a != result_b
-        assert call_count["n"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -338,41 +277,29 @@ class TestInferProjectRoot:
         """Clear module-level root cache before each test."""
         dh_paths._root_cache.clear()
 
-    def test_infer_respects_dh_project_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
+    def test_infer_respects_dh_project_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """DH_PROJECT_ROOT pointing at a repo resolves via git common dir."""
         repo = tmp_path / "repo"
-        repo.mkdir()
-        fake_git = repo / ".git"
-        fake_git.mkdir()
+        _init_repo(repo)
         monkeypatch.setenv("DH_PROJECT_ROOT", str(repo))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git))
 
         assert infer_project_root() == repo
 
-    def test_git_project_root_without_cwd_uses_infer(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
+    def test_git_project_root_without_cwd_uses_infer(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """git_project_root(None) applies DH_PROJECT_ROOT like infer_project_root."""
         repo = tmp_path / "repo"
-        repo.mkdir()
-        fake_git = repo / ".git"
-        fake_git.mkdir()
+        _init_repo(repo)
         monkeypatch.setenv("DH_PROJECT_ROOT", str(repo))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git))
 
         assert git_project_root() == repo
 
     def test_infer_uses_codex_pwd_when_plugin_cwd_is_not_a_repository(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Codex MCP uses its forwarded agent PWD instead of the plugin cache cwd."""
         project = tmp_path / "project"
         plugin_cache = tmp_path / "plugin-cache"
-        project.mkdir()
-        fake_git = project / ".git"
-        fake_git.mkdir()
+        _init_repo(project)
         plugin_cache.mkdir()
         monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
@@ -382,121 +309,64 @@ class TestInferProjectRoot:
         monkeypatch.setenv("PWD", str(project))
         monkeypatch.chdir(plugin_cache)
 
-        def _side_effect(args: list[str], **kwargs: object) -> object:
-            cwd = str(kwargs.get("cwd", ""))
-            if str(project) not in cwd:
-                raise subprocess.CalledProcessError(128, "git")
-            return type("CompletedProcess", (), {"stdout": str(fake_git) + "\n", "returncode": 0})()
-
-        mocker.patch("subprocess.run", side_effect=_side_effect)
-
         assert infer_project_root() == project
 
-    def test_infer_workspace_folder_paths_json(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    def test_infer_ignores_codex_pwd_when_cwd_is_explicit(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """The Codex PWD hint only applies to the no-arg (MCP) resolution path."""
+        pwd_repo = tmp_path / "pwd-repo"
+        explicit_repo = tmp_path / "explicit-repo"
+        _init_repo(pwd_repo)
+        _init_repo(explicit_repo)
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setenv("CODEX_THREAD_ID", "codex-test-thread")
+        monkeypatch.setenv("PWD", str(pwd_repo))
+
+        assert infer_project_root(cwd=explicit_repo) == explicit_repo
+
+    def test_infer_workspace_folder_paths_json(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """WORKSPACE_FOLDER_PATHS JSON array first folder is used."""
         monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         repo = tmp_path / "ws"
-        repo.mkdir()
-        fake_git = repo / ".git"
-        fake_git.mkdir()
+        _init_repo(repo)
         monkeypatch.setenv("WORKSPACE_FOLDER_PATHS", json.dumps([str(repo)]))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git))
 
         assert infer_project_root() == repo
 
     def test_infer_workspace_folder_paths_precedes_claude_project_dir(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """VS Code/Cursor WORKSPACE_FOLDER_PATHS is used before CLAUDE_PROJECT_DIR."""
         claude_side = tmp_path / "claude-path"
         ws_side = tmp_path / "workspace-path"
-        claude_side.mkdir()
-        ws_side.mkdir()
-        (claude_side / ".git").mkdir()
-        (ws_side / ".git").mkdir()
+        _init_repo(claude_side)
+        _init_repo(ws_side)
         monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(claude_side))
         monkeypatch.setenv("WORKSPACE_FOLDER_PATHS", json.dumps([str(ws_side)]))
 
-        def _side_effect(args: list[str], **kwargs: object) -> object:
-            cwd = str(kwargs.get("cwd", ""))
-            git_dir = ws_side / ".git" if str(ws_side) in cwd else claude_side / ".git"
-            return type("CP", (), {"stdout": str(git_dir) + "\n", "returncode": 0})()
-
-        mocker.patch("subprocess.run", side_effect=_side_effect)
-
         assert infer_project_root() == ws_side
 
-    def test_infer_fails_with_runtime_error_wrapping_git_failure(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+    def test_infer_fails_with_runtime_error_when_no_project_root_is_available(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """When all strategies fail, raise RuntimeError with chained CalledProcessError."""
+        """When all strategies fail, log the cause and raise an actionable error."""
         monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
-        mocker.patch("subprocess.run", side_effect=subprocess.CalledProcessError(128, "git"))
-
+        caplog.set_level(logging.INFO, logger="dh_paths")
         with pytest.raises(RuntimeError, match="Could not resolve the git project root"):
             infer_project_root(tmp_path)
 
-    def test_infer_fails_with_runtime_error_wrapping_git_timeout(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
-        """A hung git process (TimeoutExpired) is wrapped in RuntimeError, not left to escape raw.
-
-        Regression test: TimeoutExpired is a sibling of CalledProcessError (both
-        subclass SubprocessError), not a subclass of it, so a bare
-        ``except subprocess.CalledProcessError`` does not catch it.
-        """
-        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
-        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
-        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
-        mocker.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 10))
-
-        with pytest.raises(RuntimeError, match="did not respond within the timeout"):
-            infer_project_root(tmp_path)
-
-    def test_infer_falls_through_when_a_lower_priority_hint_times_out(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
-        """A timed-out WORKSPACE_FOLDER_PATHS hint doesn't crash resolution when
-        walking up from cwd (a lower-priority strategy) can still succeed.
-
-        Regression test: infer_project_root's hint tuple is a literal, so all
-        three hint functions are evaluated eagerly before the loop picks the
-        first non-None result -- an uncaught TimeoutExpired from any of them
-        (even a lower-priority one) would crash the whole resolution and
-        discard an already-resolved higher-priority hint. With the fix, a
-        timeout is just a failed candidate, not a fatal error.
-        """
-        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
-        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
-        stalled_workspace = tmp_path / "stalled-network-mount"
-        stalled_workspace.mkdir()
-        monkeypatch.setenv("WORKSPACE_FOLDER_PATHS", json.dumps([str(stalled_workspace)]))
-
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        fake_git = repo / ".git"
-        fake_git.mkdir()
-
-        def _side_effect(args: list[str], **kwargs: object) -> object:
-            cwd = str(kwargs.get("cwd", ""))
-            if str(stalled_workspace) in cwd:
-                raise subprocess.TimeoutExpired("git", 10)
-            return type("CompletedProcess", (), {"stdout": str(fake_git) + "\n", "returncode": 0})()
-
-        mocker.patch("subprocess.run", side_effect=_side_effect)
-
-        assert infer_project_root(repo) == repo
+        assert "Could not resolve the git project root" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -832,12 +702,12 @@ class TestDHStateHomeOverride:
 class TestEnsureDirs:
     """Tests for ensure_dirs(): idempotent directory creation.
 
-    Strategy: Use mocker.patch on subprocess.run and DH_STATE_HOME monkeypatch
-    to run ensure_dirs in a fully isolated tmp_path environment.
+    Strategy: Pass an explicit project root and use DH_STATE_HOME to run
+    ensure_dirs in a fully isolated tmp_path environment.
     """
 
     def test_ensure_dirs_creates_all_expected_directories(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Verify ensure_dirs creates all Tier 2 and Tier 3 subdirectories.
 
@@ -848,10 +718,7 @@ class TestEnsureDirs:
         """
         # Arrange
         dh_paths._root_cache.clear()
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
         monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh"))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
 
         # Act
         returned = ensure_dirs(project_root=tmp_path)
@@ -870,7 +737,7 @@ class TestEnsureDirs:
             assert d.is_dir(), f"Expected directory not created: {d}"
 
     def test_ensure_dirs_creates_tier1_dh_dir_with_gitkeep(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Verify ensure_dirs creates the in-repo .dh/ dir with .gitkeep file.
 
@@ -880,10 +747,7 @@ class TestEnsureDirs:
         """
         # Arrange
         dh_paths._root_cache.clear()
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
         monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh"))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
 
         # Act
         ensure_dirs(project_root=tmp_path)
@@ -893,7 +757,7 @@ class TestEnsureDirs:
         assert (tmp_path / ".dh" / ".gitkeep").exists()
 
     def test_ensure_dirs_is_idempotent_called_twice_no_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Verify ensure_dirs can be called twice without raising an error.
 
@@ -903,10 +767,7 @@ class TestEnsureDirs:
         """
         # Arrange
         dh_paths._root_cache.clear()
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
         monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh"))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
 
         # Act — calling twice must not raise
         ensure_dirs(project_root=tmp_path)
@@ -915,9 +776,7 @@ class TestEnsureDirs:
         # Assert — directories still exist after second call
         assert (tmp_path / ".dh").is_dir()
 
-    def test_ensure_dirs_returns_state_root_path(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
+    def test_ensure_dirs_returns_state_root_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify ensure_dirs returns the state_root path.
 
         Tests: ensure_dirs return value is the per-project state root
@@ -926,10 +785,7 @@ class TestEnsureDirs:
         """
         # Arrange
         dh_paths._root_cache.clear()
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
         monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh"))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
 
         # Act
         result = ensure_dirs(project_root=tmp_path)
@@ -938,9 +794,7 @@ class TestEnsureDirs:
         expected = state_root(project_root=tmp_path)
         assert result == expected
 
-    def test_ensure_dirs_does_not_delete_existing_files(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
+    def test_ensure_dirs_does_not_delete_existing_files(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify ensure_dirs preserves existing files when called again.
 
         Tests: ensure_dirs does not wipe existing state on second invocation
@@ -949,10 +803,7 @@ class TestEnsureDirs:
         """
         # Arrange
         dh_paths._root_cache.clear()
-        fake_git_dir = tmp_path / ".git"
-        fake_git_dir.mkdir()
         monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh"))
-        mocker.patch("subprocess.run", side_effect=_make_git_run_mock(fake_git_dir))
 
         state = ensure_dirs(project_root=tmp_path)
         sentinel = state / "backlog" / "sentinel.txt"
