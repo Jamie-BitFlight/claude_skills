@@ -532,6 +532,11 @@ def main(
             update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
             raise typer.Exit(code=0)
 
+        if not new_releases:
+            console.print("[yellow]No new releases found[/yellow]")
+            update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
+            raise typer.Exit(code=0)
+
         # Display summary
         display_release_summary(releases)
 
