@@ -90,3 +90,6 @@ plan/
 
 # Hermes
 .hermes/plans/
+
+# Resumable collection-state files (transient; see scripts/discover_cross_harness_mcp_candidates.py --checkpoint)
+*.checkpoint.json
