@@ -1372,6 +1372,14 @@ def add_item(
     Raises:
         ValidationError: If priority or type_ is not a recognized value. No
             item is stored and no backend issue is created when raised.
+        ContentUnavailableError: On a string-ID backend (beads), when the
+            backend issue could not be created. ``_try_create_backend_issue_ref``
+            treats creation failure as non-fatal and returns ``""``, but the
+            subsequent ``backend.put_work_item()`` call retries creation for a
+            still-issueless item and raises instead of falling back to a
+            local-only item a second time (see ``BeadsBackend.put_work_item``).
+            Integer-ID backends (GitHub, sqlite, memory) do not raise this —
+            their local-only fallback is unconditional.
     """
     _validate_add_item_priority(priority)
     _validate_add_item_type(type_)
