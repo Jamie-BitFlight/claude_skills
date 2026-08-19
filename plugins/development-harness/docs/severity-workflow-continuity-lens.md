@@ -2,8 +2,8 @@
 title: "Workflow-Continuity Risk Lens — Case Studies"
 purpose: "Worked, mechanism-grounded examples of assessing backlog-grooming severity by pipeline data-continuity, not literal data deletion"
 related:
-  - agents/impact-analyst.md
-  - agents/classifier.md
+  - ../agents/impact-analyst.md
+  - ../agents/classifier.md
 created: 2026-08-19
 ---
 
