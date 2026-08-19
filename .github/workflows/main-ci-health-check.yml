@@ -113,21 +113,41 @@ jobs:
               return;
             }
 
-            // Latest run is green (or at least not 'failure') — close out any open tracking issue.
+            if (latestRun.conclusion === 'success') {
+              // Latest run genuinely passed — close out any open tracking issue.
+              if (trackingIssue) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: trackingIssue.number,
+                  body: `:white_check_mark: Latest push to \`${BRANCH}\` passed \`${WORKFLOW_FILE}\` (${latestRun.html_url}). Closing.`,
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: trackingIssue.number,
+                  state: 'closed',
+                });
+                console.log(`Closed tracking issue #${trackingIssue.number} — main is green again.`);
+              } else {
+                console.log(`${BRANCH} is green — nothing to do.`);
+              }
+              return;
+            }
+
+            // Ambiguous conclusion (neutral, cancelled, timed_out, action_required, skipped, stale, ...) —
+            // this is neither a confirmed red nor a confirmed green, so do not open, close, or claim an
+            // all-clear. Leave any existing tracking issue exactly as-is and just surface the ambiguity.
+            console.log(
+              `Latest ${WORKFLOW_FILE} push run on ${BRANCH} concluded '${latestRun.conclusion}' — ` +
+              'not a definitive pass or fail, leaving tracking issue state unchanged.'
+            );
             if (trackingIssue) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: trackingIssue.number,
-                body: `:white_check_mark: Latest push to \`${BRANCH}\` passed \`${WORKFLOW_FILE}\` (${latestRun.html_url}). Closing.`,
+                body: `:warning: Latest push to \`${BRANCH}\` concluded \`${latestRun.conclusion}\` (${latestRun.html_url}) — ` +
+                  'ambiguous result, not treated as pass or fail. Leaving this issue open.',
               });
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: trackingIssue.number,
-                state: 'closed',
-              });
-              console.log(`Closed tracking issue #${trackingIssue.number} — main is green again.`);
-            } else {
-              console.log(`${BRANCH} is green — nothing to do.`);
             }
