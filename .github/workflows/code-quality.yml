@@ -157,6 +157,13 @@ jobs:
 
       - name: Require plugin.json version bump for every changed plugin
         if: github.event_name == 'pull_request'
+        # Advisory, not blocking: this gate compares against the PR's merge-base,
+        # which by definition predates a sibling PR merged in the meantime -- it
+        # cannot detect the version-collision race (#3027). The post-merge repair
+        # job on main (.github/workflows/bump-marketplace.yml) is the actual
+        # correctness backstop; this step remains as early feedback for the
+        # "no bump at all" case only. See .claude/rules/plugin-development.md.
+        continue-on-error: true
         run: |
           BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
           uv run -q --no-sync \

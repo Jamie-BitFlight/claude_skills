@@ -473,6 +473,133 @@ class TestRunAudit:
         assert json.loads(capsys.readouterr().out) == {"drifted_plugins": ["dh"]}
 
 
+class TestRunRepair:
+    """Tests for _run_repair -- the --repair CLI mode."""
+
+    def test_reports_no_repairs_when_no_drift(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+        """No drifted plugins -- reports an empty JSON result and exits 0.
+
+        Tests: _run_repair
+        How: audit_version_drift monkeypatched to return [].
+        Why: --repair must be a safe no-op on a healthy repo -- the post-merge
+             CI job runs this unconditionally on every push (T3), so a clean
+             tree must never be mistaken for an error.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "plugins").mkdir()
+        monkeypatch.setattr(gate, "audit_version_drift", lambda _root: [])
+
+        # Act
+        exit_code = gate._run_repair()
+
+        # Assert
+        assert exit_code == 0
+        assert json.loads(capsys.readouterr().out) == {"repaired": [], "failed": []}
+
+    def test_reports_repaired_plugins(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+        """Drifted plugins are repaired and reported with their old/new versions.
+
+        Tests: _run_repair
+        How: audit_version_drift monkeypatched to return ["dh"];
+             repair_plugin_version monkeypatched to simulate a successful bump.
+        Why: The repair job's commit message and evidence trail depend on this
+             JSON naming each plugin and its version delta (T1 spec).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "plugins").mkdir()
+        monkeypatch.setattr(gate, "audit_version_drift", lambda _root: ["dh"])
+        monkeypatch.setattr(gate, "repair_plugin_version", lambda _plugin_dir: ("9.0.17", "9.0.18"))
+
+        # Act
+        exit_code = gate._run_repair()
+
+        # Assert
+        assert exit_code == 0
+        assert json.loads(capsys.readouterr().out) == {
+            "repaired": [{"plugin": "dh", "old_version": "9.0.17", "new_version": "9.0.18"}],
+            "failed": [],
+        }
+
+    def test_failed_repair_is_reported_and_exits_nonzero(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+        """A drifted plugin that cannot be repaired is surfaced, not silently dropped.
+
+        Tests: _run_repair
+        How: audit_version_drift monkeypatched to return a drifted plugin;
+             repair_plugin_version monkeypatched to return None (its documented
+             failure contract -- see repair_plugin_version's docstring).
+        Why: Copilot review on PR #3032 flagged that a drifted plugin whose
+             current plugin.json has a missing/non-string version made
+             _run_repair silently drop it from the output while still exiting
+             0 -- CI would report success while the repair never landed.
+             Per .claude/rules/silent-failure-prevention.md, a write operation
+             must report what changed (or, here, what could not be changed).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "plugins").mkdir()
+        monkeypatch.setattr(gate, "audit_version_drift", lambda _root: ["broken"])
+        monkeypatch.setattr(gate, "repair_plugin_version", lambda _plugin_dir: None)
+
+        # Act
+        exit_code = gate._run_repair()
+
+        # Assert
+        assert exit_code == 1
+        assert json.loads(capsys.readouterr().out) == {"repaired": [], "failed": ["broken"]}
+
+
+class TestRepairPluginVersion:
+    """Tests for repair_plugin_version's documented None-on-malformed-input contract."""
+
+    def test_returns_none_on_missing_plugin_json(self, tmp_path: Path) -> None:
+        """A plugin.json that does not exist on disk returns None instead of crashing.
+
+        Tests: repair_plugin_version
+        Why: Copilot review on PR #3032 (check_plugin_version_bump.py:190) flagged
+             that repair_plugin_version's docstring claims it returns None for a
+             malformed/missing plugin.json, but it called read_text()+json.loads()
+             with no FileNotFoundError handling -- --repair would crash instead.
+        """
+        plugin_dir = tmp_path / "plugins" / "missing"
+        (plugin_dir / ".claude-plugin").mkdir(parents=True)
+
+        assert gate.repair_plugin_version(plugin_dir) is None
+
+    def test_returns_none_on_malformed_json(self, tmp_path: Path) -> None:
+        """A plugin.json containing invalid JSON returns None instead of crashing.
+
+        Tests: repair_plugin_version
+        Why: Same Copilot finding as test_returns_none_on_missing_plugin_json --
+             json.loads() previously propagated JSONDecodeError uncaught.
+        """
+        plugin_dir = tmp_path / "plugins" / "malformed"
+        (plugin_dir / ".claude-plugin").mkdir(parents=True)
+        (plugin_dir / ".claude-plugin" / "plugin.json").write_text("{not valid json", encoding="utf-8")
+
+        assert gate.repair_plugin_version(plugin_dir) is None
+
+    def test_returns_none_on_malformed_version_string(self, tmp_path: Path) -> None:
+        """A syntactically valid plugin.json with a non-semver version string returns None.
+
+        Tests: repair_plugin_version
+        Why: Greptile review on PR #3032 (check_plugin_version_bump.py:193-197) flagged
+             that the pre-fix type check only verified `version` was a `str`, not that
+             it was a well-formed `major.minor.patch` value. A drifted manifest with
+             `"version": "abc"` passed that check, and `bump_version` silently coerced
+             it to "0.1.0" -- reporting a successful repair while actually downgrading
+             the plugin instead of surfacing the invalid version as a failed repair.
+        """
+        plugin_dir = tmp_path / "plugins" / "malformed-version"
+        (plugin_dir / ".claude-plugin").mkdir(parents=True)
+        (plugin_dir / ".claude-plugin" / "plugin.json").write_text(
+            json.dumps({"name": "malformed-version", "version": "abc"}), encoding="utf-8"
+        )
+
+        assert gate.repair_plugin_version(plugin_dir) is None
+
+
 # ============================================================================
 # Area 5: Integration tests -- real git repos, no mocking
 # ============================================================================
@@ -854,3 +981,138 @@ class TestAuditVersionDriftIntegration:
 
         # Assert
         assert drifted == []
+
+
+@pytest.mark.integration
+class TestRepairPluginVersionIntegration:
+    """End-to-end tests for --repair against a real git history.
+
+    These are the regression tests for #3027 -- two branches deriving the
+    same next version from an identical origin/main snapshot land on the
+    same number after both merge. `repair_plugin_version` runs against
+    `check.py --repair`'s own module (`gate`), not `auto_sync_manifests`,
+    so it must fail on the pre-T1 `check_plugin_version_bump.py` (no
+    `--repair` mode existed at all) and pass once T1 lands.
+    """
+
+    def test_repairs_the_pr_3027_collision(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """A version collision (two merges landing on the same number) is un-collided.
+
+        Tests: repair_plugin_version, audit_version_drift (via _run_repair)
+        How: Commit A (PR A's merge): bumps dh's plugin.json from 9.0.16 to
+             9.0.17. Commit B (PR B's merge): changes dh content but leaves
+             the version at 9.0.17 -- both PRs independently computed
+             base_version + 1 from the same origin/main snapshot, so B's
+             merge does not raise the version further. This is the exact
+             #3027 collision shape from plan/architect-plugin-version-bump-race.md.
+        Why: This is the regression test for #3027. It must fail against
+             pre-T1 code (repair_plugin_version / --repair did not exist) and
+             pass once the fix lands -- the actual evidence for the fix, not
+             just "tests added."
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _git(tmp_path, "init")
+        _git(tmp_path, "config", "commit.gpgsign", "false")
+        skill_path = tmp_path / "plugins" / "dh" / "skills" / "foo" / "SKILL.md"
+        skill_path.parent.mkdir(parents=True, exist_ok=True)
+        skill_path.write_text("original content\n", encoding="utf-8")
+        _write_plugin_json(tmp_path, "dh", "9.0.16")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "base: dh at 9.0.16")
+
+        # Commit A -- PR A's merge: bumps to 9.0.17
+        _write_plugin_json(tmp_path, "dh", "9.0.17")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "PR A merge: bump dh to 9.0.17")
+
+        # Commit B -- PR B's merge: content change, version left at 9.0.17 (collision)
+        skill_path.write_text("PR B content change\n", encoding="utf-8")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "PR B merge: content change, version still 9.0.17")
+
+        # Act
+        exit_code = gate._run_repair()
+
+        # Assert -- repaired to 9.0.18, un-colliding the two merges
+        plugin_json_path = tmp_path / "plugins" / "dh" / ".claude-plugin" / "plugin.json"
+        assert exit_code == 0
+        assert json.loads(plugin_json_path.read_text(encoding="utf-8"))["version"] == "9.0.18"
+
+    def test_repairs_the_pr_3021_no_bump_case(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """A GitHub-UI merge that skipped the pre-commit hook entirely still gets bumped.
+
+        Tests: repair_plugin_version, audit_version_drift (via _run_repair)
+        How: Single commit -- plugin.json at 1.0.0, never bumped since
+             creation, with a content change. This is the #3021 shape: a
+             squash-merge that never ran the local pre-commit hook.
+        Why: T1's repair predicate must close both #3027 and #3021 with one
+             rule (per the plan's Recommendation section) -- this proves the
+             no-bump-at-all case independently of the collision case above.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _git(tmp_path, "init")
+        _git(tmp_path, "config", "commit.gpgsign", "false")
+        readme = tmp_path / "plugins" / "dh" / "README.md"
+        readme.parent.mkdir(parents=True, exist_ok=True)
+        readme.write_text("v1\n", encoding="utf-8")
+        _write_plugin_json(tmp_path, "dh", "1.0.0")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "root: dh at 1.0.0")
+
+        readme.write_text("v2 -- squash-merged, no bump\n", encoding="utf-8")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "GitHub-UI squash-merge, hook never ran")
+
+        # Act
+        exit_code = gate._run_repair()
+
+        # Assert
+        plugin_json_path = tmp_path / "plugins" / "dh" / ".claude-plugin" / "plugin.json"
+        assert exit_code == 0
+        assert json.loads(plugin_json_path.read_text(encoding="utf-8"))["version"] == "1.0.1"
+
+    def test_idempotent_on_clean_tree(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Running --repair twice in a row only bumps once.
+
+        Tests: repair_plugin_version, audit_version_drift (via _run_repair)
+        How: Repair a real collision (as above), commit the repair, then run
+             --repair again against the now-clean tree.
+        Why: The post-merge CI job (T3) runs on every push -- if repair were
+             not idempotent, every subsequent unrelated push would keep
+             bumping every previously-repaired plugin forever.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        _git(tmp_path, "init")
+        _git(tmp_path, "config", "commit.gpgsign", "false")
+        skill_path = tmp_path / "plugins" / "dh" / "skills" / "foo" / "SKILL.md"
+        skill_path.parent.mkdir(parents=True, exist_ok=True)
+        skill_path.write_text("original content\n", encoding="utf-8")
+        _write_plugin_json(tmp_path, "dh", "9.0.16")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "base: dh at 9.0.16")
+
+        _write_plugin_json(tmp_path, "dh", "9.0.17")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "PR A merge: bump dh to 9.0.17")
+
+        skill_path.write_text("PR B content change\n", encoding="utf-8")
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "PR B merge: content change, version still 9.0.17")
+
+        first_exit_code = gate._run_repair()
+        assert first_exit_code == 0
+        plugin_json_path = tmp_path / "plugins" / "dh" / ".claude-plugin" / "plugin.json"
+        assert json.loads(plugin_json_path.read_text(encoding="utf-8"))["version"] == "9.0.18"
+
+        _git(tmp_path, "add", ".")
+        _git(tmp_path, "commit", "-m", "repair commit: bump dh to 9.0.18")
+
+        # Act -- second run against the now-clean tree
+        second_exit_code = gate._run_repair()
+
+        # Assert -- no further bump
+        assert second_exit_code == 0
+        assert json.loads(plugin_json_path.read_text(encoding="utf-8"))["version"] == "9.0.18"
