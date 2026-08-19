@@ -11,8 +11,8 @@ Consult `python3-core` for standing defaults.
 Command defaults and quick reference for uv, the type checker, ruff, the build backend,
 pre-commit, TOML, and PyPI packaging: `references/tooling-defaults.md`.
 
-This plugin's policy, conflict resolution against Astral's official guidance, and archive links for
-a specific tool: load the matching wrapper skill below.
+This plugin's policy and conflict resolution against Astral's official guidance for a specific
+tool: load the matching wrapper skill below.
 
 ## Standalone Tool Skills
 
@@ -32,5 +32,4 @@ Load when the task is focused entirely on one tool:
 
 - `references/tooling-defaults.md` — command defaults and quick reference
 - `references/compatibility-lanes.md` — version compatibility
-- `references/{uv,ty}/README.md` — cached snapshots of `docs.astral.sh` (generated, not authored); read each precedence chain before trusting a stale-looking claim
 - `references/pre-commit/pre-commit-official-docs.md` — cached snapshot of pre-commit's official docs
