@@ -63,14 +63,22 @@ jobs:
           # A concurrent writer may have advanced main since checkout -- retry
           # on a non-fast-forward rejection by rebasing our repair commit onto
           # the new tip before pushing again, so the authoritative repair
-          # never silently drops (issue #3027).
+          # never silently drops (issue #3027). Steps run under `bash -e`, so
+          # a rebase conflict (a second concurrent writer touching the same
+          # generated manifest) must be caught explicitly -- an unguarded
+          # `git rebase` failure would otherwise kill the step immediately,
+          # skipping the remaining attempts and the final ::error:: below.
           for attempt in 1 2 3; do
             if git push; then
               exit 0
             fi
             echo "Push rejected (attempt $attempt/3) -- fetching and rebasing"
             git fetch origin main
-            git rebase origin/main
+            if ! git rebase origin/main; then
+              echo "Rebase conflict (attempt $attempt/3) -- aborting rebase and retrying from a fresh fetch"
+              git rebase --abort
+              continue
+            fi
           done
 
           echo "::error::Failed to push repair commit after 3 attempts"
