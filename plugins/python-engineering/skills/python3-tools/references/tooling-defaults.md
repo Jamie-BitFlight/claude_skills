@@ -19,8 +19,7 @@ Detection order: `.pre-commit-config.yaml` → CI config → `pyproject.toml`. D
 active checker from config-key presence alone (`[tool.mypy]` may be stub config for IDEs).
 
 - **Default**: ty (Astral) for new work
-- **Existing projects on mypy**: keep mypy, do not force migration
-- **Existing projects on pyright/basedpyright**: respect that, do not force ty
+- **Existing projects**: keep the checker already in use (mypy, pyright, basedpyright) — don't force a migration to ty
 - **IDEs**: keep stub config so built-in checkers stay quiet after migration
 
 ## Linter / Formatter

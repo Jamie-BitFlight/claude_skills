@@ -213,45 +213,10 @@ guess:
 - Cite sources with URLs and access dates
 - File references use `./` relative prefix
 
-**SKILL.md string substitution** happens at load time, including inside fenced code blocks —
-backslash-escaping (`\$1`) does not prevent it:
-
-- `$ARGUMENTS`, `$ARGUMENTS[N]`, `$0`–`$9` — arguments passed at invocation
-- `${CLAUDE_SESSION_ID}` — current session ID
-- `${CLAUDE_SKILL_DIR}` — the skill's own directory (for plugin skills: the skill subdirectory,
-  NOT the plugin root)
-- `${CLAUDE_PLUGIN_ROOT}` — the plugin's root directory. Applies only when the loaded `SKILL.md`
-  belongs to a plugin (not a project-level `.claude/skills/` skill). Substitutes throughout the
-  entire rendered body — plain prose and markdown link targets, not only `` !`bash` `` injection
-  lines — before the model sees the text. Absent from `code.claude.com/docs/en/skills.md`'s own
-  substitution table (a documentation gap on Anthropic's side, not evidence against the behavior).
-  Verified live via `dh-meta-docs` and `implementation-manager`, and canary-tested against a
-  no-variable control line (2026-08-06) — see
-  `.claude/agent-memory/python-engineering-python-cli-architect/project_claude_plugin_root_bang_exec_vs_later_bash.md`.
-- Literal `$N` is only safe to document inside `references/*.md` files, which are not substituted —
-  a SKILL.md itself cannot explain this syntax without being corrupted by it. `${CLAUDE_PLUGIN_ROOT}`
-  and `${CLAUDE_SKILL_DIR}` are likewise NOT substituted inside `references/*.md` files — only the
-  `SKILL.md` body itself. Canary-test any new substitution-adjacent pattern
-  (`/example-argument-substitution`) before applying it across multiple files.
-
-Hook/command scripts additionally receive these as real process env vars (a separate mechanism from
-the load-time text substitution above): `CLAUDE_PROJECT_DIR` (project root, all hooks),
-`CLAUDE_PLUGIN_ROOT` (plugin root, plugin hooks only — `CLAUDE_PLUGIN_DIR` does not exist),
-`CLAUDE_ENV_FILE` (SessionStart hooks only), `CLAUDE_CODE_REMOTE`.
-
-**Multi-mode workflow skills**: when a SKILL.md parses `$ARGUMENTS` into a structured `<input>`
-JSON block, its `references/workflows/*.md` files use self-closing XML tags (e.g. `<item_ref/>`)
-as **labels naming a key in that JSON** — not variables passed into the file. Reference them as
-"the value from the `item_ref` key," never "the parser provides `item_ref`."
-
-**Agent `tools:` frontmatter** requires exact, correctly-cased tool names
-(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`) — wildcards (`*`) and short-form MCP
-aliases (`mcp__context-mode__ctx_stats` instead of the full
-`mcp__plugin_context-mode_context-mode__ctx_stats`) silently resolve to zero tools, with no error
-raised.
-
-After editing any SKILL.md, invoke the skill and confirm it still renders correctly with no
-unexpected prompts or extra steps.
+Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — string
+substitution happens at load time, including inside fenced code blocks, and gets the
+`${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` / `$ARGUMENTS` mechanics wrong in ways that corrupt
+the rendered skill.
 
 ### JavaScript/TypeScript
 
@@ -362,7 +327,7 @@ The backlog system uses the configured provider's native interface and selected 
 
 Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `backlog_close`
 
-- The selected backend is the source of truth; in the default deployment this is GitHub Issues, while `.claude/backlog/` is local cache
+- The selected backend is the source of truth. **This checkout's backend is GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`; no `.beads/` directory exists here) — the Beads block near the end of this file is generic boilerplate injected regardless of which backend a checkout actually uses. Follow this section, not that block, unless `.beads/` appears. `.claude/backlog/` is local cache either way.
 - Before starting multi-step work: create a backlog item through the selected backend or its structured `backlog_add` operation
 - Use `backlog_groom` with `append=True` for incremental section writes
 
@@ -379,7 +344,9 @@ Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `bac
   the QG plan it generates internally — passing the QG plan back in produces a spurious second
   `qg-qg-...` plan and re-runs quality gates on an already-complete pass
 
-### Rule Files
+### Other Tools' Rule Files
+
+Rule files outside `.claude/rules/` that other harnesses read — not a full rule-file index:
 
 | File | Purpose |
 |------|---------|
@@ -399,23 +366,22 @@ this file) was removed to avoid two files drifting out of sync.
 
 ## Gotchas & Non-Obvious Patterns
 
-1. **Always `uv run`**: Never run Python commands directly — always prefix with `uv run`
-2. **prek not pre-commit**: This repo uses `prek` (Rust-based), not `pre-commit`. Same config, different binary.
-3. **Symlink issues on Windows**: Git symlinks (mode 120000) become plain files on Windows. The `repair-symlinks` pre-commit hook fixes this. Both `ruff` and `ty` have `extend-exclude` entries for symlinked directories.
-4. **Skip magic trailing comma**: Ruff config has `skip-magic-trailing-comma = true` — formatting differences around trailing commas are expected.
-5. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
-6. **pytest parallelism**: Tests run with `-n auto --dist loadgroup` (xdist). Tests marked with `@pytest.mark.xdist_group` run in same worker.
-7. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
-8. **Markdown lint exclusions**: `plan/` and `.claude/backlog/` are excluded from markdownlint (they may have intentionally relaxed formatting).
-9. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
-10. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
-11. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism.
-12. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `.claude/rules/script-invocation.md` for the isolation rationale.
-13. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
-14. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
-15. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.
-16. **No `git stash` on the primary checkout**: compare against a clean baseline in an isolated worktree instead — other agents may be mid-write there.
-17. **Bounded subprocess execution**: `scripts/run_bounded.py` runs a command with a timeout and terminates its full process group (POSIX process-group signals; `taskkill /T /F` on Windows) on expiry, including descendants a bare `subprocess.run(timeout=...)` would leave behind. Wrap any external command invocation that may hang or spawn children with `uv run --script scripts/run_bounded.py --timeout-seconds <n> -- <command>`.
+1. **prek not pre-commit**: This repo uses `prek` (Rust-based), not `pre-commit`. Same config, different binary.
+2. **Symlink issues on Windows**: Git symlinks (mode 120000) become plain files on Windows. The `repair-symlinks` pre-commit hook fixes this. Both `ruff` and `ty` have `extend-exclude` entries for symlinked directories.
+3. **Skip magic trailing comma**: Ruff config has `skip-magic-trailing-comma = true` — formatting differences around trailing commas are expected.
+4. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
+5. **pytest parallelism**: Tests run with `-n auto --dist loadgroup` (xdist). Tests marked with `@pytest.mark.xdist_group` run in same worker.
+6. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
+7. **Markdown lint exclusions**: `plan/` and `.claude/backlog/` are excluded from markdownlint (they may have intentionally relaxed formatting).
+8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
+9. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
+10. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism.
+11. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `.claude/rules/script-invocation.md` for the isolation rationale.
+12. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
+13. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
+14. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.
+15. **No `git stash` on the primary checkout**: compare against a clean baseline in an isolated worktree instead — other agents may be mid-write there.
+16. **Bounded subprocess execution**: `scripts/run_bounded.py` runs a command with a timeout and terminates its full process group (POSIX process-group signals; `taskkill /T /F` on Windows) on expiry, including descendants a bare `subprocess.run(timeout=...)` would leave behind. Wrap any external command invocation that may hang or spawn children with `uv run --script scripts/run_bounded.py --timeout-seconds <n> -- <command>`.
 
 ## File Locations Quick Reference
 

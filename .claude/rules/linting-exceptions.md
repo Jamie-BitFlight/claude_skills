@@ -57,8 +57,7 @@ the specific justification in a comment beside the config entry. Do not use inli
 
 ## Unacceptable Exceptions (MUST fix or escalate)
 
-If none of the above apply, or the only justification given is a category label with no specific
-reason:
+If none of the above apply:
 
 1. Fix linting smell using `/holistic-linting:holistic-linting` Skill (exact methodology for addressing linting issues)
 2. If unable to fix, document specific blocker
@@ -66,7 +65,7 @@ reason:
 
 ## Rule Codes That MUST Always Be Fixed (never suppress)
 
-These are never eligible for any exception above, including environment-constrained runtimes:
+These are never eligible for any exception above:
 
 - BLE001 (blind-except): Replace `except Exception` with specific exception types
 - D103 (missing-docstring-in-public-function): Add docstrings to public functions
@@ -78,15 +77,13 @@ These are never eligible for any exception above, including environment-constrai
 
 Configured in `pyproject.toml`'s `[tool.ruff.lint.per-file-ignores]` (and `[[tool.ty.overrides]]` for
 ty) — never as an inline `# noqa`/`# type: ignore`. This file does not summarize that list: it is
-long, specific, and changes independently of this document, so a copy here would only go stale (as
-the previous version of this section did — it claimed directory-wide codes that didn't match the
-actual config). Read `pyproject.toml` directly for the current entries.
+long and changes independently of this document, so a copy here would only go stale. Read
+`pyproject.toml` directly for the current entries.
 
-Every entry there names specific rule codes for a specific path pattern, never a bare "everything is
-fine here," and (with rare exceptions treated as bugs to fix, not precedent to copy) carries an inline
-comment stating why — matching one of the six categories above. New entries must do the same: name
-the codes, not the whole rule family unless every code in it genuinely applies, and state the specific
-reason next to the code, not just above the block.
+Every entry there names specific rule codes for a specific path pattern and (with rare exceptions
+treated as bugs to fix, not precedent) carries an inline comment stating why — matching one of the
+categories above. New entries must do the same: name the codes, not the whole rule family unless
+every code genuinely applies, and state the reason next to the code, not above the block.
 
 ## `--ignore` and `--unsafe-fixes`
 
@@ -96,10 +93,5 @@ is permitted only after reviewing the change with `--diff` first; never apply un
 See [`astral-tool-overrides.md`](./astral-tool-overrides.md) C2 for why this departs from Astral's
 own `ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gate.
 
-SOURCE: User policy established in conversation (2025-01-15); narrowed 2026-08-19 to require a
-per-instance justification and replace ad hoc categories with rule-conflict / rule-testing /
-negative-example / externally-managed-vendored / environment-constrained-runtime /
-maintenance-burden-exceeds-compliance-gain. The previous
-version of this file's Per-File Exceptions section claimed 4 directory-wide code lists that didn't
-match `pyproject.toml` at all (verified 2026-08-19) — the actual config is per-file, not per-directory,
-and (with one gap fixed the same day) already carries the required per-entry justification.
+SOURCE: User policy established in conversation (2025-01-15); narrowed 2026-08-19 to the categories
+above, each requiring a per-instance justification.

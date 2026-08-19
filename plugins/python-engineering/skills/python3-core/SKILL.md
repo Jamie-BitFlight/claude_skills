@@ -6,7 +6,8 @@ user-invocable: false
 
 # Python Engineering Standards
 
-Consult `references/python3-standards.md` for the full standards document.
+For the full rationale and edge cases behind the defaults below, load the
+`python-engineering:standards-for-python-development` skill.
 
 ## Standing Defaults (apply to every Python task)
 

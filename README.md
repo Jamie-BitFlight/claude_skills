@@ -267,8 +267,11 @@ plugins/plugin-name/
 ├── commands/             # Slash commands you can use
 ├── agents/               # Specialized sub-agents
 ├── hooks/                # hooks.json and hook scripts
+├── scripts/              # Python scripts (optional)
 └── README.md             # Documentation
 ```
+
+Full field-level structure (required vs. optional, frontmatter schemas): see `AGENTS.md`'s Plugin Structure section.
 
 ## Local Development
 
@@ -319,14 +322,7 @@ Reinstall the specific plugin (use the install name from the tables above):
 /plugin install <install-name>@jamie-bitflight-skills
 ```
 
-## Get Started Now
-
-```bash
-/plugin marketplace add Jamie-BitFlight/claude_skills
-/plugin install dh@jamie-bitflight-skills
-```
-
-Every plugin works immediately after install — no restart, no configuration.
+Every plugin works immediately after install — no restart, no configuration. See [Quick Start](#quick-start) above to begin.
 
 ## Contributing
 

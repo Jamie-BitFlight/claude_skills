@@ -28,6 +28,6 @@ above from the GitHub Releases API and opens a PR when it changes.
 The reference corpus itself (`cli_reference.md`, `configuration.md`,
 `migration-guide.md`, `quick-reference.md`, `troubleshooting.md`) has **no
 automated regeneration today** — refreshing it is a manual, reviewed pass
-against `docs.astral.sh/uv`, not something this stamp guarantees is current.
+against `docs.astral.sh/uv`.
 
 generated_at: 2026-08-19

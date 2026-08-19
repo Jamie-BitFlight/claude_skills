@@ -11,24 +11,26 @@ Consult `python3-core` for standing defaults.
 Command defaults and quick reference for uv, the type checker, ruff, the build backend,
 pre-commit, TOML, and PyPI packaging: `references/tooling-defaults.md`.
 
-Repo policy, conflict resolution against Astral's official guidance, and archive links for a
-specific tool: load the matching wrapper skill below.
+This plugin's policy, conflict resolution against Astral's official guidance, and archive links for
+a specific tool: load the matching wrapper skill below.
 
 ## Standalone Tool Skills
 
-Load these skills when the task is focused entirely on one tool:
+Load when the task is focused entirely on one tool:
 
-- Load `python-engineering:uv` when the task involves uv commands, lockfiles, PEP 723 scripts, workspace configuration, Python version management, CI/CD integration, Docker setup with uv, or migration from pip/poetry/pyenv.
-- Load `python-engineering:ty` when the task involves running ty type checks, configuring `ty.toml` or `[tool.ty]`, suppressing diagnostics, interpreting ty error codes, ty editor integration, or migrating from mypy/pyright to ty.
-- Load `python-engineering:ruff` when the task involves ruff linting or formatting, rule selection, suppression policy, or reviewing `--unsafe-fixes`.
-- Load `python-engineering:hatchling` when the task involves Hatchling build hooks, custom builders, wheel/sdist configuration, editable installs, VCS version sources, PEP 517/518/621/660 compliance, or setuptools migration.
-- Load `python-engineering:toml-python` when the task requires advanced TOML manipulation: comment-preserving read-modify-write, atomic config updates, tomlkit API patterns, or XDG config file management.
-- Load `python-engineering:pre-commit` when the task requires configuring hook stages, writing `.pre-commit-hooks.yaml` definitions, implementing `prepare-commit-msg` hooks, or distributing a tool as a pre-commit hook.
-- Load `python-engineering:pypi-readme-creator` when the task involves creating or validating a PyPI README, choosing between Markdown and RST formats, configuring `readme` in `pyproject.toml`, or running `twine check`.
+| Skill | Load when the task involves |
+|---|---|
+| `python-engineering:uv` | uv commands, lockfiles, PEP 723 scripts, workspace config, Python version management, CI/CD integration, Docker setup, or pip/poetry/pyenv migration |
+| `python-engineering:ty` | ty type checks, `ty.toml`/`[tool.ty]` config, diagnostic suppression, ty error codes, editor integration, or mypy/pyright migration |
+| `python-engineering:ruff` | ruff linting/formatting, rule selection, suppression policy, or `--unsafe-fixes` review |
+| `python-engineering:hatchling` | build hooks, custom builders, wheel/sdist config, editable installs, VCS version sources, PEP 517/518/621/660 compliance, or setuptools migration |
+| `python-engineering:toml-python` | comment-preserving read-modify-write, atomic config updates, tomlkit API patterns, or XDG config management |
+| `python-engineering:pre-commit` | hook stage config, `.pre-commit-hooks.yaml`, `prepare-commit-msg` hooks, or distributing a tool as a pre-commit hook |
+| `python-engineering:pypi-readme-creator` | PyPI README validation, Markdown vs RST choice, `readme` config, or `twine check` |
 
 ## References
 
 - `references/tooling-defaults.md` — command defaults and quick reference
 - `references/compatibility-lanes.md` — version compatibility
-- `references/uv/README.md` — cached snapshot of `docs.astral.sh/uv` (generated, not authored); read its precedence chain before trusting a stale-looking claim
-- `references/ty/README.md` — cached snapshot of `docs.astral.sh/ty` (generated, not authored); read its precedence chain before trusting a stale-looking claim
+- `references/{uv,ty}/README.md` — cached snapshots of `docs.astral.sh` (generated, not authored); read each precedence chain before trusting a stale-looking claim
+- `references/pre-commit/pre-commit-official-docs.md` — cached snapshot of pre-commit's official docs

@@ -25,17 +25,14 @@ Use direct execution first. Scripts are self-contained executables, not library 
 
 Never `#!/usr/bin/env -S uv run --active --script` (or any flag order carrying `--active`).
 `--active` makes `uv run` prefer an ambient activated virtual environment over an isolated
-ephemeral one — when a caller's shell has `VIRTUAL_ENV` set, the script's inline dependencies
-install into that venv instead of a throwaway environment, which drifts `.venv` from `uv.lock`.
-This was empirically verified: a probe script declaring a dependency absent from the repo venv,
-run under `--active --script` with `VIRTUAL_ENV` pointed at this repo's `.venv`, measurably
-installed the package into `.venv/lib/python3.13/site-packages/` — with `--active` omitted, the
-same probe resolved into an isolated `~/.cache/uv/environments-v2/` environment instead, leaving
-`.venv` untouched. `--quiet`/`-q` is a global option and order-independent; `--active` is the only
-semantic difference between the two forms in use across this repo.
+ephemeral one — when a caller's shell has `VIRTUAL_ENV` set, the script's dependencies install
+into that venv instead, drifting `.venv` from `uv.lock`. Empirically verified (uv 0.12.5): with
+`--active`, a probe script's dependency installed into `.venv/lib/python3.13/site-packages/`; with
+it omitted, the same probe resolved into an isolated `~/.cache/uv/environments-v2/` environment,
+leaving `.venv` untouched. `--quiet`/`-q` is a global option and order-independent; `--active` is
+the only semantic difference between the two forms in use across this repo.
 
-SOURCE: empirical uv 0.12.5 probe run 2026-08-19 during the Astral plugin adoption (PR #3019);
-corroborates AGENTS.md Gotcha #12.
+SOURCE: empirical uv 0.12.5 probe; corroborates AGENTS.md Gotcha #11.
 
 **Wrong — bypasses shebang and PEP 723 dependency resolution:**
 
@@ -43,5 +40,3 @@ corroborates AGENTS.md Gotcha #12.
 python3 plugins/plugin-creator/scripts/auto_sync_manifests.py --reconcile
 node .claude/hooks/session-start-backlog.cjs
 ```
-
-SOURCE: Experimental validation (2026-02-02). Evidence from `.claude/hooks/session-start-backlog.cjs`, `plugins/plugin-creator/scripts/create_plugin.py`.
