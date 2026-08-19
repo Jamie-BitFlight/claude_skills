@@ -56,8 +56,8 @@ flowchart TD
 
 Reference other skills using activation syntax:
 
-✅ `For comprehensive Astral uv documentation, use the /uv skill.`
-❌ `See /uv/SKILL.md for uv documentation`
+✅ `For comprehensive linting documentation, use the /holistic-linting:holistic-linting skill.`
+❌ `See /holistic-linting:holistic-linting/SKILL.md for linting documentation`
 
 ## Subdirectory Namespaces — Skills Do NOT Support This
 
