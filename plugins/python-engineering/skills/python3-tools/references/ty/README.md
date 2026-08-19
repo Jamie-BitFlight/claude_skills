@@ -8,8 +8,8 @@ stale fact; refresh from the live docs instead.
 
 When anything in this archive is disputed or ambiguous, resolve in this order:
 
-1. `.claude/rules/astral-tool-overrides.md` — this repo's policy on *how we
-   work with ty here*. Wins over both sources below.
+1. The `python-engineering:ty` skill, if also loaded — this plugin's own policy on *how to work
+   with ty*. Wins over both sources below.
 2. The live `astral:ty` skill / `docs.astral.sh/ty` — authoritative on *tool
    facts* (current flags, defaults, behavior).
 3. This archive — a snapshot of (2). Lowest priority; check the live site

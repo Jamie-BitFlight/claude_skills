@@ -1,6 +1,6 @@
 ---
 name: shebangpython
-description: Validates and corrects Python shebangs and PEP 723 inline script metadata by applying four shebang-selection rules. Use when auditing or fixing shebangs in Python files — choosing between plain python3 and the uv shebang for standalone scripts with external dependencies, enforcing correct uv flag ordering (--quiet before run subcommand), adding or removing PEP 723 metadata blocks to match actual import requirements, checking execute bit presence, or avoiding redundant transitive dependencies when typer is declared (typer bundles rich and shellingham automatically).
+description: Validates and corrects Python shebangs and PEP 723 inline script metadata by applying four shebang-selection rules. Use when auditing or fixing shebangs in Python files — choosing between plain python3 and the uv shebang for standalone scripts with external dependencies, adding or removing PEP 723 metadata blocks to match actual import requirements, checking execute bit presence, or avoiding redundant transitive dependencies when typer is declared (typer bundles rich and shellingham automatically).
 argument-hint: '[file-paths...]'
 user-invocable: true
 ---
@@ -61,7 +61,7 @@ If no arguments provided:
 
 ### Rule 3: Standalone scripts with external dependencies
 
-**Pattern**: `#!/usr/bin/env -S uv --quiet run --active --script`
+**Pattern**: `#!/usr/bin/env -S uv run --quiet --script`
 
 **Conditions**:
 
@@ -69,6 +69,13 @@ If no arguments provided:
 - Requires external packages
 
 **Reasoning**: PEP 723 inline metadata declares dependencies, uv installs them automatically.
+Never add `--active`: it makes `uv run` prefer an ambient activated virtual environment over the
+isolated ephemeral one PEP 723 scripts are supposed to get, installing the script's dependencies
+into the caller's shared `.venv` instead of a throwaway environment — empirically verified: a
+probe script declaring a dependency absent from a project venv, run under `--active --script`
+with `VIRTUAL_ENV` set, measurably installed into that venv; with `--active` omitted, the same
+probe resolved into an isolated `uv` cache environment instead, leaving the project venv
+untouched.
 
 ### Rule 4: Non-executable files
 
@@ -86,41 +93,29 @@ If no arguments provided:
 
 ## UV Shebang Command Structure
 
-The shebang: `#!/usr/bin/env -S uv --quiet run --active --script`
+The shebang: `#!/usr/bin/env -S uv run --quiet --script`
 
 ### Component Breakdown
 
-| Component           | Position                        | Purpose                                                       |
-| ------------------- | ------------------------------- | ------------------------------------------------------------- |
-| `#!/usr/bin/env -S` | Prefix                          | Shebang invoking env with -S flag for multiple arguments      |
-| `uv`                | Command                         | The uv binary on PATH                                         |
-| `--quiet`           | GLOBAL flag (before subcommand) | Suppresses progress output from uv                            |
-| `run`               | Subcommand                      | Executes Python scripts with automatic environment management |
-| `--active`          | run flag (after subcommand)     | Prefer active virtual environment over isolated environment   |
-| `--script`          | run flag (after subcommand)     | Indicates file contains PEP 723 inline script metadata        |
+| Component           | Position    | Purpose                                                        |
+| -------------------- | ----------- | ---------------------------------------------------------------|
+| `#!/usr/bin/env -S`  | Prefix      | Shebang invoking env with -S flag for multiple arguments       |
+| `uv`                 | Command     | The uv binary on PATH                                          |
+| `run`                | Subcommand  | Executes Python scripts with automatic environment management  |
+| `--quiet`            | Global flag | Suppresses progress output from uv                             |
+| `--script`           | run flag    | Indicates file contains PEP 723 inline script metadata         |
 
-### Command Syntax Pattern
+### Flag Ordering
 
-```text
-uv [GLOBAL_FLAGS] SUBCOMMAND [SUBCOMMAND_FLAGS] [ARGS]
-```
-
-### Flag Ordering Rule
-
-Global flags modify the uv binary behavior and MUST appear before the subcommand.
-Subcommand flags modify that specific subcommand's behavior and MUST appear after the subcommand.
-
-**Valid**: `uv --quiet run --active --script`
-**Invalid**: `uv run --quiet --active --script` (--quiet is global flag)
+`--quiet`/`-q` is a global option — `uv --help` and `uv run --help` list it identically, and
+`uv run --quiet --script` / `uv --quiet run --script` are confirmed equivalent at runtime (both
+exit 0, identical output). Either ordering works; use `uv run --quiet --script` as the canonical
+form for consistency.
 
 ### Invalid Variations
 
-The model MUST reject these malformed shebangs:
-
-- `#!/usr/bin/env -S uv run --quiet --active --script` (--quiet in wrong position)
-- `#!/usr/bin/env -S uv --quiet run --script` (missing --active)
-- `#!/usr/bin/env -S uv run --active --script` (missing --quiet)
-- `#!/usr/bin/env -S uv --quiet --active run --script` (--active in wrong position)
+The model MUST reject any shebang carrying `--active` in any position — it breaks PEP 723
+isolation (see Rule 3 above) — and any PEP-723-metadata file missing `--script`.
 
 ---
 
@@ -164,7 +159,7 @@ For each file, output in this exact order:
 **Before** (invalid - no external dependencies):
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
@@ -232,7 +227,7 @@ from rich.panel import Panel
 **After** (corrected):
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
