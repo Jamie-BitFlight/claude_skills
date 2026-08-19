@@ -181,7 +181,13 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     longer-content-wins-per-id rule :func:`github_sync.merge_item` applies to
     local/remote reconciliation — rather than a bespoke first-seen-wins dedup
     that would silently drop a struck or longer-content copy sharing an id
-    with the other key's entry.
+    with the other key's entry. The canonical (non-``unknown__``) key's
+    entries are always passed as :func:`merge_entries`' first (tie-break-
+    winning) argument, regardless of which key ``sections`` happens to
+    iterate first — the dict's key order is an incidental artifact of the
+    caller (YAML load order, dict-literal order in a test), not a documented
+    local/remote distinction, so the exact-tie winner must not depend on it
+    (#3015 Copilot review finding).
 
     Recovery is routed through :func:`~.section_registry.resolve_section_name`
     — the same alias-aware resolver the write boundary
@@ -211,22 +217,40 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
         ``unknown__`` name is still uncanonical, are returned unchanged.
     """
     normalized: dict[str, Section | GroomedData] = {}
+    # Tracks, per target key, whether the Section entries currently stored in
+    # `normalized` include the canonical key's own entries — so a canonical
+    # key encountered *after* its legacy `unknown__` counterpart still wins
+    # merge_entries' tie-break, instead of losing simply because it folded
+    # into `normalized[target]` second.
+    canonical_owns: dict[str, bool] = {}
     for key, value in sections.items():
         target = key
-        if key.startswith("unknown__") and isinstance(value, Section):
+        is_canonical_key = not key.startswith("unknown__")
+        if not is_canonical_key and isinstance(value, Section):
             stripped = key.removeprefix("unknown__")
             canonical = resolve_section_name(stripped) or resolve_section_name(unknown_key_to_heading(key))
             if canonical is not None:
                 target = canonical
         existing = normalized.get(target)
         if isinstance(existing, Section) and isinstance(value, Section):
-            normalized[target] = Section(entries=merge_entries(existing.entries, value.entries))
+            existing_is_canonical = canonical_owns.get(target, False)
+            if is_canonical_key and not existing_is_canonical:
+                # `value` carries the canonical key's own entries but was
+                # reached second — swap argument order so it is still the
+                # tie-break-winning ("local") side of merge_entries.
+                merged_entries = merge_entries(value.entries, existing.entries)
+            else:
+                merged_entries = merge_entries(existing.entries, value.entries)
+            normalized[target] = Section(entries=merged_entries)
+            canonical_owns[target] = existing_is_canonical or is_canonical_key
         elif isinstance(value, GroomedData):
             normalized[target] = GroomedData(
                 date=value.date, subsections=normalize_groomed_subsections(value.subsections)
             )
         else:
             normalized[target] = value
+            if isinstance(value, Section):
+                canonical_owns[target] = is_canonical_key
     return normalized
 
 

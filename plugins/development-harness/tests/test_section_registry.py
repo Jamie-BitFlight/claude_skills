@@ -576,6 +576,38 @@ def test_normalize_unknown_sections_fold_prefers_longer_content_on_id_collision(
     assert folded_section.entries[0].content == "This is a much longer entry body."
 
 
+def test_normalize_unknown_sections_fold_prefers_canonical_entry_on_exact_tie() -> None:
+    """On an exact tie (same struck state, same content length), the canonical key wins regardless of dict order.
+
+    Tests: rendering.normalize_unknown_sections tie-break determinism
+           (post-#3015 Copilot review finding: merge_entries' documented
+           tie-break is "local wins" — its first positional argument. The
+           fold previously passed (existing.entries, value.entries) where
+           `existing` was whichever key the loop reached the ``target`` dict
+           slot for *first* in ``sections.items()`` order, not necessarily
+           the canonical (non-``unknown__``) key. Two sections dicts that
+           differ only in which key comes first then folded to different
+           winners for the exact same logical collision, so the canonical
+           entry could lose to its own legacy ``unknown__`` copy purely
+           because of dict insertion order.
+    """
+    canonical_entry = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Canonical copy.")])
+    legacy_entry = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Legacy variant.")])
+    assert len(canonical_entry.entries[0].content) == len(legacy_entry.entries[0].content), (
+        "fixture bug: contents must be equal length to exercise the tie branch"
+    )
+
+    canonical_first = rendering.normalize_unknown_sections({"story": canonical_entry, "unknown__story": legacy_entry})
+    legacy_first = rendering.normalize_unknown_sections({"unknown__story": legacy_entry, "story": canonical_entry})
+
+    canonical_first_section = canonical_first["story"]
+    legacy_first_section = legacy_first["story"]
+    assert isinstance(canonical_first_section, Section)
+    assert isinstance(legacy_first_section, Section)
+    assert canonical_first_section.entries[0].content == "Canonical copy."
+    assert legacy_first_section.entries[0].content == "Canonical copy."
+
+
 # ---------------------------------------------------------------------------
 # SubsectionKey registers the "content" storage shape written by the
 # no-section_name groomed-content path (post-#2987 Copilot pass finding: the
