@@ -580,6 +580,25 @@ class TestRepairPluginVersion:
 
         assert gate.repair_plugin_version(plugin_dir) is None
 
+    def test_returns_none_on_malformed_version_string(self, tmp_path: Path) -> None:
+        """A syntactically valid plugin.json with a non-semver version string returns None.
+
+        Tests: repair_plugin_version
+        Why: Greptile review on PR #3032 (check_plugin_version_bump.py:193-197) flagged
+             that the pre-fix type check only verified `version` was a `str`, not that
+             it was a well-formed `major.minor.patch` value. A drifted manifest with
+             `"version": "abc"` passed that check, and `bump_version` silently coerced
+             it to "0.1.0" -- reporting a successful repair while actually downgrading
+             the plugin instead of surfacing the invalid version as a failed repair.
+        """
+        plugin_dir = tmp_path / "plugins" / "malformed-version"
+        (plugin_dir / ".claude-plugin").mkdir(parents=True)
+        (plugin_dir / ".claude-plugin" / "plugin.json").write_text(
+            json.dumps({"name": "malformed-version", "version": "abc"}), encoding="utf-8"
+        )
+
+        assert gate.repair_plugin_version(plugin_dir) is None
+
 
 # ============================================================================
 # Area 5: Integration tests -- real git repos, no mocking

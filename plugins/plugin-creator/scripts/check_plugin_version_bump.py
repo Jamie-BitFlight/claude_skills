@@ -183,16 +183,20 @@ def repair_plugin_version(plugin_dir: Path) -> tuple[str, str] | None:
     Returns:
         ``(old_version, new_version)`` on success, or None when
         ``plugin.json`` is missing, unreadable, malformed, or lacks a
-        well-formed string ``version`` field.
+        well-formed ``major.minor.patch`` string ``version`` field.
     """
     plugin_json_path = plugin_dir / ".claude-plugin" / "plugin.json"
     try:
         data = json.loads(plugin_json_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if not isinstance(data, dict) or not isinstance(data.get("version"), str):
+    if not isinstance(data, dict):
         return None
-
+    # extract_version_from_json validates well-formed major.minor.patch, not just str-ness --
+    # reused here (instead of a bare isinstance check) so a malformed version like "abc" is
+    # rejected as unrepairable rather than silently coerced by bump_version to "0.1.0".
+    if extract_version_from_json(data, ["version"]) is None:
+        return None
     old_version = data["version"]
     new_version = bump_version(old_version, "patch")
     data["version"] = new_version
