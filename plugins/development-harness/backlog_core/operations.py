@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import operator
 import re
+import sys
 from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,7 +30,6 @@ from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, Issu
 from .entry_blocks import ENTRY_RE, _render_entry_raw, parse_entries
 from .models import (
     ITEM_TYPE_ALIASES,
-    SECTION_HEADING_ALIAS,
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
     VALID_NEW_ITEM_PRIORITIES,
@@ -73,7 +73,8 @@ from .parsing import (
     today,
     view_result_from_local_item,
 )
-from .rendering import SECTION_HEADING, heading_to_unknown_key
+from .rendering import heading_to_unknown_key
+from .section_registry import resolve_section_name
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
@@ -888,15 +889,24 @@ def _apply_groomed_entries(
         section.entries.append(Entry(id=now_iso(), content=groomed_content))
 
 
-def _normalize_section_key(name: str) -> str:
+def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
     """Return the canonical storage key for a section name.
 
-    Resolves display names (e.g. ``"RT-ICA"``) and aliases (e.g. ``"rt-ica"``) to
-    the snake_case key used in ``SECTION_HEADING`` (e.g. ``"rt_ica"``).  Unknown
-    and custom section names (e.g. ``"Custom Analysis"``) are routed
-    through :func:`heading_to_unknown_key` — the same normaliser
+    Resolves the name through :func:`~.section_registry.resolve_section_name`
+    — the single write-boundary + read-boundary registry lookup (canonical
+    ``SectionKey`` display names plus ``SECTION_NAME_ALIASES`` historic
+    spellings, e.g. ``"RT-ICA"`` or ``"rt-ica"`` -> ``"rt_ica"``). A name that
+    resolves through either path always returns the canonical key — never the
+    alias spelling and never an ``unknown__``-prefixed key, even when the
+    caller supplied the alias or a legacy ``unknown__`` form.
+
+    Names that resolve to neither the registry nor the alias map fall through
+    to :func:`heading_to_unknown_key` — the same normaliser
     ``github_sync.parse_issue_body`` applies to an unrecognised ``## Heading``
-    parsed back from a GitHub issue body.
+    parsed back from a GitHub issue body. That fallback is reported (see
+    :func:`_warn_unregistered_section`) so a genuinely new, permanently
+    unregistered section name is visible immediately instead of silently
+    accumulating — the direct root cause #2970 exists to close.
 
     Without this, a local write of e.g. ``"Files"`` stored the key verbatim
     while a GitHub round-trip of the same rendered heading produced
@@ -912,35 +922,58 @@ def _normalize_section_key(name: str) -> str:
     and producing a key that would not match a subsequent GitHub round trip
     of the same (already-trimmed) heading text.
 
-    Lookup order:
-    1. ``SECTION_HEADING_ALIAS`` keyed by ``name.lower()`` — catches hyphened aliases.
-    2. Case-insensitive reverse scan of ``SECTION_HEADING`` for a matching display
-       value — catches display names stored verbatim (e.g. ``"RT-ICA"`` → ``"rt_ica"``),
-       matching case-insensitively for parity with the parse-side lookup
-       (``github_sync.py``'s ``_HEADING_TO_KEY.get(heading.lower())``) so a caller-supplied
-       ``"story"`` normalises the same as GitHub-parsed ``"Story"`` instead of falling
-       through to :func:`heading_to_unknown_key`.
-    3. Return *name* unchanged when it is already a normalised ``unknown__`` key
-       (idempotent re-normalisation of a key read back from storage).
-    4. Otherwise, normalise via :func:`heading_to_unknown_key`.
-
     Args:
         name: Section name as provided by the caller (e.g. ``"RT-ICA"`` or ``"Custom Analysis"``).
+        output: Optional ``Output`` aggregator. When provided, a fallback to
+            ``unknown__`` is also recorded as a warning visible to the caller
+            (MCP response / CLI output) in addition to the stderr diagnostic
+            :func:`_warn_unregistered_section` always emits.
 
     Returns:
         Canonical storage key, e.g. ``"rt_ica"`` for a canonical section or
         ``"unknown__custom_analysis"`` for a custom one.
     """
     name = name.strip()
-    alias_key = SECTION_HEADING_ALIAS.get(name.lower())
-    if alias_key is not None:
-        return alias_key
-    for snake_key, display in SECTION_HEADING.items():
-        if display.lower() == name.lower():
-            return snake_key
+    canonical = resolve_section_name(name)
+    if canonical is not None:
+        return canonical
     if name.startswith("unknown__"):
-        return name
-    return heading_to_unknown_key(name)
+        # A caller writing back a previously-stored unknown__ key (e.g. a
+        # round-trip through view_item -> groom_item) must heal the exact
+        # duplication the write-boundary validation exists to prevent when
+        # the name has since become canonical — never just echo the stored
+        # unknown__ key back verbatim, which would preserve the duplication.
+        recovered = resolve_section_name(name.removeprefix("unknown__"))
+        return recovered if recovered is not None else name
+    key = heading_to_unknown_key(name)
+    _warn_unregistered_section(name, key, output)
+    return key
+
+
+def _warn_unregistered_section(name: str, key: str, output: Output | None) -> None:
+    """Report a section name that fell back to an ``unknown__`` storage key.
+
+    Emits a stderr diagnostic unconditionally — this is forensic/debug output,
+    not primary CLI/MCP output (see AGENTS.md "CLI and script output"), so it
+    surfaces in a session's raw stderr stream even when no caller reads
+    ``output.warnings``. When *output* is provided, the same fact is also
+    recorded as a structured warning so an MCP caller sees it in the tool
+    response without needing stderr access.
+
+    Args:
+        name: The caller-supplied section name that did not resolve.
+        key: The ``unknown__``-prefixed storage key it was normalised to.
+        output: Optional ``Output`` aggregator to also receive the warning.
+    """
+    message = (
+        f"Unregistered section name {name!r} stored under fallback key {key!r}. "
+        "Register it in backlog_core/section_registry.py (SectionKey + SECTION_HEADING) "
+        "if this is a legitimate recurring section — see ARCHITECTURE.md 'Module: "
+        "section_registry.py' for the template."
+    )
+    print(message, file=sys.stderr)
+    if output is not None:
+        output.warn(message)
 
 
 def _write_groomed_to_item(
@@ -948,6 +981,7 @@ def _write_groomed_to_item(
     groomed_content: str,
     section_name: str | None = None,
     *,
+    output: Output | None = None,
     entry_id: str | None = None,
     replace_section: bool = False,
     reason: str | None = None,
@@ -964,6 +998,9 @@ def _write_groomed_to_item(
         groomed_content: The text to write into the section.
         section_name: Named section to update.  When ``None`` the top-level
             ``groomed`` section (stored as ``GroomedData``) is updated.
+        output: Optional ``Output`` aggregator, forwarded to
+            :func:`_normalize_section_key` so an unregistered-name fallback
+            is visible in the caller's response, not only on stderr.
         entry_id: Optional ID used to locate an existing entry for update.
         replace_section: When ``True``, strike all existing entries and add
             the new content as a replacement.  Requires ``reason``.
@@ -983,7 +1020,7 @@ def _write_groomed_to_item(
         groomed_data.subsections["content"] = groomed_content.strip()
         item.sections["groomed"] = groomed_data
     else:
-        section_key = _normalize_section_key(section_name)
+        section_key = _normalize_section_key(section_name, output=output)
         existing_section = item.sections.get(section_key)
         section = existing_section if isinstance(existing_section, Section) else Section()
         _apply_groomed_entries(
@@ -1019,7 +1056,9 @@ def _write_groomed_to_reference(
         groomed_content: Content to merge into the item.
         section_name: Named section to update; when ``None`` the top-level
             ``groomed`` section is replaced.
-        output: Optional output collector (unused; kept for API compatibility).
+        output: Optional output collector, forwarded to
+            :func:`_write_groomed_to_item` so an unregistered section-name
+            fallback surfaces as a warning in the caller's response.
         entry_id: Optional ID used to locate an existing entry for update.
         replace_section: Strike existing entries and replace when ``True``.
         reason: Strike reason; required when ``replace_section`` is ``True``.
@@ -1031,6 +1070,7 @@ def _write_groomed_to_reference(
         reference,
         groomed_content,
         section_name,
+        output=output,
         entry_id=entry_id,
         replace_section=replace_section,
         reason=reason,
@@ -1142,7 +1182,7 @@ def _handle_batch_groomed(
     today_str = today()
     batch_item.metadata.groomed = today_str
     for section_name, content in sections.items():
-        section_key = _normalize_section_key(section_name)
+        section_key = _normalize_section_key(section_name, output=out)
         existing_section = batch_item.sections.get(section_key)
         section = existing_section if isinstance(existing_section, Section) else Section()
         _apply_groomed_entries(

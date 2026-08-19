@@ -466,16 +466,6 @@ PRIORITY_SECTIONS: dict[str, str] = {
     "Ideas": "## Ideas",
 }
 
-# Heading alias normalization: lowercased heading text (with hyphens, as produced by
-# legacy .md parser) -> canonical underscore section key (as used in BacklogItem.sections).
-# Consumed by parsing.py (section key normalization) and the GitHub sync adapter
-# (reverse-lookup table for known headings).
-SECTION_HEADING_ALIAS: dict[str, str] = {
-    "fact-check": "fact_check",
-    "rt-ica": "rt_ica",
-    "issue-classification": "issue_classification",
-}
-
 # ---------------------------------------------------------------------------
 # Utility functions
 # ---------------------------------------------------------------------------

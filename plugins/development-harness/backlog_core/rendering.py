@@ -14,19 +14,18 @@ Do not import from github_sync, operations, gh_client, or server.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 
-from .models import Section
-
-if TYPE_CHECKING:
-    from .models import GroomedData
+from .models import GroomedData, Section
+from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_section_name, resolve_subsection_name
 
 __all__ = [
     "GROOMED_SUBSECTION_ORDER",
     "SECTION_HEADING",
     "heading_to_unknown_key",
+    "normalize_groomed_subsections",
     "normalize_unknown_sections",
     "render_groomed_section",
+    "resolve_subsection_name",
     "section_display_title",
     "unknown_key_to_heading",
 ]
@@ -34,84 +33,26 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-# Section key (used in BacklogItem.sections) -> markdown heading text.
 #
-# The first three entries (fact_check, rt_ica, issue_classification) need an
-# explicit mapping because their correct display form cannot be derived by
-# the generic unknown-section fallback (title-casing "rt_ica" produces "Rt
-# Ica", not the acronym-cased "RT-ICA"; "fact_check" needs a hyphen, not a
-# space). Every entry below this point DOES already round-trip correctly
-# through the generic unknown__ fallback (#2956's write-path/parse-path fix
-# makes that true for ANY section name, registered or not) — registering
-# them here is a display-quality improvement only, not a correctness fix:
-# it gives grooming's most commonly observed sections a clean canonical
-# storage key (e.g. "files") instead of the "unknown__" prefix. Sourced from
-# a full grep of the real corrupted local cache for #2953/#2955 (the
-# ground-truth evidence for #2956) plus every literal `section=` value found
-# across plugins/development-harness/agents/*.md and skill references
-# (2026-08-18) — not a guessed or partial list.
-SECTION_HEADING: dict[str, str] = {
-    "fact_check": "Fact-Check",
-    "rt_ica": "RT-ICA",
-    "issue_classification": "Issue Classification",
-    "files": "Files",
-    "resources": "Resources",
-    "impact": "Impact",
-    "impact_radius": "Impact Radius",
-    "dependencies": "Dependencies",
-    "priority": "Priority",
-    "benefits": "Benefits",
-    "research": "Research",
-    "design_intent_alignment": "Design Intent Alignment",
-    "acceptance_criteria": "Acceptance Criteria",
-    "expected_behavior": "Expected Behavior",
-    "effort": "Effort",
-    "reproducibility": "Reproducibility",
-    "story": "Story",
-    "context": "Context",
-    "working_register": "Working Register",
-    "suggested_location": "Suggested Location",
-    "concerns": "Concerns",
-    "divergence_notes": "Divergence Notes",
-    "execution_results": "Execution Results",
-    "grooming_notes": "Grooming Notes",
-    "root_cause_analysis": "Root-Cause Analysis",
-    "scope": "Scope",
-    "desired_structure": "Desired Structure",
-    "output_evidence": "Output / Evidence",
-}
+# SECTION_HEADING is re-exported from section_registry — that module is the
+# single canonical source of truth (SectionKey StrEnum + SECTION_NAME_ALIASES).
+# See backlog_core/ARCHITECTURE.md "Module: section_registry.py" for the "how
+# to add a section" template.
 
 # Frozenset of the display values in SECTION_HEADING.
 # Used by section_display_title to recognise display-name keys stored verbatim
 # (e.g. "RT-ICA") that bypass the snake_case lookup but are already correct.
 _SECTION_HEADING_VALUES: frozenset[str] = frozenset(SECTION_HEADING.values())
 
-# Reverse lookup: lowercased display title -> canonical snake_case key.
-# Used by normalize_unknown_sections to fold an unknown__ key into its
-# now-canonical counterpart by comparing display titles rather than raw
-# storage-key text, so a key produced under an older, less-sanitized
-# heading_to_unknown_key() (e.g. "unknown__output_/_evidence") still folds
-# once its title ("Output / Evidence") matches a registered entry.
-_SECTION_HEADING_BY_LOWER_TITLE: dict[str, str] = {v.lower(): k for k, v in SECTION_HEADING.items()}
-
 # Matches any run of characters that are not lowercase ASCII letters or
 # digits, so heading_to_unknown_key() collapses ALL punctuation (spaces,
 # slashes, etc.) to a single separator instead of only spaces.
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 
-# Canonical render order for GroomedData subsections (heading text as stored)
-GROOMED_SUBSECTION_ORDER: list[str] = [
-    "Priority",
-    "Impact",
-    "Benefits",
-    "Expected Behavior",
-    "Desired Structure",
-    "Acceptance Criteria",
-    "Resources",
-    "Dependencies",
-    "Effort",
-]
+# Canonical render order for GroomedData subsections — re-exported from
+# section_registry.SUBSECTION_KEY_ORDER (derived from the SubsectionKey enum)
+# under its historic name so existing callers are unaffected.
+GROOMED_SUBSECTION_ORDER: list[str] = SUBSECTION_KEY_ORDER
 
 # ---------------------------------------------------------------------------
 # Heading <-> key helpers
@@ -189,12 +130,24 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     ``sections`` dict (e.g. a manually edited cache file), their entries are
     concatenated, deduplicating by entry ``id``.
 
-    The fold matches by display title (:func:`unknown_key_to_heading` output),
-    not by raw key-string equality — so a legacy ``unknown__`` key produced
-    before :func:`heading_to_unknown_key` sanitized punctuation (e.g.
-    ``"unknown__output_/_evidence"``, whose title is ``"Output / Evidence"``)
-    still folds into a later-registered canonical key even though its raw
-    text never matches the key sanitized writes now produce.
+    Recovery is routed through :func:`~.section_registry.resolve_section_name`
+    — the same alias-aware resolver the write boundary
+    (``operations._normalize_section_key``) and the GitHub-parse boundary
+    (``github_sync.parse_issue_body``) both use — rather than a bespoke
+    display-title-only comparison, so a legacy ``unknown__`` key whose
+    reconstructed heading matches a registered *alias* (e.g.
+    ``"unknown__facts_check"`` -> alias ``"facts check"`` -> canonical
+    ``fact_check``), not only an exact :data:`SECTION_HEADING` display title,
+    still folds.
+
+    Two forms of the stored key are tried, in order: the raw ``unknown__``-
+    stripped key itself (already ``snake_case`` for keys produced by the
+    current, punctuation-sanitizing :func:`heading_to_unknown_key`), then the
+    reconstructed display heading (:func:`unknown_key_to_heading` output) —
+    the fallback that still supports older, more heavily punctuation-bearing
+    keys (e.g. ``"unknown__output_/_evidence"``, whose raw stripped form
+    never matches a ``SectionKey`` value but whose reconstructed title
+    ``"Output / Evidence"`` does).
 
     Args:
         sections: Raw ``BacklogItem.sections`` mapping as loaded from storage.
@@ -208,7 +161,8 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     for key, value in sections.items():
         target = key
         if key.startswith("unknown__") and isinstance(value, Section):
-            canonical = _SECTION_HEADING_BY_LOWER_TITLE.get(unknown_key_to_heading(key).lower())
+            stripped = key.removeprefix("unknown__")
+            canonical = resolve_section_name(stripped) or resolve_section_name(unknown_key_to_heading(key))
             if canonical is not None:
                 target = canonical
         existing = normalized.get(target)
@@ -216,8 +170,49 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
             seen_ids = {e.id for e in existing.entries}
             merged_entries = [*existing.entries, *(e for e in value.entries if e.id not in seen_ids)]
             normalized[target] = Section(entries=merged_entries)
+        elif isinstance(value, GroomedData):
+            normalized[target] = GroomedData(
+                date=value.date, subsections=normalize_groomed_subsections(value.subsections)
+            )
         else:
             normalized[target] = value
+    return normalized
+
+
+def normalize_groomed_subsections(subsections: dict[str, str]) -> dict[str, str]:
+    """Fold aliased or miscased subsection keys into their canonical spelling.
+
+    Mirrors :func:`normalize_unknown_sections` one level deeper, applying the
+    same registry-plus-alias-plus-fold pattern to ``GroomedData.subsections``
+    via :func:`~.section_registry.resolve_subsection_name` instead of a
+    bespoke, one-off comparison.
+
+    When two keys fold onto the same canonical name (e.g. a legacy cache held
+    both ``"priority"`` and ``"Priority"``), the longer content wins — the
+    same per-key rule :func:`github_sync._merge_groomed` already uses to
+    merge local and remote ``GroomedData``, reused here rather than inventing
+    a second merge policy for what is the same kind of collision (single
+    string value per key, not an entry list). On an exact length tie, the
+    first-seen (canonical dict-iteration-order) value wins — matching
+    :func:`github_sync._merge_groomed`'s strict ``>`` comparison, where the
+    already-present ``local`` value is kept unless the incoming value is
+    *strictly* longer, not merely as long.
+
+    Args:
+        subsections: Raw ``GroomedData.subsections`` mapping as loaded from
+            storage.
+
+    Returns:
+        A new mapping with resolvable keys folded to their canonical
+        spelling. Keys that resolve_subsection_name does not recognise are
+        returned unchanged — an unregistered subsection name is legitimate
+        free text, not an error.
+    """
+    normalized: dict[str, str] = {}
+    for key, content in subsections.items():
+        target = resolve_subsection_name(key) or key
+        existing = normalized.get(target, "")
+        normalized[target] = content if len(content) > len(existing) else existing
     return normalized
 
 

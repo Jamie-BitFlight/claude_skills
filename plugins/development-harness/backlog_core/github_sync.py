@@ -70,20 +70,6 @@ heading_to_unknown_key = _rendering.heading_to_unknown_key
 unknown_key_to_heading = _rendering.unknown_key_to_heading
 
 
-# Canonical render order for GroomedData subsections (heading text as stored in the dict)
-_GROOMED_SUBSECTION_ORDER: list[str] = [
-    "Priority",
-    "Impact",
-    "Benefits",
-    "Expected Behavior",
-    "Desired Structure",
-    "Acceptance Criteria",
-    "Resources",
-    "Dependencies",
-    "Effort",
-]
-
-
 # ---------------------------------------------------------------------------
 # render_issue_body helpers
 # ---------------------------------------------------------------------------
@@ -231,9 +217,21 @@ def _parse_groomed_section(heading: str, content: str) -> GroomedData:
     date = date_match.group(1).strip() if date_match else ""
     subsections: dict[str, str] = {}
     for sub_match in _SUBSECTION_RE.finditer(content):
-        sub_key = sub_match.group(1).strip()
+        raw_sub_key = sub_match.group(1).strip()
+        # Resolve through the same canonical subsection registry the write path
+        # (operations._write_groomed_to_item) and the read-time fold
+        # (rendering.normalize_groomed_subsections) use, so a GitHub-authored
+        # "### priority" and a locally-written "Priority" collide on one key
+        # instead of round-tripping as two separate subsections.
+        sub_key = _rendering.resolve_subsection_name(raw_sub_key) or raw_sub_key
         sub_content = sub_match.group(2).strip()
-        subsections[sub_key] = sub_content
+        # When two ### headings in the same body collide onto one canonical
+        # key (e.g. "### Priority" and "### priority"), the LONGER content
+        # wins — the same rule _merge_groomed applies when merging local and
+        # remote GroomedData — not whichever heading happens to appear last
+        # in source order.
+        existing = subsections.get(sub_key, "")
+        subsections[sub_key] = sub_content if len(sub_content) > len(existing) else existing
     return GroomedData(date=date, subsections=subsections)
 
 

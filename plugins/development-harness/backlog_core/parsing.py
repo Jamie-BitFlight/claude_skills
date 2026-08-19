@@ -33,7 +33,6 @@ from .models import (
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
     ROLE_MAP,
-    SECTION_HEADING_ALIAS,
     SKIP_STATUS,
     AmbiguousSelectorError,
     BacklogItem,
@@ -44,6 +43,7 @@ from .models import (
     ViewItemResult,
     parse_issue_number,
 )
+from .section_registry import resolve_section_name, resolve_subsection_name
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -1068,12 +1068,21 @@ def _split_h3_subsections(content: str) -> dict[str, str]:
     Subsection content is extracted from the raw source lines so that entry
     block HTML is stored verbatim.
 
+    Subsection names are resolved through
+    :func:`~.section_registry.resolve_subsection_name` — the same registry
+    lookup :func:`github_sync._parse_groomed_section` applies to
+    GitHub-authored ``### `` headings — so a legacy ``.md`` heading like
+    ``### priority`` lands under the canonical ``"Priority"`` key instead of
+    round-tripping as its own uncanonicalized spelling. An unregistered name
+    is preserved verbatim (legitimate free text, not an error).
+
     Args:
         content: Block of text under a ``## `` section.
 
     Returns:
-        Dict mapping subsection name to raw content (verbatim).
-        Keys are the heading text after ``### ``, whitespace stripped.
+        Dict mapping canonical subsection name to raw content (verbatim).
+        Keys are the heading text after ``### ``, whitespace stripped, then
+        resolved through the subsection registry.
     """
     ast_headings = _ast_h3_headings(content)
     if not ast_headings:
@@ -1083,11 +1092,17 @@ def _split_h3_subsections(content: str) -> dict[str, str]:
     positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=3)
 
     subsections: dict[str, str] = {}
-    for i, (line_idx, sub_name) in enumerate(positioned):
+    for i, (line_idx, raw_sub_name) in enumerate(positioned):
         content_start = line_idx + 1
         content_end = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
         sub_content = "\n".join(raw_lines[content_start:content_end]).strip()
-        subsections[sub_name] = sub_content
+        sub_name = resolve_subsection_name(raw_sub_name) or raw_sub_name
+        # When two headings collide onto one canonical key (e.g. "Priority"
+        # and "priority" in the same body), the longer content wins — the
+        # same rule github_sync._parse_groomed_section and _merge_groomed
+        # apply, not whichever heading happens to appear last.
+        existing = subsections.get(sub_name, "")
+        subsections[sub_name] = sub_content if len(sub_content) > len(existing) else existing
 
     return subsections
 
@@ -1236,9 +1251,16 @@ def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> di
                 result[key] = parsed
         else:
             raw_key = heading_name.lower()
-            # Normalize legacy hyphenated keys (e.g. "fact-check") to canonical
-            # underscore form (e.g. "fact_check") so they are visible to render_issue_body.
-            key = SECTION_HEADING_ALIAS.get(raw_key, raw_key)
+            # Route through the canonical registry resolver — the same
+            # write-boundary lookup operations._normalize_section_key uses —
+            # so a display heading like "Impact Radius" resolves to its
+            # registered snake_case key ("impact_radius"), not the raw
+            # lowercased heading text. A name the registry does not recognise
+            # (e.g. "Description", "Context") falls through to the raw
+            # lowercased key unchanged — this legacy .md path has never
+            # unknown__-prefixed unrecognised names, and changing that is out
+            # of scope for this canonicalization fix.
+            key = resolve_section_name(heading_name) or raw_key
             parsed_section = _parse_section_entries(content, added_date)
             existing_section = result.get(key)
             if isinstance(existing_section, Section):

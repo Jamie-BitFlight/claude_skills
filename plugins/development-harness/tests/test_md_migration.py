@@ -494,7 +494,13 @@ def test_roundtrip_section_entries_preserved(tmp_path: Path) -> None:
 
 
 def test_roundtrip_plain_section_preserved(tmp_path: Path) -> None:
-    """Plain-text section (no entry blocks) survives save/reload as .yaml."""
+    """Plain-text section (no entry blocks) survives save/reload as .yaml.
+
+    The "## Impact Radius" heading resolves to the canonical snake_case key
+    "impact_radius" (registered in SECTION_HEADING), not the raw lowercased
+    heading text "impact radius" — see backlog_core.parsing.parse_md_body_sections'
+    section_registry.resolve_section_name routing.
+    """
     md_path = Path("migration-item.md")
     item = load_item_text(_FULL_ITEM_MD, md_path)
 
@@ -503,7 +509,7 @@ def test_roundtrip_plain_section_preserved(tmp_path: Path) -> None:
 
     reloaded = load_item_text(yaml_path.read_text(encoding="utf-8"), yaml_path)
 
-    impact = reloaded.sections.get("impact radius")
+    impact = reloaded.sections.get("impact_radius")
     assert isinstance(impact, Section)
     assert "Some impact notes here." in impact.entries[0].content
 
