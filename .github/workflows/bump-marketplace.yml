@@ -19,8 +19,9 @@ jobs:
   bump:
     name: Repair plugin versions and sync marketplace.json
     runs-on: ubuntu-latest
-    # Skip commits from this action to avoid infinite loop
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    # Skip commits from this action to avoid infinite loop. workflow_dispatch runs have no
+    # head_commit, so short-circuit on event type before evaluating contains() against it.
+    if: "github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')"
     permissions:
       contents: write
     steps:
@@ -82,7 +83,7 @@ jobs:
             git fetch origin main
             if ! git rebase origin/main; then
               echo "Rebase conflict (attempt $attempt/3) -- aborting rebase and retrying from a fresh fetch"
-              git rebase --abort
+              git rebase --abort || true
               continue
             fi
           done
