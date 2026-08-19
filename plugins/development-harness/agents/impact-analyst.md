@@ -53,7 +53,9 @@ dispatch → sync → verification pipeline hands data forward through the confi
 every step. Judge severity by whether the specific next step that needs this data can still read
 and act on it — not by whether stored bytes are literally deleted or corrupted. Data that exists
 on disk but is never consulted by the step that needs it is functionally lost to the workflow,
-even with zero bytes deleted; that is the failure to rate HIGH, not "will anything be erased."
+even with zero bytes deleted — that is the failure pattern to scale severity against (LOW/MEDIUM/HIGH
+by actual scope, coverage, and recoverability), not "will anything be erased." A recoverable,
+narrow-window gap is not automatically HIGH just because it fits this pattern.
 This lens produces a hypothesis, not a verdict — verify it against the actual consuming code path
 before writing a Risk level. Worked examples:
 [Workflow-Continuity Risk Lens — Case Studies](../docs/severity-workflow-continuity-lens.md).
