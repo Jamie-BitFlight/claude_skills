@@ -186,8 +186,10 @@ guess:
   value to its meaning via column *position* (nth value = nth header); JSON binds via an explicit
   *repeated key* at each value — a more direct, unambiguous token-level association for an LLM
   parsing the output, with no risk of misparsing when a cell value contains whitespace. Emit
-  compact JSON (`json.dumps(data)` / `model_dump_json()`, no `indent=`) — see
-  `.claude/CLAUDE.md` "Code Quality Standards" for the JSON-output rule.
+  compact JSON (`json.dumps(data)` / `model_dump_json()`, no `indent=`) for this — output a script
+  or CLI emits for an agent to parse. This does **not** apply to static repo config files
+  (`package.json`, `.claude-plugin/*.json`, `marketplace.json`) — those are read by humans
+  browsing the repo and by non-AI tooling (npm, git), and stay pretty-printed.
 - **`logging` is for debug/trace/forensic output only** — never for primary output a calling agent
   needs to read or parse. Status messages, results, and errors meant to be consumed by the caller
   go through direct stdout/stderr emission (`typer.echo()`, `print()`, structured JSON), not a
@@ -205,18 +207,30 @@ guess:
   `references/typer-rich-non-tty-patterns.md` for the measure-and-render pattern that keeps it
   data-loss-safe; do not use Rich's TTY-oriented defaults unmodified.
 
+### Writing `.claude/rules/*.md` Files
+
+Rules are the current requirement only — never provenance, citations, or narrative. Put those in
+the commit message or PR description; put a durable architecture decision in `docs/` instead.
+
+Rules are read only when small. Tightening an existing rule means rewriting it from scratch as
+flat directives, not `Edit`-trimming words from its existing structure.
+
 ### Markdown (Skills/Commands/Agents)
 
-- Skills are **AI-facing documentation**, NOT user documentation
+- Skills are AI-facing documentation, NOT user documentation
 - Use imperative language ("The model MUST...")
+- No decorative `**bold**` — a model reads it as no stronger a signal than plain text. Use
+  imperative wording for emphasis, backtick code-spans for literal identifiers (tool names, config
+  keys)
 - Include XML tags for structured sections
-- Cite sources with URLs and access dates
+- Cite sources with URLs and access dates (not `.claude/rules/*.md` — see above)
 - File references use `./` relative prefix
+- Skill handoffs use plain prose (`plugin:skill-name`, `/plugin:skill-name`), not
+  `Skill(skill="...")` — that syntax is Claude-Code-only and this repo's plugin content also
+  targets Codex and OpenCode. Existing `Skill(...)` blocks are pre-convention, not bugs.
 
-Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — string
-substitution happens at load time, including inside fenced code blocks, and gets the
-`${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` / `$ARGUMENTS` mechanics wrong in ways that corrupt
-the rendered skill.
+Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — load-time
+substitution can silently corrupt the rendered skill if unaccounted for.
 
 ### JavaScript/TypeScript
 
