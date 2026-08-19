@@ -413,19 +413,70 @@ class TestAddItemCreatesLocalFile:
 
         assert result["item_ref"] == "#1632"
 
-    def test_add_item_item_ref_absent_when_no_github_issue(self, mocker: MockerFixture) -> None:
-        """Verify item_ref is absent from result when GitHub issue creation fails.
+    def test_add_item_item_ref_empty_when_no_github_issue(self, mocker: MockerFixture) -> None:
+        """Verify item_ref is present but empty when GitHub issue creation fails.
 
-        Tests: add_item item_ref absent on no-issue path.
+        Tests: add_item item_ref contract on the local-only-create path (#2999).
         How: Mock try_get_github to return None (no GitHub available).
-        Why: item_ref must not be present with a falsy value — absence is the
-             correct signal that no issue was created.
+        Why: item_ref must always be present — its emptiness, not its absence, is
+             the local-only signal. A dict with no distinguishing key at all is
+             indistinguishable from a successful create by any caller that does
+             not specifically probe for the key's presence (the original #2999 bug).
         """
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
         result = add_item(title="Local Only No Ref", description="desc", priority="P2")
 
-        assert "item_ref" not in result
+        assert result["item_ref"] == ""
+
+    def test_add_item_issue_created_signals_github_backed_vs_local_only(self, mocker: MockerFixture) -> None:
+        """Verify issue_created distinguishes a GitHub-backed create from a local-only one.
+
+        Tests: add_item's explicit success signal (#2999) — the field a caller checks
+            instead of inferring state from item_ref truthiness alone.
+        How: Run add_item once with GitHub issue creation succeeding and once with it
+             unavailable; compare issue_created on both results.
+        Why: Before this fix, a failed/skipped GitHub create returned a response with
+             no error field and no boolean signal — shape-identical to success except
+             for the presence of one optional key, so no caller not specifically
+             checking for item_ref could tell the two outcomes apart.
+        """
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=7)
+        created = add_item(title="GitHub Backed Item", description="desc", priority="P1")
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        local_only = add_item(title="Local Only Item Signal", description="desc", priority="P2")
+
+        assert created["issue_created"] is True
+        assert local_only["issue_created"] is False
+
+    def test_add_item_local_only_pending_state_visible_via_list_and_view(self, mocker: MockerFixture) -> None:
+        """Verify a local-only create's pending state is visible on later reads, not just at creation.
+
+        Tests: item 2 of #2999's fix — a caller reading the item later (grooming,
+            RT-ICA, dispatch) via list_items/view_item, not the add_item() return
+            value itself, must still be able to tell the item has no backend issue.
+        How: Create a local-only item (GitHub unavailable), then read it back through
+             both list_items and view_item; assert the empty "issue" field is present
+             on both, exactly mirroring add_item's own item_ref=="" signal.
+        Why: _build_list_entry and view_result_from_local_item already emit "issue"
+             unconditionally (BacklogItem.issue defaults to ""), so this test locks in
+             that the read paths already carry the signal add_item now also returns —
+             no separate mechanism was needed for requirement 2.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+        add_item(title="Pending Local Only Item", description="desc", priority="P2")
+
+        listed = list_items(from_github=False)
+        list_entries = cast("list[dict[str, str | bool]]", listed["items"])
+        entry = next(it for it in list_entries if it["title"] == "Pending Local Only Item")
+        assert entry["issue"] == ""
+
+        viewed = view_item("Pending Local Only Item")
+        assert viewed.issue == ""
 
 
 class TestAddItemValidatesPriorityAndType:
