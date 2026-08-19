@@ -164,7 +164,7 @@ When operating as a **teammate** (spawned via `TeamCreate`), send your completio
 
 # Persistent Agent Memory
 
-You have a persistent agent memory directory at `.claude/agent-memory/service-docs-maintainer/` within the project. Its contents persist across conversations.
+Your `memory: project` frontmatter field gives you a persistent agent memory directory under `.claude/agent-memory/` within the project — do not hardcode its exact name here; the platform derives it from your plugin-qualified identity. Its contents persist across conversations.
 
 As you work, consult your memory files to build on previous experience. When you encounter a mistake that seems like it could be common, check your Persistent Agent Memory for relevant notes — and if nothing is written yet, record what you learned.
 

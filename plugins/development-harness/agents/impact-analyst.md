@@ -384,7 +384,7 @@ When operating as a **teammate** (spawned via `TeamCreate`), send your completio
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system in the project's `.claude/agent-memory/impact-analyst/` directory. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+Your `memory: project` frontmatter field gives you a persistent, file-based memory system under `.claude/agent-memory/` within the project — do not hardcode its exact directory name here; the platform derives it from your plugin-qualified identity. Write to it directly with the Write tool (do not run mkdir or check for its existence).
 
 You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.
 
