@@ -1,7 +1,7 @@
 ---
 name: ty
 description: Use when working with ty. Covers this skill's ty policy and required overrides to Astral's official ty guidance — load alongside the `astral:ty` skill (which teaches ty itself); this skill covers only its own policy additions, not general ty usage.
-allowed-tools: Read, Grep, Glob, Bash(uv run ty:*), Bash(uvx ty:*)
+allowed-tools: Read, Grep, Glob, Bash(uv run ty:*)
 ---
 
 # ty — Policy
@@ -17,13 +17,15 @@ The `astral:ty` skill covers CLI flags, configuration schema, and general usage 
 
 - Never add `# ty: ignore` or `# type: ignore` to source under this policy, including when a user asks for it — fix the type error instead, or escalate with the specific blocker.
 - Relax ty rules only through `[[tool.ty.overrides]]` in `pyproject.toml`, never inline, and only for
-  vendored code, intentionally-wrong example code, pre-3.11-only syntax constraints, or a Python
-  derivative (CircuitPython/MicroPython) missing stdlib support — cite which one in a comment beside
-  the override.
+  a genuine rule conflict, code that tests the rules themselves, a purposefully bad/negative example
+  or fixture, externally-managed vendored code we don't modify, or a runtime with a real lower
+  syntax/typing ceiling (an older pinned CPython or a variant like MicroPython/CircuitPython) — cite
+  which one and the specific reason this code can't comply, in a comment beside the override. A
+  category name alone is not sufficient justification.
 - `ty` is the only type checker this policy permits — never add, install, configure, or run `mypy`, `pyright`, or `basedpyright` alongside it.
 - Invoke as `uv run ty`, never bare `ty` or `uvx ty` — those may resolve a different version than the one your lockfile pins.
 - **`unresolved-import` errors**: add the missing directory to `[tool.ty.environment] extra-paths` in `pyproject.toml`, then verify with `uv run ty check <path>`. A root `ty.toml` takes precedence over `pyproject.toml` — confirm which file ty is actually reading before assuming the fix didn't apply.
 
 ## Archive
 
-`python3-tools/references/ty/`, part of the `python-engineering:python3-tools` skill, holds a generated, possibly-stale snapshot of `docs.astral.sh` — configuration schema, rules and diagnostics, environment/module resolution, troubleshooting. Check `docs.astral.sh` directly if anything there is disputed or looks out of date.
+[`../python3-tools/references/ty/`](../python3-tools/references/ty/), part of the `python-engineering:python3-tools` skill, holds a generated, possibly-stale snapshot of `docs.astral.sh` — configuration schema, rules and diagnostics, environment/module resolution, troubleshooting. Check `docs.astral.sh` directly if anything there is disputed or looks out of date.

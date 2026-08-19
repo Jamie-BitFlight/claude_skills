@@ -7,7 +7,7 @@
 #
 # What this does NOT do: it does not regenerate the reference corpus itself
 # (cli_reference.md, configuration.md, etc.) — no automated tooling for that
-# exists in this repo today (see astral-delta.md Part 3 Q1). rwr:user-docs-to-ai-skill
+# exists in this repo today. rwr:user-docs-to-ai-skill
 # is deliberately NOT used here: its output contract is hardcoded to
 # plugins/<x>/skills/<y>/, it caps at 6 themes (the ty corpus has 9), and it
 # clones sources into .claude/worktrees/, colliding with Claude Code's own
@@ -40,6 +40,9 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-python
 
       - name: Run uv changelog sync

@@ -9,9 +9,11 @@ paths:
 
 Precedence when this repo and Astral's `uv`/`ty`/`ruff` guidance disagree: repo policy on *how we
 work here* wins first, live `docs.astral.sh` / the `astral:` plugin skills are authoritative on
-*tool facts* second, and this repo's archived corpus (`python3-tools/references/{uv,ty}/`) is
-lowest priority — re-check the live site when a claim is disputed, since the archive is refreshed
-only weekly. SOURCE: Astral plugin adoption migration (PR #3019), "Precedence" decision (2026-08-19).
+*tool facts* second, and this repo's archived corpus
+([`uv`](../../plugins/python-engineering/skills/python3-tools/references/uv/) /
+[`ty`](../../plugins/python-engineering/skills/python3-tools/references/ty/)) is lowest priority —
+re-check the live site when a claim is disputed, since the archive is refreshed only weekly.
+SOURCE: Astral plugin adoption migration (PR #3019), "Precedence" decision (2026-08-19).
 
 The eight rows below are every point where Astral's shipped skills (`astral/{uv,ty,ruff}/SKILL.md`,
 fetched 2026-08-19) and this repo's own rules disagree, verified against those primary sources

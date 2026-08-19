@@ -19,7 +19,7 @@ The `astral:uv` skill covers command syntax, migration tables, and general usage
 
 ## Archive
 
-`python3-tools/references/uv/`, part of the `python-engineering:python3-tools` skill, holds a generated, possibly-stale snapshot of `docs.astral.sh` — migration guide, CLI reference, troubleshooting. Check `docs.astral.sh` directly if anything there is disputed or looks out of date.
+[`../python3-tools/references/uv/`](../python3-tools/references/uv/), part of the `python-engineering:python3-tools` skill, holds a generated, possibly-stale snapshot of `docs.astral.sh` — migration guide, CLI reference, troubleshooting. Check `docs.astral.sh` directly if anything there is disputed or looks out of date.
 
 ## External Resources
 
