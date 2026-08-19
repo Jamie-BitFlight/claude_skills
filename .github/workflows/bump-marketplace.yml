@@ -37,55 +37,59 @@ jobs:
           cache-dependency-glob: "**/uv.lock"
           cache-python: true
 
-      - name: Repair drifted plugin versions
+      - name: Repair, sync, and push plugin version drift
         run: |
-          uv run -q --no-sync \
-            plugins/plugin-creator/scripts/check_plugin_version_bump.py \
-            --repair
-
-      - name: Sync marketplace version
-        run: |
-          uv run -q --no-sync \
-            plugins/plugin-creator/scripts/auto_sync_manifests.py \
-            --sync-marketplace
-
-      - name: Commit and push if changed
-        run: |
-          if git diff HEAD --quiet .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'; then
-            echo "No plugin or marketplace changes to commit"
-            exit 0
-          fi
-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'
-          git commit -m "chore: repair plugin version drift and sync marketplace [skip ci]"
 
-          # A concurrent writer may have advanced main since checkout -- retry
-          # on a non-fast-forward rejection by rebasing our repair commit onto
-          # the new tip before pushing again, so the authoritative repair
-          # never silently drops (issue #3027). Steps run under `bash -e`, so
-          # a rebase conflict (a second concurrent writer touching the same
-          # generated manifest) must be caught explicitly -- an unguarded
-          # `git rebase` failure would otherwise kill the step immediately,
-          # skipping the remaining attempts and the final ::error:: below.
-          # Only a non-fast-forward rejection is retried -- any other push
-          # failure (auth, branch protection, network) fails fast with the
-          # real error surfaced instead of masking it behind pointless retries.
+          # Repair + sync run fresh on every attempt, not just once before the
+          # push retry loop. The previous design computed the repair/sync
+          # commit ONCE, then retried only the push+rebase of that single,
+          # now-stale commit. If a concurrent writer advanced main and edited
+          # the same generated manifest, the rebase conflicted; `git rebase
+          # --abort` restored the same stale commit onto the same stale base;
+          # the very next attempt recomputed an identical rebase against the
+          # identical new tip and hit the identical conflict -- all 3
+          # attempts failed identically and the authoritative repair never
+          # reached main (issue #3027 follow-up). check_plugin_version_bump.py
+          # --repair and auto_sync_manifests.py --sync-marketplace are
+          # idempotent and deterministic given repo state (confirmed for
+          # --repair in this PR's T1 evidence), so on a rejected push this
+          # loop discards the stale commit outright (git reset --hard onto
+          # the newly-fetched tip) and regenerates it from current state --
+          # a fresh computation with nothing to reconcile, correct by
+          # construction, instead of a text-merge of two conflicting diffs.
           for attempt in 1 2 3; do
+            uv run -q --no-sync \
+              plugins/plugin-creator/scripts/check_plugin_version_bump.py \
+              --repair
+
+            uv run -q --no-sync \
+              plugins/plugin-creator/scripts/auto_sync_manifests.py \
+              --sync-marketplace
+
+            if git diff --quiet .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'; then
+              echo "No plugin or marketplace changes to commit"
+              exit 0
+            fi
+
+            git add .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'
+            git commit -m "chore: repair plugin version drift and sync marketplace [skip ci]"
+
             push_output=$(git push 2>&1) && exit 0
             echo "$push_output"
+            # Only a non-fast-forward rejection is retried -- any other push
+            # failure (auth, branch protection, network) fails fast with the
+            # real error surfaced instead of masking it behind pointless
+            # retries.
             if ! grep -qE "(non-fast-forward|fetch first|rejected)" <<<"$push_output"; then
               echo "::error::git push failed for a reason other than a non-fast-forward rejection -- see output above"
               exit 1
             fi
-            echo "Push rejected (attempt $attempt/3) -- fetching and rebasing"
+
+            echo "Push rejected (attempt $attempt/3) -- discarding the stale commit and regenerating from the new tip"
             git fetch origin main
-            if ! git rebase origin/main; then
-              echo "Rebase conflict (attempt $attempt/3) -- aborting rebase and retrying from a fresh fetch"
-              git rebase --abort || true
-              continue
-            fi
+            git reset --hard origin/main
           done
 
           echo "::error::Failed to push repair commit after 3 attempts"
