@@ -1,6 +1,6 @@
 ---
 name: python-cli-design-spec
-description: Produces architecture specifications for Python CLI applications — 11-section design-first specs covering Executive Summary, Architecture Overview, Technology Stack, Component Design, Data Architecture, Type System Design, Security Architecture, Testing Architecture, Distribution Architecture, ADRs, and Scalability Strategy. Activates on architecture planning requests for new CLI tools or major feature additions. Produces WHAT to build (interfaces, schemas, contracts); python-cli-architect handles the HOW (implementation).
+description: Produces architecture specifications for Python CLI applications — design-first specs covering Executive Summary, Architecture Overview, Technology Stack, Component Design, Data Architecture, Type System Design, Security Architecture, Testing Architecture, Distribution Architecture, ADRs, and Scalability Strategy. Activates on architecture planning requests for new CLI tools or major feature additions. Produces WHAT to build (interfaces, schemas, contracts); python-cli-architect handles the HOW (implementation).
 model: sonnet
 color: blue
 memory: project
@@ -89,8 +89,8 @@ Architecture specs routinely exceed 25K characters. Apply before writing:
 
 ## Stopping Condition
 
-Stop when the `architect-{slug}` plan (and any companion plans) exist and contain all 11 sections
-above. Report: `STATUS: DONE — architect-{slug} plan created via sam_create`.
+Stop when the `architect-{slug}` plan (and any companion plans) exist and contain all sections
+listed above. Report: `STATUS: DONE — architect-{slug} plan created via sam_create`.
 
 If requirements are ambiguous or contradictory, report: `STATUS: BLOCKED — {specific question}`.
 

@@ -212,7 +212,7 @@ uv run ./scripts/install_agents.py --scope user --force
 
 Comprehensive documentation of linting rules from three major tools:
 
-#### Ruff Rules (933 rules documented)
+#### Ruff Rules
 
 Location: [`./references/rules/ruff/index.md`](./references/rules/ruff/index.md)
 
@@ -260,7 +260,7 @@ Each error code documents:
 - Corrected code examples
 - Configuration options (mypy.ini, pyproject.toml)
 
-#### Bandit Security Checks (65+ checks documented)
+#### Bandit Security Checks
 
 Location: [`./references/rules/bandit/index.md`](./references/rules/bandit/index.md)
 
@@ -374,7 +374,7 @@ Sub-agent:
 
 When a linter run reveals issues in files the current agent did not modify, "pre-existing issues not related to my changes" is a trigger to act — not a reason to skip. Every detected problem gets recorded. No detected issue silently disappears.
 
-**Two outcomes based on whether the issue blocks the pipeline:**
+**Outcome depends on whether the issue blocks the pipeline:**
 
 - **Blocking** (linter exits nonzero, CI would fail, or current task verification cannot pass) → apply a pre-fix check before touching any file: (1) load the domain skill for the affected file, (2) state in one sentence how the fix aligns with that plugin's mission, (3) classify complexity. Trivial (one file, obvious root cause): fix now. Multi-file or design-decision: route to planning for an in-session fix, or mark the current run BLOCKED if the fix cannot be scoped to this session.
 - **Non-blocking** (advisory warning, file unrelated to current task) → discover the repo's tracking system and record it

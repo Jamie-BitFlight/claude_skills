@@ -1,6 +1,6 @@
 # AIR: flake8-airflow Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: Multiple rules **Purpose**: Airflow DAG configuration checks
+**Source**: Official Ruff Documentation **Purpose**: Airflow DAG configuration checks
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for Multiple rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

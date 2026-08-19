@@ -59,7 +59,7 @@ If the skill spans multiple types, apply the union of warranted categories.
 
 ### Step 3: Evaluate agentskills.io best practices (primary)
 
-Apply the 5 best-practice checks from [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md) — section "agentskills.io Best Practice Checks". Rate each PASS / PARTIAL / FAIL with evidence from SKILL.md.
+Apply the best-practice checks from [./references/skill-completeness-checklist.md](./references/skill-completeness-checklist.md) — section "agentskills.io Best Practice Checks". Rate each PASS / PARTIAL / FAIL with evidence from SKILL.md.
 
 | Check | Question |
 |-------|----------|
@@ -73,7 +73,7 @@ For each check: state the verdict, cite specific evidence (file:line where possi
 
 ### Step 4: Evaluate structural quality categories (secondary)
 
-Five categories are **universal** (always scored). Three are **conditional** (scored only when warranted by purpose; marked N/A otherwise).
+The categories below are **universal** (always scored) or **conditional** (scored only when warranted by purpose; marked N/A otherwise).
 
 **Universal categories:**
 
@@ -93,7 +93,7 @@ Five categories are **universal** (always scored). Three are **conditional** (sc
 | **References** | The skill requires domain-specific knowledge (API formats, schemas, conventions, standards) that an AI cannot reliably generate from training data |
 | **Assets** | The skill produces output that uses templates, fonts, images, or boilerplate that should be bundled for use (not read into context) |
 
-For each of the eight categories:
+For each category:
 
 1. **Warrant check (conditional categories only — Scripts, References, Assets):**
    - Ask: is this category warranted for this skill's purpose type (from Step 2)?

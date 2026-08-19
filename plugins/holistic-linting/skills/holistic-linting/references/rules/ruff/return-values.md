@@ -1,6 +1,6 @@
 # R: flake8-return Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 71 rules **Purpose**: Return statement pattern analysis
+**Source**: Official Ruff Documentation **Purpose**: Return statement pattern analysis
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 71 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

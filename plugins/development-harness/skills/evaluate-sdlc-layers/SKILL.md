@@ -31,7 +31,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 - [ ] Layer 0 docs → `TASK_FILE_FORMAT.md` — exists at `plugins/development-harness/docs/TASK_FILE_FORMAT.md`
 - [ ] Layer 1 → `language-manifest-schema.md`, `role-resolution-protocol.md` — exist in development-harness
 - [ ] Layer 2 → `plugins/development-harness/docs/sdlc-layers/layer-2/` — exists with README, schema, pilot profiles
-- [ ] Layer-0 redirect stubs — 4 files (`artifact-conventions.md`, `task-file-format.md`, `sam-pipeline.md`, `arl-touchpoints.md`) contain redirect pointers to canonical locations. Validate each redirect target exists.
+- [ ] Layer-0 redirect stubs — `artifact-conventions.md`, `task-file-format.md`, `sam-pipeline.md`, `arl-touchpoints.md` contain redirect pointers to canonical locations. Validate each redirect target exists.
 
 **Evidence:** List each path checked and result (exists / 404 / wrong content).
 

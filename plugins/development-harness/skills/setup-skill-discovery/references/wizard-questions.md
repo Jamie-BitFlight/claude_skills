@@ -3,10 +3,10 @@
 Questions presented in Step 5 of the `setup-skill-discovery` wizard. Each question surfaces
 a project convention that repo scanning (Step 1) cannot infer from file presence alone.
 
-**Total questions**: 12, across 6 categories.
-**Questions shown per run**: 4–7 (filtered by stack trigger).
-**Presentation order**: Categories 1–5 first, then Domain questions (Category 6) for detected
-signals only.
+**Questions**: see the `## Category` and `### Q` headings below for the full set.
+**Questions shown per run**: filtered by stack trigger — a subset, not the full set.
+**Presentation order**: numbered categories in order, with the Domain-Specific category (last)
+shown only for detected signals.
 
 > **Constraint**: Do NOT ask questions answerable by repo scanning. Step 1 already infers
 > primary language, frameworks, dependency lists, and tooling presence. These questions

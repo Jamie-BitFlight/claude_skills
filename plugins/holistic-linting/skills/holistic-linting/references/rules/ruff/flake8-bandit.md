@@ -1,6 +1,6 @@
 # S: flake8-bandit Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 107 rules **Purpose**: Security Issue Detection
+**Source**: Official Ruff Documentation **Purpose**: Security Issue Detection
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

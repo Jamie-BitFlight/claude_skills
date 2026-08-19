@@ -67,7 +67,7 @@ workflow operations and provider-specific capabilities; they must not proxy ordi
 ## Tests
 
 - `.claude/skills/backlog/tests/test_backlog_gh_first.py` — GitHub-first backlog tests
-- `plugins/development-harness/tests/test_comment_operations.py` — Comment list/read operations (19 tests)
+- `plugins/development-harness/tests/test_comment_operations.py` — Comment list/read operations
 
 ## Documentation and Schema
 

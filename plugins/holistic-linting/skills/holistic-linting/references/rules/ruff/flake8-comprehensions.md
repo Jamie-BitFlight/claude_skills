@@ -1,6 +1,6 @@
 # C: flake8-comprehensions Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 24 rules **Purpose**: Comprehension Pattern Optimization
+**Source**: Official Ruff Documentation **Purpose**: Comprehension Pattern Optimization
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

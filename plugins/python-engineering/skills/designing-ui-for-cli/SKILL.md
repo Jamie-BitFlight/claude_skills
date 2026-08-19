@@ -115,11 +115,11 @@ Load by library in scope. Detect via pyproject.toml dependencies and imports.
 
 ### Stage 5 — Audit
 
-- `./references/audit-checklist.md` — 5 dimensions (Inclusion & Accessibility, Performance & Responsiveness, Theming & Portability, Width & Adaptive Layout, Anti-Patterns & Slop); per-dimension 0–4 rubric; per-issue P0–P3 severity tagging; re-run loop
+- `./references/audit-checklist.md` — dimensions covering Inclusion & Accessibility, Performance & Responsiveness, Theming & Portability, Width & Adaptive Layout, and Anti-Patterns & Slop; per-dimension 0–4 rubric; per-issue P0–P3 severity tagging; re-run loop
 
 ### Stage 6 — Polish
 
-- `./references/polish-checklist.md` — 22 binary items adapted for TUI (column alignment at 80/100/120/≥160 cells, NO_COLOR honoured, terminal-emulator portability, Tab-order keyboard targets); pre-polish assessment; triage rule
+- `./references/polish-checklist.md` — binary items adapted for TUI (column alignment at 80/100/120/≥160 cells, NO_COLOR honoured, terminal-emulator portability, Tab-order keyboard targets); pre-polish assessment; triage rule
 
 ### Always loadable when implementing display logic
 

@@ -95,7 +95,7 @@ NEVER use the following exits when the permanent solve is reachable:
 ## The One Legitimate Exit — BLOCKED Declaration
 
 When the permanent solve is genuinely unreachable due to an external constraint, use this form.
-Copy [./assets/blocked-declaration-template.md](./assets/blocked-declaration-template.md) verbatim into your response and fill in the four fields.
+Copy [./assets/blocked-declaration-template.md](./assets/blocked-declaration-template.md) verbatim into your response and fill in every field.
 Full contract: [./references/blocked-declaration-contract.md](./references/blocked-declaration-contract.md)
 
 ```text

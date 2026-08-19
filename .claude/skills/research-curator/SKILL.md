@@ -161,7 +161,7 @@ Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Bat
    d. Update ./research/README.md -- add new entry to category table, or refresh the freshness date for an existing entry when step 2 routed to `--rerun`
    ```
 
-7. **Wait for all four tasks and surface results** -- collect structured return blocks from all three agents and confirm README updated:
+7. **Wait for all tasks above and surface results** -- collect structured return blocks from each agent and confirm README updated:
 
    - **Insight**: if the result contains `IMMEDIATE_ATTENTION:`, report each item with `#{issue} {title}` and the one-sentence reason. If no `IMMEDIATE_ATTENTION` section: report "N improvements added to backlog from {resource-name}."
    - **Utilization**: relay `PROPOSALS_WRITTEN` count and `FILE` path. If `STATUS: no_utilization_surface`, report "No direct utilization surface found."
@@ -197,7 +197,7 @@ Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all a
 1. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
 2. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
 3. If validator returns errors: mark entry as "created with issues", skip analysis agents for that entry, include in output report with exact error text
-4. If validator passes: spawn three concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently — 3 agents each)
+4. If validator passes: spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents)
 
 See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
@@ -253,10 +253,10 @@ flowchart TD
     FindAll --> WaveSpawn["Spawn @research-curator agents in waves of 5<br>each receives --rerun ./research/category/name.md<br>wait for each wave before spawning next"]
     WaveSpawn --> RelayCheck2["Apply pre-relay quality checklist<br>to all wave results"]
     RelayCheck2 --> UpdateDates["Update ./research/README.md<br>refresh freshness dates for all re-researched entries"]
-    UpdateDate --> SpawnAnalysis1["Concurrently spawn 3 agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
-    SpawnAnalysis1 --> WaitAnalysis1["Wait for all 3 agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
+    UpdateDate --> SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
+    SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
     WaitAnalysis1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
-    UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn 3 agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
+    UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
     WaitAnalysisN --> PostActions
 ```
@@ -310,7 +310,7 @@ flowchart TD
 
    d. If validator passes: include in analysis agent dispatch (step 7)
 
-7. For each entry that passed validation: spawn three concurrent analysis agents per entry (up to 5 entries concurrently) — `@research-insight-extractor`, `@research-utilization-assessor`, `@research-cross-referencer`
+7. For each entry that passed validation: spawn concurrent analysis agents per entry (up to 5 entries concurrently) — `@research-insight-extractor`, `@research-utilization-assessor`, `@research-cross-referencer`
 
 </rerun_mode>
 

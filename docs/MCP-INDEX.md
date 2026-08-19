@@ -6,7 +6,7 @@ Complete documentation for adding Model Context Protocol (MCP) servers to claude
 
 ## Overview
 
-**Current State:** 1 of 27 plugins has MCP tooling
+**Current State:** Only agentskill-kaizen has MCP tooling (see `plugins/` for the full plugin roster)
 **Goal:** Universal MCP interface for all high-value plugins
 **Pattern:** FastMCP with Python 3.11+ (PEP 723 scripts)
 

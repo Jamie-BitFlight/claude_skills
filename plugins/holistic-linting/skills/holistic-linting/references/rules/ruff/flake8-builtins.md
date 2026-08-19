@@ -1,6 +1,6 @@
 # A: flake8-builtins Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 43 rules **Purpose**: Builtin name shadowing detection
+**Source**: Official Ruff Documentation **Purpose**: Builtin name shadowing detection
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 43 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

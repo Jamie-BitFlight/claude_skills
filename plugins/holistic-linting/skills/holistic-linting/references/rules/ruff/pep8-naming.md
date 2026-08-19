@@ -1,6 +1,6 @@
 # N: pep8-naming Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 20 rules **Purpose**: Naming Convention Checks
+**Source**: Official Ruff Documentation **Purpose**: Naming Convention Checks
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

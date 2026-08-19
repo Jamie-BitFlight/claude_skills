@@ -1,10 +1,10 @@
 # Commit Cadence and Agent Worktrees
 
 Commit often, in small file-scoped commits. Push in batches. Use worktrees for concurrent
-agent writes. These three rules solve two specific race conditions — not a general aversion to
+agent writes. These rules solve the specific race conditions below — not a general aversion to
 committing.
 
-## The two real race conditions
+## The real race conditions
 
 1. **Same-tree concurrent writes + prek's stash-on-commit.** `prek` stashes unstaged changes
    before running hooks and restores them after. If an agent is mid-edit in the same working

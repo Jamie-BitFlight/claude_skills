@@ -1,6 +1,6 @@
 # F: Pyflakes Rules
 
-**Source**: [Pyflakes](https://github.com/PyCQA/pyflakes/) **Total Rules**: 92 rules **Purpose**: Detects logical errors, undefined names, unused imports, and other code quality issues
+**Source**: [Pyflakes](https://github.com/PyCQA/pyflakes/) **Purpose**: Detects logical errors, undefined names, unused imports, and other code quality issues
 
 Pyflakes rules are the foundation of Python linting. These rules detect real bugs and incorrect code patterns that can lead to runtime errors. Unlike style rules (E/W), Pyflakes violations typically indicate genuine problems that should be fixed.
 

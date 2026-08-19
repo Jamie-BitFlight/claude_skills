@@ -1,6 +1,6 @@
 # E/W: pycodestyle Errors and Warnings
 
-**Source**: [pycodestyle](https://pycodestyle.pycqa.org/) **Total Rules**: 76 (69 E errors, 7 W warnings)
+**Source**: [pycodestyle](https://pycodestyle.pycqa.org/)
 
 This rule family enforces Python style conventions as defined by PEP 8. Rules are divided into two categories:
 

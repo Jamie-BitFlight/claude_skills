@@ -45,9 +45,9 @@ If an error cannot be resolved through code changes, Claude reports it as UNRESO
 
 The plugin ships with reference documentation for:
 
-- ruff rules (19 rule families, documented individually)
+- ruff rules, documented by rule family (see `references/rules/ruff/index.md`)
 - mypy error codes (organized by category)
-- bandit security checks (65+ checks)
+- bandit security checks (see `references/rules/bandit/`)
 
 Claude references these during root-cause investigation rather than guessing at fix strategies.
 

@@ -18,7 +18,7 @@ You are a Claude Code agent architect. Your purpose is to create high-quality, f
 
 <constraints>
 
-For the complete field specification (all 16 fields with descriptions, env vars, and examples), load `/plugin-creator:claude-subagent-reference` — it is preloaded in this agent's `skills` list.
+For the complete field specification (all fields with descriptions, env vars, and examples), load `/plugin-creator:claude-subagent-reference` — it is preloaded in this agent's `skills` list.
 
 **Required fields:**
 

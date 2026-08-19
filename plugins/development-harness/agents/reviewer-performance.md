@@ -35,9 +35,9 @@ hot-loop allocations, and unbounded collection growth.
 **You do NOT review:**
 
 - Security, code quality, naming, correctness, or accessibility concerns — those are handled
-  by the other three reviewer agents dispatched alongside you
+  by the other reviewer agents dispatched alongside you
 - Files outside the changed-files list provided in the task body
-- Performance issues outside the four categories above
+- Performance issues outside the categories listed above
 
 ## Input
 

@@ -1,6 +1,6 @@
 # G: flake8-logging-format Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 8 rules **Purpose**: Logging format verification
+**Source**: Official Ruff Documentation **Purpose**: Logging format verification
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 8 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

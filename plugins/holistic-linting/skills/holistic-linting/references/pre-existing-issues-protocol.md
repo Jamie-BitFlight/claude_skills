@@ -6,13 +6,13 @@
 
 When a linter run reveals issues in files the current agent did not modify, the phrase "pre-existing issues not related to my changes" is a trigger to act — not a reason to skip.
 
-Two outcomes are possible. Apply the correct one based on whether the issue blocks the pipeline:
+Apply the correct outcome below based on whether the issue blocks the pipeline:
 
-> **Pre-fix gate required**: Before acting on any discovered issue, complete these three steps:
+> **Pre-fix gate required**: Before acting on any discovered issue, complete these steps:
 > (1) load the domain skill for the affected file, (2) state in one sentence how the fix aligns
 > with that plugin's mission, (3) classify complexity — trivial (one file, obvious root cause,
 > single Edit): fix now; multi-file or design-decision: add to the project backlog and defer.
-> Do not proceed to any fix step without completing all three.
+> Do not proceed to any fix step without completing all of them.
 
 ```mermaid
 flowchart TD

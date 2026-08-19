@@ -1,6 +1,6 @@
 # Y: flake8-2020 Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 10 rules **Purpose**: Python version compatibility checks
+**Source**: Official Ruff Documentation **Purpose**: Python version compatibility checks
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 10 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

@@ -48,7 +48,7 @@ flowchart TD
     Q1 -->|Choose agent types or backends| S[swarm-spawning]
     Q1 -->|Look up tool API or message format| O[swarm-operations]
     Q1 -->|Build a workflow from a recipe| R[swarm-patterns]
-    Q1 -->|Full reference on everything| All[Load all 4 skills]
+    Q1 -->|Full reference on everything| All[Load all of the above]
 ```
 
 ---

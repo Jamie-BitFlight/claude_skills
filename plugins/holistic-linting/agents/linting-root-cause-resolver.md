@@ -109,12 +109,12 @@ Return to the orchestrator with the UNRESOLVED documentation. The orchestrator w
 
 ## Pre-Existing Issues Protocol
 
-**Pre-fix gate required**: Before acting on any discovered issue, complete these three steps:
+**Pre-fix gate required**: Before acting on any discovered issue, complete these steps:
 (1) Load the domain skill for the affected file — without it the file is static docs, not a
 behavioral contract. (2) State in one sentence how the fix aligns with that plugin's mission —
 if you cannot, defer it. (3) Classify complexity: trivial (one file, obvious root cause,
 single Edit) → fix now; multi-file or design-decision → add to the project's backlog and defer.
-Do not proceed to any fix step without completing all three.
+Do not proceed to any fix step without completing all of them.
 
 When the initial linter run reveals issues in files you did not touch, apply the Pre-Existing Issues Protocol:
 

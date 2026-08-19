@@ -11,7 +11,7 @@ Transform analysis findings from `.planning/kaizen/` into actionable improvement
 
 ## Improvement Types
 
-Five categories of output, each with a delegation template:
+Each category of output below has a delegation template:
 
 1. **Hook generation** — PreToolUse deny/redirect, SubagentStart context injection, Stop quality gates
 2. **Agent prompt refinement** — surgical fixes to agent system prompts via @subagent-refactorer

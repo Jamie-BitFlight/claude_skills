@@ -435,13 +435,13 @@ Guard: skipped silently when task status is already `complete`.
 
 ## 7. Quality Gate SAM Dispatch Flow
 
-The `/complete-implementation` skill enforces quality gates via a SAM-based dispatch loop. Each of the 6 phases is a task in a dedicated plan returned by the configured backend. The phase dependency chain enforces ordered execution. No phase can start until the previous phase's task reaches terminal status.
+The `/complete-implementation` skill enforces quality gates via a SAM-based dispatch loop. Each phase defined by `build_quality_gate_plan` (`sam_schema/core/quality_gates.py`) is a task in a dedicated plan returned by the configured backend. The phase dependency chain enforces ordered execution. No phase can start until the previous phase's task reaches terminal status.
 
 ```mermaid
 flowchart TD
     Start(["/complete-implementation<br>invoked"]) --> PrePhase["Pre-phases<br>TN verification, artifact discovery,<br>concern processing"]
     PrePhase --> CheckQG{QG plan<br>exists?}
-    CheckQG -->|"No — first run"| GenYAML["build_quality_gate_plan<br>produces 6-task YAML"]
+    CheckQG -->|"No — first run"| GenYAML["build_quality_gate_plan<br>produces task YAML"]
     GenYAML --> CreatePlan["sam_plan(config={action:'create',slug:'qg-{slug}',<br>tasks:[...],owner_reference:...})<br>→ opaque qg_plan_address"]
     CheckQG -->|"Yes — resume"| ResetBlocked["Reset BLOCKED tasks<br>to NOT_STARTED via sam_task config={action:'state'}"]
     CreatePlan --> DispatchLoop

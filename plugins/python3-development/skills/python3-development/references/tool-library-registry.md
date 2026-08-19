@@ -14,7 +14,7 @@ python_versions: ['3.11', '3.12', '3.13', '3.14']
 
 Comprehensive catalog of development tools, testing frameworks, CLI libraries, data processing utilities, and MCP tools for modern Python 3.11+ development.
 
-**Coverage**: 50+ tools across 10 categories **Sources**: Pattern extraction analysis, taxonomy organization, 13 agent discovery reports **User Requirements**: datasette, arrow, fabric, shiv, httpx, prefect, boltons, blinker, paho-mqtt, robotframework, copier, pytest, prospector, pre-commit, mypy, bandit, ruff, uv, hatchling
+**Coverage**: tools and libraries spanning the categories in the matrix below **Sources**: Pattern extraction analysis, taxonomy organization, agent discovery reports **User Requirements**: datasette, arrow, fabric, shiv, httpx, prefect, boltons, blinker, paho-mqtt, robotframework, copier, pytest, prospector, pre-commit, mypy, bandit, ruff, uv, hatchling
 
 ---
 

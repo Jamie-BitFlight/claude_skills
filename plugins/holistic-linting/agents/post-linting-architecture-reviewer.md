@@ -77,7 +77,7 @@ If any UNRESOLVED items exist, flag them and include in the review output as a b
 
 Flag report: "UNRESOLVED ITEMS — N items require human decision before task-complete. Orchestrator must surface these to the user."
 
-**2d. Before/after count verification** — the resolution report must contain all three fields:
+**2d. Before/after count verification** — the resolution report must contain all of these fields:
 
 - `**Issues before resolution:**` with a specific number
 - `**Issues after resolution:** 0` (must be zero for all touched files)
