@@ -1,22 +1,20 @@
-# Weekly astral corpus changelog sync.
+# Weekly astral corpus sync: uv's changelog stub, and the uv/ruff/ty docs mirror.
 #
-# What this DOES: runs sync_uv_releases.py, which queries the GitHub Releases
-# API for astral-sh/uv and rewrites the "## Version Information" section of
-# plugins/python-engineering/skills/python3-tools/references/uv/README.md.
-# Opens a PR when that section changes; no-ops cleanly when it doesn't.
+# sync-uv-changelog: runs sync_uv_releases.py, which queries the GitHub
+# Releases API for astral-sh/uv and rewrites the "## Version Information"
+# section of references/uv/README.md. Opens a PR when that section changes.
 #
-# What this does NOT do: it does not regenerate the reference corpus itself
-# (cli_reference.md, configuration.md, etc.) — no automated tooling for that
-# exists in this repo today. rwr:user-docs-to-ai-skill
-# is deliberately NOT used here: its output contract is hardcoded to
-# plugins/<x>/skills/<y>/, it caps at 6 themes (the ty corpus has 9), and it
-# clones sources into .claude/worktrees/, colliding with Claude Code's own
-# worktree directory. rwr is reserved for a manual, reviewed, one-shot
-# regeneration — never this scheduled job.
+# sync-docs: runs sync_astral_docs.py, which downloads each tool's repo zip,
+# mirrors its docs/ subtree into references/<tool>/docs/, and regenerates
+# the "## Documentation Index" section of references/<tool>/README.md. Opens
+# a PR when the corpus changes. This is the actual reference content agents
+# read offline — distinct from the changelog stub above.
 #
-# ty has no automated changelog sync — sync_ty_releases.py was deleted as dead
-# code (its target section never existed in ty/SKILL.md). See
-# references/ty/README.md for the documented gap.
+# rwr:user-docs-to-ai-skill is deliberately NOT used for either job: its
+# output contract is hardcoded to plugins/<x>/skills/<y>/, it caps at 6
+# themes, and it clones sources into .claude/worktrees/, colliding with
+# Claude Code's own worktree directory. It's reserved for manual, reviewed,
+# one-shot work — never a scheduled job.
 
 name: Sync Astral Corpus
 
@@ -33,7 +31,7 @@ concurrency:
 permissions: {}
 
 jobs:
-  sync:
+  sync-uv-changelog:
     name: Sync uv changelog
     runs-on: ubuntu-latest
     permissions:
@@ -50,7 +48,7 @@ jobs:
           uv run -q --locked \
             plugins/python-engineering/skills/python3-tools/scripts/sync_uv_releases.py
 
-      - name: Open PR if the archive changed
+      - name: Open PR if the changelog changed
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -67,3 +65,45 @@ jobs:
           delete-branch: true
           add-paths: |
             plugins/python-engineering/skills/python3-tools/references/uv/README.md
+
+  sync-docs:
+    name: Sync uv/ruff/ty docs corpus
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+
+      - name: Run docs corpus sync
+        run: |
+          uv run -q --locked \
+            plugins/python-engineering/skills/python3-tools/scripts/sync_astral_docs.py \
+            uv ruff ty
+
+      - name: Open PR if the corpus changed
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(python3-tools): sync uv/ruff/ty docs corpus"
+          title: "chore(python3-tools): sync uv/ruff/ty docs corpus"
+          body: |
+            Automated weekly mirror of `astral-sh/{uv,ruff,ty}`'s `docs/` trees into
+            `plugins/python-engineering/skills/python3-tools/references/{uv,ruff,ty}/docs/`
+            by `sync_astral_docs.py`, run from `.github/workflows/sync-astral-corpus.yml`.
+            Also regenerates each archive's Documentation Index.
+
+            Review the diff before merging — grooming (admonitions, tabs) is
+            mechanical and can occasionally misrender an edge case.
+          branch: sync-astral-corpus/docs
+          delete-branch: true
+          add-paths: |
+            plugins/python-engineering/skills/python3-tools/references/uv/docs/**
+            plugins/python-engineering/skills/python3-tools/references/uv/README.md
+            plugins/python-engineering/skills/python3-tools/references/ruff/docs/**
+            plugins/python-engineering/skills/python3-tools/references/ruff/README.md
+            plugins/python-engineering/skills/python3-tools/references/ty/docs/**
+            plugins/python-engineering/skills/python3-tools/references/ty/README.md

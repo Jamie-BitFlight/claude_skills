@@ -35,7 +35,11 @@ sessions/.archived/
 .claude/kaizen/
 
 # GitLab skill sync lock files
-*/.sync-gitlab-docs.lock
+**/.sync-gitlab-docs.lock
+
+# Astral corpus sync lock files (uv changelog + docs mirror cooldowns)
+**/.sync-uv-releases.lock
+**/.sync-astral-docs-*.lock
 
 # Claude Code scheduled tasks lock
 .claude/scheduled_tasks.lock

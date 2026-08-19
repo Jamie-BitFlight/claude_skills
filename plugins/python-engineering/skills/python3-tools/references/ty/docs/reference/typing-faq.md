@@ -1,0 +1,459 @@
+# Typing FAQ
+
+This page answers some commonly asked questions about ty and Python's type system.
+
+## Why does ty report an error on my code?
+
+Check the [documentation](https://docs.astral.sh/ty/reference/rules/) for the specific error code
+you are seeing; it may explain the problem.
+
+## What is the `Unknown` type and when does it appear?
+
+`Unknown` is ty's way of representing a type that could not be fully inferred. It behaves the same
+way as `Any`, but appears implicitly, rather than through an explicit `Any` annotation:
+
+```py
+from missing_module import MissingClass  # error: unresolved-import
+
+reveal_type(MissingClass)  # Unknown
+```
+
+ty also uses unions with `Unknown` to avoid false positive errors in untyped code while still
+providing useful type information where possible.
+
+For example, consider the following untyped `Message` class (which could come from a third-party
+dependency that you have no control over). ty treats the `data` attribute as having type
+`Unknown | None`, since there is no type annotation that restricts it further. The `Unknown` in the
+union allows ty to avoid raising errors on the `msg.data = …` assignment. On the other hand, the
+`None` in the union reflects the fact that `data` *could* possibly be `None`, and requires code that
+uses `msg.data` to handle that case explicitly.
+
+```py
+class Message:
+    data = None
+
+    def __init__(self, title):
+        self.title = title
+
+
+def receive(msg: Message):
+    reveal_type(msg.data)  # Unknown | None
+
+
+msg = Message("Favorite color")
+msg.data = {"color": "blue"}
+```
+
+([Full example in the playground](https://play.ty.dev/862941a8-a3f6-4818-9ea1-d9d59b0bd2fa))
+
+## What is the `@Todo` type and when does it appear?
+
+`@Todo` is ty's way of representing a type that cannot yet be inferred precisely because of a known
+missing feature or incomplete implementation in ty. Like `Any` and `Unknown`, it is a dynamic type,
+so ty allows any operation on it.
+
+Unlike `Any`, `@Todo` does not come from an explicit annotation. Unlike `Unknown`, it does
+not represent missing type information in the code being checked; instead, it indicates a
+limitation in ty itself. It may appear in type hints, `reveal_type()` output, or diagnostics.
+
+`@Todo` is an internal type and cannot be used in annotations. We aim to eliminate all `@Todo` types
+as we implement the missing functionality.
+
+## What is the `Divergent` type and when does it appear?
+
+`Divergent` is ty's way of representing type-level recursion that does not converge. Type inference
+can be recursive; for example, the type of a variable at the end of a loop can depend on its type at
+the beginning. ty analyzes such cycles repeatedly, looking for a stable result. If each iteration
+produces a new type, ty replaces the non-convergent part with `Divergent`.
+
+For example, each iteration of this loop wraps `x` in another list:
+
+```py
+def some_condition() -> bool:
+    ...
+
+
+x = 1
+while some_condition():
+    x = [x]
+
+reveal_type(x)  # Literal[1] | list[Divergent]
+```
+
+After the first analysis of the loop, `x` can be `Literal[1]` or `list[Literal[1]]`. The next
+analysis adds `list[list[Literal[1]]]`, and every subsequent analysis adds another level of nesting.
+This does not converge to a finite type. The revealed type preserves the known base case and uses
+`Divergent` for the infinitely expanding part.
+
+Like `Any` and `Unknown`, `Divergent` is a gradual type, so ty allows any operation on the
+`Divergent` part of a type. Unlike `Unknown`, it does not represent missing type information. It is
+an internal type used by ty and cannot be used in annotations.
+
+## Why does ty show `float*` or `complex*`?
+
+The [Python typing specification](https://typing.python.org/en/latest/spec/special-types.html)
+includes a special rule for numeric types where an `int` can be used wherever a `float` is expected:
+
+```py
+def circle_area(radius: float) -> float:
+    return 3.14 * radius * radius
+
+circle_area(2)      # OK: int is allowed where float is expected
+```
+
+This rule is a special case, since `int` is not actually a subclass of `float`. A `float` annotation
+therefore accepts both integers and actual floating-point values, and ty displays this complete type
+as `float`. When ty knows that a value is an actual `float`, rather than an `int`, it displays the
+more precise type as `float*`:
+
+```py
+def takes_float(value: float) -> None:
+    reveal_type(value)  # float
+
+
+reveal_type(1.0)  # float*
+```
+
+A similar rule applies to `complex`: a `complex` annotation accepts `int`, `float`, and `complex`
+values, and ty displays it as `complex`. A value known to be an actual `complex`, rather than an
+`int` or a `float`, is displayed as `complex*`:
+
+```py
+def takes_complex(value: complex) -> None:
+    reveal_type(value)  # complex
+
+
+reveal_type(1j)  # complex*
+```
+
+The starred spellings only appear in ty's output; they cannot be used in Python annotations.
+
+> **Info:**
+>
+> These special rules for `float` and `complex` exist for a reason. In almost all cases, you
+> probably want to accept both `int` and `float` when you annotate something as `float`.
+> If you really need to accept *only* `float` and not `int`, you can use ty's `JustFloat`
+> type. At the time of writing, this import needs to be guarded by a `TYPE_CHECKING` block:
+>
+> ```py
+> from typing import TYPE_CHECKING
+>
+> if TYPE_CHECKING:
+>     from ty_extensions import JustFloat
+> else:
+>     JustFloat = float
+>
+> def only_actual_floats_allowed(f: JustFloat) -> None: ...
+>
+> only_actual_floats_allowed(1.0)  # OK
+> only_actual_floats_allowed(1)    # error: invalid-argument-type
+> ```
+>
+> ([Full example in the playground](https://play.ty.dev/fb034780-3ba7-4c6a-9449-5b0f44128bab))
+>
+> If you need this for `complex`, you can use `ty_extensions.JustComplex` in a similar way.
+
+
+## Why can't I use `list[Subtype]` when a `list[Supertype]` is expected? { #invariant-generics }
+
+Let's say you have a class hierarchy with an `Entry` base class as well as `Directory` and `File` subclasses. Since
+a `Directory` *is* an `Entry`, you can use it everywhere an `Entry` is expected.
+You might therefore expect a `list[Directory]` to
+be usable in any context where a `list[Entry]` is expected, but this is not
+the case. The reason for this is mutability:
+
+```py
+# Setup of `Entry`, `Directory`, and `File` classes (1)
+
+def modify(entries: list[Entry]):
+    entries.append(File("README.txt")) # mutation
+
+directories: list[Directory] = [Directory("Downloads"), Directory("Documents")]
+modify(directories)  # ty emits an error on this call
+```
+
+1. The full example might look like this:
+
+    ```py
+    from dataclasses import dataclass
+
+    @dataclass
+    class Entry:
+         path: str
+         def size_bytes(self) -> int: ...
+
+    @dataclass
+    class Directory(Entry):
+        def children(self) -> list[Entry]: ...
+
+    @dataclass
+    class File(Entry):
+        def content(self) -> bytes: ...
+
+    def modify(entries: list[Entry]):
+        entries.append(File("README.txt")) # mutation
+
+    directories: list[Directory] = [Directory("Downloads"), Directory("Documents")]
+    modify(directories)  # ty emits an error on this call
+    ```
+
+    You can try it out in [this playground example](https://play.ty.dev/01013e73-da54-40c4-a9c5-2af269abda9d).
+
+The `modify` call mutates the contents of the `directories` list. After this call,
+it contains two directories *and one `File`*, which clearly violates the
+`list[Directory]` type annotation. If this call *were* allowed, subsequent code
+that relies on the fact that `directories` only contains `Directory` instances might
+break at runtime:
+
+```py
+for directory in directories:
+    directory.children()  # runtime: 'File' object has no attribute 'children'
+```
+
+> **Info:**
+>
+> In type system terminology, we say `list` is *invariant*, which means that
+> just because `A` is a subtype of `B` does not mean that `list[A]` will be a
+> subtype of `list[B]`. The same is true for other builtin collections such as
+> `set` or `dict`. In contrast, read-only collections like `tuple` or
+> `frozenset` are *covariant* in their type parameter. It is safe to assign a
+> `frozenset[bool]` to a `frozenset[int]` because the contents cannot be
+> mutated.
+
+
+You might run into problems with invariance in situations where mutability isn't
+required:
+
+```py
+def total_size_bytes(entries: list[Entry]) -> int:
+    return sum(entry.size_bytes() for entry in entries)
+
+# inferred as `list[Directory]`
+media_entries = [Directory("Pictures"), Directory("Videos")]
+
+# still a type-check error, but should be fine in principle (no mutation occurs)
+size = total_size_bytes(media_entries)
+```
+
+To prevent this, you can adapt the signature of `total_size_bytes` to take an
+argument of type
+[`Sequence[Entry]`](https://docs.python.org/3/library/collections.abc.html#collections-abstract-base-classes)
+instead. This type describes read-only sequences (that contain values of type
+`Entry`). `Sequence` is therefore covariant in its type parameter.
+
+If you cannot adapt the signature of the function you are calling, you can also
+widen the type of the argument by annotating `media_entries` as `list[Entry]`.
+In some cases it's also a reasonable solution to create a copy of the list
+(`total_size_bytes(list(media_entries))`).
+
+> **Note:**
+>
+> If you are looking for a covariant alternative to `dict[str, V]`, you can use [`Mapping[str, V]`](https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping).
+
+
+## Why does ty say `Callable` has no attribute `__name__`?
+
+When you access `__name__`, `__qualname__`, `__module__`, or `__doc__` on a value typed as `Callable`,
+ty reports an `unresolved-attribute` error. This is because not all callables have these attributes.
+Functions do (including lambdas), but other callable objects do not. The `FileUpload` class below, for
+example, is callable, but instances of `FileUpload` do not have a `__name__` attribute. Passing a
+`FileUpload` instance to `retry` would lead to an `AttributeError` at runtime.
+
+```py
+from typing import Callable
+
+def retry(times: int, operation: Callable[[], bool]) -> bool:
+    for i in range(times):
+        # WRONG: `operation` does not necessarily have a `__name__` attribute
+        print(f"Calling {operation.__name__}, attempt {i + 1} of {times}")
+        if operation():
+            return True
+    return False
+
+class FileUpload:
+    def __init__(self, name: str) -> None:
+        # …
+
+    def __call__(self) -> bool:
+        # …
+
+retry(3, FileUpload("image.png"))
+```
+
+To fix this, you could use `getattr` with a fall back to a default name when the
+attribute is not present (or use a `hasattr(…, "__name__")` check if you access
+it multiple times):
+
+```py
+name = getattr(operation, "__name__", "operation")
+```
+
+Alternatively, you could use an `isinstance(…, types.FunctionType)` check to narrow the type of
+`operation` to something that definitely has a `__name__` attribute:
+
+```py
+if isinstance(operation, FunctionType):
+    print(f"Calling {operation.__name__}, attempt {i + 1} of {times}")
+else:
+    print(f"Calling operation, attempt {i + 1} of {times}")
+```
+
+You can try various approaches in [this playground example](https://play.ty.dev/f6f7f35a-47c3-423d-be8d-33d03c61d40c).
+See also [this discussion](https://github.com/astral-sh/ty/issues/1495) for some plans to improve
+the developer experience around this in the future.
+
+> **Info:**
+>
+> ty has first-class support for intersection types. If you only want to accept function-like
+> callables, you could define `FunctionLikeCallable` as an intersection of `Callable` and
+> `types.FunctionType`:
+>
+> ```py
+> from typing import Callable, TYPE_CHECKING
+> from types import FunctionType
+>
+> if TYPE_CHECKING:
+>     from ty_extensions import Intersection
+>
+>     type FunctionLikeCallable[**P, R] = Intersection[Callable[P, R], FunctionType]
+> else:
+>     FunctionLikeCallable = Callable
+>
+>
+> def retry(times: int, operation: FunctionLikeCallable[[], bool]) -> bool:
+>     ...
+> ```
+>
+> You can check out the full example [here](https://play.ty.dev/7a1ea4ab-04e1-4271-adf5-ddc3a5d2fcfd),
+> which demonstrates that `FileUpload` instances are no longer accepted by `retry`.
+
+
+## What is `Top[list[Unknown]]`, and why does it appear?
+
+This type represents "all possible lists of any element type" (as opposed to `list[Unknown]`, which
+represents "a list of some unknown element type"). It usually arises from a check such as
+`if isinstance(x, list):` if you have the [`analysis.strict-generic-narrowing`](../reference/configuration.md#strict-generic-narrowing)
+option enabled. If `x` was previously of type `Item | list[Item]`, you might expect this
+check to narrow the type to `list[Item]`, but ty respects the possibility that there could be a
+common subclass of both `Item` and `list` (which may not be a list of `Item`!), and so the narrowed
+type is instead `(Item & Top[list[Unknown]]) | list[Item]`. This code can be made more robust by
+instead checking `if instance(x, Item)`, or by declaring the `Item` type as `@typing.final`.
+
+See also the [discussion
+here](https://docs.astral.sh/ty/features/type-system/#top-and-bottom-materializations) and [in this
+issue](https://github.com/astral-sh/ty/issues/1578).
+
+## Does ty have a strict mode?
+
+ty doesn't currently have a flag called `--strict`, but it is reasonably strict by default, and
+there are some easy ways to enable stricter type-checking on your code. See
+[Stricter checking with ty](../coming-from-mypy-or-pyright.md#stricter-checking-with-ty) for more
+details.
+
+## Why doesn't ty warn about missing type annotations?
+
+ty does not report an error for unannotated function parameters, return types, or variables. When
+ty encounters an unannotated symbol, it infers the type as [`Unknown`](#what-is-the-unknown-type-and-when-does-it-appear)
+while still providing useful diagnostics where possible.
+
+If you are looking for the equivalent of mypy's
+[`disallow_untyped_defs`](https://mypy.readthedocs.io/en/stable/config_file.html#confval-disallow_untyped_defs)
+(error code: `no-untyped-def`), Ruff provides this as a set of opt-in lint rules via its
+[`flake8-annotations` (`ANN`)](https://docs.astral.sh/ruff/rules/#flake8-annotations-ann) rule
+group.
+
+Some rules you might find useful include:
+
+- [`ANN001`](https://docs.astral.sh/ruff/rules/missing-type-function-argument/): Missing type
+    annotation for function argument
+- [`ANN002`](https://docs.astral.sh/ruff/rules/missing-type-args/): Missing type annotation for
+    `*args`
+- [`ANN003`](https://docs.astral.sh/ruff/rules/missing-type-kwargs/): Missing type annotation for
+    `**kwargs`
+- [`ANN201`](https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/):
+    Missing return type annotation for public function
+- [`ANN202`](https://docs.astral.sh/ruff/rules/missing-return-type-private-function/): Missing
+    return type annotation for private function
+- [`RUF045`](https://docs.astral.sh/ruff/rules/implicit-class-var-in-dataclass/): Implicit class
+    variable in dataclass
+
+## Why can't ty resolve my imports?
+
+Import resolution issues are often caused by a missing or incorrect environment configuration. When
+ty reports *"Cannot resolve imported module …"*, check the following:
+
+1. **Virtual environment**: Make sure your virtual environment is discoverable. ty looks for an
+    active virtual environment via `VIRTUAL_ENV` or a `.venv` directory in your project root. See the
+    [module discovery](../modules.md#python-environment) documentation for more details.
+
+1. **Project structure**: If your source code is not in the project root or `src/` directory,
+    configure [`environment.root`](./configuration.md#root) in your `pyproject.toml`:
+
+    ```toml
+    [tool.ty.environment]
+    root = ["./app"]
+    ```
+
+1. **Third-party packages**: Ensure dependencies are installed in your virtual environment. Run ty
+    with `-v` to see the search paths being used.
+
+1. **Compiled extensions**: ty requires `.py` or `.pyi` files for type information. If a package
+    contains only compiled extensions (`.so` or `.pyd` files), you'll need stub files (`.pyi`) for ty
+    to understand the types. See also [this issue](https://github.com/astral-sh/ty/issues/487) which
+    tracks improvements in this area.
+
+## Does ty support monorepos?
+
+ty can work with monorepos, but automatic discovery of nested projects is limited. By default, ty
+uses the current working directory or the `--project` option to determine the project root.
+
+For monorepos with multiple Python packages, you have a few options:
+
+1. **Run ty per-package**: Run `ty check` from each package directory, or use `--project` to specify
+    the package:
+
+    ```bash
+    ty check --project packages/package-a
+    ty check --project packages/package-b
+    ```
+
+1. **Configure multiple source roots**: Use [`environment.root`](./configuration.md#root) to specify
+    multiple source directories:
+
+    ```toml
+    [tool.ty.environment]
+    root = ["packages/package-a", "packages/package-b"]
+    ```
+
+    This has the disadvantage of treating all packages as a single project, which may lead to cases
+    in which ty thinks something is importable when it wouldn't be at runtime.
+
+You can follow [this issue](https://github.com/astral-sh/ty/issues/819) to get updates on this
+topic.
+
+## Does ty support PEP 723 inline-metadata scripts?
+
+It depends on what you want to do. If you have a single inline-metadata script, you can type check
+it with ty by using uv's `--with-requirements` flag to install the dependencies specified in the
+script header:
+
+```bash
+uvx --with-requirements script.py ty check script.py
+```
+
+If you have multiple scripts in your workspace, ty does not yet recognize that they have different
+dependencies based on their inline metadata.
+
+You can follow [this issue](https://github.com/astral-sh/ty/issues/691) for updates.
+
+## Is there a pre-commit hook for ty?
+
+Yes! You can find it over at <https://github.com/astral-sh/ty-pre-commit>.
+
+## Does ty support (mypy) plugins?
+
+No. ty does not have a plugin system and there is currently no plan to add one.
+
+We prefer extending the type system with well-specified features rather than relying on
+type-checker-specific plugins. That said, we are considering adding support for popular third-party
+libraries like pydantic, SQLAlchemy, attrs, or django directly into ty.

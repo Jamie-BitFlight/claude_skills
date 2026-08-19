@@ -29,4 +29,4 @@ stale).
 
 ## Archive
 
-[`../python3-tools/references/ty/`](../python3-tools/references/ty/) (part of `python-engineering:python3-tools`): configuration schema, rules and diagnostics, environment/module resolution, troubleshooting.
+[`../python3-tools/references/ty/README.md`](../python3-tools/references/ty/README.md) (part of `python-engineering:python3-tools`) — index into a full mirror of `astral-sh/ty`'s `docs/` tree: configuration, rules, features, reference.

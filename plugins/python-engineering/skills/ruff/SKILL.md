@@ -15,3 +15,7 @@ syntax and general usage (not duplicated here).
 - `--unsafe-fixes` is permitted only with `--diff` reviewed before applying.
 - Format every Python file you touch in full — do not adopt Astral's default advice to skip unformatted files; a project gating on `ruff format --check --all-files` will fail the build otherwise.
 - Invoke as `uv run ruff`, never bare `ruff` or `uvx ruff` — those may resolve a different version than the one your lockfile pins.
+
+## Archive
+
+[`../python3-tools/references/ruff/README.md`](../python3-tools/references/ruff/README.md) (part of `python-engineering:python3-tools`) — index into a full mirror of `astral-sh/ruff`'s `docs/` tree: configuration, linter, formatter, editor integrations.

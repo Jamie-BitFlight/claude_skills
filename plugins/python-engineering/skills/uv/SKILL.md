@@ -19,7 +19,7 @@ be stale).
 
 ## Archive
 
-[`../python3-tools/references/uv/`](../python3-tools/references/uv/) (part of `python-engineering:python3-tools`): migration guide, CLI reference, troubleshooting.
+[`../python3-tools/references/uv/README.md`](../python3-tools/references/uv/README.md) (part of `python-engineering:python3-tools`) — index into a full mirror of `astral-sh/uv`'s `docs/` tree: getting started, concepts, guides, the pip interface, reference.
 
 ## External Resources (if `astral:uv` isn't installed)
 

@@ -15,25 +15,38 @@ When anything in this archive is disputed or ambiguous, resolve in this order:
 3. This archive — a snapshot of (2). Lowest priority; check the live site
    before trusting a stale-looking claim.
 
+## Documentation Index
+
+- [Coming from mypy or pyright](./docs/coming-from-mypy-or-pyright.md)
+- [Configuration](./docs/configuration.md)
+- [Editor integration](./docs/editors.md)
+- [Excluding files](./docs/exclusions.md)
+- [ty](./docs/index.md)
+- [Installing ty](./docs/installation.md)
+- [Module discovery](./docs/modules.md)
+- [Python version](./docs/python-version.md)
+- [Rules](./docs/rules.md)
+- [Suppression](./docs/suppression.md)
+- [Type checking](./docs/type-checking.md)
+- **features/**
+  - [Diagnostics](./docs/features/diagnostics.md)
+  - [Language server](./docs/features/language-server.md)
+  - [Type system](./docs/features/type-system.md)
+- **reference/**
+  - [CLI Reference](./docs/reference/cli.md)
+  - [Configuration](./docs/reference/configuration.md)
+  - [Editor settings](./docs/reference/editor-settings.md)
+  - [Environment variables](./docs/reference/environment.md)
+  - [Exit codes](./docs/reference/exit-codes.md)
+  - [Rules](./docs/reference/rules.md)
+  - [Typing FAQ](./docs/reference/typing-faq.md)
+
 ## Refresh cadence
 
-`.github/workflows/sync-astral-corpus.yml` runs weekly but only covers uv —
-ty has no changelog sync job. If wanted later, parameterize
-`../../scripts/sync_uv_releases.py` with a `--repo` flag rather than adding a
-new script. Staleness is tracked only by the `generated_at` stamp below —
-check `docs.astral.sh/ty` directly for anything time-sensitive.
-
-The reference corpus itself has **no automated regeneration today** — each
-file below is a manual, reviewed pass against `docs.astral.sh/ty`:
-
-- `cli-reference.md`
-- `configuration-schema.md`
-- `environment-and-modules.md` — import resolution, unresolved imports, virtual environments, environment variables
-- `file-selection.md`
-- `installation.md`
-- `migration-guide.md`
-- `quick-reference.md`
-- `rules-and-diagnostics.md`
-- `troubleshooting.md`
+`docs/` and the index above are refreshed weekly by
+`.github/workflows/sync-astral-corpus.yml`, which runs
+`../../scripts/sync_astral_docs.py ty` (mirrors `astral-sh/ty`'s `docs/`
+tree) and opens a PR when it changes. ty has no changelog sync job — only uv
+does; see `references/uv/README.md`.
 
 generated_at: 2026-08-19

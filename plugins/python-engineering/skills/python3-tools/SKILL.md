@@ -32,5 +32,5 @@ Load when the task is focused entirely on one tool:
 
 - `references/tooling-defaults.md` — command defaults and quick reference
 - `references/compatibility-lanes.md` — version compatibility
-- `references/{uv,ty}/README.md` — cached snapshots of `docs.astral.sh` (generated, not authored); read each precedence chain before trusting a stale-looking claim
+- `references/{uv,ruff,ty}/README.md` — cached snapshots of `docs.astral.sh` (generated, not authored); read each precedence chain before trusting a stale-looking claim
 - `references/pre-commit/pre-commit-official-docs.md` — cached snapshot of pre-commit's official docs
