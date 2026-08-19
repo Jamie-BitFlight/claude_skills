@@ -7,7 +7,7 @@ allowed-tools: Read, Grep, Glob, Bash
 # ty — This Repo's Conventions
 
 **ty version:**
-!`ty --version 2>/dev/null || echo "ty not found in PATH — use 'uvx ty check' or 'uv run ty check'"`
+!`uv run ty --version 2>/dev/null || echo "ty not found — run 'uv sync' first"`
 
 Precedence: this repo's policy (below) > live `docs.astral.sh` / the `astral:ty` skill (tool facts) > the archived corpus linked below (may be stale).
 

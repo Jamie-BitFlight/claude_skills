@@ -9,7 +9,7 @@
 - `uv sync --frozen` for CI
 - `uv sync --locked` to detect stale lockfiles
 - `uv venv --clear` since 0.10.0 to overwrite existing environments
-- PEP 723 shebang: `#!/usr/bin/env -S uv --quiet run --active --script`
+- PEP 723 shebang: `#!/usr/bin/env -S uv run --quiet --script` — never `--active` (see `.claude/rules/script-invocation.md`)
 
 ## Type Checker
 
