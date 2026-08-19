@@ -75,7 +75,7 @@ Load `/python3-development:specialist-skill-routing` when the task involves uv, 
 
 - `uv` - Python package and project manager (required)
 - `ruff` - Linter and formatter
-- `ty` - Primary static type checker (Astral); default for new work — see `/python3-development:ty`
+- `ty` - Primary static type checker (Astral); default for new work — see `/astral:ty`
 - `mypy` - Static type checker; use when the project already configures it — do not force migration away from mypy
 - `pyright` / `basedpyright` - Use when the project already standardizes on them
 - `pytest` - Testing framework

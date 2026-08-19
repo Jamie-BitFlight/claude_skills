@@ -50,7 +50,7 @@ Modern package manager and project tool written in Rust. Replaces pip, pip-tools
 - Building CI/CD pipelines
 - Replacing Poetry or pip-tools workflows
 
-**See Also:** For comprehensive uv documentation, activate the uv skill: `Skill(skill: "python3-development:uv")`
+**See Also:** For comprehensive uv documentation, activate the uv skill: `Skill(skill: "astral:uv")`
 
 ---
 

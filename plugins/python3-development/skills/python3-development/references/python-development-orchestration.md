@@ -33,7 +33,7 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 - **/python3-development:modernpython** — Apply Python 3.11+ best practices and modern patterns (reference guide, not automated tool)
 - **/python3-development:shebangpython** — Validate and correct PEP 723 shebang compliance (edits files directly)
 
-- **/python3-development:uv** — Package management with uv (always use for Python dependency management)
+- **/astral:uv** — Package management with uv (always use for Python dependency management)
 
 ## Delegation Rule
 

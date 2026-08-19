@@ -92,7 +92,6 @@ pythonpath = [
     "./plugins/plugin-creator/skills/skill-creator/scripts",
     "./plugins/python3-development/scripts",
     "./plugins/python3-development/skills/mkdocs/scripts",
-    "./plugins/python3-development/skills/uv/scripts",
     "./plugins/summarizer/scripts",
     "./plugins/frustration-analyzer/tests",
     "./examples/solid-review-ab",
@@ -159,7 +158,6 @@ extra-paths = [
     "./plugins/plugin-creator/skills/skill-creator",
     "./plugins/plugin-creator/skills/skill-creator/scripts",
     "./plugins/python3-development/skills/mkdocs/scripts",
-    "./plugins/python3-development/skills/uv/scripts",
     "./plugins/summarizer/scripts",
     "./.claude/skills/daily-releases/scripts/daily_releases_lib",
     "./plugins/scientific-method/mcp/experiment-registry",
@@ -218,12 +216,7 @@ unresolved-import = "ignore"
 [tool.ty.rules]
 
 [tool.ty.src]
-# Exclude git symlinks (mode 120000) - on Windows without symlink support, these are
-# regular files whose content is the target path; linters parse that as Python and fail.
-# All 6 repo symlinks: 5 .md (accessing_online_resources), 1 dir (plugins/uv/skills/uv).
-# Only the dir needs exclusion for Python linting.
 exclude = [
-    "plugins/uv/skills/uv",
     ".tmp",
     # SOLID experiment corpus — intentional violations at known lines (category 3: negative/bad-code examples)
     "examples/solid-review-ab/corpus",
@@ -231,10 +224,7 @@ exclude = [
 include = ["**/*.py"]
 
 [tool.ruff]
-# Exclude git symlinks - Windows reads target path as file content; linters fail.
-# See [tool.ty.src] exclude for full list. Add new symlinked .py paths here.
 extend-exclude = [
-    "plugins/uv/skills/uv",
     ".tmp",
     # SOLID experiment corpus — intentional violations at known lines (category 3: negative/bad-code examples)
     "examples/solid-review-ab/corpus",

@@ -82,10 +82,6 @@
       "source": "./plugins/summarizer"
     },
     {
-      "name": "uv",
-      "source": "./plugins/uv"
-    },
-    {
       "name": "agentskill-kaizen",
       "source": "./plugins/agentskill-kaizen"
     },

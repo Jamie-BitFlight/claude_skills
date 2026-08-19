@@ -74,9 +74,7 @@ After loading, follow the trigger matrix inside that skill to load only the refe
 
 **Triggers**: `ty check`, `ty.toml`, `[tool.ty]` in pyproject.toml, suppressing ty diagnostics, ty rule names and severity levels, ty environment/module resolution, unresolved imports in ty, migrating from mypy or pyright to ty, integrating ty with editors or CI
 
-```text
-Skill(skill="python3-development:ty")
-```
+Activate the `astral:ty` skill (if installed).
 
 Covers: CLI flags, configuration schema, rule levels (`error`/`warn`/`ignore`), suppression comments (`ty: ignore`, `type: ignore`), virtual environment discovery, Python version targeting, installation, VS Code/Neovim/Zed/PyCharm integration, troubleshooting.
 
@@ -88,9 +86,7 @@ Does NOT cover: deep mypy or pyright configuration (follow the project’s `pypr
 
 **Triggers**: `uv add`, `uv run`, `uv build`, `uv publish`, `uv sync`, `uv lock`, `uvx`, PEP 723 inline script metadata, managing Python versions with uv, configuring package indexes or private registries, workspace configuration (`[tool.uv.workspace]`), migrating from pip/poetry/conda, CI/CD with `astral-sh/setup-uv`, Docker with uv, `uv venv`, dependency groups, `uv tool install`
 
-```text
-Skill(skill="python3-development:uv")
-```
+Activate the `astral:uv` skill (if installed).
 
 Key facts — do not guess these from training data:
 

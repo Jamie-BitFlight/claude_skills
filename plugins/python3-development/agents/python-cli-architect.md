@@ -4,7 +4,6 @@ description: Creates, enhances, and reviews Python CLI code using Typer and Rich
 color: pink
 model: sonnet
 skills:
-  - python3-development:uv
   - python3-development:python3-test-design
   - python3-development:python-cli-architect
   - python3-development:typer
