@@ -428,19 +428,42 @@ def test_parse_md_body_sections_canonicalizes_every_registered_display_heading(d
         )
 
 
-def test_parse_md_body_sections_unregistered_heading_falls_back_to_raw_lowercase() -> None:
-    """A genuinely unregistered '## ' heading keeps the legacy raw-lowercased fallback.
+def test_parse_md_body_sections_unregistered_heading_routes_through_unknown_prefix() -> None:
+    """A genuinely unregistered '## ' heading routes through heading_to_unknown_key (#2978).
 
-    Tests: parsing.parse_md_body_sections unregistered-name passthrough —
-           falsification check proving the fix does not unknown__-prefix
-           names this legacy path has never prefixed.
+    Tests: parsing.parse_md_body_sections unregistered-name fallback now matches
+           operations._normalize_section_key and github_sync.parse_issue_body,
+           which both fall through to heading_to_unknown_key for the same case.
+           Previously this legacy .md path used the raw lowercased heading text
+           instead, producing a different storage key than the other two parse
+           paths for the identical unregistered heading.
     """
     from backlog_core.parsing import parse_md_body_sections
 
-    result = parse_md_body_sections("## Zzyx Quantum Analysis 9000\n\nContent.\n")
+    heading = "Zzyx Quantum Analysis 9000"
+    result = parse_md_body_sections(f"## {heading}\n\nContent.\n")
 
-    assert "zzyx quantum analysis 9000" in result
-    assert not any(k.startswith("unknown__") for k in result)
+    assert rendering.heading_to_unknown_key(heading) in result
+    assert "zzyx quantum analysis 9000" not in result
+
+
+def test_parse_md_body_sections_unregistered_heading_matches_write_and_github_paths() -> None:
+    """The three section-key derivation paths agree for an unregistered heading (#2978).
+
+    Tests: parsing.parse_md_body_sections vs operations._normalize_section_key
+           vs github_sync.parse_issue_body — same unregistered heading must
+           produce the same storage key on all three paths.
+    """
+    from backlog_core.parsing import parse_md_body_sections
+
+    heading = "Custom Analysis"
+    md_key = next(iter(parse_md_body_sections(f"## {heading}\n\nContent.\n")))
+    write_key = ops._normalize_section_key(heading)
+    gh_item = github_sync.parse_issue_body(f"## {heading}\n\nContent.\n")
+    gh_keys = [k for k in gh_item.sections if k != "preamble"]
+
+    assert md_key == write_key
+    assert gh_keys == [write_key]
 
 
 @pytest.mark.parametrize("subsection_name", sorted(section_registry.SubsectionKey))
