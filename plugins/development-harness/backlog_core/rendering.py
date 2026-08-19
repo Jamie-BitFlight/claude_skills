@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 
 from .models import GroomedData, Section
-from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_subsection_name
+from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_section_name, resolve_subsection_name
 
 __all__ = [
     "GROOMED_SUBSECTION_ORDER",
@@ -43,14 +43,6 @@ __all__ = [
 # Used by section_display_title to recognise display-name keys stored verbatim
 # (e.g. "RT-ICA") that bypass the snake_case lookup but are already correct.
 _SECTION_HEADING_VALUES: frozenset[str] = frozenset(SECTION_HEADING.values())
-
-# Reverse lookup: lowercased display title -> canonical snake_case key.
-# Used by normalize_unknown_sections to fold an unknown__ key into its
-# now-canonical counterpart by comparing display titles rather than raw
-# storage-key text, so a key produced under an older, less-sanitized
-# heading_to_unknown_key() (e.g. "unknown__output_/_evidence") still folds
-# once its title ("Output / Evidence") matches a registered entry.
-_SECTION_HEADING_BY_LOWER_TITLE: dict[str, str] = {v.lower(): k for k, v in SECTION_HEADING.items()}
 
 # Matches any run of characters that are not lowercase ASCII letters or
 # digits, so heading_to_unknown_key() collapses ALL punctuation (spaces,
@@ -138,12 +130,24 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     ``sections`` dict (e.g. a manually edited cache file), their entries are
     concatenated, deduplicating by entry ``id``.
 
-    The fold matches by display title (:func:`unknown_key_to_heading` output),
-    not by raw key-string equality — so a legacy ``unknown__`` key produced
-    before :func:`heading_to_unknown_key` sanitized punctuation (e.g.
-    ``"unknown__output_/_evidence"``, whose title is ``"Output / Evidence"``)
-    still folds into a later-registered canonical key even though its raw
-    text never matches the key sanitized writes now produce.
+    Recovery is routed through :func:`~.section_registry.resolve_section_name`
+    — the same alias-aware resolver the write boundary
+    (``operations._normalize_section_key``) and the GitHub-parse boundary
+    (``github_sync.parse_issue_body``) both use — rather than a bespoke
+    display-title-only comparison, so a legacy ``unknown__`` key whose
+    reconstructed heading matches a registered *alias* (e.g.
+    ``"unknown__facts_check"`` -> alias ``"facts check"`` -> canonical
+    ``fact_check``), not only an exact :data:`SECTION_HEADING` display title,
+    still folds.
+
+    Two forms of the stored key are tried, in order: the raw ``unknown__``-
+    stripped key itself (already ``snake_case`` for keys produced by the
+    current, punctuation-sanitizing :func:`heading_to_unknown_key`), then the
+    reconstructed display heading (:func:`unknown_key_to_heading` output) —
+    the fallback that still supports older, more heavily punctuation-bearing
+    keys (e.g. ``"unknown__output_/_evidence"``, whose raw stripped form
+    never matches a ``SectionKey`` value but whose reconstructed title
+    ``"Output / Evidence"`` does).
 
     Args:
         sections: Raw ``BacklogItem.sections`` mapping as loaded from storage.
@@ -157,7 +161,8 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
     for key, value in sections.items():
         target = key
         if key.startswith("unknown__") and isinstance(value, Section):
-            canonical = _SECTION_HEADING_BY_LOWER_TITLE.get(unknown_key_to_heading(key).lower())
+            stripped = key.removeprefix("unknown__")
+            canonical = resolve_section_name(stripped) or resolve_section_name(unknown_key_to_heading(key))
             if canonical is not None:
                 target = canonical
         existing = normalized.get(target)
@@ -187,7 +192,11 @@ def normalize_groomed_subsections(subsections: dict[str, str]) -> dict[str, str]
     same per-key rule :func:`github_sync._merge_groomed` already uses to
     merge local and remote ``GroomedData``, reused here rather than inventing
     a second merge policy for what is the same kind of collision (single
-    string value per key, not an entry list).
+    string value per key, not an entry list). On an exact length tie, the
+    first-seen (canonical dict-iteration-order) value wins — matching
+    :func:`github_sync._merge_groomed`'s strict ``>`` comparison, where the
+    already-present ``local`` value is kept unless the incoming value is
+    *strictly* longer, not merely as long.
 
     Args:
         subsections: Raw ``GroomedData.subsections`` mapping as loaded from
@@ -203,7 +212,7 @@ def normalize_groomed_subsections(subsections: dict[str, str]) -> dict[str, str]
     for key, content in subsections.items():
         target = resolve_subsection_name(key) or key
         existing = normalized.get(target, "")
-        normalized[target] = content if len(content) >= len(existing) else existing
+        normalized[target] = content if len(content) > len(existing) else existing
     return normalized
 
 
