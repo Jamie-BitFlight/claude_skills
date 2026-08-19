@@ -113,3 +113,121 @@ def test_git_project_fixture_creates_repository() -> None:
         assert (workspace.project_dir / ".git").is_dir()
     finally:
         validator.cleanup_workspace(workspace)
+
+
+# ---------------------------------------------------------------------------
+# copy_auth_from_current_home
+# ---------------------------------------------------------------------------
+
+
+def test_copy_auth_from_current_home_copies_only_auth_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only auth.json is copied from a realistic Codex home; sibling files are left behind."""
+    fake_home = tmp_path / "fake-codex-home"
+    fake_home.mkdir()
+    (fake_home / "auth.json").write_text('{"token": "secret"}', encoding="utf-8")
+    (fake_home / "config.toml").write_text('model = "gpt"\n', encoding="utf-8")
+    history_dir = fake_home / "history"
+    history_dir.mkdir()
+    (history_dir / "session.jsonl").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(fake_home))
+
+    workspace = validator.create_temp_workspace("development-harness")
+    try:
+        copied = validator.copy_auth_from_current_home(workspace)
+
+        assert copied == workspace.codex_home / "auth.json"
+        assert copied.read_text(encoding="utf-8") == '{"token": "secret"}'
+        assert (copied.stat().st_mode & 0o777) == 0o600
+        assert [entry.name for entry in workspace.codex_home.iterdir()] == ["auth.json"]
+    finally:
+        validator.cleanup_workspace(workspace)
+
+
+def test_copy_auth_from_current_home_missing_auth_raises_harness_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A source Codex home without auth.json raises an actionable HarnessError."""
+    fake_home = tmp_path / "fake-codex-home-empty"
+    fake_home.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(fake_home))
+
+    workspace = validator.create_temp_workspace("development-harness")
+    try:
+        with pytest.raises(validator.HarnessError, match="does not exist"):
+            validator.copy_auth_from_current_home(workspace)
+    finally:
+        validator.cleanup_workspace(workspace)
+
+
+# ---------------------------------------------------------------------------
+# create_temp_workspace — symlink-escape guard
+# ---------------------------------------------------------------------------
+
+
+def test_create_temp_workspace_rejects_plugin_with_escaping_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A plugin tree containing a symlink pointing outside its own directory is rejected."""
+    plugins_root = tmp_path / "plugins"
+    plugin_dir = plugins_root / "escaping-plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(json.dumps({"name": "escaping-plugin"}), encoding="utf-8")
+    outside_target = tmp_path / "outside-target"
+    outside_target.mkdir()
+    (plugin_dir / "escape").symlink_to(outside_target)
+    monkeypatch.setattr(validator, "PLUGINS_ROOT", plugins_root)
+
+    with pytest.raises(validator.HarnessError, match="symlink outside its distribution"):
+        validator.create_temp_workspace("escaping-plugin")
+
+
+def test_create_temp_workspace_allows_symlink_within_plugin_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A symlink that stays inside its own plugin directory is not rejected.
+
+    ``shutil.copytree`` dereferences symlinks into regular files by default
+    (no ``symlinks=True``), so the copied tree has no symlink to inspect —
+    this test only asserts the guard itself does not raise for an in-tree
+    symlink, and that the pointed-to content survives the copy.
+    """
+    plugins_root = tmp_path / "plugins"
+    plugin_dir = plugins_root / "internal-symlink-plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps({"name": "internal-symlink-plugin"}), encoding="utf-8"
+    )
+    real_file = plugin_dir / "real.txt"
+    real_file.write_text("content", encoding="utf-8")
+    (plugin_dir / "alias.txt").symlink_to(real_file)
+    monkeypatch.setattr(validator, "PLUGINS_ROOT", plugins_root)
+
+    workspace = validator.create_temp_workspace("internal-symlink-plugin")
+    try:
+        assert (workspace.plugin_dir / "alias.txt").read_text(encoding="utf-8") == "content"
+    finally:
+        validator.cleanup_workspace(workspace)
+
+
+# ---------------------------------------------------------------------------
+# main() — malformed JSON handling
+# ---------------------------------------------------------------------------
+
+
+def test_main_reports_clean_error_for_malformed_plugin_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Malformed JSON in a plugin manifest surfaces a clean error, not a raw traceback."""
+    plugins_root = tmp_path / "plugins"
+    plugin_dir = plugins_root / "broken-plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text("{not valid json", encoding="utf-8")
+    monkeypatch.setattr(validator, "PLUGINS_ROOT", plugins_root)
+    monkeypatch.setattr(
+        sys, "argv", ["validate_codex_plugin_isolated.py", "--distribution-mode", "copy", "--plugin", "broken-plugin"]
+    )
+
+    exit_code = validator.main()
+
+    assert exit_code == 1
+    assert capsys.readouterr().err.startswith("error:")

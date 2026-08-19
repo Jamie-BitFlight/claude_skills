@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -263,6 +264,117 @@ class TestGitProjectRoot:
 
         # Assert — two distinct roots resolved
         assert result_a != result_b
+
+
+# ---------------------------------------------------------------------------
+# _git_common_root — resource cleanup and hang protection
+# ---------------------------------------------------------------------------
+
+
+class TestGitCommonRootResourceCleanup:
+    """Tests that the GitPython Repo object constructed internally is closed."""
+
+    def setup_method(self) -> None:
+        """Clear module-level root cache before each test."""
+        dh_paths._root_cache.clear()
+
+    def test_git_common_root_closes_repo_object(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """_git_common_root closes the GitPython Repo it constructs.
+
+        Tests: resource cleanup for the Repo object built inside _git_common_root
+        How: Spy on git.Repo.close; resolve a real repo; assert close was called once
+        Why: An unclosed Repo leaks file handles/locks across repeated resolutions
+        """
+        # Arrange
+        repo_path = tmp_path / "repo"
+        _init_repo(repo_path)
+        close_spy = mocker.spy(git.Repo, "close")
+
+        # Act
+        dh_paths._git_common_root(repo_path)
+
+        # Assert
+        assert close_spy.call_count == 1
+
+
+class TestGitCommonRootHangProtection:
+    """Tests that a hung GitPython Repo() construction times out with an actionable error.
+
+    Strategy: monkeypatch git.Repo with a stub that sleeps past a shortened
+    timeout, proving the wrapper itself enforces the bound rather than relying
+    on the real (long) production timeout in a test.
+    """
+
+    def setup_method(self) -> None:
+        """Clear module-level root cache before each test."""
+        dh_paths._root_cache.clear()
+
+    @staticmethod
+    def _install_hanging_repo_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(dh_paths, "_GIT_RESOLUTION_TIMEOUT_SECONDS", 0.05)
+
+        def _hang(*args: object, **kwargs: object) -> git.Repo:
+            del args, kwargs
+            time.sleep(2)
+            raise AssertionError("hanging stub should never return")
+
+        monkeypatch.setattr(dh_paths.git, "Repo", _hang)
+
+    def test_git_common_root_raises_timeout_error_on_hang(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_git_common_root bounds a hung Repo() construction and raises an actionable error.
+
+        Tests: GitResolutionTimeoutError is raised (not an indefinite hang)
+        How: Stub git.Repo to sleep past a shortened timeout; call _git_common_root
+        Why: A bad NFS mount must fail fast with a diagnosable message, not hang forever
+        """
+        # Arrange
+        self._install_hanging_repo_stub(monkeypatch)
+
+        # Act / Assert — bounded by the shortened timeout, not the 2-second stub sleep
+        with pytest.raises(dh_paths.GitResolutionTimeoutError, match="unreachable network filesystem"):
+            dh_paths._git_common_root(tmp_path)
+
+    def test_git_root_if_directory_treats_hang_as_failed_candidate(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_git_root_if_directory treats a hang as a failed candidate, not a fatal error.
+
+        Tests: hang handling inside the per-hint candidate resolver
+        How: Stub git.Repo to hang; call _git_root_if_directory; expect None
+        Why: A hang on one candidate directory must not abort the whole hint chain
+        """
+        # Arrange
+        self._install_hanging_repo_stub(monkeypatch)
+
+        # Act
+        result = dh_paths._git_root_if_directory(tmp_path)
+
+        # Assert
+        assert result is None
+
+    def test_infer_project_root_raises_actionable_runtime_error_on_hang(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """infer_project_root turns a final-fallback git hang into the documented RuntimeError.
+
+        Tests: end-to-end hang handling through the public resolution entrypoint
+        How: Disable all env hints; stub git.Repo to hang; call infer_project_root
+        Why: Callers (MCP servers, CLI) need the same actionable message a timed-out
+             subprocess git call used to produce, not a silent indefinite hang
+        """
+        # Arrange
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+        self._install_hanging_repo_stub(monkeypatch)
+
+        # Act / Assert
+        with pytest.raises(RuntimeError, match="unreachable network filesystem"):
+            dh_paths.infer_project_root(tmp_path)
 
 
 # ---------------------------------------------------------------------------
