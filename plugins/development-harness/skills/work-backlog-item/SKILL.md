@@ -6,7 +6,7 @@ user-invocable: true
 shell: bash
 ---
 <gate_token>
-!`node "${CLAUDE_SKILL_DIR}/scripts/get-gate-token.mjs"`
+!`node "${CLAUDE_PLUGIN_ROOT}/skills/work-backlog-item/scripts/get-gate-token.mjs"`
 </gate_token>
 
 <provided_arguments>
