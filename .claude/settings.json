@@ -45,6 +45,17 @@
   "worktree": {
     "baseRef": "head"
   },
+  "extraKnownMarketplaces": {
+    "jamie-bitflight-skills": {
+      "source": {
+        "source": "directory",
+        "path": "."
+      }
+    }
+  },
+  "enabledPlugins": {
+    "astral@jamie-bitflight-skills": true
+  },
   "claudeMdExcludes": [
     "**/.claude/worktrees/**/.claude/CLAUDE.md",
     "**/.claude/worktrees/**/.claude/rules/**",
