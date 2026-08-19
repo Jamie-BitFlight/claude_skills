@@ -73,8 +73,8 @@ from .parsing import (
     today,
     view_result_from_local_item,
 )
-from .rendering import heading_to_unknown_key
-from .section_registry import resolve_section_name
+from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
+from .section_registry import SectionKey, resolve_section_name
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
@@ -943,7 +943,18 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
         # duplication the write-boundary validation exists to prevent when
         # the name has since become canonical — never just echo the stored
         # unknown__ key back verbatim, which would preserve the duplication.
-        recovered = resolve_section_name(name.removeprefix("unknown__"))
+        #
+        # Two forms of the stored key are tried, in order — mirroring
+        # rendering.normalize_unknown_sections' read-time fold exactly: the
+        # raw stripped key itself (already snake_case for keys produced by
+        # the current, punctuation-sanitizing heading_to_unknown_key), then
+        # the reconstructed display heading (unknown_key_to_heading output).
+        # The raw form alone misses a multi-word alias, e.g.
+        # "unknown__facts_check" strips to "facts_check", which matches
+        # neither a SectionKey value nor the "facts check" alias spelling —
+        # only its reconstructed heading "Facts Check" does.
+        stripped = name.removeprefix("unknown__")
+        recovered = resolve_section_name(stripped) or resolve_section_name(_reconstruct_unknown_heading(name))
         return recovered if recovered is not None else name
     key = heading_to_unknown_key(name)
     _warn_unregistered_section(name, key, output)
@@ -1132,7 +1143,13 @@ def _handle_update_groomed(
     out = output or Output()
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
-    if section_name == "Acceptance Criteria":
+    # Resolve through the same normalizer the write path below uses (not the
+    # narrower resolve_section_name alone) so a recoverable form — surrounding
+    # whitespace, or a legacy `unknown__acceptance_criteria` key — that
+    # `_write_groomed_to_reference` -> `_normalize_section_key` would route to
+    # `acceptance_criteria` also triggers this overlap warning, instead of
+    # silently skipping it (#3015 Greptile review finding).
+    if section_name is not None and _normalize_section_key(section_name) == SectionKey.ACCEPTANCE_CRITERIA.value:
         _check_ac_overlap(item, out)
 
     _write_groomed_to_reference(
@@ -1193,7 +1210,13 @@ def _handle_batch_groomed(
     get_config().backend.put_work_item(batch_item)
     out.info(f"Updated {item.reference} with {len(written)} groomed section(s)")
 
-    if "Acceptance Criteria" in sections:
+    # Check the actual normalized keys just written (`written`), not a
+    # re-resolution of the raw input names via resolve_section_name — the
+    # latter misses recoverable forms (whitespace, legacy `unknown__` keys)
+    # that `_normalize_section_key` above already routed to
+    # `acceptance_criteria`, which silently skipped this overlap warning
+    # (#3015 Greptile review finding).
+    if SectionKey.ACCEPTANCE_CRITERIA.value in written:
         _check_ac_overlap(item, out)
 
     _reconcile_groomed_item(batch_item, out)

@@ -288,6 +288,10 @@ primary output) and records the same fact on the caller's `Output.warnings` when
 so a new, permanently unregistered name is visible immediately instead of silently accumulating.
 `github_sync._parse_groomed_section` applies the identical `resolve_subsection_name` resolution to
 `### subsection` headings parsed from a GitHub issue body — the write boundary for subsections.
+`github_sync.parse_issue_body`'s top-level `## Section` heading lookup and the public
+`github_sync.heading_to_section_key` both resolve through `resolve_section_name` too, so a
+registered alias spelling (e.g. `"## Facts check"`) resolves to its canonical section on a GitHub
+round-trip, not only on the `### subsection` and legacy `.md` parse paths.
 
 **Read-time recovery**: `rendering.normalize_unknown_sections` (read boundary, called from
 `yaml_io.load_item`/`load_item_text`) folds a legacy `unknown__{key}` section into `{key}` once that
@@ -296,13 +300,17 @@ name becomes canonical, and now also calls `rendering.normalize_groomed_subsecti
 already-corrupted cache records on next load — no bulk migration script touches live GitHub issues.
 
 **Merge rule for a section that already has both `unknown__{key}` and `{key}` present** (possible
-once some items are re-groomed post-fix while others are not): `normalize_unknown_sections`
-concatenates the two `Section.entries` lists, deduplicating by entry `id`. This mirrors, rather than
-duplicates, `github_sync.merge_item`/`_merge_entries`'s per-id union approach — both sides hold
-genuinely distinct entries (each write generates a fresh timestamp `id`), not two competing versions
-of the same entry, so union is the correct rule and there is no "struck wins / longer content wins"
-conflict to resolve at this collision site. `normalize_groomed_subsections` uses the adjacent rule
-from `github_sync._merge_groomed` instead — "longer content wins" per key — because a subsection
+once some items are re-groomed post-fix while others are not, or after a manually edited cache
+file): `normalize_unknown_sections` merges the two `Section.entries` lists through
+`rendering.merge_entries` — the same struck-wins-then-longer-content-wins-per-id rule
+`github_sync.merge_item` applies when reconciling local and remote entries. `merge_entries` is
+defined once in `rendering.py` (a leaf shared by both callers, since `rendering.py` may not import
+`github_sync`) and re-exported as `github_sync._merge_entries` for backward compatibility with
+existing callers. Two entries sharing an id are not always distinct — a struck entry and a stale
+active copy, or two edits of the same logical entry, can collide across the `unknown__{key}`/`{key}`
+split — so a naive union/first-seen-wins dedup would silently drop whichever copy carries the
+struck state or the longer content. `normalize_groomed_subsections` uses the adjacent rule from
+`github_sync._merge_groomed` instead — "longer content wins" per key — because a subsection
 collision genuinely is two versions of one string value under two spellings, the same shape
 `_merge_groomed` already handles.
 
@@ -448,12 +456,14 @@ Operations layer never writes raw markdown body strings directly — they go thr
   and groomed section in canonical order
 - `parse_issue_body(body, existing)` — reconstructs `BacklogItem` from issue body text; extracts
   metadata comment for priority/type/status/added; maps `## Section` headings to typed section
-  models; non-body fields are carried over from `existing` when provided
+  models via `resolve_section_name` (so a registered alias spelling resolves to its canonical
+  section, not only an exact `SECTION_HEADING` display match); non-body fields are carried over
+  from `existing` when provided
 - `merge_item(local, remote)` — merges remote into local; local metadata is authoritative; sections
-  are merged per-entry (struck state wins over active; longer content wins on tie; unique entries
-  from either side are preserved)
+  are merged per-entry via `rendering.merge_entries` (struck state wins over active; longer content
+  wins on tie; unique entries from either side are preserved)
 - `SECTION_HEADING` — re-exported from `rendering` (originally `section_registry` — see "Module: section_registry.py"); dict mapping section storage keys to GitHub markdown heading text (e.g. `"fact_check"` → `"Fact-Check"`)
-- `heading_to_section_key(heading_text)` — maps a `## Heading` text to its section storage key; returns `None` for unknown headings
+- `heading_to_section_key(heading_text)` — maps a `## Heading` text to its section storage key via `resolve_section_name` (alias-aware); returns `None` for unknown headings
 - `heading_to_unknown_key(heading_text)` — converts an unknown heading to an `"unknown__"` prefixed storage key
 - `unknown_key_to_heading(key)` — reverses `heading_to_unknown_key`; strips prefix, title-cases result
 
@@ -466,8 +476,8 @@ dedicated branch in `render_issue_body`/`parse_issue_body`, not the generic `SEC
 **Dependency direction**: `models ← parsing ← entry_blocks ← github_sync` (must remain acyclic;
 do not import from `gh_client.py`, `operations.py`, or `server.py`)
 
-**Imports from other modules**: `from .entry_blocks import parse_entries`,
-`from .models import BacklogItem, Entry, GroomedData, Section`,
+**Imports from other modules**: `from . import rendering as _rendering`,
+`from .entry_blocks import parse_entries`, `from .models import BacklogItem, GroomedData, Section`,
 `from .parsing import extract_sections`
 
 ---
@@ -480,18 +490,19 @@ ensuring identical logical section rendering where the provider representation r
 
 **Dependency direction**: `section_registry ← models ← rendering` (must remain acyclic; do not import from `github_sync`, `operations`, `gh_client`, or `server`)
 
-**Public API** (`__all__`): `GROOMED_SUBSECTION_ORDER`, `SECTION_HEADING`, `heading_to_unknown_key`, `normalize_groomed_subsections`, `normalize_unknown_sections`, `render_groomed_section`, `resolve_subsection_name`, `section_display_title`, `unknown_key_to_heading`
+**Public API** (`__all__`): `GROOMED_SUBSECTION_ORDER`, `SECTION_HEADING`, `heading_to_unknown_key`, `merge_entries`, `normalize_groomed_subsections`, `normalize_unknown_sections`, `render_groomed_section`, `resolve_subsection_name`, `section_display_title`, `unknown_key_to_heading`
 
 - `SECTION_HEADING` — re-exported from `section_registry` (the canonical registry — see "Module: section_registry.py"); dict mapping known section storage keys to display heading text (e.g. `"fact_check"` → `"Fact-Check"`); shared constant used by all backends
 - `GROOMED_SUBSECTION_ORDER` — re-exported from `section_registry.SUBSECTION_KEY_ORDER`; canonical render order for `GroomedData` subsections (heading text as stored), kept under its historic name so existing callers are unaffected
+- `merge_entries(local_entries, remote_entries)` — merges two `Entry` lists per id (struck state wins over active; longer content wins on tie; unique entries from either side are preserved); shared by `github_sync.merge_item` (re-exported there as `_merge_entries` for backward compatibility) and `normalize_unknown_sections` below, so there is one merge policy for "two entry lists that may share an id", not one per caller
 - `render_groomed_section(groomed)` — renders a `GroomedData` as `## Groomed ({date})` with `### subsection` children in canonical order; extras appended alphabetically
 - `section_display_title(key, groomed_date)` — returns the human-readable title for a section storage key; handles known keys via `SECTION_HEADING`, `"unknown__"` prefix via `unknown_key_to_heading`, and the special `"groomed"` key with optional date
 - `unknown_key_to_heading(key)` / `heading_to_unknown_key(heading_text)` — the local-write / GitHub-parse boundary normaliser pair (see "Module: section_registry.py" for why both sides must call the same function)
-- `normalize_unknown_sections(sections)` — read-boundary fold: legacy `unknown__{key}` sections fold into `{key}` once registered; also folds each `GroomedData` value's subsections via `normalize_groomed_subsections`
+- `normalize_unknown_sections(sections)` — read-boundary fold: legacy `unknown__{key}` sections fold into `{key}` once registered via `merge_entries` (not a first-seen-wins dedup — a colliding id may carry a struck state or longer content that must win); also folds each `GroomedData` value's subsections via `normalize_groomed_subsections`
 - `normalize_groomed_subsections(subsections)` — the subsection-level counterpart of `normalize_unknown_sections`, via `section_registry.resolve_subsection_name`
 - `resolve_subsection_name(name)` — re-exported from `section_registry`; used directly by `github_sync._parse_groomed_section` (the subsection write boundary)
 
-**Imports from other modules**: `from .models import GroomedData, Section` (real imports — `Section`/`GroomedData` instances are constructed here, not only referenced in type annotations); `from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_subsection_name`
+**Imports from other modules**: `from .models import Entry, GroomedData, Section` (real imports — `Entry`/`Section`/`GroomedData` instances are constructed here, not only referenced in type annotations); `from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_section_name, resolve_subsection_name`
 
 ---
 

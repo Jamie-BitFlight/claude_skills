@@ -17,8 +17,8 @@ import re
 
 from . import rendering as _rendering
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
-from .entry_blocks import _render_entry_raw, parse_entries
-from .models import BacklogItem, Entry, GroomedData, Section, parse_issue_number
+from .entry_blocks import _deduplicate_timestamps, _render_entry_raw, parse_entries
+from .models import BacklogItem, GroomedData, Section, parse_issue_number
 from .parsing import extract_sections
 
 __all__ = [
@@ -43,15 +43,17 @@ _SUBSECTION_RE = re.compile(r"### ([^\n]+)\n([\s\S]*?)(?=\n### |\Z)")
 # Re-exported from rendering — canonical definition lives in rendering.SECTION_HEADING
 SECTION_HEADING = _rendering.SECTION_HEADING
 
-# Reverse lookup: heading text (lowercased) -> section key
-_HEADING_TO_KEY: dict[str, str] = {v.lower(): k for k, v in SECTION_HEADING.items()}
-
 # All known section keys plus "groomed" — used to identify unknown sections in render_issue_body
 _KNOWN_SECTION_KEYS: frozenset[str] = frozenset(SECTION_HEADING) | {"groomed"}
 
 
 def heading_to_section_key(heading_text: str) -> str | None:
     """Return the BacklogItem.sections key for a markdown heading text, or None if unknown.
+
+    Routes through the same alias-aware :func:`~.section_registry.resolve_section_name`
+    resolver the write boundary (``operations._normalize_section_key``) uses, so a
+    registered historic heading spelling (e.g. ``"Facts check"``) resolves to its
+    canonical key here too, instead of only exact :data:`SECTION_HEADING` display text.
 
     Args:
         heading_text: Heading text with ``##`` prefix stripped and whitespace trimmed.
@@ -60,7 +62,7 @@ def heading_to_section_key(heading_text: str) -> str | None:
         Normalised section key (e.g. ``"fact_check"``) or ``None`` when the heading
         does not correspond to a known section.
     """
-    return _HEADING_TO_KEY.get(heading_text.lower())
+    return _rendering.resolve_section_name(heading_text)
 
 
 # Re-exported from rendering — canonical definitions live there so that the
@@ -275,16 +277,33 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
             parsed_sections["groomed"] = _parse_groomed_section(heading, content)
             continue
 
-        # Entry-bearing sections — normalised case lookup
-        section_key = _HEADING_TO_KEY.get(heading_name.lower())
-        if section_key is not None:
-            entries = parse_entries(content, show="all")
-            parsed_sections[section_key] = Section(entries=entries)
-        else:
-            # Unknown heading: store with prefixed key so it survives round-trips.
-            unknown_key = heading_to_unknown_key(heading_name)
-            entries = parse_entries(content, show="all")
-            parsed_sections[unknown_key] = Section(entries=entries)
+        # Entry-bearing sections — routed through the same alias-aware resolver
+        # the write boundary (operations._normalize_section_key) and the
+        # subsection parser above use, so a registered historic heading (e.g.
+        # "## Facts check") resolves to its canonical key here too instead of
+        # only an exact SECTION_HEADING display-text match.
+        section_key = _rendering.resolve_section_name(heading_name)
+        target_key = section_key if section_key is not None else heading_to_unknown_key(heading_name)
+        entries = parse_entries(content, show="all")
+        # A canonical heading and one of its aliases (e.g. "## Fact-Check" and
+        # "## Facts check") both resolve to the same target_key. Concatenate
+        # rather than overwrite, so the earlier heading's entries are not
+        # silently dropped (#3015 Greptile review finding) -- and use
+        # _deduplicate_timestamps, not merge_entries, to reconcile any id
+        # collision: unlike merge_item's local/remote reconciliation, these
+        # are two literal, physically distinct headings in one document, not
+        # two versions of the same logical entry, so an id-keyed "pick a
+        # winner" merge is the wrong tool even before considering collisions.
+        # A collision is also not a rare edge case here: unwrapped/legacy
+        # content with no leading timestamp always falls back to the same
+        # f"{added_date}T00:00:00Z" id (see entry_blocks.parse_entries), so
+        # two colliding headings' unwrapped content would otherwise share an
+        # id and merge_entries would keep only the struck/longer one.
+        existing_section = parsed_sections.get(target_key)
+        if isinstance(existing_section, Section):
+            entries = [*existing_section.entries, *entries]
+            _deduplicate_timestamps(entries)
+        parsed_sections[target_key] = Section(entries=entries)
 
     return BacklogItem(
         title=base.title,
@@ -307,45 +326,12 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
 # ---------------------------------------------------------------------------
 
 
-def _merge_entries(local_entries: list[Entry], remote_entries: list[Entry]) -> list[Entry]:
-    """Merge two entry lists into a single chronologically-ordered list.
-
-    Merge rules (applied per entry id):
-    - struck state wins over active for the same id
-    - when both have the same struck state, longer content wins
-    - entries unique to either side are always preserved
-    - result is sorted chronologically by id
-
-    Args:
-        local_entries: Entries from the local BacklogItem.
-        remote_entries: Entries from the remote (GitHub) BacklogItem.
-
-    Returns:
-        Merged list of Entry objects ordered by id (ascending).
-    """
-    local_by_id: dict[str, Entry] = {e.id: e for e in local_entries}
-    remote_by_id: dict[str, Entry] = {e.id: e for e in remote_entries}
-
-    merged: dict[str, Entry] = {}
-    for eid in set(local_by_id) | set(remote_by_id):
-        local_e = local_by_id.get(eid)
-        remote_e = remote_by_id.get(eid)
-
-        if local_e is None and remote_e is not None:
-            merged[eid] = remote_e
-        elif remote_e is None and local_e is not None:
-            merged[eid] = local_e
-        elif local_e is not None and remote_e is not None:
-            if local_e.struck and not remote_e.struck:
-                # struck wins over active
-                merged[eid] = local_e
-            elif remote_e.struck and not local_e.struck:
-                merged[eid] = remote_e
-            else:
-                # same struck state — longer content wins; local wins on tie
-                merged[eid] = local_e if len(local_e.content) >= len(remote_e.content) else remote_e
-
-    return [merged[eid] for eid in sorted(merged)]
+# Re-exported from rendering — canonical definition lives in
+# rendering.merge_entries, shared with normalize_unknown_sections' same-id
+# fold so there is one struck-wins/longer-content-wins merge policy, not one
+# per caller. Kept under this name for backward compatibility with existing
+# callers that import it directly from github_sync.
+_merge_entries = _rendering.merge_entries
 
 
 def _merge_groomed(local: GroomedData, remote: GroomedData) -> GroomedData:

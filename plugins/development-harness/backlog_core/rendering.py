@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import re
 
-from .models import GroomedData, Section
+from .models import Entry, GroomedData, Section
 from .section_registry import SECTION_HEADING, SUBSECTION_KEY_ORDER, resolve_section_name, resolve_subsection_name
 
 __all__ = [
     "GROOMED_SUBSECTION_ORDER",
     "SECTION_HEADING",
     "heading_to_unknown_key",
+    "merge_entries",
     "normalize_groomed_subsections",
     "normalize_unknown_sections",
     "render_groomed_section",
@@ -113,6 +114,54 @@ def heading_to_unknown_key(heading_text: str) -> str:
     return f"unknown__{normalised}"
 
 
+def merge_entries(local_entries: list[Entry], remote_entries: list[Entry]) -> list[Entry]:
+    """Merge two entry lists into a single chronologically-ordered list.
+
+    Merge rules (applied per entry id):
+    - struck state wins over active for the same id
+    - when both have the same struck state, longer content wins
+    - entries unique to either side are always preserved
+    - result is sorted chronologically by id
+
+    Shared by :func:`github_sync.merge_item` (local vs. remote reconciliation)
+    and :func:`normalize_unknown_sections` (folding an ``unknown__{key}`` and
+    ``{key}`` pair within the same item) — one merge policy for "two entry
+    lists that may both contain the same id", not a bespoke first-seen-wins
+    rule per caller that could silently drop a struck or longer-content copy.
+
+    Args:
+        local_entries: Entries from one side (e.g. the local BacklogItem).
+        remote_entries: Entries from the other side (e.g. the remote/GitHub
+            BacklogItem, or a second key folding onto the same target).
+
+    Returns:
+        Merged list of Entry objects ordered by id (ascending).
+    """
+    local_by_id: dict[str, Entry] = {e.id: e for e in local_entries}
+    remote_by_id: dict[str, Entry] = {e.id: e for e in remote_entries}
+
+    merged: dict[str, Entry] = {}
+    for eid in set(local_by_id) | set(remote_by_id):
+        local_e = local_by_id.get(eid)
+        remote_e = remote_by_id.get(eid)
+
+        if local_e is None and remote_e is not None:
+            merged[eid] = remote_e
+        elif remote_e is None and local_e is not None:
+            merged[eid] = local_e
+        elif local_e is not None and remote_e is not None:
+            if local_e.struck and not remote_e.struck:
+                # struck wins over active
+                merged[eid] = local_e
+            elif remote_e.struck and not local_e.struck:
+                merged[eid] = remote_e
+            else:
+                # same struck state — longer content wins; local wins on tie
+                merged[eid] = local_e if len(local_e.content) >= len(remote_e.content) else remote_e
+
+    return [merged[eid] for eid in sorted(merged)]
+
+
 def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> dict[str, Section | GroomedData]:
     """Fold ``unknown__{key}`` entries into ``{key}`` when now canonical.
 
@@ -128,7 +177,17 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
 
     When both ``unknown__{key}`` and ``{key}`` are present in the same
     ``sections`` dict (e.g. a manually edited cache file), their entries are
-    concatenated, deduplicating by entry ``id``.
+    merged through :func:`merge_entries` — the same struck-wins /
+    longer-content-wins-per-id rule :func:`github_sync.merge_item` applies to
+    local/remote reconciliation — rather than a bespoke first-seen-wins dedup
+    that would silently drop a struck or longer-content copy sharing an id
+    with the other key's entry. The canonical (non-``unknown__``) key's
+    entries are always passed as :func:`merge_entries`' first (tie-break-
+    winning) argument, regardless of which key ``sections`` happens to
+    iterate first — the dict's key order is an incidental artifact of the
+    caller (YAML load order, dict-literal order in a test), not a documented
+    local/remote distinction, so the exact-tie winner must not depend on it
+    (#3015 Copilot review finding).
 
     Recovery is routed through :func:`~.section_registry.resolve_section_name`
     — the same alias-aware resolver the write boundary
@@ -158,24 +217,40 @@ def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> di
         ``unknown__`` name is still uncanonical, are returned unchanged.
     """
     normalized: dict[str, Section | GroomedData] = {}
+    # Tracks, per target key, whether the Section entries currently stored in
+    # `normalized` include the canonical key's own entries — so a canonical
+    # key encountered *after* its legacy `unknown__` counterpart still wins
+    # merge_entries' tie-break, instead of losing simply because it folded
+    # into `normalized[target]` second.
+    canonical_owns: dict[str, bool] = {}
     for key, value in sections.items():
         target = key
-        if key.startswith("unknown__") and isinstance(value, Section):
+        is_canonical_key = not key.startswith("unknown__")
+        if not is_canonical_key and isinstance(value, Section):
             stripped = key.removeprefix("unknown__")
             canonical = resolve_section_name(stripped) or resolve_section_name(unknown_key_to_heading(key))
             if canonical is not None:
                 target = canonical
         existing = normalized.get(target)
         if isinstance(existing, Section) and isinstance(value, Section):
-            seen_ids = {e.id for e in existing.entries}
-            merged_entries = [*existing.entries, *(e for e in value.entries if e.id not in seen_ids)]
+            existing_is_canonical = canonical_owns.get(target, False)
+            if is_canonical_key and not existing_is_canonical:
+                # `value` carries the canonical key's own entries but was
+                # reached second — swap argument order so it is still the
+                # tie-break-winning ("local") side of merge_entries.
+                merged_entries = merge_entries(value.entries, existing.entries)
+            else:
+                merged_entries = merge_entries(existing.entries, value.entries)
             normalized[target] = Section(entries=merged_entries)
+            canonical_owns[target] = existing_is_canonical or is_canonical_key
         elif isinstance(value, GroomedData):
             normalized[target] = GroomedData(
                 date=value.date, subsections=normalize_groomed_subsections(value.subsections)
             )
         else:
             normalized[target] = value
+            if isinstance(value, Section):
+                canonical_owns[target] = is_canonical_key
     return normalized
 
 

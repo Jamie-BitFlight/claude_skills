@@ -15,7 +15,7 @@ from pathlib import Path
 import backlog_core.operations as ops
 import pytest
 from backlog_core import github_sync, rendering, section_registry
-from backlog_core.models import Entry, GroomedData, Output, Section
+from backlog_core.models import BacklogItem, Entry, GroomedData, Output, Section
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
@@ -437,3 +437,295 @@ def test_producer_subsection_name_resolves_through_registry(name: str) -> None:
          produces routinely.
     """
     assert section_registry.resolve_subsection_name(name) == name
+
+
+# ---------------------------------------------------------------------------
+# Top-level '## ' heading parse routes through the alias-aware resolver too
+# (post-#2987 Copilot pass finding: only the '### ' subsection parser and the
+# legacy .md '## ' parser were fixed — github_sync.parse_issue_body's '## '
+# lookup still bypassed SECTION_NAME_ALIASES via the raw _HEADING_TO_KEY map)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_issue_body_top_level_heading_resolves_registered_alias() -> None:
+    """A GitHub issue '## Facts check' heading resolves to 'fact_check', not unknown__facts_check.
+
+    Tests: github_sync.parse_issue_body top-level '## ' heading resolution
+    Why: parse_issue_body's subsection parser (_parse_groomed_section) and the
+         legacy .md parser (parse_md_body_sections) both route through
+         resolve_section_name, but the top-level '## ' lookup still used the
+         raw _HEADING_TO_KEY map (exact SECTION_HEADING display text only),
+         so a registered alias spelling split from the canonical section on a
+         real GitHub round-trip.
+    """
+    body = "## Facts check\n\n<div><sub>2026-01-01T00:00:00Z</sub>\n\nSome content.\n</div>\n"
+
+    item = github_sync.parse_issue_body(body)
+
+    assert "fact_check" in item.sections
+    assert not any(key.startswith("unknown__facts_check") for key in item.sections)
+
+
+def test_heading_to_section_key_resolves_registered_alias() -> None:
+    """heading_to_section_key resolves a registered alias, not only exact display text."""
+    assert github_sync.heading_to_section_key("Facts check") == "fact_check"
+
+
+# ---------------------------------------------------------------------------
+# Two headings resolving to the same section merge, not overwrite
+# (#3015 Greptile review finding: "## Fact-Check" and its alias "## Facts
+# check" both resolve to "fact_check" via resolve_section_name, but the
+# second heading's dict assignment previously replaced the first heading's
+# Section outright — permanently dropping its entries on reconciliation)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_issue_body_canonical_heading_and_alias_merge_not_overwrite() -> None:
+    """A canonical heading and a same-key alias heading in one body merge, not overwrite.
+
+    Tests: github_sync.parse_issue_body two-heading collision on one section_key
+    Why: "## Fact-Check" and "## Facts check" both resolve to "fact_check".
+         Assigning ``parsed_sections[section_key] = Section(entries=entries)``
+         unconditionally for the second heading discarded the first heading's
+         entries outright instead of merging them.
+    """
+    body = (
+        "## Fact-Check\n\n<div><sub>2026-01-01T00:00:00Z</sub>\n\nFirst entry.\n</div>\n\n"
+        "## Facts check\n\n<div><sub>2026-01-02T00:00:00Z</sub>\n\nSecond entry.\n</div>\n"
+    )
+
+    item = github_sync.parse_issue_body(body)
+
+    section = item.sections["fact_check"]
+    assert isinstance(section, Section)
+    assert {e.content for e in section.entries} == {"First entry.", "Second entry."}
+
+
+def test_parse_issue_body_canonical_heading_and_alias_merge_survives_id_collision() -> None:
+    """Colliding headings whose entries share a fallback id both survive, not just one.
+
+    Tests: github_sync.parse_issue_body two-heading collision, unwrapped (legacy) content
+    Why: Content with no leading entry-block timestamp falls back to the same
+         ``f"{added_date}T00:00:00Z"`` id for every unwrapped entry
+         (``entry_blocks.parse_entries``), so two colliding headings' unwrapped
+         content produce entries sharing one id. An id-keyed reconciliation
+         merge (``merge_entries``) would treat those as two versions of the
+         same entry and keep only the struck/longer one, discarding the
+         other heading's content outright (#3015 Greptile review finding).
+    """
+    body = "## Fact-Check\n\nFirst legacy line.\n\n## Facts check\n\nSecond legacy line.\n"
+
+    item = github_sync.parse_issue_body(body)
+
+    section = item.sections["fact_check"]
+    assert isinstance(section, Section)
+    assert {e.content for e in section.entries} == {"First legacy line.", "Second legacy line."}
+    assert len({e.id for e in section.entries}) == len(section.entries)
+
+
+# ---------------------------------------------------------------------------
+# Write-back unknown__-prefix healing tries the reconstructed heading too
+# (post-#2987 Copilot pass finding: the write boundary's unknown__ recovery
+# tried only the raw stripped key, missing multi-word aliases whose stripped
+# form uses underscores where the alias map uses spaces)
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_section_key_recovers_multiword_alias_from_unknown_prefix() -> None:
+    """'unknown__facts_check' heals to 'fact_check' on write-back, mirroring the read-time fold.
+
+    Tests: operations._normalize_section_key unknown__-prefix recovery via the
+           reconstructed-heading fallback (mirrors
+           rendering.normalize_unknown_sections, see
+           test_normalize_unknown_sections_folds_via_alias_with_punctuation).
+    Why: "unknown__facts_check" strips to "facts_check", which matches
+         neither a SectionKey value nor the "facts check" alias spelling
+         (space, not underscore) — only its reconstructed heading
+         "Facts Check" resolves via the alias map. Without the reconstructed-
+         heading fallback, a round-trip through view_item -> groom_item never
+         heals this key even though the read path already folds it.
+    """
+    assert ops._normalize_section_key("unknown__facts_check") == "fact_check"
+
+
+# ---------------------------------------------------------------------------
+# AC-overlap check keys off the resolved canonical section, not raw spelling
+# (post-#2987 Copilot pass finding: canonicalization made "acceptance_criteria"
+# a valid section input, but the overlap checks still compared against the
+# literal "Acceptance Criteria" display string)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("section_name", ["Acceptance Criteria", "acceptance_criteria", "ACCEPTANCE_CRITERIA"])
+def test_handle_update_groomed_ac_overlap_check_fires_for_every_ac_spelling(
+    section_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_handle_update_groomed's AC-overlap warning fires for the canonical key too, not only the display string.
+
+    Tests: operations._handle_update_groomed -> _check_ac_overlap gating,
+           parametrized over the display heading, the canonical snake_case
+           key, and an uppercase variant of the canonical key.
+    Why: A caller supplying the now-valid canonical key "acceptance_criteria"
+         silently skipped the dedicated AC-overlap warning because the gate
+         compared ``section_name == "Acceptance Criteria"`` verbatim instead
+         of the resolved section key.
+    """
+    item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
+    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *a, **k: None)
+    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *a, **k: None)
+    out = Output()
+
+    ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
+
+    assert any("Acceptance Criteria" in w for w in out.warnings)
+
+
+@pytest.mark.parametrize("section_name", ["unknown__acceptance_criteria", " acceptance_criteria "])
+def test_handle_update_groomed_ac_overlap_check_fires_for_recoverable_spellings(
+    section_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The AC-overlap gate also fires for forms only _normalize_section_key recovers.
+
+    Tests: operations._handle_update_groomed -> _check_ac_overlap gating,
+           parametrized over a legacy ``unknown__`` key and a whitespace-padded
+           canonical key — both of which ``_write_groomed_to_reference`` below
+           (via ``_normalize_section_key``) routes to ``acceptance_criteria``.
+    Why: The gate previously called the narrower ``resolve_section_name``
+         directly on the raw ``section_name``, which does not strip whitespace
+         and does not recover ``unknown__``-prefixed keys — so content that
+         the write path actually stored under ``acceptance_criteria`` silently
+         skipped the overlap warning (#3015 Greptile review finding).
+    """
+    item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
+    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *a, **k: None)
+    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *a, **k: None)
+    out = Output()
+
+    ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
+
+    assert any("Acceptance Criteria" in w for w in out.warnings)
+
+
+def test_handle_batch_groomed_ac_overlap_check_fires_for_recoverable_spelling() -> None:
+    """The batch AC-overlap gate fires when the batch keys, not raw input names, contain the AC key.
+
+    Tests: operations._handle_batch_groomed -> _check_ac_overlap gating
+    Why: The gate previously re-resolved the raw ``sections`` keys via
+         ``resolve_section_name`` instead of checking the already-normalized
+         ``written`` keys, so a legacy ``unknown__acceptance_criteria`` input
+         key silently skipped the overlap warning even though the batch write
+         above it stored the content under ``acceptance_criteria``
+         (#3015 Greptile review finding).
+    """
+    item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
+    ops.get_config().backend.put_work_item(item)
+    out = Output()
+
+    ops._handle_batch_groomed(item, {"unknown__acceptance_criteria": "AC content"}, "owner/repo", output=out)
+
+    assert any("Acceptance Criteria" in w for w in out.warnings)
+
+
+# ---------------------------------------------------------------------------
+# unknown__/canonical fold merges same-id entries via the shared merge rule,
+# not a first-seen-wins dedup (post-#2987 Copilot pass finding: the fold in
+# normalize_unknown_sections dropped the second copy of a colliding entry id
+# outright instead of applying the struck-wins/longer-content-wins rule
+# github_sync.merge_item already uses for local/remote reconciliation)
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_unknown_sections_fold_prefers_struck_entry_on_id_collision() -> None:
+    """A struck entry wins over an active entry sharing the same id across the two folding keys."""
+    active = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Active copy.")])
+    struck = Section(
+        entries=[
+            Entry(
+                id="2026-01-01T00:00:00Z",
+                content="Struck copy.",
+                struck=True,
+                struck_at="2026-01-02T00:00:00Z",
+                struck_reason="superseded",
+            )
+        ]
+    )
+    sections: dict[str, Section | GroomedData] = {"unknown__story": active, "story": struck}
+
+    folded = rendering.normalize_unknown_sections(sections)
+
+    folded_section = folded["story"]
+    assert isinstance(folded_section, Section)
+    assert len(folded_section.entries) == 1
+    assert folded_section.entries[0].struck is True
+    assert folded_section.entries[0].content == "Struck copy."
+
+
+def test_normalize_unknown_sections_fold_prefers_longer_content_on_id_collision() -> None:
+    """The longer-content copy wins over a shorter one sharing the same id and struck state."""
+    short = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Short.")])
+    long_ = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="This is a much longer entry body.")])
+    sections: dict[str, Section | GroomedData] = {"unknown__story": short, "story": long_}
+
+    folded = rendering.normalize_unknown_sections(sections)
+
+    folded_section = folded["story"]
+    assert isinstance(folded_section, Section)
+    assert len(folded_section.entries) == 1
+    assert folded_section.entries[0].content == "This is a much longer entry body."
+
+
+def test_normalize_unknown_sections_fold_prefers_canonical_entry_on_exact_tie() -> None:
+    """On an exact tie (same struck state, same content length), the canonical key wins regardless of dict order.
+
+    Tests: rendering.normalize_unknown_sections tie-break determinism
+           (post-#3015 Copilot review finding: merge_entries' documented
+           tie-break is "local wins" — its first positional argument. The
+           fold previously passed (existing.entries, value.entries) where
+           `existing` was whichever key the loop reached the ``target`` dict
+           slot for *first* in ``sections.items()`` order, not necessarily
+           the canonical (non-``unknown__``) key. Two sections dicts that
+           differ only in which key comes first then folded to different
+           winners for the exact same logical collision, so the canonical
+           entry could lose to its own legacy ``unknown__`` copy purely
+           because of dict insertion order.
+    """
+    canonical_entry = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Canonical copy.")])
+    legacy_entry = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Legacy variant.")])
+    assert len(canonical_entry.entries[0].content) == len(legacy_entry.entries[0].content), (
+        "fixture bug: contents must be equal length to exercise the tie branch"
+    )
+
+    canonical_first = rendering.normalize_unknown_sections({"story": canonical_entry, "unknown__story": legacy_entry})
+    legacy_first = rendering.normalize_unknown_sections({"unknown__story": legacy_entry, "story": canonical_entry})
+
+    canonical_first_section = canonical_first["story"]
+    legacy_first_section = legacy_first["story"]
+    assert isinstance(canonical_first_section, Section)
+    assert isinstance(legacy_first_section, Section)
+    assert canonical_first_section.entries[0].content == "Canonical copy."
+    assert legacy_first_section.entries[0].content == "Canonical copy."
+
+
+# ---------------------------------------------------------------------------
+# SubsectionKey registers the "content" storage shape written by the
+# no-section_name groomed-content path (post-#2987 Copilot pass finding: the
+# producer-completeness test above only scans two Markdown template/doc
+# files, so it never covered the "content" key operations.py writes directly
+# in Python — a real, unregistered producer the test suite couldn't see)
+# ---------------------------------------------------------------------------
+
+
+def test_subsection_key_registers_write_groomed_to_item_content_key() -> None:
+    """The literal 'content' key operations._write_groomed_to_item writes is a registered SubsectionKey.
+
+    Tests: section_registry.SubsectionKey completeness against the Python
+           producer at operations._write_groomed_to_item (the section_name=None
+           branch), which is invisible to the Markdown-template-scanning
+           test_producer_subsection_name_resolves_through_registry above.
+    Why: An unregistered "content" key rendered as an unordered, alphabetically
+         -sorted "extra" instead of the canonical registry's ordered position —
+         the same accumulation-of-unregistered-names failure mode #2970 exists
+         to close, just for a Python producer instead of a Markdown one.
+    """
+    assert section_registry.SubsectionKey.CONTENT == "content"
+    assert section_registry.resolve_subsection_name("content") == "content"
