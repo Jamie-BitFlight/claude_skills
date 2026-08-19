@@ -31,7 +31,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Install Python dependencies
-        run: uv sync --group dev
+        run: uv sync --frozen --group dev
 
       # ---------------------------------------------------------------
       # Node.js toolchain: Node 22 + Biome (JS/TS linting)
@@ -52,15 +52,15 @@ jobs:
       # Enables commit-msg and pre-commit hooks for the coding agent
       # ---------------------------------------------------------------
       - name: Install prek git hooks
-        run: uv run -q prek install
+        run: uv run -q --locked prek install
 
       # ---------------------------------------------------------------
       # Verify environment is functional
       # ---------------------------------------------------------------
       - name: Verify Python toolchain
         run: |
-          uv run -q python --version
-          uv run -q ruff --version
+          uv run -q --locked python --version
+          uv run -q --locked ruff --version
 
       - name: Verify Node toolchain
         run: |

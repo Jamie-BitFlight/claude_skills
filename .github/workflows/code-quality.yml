@@ -31,10 +31,10 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Lint with Ruff
-        run: uv run -q prek run ruff --all-files
+        run: uv run -q --locked prek run ruff --all-files
 
       - name: Check formatting with Ruff
-        run: uv run -q prek run ruff-format --all-files
+        run: uv run -q --locked prek run ruff-format --all-files
 
   # =============================================================================
   # Python: Type checking with ty (Astral)
@@ -52,7 +52,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run ty
-        run: uv run -q ty check .
+        run: uv run -q --locked ty check .
 
   # =============================================================================
   # JavaScript/TypeScript/JSON: Biome linting and formatting (via prek)
@@ -69,7 +69,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run Biome
-        run: uv run -q prek run biome-check --all-files
+        run: uv run -q --locked prek run biome-check --all-files
 
   # =============================================================================
   # Markdown: markdownlint (via prek)
@@ -86,7 +86,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run markdownlint-cli2
-        run: uv run -q prek run markdownlint-cli2 --all-files
+        run: uv run -q --locked prek run markdownlint-cli2 --all-files
 
   # =============================================================================
   # Shell: shellcheck and shfmt (via prek)
@@ -103,10 +103,10 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run shellcheck
-        run: uv run -q prek run shellcheck --all-files
+        run: uv run -q --locked prek run shellcheck --all-files
 
       - name: Run shfmt
-        run: uv run -q prek run shell-fmt-go --all-files
+        run: uv run -q --locked prek run shell-fmt-go --all-files
 
   # =============================================================================
   # Local hooks: plugin validation (via prek)
@@ -153,7 +153,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Check manifest sync
-        run: uv run -q prek run auto-sync-manifests --all-files
+        run: uv run -q --locked prek run auto-sync-manifests --all-files
 
       - name: Require plugin.json version bump for every changed plugin
         if: github.event_name == 'pull_request'
@@ -191,9 +191,9 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
-            uv run prek run --from-ref "${BASE}" --to-ref "origin/${GITHUB_HEAD_REF}"
+            uv run --locked prek run --from-ref "${BASE}" --to-ref "origin/${GITHUB_HEAD_REF}"
           else
-            uv run prek run --all-files
+            uv run --locked prek run --all-files
           fi
 
   # =============================================================================
@@ -217,7 +217,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Validate research entries
-        run: uv run -q prek run validate-research-entries --all-files
+        run: uv run -q --locked prek run validate-research-entries --all-files
 
   # =============================================================================
   # Python: pytest test suite
@@ -234,7 +234,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run pytest
-        run: uv run -q pytest
+        run: uv run -q --locked pytest
 
   # =============================================================================
   # Python: Cross-backend protocol compliance tests
@@ -259,7 +259,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run cross-backend tests
-        run: uv run -q pytest plugins/development-harness/tests/test_cross_backend.py -v -m cross_backend
+        run: uv run -q --locked pytest plugins/development-harness/tests/test_cross_backend.py -v -m cross_backend
 
   # =============================================================================
   # Python: Integration tests (real-subprocess CLI/network-guard behavior)
@@ -283,7 +283,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run integration tests
-        run: uv run -q pytest -m integration -v plugins/development-harness/tests/
+        run: uv run -q --locked pytest -m integration -v plugins/development-harness/tests/
 
   # =============================================================================
   # Python: End-to-end live validation tests
@@ -310,7 +310,7 @@ jobs:
 
       - name: Run e2e tests
         timeout-minutes: 10
-        run: uv run -q pytest -m e2e -v plugins/development-harness/tests/test_live_validation.py
+        run: uv run -q --locked pytest -m e2e -v plugins/development-harness/tests/test_live_validation.py
 
       - name: Emergency cleanup (always runs)
         if: always()

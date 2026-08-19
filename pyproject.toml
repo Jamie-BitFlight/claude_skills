@@ -201,7 +201,7 @@ too-many-positional-arguments = "ignore" # ty 0.0.17 bug: @_with_exception decor
 
 [[tool.ty.overrides]]
 # SOLID experiment corpus files — intentional violations at known line numbers
-# (linting-exceptions.md category 2: what-not-to-do examples / negative test cases).
+# (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
 # Modifying these to satisfy ty would destroy the seeded defects the experiment measures.
 include = ["examples/solid-review-ab/corpus/**"]
 
@@ -225,7 +225,7 @@ unresolved-import = "ignore"
 exclude = [
     "plugins/uv/skills/uv",
     ".tmp",
-    # SOLID experiment corpus — intentional violations at known lines (category 2: negative examples)
+    # SOLID experiment corpus — intentional violations at known lines (category 3: negative/bad-code examples)
     "examples/solid-review-ab/corpus",
 ]
 include = ["**/*.py"]
@@ -236,7 +236,7 @@ include = ["**/*.py"]
 extend-exclude = [
     "plugins/uv/skills/uv",
     ".tmp",
-    # SOLID experiment corpus — intentional violations at known lines (category 2: negative examples)
+    # SOLID experiment corpus — intentional violations at known lines (category 3: negative/bad-code examples)
     "examples/solid-review-ab/corpus",
 ]
 fix = true
@@ -475,7 +475,7 @@ max-complexity = 12
     "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
 ]
 # Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
-# (linting-exceptions.md category 2: what-not-to-do examples / negative test cases).
+# (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
 # Modifying these to satisfy linters would remove the seeded defects the experiment measures.
 "examples/solid-review-ab/corpus/cases/*.py" = [
     "ANN", # Intentionally missing annotations on violation-seeding helpers
@@ -506,8 +506,10 @@ max-complexity = 12
 "plugins/scientific-method/mcp/experiment-registry/__init__.py" = [
     "invalid-module-name",
 ]
-# ruamel.yaml returns dynamically typed values; Any is the correct annotation here
-"research/knowledge-explorer.py" = ["any-type"]
+# Third-party type stubs authored here to keep typing consistent for packages that ship none.
+# A (builtin-shadowing) and N (naming) often must mirror the external module's real names
+# verbatim; ANN softening (e.g. Any) reflects that the systems below the stub aren't ours to
+# manage — we can't always express their real shape more precisely than upstream does.
 "typings/**" = ["A", "ANN", "N"]
 
 [tool.ruff.lint.pycodestyle]

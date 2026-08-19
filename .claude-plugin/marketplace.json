@@ -113,6 +113,15 @@
       }
     },
     {
+      "name": "astral",
+      "source": {
+        "source": "git-subdir",
+        "url": "astral-sh/claude-code-plugins",
+        "path": "plugins/astral",
+        "sha": "f3ce88a7ba830f53afd6d944c1d0278ed318e142"
+      }
+    },
+    {
       "name": "scientific-method",
       "source": "./plugins/scientific-method"
     },

@@ -14,7 +14,20 @@ How ty discovers Python environments, resolves first-party and third-party modul
 
 ## Environment Discovery Flow
 
-See `../resources/workflows/environment-discovery.md` for the full decision flowchart.
+```mermaid
+flowchart TD
+    Start([ty check invoked]) --> Q1{--python flag or<br>environment.python config set?}
+    Q1 -->|Yes| UseExplicit([Use explicitly configured<br>interpreter or venv path])
+    Q1 -->|No| Q2{VIRTUAL_ENV<br>env var set?}
+    Q2 -->|Yes| UseVirtualEnv([Use virtual env at VIRTUAL_ENV])
+    Q2 -->|No| Q3{CONDA_PREFIX<br>env var set?}
+    Q3 -->|Yes| UseConda([Use Conda env at CONDA_PREFIX])
+    Q3 -->|No| Q4{.venv directory exists<br>in project root or<br>working directory?}
+    Q4 -->|Yes| UseDotVenv([Use .venv virtual environment])
+    Q4 -->|No| Q5{python3 or python<br>binary in PATH?}
+    Q5 -->|Yes| UsePath([Use python3 or python from PATH])
+    Q5 -->|No| NoEnv([No environment found —<br>third-party imports unresolved])
+```
 
 Summary of precedence:
 
@@ -111,7 +124,16 @@ replace-imports-with-any = ["pandas.**", "numpy.**"]
 
 ## Python Version Resolution
 
-See `../resources/workflows/python-version-resolution.md` for the full decision flowchart.
+```mermaid
+flowchart TD
+    Start([ty check invoked]) --> Q1{--python-version flag<br>or environment.python-version<br>config set?}
+    Q1 -->|Yes| UseExplicit([Use specified version directly])
+    Q1 -->|No| Q2{project.requires-python<br>in pyproject.toml?}
+    Q2 -->|Yes| UseRequires([Use minimum version<br>from requires-python range])
+    Q2 -->|No| Q3{Activated or configured<br>Python environment<br>detected?}
+    Q3 -->|Yes| InferVenv([Infer version from<br>Python environment metadata])
+    Q3 -->|No| Fallback([Fall back to latest stable<br>Python version supported by ty<br>currently 3.14])
+```
 
 The target Python version affects:
 - Allowed syntax (e.g., `match` statements require Python 3.10+)

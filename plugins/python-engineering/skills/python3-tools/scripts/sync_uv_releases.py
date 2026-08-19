@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -6,15 +6,16 @@
 #     "httpx>=0.28.1",
 # ]
 # ///
-"""Fetch ty release notes from GitHub and update skill documentation.
+"""Fetch uv release notes from GitHub and update the archive header file.
 
-Queries the GitHub Releases API for astral-sh/ty, identifies releases
+Queries the GitHub Releases API for astral-sh/uv, identifies releases
 newer than the last recorded version, categorizes changes (features,
 breaking, deprecations, new commands/flags), and updates the Version
-Information section in SKILL.md with version-annotated entries.
+Information section in references/uv/README.md with version-annotated
+entries.
 
-The AI using this skill compares these version annotations against the
-user's installed ty version at runtime to determine feature availability.
+The AI using the uv archive compares these version annotations against the
+user's installed uv version at runtime to determine feature availability.
 """
 
 from __future__ import annotations
@@ -36,21 +37,18 @@ if isinstance(sys.stderr, TextIOWrapper):
 
 import httpx
 import typer
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-
-# Console setup
-console = Console()
-error_console = Console(stderr=True, style="bold red")
 
 # Constants
-GITHUB_API_BASE = "https://api.github.com/repos/astral-sh/ty/releases"
-LOCK_FILE_NAME = ".sync-ty-releases.lock"
+GITHUB_API_BASE = "https://api.github.com/repos/astral-sh/uv/releases"
+LOCK_FILE_NAME = ".sync-uv-releases.lock"
 COOLDOWN_DAYS = 1
 MAX_RELEASES_PER_PAGE = 50
 MAX_API_PAGES = 10
 VERSION_PARTS_EXPECTED = 3
+
+# The archive header file this script updates, relative to the script's own
+# location — so it resolves correctly regardless of the caller's cwd.
+DEFAULT_ARCHIVE_DIR = Path(__file__).resolve().parent.parent / "references" / "uv"
 
 # Patterns for parsing release notes
 BREAKING_PATTERN = re.compile(r"#+\s*breaking\s*changes?", re.IGNORECASE)
@@ -60,10 +58,10 @@ DEPRECATION_PATTERN = re.compile(r"#+\s*deprecations?", re.IGNORECASE)
 BUGFIX_PATTERN = re.compile(r"#+\s*(bug\s*fix|fix)", re.IGNORECASE)
 SECURITY_PATTERN = re.compile(r"#+\s*security", re.IGNORECASE)
 CLI_FLAG_PATTERN = re.compile(r"`--([\w-]+)`")
-TY_CMD_PATTERN = re.compile(r"`(ty\s+[\w\s-]+)`")
-ENV_VAR_PATTERN = re.compile(r"`(TY_[\w]+)`")
+UV_CMD_PATTERN = re.compile(r"`(uv\s+[\w\s-]+)`")
+ENV_VAR_PATTERN = re.compile(r"`(UV_[\w]+)`")
 
-# SKILL.md section pattern
+# Archive header file section pattern
 VERSION_SECTION_PATTERN = re.compile(r"(^## Version Information\s*\n)(.*?)(?=^## |\Z)", re.MULTILINE | re.DOTALL)
 
 
@@ -79,11 +77,12 @@ def parse_version(tag: str) -> tuple[int, ...]:
     """Parse a version string into a comparable tuple.
 
     Args:
-        tag: Version string like "0.0.1"
+        tag: Version string like "0.10.2"
 
     Returns:
         Tuple of integers for comparison
     """
+    # Strip leading 'v' if present
     tag = tag.lstrip("v")
     parts = []
     for part in tag.split("."):
@@ -133,15 +132,10 @@ def check_cooldown(working_dir: Path, force: bool) -> bool:
         hours = int(remaining.total_seconds() // 3600)
         minutes = int((remaining.total_seconds() % 3600) // 60)
         last_version = lock_data.get("last_version", "unknown")
-        console.print(
-            Panel(
-                f"Last successful sync: {last_run.strftime('%Y-%m-%d %H:%M UTC')}\n"
-                f"Last synced version: {last_version}\n"
-                f"Cooldown remaining: {hours}h {minutes}m\n"
-                f"Bypass with: --force",
-                title="Sync Cooldown Active",
-                border_style="yellow",
-            )
+        print(
+            f"Sync cooldown active. Last successful sync: {last_run.strftime('%Y-%m-%d %H:%M UTC')}, "
+            f"last synced version: {last_version}, cooldown remaining: {hours}h {minutes}m. "
+            f"Bypass with: --force"
         )
 
     return time_since >= cooldown
@@ -170,11 +164,11 @@ def update_lock_file(working_dir: Path, status: str, last_version: str = "", rel
         temp_file.write_text(json.dumps(lock_data, indent=2), encoding="utf-8")
         temp_file.rename(lock_file)
     except OSError as e:
-        error_console.print(f"Warning: Failed to write lock file: {e}")
+        print(f"Warning: Failed to write lock file: {e}", file=sys.stderr)
 
 
 def fetch_releases(since_version: str | None = None) -> list[dict[str, str]]:
-    """Fetch ty releases from GitHub API.
+    """Fetch uv releases from GitHub API.
 
     Args:
         since_version: Only return releases newer than this version
@@ -211,6 +205,7 @@ def fetch_releases(since_version: str | None = None) -> list[dict[str, str]]:
                     }
 
                     if since_version and parse_version(tag) <= parse_version(since_version):
+                        # We've reached releases older than our baseline
                         all_releases.append(release_info)
                         return all_releases
 
@@ -254,7 +249,7 @@ def _detect_section(stripped: str) -> str | None:
 
 def _extract_cli_patterns(stripped: str, categories: dict[str, list[str]]) -> None:
     """Extract CLI commands, flags, and env vars from a line."""
-    for match in TY_CMD_PATTERN.finditer(stripped):
+    for match in UV_CMD_PATTERN.finditer(stripped):
         cmd = match.group(1).strip()
         if cmd not in categories["new_commands"]:
             categories["new_commands"].append(cmd)
@@ -316,21 +311,21 @@ def categorize_release(body: str) -> dict[str, list[str]]:
     return categories
 
 
-def get_current_skill_version(skill_file: Path) -> str | None:
-    """Extract the current documented version from SKILL.md.
+def get_current_archive_version(readme_file: Path) -> str | None:
+    """Extract the current documented version from the archive header file.
 
-    Looks for patterns like "Current latest version: **0.0.1**"
+    Looks for patterns like "Current latest version: **0.10.2**"
 
     Args:
-        skill_file: Path to SKILL.md
+        readme_file: Path to references/uv/README.md
 
     Returns:
         Version string or None
     """
-    if not skill_file.exists():
+    if not readme_file.exists():
         return None
 
-    content = skill_file.read_text(encoding="utf-8")
+    content = readme_file.read_text(encoding="utf-8")
     match = re.search(r"Current latest version:\s*\*\*([\d.]+)\*\*", content)
     return match.group(1) if match else None
 
@@ -385,12 +380,12 @@ def _format_breaking_changes(releases: list[dict[str, str]], lines: list[str]) -
 def build_version_section(releases: list[dict[str, str]], current_doc_version: str | None) -> str:
     """Build the Version Information section content.
 
-    Produces version-annotated entries so the AI using this skill can
-    compare feature availability against the user's installed ty version.
+    Produces version-annotated entries so the AI using this archive can
+    compare feature availability against the user's installed uv version.
 
     Args:
         releases: List of release dicts (newest first)
-        current_doc_version: Version currently documented in SKILL.md
+        current_doc_version: Version currently documented in the archive header file
 
     Returns:
         Markdown string for the Version Information section
@@ -405,11 +400,13 @@ def build_version_section(releases: list[dict[str, str]], current_doc_version: s
 
     _format_breaking_changes(releases, lines)
 
+    # Features stabilized
     if stabilized:
         lines.append("### Features Stabilized\n")
         lines.extend(f"- {item} ({ver})" for ver, item in stabilized)
         lines.append("")
 
+    # Key features added (since the baseline)
     baseline = current_doc_version or "0.0.0"
     new_features = [(ver, item) for ver, item in feature_highlights if parse_version(ver) > parse_version(baseline)]
 
@@ -423,6 +420,7 @@ def build_version_section(releases: list[dict[str, str]], current_doc_version: s
                 lines.append(f"- {item} ({ver})")
         lines.append("")
 
+    # Deprecations
     if deprecations:
         lines.append("### Deprecations\n")
         lines.extend(f"- {item} ({ver})" for ver, item in deprecations)
@@ -431,55 +429,39 @@ def build_version_section(releases: list[dict[str, str]], current_doc_version: s
     return "\n".join(lines) + "\n"
 
 
-def update_skill_file(skill_file: Path, version_content: str) -> None:
-    """Update the Version Information section in SKILL.md.
+def update_readme_file(readme_file: Path, version_content: str) -> None:
+    """Update the Version Information section in the archive header file.
 
     Args:
-        skill_file: Path to SKILL.md
+        readme_file: Path to references/uv/README.md
         version_content: New content for the Version Information section
 
     Raises:
-        SyncError: If SKILL.md update fails
+        SyncError: If the archive header file update fails
     """
-    if not skill_file.exists():
-        msg = f"SKILL.md not found at {skill_file}"
+    if not readme_file.exists():
+        msg = f"Archive header file not found at {readme_file}"
         raise SyncError(msg)
 
-    content = skill_file.read_text(encoding="utf-8")
+    content = readme_file.read_text(encoding="utf-8")
 
     if VERSION_SECTION_PATTERN.search(content):
         new_content = VERSION_SECTION_PATTERN.sub(f"## Version Information\n\n{version_content}", content)
     else:
         new_content = content.rstrip() + f"\n\n## Version Information\n\n{version_content}\n"
 
-    skill_file.write_text(new_content, encoding="utf-8")
+    readme_file.write_text(new_content, encoding="utf-8")
 
 
 def display_release_summary(releases: list[dict[str, str]]) -> None:
-    """Print a summary table of releases to the console.
+    """Print a summary of releases: version, date, breaking-change count, feature count.
 
     Args:
         releases: List of release dicts
     """
-    table = Table(title="ty Releases Summary")
-    table.add_column("Version", style="cyan")
-    table.add_column("Date", style="green")
-    table.add_column("Breaking", style="red")
-    table.add_column("Features", style="blue")
-
     for r in releases[:15]:
         cats = categorize_release(r["body"])
-        breaking_count = len(cats["breaking"])
-        feature_count = len(cats["features"])
-
-        table.add_row(
-            r["version"],
-            r["date"],
-            str(breaking_count) if breaking_count else "-",
-            str(feature_count) if feature_count else "-",
-        )
-
-    console.print(table)
+        print(f"{r['version']}  {r['date']}  breaking={len(cats['breaking'])}  features={len(cats['features'])}")
 
 
 def main(
@@ -488,7 +470,7 @@ def main(
         typer.Option(
             "--working-dir",
             "-w",
-            help="Working directory for the ty skill (default: current directory)",
+            help="Directory containing the archive's README.md (default: references/uv/ next to this script)",
             exists=True,
             file_okay=False,
             dir_okay=True,
@@ -499,71 +481,78 @@ def main(
     since: Annotated[
         str | None,
         typer.Option(
-            "--since", help="Only fetch releases newer than this version (default: auto-detect from SKILL.md)"
+            "--since", help="Only fetch releases newer than this version (default: auto-detect from README.md)"
         ),
     ] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would change without modifying files")] = False,
 ) -> None:
-    """Sync ty release information from GitHub into the skill documentation.
+    """Sync uv release information from GitHub into the archive header file.
 
-    Fetches release notes from astral-sh/ty GitHub releases, categorizes
+    Fetches release notes from astral-sh/uv GitHub releases, categorizes
     changes (breaking, features, deprecations, new commands), and updates
-    the Version Information section in SKILL.md with version-annotated entries.
+    the Version Information section in references/uv/README.md with
+    version-annotated entries.
     """
-    resolved_dir = working_dir if working_dir is not None else Path.cwd()
+    resolved_dir = working_dir if working_dir is not None else DEFAULT_ARCHIVE_DIR
 
+    # Check cooldown
     if not check_cooldown(resolved_dir, force):
         raise typer.Exit(code=0)
 
-    skill_file = resolved_dir / "SKILL.md"
+    readme_file = resolved_dir / "README.md"
 
-    current_doc_version = get_current_skill_version(skill_file)
+    # Determine baseline version
+    current_doc_version = get_current_archive_version(readme_file)
     baseline = since or current_doc_version
     if baseline:
-        console.print(f"Fetching releases since: [cyan]{baseline}[/cyan]")
+        print(f"Fetching releases since: {baseline}")
     else:
-        console.print("No baseline version found, fetching all releases")
+        print("No baseline version found, fetching all releases")
 
     try:
-        console.print(Panel(f"Querying GitHub API: {GITHUB_API_BASE}", title="Fetch Releases", border_style="blue"))
+        # Fetch releases
+        print(f"Querying GitHub API: {GITHUB_API_BASE}")
         releases = fetch_releases(since_version=baseline)
 
         if not releases:
-            console.print("[yellow]No new releases found[/yellow]")
+            print("No new releases found")
             update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
             raise typer.Exit(code=0)
 
+        # Filter to only newer releases
         if baseline:
             new_releases = [r for r in releases if parse_version(r["version"]) > parse_version(baseline)]
         else:
             new_releases = releases
 
-        console.print(
-            f"Found [cyan]{len(releases)}[/cyan] total releases, [green]{len(new_releases)}[/green] newer than baseline"
-        )
+        print(f"Found {len(releases)} total releases, {len(new_releases)} newer than baseline")
 
+        if not new_releases:
+            print("No new releases found")
+            update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
+            raise typer.Exit(code=0)
+
+        # Display summary
         display_release_summary(releases)
 
         if dry_run:
-            console.print(Panel("Dry run mode - no files modified", title="Dry Run", border_style="yellow"))
+            print("Dry run mode - no files modified")
+            # Still build the content to show what would change
             version_content = build_version_section(new_releases, baseline)
-            console.print("\n[bold]Would write to Version Information section:[/bold]\n")
-            console.print(version_content)
+            print("\nWould write to Version Information section:\n")
+            print(version_content)
             raise typer.Exit(code=0)
 
+        # Build and write version section
         version_content = build_version_section(new_releases, baseline)
-        update_skill_file(skill_file, version_content)
+        update_readme_file(readme_file, version_content)
 
         latest_version = releases[0]["version"]
 
-        console.print(
-            Panel(
-                f"Updated SKILL.md Version Information section\n"
-                f"Latest version: {latest_version}\n"
-                f"Releases processed: {len(new_releases)}",
-                title="Success",
-                border_style="green",
-            )
+        print(
+            f"Updated archive README.md Version Information section\n"
+            f"Latest version: {latest_version}\n"
+            f"Releases processed: {len(new_releases)}"
         )
 
         update_lock_file(
@@ -572,11 +561,11 @@ def main(
 
     except SyncError as e:
         update_lock_file(resolved_dir, status="failure")
-        error_console.print(Panel(f"{e}", title="Sync Failed", border_style="red"))
+        print(f"Sync failed: {e}", file=sys.stderr)
         raise typer.Exit(code=1) from e
     except KeyboardInterrupt:
         update_lock_file(resolved_dir, status="failure")
-        console.print("\nSync cancelled by user")
+        print("\nSync cancelled by user")
         raise typer.Exit(code=130) from None
 
 

@@ -34,7 +34,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv run -q fastmcp call \
+          uv run -q --locked fastmcp call \
             --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
             --target backlog_sync
 

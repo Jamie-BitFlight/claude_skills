@@ -33,31 +33,14 @@ Use markdown links with relative paths starting with `./`. **Reason**: Enables C
 - From references/file.md → same dir: `[text](./filename.md)`
 - From references/file.md → subdir: `[text](./subdir/filename.md)`
 
-**File Reference Decision:**
-
-```mermaid
-flowchart TD
-    Start([Reference a file]) --> Q1{Is it a skill?}
-    Q1 -->|Yes| Skill[Use activation syntax: Skill command colon name]
-    Q1 -->|No| Q2{Is it a file in the repo?}
-    Q2 -->|Yes| Q3{Path starts with ./?}
-    Q3 -->|Yes| Link["Use markdown link: [text](./path/to/file.md)"]
-    Q3 -->|No — missing ./ prefix| Fix["Add ./ prefix: [text](./references/file.md)"]
-    Q2 -->|No — external| Ext[Use full URL with access date]
-    Link --> Done([Correct])
-    Fix --> Done
-    Skill --> Done
-    Ext --> Done
-    Q3 -.->|Never| Bad1["Backtick paths: modern-modules/httpx.md"]
-    Q3 -.->|Never| Bad2["Absolute paths: /home/user/repos/.../file.md"]
-```
+Never backtick-only (`modern-modules/httpx.md`) or absolute paths (`/home/user/...`). External file: full URL with access date.
 
 ## Skill Activation References
 
 Reference other skills using activation syntax:
 
-✅ `For comprehensive Astral uv documentation, use the /uv skill.`
-❌ `See /uv/SKILL.md for uv documentation`
+✅ `For comprehensive linting documentation, use the /holistic-linting:holistic-linting skill.`
+❌ `See /holistic-linting:holistic-linting/SKILL.md for linting documentation`
 
 ## Subdirectory Namespaces — Skills Do NOT Support This
 
