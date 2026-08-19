@@ -45,16 +45,11 @@ committing.
   the current working tree's uncommitted changes — those are invisible to a new worktree. Before
   spawning a worktree-isolated agent, commit (not necessarily push) whatever the agent needs to
   build on.
-- **Root cause of stale worktree bases (fixed 2026-08-05):** Claude Code's default worktree
-  behavior (`worktree.baseRef: "fresh"`) branches every new worktree — including subagent
-  isolation — from the repository's default branch on the remote (`origin/main`), not from the
-  current local branch or HEAD. On an unmerged feature branch, this guarantees a worktree-isolated
-  agent starts without that branch's commits, no matter how recently the repo was fetched. This
-  repo sets `worktree.baseRef: "head"` in `.claude/settings.json` (commit `82c11e86`) so worktrees
-  branch from current local HEAD instead — verified against a live probe agent whose worktree HEAD
-  matched the main checkout's HEAD exactly. SOURCE:
-  [code.claude.com/docs/en/worktrees.md](https://code.claude.com/docs/en/worktrees.md#choose-the-base-branch)
-  (accessed 2026-08-05), "Choose the base branch" section.
+- **Worktree base is local HEAD, not `origin/main`.** This repo sets `worktree.baseRef: "head"` in
+  `.claude/settings.json` — new worktrees, including subagent isolation, branch from current local
+  HEAD. Without this, Claude Code's default (`worktree.baseRef: "fresh"`) branches from the
+  repository's remote default branch instead, so a worktree-isolated agent on an unmerged feature
+  branch would start without that branch's commits no matter how recently the repo was fetched.
 - Still tell a worktree-isolated agent to verify its HEAD (`git merge-base --is-ancestor <recent
   commit> HEAD`) before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not
   a guarantee for every session (e.g. a session launched with `--settings` overriding it, or a
