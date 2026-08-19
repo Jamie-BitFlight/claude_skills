@@ -186,8 +186,10 @@ guess:
   value to its meaning via column *position* (nth value = nth header); JSON binds via an explicit
   *repeated key* at each value — a more direct, unambiguous token-level association for an LLM
   parsing the output, with no risk of misparsing when a cell value contains whitespace. Emit
-  compact JSON (`json.dumps(data)` / `model_dump_json()`, no `indent=`) — see
-  `.claude/CLAUDE.md` "Code Quality Standards" for the JSON-output rule.
+  compact JSON (`json.dumps(data)` / `model_dump_json()`, no `indent=`) for this — output a script
+  or CLI emits for an agent to parse. This does **not** apply to static repo config files
+  (`package.json`, `.claude-plugin/*.json`, `marketplace.json`) — those are read by humans
+  browsing the repo and by non-AI tooling (npm, git), and stay pretty-printed.
 - **`logging` is for debug/trace/forensic output only** — never for primary output a calling agent
   needs to read or parse. Status messages, results, and errors meant to be consumed by the caller
   go through direct stdout/stderr emission (`typer.echo()`, `print()`, structured JSON), not a
