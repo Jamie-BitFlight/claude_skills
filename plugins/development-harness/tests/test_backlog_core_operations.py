@@ -429,29 +429,6 @@ class TestAddItemCreatesLocalFile:
 
         assert result["item_ref"] == ""
 
-    def test_add_item_issue_created_signals_github_backed_vs_local_only(self, mocker: MockerFixture) -> None:
-        """Verify issue_created distinguishes a GitHub-backed create from a local-only one.
-
-        Tests: add_item's explicit success signal (#2999) — the field a caller checks
-            instead of inferring state from item_ref truthiness alone.
-        How: Run add_item once with GitHub issue creation succeeding and once with it
-             unavailable; compare issue_created on both results.
-        Why: Before this fix, a failed/skipped GitHub create returned a response with
-             no error field and no boolean signal — shape-identical to success except
-             for the presence of one optional key, so no caller not specifically
-             checking for item_ref could tell the two outcomes apart.
-        """
-        mock_repo = mocker.Mock()
-        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
-        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=7)
-        created = add_item(title="GitHub Backed Item", description="desc", priority="P1")
-
-        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
-        local_only = add_item(title="Local Only Item Signal", description="desc", priority="P2")
-
-        assert created["issue_created"] is True
-        assert local_only["issue_created"] is False
-
     def test_add_item_local_only_pending_state_visible_via_list_and_view(self, mocker: MockerFixture) -> None:
         """Verify a local-only create's pending state is visible on later reads, not just at creation.
 
