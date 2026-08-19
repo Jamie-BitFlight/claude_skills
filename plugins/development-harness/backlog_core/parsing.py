@@ -1256,10 +1256,10 @@ def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> di
             # so a display heading like "Impact Radius" resolves to its
             # registered snake_case key ("impact_radius"), not the raw
             # lowercased heading text. A name the registry does not recognise
-            # (e.g. "Description", "Context") falls through to the raw
-            # lowercased key unchanged — this legacy .md path has never
-            # unknown__-prefixed unrecognised names, and changing that is out
-            # of scope for this canonicalization fix.
+            # (e.g. "Description", an ad hoc heading a caller invented) falls
+            # through to the raw lowercased key unchanged — this legacy .md
+            # path has never unknown__-prefixed unrecognised names, and
+            # changing that is out of scope for this canonicalization fix.
             key = resolve_section_name(heading_name) or raw_key
             parsed_section = _parse_section_entries(content, added_date)
             existing_section = result.get(key)
