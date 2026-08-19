@@ -45,6 +45,12 @@
   "worktree": {
     "baseRef": "head"
   },
+  "claudeMdExcludes": [
+    "**/.claude/worktrees/**/.claude/CLAUDE.md",
+    "**/.claude/worktrees/**/.claude/rules/**",
+    "**/.claude/worktrees/**/CLAUDE.md",
+    "**/.claude/worktrees/**/CLAUDE.local.md"
+  ],
   "permissions": {
     "allow": [
       "Bash(gh issue list:*)",
