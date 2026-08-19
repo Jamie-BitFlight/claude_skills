@@ -53,6 +53,3 @@ importing code itself. A root-level `ty.toml`, if one exists, takes precedence o
 resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see [AGENTS.md's "Common ty Failure
 Patterns"](../../AGENTS.md#common-ty-failure-patterns).
-
-SOURCE: verified against `pyproject.toml`'s `[tool.ty.environment] extra-paths` and
-`[tool.ty.overrides]` blocks.

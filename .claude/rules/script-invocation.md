@@ -24,5 +24,5 @@ mechanism.
 ```
 
 Never `--active`, in any position. It pollutes the shared `.venv` with the script's own
-dependencies instead of using an isolated ephemeral environment — empirically verified on uv
-0.12.5 (AGENTS.md Gotcha #11). `--quiet`/`-q` is a global flag and order-independent.
+dependencies instead of using an isolated ephemeral environment. `--quiet`/`-q` is a global flag
+and order-independent.

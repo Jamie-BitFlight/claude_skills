@@ -36,8 +36,6 @@ uvx skilllint@latest check --fix {path}
 
 The validator auto-adds `name:` derived from the directory name when absent (plugin skills only).
 
-**SOURCE:** `skilllint` and [agentskills.io specification](https://agentskills.io/specification)
-
 ## `skills:` — Never List an Externally-Sourced Plugin's Skill
 
 An agent's `skills:` field preloads skill content at subagent startup. A listed skill absent from
