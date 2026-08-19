@@ -42,4 +42,12 @@ If NONE of the above apply:
 
 **Touched Files Must Be Clean**: When files are modified/moved/renamed, all linting issues MUST be resolved before committing. Touching a file means taking responsibility for its quality.
 
+## `--ignore` and `--unsafe-fixes`
+
+Never pass `--ignore` to `ruff check` to make this repository's CI pass — that suppresses the same
+class of error this file already prohibits suppressing by comment. `ruff check --fix --unsafe-fixes`
+is permitted only after reviewing the change with `--diff` first; never apply unsafe fixes blind.
+See [`astral-tool-overrides.md`](./astral-tool-overrides.md) C2 for why this departs from Astral's
+own `ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gate.
+
 SOURCE: User policy established in conversation (2025-01-15)

@@ -34,4 +34,25 @@ Must return only the root `uv.lock`. A per-plugin `uv.lock` is never read — th
 
 ## ty Type Checker Errors
 
-Fix the code to satisfy the type checker — inline `# ty: ignore` suppressions and per-file-ignores relaxation are prohibited. Load `python-engineering:ty` for suppression syntax, diagnostics, and unresolved-import/environment resolution. Load `python-engineering:python3-typing` for the boundary-validation pattern (`model_validate()` on raw input) instead of passing untyped values to typed constructors.
+Fix the code to satisfy the type checker — inline `# ty: ignore` suppressions are prohibited.
+Config-level relaxation via `[[tool.ty.overrides]]` in `pyproject.toml` is allowed, but only for a
+case matching one of the four acceptable-exception categories in
+[`linting-exceptions.md`](./linting-exceptions.md) — cite the matching category by name in a
+comment beside the override (see `pyproject.toml:202–208`'s SOLID-corpus override for the pattern).
+Load `python-engineering:ty` for suppression syntax, diagnostics, and unresolved-import/environment
+resolution. Load `python-engineering:python3-typing` for the boundary-validation pattern
+(`model_validate()` on raw input) instead of passing untyped values to typed constructors.
+
+### `unresolved-import` errors
+
+When `ty` reports `unresolved-import` for a module that genuinely exists on disk, the module's
+directory is almost always missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`.
+Add the directory there, then re-verify with `uv run ty check <path>` before investigating the
+importing code itself. A root-level `ty.toml`, if one exists, takes precedence over
+`pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths` addition doesn't
+resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
+symptom, same environment-resolution root cause), see AGENTS.md's "Common ty Failure Patterns".
+
+SOURCE: `.tmp/scratch/analysis/astral-delta.md` Part 1c, lines 123–125 (verified against
+`pyproject.toml:137–167` `[tool.ty.environment] extra-paths` and `[tool.ty.overrides]` blocks at
+`pyproject.toml:169–216`, 2026-08-19).
