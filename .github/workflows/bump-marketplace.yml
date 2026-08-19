@@ -68,9 +68,15 @@ jobs:
           # generated manifest) must be caught explicitly -- an unguarded
           # `git rebase` failure would otherwise kill the step immediately,
           # skipping the remaining attempts and the final ::error:: below.
+          # Only a non-fast-forward rejection is retried -- any other push
+          # failure (auth, branch protection, network) fails fast with the
+          # real error surfaced instead of masking it behind pointless retries.
           for attempt in 1 2 3; do
-            if git push; then
-              exit 0
+            push_output=$(git push 2>&1) && exit 0
+            echo "$push_output"
+            if ! grep -qE "(non-fast-forward|fetch first|rejected)" <<<"$push_output"; then
+              echo "::error::git push failed for a reason other than a non-fast-forward rejection -- see output above"
+              exit 1
             fi
             echo "Push rejected (attempt $attempt/3) -- fetching and rebasing"
             git fetch origin main
