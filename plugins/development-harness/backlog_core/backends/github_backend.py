@@ -68,7 +68,6 @@ if TYPE_CHECKING:
     from github.Repository import Repository
 
     from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode
-    from backlog_core.backends._github_work_item_versions import WorkItemVersion
     from backlog_core.file_cache_state import _PendingWorkItemMutation
     from backlog_core.models import (
         BackendStatus,
@@ -554,13 +553,11 @@ class GitHubBackend:
         Returns:
             True if enrichment succeeded, False if the issue was not found.
         """
-
-        def _resolve_version(repo_obj: Repository, owner: str, repo_name: str, issue: IssueNode) -> WorkItemVersion:
-            version, _head_record, _root = self._work_items.work_item_version(repo_obj, owner, repo_name, issue)
-            return version
-
         return gh_client.view_enrich_from_github(
-            result, issue_num, repo or self._repo, resolve_version=_resolve_version
+            result,
+            issue_num,
+            repo or self._repo,
+            resolve_version=lambda r, o, n, i: self._work_items.work_item_version(r, o, n, i)[0],
         )
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
