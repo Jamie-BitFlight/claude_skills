@@ -37,13 +37,6 @@ if isinstance(sys.stderr, TextIOWrapper):
 
 import httpx
 import typer
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-
-# Console setup
-console = Console()
-error_console = Console(stderr=True, style="bold red")
 
 # Constants
 GITHUB_API_BASE = "https://api.github.com/repos/astral-sh/uv/releases"
@@ -139,15 +132,10 @@ def check_cooldown(working_dir: Path, force: bool) -> bool:
         hours = int(remaining.total_seconds() // 3600)
         minutes = int((remaining.total_seconds() % 3600) // 60)
         last_version = lock_data.get("last_version", "unknown")
-        console.print(
-            Panel(
-                f"Last successful sync: {last_run.strftime('%Y-%m-%d %H:%M UTC')}\n"
-                f"Last synced version: {last_version}\n"
-                f"Cooldown remaining: {hours}h {minutes}m\n"
-                f"Bypass with: --force",
-                title="Sync Cooldown Active",
-                border_style="yellow",
-            )
+        print(
+            f"Sync cooldown active. Last successful sync: {last_run.strftime('%Y-%m-%d %H:%M UTC')}, "
+            f"last synced version: {last_version}, cooldown remaining: {hours}h {minutes}m. "
+            f"Bypass with: --force"
         )
 
     return time_since >= cooldown
@@ -176,7 +164,7 @@ def update_lock_file(working_dir: Path, status: str, last_version: str = "", rel
         temp_file.write_text(json.dumps(lock_data, indent=2), encoding="utf-8")
         temp_file.rename(lock_file)
     except OSError as e:
-        error_console.print(f"Warning: Failed to write lock file: {e}")
+        print(f"Warning: Failed to write lock file: {e}", file=sys.stderr)
 
 
 def fetch_releases(since_version: str | None = None) -> list[dict[str, str]]:
@@ -466,30 +454,14 @@ def update_readme_file(readme_file: Path, version_content: str) -> None:
 
 
 def display_release_summary(releases: list[dict[str, str]]) -> None:
-    """Print a summary table of releases to the console.
+    """Print a summary of releases: version, date, breaking-change count, feature count.
 
     Args:
         releases: List of release dicts
     """
-    table = Table(title="uv Releases Summary")
-    table.add_column("Version", style="cyan")
-    table.add_column("Date", style="green")
-    table.add_column("Breaking", style="red")
-    table.add_column("Features", style="blue")
-
     for r in releases[:15]:
         cats = categorize_release(r["body"])
-        breaking_count = len(cats["breaking"])
-        feature_count = len(cats["features"])
-
-        table.add_row(
-            r["version"],
-            r["date"],
-            str(breaking_count) if breaking_count else "-",
-            str(feature_count) if feature_count else "-",
-        )
-
-    console.print(table)
+        print(f"{r['version']}  {r['date']}  breaking={len(cats['breaking'])}  features={len(cats['features'])}")
 
 
 def main(
@@ -533,17 +505,17 @@ def main(
     current_doc_version = get_current_archive_version(readme_file)
     baseline = since or current_doc_version
     if baseline:
-        console.print(f"Fetching releases since: [cyan]{baseline}[/cyan]")
+        print(f"Fetching releases since: {baseline}")
     else:
-        console.print("No baseline version found, fetching all releases")
+        print("No baseline version found, fetching all releases")
 
     try:
         # Fetch releases
-        console.print(Panel(f"Querying GitHub API: {GITHUB_API_BASE}", title="Fetch Releases", border_style="blue"))
+        print(f"Querying GitHub API: {GITHUB_API_BASE}")
         releases = fetch_releases(since_version=baseline)
 
         if not releases:
-            console.print("[yellow]No new releases found[/yellow]")
+            print("No new releases found")
             update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
             raise typer.Exit(code=0)
 
@@ -553,12 +525,10 @@ def main(
         else:
             new_releases = releases
 
-        console.print(
-            f"Found [cyan]{len(releases)}[/cyan] total releases, [green]{len(new_releases)}[/green] newer than baseline"
-        )
+        print(f"Found {len(releases)} total releases, {len(new_releases)} newer than baseline")
 
         if not new_releases:
-            console.print("[yellow]No new releases found[/yellow]")
+            print("No new releases found")
             update_lock_file(resolved_dir, status="success", last_version=baseline or "", releases_processed=0)
             raise typer.Exit(code=0)
 
@@ -566,11 +536,11 @@ def main(
         display_release_summary(releases)
 
         if dry_run:
-            console.print(Panel("Dry run mode - no files modified", title="Dry Run", border_style="yellow"))
+            print("Dry run mode - no files modified")
             # Still build the content to show what would change
             version_content = build_version_section(new_releases, baseline)
-            console.print("\n[bold]Would write to Version Information section:[/bold]\n")
-            console.print(version_content)
+            print("\nWould write to Version Information section:\n")
+            print(version_content)
             raise typer.Exit(code=0)
 
         # Build and write version section
@@ -579,14 +549,10 @@ def main(
 
         latest_version = releases[0]["version"]
 
-        console.print(
-            Panel(
-                f"Updated archive README.md Version Information section\n"
-                f"Latest version: {latest_version}\n"
-                f"Releases processed: {len(new_releases)}",
-                title="Success",
-                border_style="green",
-            )
+        print(
+            f"Updated archive README.md Version Information section\n"
+            f"Latest version: {latest_version}\n"
+            f"Releases processed: {len(new_releases)}"
         )
 
         update_lock_file(
@@ -595,11 +561,11 @@ def main(
 
     except SyncError as e:
         update_lock_file(resolved_dir, status="failure")
-        error_console.print(Panel(f"{e}", title="Sync Failed", border_style="red"))
+        print(f"Sync failed: {e}", file=sys.stderr)
         raise typer.Exit(code=1) from e
     except KeyboardInterrupt:
         update_lock_file(resolved_dir, status="failure")
-        console.print("\nSync cancelled by user")
+        print("\nSync cancelled by user")
         raise typer.Exit(code=130) from None
 
 
