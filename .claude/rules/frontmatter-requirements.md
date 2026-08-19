@@ -45,15 +45,6 @@ is `github`, `git-subdir`, `url`, or `npm`, not a local path) in `skills:`. Refe
 only in prose (a `Skill(skill="...")` call, a routing table), where a dangling name degrades to a
 harmless no-op instead of silently starting an agent with no fallback and no signal.
 
-## `skills:` — Never List an Externally-Sourced Plugin's Skill
-
-An agent's `skills:` field preloads skill content at subagent startup. A listed skill absent from
-the host (an uninstalled plugin) is a **silent no-op** — no error, agent just starts without that
-content. Never name a skill from an externally-sourced plugin (a marketplace entry whose `source`
-is `github`, `git-subdir`, `url`, or `npm`, not a local path) in `skills:`. Reference such skills
-only in prose (a `Skill(skill="...")` call, a routing table), where a dangling name degrades to a
-harmless no-op instead of silently starting an agent with no fallback and no signal.
-
 ## Multi-Ecosystem Frontmatter Preservation
 
 A top-level `mcp:` key also targets OpenCode. Treat it and its nested content as opaque: copy
