@@ -1143,7 +1143,13 @@ def _handle_update_groomed(
     out = output or Output()
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
-    if section_name is not None and resolve_section_name(section_name) == SectionKey.ACCEPTANCE_CRITERIA.value:
+    # Resolve through the same normalizer the write path below uses (not the
+    # narrower resolve_section_name alone) so a recoverable form — surrounding
+    # whitespace, or a legacy `unknown__acceptance_criteria` key — that
+    # `_write_groomed_to_reference` -> `_normalize_section_key` would route to
+    # `acceptance_criteria` also triggers this overlap warning, instead of
+    # silently skipping it (#3015 Greptile review finding).
+    if section_name is not None and _normalize_section_key(section_name) == SectionKey.ACCEPTANCE_CRITERIA.value:
         _check_ac_overlap(item, out)
 
     _write_groomed_to_reference(
@@ -1204,7 +1210,13 @@ def _handle_batch_groomed(
     get_config().backend.put_work_item(batch_item)
     out.info(f"Updated {item.reference} with {len(written)} groomed section(s)")
 
-    if any(resolve_section_name(name) == SectionKey.ACCEPTANCE_CRITERIA.value for name in sections):
+    # Check the actual normalized keys just written (`written`), not a
+    # re-resolution of the raw input names via resolve_section_name — the
+    # latter misses recoverable forms (whitespace, legacy `unknown__` keys)
+    # that `_normalize_section_key` above already routed to
+    # `acceptance_criteria`, which silently skipped this overlap warning
+    # (#3015 Greptile review finding).
+    if SectionKey.ACCEPTANCE_CRITERIA.value in written:
         _check_ac_overlap(item, out)
 
     _reconcile_groomed_item(batch_item, out)

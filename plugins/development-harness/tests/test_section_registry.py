@@ -472,6 +472,36 @@ def test_heading_to_section_key_resolves_registered_alias() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Two headings resolving to the same section merge, not overwrite
+# (#3015 Greptile review finding: "## Fact-Check" and its alias "## Facts
+# check" both resolve to "fact_check" via resolve_section_name, but the
+# second heading's dict assignment previously replaced the first heading's
+# Section outright — permanently dropping its entries on reconciliation)
+# ---------------------------------------------------------------------------
+
+
+def test_parse_issue_body_canonical_heading_and_alias_merge_not_overwrite() -> None:
+    """A canonical heading and a same-key alias heading in one body merge, not overwrite.
+
+    Tests: github_sync.parse_issue_body two-heading collision on one section_key
+    Why: "## Fact-Check" and "## Facts check" both resolve to "fact_check".
+         Assigning ``parsed_sections[section_key] = Section(entries=entries)``
+         unconditionally for the second heading discarded the first heading's
+         entries outright instead of merging them.
+    """
+    body = (
+        "## Fact-Check\n\n<div><sub>2026-01-01T00:00:00Z</sub>\n\nFirst entry.\n</div>\n\n"
+        "## Facts check\n\n<div><sub>2026-01-02T00:00:00Z</sub>\n\nSecond entry.\n</div>\n"
+    )
+
+    item = github_sync.parse_issue_body(body)
+
+    section = item.sections["fact_check"]
+    assert isinstance(section, Section)
+    assert {e.content for e in section.entries} == {"First entry.", "Second entry."}
+
+
+# ---------------------------------------------------------------------------
 # Write-back unknown__-prefix healing tries the reconstructed heading too
 # (post-#2987 Copilot pass finding: the write boundary's unknown__ recovery
 # tried only the raw stripped key, missing multi-word aliases whose stripped
@@ -524,6 +554,52 @@ def test_handle_update_groomed_ac_overlap_check_fires_for_every_ac_spelling(
     out = Output()
 
     ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
+
+    assert any("Acceptance Criteria" in w for w in out.warnings)
+
+
+@pytest.mark.parametrize("section_name", ["unknown__acceptance_criteria", " acceptance_criteria "])
+def test_handle_update_groomed_ac_overlap_check_fires_for_recoverable_spellings(
+    section_name: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The AC-overlap gate also fires for forms only _normalize_section_key recovers.
+
+    Tests: operations._handle_update_groomed -> _check_ac_overlap gating,
+           parametrized over a legacy ``unknown__`` key and a whitespace-padded
+           canonical key — both of which ``_write_groomed_to_reference`` below
+           (via ``_normalize_section_key``) routes to ``acceptance_criteria``.
+    Why: The gate previously called the narrower ``resolve_section_name``
+         directly on the raw ``section_name``, which does not strip whitespace
+         and does not recover ``unknown__``-prefixed keys — so content that
+         the write path actually stored under ``acceptance_criteria`` silently
+         skipped the overlap warning (#3015 Greptile review finding).
+    """
+    item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
+    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *a, **k: None)
+    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *a, **k: None)
+    out = Output()
+
+    ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
+
+    assert any("Acceptance Criteria" in w for w in out.warnings)
+
+
+def test_handle_batch_groomed_ac_overlap_check_fires_for_recoverable_spelling() -> None:
+    """The batch AC-overlap gate fires when the batch keys, not raw input names, contain the AC key.
+
+    Tests: operations._handle_batch_groomed -> _check_ac_overlap gating
+    Why: The gate previously re-resolved the raw ``sections`` keys via
+         ``resolve_section_name`` instead of checking the already-normalized
+         ``written`` keys, so a legacy ``unknown__acceptance_criteria`` input
+         key silently skipped the overlap warning even though the batch write
+         above it stored the content under ``acceptance_criteria``
+         (#3015 Greptile review finding).
+    """
+    item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
+    ops.get_config().backend.put_work_item(item)
+    out = Output()
+
+    ops._handle_batch_groomed(item, {"unknown__acceptance_criteria": "AC content"}, "owner/repo", output=out)
 
     assert any("Acceptance Criteria" in w for w in out.warnings)
 

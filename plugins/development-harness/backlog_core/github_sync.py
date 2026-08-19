@@ -283,14 +283,17 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
         # "## Facts check") resolves to its canonical key here too instead of
         # only an exact SECTION_HEADING display-text match.
         section_key = _rendering.resolve_section_name(heading_name)
-        if section_key is not None:
-            entries = parse_entries(content, show="all")
-            parsed_sections[section_key] = Section(entries=entries)
-        else:
-            # Unknown heading: store with prefixed key so it survives round-trips.
-            unknown_key = heading_to_unknown_key(heading_name)
-            entries = parse_entries(content, show="all")
-            parsed_sections[unknown_key] = Section(entries=entries)
+        target_key = section_key if section_key is not None else heading_to_unknown_key(heading_name)
+        entries = parse_entries(content, show="all")
+        # A canonical heading and one of its aliases (e.g. "## Fact-Check" and
+        # "## Facts check") both resolve to the same target_key. Merge into
+        # any entries already parsed for that key instead of overwriting them
+        # outright, which would silently drop the earlier heading's content
+        # (#3015 Greptile review finding).
+        existing_section = parsed_sections.get(target_key)
+        if isinstance(existing_section, Section):
+            entries = _merge_entries(existing_section.entries, entries)
+        parsed_sections[target_key] = Section(entries=entries)
 
     return BacklogItem(
         title=base.title,
