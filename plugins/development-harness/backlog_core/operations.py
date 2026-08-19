@@ -938,7 +938,13 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
     if canonical is not None:
         return canonical
     if name.startswith("unknown__"):
-        return name
+        # A caller writing back a previously-stored unknown__ key (e.g. a
+        # round-trip through view_item -> groom_item) must heal the exact
+        # duplication the write-boundary validation exists to prevent when
+        # the name has since become canonical — never just echo the stored
+        # unknown__ key back verbatim, which would preserve the duplication.
+        recovered = resolve_section_name(name.removeprefix("unknown__"))
+        return recovered if recovered is not None else name
     key = heading_to_unknown_key(name)
     _warn_unregistered_section(name, key, output)
     return key
