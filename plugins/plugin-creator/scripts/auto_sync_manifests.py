@@ -832,14 +832,26 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
     updated = False
     version = "0.0.0"
     version_set = False
+    manifest_versions: dict[str, str] = {}
     for manifest_path, sync_components in _plugin_manifest_paths(plugin_name):
         manifest_updated, manifest_version = _update_plugin_manifest(
             manifest_path, changes, sync_components=sync_components
         )
         updated |= manifest_updated
+        manifest_versions[str(manifest_path)] = manifest_version
         if sync_components or not version_set:
             version = manifest_version
             version_set = True
+
+    # Each manifest variant (.claude-plugin, .codex-plugin, ...) bumps from its
+    # own base version independently by design (see
+    # test_update_plugin_json_bumps_all_harness_manifests) -- they are not
+    # forced into numeric agreement. Surface divergence instead of leaving it
+    # silent, so a widening gap is visible in hook/CI output.
+    if updated and len({*manifest_versions.values()}) > 1:
+        drift = ", ".join(f"{path}={ver}" for path, ver in sorted(manifest_versions.items()))
+        print(f"Info: {plugin_name} manifest versions diverge across harnesses ({drift})")
+
     return updated, version
 
 

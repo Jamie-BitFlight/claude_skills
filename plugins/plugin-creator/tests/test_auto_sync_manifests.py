@@ -235,6 +235,46 @@ class TestIdempotency:
         assert json.loads(codex_manifest.read_text(encoding="utf-8"))["version"] == "1.0.2"
         assert json.loads(cursor_manifest.read_text(encoding="utf-8"))["version"] == "1.0.3"
 
+    def test_update_plugin_json_reports_manifest_version_divergence(
+        self, tmp_path: Path, monkeypatch: Any, capsys: Any
+    ) -> None:
+        """Verify divergent per-manifest versions are surfaced, not silent.
+
+        Tests: update_plugin_json's post-bump divergence report
+        How: Reuse the harness-manifest fixture where .claude-plugin, .codex-plugin,
+             and .cursor-plugin bump to three different final versions, then check stdout
+        Why: Each manifest bumps from its own base version by design (see
+             test_update_plugin_json_bumps_all_harness_manifests) -- they are not forced
+             into agreement -- but a widening gap must be visible in hook/CI output rather
+             than silently accumulating
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        plugin_name = "test-plugin"
+        original_data = {"name": plugin_name, "version": "1.0.0", "skills": ["./skills/existing/"]}
+        _make_plugin_json(tmp_path, plugin_name, original_data)
+        codex_manifest = tmp_path / "plugins" / plugin_name / ".codex-plugin" / "plugin.json"
+        codex_manifest.parent.mkdir(parents=True)
+        codex_manifest.write_text(json.dumps({"name": plugin_name, "version": "1.0.1"}, indent=2) + "\n")
+
+        def read_head(path: str) -> dict[str, object]:
+            if ".codex-plugin" in path:
+                return {"name": plugin_name, "version": "1.0.1"}
+            return dict(original_data)
+
+        monkeypatch.setattr(auto_sync, "_read_head_json", read_head)
+
+        # Act
+        updated, _version = auto_sync.update_plugin_json(plugin_name, _changes_with_modified_skill())
+        out = capsys.readouterr().out
+
+        # Assert -- divergence reported by path, with each manifest's own final version
+        assert updated is True
+        assert ".claude-plugin/plugin.json=1.0.1" in out
+        assert ".codex-plugin/plugin.json=1.0.2" in out
+        assert "diverge" in out.lower()
+
     def test_update_marketplace_json_no_double_bump_on_retry(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Verify marketplace version does NOT double-bump on retry.
 
