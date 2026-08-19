@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from backlog_core.backends._github_work_item_versions import WorkItemVersion
 from backlog_core.gh_client import (
     _get_repo_node_id,
     _is_not_found_error,
@@ -40,7 +41,14 @@ from backlog_core.gh_client import (
     try_get_github,
     view_enrich_from_github,
 )
-from backlog_core.models import BacklogError, BacklogItem, Output, ViewItemResult
+from backlog_core.models import (
+    BacklogError,
+    BacklogItem,
+    ContentConflictError,
+    ContentUnavailableError,
+    Output,
+    ViewItemResult,
+)
 
 from tests.graphql_factories import (
     make_create_issue_response,
@@ -1222,6 +1230,59 @@ class TestViewEnrichFromGithub:
 
         # Assert
         assert enriched is False
+
+    def test_uses_resolve_version_body_when_provided(self, mocker: MockerFixture) -> None:
+        """A successful resolve_version callback's body wins over the raw issue body.
+
+        Tests: view_enrich_from_github resolve_version success path (#2956 root cause A)
+        Why: backlog_groom writes land in the agent-owned authoritative body (head
+             record + audit comment), not the raw human-owned issue.body — the two
+             can diverge. resolve_version exists precisely so the view reflects
+             whichever body a caller actually wrote to; a passing resolver must win.
+        """
+        # Arrange
+        issue_node = make_issue_node(number=42, title="Item", state="OPEN", body="Raw human-owned body")
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node))
+        result = ViewItemResult()
+        resolved_version = WorkItemVersion(revision="deadbeef", body="Authoritative agent-managed body")
+
+        # Act
+        enriched = view_enrich_from_github(result, "42", resolve_version=lambda *_args: resolved_version)
+
+        # Assert
+        assert enriched is True
+        assert result.body == "Authoritative agent-managed body"
+
+    @pytest.mark.parametrize(
+        "error", [BacklogError("boom"), ContentConflictError("boom"), ContentUnavailableError("boom")]
+    )
+    def test_falls_back_to_raw_body_when_resolve_version_raises(self, mocker: MockerFixture, error: Exception) -> None:
+        """A raising resolve_version degrades to the raw issue body, not a failed view.
+
+        Tests: view_enrich_from_github resolve_version failure fallback,
+               parametrized over every exception class the call site suppresses.
+        Why: A content-store hiccup (unavailable, conflicting/malformed head or
+             comment) must not break the whole view — it should look exactly like
+             the pre-fix behavior (raw body), not raise past the caller.
+        """
+        # Arrange
+        issue_node = make_issue_node(number=42, title="Item", state="OPEN", body="Raw human-owned body")
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=mock_repo)
+        mocker.patch("backlog_core.gh_client._graphql_request", return_value=make_issue_by_number_response(issue_node))
+        result = ViewItemResult()
+
+        def _raising_resolver(*_args: object) -> WorkItemVersion:
+            raise error
+
+        # Act
+        enriched = view_enrich_from_github(result, "42", resolve_version=_raising_resolver)
+
+        # Assert
+        assert enriched is True
+        assert result.body == "Raw human-owned body"
 
 
 # ---------------------------------------------------------------------------

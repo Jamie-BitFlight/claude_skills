@@ -11,6 +11,7 @@ transport (established in Phase 1, #773).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -28,6 +29,8 @@ from .models import (
     BackendStatus,
     BacklogError,
     BacklogItem,
+    ContentConflictError,
+    ContentUnavailableError,
     GitHubUnavailableError,
     IssueLocalFields,
     IssueStatus,
@@ -54,6 +57,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from github.Repository import Repository
+
+    from .backends._github_work_item_versions import WorkItemVersion
 
 
 class _GraphQLRequester(Protocol):
@@ -1708,8 +1713,23 @@ def fetch_open_issues_by_title(repo: Repository, issues: list[IssueNode] | None 
 # ---------------------------------------------------------------------------
 
 
-def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+def view_enrich_from_github(
+    result: ViewItemResult,
+    issue_num: str,
+    repo: str = "",
+    resolve_version: Callable[[Repository, str, str, IssueNode], WorkItemVersion] | None = None,
+) -> bool:
     """Enrich view result with live GitHub issue data.
+
+    GitHub carries two body representations for a work item: the raw human-owned
+    ``issue.body``, and (for backends that maintain one) the agent-owned authoritative
+    body tracked via a Contents-API head record and audit comment — see
+    ``backlog_core/ARCHITECTURE.md`` "GitHub writable records". ``backlog_groom``
+    writes land in the second representation. When *resolve_version* is provided,
+    it is used to resolve that authoritative body instead of the raw issue body, so
+    callers see the same content the write path actually targets. A resolution
+    failure (content store unavailable, conflicting/malformed head or comment) falls
+    back to the raw issue body rather than failing the whole view.
 
     Returns:
         True if GitHub data was fetched, False if unavailable or errored.
@@ -1722,10 +1742,14 @@ def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = 
         gh_issue = _fetch_issue_graphql(gh_repo, owner, repo_name, int(issue_num))
     except (BacklogError, GithubException):
         return False
+    body = gh_issue["body"]
+    if resolve_version is not None:
+        with contextlib.suppress(BacklogError, ContentConflictError, ContentUnavailableError):
+            body = resolve_version(gh_repo, owner, repo_name, gh_issue).body
     result.number = gh_issue["number"]
     result.title = gh_issue["title"]
     result.state = gh_issue["state"].lower()  # GraphQL returns "OPEN"/"CLOSED"; callers expect lowercase
-    result.body = gh_issue["body"]
+    result.body = body
     result.labels = [lb["name"] for lb in gh_issue["labels"]]
     ms = gh_issue["milestone"]
     result.milestone = ms["title"] if ms else ""
