@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Agentskill Kaizen",
-    "shortDescription": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, missing tooling opportunities, and user frustration signals for continuous improvement",
-    "longDescription": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, missing tooling opportunities, and user frustration signals for continuous improvement",
+    "shortDescription": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, and missing tooling opportunities for continuous improvement",
+    "longDescription": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, and missing tooling opportunities for continuous improvement",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],

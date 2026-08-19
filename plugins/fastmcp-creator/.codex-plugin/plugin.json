@@ -9,7 +9,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Fastmcp Creator",
-    "shortDescription": "Build FastMCP 3.x Python MCP servers \u2014 covers provider/transform architecture (including CodeMode, Tool Search, and server-level transforms), component versioning, session state, authorization (MultiAuth, PropelAuth, connection-pooled token verifiers), evaluation creation, Pydantic validation, async patterns, STDIO and HTTP transports, nginx reverse proxy deployment, background tasks, Prefab Apps UI, security patterns, client SDK usage, testing, deployment, and migration from FastMCP v2. TypeScript is a legacy reference only and is not updated for v3.",
+    "shortDescription": "Build FastMCP 3.x Python MCP servers \u2014 covers provider/transform architecture (including CodeMode, Tool Search, and server-level transforms), component versioning, session state, authorization (MultiAuth, PropelAuth, connection-pooled...",
     "longDescription": "Build FastMCP 3.x Python MCP servers \u2014 covers provider/transform architecture (including CodeMode, Tool Search, and server-level transforms), component versioning, session state, authorization (MultiAuth, PropelAuth, connection-pooled token verifiers), evaluation creation, Pydantic validation, async patterns, STDIO and HTTP transports, nginx reverse proxy deployment, background tasks, Prefab Apps UI, security patterns, client SDK usage, testing, deployment, and migration from FastMCP v2. TypeScript is a legacy reference only and is not updated for v3.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
