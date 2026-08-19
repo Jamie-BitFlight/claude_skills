@@ -48,14 +48,30 @@ jobs:
             plugins/plugin-creator/scripts/auto_sync_manifests.py \
             --sync-marketplace
 
-      - name: Commit if changed
+      - name: Commit and push if changed
         run: |
           if git diff HEAD --quiet .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'; then
             echo "No plugin or marketplace changes to commit"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'
-            git commit -m "chore: repair plugin version drift and sync marketplace [skip ci]"
-            git push
+            exit 0
           fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'
+          git commit -m "chore: repair plugin version drift and sync marketplace [skip ci]"
+
+          # A concurrent writer may have advanced main since checkout -- retry
+          # on a non-fast-forward rejection by rebasing our repair commit onto
+          # the new tip before pushing again, so the authoritative repair
+          # never silently drops (issue #3027).
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt/3) -- fetching and rebasing"
+            git fetch origin main
+            git rebase origin/main
+          done
+
+          echo "::error::Failed to push repair commit after 3 attempts"
+          exit 1
