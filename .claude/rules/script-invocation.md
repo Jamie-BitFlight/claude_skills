@@ -34,13 +34,6 @@ same probe resolved into an isolated `~/.cache/uv/environments-v2/` environment 
 `.venv` untouched. `--quiet`/`-q` is a global option and order-independent; `--active` is the only
 semantic difference between the two forms in use across this repo.
 
-<!--
-A 2026-08-19 audit (`.tmp/scratch/analysis/astral-delta.md` Part 4) found 67 tracked scripts still
-carry the `--active` shebang despite this rule. That mass rewrite is tracked separately as backlog
-item #3007 and is intentionally out of scope here — this rule states the canonical form going
-forward; it does not assert the 67 files already match it.
--->
-
 SOURCE: empirical uv 0.12.5 probe run 2026-08-19 during the Astral plugin adoption (PR #3019);
 corroborates AGENTS.md Gotcha #12.
 

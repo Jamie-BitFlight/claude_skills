@@ -118,8 +118,8 @@ not create and activate a virtualenv to work around it.
 ## Aspirational vs current: `--frozen` / `--locked` in CI
 
 Astral's `astral/uv` do/don't guidance (mirrored in the old `uv/SKILL.md:987,998`) says to use
-`--locked`/`--frozen` on every `uv run`/`uv sync` in CI. As of this migration that policy is now
-enforced: every project-mode `uv run`/`uv sync` invocation in `.github/workflows/*.yml` passes
+`--locked`/`--frozen` on every `uv run`/`uv sync` in CI. This is enforced: every project-mode
+`uv run`/`uv sync` invocation in `.github/workflows/*.yml` passes
 `--frozen` (sync) or `--locked` (run) — see `.claude/rules/ci-workflows.md` for the CI modification
 protocol this was applied under. PEP 723 `--script` invocations are exempt: they resolve from their
 own inline metadata block, not the root `uv.lock`, so neither flag applies to them.
