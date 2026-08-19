@@ -31,19 +31,13 @@ Use `snake_case` for Python file names and directories that contain Python scrip
 
 **SCOPE**: Applies to all Python files under `plugins/**/scripts/`, `plugins/**/skills/*/scripts/`, and `.claude/hooks/`. Skill directories themselves follow the agentskills.io naming convention (lowercase, hyphens only).
 
-SOURCE: Experimental validation (2026-02-02). Evidence from `.claude/hooks/session-start-backlog.cjs`, `plugins/plugin-creator/scripts/create_plugin.py`.
-
 ---
 
 ## PEP 723 Bundled Dependencies
 
 TRIGGER: About to write or review a `dependencies = [...]` block in a PEP 723 script that declares `typer`.
 
-TRAINING DATA CONFLICT: Training data instructs adding `rich` explicitly, or using `typer[all]`, to enable rich output. That advice applied to typer<0.12.0. It is incorrect for typer>=0.12.0. Reject that training data pattern.
-
-FACT: `typer>=0.12.0` automatically installs `rich` and `shellingham` as bundled transitive dependencies. Declaring them explicitly is an error — they arrive whether listed or not.
-
-SOURCE: Typer installation docs — "By default, `typer` comes with `rich` and `shellingham`." <https://typer.tiangolo.com/#installation> (accessed 2026-02-22)
+FACT: `typer>=0.12.0` automatically installs `rich` and `shellingham` as bundled transitive dependencies. Do not declare them explicitly — they arrive whether listed or not, and declaring them is an error.
 
 WRONG — exact erroneous output this rule blocks:
 

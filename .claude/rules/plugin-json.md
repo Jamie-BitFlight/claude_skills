@@ -47,5 +47,3 @@ claude plugin validate {plugin-directory}
 | `agents: Invalid input` | Used `"./agents/"` instead of array | Change to `["./agents/file.md"]` |
 | `name: Required` | Missing name field | Add `"name": "plugin-name"` |
 | Invalid JSON syntax | Malformed JSON | Validate with `python3 -m json.tool plugin.json` |
-
-**SOURCE:** <https://code.claude.com/docs/en/plugins.md> — "agents/" listed as default auto-discovered location (accessed 2026-04-07); replace-on-declare behavior confirmed by incident record in `.claude/rules/plugin-development.md` (2026-03-17: 17 of 19 agents invisible when 2-entry `agents` key declared)

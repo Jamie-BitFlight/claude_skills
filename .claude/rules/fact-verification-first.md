@@ -29,7 +29,3 @@ This rule is **proactive**: it fires on the incoming prompt BEFORE any planning,
 The `/fact-check` skill is **reactive**: it fires AFTER content is written, triggered by `UNVERIFIED` tags or backlog items flagged for fact verification. It spawns parallel verification agents and produces VERIFIED/REFUTED/INCONCLUSIVE verdicts with citations.
 
 These two mechanisms address different lifecycle phases and do not overlap. Satisfying this rule does not substitute for the reactive `/fact-check` pass when that skill is triggered.
-
-## Source
-
-SOURCE: `research/ai-design-tools/huashu-design.md` lines 110–112 — Principle #0 "Fact Verification First" from Huashu Design v2.0 (verified 2026-05-03). Quote: "when the task mentions a specific product / technology / event (e.g., 'DJI Pocket 4', 'Nano Banana Pro', 'Gemini 3 Pro'), the first action **must** be a `WebSearch` to confirm existence, release status, current version, and specs. No claims from training-corpus memory. Cost of a search: ~10 seconds. Cost of a wrong assumption: 1–2 hours of rework."

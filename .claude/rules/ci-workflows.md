@@ -13,7 +13,7 @@ Before writing/modifying workflow YAML:
 
 1. Read existing workflow file(s) in `.github/workflows/` to understand current state
 2. Identify specific problem/requirement (broken, missing, needs change)
-3. Research best practices and search established patterns in mature projects (CPython, Rust, TypeScript)
+3. Research best practices and search established patterns in mature projects
 4. Document findings: patterns, trade-offs, scenario fit
 
 **Gate**: State what pattern to use and why, citing at least one external reference.
@@ -65,7 +65,7 @@ After execution, verify:
 
 ## Quality Gate Pattern (Required)
 
-Repository uses `alls-green` quality gate pattern (following CPython established practice).
+Repository uses the `alls-green` quality gate pattern.
 
 **How it works:**
 
@@ -105,5 +105,3 @@ flowchart TD
     Q4 -->|Yes| OK[Correct — gate has visibility]
     Q4 -->|No| Reject3[Add to needs — gate cannot wait for invisible jobs]
 ```
-
-SOURCE: CPython `build.yml` quality gate pattern, GitHub Actions docs on `continue-on-error` behavior and branch protection interaction (2026-02-14)

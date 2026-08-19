@@ -26,12 +26,10 @@ flowchart TD
     Q2 -->|No — general interpretation| Q3{Prompt optimization or AI-facing content?}
     Q3 -->|Yes| CCO[contextual-ai-documentation-optimizer agent]
     Q3 -->|No| CG
-    Explore -.->|⚠️ Haiku-based ~50% hallucination rate on ambiguous queries| Warning[Never use for reasoning tasks]
+    Explore -.->|⚠️ Haiku-based, unreliable on ambiguous queries| Warning[Never use for reasoning tasks]
 ```
 
-**Explore Failure Modes** (validated 2026-02-02, 2/4 accuracy):
-- Semantic ambiguity: matched pre-commit hooks instead of Claude Code hooks
-- Premature termination: declared "not found" instead of deeper search
-- Fabricated implementations: suggested bash when repo uses Python/JavaScript
-
-SOURCE: Experimental validation (2026-02-02). Context-gathering: 4/4 correct. Explore: 2/4 correct.
+**Never use Explore for reasoning tasks.** Its failure modes:
+- Semantic ambiguity: matches the wrong domain concept (e.g. pre-commit hooks instead of Claude Code hooks)
+- Premature termination: declares "not found" instead of searching deeper
+- Fabricated implementations: suggests a technology/pattern the repo doesn't use
