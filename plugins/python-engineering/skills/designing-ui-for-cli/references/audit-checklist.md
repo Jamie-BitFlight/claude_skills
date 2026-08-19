@@ -1,12 +1,12 @@
 # Audit Checklist
 
-Run systematic technical quality checks across 5 dimensions for any CLI/TUI surface. Document findings; do not fix in this stage. Re-run the audit after fixes are applied (see Re-run loop at the end of this file).
+Run systematic technical quality checks across the dimensions below for any CLI/TUI surface. Document findings; do not fix in this stage. Re-run the audit after fixes are applied (see Re-run loop at the end of this file).
 
 This is a code-level audit, not a design critique. Check what is measurable and verifiable in the implementation. Tag every issue with a P0-P3 severity. The aggregate /20 score is advisory; the blocking signal is per-issue P0 tagging.
 
-## Diagnostic Scan — 5 Dimensions
+## Diagnostic Scan — Dimensions
 
-Run comprehensive checks across the 5 dimensions below. Score each dimension 0-4 using the criteria in each section.
+Run comprehensive checks across the dimensions below. Score each dimension 0-4 using the criteria in each section.
 
 ### 1. Inclusion & Accessibility
 
@@ -30,7 +30,7 @@ Edge-case categories (port from the harden stage):
 - **Network errors**: CLI exits with a non-zero exit code, prints a structured error to stderr, suggests a recovery action
 - **Large datasets**: pagination or virtual-list strategy for ≥1000 items; never load-and-render everything in a single pass
 
-Cognitive load checklist (port verbatim, 8 items):
+Cognitive load checklist (port verbatim):
 
 - [ ] **Single focus**: Can the user complete their primary task without distraction from competing elements? (TUI: no competing terminal UI)
 - [ ] **Chunking**: Is information presented in digestible groups (≤4 items per group)?
@@ -51,7 +51,7 @@ Cognitive load checklist (port verbatim, 8 items):
 - Dashboard widgets: ≤4 key metrics visible without scrolling
 - Decision points: ≤4 visible options (more causes analysis paralysis)
 
-**Common cognitive load violations** (8 violations, with TUI examples):
+**Common cognitive load violations** (with TUI examples):
 
 1. **Wall of Options** — `--help` listing 30 flags flat with no hierarchy. Fix: group into categories, highlight the most common, use progressive disclosure (`--help` shows top-level; `--help-all` shows everything).
 2. **Memory Bridge** — output from one command must be remembered to act on the next; state not retained across invocations. Fix: keep relevant context visible, or surface it where it is needed.

@@ -1,7 +1,7 @@
 # Proactive Fix Gate (Required Before Any Self-Initiated Fix)
 
 Before acting on any problem discovered during a session — regardless of how obvious the fix
-appears — execute the following three steps in order. All three must complete before touching
+appears — execute the following steps in order. All must complete before touching
 any file.
 
 **Step 1 — Domain skill loaded?**

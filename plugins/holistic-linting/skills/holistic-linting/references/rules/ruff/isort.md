@@ -1,6 +1,6 @@
 # I: isort Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 12 rules **Purpose**: Import Sorting and Organization
+**Source**: Official Ruff Documentation **Purpose**: Import Sorting and Organization
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

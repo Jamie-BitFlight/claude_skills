@@ -88,8 +88,8 @@ Choose based on your needs:
 
 | Aspect | Coverage |
 |--------|----------|
-| **Diagram Types** | 24 types fully documented |
-| **Examples** | 60+ complete, working examples |
+| **Diagram Types** | All types fully documented (see [DIAGRAM_INDEX.md](./DIAGRAM_INDEX.md)) |
+| **Examples** | Complete, working examples for every pattern |
 | **Syntax Patterns** | All major constructs and variations |
 | **Configuration** | Theme, styling, custom options |
 | **Version Support** | v9.4.0+ through v11.12.3 |

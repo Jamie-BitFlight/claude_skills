@@ -21,7 +21,7 @@ named external constraint. It does NOT mean:
 
 ## Required Fields
 
-All four fields are mandatory. Omitting any field makes the declaration incomplete.
+All fields below are mandatory. Omitting any field makes the declaration incomplete.
 
 ```text
 BLOCKED: [specific reason the permanent solve cannot be completed now]

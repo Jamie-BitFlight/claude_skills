@@ -21,7 +21,7 @@ customisable configuration that Phase 3 reads directly.
 
 ## When This Skill Activates
 
-**User-invoked (`/dh:setup-skill-discovery`)**: Run the full interactive wizard (Steps 1–6).
+**User-invoked (`/dh:setup-skill-discovery`)**: Run the full interactive wizard (all steps below).
 
 **Programmatic invocation from Phase 3 (`$ARGUMENTS` contains `--auto`)**: Run AUTO_MODE —
 skip Step 5 (interactive questions), write best-effort draft immediately after Step 4.
@@ -44,7 +44,7 @@ file at the workflow step where it is needed — do not pre-load all references 
 flowchart TD
     Start([Skill invoked]) --> ArgCheck{"$ARGUMENTS contains --auto?"}
     ArgCheck -->|Yes| AutoMode[AUTO_MODE active\nSkip Step 5\nWrite best-effort draft at end of Step 4]
-    ArgCheck -->|No| Interactive[Interactive mode\nAll 6 steps run\nUser confirms before write]
+    ArgCheck -->|No| Interactive[Interactive mode\nAll steps run\nUser confirms before write]
     AutoMode --> S1
     Interactive --> S1
     S1([Step 1: Scan repo])

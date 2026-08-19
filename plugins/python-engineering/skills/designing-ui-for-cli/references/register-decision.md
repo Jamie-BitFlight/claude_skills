@@ -11,7 +11,7 @@ A CLI rarely sits in both registers at once. A product-cli MAY contain one brand
 
 ## First-match-wins decision rule
 
-Apply the four checks in order. The first one that yields a register name is the answer. Stop there.
+Apply the checks below in order. The first one that yields a register name is the answer. Stop there.
 
 1. **Task cue.** Words in the task itself. "splash", "demo", "marketing", "installer", "welcome", "onboarding-art" → brand-cli. "dashboard", "monitor", "manage", "audit", "migrate", "inspect" → product-cli.
 2. **Surface in focus.** What is the CLI surface being designed? An interactive welcome screen or one-shot art moment → brand-cli. A subcommand that processes data, a panel a user returns to, a flag-driven utility → product-cli.
@@ -66,7 +66,7 @@ The fifth row shows the surface check overriding PRODUCT.md when the task itself
 - Display-style output where labels suffice (PyFiglet titles on a `--list` subcommand)
 - Reinventing standard subcommand affordances for flavour (custom `--help` shapes, non-GNU flag conventions)
 
-## Register splits across six dimensions
+## Register splits across dimensions
 
 The register modulates each design dimension. When a task asks for "bolder", "quieter", "more delight", or similar adjustment, look up which register is in play and apply the matching column.
 

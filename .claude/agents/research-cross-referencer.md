@@ -8,7 +8,7 @@ model: haiku
 
 Reads a new or refreshed research entry, scans the `research/README.md` index to find
 related entries, and appends a `## Cross-References` table to the entry. Enables readers
-to navigate the research knowledge base without manually searching 162+ entries.
+to navigate the research knowledge base without manually searching every entry.
 
 **Input** (from orchestrator prompt):
 

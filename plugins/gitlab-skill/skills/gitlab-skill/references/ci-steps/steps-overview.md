@@ -68,7 +68,7 @@ spec:
 
 ### Document 2: Definition
 
-Specifies step implementation. Three patterns:
+Specifies step implementation. Patterns:
 
 #### Pattern 1: Environment Variables
 

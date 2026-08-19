@@ -1,6 +1,6 @@
 # D: pydocstyle Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 70 rules **Purpose**: Docstring Convention Enforcement
+**Source**: Official Ruff Documentation **Purpose**: Docstring Convention Enforcement
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

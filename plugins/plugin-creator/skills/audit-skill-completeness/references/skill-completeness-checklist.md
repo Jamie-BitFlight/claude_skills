@@ -6,7 +6,7 @@ A checklist for evaluating whether a skill provides everything an AI agent needs
 
 ## agentskills.io Best Practice Checks
 
-Five checks derived from agentskills.io design principles. Each check applies to any skill, regardless of purpose type. Evaluate PASS / PARTIAL / FAIL with evidence from SKILL.md.
+Checks derived from agentskills.io design principles. Each check applies to any skill, regardless of purpose type. Evaluate PASS / PARTIAL / FAIL with evidence from SKILL.md.
 
 SOURCE: agentskills.io/skill-creation/best-practices (accessed 2026-05-23). Principle quotes are paraphrased from the source; verdict criteria (PASS/PARTIAL/FAIL) are operationalized from the principles and are not verbatim from agentskills.io.
 

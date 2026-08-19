@@ -22,7 +22,7 @@ Provides: hook event types (13 events), hook types (command, prompt, agent), hoo
 
 4. `Skill(skill="plugin-creator:claude-subagent-reference")`
 
-Provides: all 16 agent frontmatter fields (name, description, tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, effort, isolation, color, initialPrompt) with full descriptions and examples; built-in agents (Explore, Plan, general-purpose); scope and file locations (project, user, plugin, managed, CLI-defined); tool allowlist/denylist and Agent() spawn restriction syntax; all 6 permission modes and protected paths; hooks in frontmatter vs settings.json; memory scopes and what loads at startup; worktree isolation; fork mode (experimental); agent teams vs subagents comparison.
+Provides: all agent frontmatter fields (name, description, tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, effort, isolation, color, initialPrompt) with full descriptions and examples; built-in agents (Explore, Plan, general-purpose); scope and file locations (project, user, plugin, managed, CLI-defined); tool allowlist/denylist and Agent() spawn restriction syntax; all permission modes and protected paths; hooks in frontmatter vs settings.json; memory scopes and what loads at startup; worktree isolation; fork mode (experimental); agent teams vs subagents comparison.
 
 SOURCE: <https://code.claude.com/docs/en/sub-agents.md> (accessed 2026-05-28)
 

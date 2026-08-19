@@ -83,7 +83,7 @@ Architecture specs routinely exceed 25K characters. Apply before writing:
 
 ## Stopping Condition
 
-Stop when the `architect-{slug}` plan (and any companion plans) exist and contain all 11 sections
-above. Report: `STATUS: DONE — architect-{slug} plan created via sam_create`.
+Stop when the `architect-{slug}` plan (and any companion plans) exist and contain all sections
+listed above. Report: `STATUS: DONE — architect-{slug} plan created via sam_create`.
 
 If requirements are ambiguous or contradictory, report: `STATUS: BLOCKED — {specific question}`.

@@ -2,7 +2,7 @@
 
 **Source URL**: <https://www.itonics-innovation.com/blog/chatgpt-prompts-for-ideation>
 
-**Total Prompts Documented**: 79 ChatGPT prompts organized across 8 pattern categories
+**Prompts Documented**: organized by pattern category below (see Pattern Categories and Prompts)
 
 ---
 

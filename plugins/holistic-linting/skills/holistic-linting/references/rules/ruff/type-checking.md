@@ -1,6 +1,6 @@
 # T: Type Checking Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 32 rules **Purpose**: Type checking and annotation rules
+**Source**: Official Ruff Documentation **Purpose**: Type checking and annotation rules
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 32 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

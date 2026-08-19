@@ -55,7 +55,7 @@ flowchart TD
     Q1 -->|Look up tool API or message format| O[swarm-operations]
     Q1 -->|Build a workflow from a recipe| R[swarm-patterns]
     Q1 -->|Dispatch a markdown checklist as a swarm| M[swarm-from-markdown]
-    Q1 -->|Full reference on everything| All[Load all 5 skills]
+    Q1 -->|Full reference on everything| All[Load all skills above]
 ```
 
 ---

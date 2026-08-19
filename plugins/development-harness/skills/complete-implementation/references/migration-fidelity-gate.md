@@ -31,7 +31,7 @@ flowchart TD
     Fid4 -->|"Confirmed"| AllConfirmed{"Any unconfirmed items recorded<br>in this pass?"}
     Fid4 -->|"Unconfirmed"| CollectF4["Record: Deletion deferred or confirmed — unconfirmed"]
     CollectF4 --> AllConfirmed
-    AllConfirmed -->|"No — all four confirmed"| Proceed(["Proceed to Artifact Discovery"])
+    AllConfirmed -->|"No — all confirmed"| Proceed(["Proceed to Artifact Discovery"])
     AllConfirmed -->|"Yes — unconfirmed items remain"| Blocked["COMPLETION BLOCKED — Migration Fidelity Gate<br>List each unconfirmed item<br>To unblock: run verify_migration_fidelity.py against real production data<br>OR provide a commit SHA showing completeness assertion ran on real files<br>Do NOT build QG plan, dispatch T1, or apply SAM state until resolved"]
 ```
 
@@ -52,4 +52,4 @@ items 1 and 2. Alternatively, a commit SHA showing the completeness assertion wa
 real files is accepted.
 ```
 
-Do NOT build the QG plan, dispatch T1, or apply any SAM state until all four items are confirmed.
+Do NOT build the QG plan, dispatch T1, or apply any SAM state until all items above are confirmed.

@@ -13,7 +13,7 @@ unknown
 
 ## Requirements for causal-supported
 
-All three conditions must be true:
+All conditions below must be true:
 
 1. **Prediction confirmed** — the observed result matches a pre-stated prediction
 2. **Variables isolated** — no other changes occurred between action and result

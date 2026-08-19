@@ -252,7 +252,7 @@ Any task that deletes source files must have deletion as a **separate explicit c
 
 ### Scorer behavior
 
-If any of these four criteria are absent when the draft describes migration, the scorer returns:
+If any of these criteria are absent when the draft describes migration, the scorer returns:
 
 ```text
 [E]: MISSING — migration task requires: content completeness check / real data sample test / edge case enumeration / deletion gate (see Migration and Data Conversion Tasks section)

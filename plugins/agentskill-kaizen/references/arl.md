@@ -17,7 +17,7 @@ This document provides:
 
 - **Core concept (HOOTL):** What "human out of the loop" means and what it requires
 - **Three-layer architecture:** Research body, execution model, observation layer
-- **The 10 gates (R1-R10):** Machine-verifiable conditions that replace human judgment at key points in iterative refinement
+- **The gates (R1-R10):** Machine-verifiable conditions that replace human judgment at key points in iterative refinement
 - **Universal principles:** Patterns that apply to any autonomous development system
 - **Framework coverage:** Which gates exist in current frameworks and which must be built from scratch
 - **Decision tree:** When can a human gate actually be replaced by machine verification?
@@ -48,9 +48,9 @@ The quality bar is HOOTL success: the artifact meets the same acceptance criteri
 
 The empirical findings from cross-framework analysis:
 
-- **10 failure categories (R1-R10)** — machine-verifiable conditions that replace human judgment gates at specific points in an iterative refinement loop; what goes wrong when each condition is insufficient
-- **7 structural principles** — patterns that ensure prerequisites are met, applicable to any autonomous development system
-- **Decision tree for gate replacement** — 4 conditions that ALL must hold for a human gate to be replaced by machine verification
+- **Failure categories (R1-R10)** — machine-verifiable conditions that replace human judgment gates at specific points in an iterative refinement loop; what goes wrong when each condition is insufficient
+- **Structural principles** — patterns that ensure prerequisites are met, applicable to any autonomous development system (see Universal Principles below)
+- **Decision tree for gate replacement** — conditions that ALL must hold for a human gate to be replaced by machine verification
 - **Scope-feasibility matrix** — which work can run HOOTL (bounded constraints, enumerable data, binary success) and which cannot (unbounded goals, semantic knowledge required)
 - **Eliminable/front-loadable/irreducible taxonomy** — classifying each human touchpoint and what it takes to remove the human from it
 
@@ -100,7 +100,7 @@ The goal is moving as many interactions as possible to level 4. Level 4 is HOOTL
 
 **SOURCE:** [Interaction Spectrum](https://github.com/bitflight-devops/stateless-agent-methodology/blob/main/research/arl/README.md#interaction-spectrum)
 
-## The 10 Gates (R1-R10)
+## The Gates (R1-R10)
 
 These gates formalize the machine-verifiable conditions that replace human judgment at key points in an iterative refinement loop.
 
@@ -127,7 +127,7 @@ These gates formalize the machine-verifiable conditions that replace human judgm
 | **Partial coverage** | R2, R5, R9 | Bounded iteration count (GSD), objective injection (Ralph), downstream impact analysis (Octocode) |
 | **Build from scratch** | R6, R7, R8, R10 | No framework provides content-loss detection, convergence tracking, proportionality checks, or split justification |
 
-The 4 build-from-scratch requirements all emerge specifically from iterative refinement — they are invisible to single-pass pipeline designs.
+The build-from-scratch requirements all emerge specifically from iterative refinement — they are invisible to single-pass pipeline designs.
 
 **SOURCE:** [Gate Coverage Across Existing Frameworks](https://github.com/bitflight-devops/stateless-agent-methodology/blob/main/research/arl/README.md#gate-coverage-across-existing-frameworks)
 
@@ -142,13 +142,13 @@ A human gate can potentially be replaced by machine-verifiable conditions when A
 
 When ANY of these conditions fails, the gate requires either human judgment or a more sophisticated verification mechanism (adversarial review, cross-examination between independent agents, or escalation).
 
-**Evidence status:** These 4 conditions were synthesized from cross-framework evidence. They correlate with gates classified as eliminable, but have not been tested as a predictive model.
+**Evidence status:** These conditions were synthesized from cross-framework evidence. They correlate with gates classified as eliminable, but have not been tested as a predictive model.
 
 **SOURCE:** [Decision Tree](https://github.com/bitflight-devops/stateless-agent-methodology/blob/main/research/arl/README.md#decision-tree-when-can-a-human-gate-be-replaced)
 
 ## Universal Principles
 
-Seven patterns discovered across all 6 frameworks that apply to any autonomous development system:
+Patterns discovered across the frameworks studied that apply to any autonomous development system:
 
 1. **Structure Over Instruction** — Pipeline forces checks rather than asking agents to check themselves. Telling an AI "please do X" is unreliable; structuring the pipeline so X is the only possible path is reliable.
 2. **Front-Loading Reduces Runtime Gates** — More context captured upfront = fewer human interventions during execution. Every point of ambiguity in the goal is a point where the loop will either guess or stall.

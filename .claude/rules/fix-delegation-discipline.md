@@ -33,7 +33,7 @@ flowchart TD
 
 ## Delegation Prompt Template
 
-Every fix delegation prompt MUST include these 4 fields:
+Every fix delegation prompt MUST include these fields:
 
 ```text
 Problem: [Observable symptom — error message text, CI job name, broken behavior description]

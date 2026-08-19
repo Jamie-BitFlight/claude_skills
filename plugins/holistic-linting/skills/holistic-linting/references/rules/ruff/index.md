@@ -10,48 +10,48 @@ Ruff rules follow a standardized naming convention:
 - **Number**: Three digits representing the specific rule (e.g., `401`)
 - **Full Code**: Combined prefix and number (e.g., `F401`)
 
-Total Rules Available: 933 across 19 rule families
+Rule counts vary by Ruff version — run `ruff rule --all` for the current, authoritative list across all rule families below.
 
 ## Rule Families
 
 ### Core Style and Errors
 
-- [E/W: pycodestyle](./pycodestyle-errors-warnings.md) - Python code style conventions (69 E rules, 7 W rules)
-- [F: Pyflakes](./pyflakes.md) - Logical errors and undefined names (92 rules)
+- [E/W: pycodestyle](./pycodestyle-errors-warnings.md) - Python code style conventions
+- [F: Pyflakes](./pyflakes.md) - Logical errors and undefined names
 
 ### Code Quality and Best Practices
 
-- [B: flake8-bugbear](./flake8-bugbear.md) - Common bugs and design problems (43 rules)
-- [C: flake8-comprehensions](./flake8-comprehensions.md) - Comprehension patterns (24 rules)
-- [S: flake8-bandit](./flake8-bandit.md) - Security issues (107 rules)
-- [U: pyupgrade](./pyupgrade.md) - Python syntax modernization (47 rules)
+- [B: flake8-bugbear](./flake8-bugbear.md) - Common bugs and design problems
+- [C: flake8-comprehensions](./flake8-comprehensions.md) - Comprehension patterns
+- [S: flake8-bandit](./flake8-bandit.md) - Security issues
+- [U: pyupgrade](./pyupgrade.md) - Python syntax modernization
 
 ### Documentation and Naming
 
-- [D: pydocstyle](./pydocstyle.md) - Docstring conventions (70 rules)
-- [N: pep8-naming](./pep8-naming.md) - Naming conventions (20 rules)
+- [D: pydocstyle](./pydocstyle.md) - Docstring conventions
+- [N: pep8-naming](./pep8-naming.md) - Naming conventions
 
 ### Import Management
 
-- [I: isort](./isort.md) - Import sorting and organization (12 rules)
-- [ICN: flake8-import-conventions](./import-conventions.md) - Import naming conventions (3 rules)
+- [I: isort](./isort.md) - Import sorting and organization
+- [ICN: flake8-import-conventions](./import-conventions.md) - Import naming conventions
 
 ### Type Checking and Annotations
 
-- [T: Type checking](./type-checking.md) - Type-related rules (32 rules)
+- [T: Type checking](./type-checking.md) - Type-related rules
   - TC: flake8-type-checking - Type checking imports
   - T20: flake8-print - Print statements
   - T10: flake8-debugger - Debugger statements
 
 ### Domain-Specific Rules
 
-- [A: flake8-builtins](./flake8-builtins.md) - Builtin shadowing (43 rules)
-- [G: flake8-logging-format](./logging.md) - Logging format issues (8 rules)
-- [L: flake8-logging](./logging-rules.md) - Logger configuration (7 rules)
-- [Q: flake8-quotes](./quotes.md) - Quote style consistency (5 rules)
-- [R: flake8-return](./return-values.md) - Return statement patterns (71 rules)
-- [Y: flake8-2020](./version-checks.md) - Python version checks (10 rules)
-- [P: pandas-vet](./pandas-rules.md) - Pandas best practices (266 rules)
+- [A: flake8-builtins](./flake8-builtins.md) - Builtin shadowing
+- [G: flake8-logging-format](./logging.md) - Logging format issues
+- [L: flake8-logging](./logging-rules.md) - Logger configuration
+- [Q: flake8-quotes](./quotes.md) - Quote style consistency
+- [R: flake8-return](./return-values.md) - Return statement patterns
+- [Y: flake8-2020](./version-checks.md) - Python version checks
+- [P: pandas-vet](./pandas-rules.md) - Pandas best practices
 
 ### Framework-Specific
 
@@ -168,4 +168,4 @@ For official Ruff documentation, visit the [Official Ruff Documentation](https:/
 
 ---
 
-**Last Updated**: 2025-11-04 **Ruff Version**: Latest (933 rules documented)
+**Last Updated**: 2025-11-04 **Ruff Version**: Latest

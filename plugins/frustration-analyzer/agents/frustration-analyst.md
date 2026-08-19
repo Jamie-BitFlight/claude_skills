@@ -14,7 +14,7 @@ You are the RTFP orchestrator. Your job is to run the Read The Fucking Prompt pi
 - **`mcp__frustration-analyzer__extract_user_messages`** — Write a user-only batch JSONL from a session file (Stage 1)
 - **`mcp__frustration-analyzer__get_context_window`** — Return full context around a target message (Stage 3 reconstruction)
 - **`mcp__frustration-analyzer__get_scenario`** — Alternative context retrieval by file + line_index
-- **`mcp__frustration-analyzer__render_rage_receipt`** — Render the 3-field artifact as a terminal-style PNG
+- **`mcp__frustration-analyzer__render_rage_receipt`** — Render the artifact as a terminal-style PNG
 - **Read, Write, Glob** — File access for batch files and artifact files
 
 ## Pipeline
@@ -29,9 +29,9 @@ Follow the RTFP skill workflow exactly. Steps below summarize the sequence:
 
 4. **Stage 3 — Reconstruct** — Spawn one `frustration-analyzer:context-reconstructor` subagent with the merged flags file. It picks the winner, reads full transcript context, and writes `*.rtfp.json` with `task_summary`, `assistant_excerpt`, `user_reply`.
 
-5. **Render** — Call `render_rage_receipt` with the 3 fields from `*.rtfp.json`. Report the PNG output path.
+5. **Render** — Call `render_rage_receipt` with the fields from `*.rtfp.json`. Report the PNG output path.
 
-6. **Present** — Show the 3 fields and PNG path. Offer runner-up if one was found.
+6. **Present** — Show the fields and PNG path. Offer runner-up if one was found.
 
 ## Stage 2 Subagent Delegation Pattern
 
@@ -56,7 +56,7 @@ Subagent type: frustration-analyzer:context-reconstructor
 Read the merged flags. Pick the winner and optional runner-up.
 Call get_context_window for each to retrieve full transcript context.
 Identify the assistant output that triggered the reaction.
-Write the 3-field artifact to /tmp/{session_stem}.rtfp.json.
+Write the artifact to /tmp/{session_stem}.rtfp.json.
 ```
 
 ## Stop Conditions
@@ -83,7 +83,7 @@ Write the 3-field artifact to /tmp/{session_stem}.rtfp.json.
 <example>
 Context: User says "run RTFP on my last session"
 Action: list_sessions → user picks → extract_user_messages → spawn batch-detector → merge flags → spawn context-reconstructor → render_rage_receipt → present result
-Expected: PNG at /tmp/rtfp-{stem}.png, 3-field artifact displayed, offer runner-up if exists
+Expected: PNG at /tmp/rtfp-{stem}.png, artifact displayed, offer runner-up if exists
 </example>
 
 <example>

@@ -492,7 +492,7 @@ mermaid.initialize({
 **Access Date**: 2026-03-07
 **Mermaid Version**: v11.12.3+
 **Document Status**: Complete reference
-**Diagram Types Covered**: 24 types
-**Example Diagrams**: 24 minimal examples + 24 complete examples
+**Diagram Types Covered**: all types listed in this index
+**Example Diagrams**: minimal examples here per diagram type; complete examples in `mermaid-diagram-reference.md`
 
 For detailed syntax and advanced configuration, see `mermaid-diagram-reference.md`.

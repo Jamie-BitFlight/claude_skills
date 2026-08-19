@@ -26,7 +26,7 @@ Language-agnostic development process harness that orchestrates feature developm
 
 ### SAM 7-Stage Pipeline
 
-The harness walks a feature request through seven stages, each producing a named artifact
+The harness walks a feature request through the stages below, each producing a named artifact
 registered through the configured backend. Stages gate on artifact completion, not conversation state.
 
 1. **S1 Discovery** - Understand the feature, codebase, and constraints
@@ -439,7 +439,7 @@ Load these documents based on what you are doing. They contain the system design
 
 - Run `/dh:meta-workflow-graph-refresh` — step-by-step extraction and assembly process for keeping `docs/dh-workflow-graph.json` accurate after structural changes; covers which layer to re-extract, how to run the ensemble, and how to rebuild the graph
 
-Note: Four layer-0 design documents (artifact-conventions, task-file-format, sam-pipeline, arl-touchpoints) were consolidated into the canonical skill references on 2026-03-31. The layer-0 files now contain redirects to the canonical locations. The remaining layer-0 files (evidence-discipline, orchestrator-discipline, context-fit-complexity, rt-ica-gate, verification-protocol) contain design principles with no operational equivalent — they are authoritative in place.
+Note: The layer-0 design documents artifact-conventions, task-file-format, sam-pipeline, and arl-touchpoints were consolidated into the canonical skill references on 2026-03-31. The layer-0 files now contain redirects to the canonical locations. The remaining layer-0 files (evidence-discipline, orchestrator-discipline, context-fit-complexity, rt-ica-gate, verification-protocol) contain design principles with no operational equivalent — they are authoritative in place.
 
 ### Documentation Update Triggers
 

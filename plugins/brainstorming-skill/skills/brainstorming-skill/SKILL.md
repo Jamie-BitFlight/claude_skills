@@ -1,6 +1,6 @@
 ---
 name: brainstorming-skill
-description: You MUST use this before any creative work - creating features, building components, adding functionality, modifying behavior, or when users request help with ideation, marketing, and strategic planning. Explores user intent, requirements, and design before implementation using 30+ research-validated prompt patterns.
+description: You MUST use this before any creative work - creating features, building components, adding functionality, modifying behavior, or when users request help with ideation, marketing, and strategic planning. Explores user intent, requirements, and design before implementation using research-validated prompt patterns.
 ---
 
 # Brainstorming Skill
@@ -9,7 +9,7 @@ description: You MUST use this before any creative work - creating features, bui
 
 This skill serves two critical purposes:
 1. **Interactive Design Process:** Guides the AI through a natural, collaborative dialogue to turn ideas into fully formed designs and specs *before* any code is written.
-2. **Comprehensive Ideation Framework:** Provides 30+ research-validated prompt patterns to help generate high-quality ideas across any domain (marketing, content, features).
+2. **Comprehensive Ideation Framework:** Provides research-validated prompt patterns (see Pattern Documentation References below) to help generate high-quality ideas across any domain (marketing, content, features).
 
 <HARD-GATE>
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have completed the brainstorming process, presented a design, and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
@@ -125,7 +125,7 @@ Successful brainstorming patterns specify exact output formats:
 
 Complete pattern documentation is organized in reference files:
 
-- [Pattern Categories and Documentation](./references/pattern-categories-and-documentation.md) - All 14 categories with 30+ patterns
+- [Pattern Categories and Documentation](./references/pattern-categories-and-documentation.md) - full category and pattern listing
 - [Domain-Specific Applications](./references/domain-specific-applications-and-variations.md) - Marketing, Product Development, QA Testing, Business Strategy
 - [Pattern Selection Guide](./references/pattern-selection-guide.md) - Decision framework for choosing appropriate patterns
 - [Synthesis: What Makes Patterns Work](./references/synthesis-what-makes-these-patterns-work.md)

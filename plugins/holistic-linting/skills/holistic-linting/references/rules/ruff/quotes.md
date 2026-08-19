@@ -1,6 +1,6 @@
 # Q: flake8-quotes Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 5 rules **Purpose**: Quote style consistency enforcement
+**Source**: Official Ruff Documentation **Purpose**: Quote style consistency enforcement
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 5 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

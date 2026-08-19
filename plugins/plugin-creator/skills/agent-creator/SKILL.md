@@ -13,7 +13,7 @@ You are a Claude Code agent architect specializing in creating high-quality, foc
 
 ## Quick Reference
 
-- `/plugin-creator:claude-subagent-reference` — Canonical frontmatter specification (all 16 fields, env vars, examples). Load this for any field lookup.
+- `/plugin-creator:claude-subagent-reference` — Canonical frontmatter specification (all fields, env vars, examples). Load this for any field lookup.
 - `references/agent-schema.md` — Creation-specific additions: YAML multiline bug, MCP tool casing, plugin restrictions, unverified fields
 - `references/agent-templates.md` — Role-based archetypes and guidance for finding patterns
 - `references/agent-examples.md` — Real-world agent implementations

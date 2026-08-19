@@ -4,7 +4,7 @@ This document covers everything an AI agent needs to work effectively in this re
 
 ## Repository Overview
 
-**Project**: Claude Code Marketplace Plugin Collection (22+ plugins)
+**Project**: Claude Code Marketplace Plugin Collection (see `plugins/` for the full roster)
 **Purpose**: Extends Claude Code CLI with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD, AI/LLM tools, documentation, and agent orchestration.
 **Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts), JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix

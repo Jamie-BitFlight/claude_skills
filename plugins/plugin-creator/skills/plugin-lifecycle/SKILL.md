@@ -42,7 +42,7 @@ Required for phases involving hooks (Phase 4: Create, Phase 5: Debug):
 
 Required for phases involving agents (Phase 4: Create):
 
-4. `Skill(skill="plugin-creator:claude-subagent-reference")` — all 16 agent frontmatter fields with descriptions, built-in agents, scope and file locations, tool restrictions, permission modes, hooks and memory configuration, fork mode, agent teams
+4. `Skill(skill="plugin-creator:claude-subagent-reference")` — all agent frontmatter fields with descriptions, built-in agents, scope and file locations, tool restrictions, permission modes, hooks and memory configuration, fork mode, agent teams
 
 Recommended for component selection and plugin configuration decisions:
 
@@ -294,7 +294,7 @@ Run multi-layer validation. Full task spec in `references/phase-dispatch-details
 
 ## Phase-to-Skill Mapping
 
-Full lookup table with exact invocation syntax for all 18 phase-skill pairings: `references/phase-skill-mapping.md`.
+Full lookup table with exact invocation syntax for all phase-skill pairings: `references/phase-skill-mapping.md`.
 
 Key invocations:
 - Phase 1: `Skill(skill="plugin-creator:assessor")`

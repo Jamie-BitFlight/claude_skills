@@ -1,7 +1,7 @@
 # Agent Frontmatter Schema Reference
 
 > **Canonical source**: Load `/plugin-creator:claude-subagent-reference` for the complete
-> field specification (all 16 fields with descriptions, env vars, and examples).
+> field specification (all fields with descriptions, env vars, and examples).
 >
 > This file contains creation-specific additions not covered by that reference.
 

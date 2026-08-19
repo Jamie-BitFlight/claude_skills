@@ -376,7 +376,7 @@ Guard: skipped silently when task status is already `complete`.
 
 ## 7. Quality Gate SAM Dispatch Flow
 
-The `/complete-implementation` skill enforces quality gates via a SAM-based dispatch loop. Each of the 6 phases is a task in a dedicated QG plan (prefix `QG{N}`). The dependency chain `T1 → T2 → T3 → T4 → T5 → T6` enforces ordered execution. No phase can start until the previous phase's task reaches terminal status.
+The `/complete-implementation` skill enforces quality gates via a SAM-based dispatch loop. Each phase is a task in a dedicated QG plan (prefix `QG{N}`). The dependency chain `T1 → T2 → T3 → T4 → T5 → T6` enforces ordered execution. No phase can start until the previous phase's task reaches terminal status.
 
 ```mermaid
 flowchart TD

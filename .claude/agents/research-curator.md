@@ -395,7 +395,7 @@ Follow the entry template in [entry-template.md](./../skills/research-curator/re
 
 Entry files go at `./research/{category}/{resource-name}.md`.
 
-All 10 sections in the template MUST be complete with real data gathered from primary sources. Placeholders, "TBD", and bare "N/A" are FORBIDDEN. If data is genuinely unavailable, write what was searched, what was found, and why the data is absent.
+All sections in the template MUST be complete with real data gathered from primary sources. Placeholders, "TBD", and bare "N/A" are FORBIDDEN. If data is genuinely unavailable, write what was searched, what was found, and why the data is absent.
 
 ---
 

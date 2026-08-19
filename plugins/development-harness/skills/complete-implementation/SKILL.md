@@ -217,7 +217,7 @@ flowchart TD
 
 **Step 5 -- Completion verification gate**:
 
-After the dispatch loop exits, verify all 5 phases reached terminal status:
+After the dispatch loop exits, verify all phases (defined by `build_quality_gate_plan` in `sam_schema/core/quality_gates.py`) reached terminal status:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{pqg_plan_address}"

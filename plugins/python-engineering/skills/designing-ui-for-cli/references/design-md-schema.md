@@ -14,9 +14,9 @@ The sidecar `.impeccable/design.json` from impeccable's web flow is NOT ported. 
 
 ## File structure
 
-Both variants follow the same shape: YAML frontmatter on top, then a markdown body with exactly six sections in fixed order. Section headers must match character-for-character so DESIGN.md-aware tools (impeccable, awesome-design-md, skill-rest) can parse the file. Optional evocative subtitles are allowed in the form `## 2. Colors: The Terminal Palette` as long as the canonical word (`Overview`, `Colors`, `Typography`, `Elevation`, `Components`, `Do's and Don'ts`) is present.
+Both variants follow the same shape: YAML frontmatter on top, then a markdown body with sections in fixed order (listed below). Section headers must match character-for-character so DESIGN.md-aware tools (impeccable, awesome-design-md, skill-rest) can parse the file. Optional evocative subtitles are allowed in the form `## 2. Colors: The Terminal Palette` as long as the canonical word (`Overview`, `Colors`, `Typography`, `Elevation`, `Components`, `Do's and Don'ts`) is present.
 
-The six sections in order:
+The sections in order:
 
 ```text
 ## 1. Overview
@@ -27,7 +27,7 @@ The six sections in order:
 ## 6. Do's and Don'ts
 ```
 
-Do not reorder, do not rename, do not insert new top-level sections (no `## Layout`, `## Motion`, `## Responsive Behavior`). Fold that content into the six canonical sections where it naturally belongs.
+Do not reorder, do not rename, do not insert new top-level sections (no `## Layout`, `## Motion`, `## Responsive Behavior`). Fold that content into the canonical sections above where it naturally belongs.
 
 ## Frontmatter schema (TUI-adapted)
 
@@ -90,7 +90,7 @@ components:
 Rules that matter:
 
 - Token refs use `{path.to.token}` (e.g. `{colors.primary}`, `{rounded.soft}`). Components may reference primitives; primitives may not reference each other.
-- Component sub-tokens are limited to 8 props: `backgroundColor`, `textColor`, `typography`, `rounded`, `padding`, `size`, `height`, `width`. Anything outside this set (focus rings, transitions, custom border characters) belongs in prose, not frontmatter.
+- Component sub-tokens are limited to these props: `backgroundColor`, `textColor`, `typography`, `rounded`, `padding`, `size`, `height`, `width`. Anything outside this set (focus rings, transitions, custom border characters) belongs in prose, not frontmatter.
 - Variants are naming convention, not schema. Use `button-primary`, `button-primary-hover`, `button-primary-active` as sibling keys. The same convention applies to panels, inputs, and any stateful component.
 - Scale keys are open-ended. Use whatever names the project already uses (`splash-orange`, `surface-container-low`); do not rename to Material defaults.
 - Do not duplicate token values between frontmatter and prose. The frontmatter is the canonical value; prose names the role and explains application.
@@ -172,7 +172,7 @@ Rules are short forceful doctrines that AI consumers can cite. Format ported ver
 **The [Name] Rule.** [short doctrine]
 ```
 
-Rules can appear in any of the six sections (Colors, Typography, Elevation, Components, Do's and Don'ts) where they apply. Aim for 1-3 per section. Rules beat bullet lists for stickiness because they have a quotable name.
+Rules can appear in any of the sections (Colors, Typography, Elevation, Components, Do's and Don'ts) where they apply. Aim for 1-3 per section. Rules beat bullet lists for stickiness because they have a quotable name.
 
 TUI examples to seed projects:
 
@@ -186,7 +186,7 @@ TUI examples to seed projects:
 **The Pipe Test Rule.** When stdout is not a TTY, ANSI is stripped, progress bars are suppressed, and output is line-oriented.
 ```
 
-These four rules apply to most CLI projects and can be carried into a project's DESIGN.TUI.md verbatim. Add project-specific rules alongside them.
+These rules apply to most CLI projects and can be carried into a project's DESIGN.TUI.md verbatim. Add project-specific rules alongside them.
 
 ## When to run
 
@@ -201,7 +201,7 @@ If a DESIGN.TUI.md or DESIGN.md already exists, do not silently overwrite. Show 
 
 - Frontmatter first, prose second. Tokens go in YAML; prose contextualises them. Do not redefine a token value in two places.
 - Cite PRODUCT.md anti-references by name in section 6 Do's and Don'ts. If PRODUCT.md says "not lolcat-coloured", the Don'ts should repeat that phrase verbatim.
-- Match the spec, do not invent new sections. The six section names are fixed. Layout, motion, responsive behaviour, agent prompt guidance — fold each into the section where it naturally belongs (Overview for philosophy-level rules, Components for per-component behaviour).
+- Match the spec, do not invent new sections. The section names above are fixed. Layout, motion, responsive behaviour, agent prompt guidance — fold each into the section where it naturally belongs (Overview for philosophy-level rules, Components for per-component behaviour).
 - Descriptive over technical: "Soft round border (TCSS `round`)" beats "rounded: round". Include the technical token in parens, lead with the description.
 - Functional over decorative: for each token, explain WHERE and WHY it is used, not just WHAT it is.
 - Exact values in parens: TCSS keywords, Rich style strings, cell counts, named colours; always the technical value alongside the description.

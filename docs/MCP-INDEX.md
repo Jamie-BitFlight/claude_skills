@@ -6,7 +6,7 @@ Complete documentation for adding Model Context Protocol (MCP) servers to claude
 
 ## Overview
 
-**Current State:** 1 of 27 plugins has MCP tooling
+**Current State:** Multiple plugins already include MCP tooling; see `plugins/**/mcp/` for the authoritative list
 **Goal:** Universal MCP interface for all high-value plugins
 **Pattern:** FastMCP with Python 3.11+ (PEP 723 scripts)
 

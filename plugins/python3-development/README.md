@@ -180,12 +180,12 @@ Then install the plugin:
 
 ## Relationship to python-engineering
 
-This plugin and `python-engineering` share 25 skills. Each also has unique skills the other does not:
+This plugin and `python-engineering` share many skills. Each also has unique skills the other does not:
 
-**Only in `python3-development`** (10 skills):
+**Only in `python3-development`**:
 `stdlib-scripting`, `semantic-code-search`, `python-cli-architect`, `rich`, `python3-bug`, `python3-review`, `implementation-manager`, `use-command-template`, `python3-development-meta-docs`, `python3-development`
 
-**Only in `python-engineering`** (18 skills):
+**Only in `python-engineering`**:
 `python3-core`, `python3-typing`, `python3-tdd`, `python3-testing`, `python3-tools`, `python3-cli`, `python3-web`, `python3-data`, `python3-stdlib-only`, `debug`, `lint`, `review`, `cleanup`, `designing-ui-for-cli`, `orchestrating-python-development`, `python-cross-platform-smoothing`, `standards-for-python-development`, `python3-stdlib-only`
 
 Install both plugins for full coverage. `stdlib-scripting` — which provides Claude with stdlib-only scripting patterns — is only available in this plugin.

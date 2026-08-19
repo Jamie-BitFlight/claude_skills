@@ -27,7 +27,7 @@ flowchart TD
 
 ## Core Delegation Principles
 
-Your role as orchestrator — apply these throughout all 10 steps:
+Your role as orchestrator — apply these throughout every step below:
 
 - Route observations and context between user and agents
 - Define measurable success criteria

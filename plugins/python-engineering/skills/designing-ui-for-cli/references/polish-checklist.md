@@ -141,7 +141,7 @@ Blur your eyes (or screenshot the terminal pane and apply blur). Can you still i
 
 If everything looks the same weight blurred, you have a hierarchy problem.
 
-For TUI: the squint test runs against a screenshot of the rendered terminal output, not the source code. Capture at the primary width tier (the one named in the shape brief), apply blur, then ask the three questions.
+For TUI: the squint test runs against a screenshot of the rendered terminal output, not the source code. Capture at the primary width tier (the one named in the shape brief), apply blur, then ask those questions.
 
 ---
 
@@ -183,7 +183,7 @@ For destructive actions, name the destruction and the count: `"Delete 5 items"` 
 
 ### Error message formula
 
-Every error answers three questions:
+Every error answers these questions:
 
 1. **What happened?** — the observable failure
 2. **Why?** — the cause, in user vocabulary
@@ -203,7 +203,7 @@ CLI errors include exit code, message, and recovery hint where applicable. Forma
 
 ### Empty state formula
 
-Three steps:
+Steps:
 
 1. **Acknowledge briefly** — confirm the empty state is real, not a bug
 2. **Explain the value** — what completes when this fills

@@ -35,7 +35,7 @@ Read the research file completely and extract:
 
 ### Phase 2: Search & Match
 
-Search the repository for connections across FIVE dimensions:
+Search the repository for connections across the dimensions below:
 
 | Dimension | What to Look For | Where to Search |
 |-----------|------------------|-----------------|

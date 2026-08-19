@@ -213,7 +213,7 @@ SOLUTION PORTFOLIO:
 
 ## Evaluation Criteria
 
-Assess all solutions on three dimensions:
+Assess all solutions on the dimensions below:
 
 | Dimension       | Question                                   | Scale     |
 | --------------- | ------------------------------------------ | --------- |

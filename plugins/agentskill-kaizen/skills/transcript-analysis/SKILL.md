@@ -41,7 +41,7 @@ For full schema details including JSON structures for each record type, see [JSO
 
 ## Signal Catalog
 
-Nine analysis dimensions, each with extraction methodology.
+Each analysis dimension below has its own extraction methodology.
 
 ### 1. Tool Misuse Detection
 
@@ -117,7 +117,7 @@ flowchart TD
     Project --> Discover[SQL — count sessions, date range, record types]
     Default --> Discover
     Discover --> Dimensions{Which dimensions?}
-    Dimensions -->|All| RunAll[Run all 9 dimensions]
+    Dimensions -->|All| RunAll[Run all dimensions]
     Dimensions -->|Specified| RunSelected[Run selected dimensions]
     RunAll --> Aggregate[Aggregate findings]
     RunSelected --> Aggregate

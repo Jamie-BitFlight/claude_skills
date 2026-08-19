@@ -1,6 +1,6 @@
 # B: flake8-bugbear Rules
 
-**Source**: [flake8-bugbear](https://github.com/PyCQA/flake8-bugbear) **Total Rules**: 43 rules **Purpose**: Detects common bugs and design problems in Python code
+**Source**: [flake8-bugbear](https://github.com/PyCQA/flake8-bugbear) **Purpose**: Detects common bugs and design problems in Python code
 
 flake8-bugbear rules focus on practical bugs that can appear in real-world code. These are more specialized than pycodestyle (E/W) but broader than domain-specific rules.
 

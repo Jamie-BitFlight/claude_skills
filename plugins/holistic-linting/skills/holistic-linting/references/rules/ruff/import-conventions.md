@@ -1,6 +1,6 @@
 # ICN: Import Conventions Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 3 rules **Purpose**: Import naming conventions (flake8-import-conventions)
+**Source**: Official Ruff Documentation **Purpose**: Import naming conventions (flake8-import-conventions)
 
 This rule family provides specialized checks for Python code quality and specific use cases.
 
@@ -44,4 +44,4 @@ This rule family works best when combined with core linting rules:
 
 ---
 
-**Last Updated**: 2025-11-04 **Status**: Reference documentation for 3 rules rules
+**Last Updated**: 2025-11-04 **Status**: Reference documentation (see `ruff rule --all` for the current rule list)

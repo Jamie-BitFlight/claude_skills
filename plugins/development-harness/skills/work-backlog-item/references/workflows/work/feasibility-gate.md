@@ -10,11 +10,11 @@ information?" — the feasibility gate answers "should we do this and can it be 
 
 ## Gate Logic
 
-Evaluate all 4 criteria in order. A single BLOCKED terminal stops the workflow.
+Evaluate the criteria below in order. A single BLOCKED terminal stops the workflow.
 
 ```mermaid
 flowchart TD
-    RTICAPass(["RT-ICA: APPROVED — proceed to feasibility gate"]) --> Load["Load feasibility-gate.md and evaluate all 4 criteria"]
+    RTICAPass(["RT-ICA: APPROVED — proceed to feasibility gate"]) --> Load["Load feasibility-gate.md and evaluate all criteria"]
 
     Load --> C1{"Criterion 1 — Technical feasibility<br>Does suggested_location exist in codebase?<br>Glob(suggested_location) returns results?<br>Do referenced APIs resolve via Grep?"}
     C1 -->|"Paths resolve"| C2
@@ -59,7 +59,7 @@ flowchart TD
 
 ## PASS Output Contract
 
-When all 4 criteria pass (or result in WARN), append the following to the feature request at Step 4.1:
+When all criteria pass (or result in WARN), append the following to the feature request at Step 4.1:
 
 ```text
 ### Feasibility Assessment
@@ -72,7 +72,7 @@ When all 4 criteria pass (or result in WARN), append the following to the featur
 **Live count**: {live_count: N (from rg) alongside manual_count: M | "Not applicable — no pattern: fields"}
 ```
 
-All 6 fields are required. Do not omit fields with empty values — use `"None"`, `"Not estimated"`, or
+All fields shown above are required. Do not omit fields with empty values — use `"None"`, `"Not estimated"`, or
 `"Not applicable — no pattern: fields"` as appropriate. The **Live count** field must be populated when
 any Impact Radius row has a `pattern:` field; use `"Not applicable — no pattern: fields"` when no
 patterns are present.
@@ -94,7 +94,7 @@ Required action: Re-groom this item to refresh the Impact Radius count before pr
 Run: /dh:groom-backlog-item {item title}
 ```
 
-All four fields (`manual_count`, `live_count`, `ratio`, `Required action`) are required. Do not
+The fields `manual_count`, `live_count`, `ratio`, and `Required action` are all required. Do not
 omit any field or substitute prose explanations.
 
 ---

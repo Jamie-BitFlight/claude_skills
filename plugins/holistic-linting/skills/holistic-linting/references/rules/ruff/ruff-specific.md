@@ -1,6 +1,6 @@
 # RUF: Ruff-Specific Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: Custom Rules **Purpose**: Rules Unique to Ruff
+**Source**: Official Ruff Documentation **Purpose**: Rules Unique to Ruff
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

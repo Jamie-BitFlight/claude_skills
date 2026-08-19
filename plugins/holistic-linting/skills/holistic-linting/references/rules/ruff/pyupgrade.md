@@ -1,6 +1,6 @@
 # U: pyupgrade Rules
 
-**Source**: Official Ruff Documentation **Total Rules**: 47 rules **Purpose**: Python Syntax Modernization
+**Source**: Official Ruff Documentation **Purpose**: Python Syntax Modernization
 
 This rule family provides comprehensive checks for Python code quality and style conformance.
 

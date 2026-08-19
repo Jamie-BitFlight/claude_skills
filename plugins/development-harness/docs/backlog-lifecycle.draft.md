@@ -398,7 +398,7 @@ flowchart TD
 | Status | GitHub Label | Set by |
 |--------|-------------|--------|
 | `needs-grooming` | `status:needs-grooming` | `backlog add` |
-| `groomed` | `status:groomed` | `backlog groom` (after all 7 sections present) |
+| `groomed` | `status:groomed` | `backlog groom` (after all required sections present, per finalize.md's Output Validation Gate) |
 | `blocked` | `status:blocked` | `backlog groom` (RT-ICA BLOCKED) or `backlog update` |
 | `in-milestone` | `status:in-milestone` | `/group-items-to-milestone` |
 | `in-progress` | `status:in-progress` | `backlog update --status in-progress` |
@@ -481,7 +481,7 @@ GitHub Issue #42:
 ```text
 ~/.dh/projects/{slug}/backlog/p1-{slug}.md  — MODIFIED
   frontmatter:
-    metadata.groomed: 2026-02-27   ← set after all 7 sections present
+    metadata.groomed: 2026-02-27   ← set after all required sections present (see finalize.md's Output Validation Gate)
     metadata.status: groomed       ← [VERIFY: whether groom sets status or only update does]
   body additions:
     ## Fact-Check
@@ -638,7 +638,7 @@ Items to verify in the next session by running the commands and observing actual
 ### State Transitions
 
 - [ ] Confirm `backlog groom "{title}" --section "Fact-Check" --content "..."` appends without overwriting existing sections
-- [ ] Confirm `metadata.groomed` is set only after all 8 required sections are present (try with 7 sections and verify field is absent)
+- [ ] Confirm `metadata.groomed` is set only after all required sections (per finalize.md's Output Validation Gate) are present (try with one section missing and verify field is absent)
 - [ ] Confirm `backlog update --status in-progress` requires a prior `--plan` to be set, or can set status independently
 - [ ] Confirm `backlog close` without `--checklist-pass` flag is rejected (expected: error or warning)
 - [ ] Confirm `backlog resolve` without `--reason` is rejected

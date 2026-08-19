@@ -76,7 +76,7 @@ uv run manifest_resolver.py show \
 - `name` is `"python3"`
 - `stage_skills` contains the stage keys listed above — note that the planning stage key in
   the manifest is `planning-context-integration`, not `planning`
-- `quality_gates` includes all five gate types: `format`, `lint`, `typecheck`, `test`,
+- `quality_gates` includes the gate types: `format`, `lint`, `typecheck`, `test`,
   `standards`
 
 ---

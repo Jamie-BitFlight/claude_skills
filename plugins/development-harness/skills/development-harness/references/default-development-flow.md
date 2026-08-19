@@ -246,7 +246,7 @@ The `/dh:complete-implementation` skill runs quality gates after all S5 executio
 
 **Pre-Phase 1: TN Verification Check** — checks for a TN verification report from `tn-verification-gate`. If regressed criteria are found, emits `COMPLETION BLOCKED — TN Verification Failed` and stops.
 
-**Pre-Phase 1a: Migration Fidelity Sign-Off** — activates when migration signals are detected in the issue title, body, or task `acceptance_criteria` fields (keywords: "migrat", "convert format", "replace .md", "format conversion", "move from", "transition from", or deletion-related acceptance criteria). When activated, confirms four items before allowing QG plan creation to proceed:
+**Pre-Phase 1a: Migration Fidelity Sign-Off** — activates when migration signals are detected in the issue title, body, or task `acceptance_criteria` fields (keywords: "migrat", "convert format", "replace .md", "format conversion", "move from", "transition from", or deletion-related acceptance criteria). When activated, confirms the following items before allowing QG plan creation to proceed:
 
 1. Fidelity check on real data — evidence exists showing content completeness was asserted against real production records, not only synthetic fixtures
 2. Content completeness verified — field-by-field completeness confirmed, not only structural validity
@@ -262,7 +262,7 @@ the issue, enabling worktree-isolated agents to read provider-owned content thro
 
 **Pre-Phase 1b: Process Accumulated Concerns** — checks the backlog item for a `## Concerns` section accumulated during `/implement-feature` and routes unresolved concerns to the QG plan.
 
-After all pre-phases complete, the skill builds the SAM-enforced QG plan (6 phases).
+After all pre-phases complete, the skill builds the SAM-enforced QG plan (phases defined by `build_quality_gate_plan` in `sam_schema/core/quality_gates.py`).
 
 For the full pre-phase logic, see the `complete-implementation` skill: `/dh:complete-implementation`.
 

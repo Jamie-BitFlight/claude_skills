@@ -514,7 +514,7 @@ LSP servers require separate binary installation — plugins configure the conne
 
 - Plugin.json: `plugins/plugin-creator/.claude-plugin/plugin.json`
 - Skills verified: All SKILL.md files read
-- Agents verified: All 6 agent .md files read
-- Scripts verified: All 5 scripts examined
+- Agents verified: All agent .md files read
+- Scripts verified: All scripts examined
 - Official docs: claude-plugins-reference-2026 skill
 - Verification date: 2026-01-28

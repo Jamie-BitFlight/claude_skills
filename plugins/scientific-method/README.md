@@ -24,7 +24,7 @@ This plugin enforces hypothesis-driven methodology. Every investigation follows 
 
 ### Unified investigation template
 
-All three skills share a 15-section template filled progressively:
+All skills in this plugin share a template (`shared/investigation-template.md`) filled progressively:
 
 **Before execution (sections 0–7)**:
 - `0 CONTEXT` — goal, system, environment, baseline
@@ -60,7 +60,7 @@ All three skills share a 15-section template filled progressively:
 
 **When to use**: Starting any investigation — debugging session, unknown root cause, repeated failure, complex problem requiring structured reasoning.
 
-Loads the unified investigation template and guides through all 15 sections. Enforces stage ordering: observations before hypotheses, predictions before experiments, falsification before causality classification.
+Loads the unified investigation template and guides through all its sections. Enforces stage ordering: observations before hypotheses, predictions before experiments, falsification before causality classification.
 
 ```text
 /scientific-method:scientific-thinking
@@ -104,7 +104,7 @@ Produces structured process-quality artefacts after an investigation reaches `re
 - Result analysis — what worked, what did not, patterns observed across iterations
 - Retrospective — lessons learned, anti-patterns encountered, rubric update recommendations
 
-Invoke after a completed investigation by passing the full investigation output (all 15 sections) as input.
+Invoke after a completed investigation by passing the full investigation output (all sections of the unified template) as input.
 
 ---
 
@@ -173,7 +173,7 @@ All skills reference canonical files in `shared/`:
 
 | File | Purpose |
 |---|---|
-| `shared/investigation-template.md` | 15-section unified investigation template |
+| `shared/investigation-template.md` | Unified investigation template |
 | `shared/evidence-rules.md` | Rules for evidence collection — raw signals, truncation disclosure, verbatim snippets |
 | `shared/causality-check.md` | Causality classification — causal-supported, correlated-only, unrelated, unknown |
 | `shared/investigation-workflow.md` | Mermaid workflow diagram for the full investigation lifecycle |

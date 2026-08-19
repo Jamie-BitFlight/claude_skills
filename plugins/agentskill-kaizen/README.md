@@ -88,7 +88,7 @@ With `--install`, approved proposals are applied immediately.
 
 ## What the Analysis Finds
 
-Nine dimensions analyzed across your session history:
+Dimensions analyzed across your session history:
 
 | Dimension | What it finds |
 |-----------|---------------|
@@ -104,7 +104,7 @@ Nine dimensions analyzed across your session history:
 
 ## Improvement Outputs
 
-Findings translate into five types of draft improvements:
+Findings translate into draft improvements:
 
 - **Hook scripts** — PreToolUse, SubagentStart, SubagentStop, and Stop hooks that enforce
   correct behavior automatically

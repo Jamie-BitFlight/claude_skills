@@ -104,7 +104,7 @@ Runs quality gates after all tasks are complete. Takes either a plan file path o
 /dh:complete-implementation #42
 ```
 
-**SAM path** (when a linked plan exists) — 7 phases:
+**SAM path** (when a linked plan exists) — phases:
 
 | Phase | Agent | Purpose |
 |---|---|---|
@@ -116,7 +116,7 @@ Runs quality gates after all tasks are complete. Takes either a plan file path o
 | T5 | service-docs-maintainer | Updates documentation (skippable if no drift found) |
 | T6 | context-refinement | Refines stored context with discoveries |
 
-**Proportional path** (for issues without a linked plan) — 3 phases: code review, test verification, acceptance criteria check.
+**Proportional path** (for issues without a linked plan) — phases: code review, test verification, acceptance criteria check.
 
 On completion, applies `status:verified` to the selected backend item.
 

@@ -7,7 +7,7 @@ description: "Strategic rebase with mandatory pre-analysis. Use when asked to re
 
 ## Mandatory Pre-Rebase Analysis
 
-Complete all 5 steps before running `git rebase`.
+Complete all steps below before running `git rebase`.
 
 ### Step 1 — Identify the merge base and branch files
 

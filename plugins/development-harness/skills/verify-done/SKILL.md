@@ -219,7 +219,7 @@ The following diagram is the authoritative procedure for Observations, Gaps, and
 
 ```mermaid
 flowchart TD
-    List["List all instances across the four categories above"] --> Q{"Any items listed?"}
+    List["List all instances across the categories above"] --> Q{"Any items listed?"}
     Q -->|"None"| None["Record: No observations"]
     Q -->|"Yes"| Gate{"Any item is contextually significant<br>OR was already flagged during the task<br>as needing a bug or backlog entry?"}
     Gate -->|"No — minor, not worth a ticket"| ObsOnly["Record as observation only<br>Include in summary below"]
