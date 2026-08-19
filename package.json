@@ -1,0 +1,16 @@
+{
+  "name": "claude_skills",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Professional development workflow extensions for Python engineers, DevOps practitioners, and AI agent developers. Covers modern Python toolchains, GitLab CI/CD automation, code quality enforcement, MCP server creation, and plugin/agent development patterns.",
+  "license": "MIT",
+  "author": "Jamie Nelson",
+  "homepage": "https://github.com/Jamie-BitFlight/claude_skills#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jamie-BitFlight/claude_skills.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jamie-BitFlight/claude_skills/issues"
+  }
+}
