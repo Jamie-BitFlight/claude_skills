@@ -506,6 +506,8 @@ max-complexity = 12
 "plugins/scientific-method/mcp/experiment-registry/__init__.py" = [
     "invalid-module-name",
 ]
+# ruamel.yaml returns dynamically typed values; Any is the correct annotation here
+"research/knowledge-explorer.py" = ["any-type"]
 # Third-party type stubs authored here to keep typing consistent for packages that ship none.
 # A (builtin-shadowing) and N (naming) often must mirror the external module's real names
 # verbatim; ANN softening (e.g. Any) reflects that the systems below the stub aren't ours to
