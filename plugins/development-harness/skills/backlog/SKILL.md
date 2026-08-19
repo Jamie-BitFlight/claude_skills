@@ -93,11 +93,24 @@ View a single backlog item in detail. Supports pagination for long bodies.
 | `include_content` | `bool` | `True` | When True (default), returns full body and section entries. When False, returns metadata and section inventory only (section names with entry counts, no body or entry content). |
 | `offset` | `int` | `0` | Skip N entry blocks from body start (for pagination) |
 | `limit` | `int` | `0` | Show at most N entry blocks (`0` = all, no truncation) |
+| `map` | `bool` | `False` | Return a flat ordinal dot-path map of the item's structure instead of content. Bounded under 2,000 tokens regardless of item size. Mutually exclusive with `navigate`. |
+| `navigate` | `str \| None` | `None` | Dot-path ordinal to fetch: `"4.0"`, `"4.0.1"`, `"4.0.code.0"`. Must match `^\d+(\.\d+)*(\.code\.\d+)?$`. An unknown ordinal returns an error listing every valid ordinal. |
+| `head` | `int \| None` | `None` | Cap tokens returned from the navigated ordinal (1–25,000). Requires `navigate`. |
+| `skip_tokens` | `int` | `0` | Token offset within the navigated content, for continuation. Requires `navigate` and `head`. Distinct from `offset`, which counts entry blocks. |
 
 Returns `{title, priority, issue, plan, file_path, body, groomed, messages, warnings}` when
 `include_content=True` (default). When `include_content=False`, returns compact metadata:
 `{title, priority, issue, plan, file_path, groomed, sections_metadata, messages, warnings}` where
 `sections_metadata` is a list of `{name, num_entries, num_struck}` dicts — no `body` or `sections` keys.
+
+With `map=True`, returns `{selector, total_sections, total_est_tokens, map_text, over_budget}`.
+With `navigate` alone, returns `{ordinal, title, content, total_tokens, truncated, child_map, has_children}`.
+With `navigate` plus `head`, returns `{ordinal, title, content, total_tokens, returned_tokens, truncated, next_call}`.
+
+Before fetching a large item to read one part of it — one acceptance-criteria block, one code
+fence, one sub-heading — read
+[progressive-disclosure.md](./references/progressive-disclosure.md) for the map-then-navigate
+drill-down, ordinal syntax, and the parent-versus-leaf `child_map` contract.
 
 ### `backlog_sync`
 
