@@ -2831,11 +2831,7 @@ class TestGroomItemMarkGroomed:
 
         out = Output()
         result = ops.groom_item(
-            selector="Mark Groomed Local",
-            section="Description",
-            content="Groomed content.",
-            output=out,
-            mark_groomed=True,
+            selector="Mark Groomed Local", section="Concerns", content="Groomed content.", output=out, mark_groomed=True
         )
 
         assert "error" not in result
@@ -2865,7 +2861,7 @@ class TestGroomItemMarkGroomed:
         out = Output()
         result = ops.groom_item(
             selector="Mark Groomed Github",
-            section="Description",
+            section="Concerns",
             content="Groomed with issue.",
             output=out,
             mark_groomed=True,
@@ -2897,7 +2893,7 @@ class TestGroomItemMarkGroomed:
         out = Output()
         result = ops.groom_item(
             selector="Mark Groomed False",
-            section="Description",
+            section="Concerns",
             content="No status change expected.",
             output=out,
             mark_groomed=False,
@@ -2963,7 +2959,7 @@ class TestGroomItemMarkGroomed:
         out = Output()
         result = ops.groom_item(
             selector="Mark Groomed Error",
-            section="Description",
+            section="Concerns",
             content="This write will fail.",
             output=out,
             mark_groomed=True,
