@@ -82,7 +82,3 @@ When writing or reviewing agent files:
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
 4. Check `SendMessage` is present when the agent is used as a teammate
-
-SOURCE: Persistent orchestrator confusion from silent agent exits (observed 2026-05-18).
-Pattern: agent completes analysis with no findings → returns nothing → orchestrator cannot
-distinguish from crash → orchestrator hunts for the agent → wasted compute and context.

@@ -53,10 +53,9 @@ The full routing taxonomy lives in
 [instruction-hygiene §6](../../plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
 (which routes onward to `candidate-fit.md`); do not restate it here.
 
-The orchestrator action this adds: when a judgment review is wrong, escalate by **changing the
-reviewer, not by re-running the cheap one**. Iterating a cheap homogeneous reviewer on a judgment
-check produces over-flagging and run-to-run disagreement — a cheap leak-pass flagged
-`Do NOT partition the rules` (a real arm procedure) as a leak and disagreed with its own prior run.
+When a judgment review is wrong, escalate by **changing the reviewer, not by re-running the cheap
+one**. Iterating a cheap homogeneous reviewer on a judgment check produces over-flagging and
+run-to-run disagreement on the same input.
 
 ## 4. Match action to the ask; quiesce agents before committing
 
@@ -80,10 +79,3 @@ state. Confirm agents are idle — token count stable across two readings — th
   an agent that lacks execution tools cannot run a gate (the orchestrator runs it), and an agent's
   "not found" is often a wrong-directory confabulation — verify against primary source. See
   source-fidelity §4.
-
-SOURCE: observed failures while de-biasing the ensemble-rule-review skill and building the SOLID
-A/B harness (session 2026-06-03). Signed off "lint clean" on files carrying content leaks; authored
-`instruction-hygiene.md` without running it against the same session's edits; iterated a cheap
-leak-pass that flagged a real procedure and disagreed run-to-run; rewrote a working runner on a
-clarifying question; held commits because background agents were mid-write. Each is a process error
-that the rules above prevent.
