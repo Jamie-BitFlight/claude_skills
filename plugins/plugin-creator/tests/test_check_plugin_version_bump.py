@@ -495,7 +495,7 @@ class TestRunRepair:
 
         # Assert
         assert exit_code == 0
-        assert json.loads(capsys.readouterr().out) == {"repaired": []}
+        assert json.loads(capsys.readouterr().out) == {"repaired": [], "failed": []}
 
     def test_reports_repaired_plugins(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
         """Drifted plugins are repaired and reported with their old/new versions.
@@ -518,8 +518,67 @@ class TestRunRepair:
         # Assert
         assert exit_code == 0
         assert json.loads(capsys.readouterr().out) == {
-            "repaired": [{"plugin": "dh", "old_version": "9.0.17", "new_version": "9.0.18"}]
+            "repaired": [{"plugin": "dh", "old_version": "9.0.17", "new_version": "9.0.18"}],
+            "failed": [],
         }
+
+    def test_failed_repair_is_reported_and_exits_nonzero(self, tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+        """A drifted plugin that cannot be repaired is surfaced, not silently dropped.
+
+        Tests: _run_repair
+        How: audit_version_drift monkeypatched to return a drifted plugin;
+             repair_plugin_version monkeypatched to return None (its documented
+             failure contract -- see repair_plugin_version's docstring).
+        Why: Copilot review on PR #3032 flagged that a drifted plugin whose
+             current plugin.json has a missing/non-string version made
+             _run_repair silently drop it from the output while still exiting
+             0 -- CI would report success while the repair never landed.
+             Per .claude/rules/silent-failure-prevention.md, a write operation
+             must report what changed (or, here, what could not be changed).
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "plugins").mkdir()
+        monkeypatch.setattr(gate, "audit_version_drift", lambda _root: ["broken"])
+        monkeypatch.setattr(gate, "repair_plugin_version", lambda _plugin_dir: None)
+
+        # Act
+        exit_code = gate._run_repair()
+
+        # Assert
+        assert exit_code == 1
+        assert json.loads(capsys.readouterr().out) == {"repaired": [], "failed": ["broken"]}
+
+
+class TestRepairPluginVersion:
+    """Tests for repair_plugin_version's documented None-on-malformed-input contract."""
+
+    def test_returns_none_on_missing_plugin_json(self, tmp_path: Path) -> None:
+        """A plugin.json that does not exist on disk returns None instead of crashing.
+
+        Tests: repair_plugin_version
+        Why: Copilot review on PR #3032 (check_plugin_version_bump.py:190) flagged
+             that repair_plugin_version's docstring claims it returns None for a
+             malformed/missing plugin.json, but it called read_text()+json.loads()
+             with no FileNotFoundError handling -- --repair would crash instead.
+        """
+        plugin_dir = tmp_path / "plugins" / "missing"
+        (plugin_dir / ".claude-plugin").mkdir(parents=True)
+
+        assert gate.repair_plugin_version(plugin_dir) is None
+
+    def test_returns_none_on_malformed_json(self, tmp_path: Path) -> None:
+        """A plugin.json containing invalid JSON returns None instead of crashing.
+
+        Tests: repair_plugin_version
+        Why: Same Copilot finding as test_returns_none_on_missing_plugin_json --
+             json.loads() previously propagated JSONDecodeError uncaught.
+        """
+        plugin_dir = tmp_path / "plugins" / "malformed"
+        (plugin_dir / ".claude-plugin").mkdir(parents=True)
+        (plugin_dir / ".claude-plugin" / "plugin.json").write_text("{not valid json", encoding="utf-8")
+
+        assert gate.repair_plugin_version(plugin_dir) is None
 
 
 # ============================================================================

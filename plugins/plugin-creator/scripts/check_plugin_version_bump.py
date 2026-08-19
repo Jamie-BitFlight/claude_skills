@@ -182,10 +182,14 @@ def repair_plugin_version(plugin_dir: Path) -> tuple[str, str] | None:
 
     Returns:
         ``(old_version, new_version)`` on success, or None when
-        ``plugin.json`` is missing a well-formed string ``version`` field.
+        ``plugin.json`` is missing, unreadable, malformed, or lacks a
+        well-formed string ``version`` field.
     """
     plugin_json_path = plugin_dir / ".claude-plugin" / "plugin.json"
-    data = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
     if not isinstance(data, dict) or not isinstance(data.get("version"), str):
         return None
 
@@ -208,8 +212,12 @@ def _run_repair() -> int:
     invariant this enforces (monotonic, cache-invalidating version).
 
     Returns:
-        0 on success, including the no-drift case (idempotent); non-zero
-        only on genuine tool error (missing ``plugins/`` directory).
+        0 when every drifted plugin was repaired (including the no-drift
+        case, which is idempotent); non-zero when the ``plugins/`` directory
+        is missing, or when any drifted plugin could not be repaired (e.g.
+        its ``plugin.json`` is missing, unreadable, malformed, or lacks a
+        well-formed string ``version``) -- that plugin remains drifted and
+        must not be reported as a successful repair.
     """
     plugins_root = Path("plugins")
     if not plugins_root.is_dir():
@@ -218,15 +226,17 @@ def _run_repair() -> int:
 
     drifted = audit_version_drift(plugins_root)
     repaired = []
+    failed = []
     for plugin_name in drifted:
         result = repair_plugin_version(plugins_root / plugin_name)
         if result is None:
+            failed.append(plugin_name)
             continue
         old_version, new_version = result
         repaired.append({"plugin": plugin_name, "old_version": old_version, "new_version": new_version})
 
-    print(json.dumps({"repaired": repaired}))
-    return 0
+    print(json.dumps({"repaired": repaired, "failed": failed}))
+    return 1 if failed else 0
 
 
 def _run_check(base_ref_arg: str | None, head_ref_arg: str | None = None) -> int:
