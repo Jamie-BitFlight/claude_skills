@@ -209,32 +209,25 @@ guess:
 
 ### Writing `.claude/rules/*.md` Files
 
-Rules state the current requirement only — never provenance, citations, or narrative. Extract the
-imperative directive; drop the evidence, the "who verified this and when," the history of how the
-rule came to be. That belongs in the commit message or PR description. A durable architecture
-decision (not an enforcement rule) belongs in `docs/`, not here.
+Rules are the current requirement only — never provenance, citations, or narrative. Put those in
+the commit message or PR description; put a durable architecture decision in `docs/` instead.
 
-Rules are kept small specifically so they get read — a long rule gets skimmed past, not followed.
-When tightening an existing rule file, rewrite it from scratch as flat directives; don't
-`Edit`-trim words out of the existing structure, which preserves the narrative's overhead and
-saves little.
+Rules are read only when small. Tightening an existing rule means rewriting it from scratch as
+flat directives, not `Edit`-trimming words from its existing structure.
 
 ### Markdown (Skills/Commands/Agents)
 
 - Skills are AI-facing documentation, NOT user documentation
 - Use imperative language ("The model MUST...")
-- No decorative `**bold**` — it carries no instruction-priority signal to a model. Use imperative
-  wording for emphasis and backtick code-spans for literal identifiers (tool names, config keys);
-  both cost less than bold and, for an identifier, are also more accurate.
+- No decorative `**bold**` — a model reads it as no stronger a signal than plain text. Use
+  imperative wording for emphasis, backtick code-spans for literal identifiers (tool names, config
+  keys)
 - Include XML tags for structured sections
-- Cite sources with URLs and access dates (this file category only — `.claude/rules/*.md` never
-  carries citations; see above)
+- Cite sources with URLs and access dates (not `.claude/rules/*.md` — see above)
 - File references use `./` relative prefix
-- Skill handoffs use plain prose (`plugin:skill-name` or `/plugin:skill-name`), not
-  `Skill(skill="...")` call syntax. `Skill(...)` is Claude-Code-specific invocation syntax; this
-  repo ships plugin content meant to run under Codex and OpenCode too, where that syntax means
-  nothing. Existing `Skill(...)` blocks predate this convention and are a known follow-up, not a
-  bug to flag.
+- Skill handoffs use plain prose (`plugin:skill-name`, `/plugin:skill-name`), not
+  `Skill(skill="...")` — that syntax is Claude-Code-only and this repo's plugin content also
+  targets Codex and OpenCode. Existing `Skill(...)` blocks are pre-convention, not bugs.
 
 Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — string
 substitution happens at load time, including inside fenced code blocks, and gets the
