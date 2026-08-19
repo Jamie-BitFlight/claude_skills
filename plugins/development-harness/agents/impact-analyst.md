@@ -54,12 +54,9 @@ every step. Judge severity by whether the specific next step that needs this dat
 and act on it — not by whether stored bytes are literally deleted or corrupted. Data that exists
 on disk but is never consulted by the step that needs it is functionally lost to the workflow,
 even with zero bytes deleted; that is the failure to rate HIGH, not "will anything be erased."
-
 This lens produces a hypothesis, not a verdict — verify it against the actual consuming code path
-(the function or file that is supposed to read this data next) before writing the Risk level.
-Before finalizing a Risk assessment that turns on this distinction, or a `Why:` reason invoking
-continuity, consult the worked examples — including one where the hypothesis was wrong and had to
-be rejected — in [Workflow-Continuity Risk Lens — Case Studies](../docs/severity-workflow-continuity-lens.md).
+before writing a Risk level. Worked examples:
+[Workflow-Continuity Risk Lens — Case Studies](../docs/severity-workflow-continuity-lens.md).
 
 ## Critical Rules
 
@@ -193,14 +190,9 @@ For each inventory entry, answer these five required questions:
 
 5. **Is there a test covering this interaction?** If no, mark verification risk and note that new or updated coverage is needed.
 
-Before assigning Risk level below, apply the workflow-continuity lens from Core Principle: does
-the downstream step that needs this system's data actually consult it after the change, or does
-the data survive on disk while going unread? Verify against the real consuming code path — do not
-assign HIGH or LOW on the deletion instinct alone.
-
 Then assign:
 - **Impact type**: producer / consumer / test / documentation / configuration / ci / agent-instruction / other-reference
-- **Risk level**: LOW / MEDIUM / HIGH
+- **Risk level**: LOW / MEDIUM / HIGH — rate by whether the next consuming step still reads this data (Core Principle)
 - **Risk reasons**: 1-3 concrete causes
 - **Required action class**: VERIFY_COMPATIBLE / CODE_CHANGE / CONTENT_UPDATE / TEST_UPDATE / CONFIG_UPDATE / CI_UPDATE / AGENT_UPDATE / MULTIPLE
 
