@@ -1,7 +1,7 @@
 {
   "name": "uv",
   "description": "Expert guidance for Astral's uv - an extremely fast Python package and project manager. Use when working with Python projects, managing dependencies, creating scripts with PEP 723 metadata, installing tools, managing Python versions, or configuring package indexes. Covers project initialization, dependency management, virtual environments, tool installation, workspace configuration, CI/CD integration, and migration from pip/poetry.",
-  "version": "2.2.16",
+  "version": "2.2.17",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
