@@ -225,7 +225,13 @@ def _parse_groomed_section(heading: str, content: str) -> GroomedData:
         # instead of round-tripping as two separate subsections.
         sub_key = _rendering.resolve_subsection_name(raw_sub_key) or raw_sub_key
         sub_content = sub_match.group(2).strip()
-        subsections[sub_key] = sub_content
+        # When two ### headings in the same body collide onto one canonical
+        # key (e.g. "### Priority" and "### priority"), the LONGER content
+        # wins — the same rule _merge_groomed applies when merging local and
+        # remote GroomedData — not whichever heading happens to appear last
+        # in source order.
+        existing = subsections.get(sub_key, "")
+        subsections[sub_key] = sub_content if len(sub_content) > len(existing) else existing
     return GroomedData(date=date, subsections=subsections)
 
 
