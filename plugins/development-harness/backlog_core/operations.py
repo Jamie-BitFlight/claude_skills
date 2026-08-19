@@ -1401,11 +1401,25 @@ def add_item(
       nanoid (e.g. ``"bd-a3f8"``).
 
     Returns:
-        Dict with title, priority, logical reference, compatibility ``file_path``, and optionally item_ref.
+        Dict with title, priority, logical reference, compatibility ``file_path``,
+        and ``item_ref`` (the backend issue ref, or ``""`` when creation failed or
+        was skipped). ``item_ref`` is always present: its emptiness, not its
+        absence, is the local-only-create signal, matching the already-persisted
+        ``BacklogItem.issue`` field and the ``issue`` key that ``list_items``/
+        ``view_item`` return for this same item on every later read (see
+        ``_build_list_entry`` and ``view_result_from_local_item``).
 
     Raises:
         ValidationError: If priority or type_ is not a recognized value. No
             item is stored and no backend issue is created when raised.
+        ContentUnavailableError: On a string-ID backend (beads), when the
+            backend issue could not be created. ``_try_create_backend_issue_ref``
+            treats creation failure as non-fatal and returns ``""``, but the
+            subsequent ``backend.put_work_item()`` call retries creation for a
+            still-issueless item and raises instead of falling back to a
+            local-only item a second time (see ``BeadsBackend.put_work_item``).
+            Integer-ID backends (GitHub, sqlite, memory) do not raise this —
+            their local-only fallback is unconditional.
     """
     _validate_add_item_priority(priority)
     _validate_add_item_type(type_)
@@ -1468,9 +1482,11 @@ def add_item(
         "priority": priority,
         "reference": item_reference,
         "file_path": item_reference,
+        # item_ref is always present — "" (not absence) is the local-only-create
+        # signal, so a caller checking `if result["item_ref"]` behaves correctly.
+        # See #2999.
+        "item_ref": issue_ref,
     }
-    if issue_ref:
-        result["item_ref"] = issue_ref
     return {**result, **out.to_dict()}
 
 

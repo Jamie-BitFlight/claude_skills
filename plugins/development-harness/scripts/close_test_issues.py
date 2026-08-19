@@ -10,6 +10,7 @@
 #   "marko>=2.0.0",
 #   "typer>=0.21.2",
 #   "python-dotenv>=1.0.0",
+#   "httpx>=0.28.1",
 # ]
 # ///
 """Close orphaned [MCP-TEST-*] GitHub issues left by failed e2e test teardown.
