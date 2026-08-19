@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from backlog_core import gh_client
+from backlog_core import gh_client, rendering as _rendering
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     WorkItemVersion,
@@ -534,6 +534,18 @@ class _GitHubReconciliation:
     ) -> list[LogicalCacheRecord]:
         """Merge cached work-item snapshots with queued mutations.
 
+        Queued mutations are read from ``_CacheState`` via plain
+        ``BacklogItem.model_validate`` (``file_cache_state.py``), which never
+        runs ``rendering.normalize_unknown_sections`` — unlike a snapshot,
+        which is always loaded through ``yaml_io.load_item`` and normalized on
+        the way in. A mutation takes precedence over its snapshot for the same
+        reference below, so a reference with a queued mutation would otherwise
+        keep serving un-normalized (duplicate/stale-keyed) sections
+        indefinitely — including while the mutation itself is stuck pending
+        (e.g. the title-mismatch acknowledgement gap tracked in #2963), which
+        is exactly when a caller most needs the healed view. Normalizing here
+        closes that gap without touching the acknowledgement logic itself.
+
         Returns:
             One logical cache record per work-item reference.
         """
@@ -544,8 +556,11 @@ class _GitHubReconciliation:
             pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
         ):
             snapshot = records_by_reference.get(mutation.item.reference)
+            item = mutation.item
+            if item.sections:
+                item = item.model_copy(update={"sections": _rendering.normalize_unknown_sections(item.sections)})
             records_by_reference[mutation.item.reference] = LogicalCacheRecord(
-                key=snapshot.key if snapshot is not None else mutation.key, item=mutation.item
+                key=snapshot.key if snapshot is not None else mutation.key, item=item
             )
         return list(records_by_reference.values())
 

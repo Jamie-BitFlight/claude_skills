@@ -1057,7 +1057,7 @@ Reserved for future use. Intended for cases where a namespace reference resolves
 **When It Occurs**:
 A symlink inside the validated directory tree has a target path that ends with
 whitespace or newline characters (e.g. `os.readlink()` returns
-`'../../python3-development/skills/uv\n'`).
+`'../../other-plugin/skills/shared\n'`).
 
 This commonly happens when symlinks are created by scripts that pass
 newline-terminated strings to `os.symlink()` or shell redirects.  The extra
@@ -1068,8 +1068,8 @@ producing false-positive NR001 errors in `NamespaceReferenceValidator`.
 
 ```python
 # Symlink created with trailing newline
-os.symlink("../../python3-development/skills/uv\n", "plugins/my-plugin/skills/uv")
-# os.readlink() now returns '../../python3-development/skills/uv\n'
+os.symlink("../../other-plugin/skills/shared\n", "plugins/my-plugin/skills/shared")
+# os.readlink() now returns '../../other-plugin/skills/shared\n'
 # Path.resolve() appends '\n' to the resolved path -- file not found
 ```
 

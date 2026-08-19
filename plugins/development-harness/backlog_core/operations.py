@@ -932,8 +932,30 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
     Returns:
         Canonical storage key, e.g. ``"rt_ica"`` for a canonical section or
         ``"unknown__custom_analysis"`` for a custom one.
+
+    Raises:
+        BacklogError: When *name* is ``"Description"`` (case-insensitive).
+            ``github_sync.parse_issue_body`` special-cases a ``## Description``
+            heading as ``BacklogItem.description``, never as a section — so a
+            section write targeting that name can never be recovered by a
+            GitHub round-trip and instead accumulates as a permanent orphan
+            key. Worse, ``render_issue_body`` still emits it as a second,
+            independent ``## Description`` heading alongside the one built
+            from ``item.description``, and ``github_sync.extract_sections``'
+            last-heading-wins parse then silently discards whichever one
+            rendered first — the exact #2956 failure mode, but for a name a
+            registry entry can never fix, because "Description" is
+            deliberately excluded from :data:`SECTION_HEADING` by design.
+            Found live on #2979/#2984/#2985 (2026-08-20).
     """
     name = name.strip()
+    if name.lower() == "description":
+        msg = (
+            'Section name "Description" is reserved for BacklogItem.description — '
+            "use update_item(description=...) instead of a section write. Writing "
+            "to it as a section produces a permanent, unrenderable orphan key."
+        )
+        raise BacklogError(msg)
     canonical = resolve_section_name(name)
     if canonical is not None:
         return canonical

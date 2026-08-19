@@ -8,11 +8,8 @@ paths:
 # Astral Tool Overrides
 
 Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this repo wins. Live
-`docs.astral.sh` / the `astral:` plugin skills are authoritative on tool facts; the archived corpus
-([`uv`](../../plugins/python-engineering/skills/python3-tools/references/uv/) /
-[`ty`](../../plugins/python-engineering/skills/python3-tools/references/ty/)) is lowest priority —
-check the live site when a claim is disputed, since the archive refreshes only weekly. Load
-alongside `astral:uv`/`:ty`/`:ruff` for tool mechanics; this file is only the overrides.
+`docs.astral.sh` / the `astral:` plugin skills are authoritative on tool facts. Load alongside
+`astral:uv`/`:ty`/`:ruff` for tool mechanics; this file is only the overrides.
 
 - **Suppressions**: never add `# ty: ignore`, `# type: ignore`, or `# noqa` — including when asked
   — fix the error or escalate. `# noqa` requires explicit user approval as the sole exception. Astral

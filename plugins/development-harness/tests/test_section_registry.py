@@ -327,6 +327,77 @@ def test_normalize_unknown_sections_folds_stripped_snake_case_key(canonical: str
     assert canonical in folded
 
 
+def test_normalize_unknown_sections_folds_bare_display_title_key() -> None:
+    """A bare (non-``unknown__``-prefixed) display-title key folds to its canonical key too.
+
+    Tests: rendering.normalize_unknown_sections bare-key fold (#2956 root cause B)
+    Why: A pre-registry write path returned an unresolved name unchanged instead of
+         ``unknown__``-prefixing it, so legacy caches carry bare keys like
+         ``"Working Register"`` with no prefix at all. The fold gate used to check
+         only ``not key.startswith("unknown__")`` to decide "already canonical",
+         so a bare key never reached the resolver even though
+         ``resolve_section_name`` resolves it cleanly — causing
+         ``render_issue_body`` to double-emit the heading and
+         ``extract_sections``' last-heading-wins parse to silently drop whichever
+         copy rendered first.
+    """
+    sections: dict[str, Section | GroomedData] = {
+        "Working Register": Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Legacy bare-key content.")])
+    }
+
+    folded = rendering.normalize_unknown_sections(sections)
+
+    assert "Working Register" not in folded
+    assert "working_register" in folded
+    folded_section = folded["working_register"]
+    assert isinstance(folded_section, Section)
+    assert folded_section.entries[0].content == "Legacy bare-key content."
+
+
+def test_normalize_unknown_sections_bare_key_alongside_canonical_merges_not_overwrites() -> None:
+    """A bare display-title key and its canonical counterpart merge, not overwrite.
+
+    Tests: rendering.normalize_unknown_sections bare-key + canonical-key collision
+           (#2956 root cause B — mirrors the existing ``unknown__`` + canonical
+           merge tests above, for the bare-key shape instead)
+    Why: The exact #2955 reproduction: a stale bare ``"Working Register"`` key
+         alongside a fresh canonical ``working_register`` write from the same
+         item. Both entries must survive the fold via the same
+         struck-wins/longer-content-wins rule as the ``unknown__`` case — a
+         first-seen-wins dedup would silently drop one entry outright.
+    """
+    canonical = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Fresh canonical write.")])
+    legacy_bare = Section(entries=[Entry(id="2026-01-02T00:00:00Z", content="Stale bare-key entry.")])
+    sections: dict[str, Section | GroomedData] = {"working_register": canonical, "Working Register": legacy_bare}
+
+    folded = rendering.normalize_unknown_sections(sections)
+
+    assert "Working Register" not in folded
+    folded_section = folded["working_register"]
+    assert isinstance(folded_section, Section)
+    assert {e.content for e in folded_section.entries} == {"Fresh canonical write.", "Stale bare-key entry."}
+
+
+def test_normalize_unknown_sections_leaves_unresolvable_bare_key_unchanged() -> None:
+    """A bare key that resolves to nothing (e.g. "Description") is left alone, not renamed or dropped.
+
+    Tests: rendering.normalize_unknown_sections orphan-key passthrough
+    Why: ``github_sync.parse_issue_body`` special-cases ``## Description`` as
+         ``BacklogItem.description``, never a section, so ``"Description"`` is
+         deliberately excluded from ``SECTION_HEADING`` and can never resolve.
+         The fold must not invent a fallback key for it — it stays exactly as
+         stored, so callers can still find and migrate it explicitly (see
+         ``operations._normalize_section_key``'s write-side rejection of new
+         writes to this name).
+    """
+    orphan = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="Orphan description content.")])
+    sections: dict[str, Section | GroomedData] = {"Description": orphan}
+
+    folded = rendering.normalize_unknown_sections(sections)
+
+    assert folded == sections
+
+
 # ---------------------------------------------------------------------------
 # Legacy Markdown parser routes both heading levels through the registry (#2987 finding 3)
 # ---------------------------------------------------------------------------

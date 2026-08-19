@@ -546,10 +546,19 @@ class GitHubBackend:
     def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
         """Enrich a ViewItemResult with live data from the backend.
 
+        Resolves the authoritative agent-managed body (head record + audit comment)
+        via ``self._work_items`` rather than the raw issue body — see
+        ``gh_client.view_enrich_from_github`` for why the two differ.
+
         Returns:
             True if enrichment succeeded, False if the issue was not found.
         """
-        return gh_client.view_enrich_from_github(result, issue_num, repo or self._repo)
+        return gh_client.view_enrich_from_github(
+            result,
+            issue_num,
+            repo or self._repo,
+            resolve_version=lambda r, o, n, i: self._work_items.work_item_version(r, o, n, i)[0],
+        )
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
         """Convert a raw IssueNode to a typed IssueLocalFields model.

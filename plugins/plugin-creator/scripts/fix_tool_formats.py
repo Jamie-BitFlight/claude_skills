@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 """Fix invalid tool format patterns in Claude Code frontmatter.
 
 Recursively scans:

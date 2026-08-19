@@ -163,69 +163,87 @@ def merge_entries(local_entries: list[Entry], remote_entries: list[Entry]) -> li
 
 
 def normalize_unknown_sections(sections: dict[str, Section | GroomedData]) -> dict[str, Section | GroomedData]:
-    """Fold ``unknown__{key}`` entries into ``{key}`` when now canonical.
+    """Fold non-canonical section keys into their registered counterpart.
 
     A local YAML cache written before a name was registered in
-    :data:`SECTION_HEADING` stores it as ``unknown__{key}`` (e.g.
-    ``unknown__story``).  Once that name becomes canonical, a freshly parsed
-    GitHub body produces the same logical section under the plain key
-    (``story``) instead — two different dict keys for one heading, which
-    survive :func:`github_sync.merge_item`'s key-union merge and render as a
-    duplicated ``## Story`` heading (#2956 follow-up). Resolving legacy
-    ``unknown__`` keys against the current registry at load time — before
-    reconciliation ever sees the item — makes both sides collide on one key.
+    :data:`SECTION_HEADING` stores it verbatim — either ``unknown__{key}``
+    (e.g. ``unknown__story``, produced by the current write/parse boundary) or
+    a bare, non-canonical key such as ``"Working Register"`` (produced by an
+    older write path that returned an unresolved caller-supplied name
+    unchanged instead of prefixing it — see #2956's write-path trace). Once
+    that name becomes canonical, a freshly parsed GitHub body or a fresh write
+    produces the same logical section under the plain registered key
+    (``working_register``) instead — two different dict keys for one heading,
+    which survive :func:`github_sync.merge_item`'s key-union merge and render
+    as a duplicated ``## Working Register`` heading, with the newer key's
+    entries silently lost on the next GitHub-body reparse (last-heading-wins
+    in :func:`github_sync.extract_sections`) — #2956's live data-loss defect.
+    Resolving *any* non-canonical key against the current registry at load
+    time — before reconciliation ever sees the item — makes both sides
+    collide on one key, whether the stale key carries the ``unknown__``
+    prefix or not.
 
-    When both ``unknown__{key}`` and ``{key}`` are present in the same
-    ``sections`` dict (e.g. a manually edited cache file), their entries are
+    A key already present in :data:`SECTION_HEADING` is left alone — it is
+    already canonical, and re-resolving it is a no-op at best.
+
+    When both a non-canonical key and its canonical counterpart are present
+    in the same ``sections`` dict (e.g. a manually edited cache file, or a
+    stale bare key alongside a fresh canonical write), their entries are
     merged through :func:`merge_entries` — the same struck-wins /
     longer-content-wins-per-id rule :func:`github_sync.merge_item` applies to
     local/remote reconciliation — rather than a bespoke first-seen-wins dedup
     that would silently drop a struck or longer-content copy sharing an id
-    with the other key's entry. The canonical (non-``unknown__``) key's
-    entries are always passed as :func:`merge_entries`' first (tie-break-
-    winning) argument, regardless of which key ``sections`` happens to
-    iterate first — the dict's key order is an incidental artifact of the
-    caller (YAML load order, dict-literal order in a test), not a documented
-    local/remote distinction, so the exact-tie winner must not depend on it
-    (#3015 Copilot review finding).
+    with the other key's entry. The canonical key's entries are always passed
+    as :func:`merge_entries`' first (tie-break-winning) argument, regardless
+    of which key ``sections`` happens to iterate first — the dict's key order
+    is an incidental artifact of the caller (YAML load order, dict-literal
+    order in a test), not a documented local/remote distinction, so the
+    exact-tie winner must not depend on it (#3015 Copilot review finding).
 
     Recovery is routed through :func:`~.section_registry.resolve_section_name`
     — the same alias-aware resolver the write boundary
     (``operations._normalize_section_key``) and the GitHub-parse boundary
     (``github_sync.parse_issue_body``) both use — rather than a bespoke
-    display-title-only comparison, so a legacy ``unknown__`` key whose
-    reconstructed heading matches a registered *alias* (e.g.
-    ``"unknown__facts_check"`` -> alias ``"facts check"`` -> canonical
-    ``fact_check``), not only an exact :data:`SECTION_HEADING` display title,
-    still folds.
+    display-title-only comparison, so a legacy key whose reconstructed
+    heading matches a registered *alias* (e.g. ``"unknown__facts_check"`` ->
+    alias ``"facts check"`` -> canonical ``fact_check``), not only an exact
+    :data:`SECTION_HEADING` display title, still folds.
 
-    Two forms of the stored key are tried, in order: the raw ``unknown__``-
-    stripped key itself (already ``snake_case`` for keys produced by the
-    current, punctuation-sanitizing :func:`heading_to_unknown_key`), then the
-    reconstructed display heading (:func:`unknown_key_to_heading` output) —
+    Two forms of the stored key are tried, in order: the raw key itself, with
+    any ``unknown__`` prefix stripped (a no-op for a bare non-canonical key;
+    already ``snake_case`` for keys produced by the current,
+    punctuation-sanitizing :func:`heading_to_unknown_key`), then the
+    reconstructed display heading (:func:`unknown_key_to_heading` output,
+    also a no-op-safe title-case pass for a bare key already in that form) —
     the fallback that still supports older, more heavily punctuation-bearing
-    keys (e.g. ``"unknown__output_/_evidence"``, whose raw stripped form
-    never matches a ``SectionKey`` value but whose reconstructed title
-    ``"Output / Evidence"`` does).
+    ``unknown__`` keys (e.g. ``"unknown__output_/_evidence"``, whose raw
+    stripped form never matches a ``SectionKey`` value but whose
+    reconstructed title ``"Output / Evidence"`` does).
+
+    A key that resolves to nothing (e.g. ``"Description"``, which
+    ``github_sync.parse_issue_body`` special-cases as ``item.description``
+    rather than a section, so it can never be a registered ``SectionKey``) is
+    left unchanged — it is orphan data outside this function's recovery
+    scope, not a bug this fold can fix.
 
     Args:
         sections: Raw ``BacklogItem.sections`` mapping as loaded from storage.
 
     Returns:
-        A new mapping with legacy ``unknown__{key}`` keys folded into their
-        now-canonical counterparts. Keys that are not legacy, or whose
-        ``unknown__`` name is still uncanonical, are returned unchanged.
+        A new mapping with legacy non-canonical keys folded into their
+        now-canonical counterparts. Keys that are already canonical, or whose
+        name is still unresolvable, are returned unchanged.
     """
     normalized: dict[str, Section | GroomedData] = {}
     # Tracks, per target key, whether the Section entries currently stored in
     # `normalized` include the canonical key's own entries — so a canonical
-    # key encountered *after* its legacy `unknown__` counterpart still wins
+    # key encountered *after* its legacy counterpart still wins
     # merge_entries' tie-break, instead of losing simply because it folded
     # into `normalized[target]` second.
     canonical_owns: dict[str, bool] = {}
     for key, value in sections.items():
         target = key
-        is_canonical_key = not key.startswith("unknown__")
+        is_canonical_key = key in SECTION_HEADING
         if not is_canonical_key and isinstance(value, Section):
             stripped = key.removeprefix("unknown__")
             canonical = resolve_section_name(stripped) or resolve_section_name(unknown_key_to_heading(key))
