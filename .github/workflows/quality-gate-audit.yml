@@ -21,6 +21,9 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Must equal StatusLabel.VERIFIED.value in
+            // plugins/development-harness/backlog_core/status_registry.py — a mismatch
+            // here is caught by test_status_label_registry_drift.py (#3004).
             const VERIFIED_LABEL = 'status:verified';
             const FLAG_LABEL = 'needs-verification';
             const PLAN_PATTERN = /\*\*Plan\*\*:/i;
