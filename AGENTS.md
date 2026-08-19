@@ -22,6 +22,9 @@ uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # I
 
 ### Linting & Formatting
 
+For full uv/ty/ruff usage guidance beyond this repo's own overrides, load the `astral` plugin
+skills (`/astral:uv`, `/astral:ty`, `/astral:ruff`) if installed, or see `docs.astral.sh` directly.
+
 ```bash
 uv run ruff check --fix path/to/file.py    # Lint with auto-fix
 uv run ruff format path/to/file.py         # Format Python
@@ -156,7 +159,7 @@ path — those break on every directory restructure.
 - **Max line length**: 120 characters
 - **Generics**: Use native forms (`list[str]`, `dict[str, Any]` not `List[str]`)
 - **Imports**: isort with `combine-as-imports = true`, `force-single-line = false`
-- **Banned**: `requests` library — use `httpx` instead
+- **Banned**: `requests` library — use `httpx` instead (enforced by ruff `flake8-tidy-imports`)
 - **Scripts**: PEP 723 inline metadata (`# /// script`) for standalone scripts run via `uv run --script`
 - **Structured data → Pydantic, not dataclass/TypedDict**: this repo's ingestion and output objects
   are standardizing on Pydantic `BaseModel`, not `@dataclass` or `TypedDict`. The
@@ -298,22 +301,32 @@ commit and changed path.
 
 ## Type Checking
 
+For full ty usage guidance beyond this repo's own overrides, load the `astral` plugin skill
+(`/astral:ty`) if installed, or see `docs.astral.sh` directly.
+
 This repository enforces **ty** (Astral) only: `uv run ty check .`. `mypy`,
 `pyright`, and `basedpyright` are not repository quality gates; references to
 them in plugin-facing documentation describe options for external plugin users.
 
-### Known ty overrides (in `pyproject.toml [tool.ty]`)
+### ty overrides and suppression policy
 
-- Test files get relaxed rules (`call-non-callable = "warn"`, etc.)
-- `plugins/agentskill-kaizen/**` has `call-non-callable = "warn"` (prefixspan incomplete stubs)
-- Symlinked directories excluded: `plugins/uv/skills/uv`, `plugins/development-harness/skills/implementation-manager`
+Suppression policy (inline `# ty: ignore` prohibited; config-level `[[tool.ty.overrides]]`
+relaxation allowed only for the categories in `linting-exceptions.md`) and its rationale live in
+`.claude/rules/astral-tool-overrides.md` (conflict C5) and `.claude/rules/python-development.md`
+("ty Type Checker Errors") — both load every session. The current override list itself lives in
+`pyproject.toml [tool.ty]`, not restated here.
+
+Symlinked directories excluded from `ty`/`ruff`: `plugins/uv/skills/uv`.
 
 ### Common ty Failure Patterns
 
 - **`unresolved-attribute` on a `ModuleType`**: almost always means the module's directory is
   missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`. Add it there first —
   mirroring the matching entry already in `[tool.pytest.ini_options] pythonpath` — and re-run
-  before investigating the importing code itself.
+  before investigating the importing code itself. For the related `unresolved-import` failure
+  (same `extra-paths` root cause, different symptom — the module isn't found at all rather than
+  an attribute on it), see `.claude/rules/python-development.md`'s "`unresolved-import` errors"
+  section.
 - **TypedDict nominal typing**: ty treats a `TypedDict` as scoped to its defining module — two
   structurally identical TypedDicts from different modules are incompatible types to ty. Avoid
   making an implementation explicitly inherit from a `@runtime_checkable` Protocol when the
@@ -396,8 +409,8 @@ this file) was removed to avoid two files drifting out of sync.
 8. **Markdown lint exclusions**: `plan/` and `.claude/backlog/` are excluded from markdownlint (they may have intentionally relaxed formatting).
 9. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 10. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
-11. **Banned API**: `requests` is banned — use `httpx` (enforced by ruff `flake8-tidy-imports`).
-12. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies.
+11. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism.
+12. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `.claude/rules/script-invocation.md` for the isolation rationale.
 13. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
 14. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
 15. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.
