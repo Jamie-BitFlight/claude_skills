@@ -21,9 +21,9 @@ When anything in this archive is disputed or ambiguous, resolve in this order:
 
 ## Refresh cadence
 
-Intended to be refreshed weekly by a scheduled CI job (A10, not yet built as
-of this writing) that runs `../../scripts/sync_uv_releases.py` to update the
-Version Information section above from the GitHub Releases API.
+Refreshed weekly by `.github/workflows/sync-astral-corpus.yml`, which runs
+`../../scripts/sync_uv_releases.py` to update the Version Information section
+above from the GitHub Releases API and opens a PR when it changes.
 
 The reference corpus itself (`cli_reference.md`, `configuration.md`,
 `migration-guide.md`, `quick-reference.md`, `troubleshooting.md`) has **no

@@ -41,8 +41,8 @@ item #3007 and is intentionally out of scope here — this rule states the canon
 forward; it does not assert the 67 files already match it.
 -->
 
-SOURCE: `.tmp/scratch/analysis/astral-delta.md` Part 4 "Shebang canonicalisation" (uv 0.12.5 probe,
-2026-08-19); corroborates AGENTS.md Gotcha #12.
+SOURCE: empirical uv 0.12.5 probe run 2026-08-19 during the Astral plugin adoption (PR #3019);
+corroborates AGENTS.md Gotcha #12.
 
 **Wrong — bypasses shebang and PEP 723 dependency resolution:**
 

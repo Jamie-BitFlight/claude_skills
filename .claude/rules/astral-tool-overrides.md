@@ -11,12 +11,11 @@ Precedence when this repo and Astral's `uv`/`ty`/`ruff` guidance disagree: repo 
 work here* wins first, live `docs.astral.sh` / the `astral:` plugin skills are authoritative on
 *tool facts* second, and this repo's archived corpus (`python3-tools/references/{uv,ty}/`) is
 lowest priority — re-check the live site when a claim is disputed, since the archive is refreshed
-only weekly. SOURCE: migration plan `great-i-want-us-frolicking-token.md`, "Precedence" decision
-row (2026-08-19).
+only weekly. SOURCE: Astral plugin adoption migration (PR #3019), "Precedence" decision (2026-08-19).
 
 The eight rows below are every point where Astral's shipped skills (`astral/{uv,ty,ruff}/SKILL.md`,
-fetched 2026-08-19) and this repo's own rules disagree, verified against primary sources in
-`.tmp/scratch/analysis/astral-delta.md` Part 2. Load this file alongside `astral:uv`/`:ty`/`:ruff`
+fetched 2026-08-19) and this repo's own rules disagree, verified against those primary sources
+directly. Load this file alongside `astral:uv`/`:ty`/`:ruff`
 so the two together state the full policy — the astral skills for tool mechanics, this file for
 where this repo's requirements override them.
 
@@ -125,6 +124,6 @@ enforced: every project-mode `uv run`/`uv sync` invocation in `.github/workflows
 protocol this was applied under. PEP 723 `--script` invocations are exempt: they resolve from their
 own inline metadata block, not the root `uv.lock`, so neither flag applies to them.
 
-SOURCE: `.tmp/scratch/analysis/astral-delta.md` Part 2 (Conflict table, verified against
-`astral-sh/claude-code-plugins` `plugins/astral/skills/{uv,ty,ruff}/SKILL.md` fetched 2026-08-19,
-and this repo's `.claude/rules/`, `AGENTS.md`, `pyproject.toml` as of commit `343e4757`).
+SOURCE: verified against `astral-sh/claude-code-plugins`
+`plugins/astral/skills/{uv,ty,ruff}/SKILL.md` fetched 2026-08-19, and this repo's `.claude/rules/`,
+`AGENTS.md`, `pyproject.toml` as of commit `343e4757` (PR #3019).

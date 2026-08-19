@@ -27,10 +27,10 @@ near-duplicate script.
 
 ## Refresh cadence
 
-Intended to be refreshed weekly by a scheduled CI job (A10, not yet built as
-of this writing). Until that job also covers ty, this archive's staleness is
-tracked only by the `generated_at` stamp below — check `docs.astral.sh/ty`
-directly for anything time-sensitive.
+`.github/workflows/sync-astral-corpus.yml` runs weekly but only covers uv
+today — ty has no changelog sync job. This archive's staleness is tracked
+only by the `generated_at` stamp below — check `docs.astral.sh/ty` directly
+for anything time-sensitive.
 
 The reference corpus itself (`cli-reference.md`, `configuration-schema.md`,
 `environment-and-modules.md`, `file-selection.md`, `installation.md`,

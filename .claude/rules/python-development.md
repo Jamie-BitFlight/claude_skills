@@ -53,6 +53,5 @@ importing code itself. A root-level `ty.toml`, if one exists, takes precedence o
 resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see AGENTS.md's "Common ty Failure Patterns".
 
-SOURCE: `.tmp/scratch/analysis/astral-delta.md` Part 1c, lines 123–125 (verified against
-`pyproject.toml:137–167` `[tool.ty.environment] extra-paths` and `[tool.ty.overrides]` blocks at
-`pyproject.toml:169–216`, 2026-08-19).
+SOURCE: verified against `pyproject.toml:137–167` `[tool.ty.environment] extra-paths` and
+`[tool.ty.overrides]` blocks at `pyproject.toml:169–216`, 2026-08-19 (PR #3019).
