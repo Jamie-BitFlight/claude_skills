@@ -38,6 +38,6 @@ def resolve_project_root(project_root: str | None) -> Path:
         return Path(env_root)
     if os.environ.get("CODEX_THREAD_ID"):
         pwd = os.environ.get("PWD", "").strip()
-        if pwd:
+        if pwd and Path(pwd).is_dir():
             return Path(pwd)
     return Path.cwd()

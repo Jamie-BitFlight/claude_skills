@@ -103,7 +103,15 @@ Practical rule:
 
 - add `mcpServers: "./.mcp.json"` when present because that is the documented Codex manifest path
 - if the Claude manifest stores MCP servers inline, generate a root `.mcp.json` from that inline object for the Codex port
-- ensure `.mcp.json` is a direct server map; do not keep a top-level `mcpServers` wrapper
+- **Superseded 2026-08-19**: keep the top-level `mcpServers` wrapper in `.mcp.json` — do not
+  strip it to a direct server map. The `frustration-analyzer` canonical-manifest fix
+  (`f9adf1f8`) established and tested the wrapped shape
+  (`tests/test_frustration_analyzer_python_compatibility.py::test_codex_mcp_launcher_...`
+  reads `config["mcpServers"]["frustration-analyzer"]`), and every `.mcp.json` shipped in this
+  repo (`process-siren`, `development-harness`, `python3-development`, `plugin-creator`,
+  `agentskill-kaizen`) now uses the wrapper. `scripts/sync_codex_plugin_manifests.py` was fixed
+  to match — it now normalizes `mcp_servers` -> `mcpServers` while preserving the wrapper instead
+  of stripping it.
 - then validate whether the plugin-scoped MCP namespace actually appears in-session
 - if the namespace does not appear, record that as a runtime gap instead of claiming full MCP support
 

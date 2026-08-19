@@ -242,8 +242,10 @@ def infer_project_root(cwd: Path | None = None) -> Path:
             "Could not resolve the git project root: process cwd is not inside a repository "
             "and no project path was found. If you use Cursor, ensure the backlog MCP entry "
             "is merged from config that expands ${workspaceFolder} (see .cursor/mcp.json or "
-            "plugin .mcp.json env). Otherwise set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, "
-            "CURSOR_PROJECT_ROOT, or CLAUDE_PROJECT_DIR, or pass --project-dir."
+            "plugin .mcp.json env). If you use Codex, ensure PWD is forwarded via the "
+            "plugin's mcpServers env_vars entry. Otherwise set DH_PROJECT_ROOT, "
+            "WORKSPACE_FOLDER_PATHS, CURSOR_PROJECT_ROOT, or CLAUDE_PROJECT_DIR, or pass "
+            "--project-dir."
         )
         _log.info("%s", msg)
         raise RuntimeError(msg) from exc

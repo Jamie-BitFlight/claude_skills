@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# ///
 """Synchronize Codex plugin manifests from their Claude plugin metadata."""
 
 from __future__ import annotations
@@ -47,7 +50,7 @@ def load_json(path: Path) -> dict:
 
 
 def sync_mcp_file(plugin_dir: Path) -> bool:
-    """Normalize a plugin MCP file to a direct server map when possible.
+    """Normalize a plugin MCP file to the canonical wrapped ``mcpServers`` shape.
 
     Returns:
         Whether the file was written.
@@ -65,15 +68,14 @@ def sync_mcp_file(plugin_dir: Path) -> bool:
     if mcp_path.is_file():
         current = load_json(mcp_path)
         if "mcpServers" in current and isinstance(current["mcpServers"], dict):
-            mcp_path.write_text(json.dumps(current["mcpServers"], indent=2) + "\n")
-            return True
+            return False
         if "mcp_servers" in current and isinstance(current["mcp_servers"], dict):
-            mcp_path.write_text(json.dumps(current["mcp_servers"], indent=2) + "\n")
+            mcp_path.write_text(json.dumps({"mcpServers": current["mcp_servers"]}, indent=2) + "\n")
             return True
         return False
 
     if source_servers is not None:
-        mcp_path.write_text(json.dumps(source_servers, indent=2) + "\n")
+        mcp_path.write_text(json.dumps({"mcpServers": source_servers}, indent=2) + "\n")
         return True
 
     return False

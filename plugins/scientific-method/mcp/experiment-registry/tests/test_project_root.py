@@ -92,3 +92,18 @@ def test_resolve_project_root_ignores_pwd_without_codex_thread_id(tmp_path: Path
     resolved = resolve_project_root(None)
 
     assert resolved == cwd
+
+
+def test_resolve_project_root_ignores_nonexistent_codex_pwd(tmp_path: Path, monkeypatch) -> None:
+    """An invalid/nonexistent Codex PWD must not override a valid cwd-based resolution."""
+    cwd = tmp_path / "actual-cwd"
+    cwd.mkdir()
+
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.setenv("CODEX_THREAD_ID", "codex-test-thread")
+    monkeypatch.setenv("PWD", str(tmp_path / "does-not-exist"))
+    monkeypatch.chdir(cwd)
+
+    resolved = resolve_project_root(None)
+
+    assert resolved == cwd
