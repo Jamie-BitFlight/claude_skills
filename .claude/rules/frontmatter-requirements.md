@@ -42,8 +42,9 @@ An agent's `skills:` field preloads skill content at subagent startup. A listed 
 the host (an uninstalled plugin) is a **silent no-op** — no error, agent just starts without that
 content. Never name a skill from an externally-sourced plugin (a marketplace entry whose `source`
 is `github`, `git-subdir`, `url`, or `npm`, not a local path) in `skills:`. Reference such skills
-only in prose (a `Skill(skill="...")` call, a routing table), where a dangling name degrades to a
-harmless no-op instead of silently starting an agent with no fallback and no signal.
+only in prose (a routing table entry, an inline mention) — a name an agent tries to activate on
+demand fails visibly if the plugin isn't installed, instead of silently starting the agent with no
+fallback and no signal.
 
 ## Multi-Ecosystem Frontmatter Preservation
 
