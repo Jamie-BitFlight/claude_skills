@@ -642,8 +642,8 @@ def test_handle_update_groomed_ac_overlap_check_fires_for_every_ac_spelling(
          of the resolved section key.
     """
     item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
-    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *a, **k: None)
-    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *a, **k: None)
+    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *_a, **_k: None)
+    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *_a, **_k: None)
     out = Output()
 
     ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
@@ -668,8 +668,8 @@ def test_handle_update_groomed_ac_overlap_check_fires_for_recoverable_spellings(
          skipped the overlap warning (#3015 Greptile review finding).
     """
     item = BacklogItem(description="- [ ] Looks like an AC checkbox", reference="p1-demo")
-    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *a, **k: None)
-    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *a, **k: None)
+    monkeypatch.setattr(ops, "_write_groomed_to_reference", lambda *_a, **_k: None)
+    monkeypatch.setattr(ops, "_reconcile_groomed_item", lambda *_a, **_k: None)
     out = Output()
 
     ops._handle_update_groomed(item, "AC content", section_name, "owner/repo", output=out)
