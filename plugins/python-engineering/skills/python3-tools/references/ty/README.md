@@ -17,14 +17,9 @@ When anything in this archive is disputed or ambiguous, resolve in this order:
 
 ## Refresh cadence
 
-`.github/workflows/sync-astral-corpus.yml` runs weekly but only covers uv —
-ty has no changelog sync job. If wanted later, parameterize
-`../../scripts/sync_uv_releases.py` with a `--repo` flag rather than adding a
-new script. Staleness is tracked only by the `generated_at` stamp below —
-check `docs.astral.sh/ty` directly for anything time-sensitive.
-
-The reference corpus itself has **no automated regeneration today** — each
-file below is a manual, reviewed pass against `docs.astral.sh/ty`:
+No automated regeneration. Staleness is tracked only by the `generated_at`
+stamp below — check `docs.astral.sh/ty` directly for anything time-sensitive.
+Each file below is a manual, reviewed pass against `docs.astral.sh/ty`:
 
 - `cli-reference.md`
 - `configuration-schema.md`
@@ -36,4 +31,4 @@ file below is a manual, reviewed pass against `docs.astral.sh/ty`:
 - `rules-and-diagnostics.md`
 - `troubleshooting.md`
 
-generated_at: 2026-08-19
+generated_at: 2026-08-20

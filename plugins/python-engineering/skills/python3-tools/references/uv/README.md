@@ -15,19 +15,10 @@ When anything in this archive is disputed or ambiguous, resolve in this order:
 3. This archive — a snapshot of (2). Lowest priority; check the live site
    before trusting a stale-looking claim.
 
-## Version Information
-
-<!-- populated by ../../scripts/sync_uv_releases.py -->
-
 ## Refresh cadence
 
-Refreshed weekly by `.github/workflows/sync-astral-corpus.yml`, which runs
-`../../scripts/sync_uv_releases.py` to update the Version Information section
-above from the GitHub Releases API and opens a PR when it changes.
+No automated regeneration — refreshing this archive (`cli_reference.md`,
+`configuration.md`, `migration-guide.md`, `quick-reference.md`,
+`troubleshooting.md`) is a manual, reviewed pass against `docs.astral.sh/uv`.
 
-The reference corpus itself (`cli_reference.md`, `configuration.md`,
-`migration-guide.md`, `quick-reference.md`, `troubleshooting.md`) has **no
-automated regeneration today** — refreshing it is a manual, reviewed pass
-against `docs.astral.sh/uv`.
-
-generated_at: 2026-08-19
+generated_at: 2026-08-20
