@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CI gate and retroactive audit for plugin.json version-bump drift.
+"""CI gate, retroactive audit, and repair for plugin.json version-bump drift.
 
 Companion to ``auto_sync_manifests.py`` (the pre-commit hook). That hook only
 inspects **staged** changes (``git diff --cached``), which is always empty in
@@ -9,7 +9,7 @@ API never runs the local pre-commit hook either. Both gaps combined let PR
 version bump, and the marketplace cache -- keyed on that version -- kept
 serving stale content indefinitely. See issue #3021.
 
-Two modes:
+Three modes:
 
 ``--check`` (CI gate, required check)
     Diffs *base-ref* against *head-ref* (a real base-vs-head tree comparison,
@@ -27,6 +27,15 @@ Two modes:
     under that plugin changed *after* that commit without a further bump.
     This is how a gap like #3021's -- already merged before this gate
     existed -- gets found without a manual ``git show`` investigation.
+
+``--repair`` (post-merge, ``main``-only, authoritative)
+    Same drift detection as ``--audit``, but patch-bumps each drifted
+    plugin's ``plugin.json`` version in place instead of only reporting it.
+    Run on ``main`` after every push -- this is the only correctness
+    mechanism for the version-collision race (#3027): two branches deriving
+    the same next version from an identical ``origin/main`` snapshot land on
+    the same number, and this is what un-collides them after merge. See
+    ``.claude/rules/plugin-development.md``.
 """
 
 from __future__ import annotations
@@ -37,6 +46,7 @@ import sys
 from pathlib import Path
 
 from auto_sync_manifests import (
+    bump_version,
     extract_version_from_json,
     parse_plugin_path,
     read_ref_json,
@@ -164,6 +174,61 @@ def audit_version_drift(plugins_root: Path) -> list[str]:
     return drifted
 
 
+def repair_plugin_version(plugin_dir: Path) -> tuple[str, str] | None:
+    """Bump a drifted plugin's version by one patch and write it to disk.
+
+    Args:
+        plugin_dir: Path to the plugin's directory (``plugins/<name>``).
+
+    Returns:
+        ``(old_version, new_version)`` on success, or None when
+        ``plugin.json`` is missing a well-formed string ``version`` field.
+    """
+    plugin_json_path = plugin_dir / ".claude-plugin" / "plugin.json"
+    data = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not isinstance(data.get("version"), str):
+        return None
+
+    old_version = data["version"]
+    new_version = bump_version(old_version, "patch")
+    data["version"] = new_version
+    # Same 2-space-indent + LF-trailing-newline format as auto_sync_manifests.py's
+    # writers (write_bytes avoids Windows CRLF conversion in text mode).
+    plugin_json_path.write_bytes((json.dumps(data, indent=2) + "\n").encode("utf-8"))
+    return old_version, new_version
+
+
+def _run_repair() -> int:
+    """Bump the version of every plugin whose content drifted past its last bump.
+
+    Reuses ``audit_version_drift`` for detection -- the same predicate that
+    closes both the #3027 collision case and the #3021 no-bump case (see
+    ``plan/architect-plugin-version-bump-race.md``). Always a patch bump:
+    re-deriving minor/major from the merge diff is unnecessary for the
+    invariant this enforces (monotonic, cache-invalidating version).
+
+    Returns:
+        0 on success, including the no-drift case (idempotent); non-zero
+        only on genuine tool error (missing ``plugins/`` directory).
+    """
+    plugins_root = Path("plugins")
+    if not plugins_root.is_dir():
+        sys.stderr.write("Error: plugins/ directory not found\n")
+        return 1
+
+    drifted = audit_version_drift(plugins_root)
+    repaired = []
+    for plugin_name in drifted:
+        result = repair_plugin_version(plugins_root / plugin_name)
+        if result is None:
+            continue
+        old_version, new_version = result
+        repaired.append({"plugin": plugin_name, "old_version": old_version, "new_version": new_version})
+
+    print(json.dumps({"repaired": repaired}))
+    return 0
+
+
 def _run_check(base_ref_arg: str | None, head_ref_arg: str | None = None) -> int:
     """Run the CI version-bump gate and print the result.
 
@@ -241,6 +306,9 @@ def main() -> int:
     mode.add_argument(
         "--audit", action="store_true", help="Report plugins whose content changed after their last version bump"
     )
+    mode.add_argument(
+        "--repair", action="store_true", help="Patch-bump plugins whose content changed after their last version bump"
+    )
     parser.add_argument("--base-ref", default=None, help="Explicit base ref for --check (default: resolve_base())")
     parser.add_argument(
         "--head-ref",
@@ -255,6 +323,8 @@ def main() -> int:
 
     if args.check:
         return _run_check(args.base_ref, args.head_ref)
+    if args.repair:
+        return _run_repair()
     return _run_audit()
 
 
