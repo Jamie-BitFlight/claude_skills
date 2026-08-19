@@ -129,6 +129,13 @@ jobs:
   # =============================================================================
   # Local hooks: manifest sync (via prek)
   # Blocking — drift was resolved 2026-02-18.
+  #
+  # The prek step below only reflects *staged* changes (git diff --cached),
+  # which is always empty on a plain CI checkout — it cannot see the PR diff
+  # at all, so it always reports "no updates needed" regardless of what
+  # actually changed. That gap (issue #3021) is what let PR #3005 merge a
+  # plugin content change with zero plugin.json version bump. The second step
+  # below closes it with a real base-vs-head comparison.
   # =============================================================================
   manifest-sync:
     name: Local / Manifest sync
@@ -139,10 +146,19 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: ./.github/actions/setup-python
 
       - name: Check manifest sync
         run: uv run -q prek run auto-sync-manifests --all-files
+
+      - name: Require plugin.json version bump for every changed plugin
+        if: github.event_name == 'pull_request'
+        run: |
+          BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")
+          uv run -q --no-sync \
+            plugins/plugin-creator/scripts/check_plugin_version_bump.py \
+            --check --base-ref "${BASE}"
 
   # =============================================================================
   # File hygiene: trailing whitespace, line endings, etc.
