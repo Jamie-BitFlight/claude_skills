@@ -3,10 +3,9 @@ name: work-backlog-item
 description: "Use when working, planning, grooming, or closing a backlog item. Bridges backlog items to SAM planning with GitHub Issue, Project, and Milestone tracking. Activates on interactive browsing with no args, loading an item from a GitHub issue reference like #N, matching by title substring to run auto-grooming plus RT-ICA gate plus GitHub sync plus SAM planning, autonomous --auto {title} mode that skips AskUserQuestion and derives data from research files while logging decisions, close {title} to dismiss an item without completion with a required reason (duplicate, out_of_scope, superseded, wontfix, blocked) per ADR-9, resolve {title} to mark DONE with an evidence trail and required summary per ADR-9, setup-github to initialize labels, project, and milestone, and --language or --stack flags that select the Layer 1 or Layer 2 profile. Stops when the item already has a Plan field or when RT-ICA returns BLOCKED."
 argument-hint: '[#N | --auto {title} | --language {lang} | --stack {stack} | item-title-substring | close {title} | resolve {title} [--force] | setup-github | --quick {title} | progress | resume [{title}]]'
 user-invocable: true
-shell: bash
 ---
 <gate_token>
-!`node "${CLAUDE_SKILL_DIR}/scripts/get-gate-token.mjs"`
+!`node "${CLAUDE_PLUGIN_ROOT}/skills/work-backlog-item/scripts/get-gate-token.mjs"`
 </gate_token>
 
 <provided_arguments>
