@@ -3,7 +3,6 @@ paths:
 - '**/SKILL.md'
 - '**/agents/**/*.md'
 - '**/commands/**/*.md'
-- .claude/rules/**/*.md
 - '**/CLAUDE.md'
 ---
 
