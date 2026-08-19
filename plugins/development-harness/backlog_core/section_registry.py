@@ -159,15 +159,29 @@ class SubsectionKey(StrEnum):
     per the module docstring's "How to add a new canonical subsection" steps.
     """
 
+    RT_ICA_ASSESSMENT = "RT-ICA Assessment"
+    ARTIFACT_CLASSIFICATION = "Artifact Classification"
+    REPRODUCIBILITY = "Reproducibility"
+    OUTPUT_EVIDENCE = "Output / Evidence"
     PRIORITY = "Priority"
     IMPACT = "Impact"
+    SCOPE = "Scope"
     BENEFITS = "Benefits"
     EXPECTED_BEHAVIOR = "Expected Behavior"
     DESIRED_STRUCTURE = "Desired Structure"
     ACCEPTANCE_CRITERIA = "Acceptance Criteria"
+    HUMAN_INPUT = "Human Input"
+    QUESTIONS_FOR_HUMAN = "Questions for Human"
     RESOURCES = "Resources"
+    RESEARCH = "Research"
+    SKILLS = "Skills"
+    AGENTS = "Agents"
+    PRIOR_WORK = "Prior Work"
+    FILES = "Files"
     DEPENDENCIES = "Dependencies"
+    BLOCKERS = "Blockers"
     EFFORT = "Effort"
+    DECISION = "Decision"
 
 
 # Canonical render order for GroomedData subsections — derived from SubsectionKey
@@ -190,9 +204,11 @@ def resolve_section_name(name: str) -> str | None:
     """Resolve a caller-supplied section name to its canonical storage key.
 
     Lookup order: :data:`SECTION_NAME_ALIASES` (exact historic spelling),
-    then a case-insensitive match against :data:`SECTION_HEADING` display
-    text (covers callers supplying the display heading verbatim, e.g.
-    ``"RT-ICA"``).
+    then the canonical ``snake_case`` :class:`SectionKey` value itself
+    (covers a caller supplying the storage key verbatim, e.g.
+    ``"fact_check"``), then a case-insensitive match against
+    :data:`SECTION_HEADING` display text (covers callers supplying the
+    display heading verbatim, e.g. ``"RT-ICA"``).
 
     Args:
         name: Caller-supplied section name, already stripped of surrounding
@@ -206,6 +222,12 @@ def resolve_section_name(name: str) -> str | None:
     alias = SECTION_NAME_ALIASES.get(lowered)
     if alias is not None:
         return alias
+    if lowered in SECTION_HEADING:
+        # SECTION_HEADING's keys ARE the canonical SectionKey values (see the
+        # dict comprehension above) — a caller supplying the storage key
+        # itself (e.g. "fact_check") is already canonical, not merely a
+        # display-heading match.
+        return lowered
     return _SECTION_HEADING_BY_LOWER.get(lowered)
 
 
