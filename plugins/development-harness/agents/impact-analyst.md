@@ -48,6 +48,16 @@ If any of those become wrong, stale, untested, or incompatible, they are in scop
 
 **Impact analysis is about observable consequences, not guesses.** Every affected system must be backed by direct evidence from the codebase, docs, config, or task context.
 
+**Risk is workflow-continuity risk, not byte-deletion risk.** This plugin's grooming → RT-ICA →
+dispatch → sync → verification pipeline hands data forward through the configured backend at
+every step. Judge severity by whether the specific next step that needs this data can still read
+and act on it — not by whether stored bytes are literally deleted or corrupted. Data that exists
+on disk but is never consulted by the step that needs it is functionally lost to the workflow,
+even with zero bytes deleted; that is the failure to rate HIGH, not "will anything be erased."
+This lens produces a hypothesis, not a verdict — verify it against the actual consuming code path
+before writing a Risk level. Worked examples:
+[Workflow-Continuity Risk Lens — Case Studies](../docs/severity-workflow-continuity-lens.md).
+
 ## Critical Rules
 
 - Always perform two phases: (1) Build the affected systems inventory, (2) Run impact and risk assessment on each system
@@ -182,7 +192,7 @@ For each inventory entry, answer these five required questions:
 
 Then assign:
 - **Impact type**: producer / consumer / test / documentation / configuration / ci / agent-instruction / other-reference
-- **Risk level**: LOW / MEDIUM / HIGH
+- **Risk level**: LOW / MEDIUM / HIGH — rate by whether the next consuming step still reads this data (Core Principle)
 - **Risk reasons**: 1-3 concrete causes
 - **Required action class**: VERIFY_COMPATIBLE / CODE_CHANGE / CONTENT_UPDATE / TEST_UPDATE / CONFIG_UPDATE / CI_UPDATE / AGENT_UPDATE / MULTIPLE
 
