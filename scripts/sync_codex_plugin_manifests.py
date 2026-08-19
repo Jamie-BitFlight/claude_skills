@@ -4,20 +4,15 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from script_utils import title_case_from_kebab
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_DIR = ROOT / "plugins"
 SHORT_DESCRIPTION_LIMIT = 240
-
-
-def title_case_from_kebab(name: str) -> str:
-    """Convert a kebab-case plugin identifier to a display name.
-
-    Returns:
-        The display name.
-    """
-    return " ".join(part.capitalize() for part in name.split("-") if part)
 
 
 def _short_description(description: str) -> str:

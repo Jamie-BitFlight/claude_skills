@@ -140,11 +140,6 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def title_case_from_kebab(name: str) -> str:
-    """Return a simple title-cased label for a kebab-case identifier."""
-    return " ".join(part.capitalize() for part in name.split("-") if part)
-
-
 def resolve_plugin_dir(plugin_name: str) -> Path:
     """Resolve the source plugin directory from the repository.
 

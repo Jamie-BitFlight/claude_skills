@@ -15,35 +15,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
 import sys
 import time
 from datetime import UTC, datetime
 from operator import itemgetter
 from pathlib import Path
-from shutil import which
 from typing import TYPE_CHECKING, Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from script_utils import run_gh_json
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-
-def run_gh_json(arguments: list[str]) -> dict[str, Any]:
-    """Run ``gh`` and parse its JSON response.
-
-    Returns:
-        Decoded JSON object emitted by the GitHub CLI.
-    """
-    gh_binary = which("gh")
-    if gh_binary is None:
-        raise RuntimeError("GitHub CLI executable 'gh' was not found on PATH")
-    process = subprocess.run([gh_binary, *arguments], check=False, capture_output=True, text=True)
-    if process.returncode:
-        raise RuntimeError(process.stderr.strip() or f"gh exited with {process.returncode}")
-    try:
-        return json.loads(process.stdout)
-    except json.JSONDecodeError as error:
-        raise RuntimeError("gh returned invalid JSON") from error
 
 
 def plugin_root(path: str, manifest_directory: str) -> str:
