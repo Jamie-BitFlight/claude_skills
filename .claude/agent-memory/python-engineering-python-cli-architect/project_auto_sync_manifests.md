@@ -11,16 +11,18 @@ metadata:
 
 ## Key Seam Contracts (test-binding)
 
-1. `_read_head_json` MUST remain the real HEAD reader. `_read_ref_json` delegates TO it when `ref == "HEAD"`. Direction is inverted from the naive spec reading — tests mock `_read_head_json` by name, so the HEAD path must flow through it.
+1. `_read_head_json` MUST remain the real HEAD reader. `read_ref_json` delegates TO it when `ref == "HEAD"`. Direction is inverted from the naive spec reading — tests mock `_read_head_json` by name, so the HEAD path must flow through it.
 
 2. `resolve_base` uses bare ref strings as argv elements — NOT `ref^{commit}`. Tests assert `"origin/main" in cmd` (exact list membership). Adding `^{commit}` suffix breaks the assertion.
 
 3. `bump_version` takes a raw version string. Use `_extract_str_version` (not `_parse_version_tuple`) to get the base version for bumping. `_parse_version_tuple` returns a tuple for comparison only.
 
+4. **(2026-08-19)** `read_ref_json` and `extract_version_from_json` were renamed from `_read_ref_json`/`_extract_version_from_json` — no longer private, because `check_plugin_version_bump.py` (new sibling script, see [[project_manifest_sync_ci_staged_diff_noop]]) now imports them cross-module. Ruff's `import-private-name` rule caught the leaky-underscore usage; the fix was promotion to public, not a suppression. If you see `_read_ref_json` in old notes/docs it's stale — the current name has no leading underscore. `_read_head_json` itself stays private (still HEAD-only, still internal).
+
 ## New Functions Added (2026-05-29)
 
 - `resolve_base() -> str | None` — ref resolution: origin/main → main → None (no `explicit` param)
-- `_read_ref_json(ref, filepath) -> object | None` — reads JSON at any ref; delegates to `_read_head_json` for "HEAD"
+- `read_ref_json(ref, filepath) -> object | None` — reads JSON at any ref; delegates to `_read_head_json` for "HEAD"
 - `_is_ahead_of_ref(filepath, version_key_path, ref) -> bool` — parameterised version comparison
 - `_version_already_bumped(filepath, version_key_path)` — alias calling `_is_ahead_of_ref(..., "HEAD")`
 - `_determine_bump_type(changes) -> Literal[...]` — DRY bump type from change lists
