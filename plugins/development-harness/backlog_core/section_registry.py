@@ -159,6 +159,10 @@ class SubsectionKey(StrEnum):
     per the module docstring's "How to add a new canonical subsection" steps.
     """
 
+    CONTENT = "content"
+    """Whole-body groomed content, written by ``operations._write_groomed_to_item``
+    when its ``section_name`` argument is ``None`` — not produced by any ``###``
+    Markdown heading, so it is registered here rather than in a producer template."""
     RT_ICA_ASSESSMENT = "RT-ICA Assessment"
     ARTIFACT_CLASSIFICATION = "Artifact Classification"
     REPRODUCIBILITY = "Reproducibility"
