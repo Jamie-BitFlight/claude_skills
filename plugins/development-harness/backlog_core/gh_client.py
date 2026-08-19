@@ -48,6 +48,7 @@ from .parsing import (
     parse_sam_task_metadata,
     today,
 )
+from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -95,9 +96,9 @@ DH_LABELS: dict[str, str] = {
     "type:refactor": "2563eb",
     "type:chore": "6b7280",
     "type:docs": "0891b2",
-    "status:needs-grooming": "f59e0b",
-    "status:in-progress": "3b82f6",
-    "status:verified": "10b981",
+    StatusLabel.NEEDS_GROOMING: "f59e0b",
+    StatusLabel.IN_PROGRESS: "3b82f6",
+    StatusLabel.VERIFIED: "10b981",
 }
 
 
@@ -1273,7 +1274,7 @@ def create_issue_for_item(
     if dry_run:
         out.info(f"  [dry-run] Would create: {issue_title}")
         return None
-    labels = ["status:needs-grooming", f"priority:{(item.priority or 'P1').lower()}", type_gh]
+    labels = [StatusLabel.NEEDS_GROOMING, f"priority:{(item.priority or 'P1').lower()}", type_gh]
     owner, repo_name = repo.full_name.split("/", 1)
     ensure_dh_labels(repo, out)
     label_id_map = _resolve_label_ids_graphql(repo, owner, repo_name, labels)
@@ -1409,7 +1410,7 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
             continue
         if num in issue_map:
             gh_issue = issue_map[num]
-            status_labels = [lbl["name"] for lbl in gh_issue["labels"] if lbl["name"].startswith("status:")]
+            status_labels = [lbl["name"] for lbl in gh_issue["labels"] if lbl["name"].startswith(STATUS_LABEL_PREFIX)]
             ms = gh_issue["milestone"]
             result[num] = IssueStatus(
                 status=_pick_primary_status_label(status_labels), milestone=ms["title"] if ms else ""
@@ -1429,8 +1430,8 @@ def _pick_primary_status_label(status_labels: list[str]) -> str:
         ``"status:blocked"`` if present, else the first label in ``status_labels``,
         else ``""``.
     """
-    if "status:blocked" in status_labels:
-        return "status:blocked"
+    if StatusLabel.BLOCKED in status_labels:
+        return StatusLabel.BLOCKED
     return status_labels[0] if status_labels else ""
 
 
@@ -1451,7 +1452,7 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
             raise ValueError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
-        labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith("status:")]
+        labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
         return _pick_primary_status_label(labels)
     except (BacklogError, GithubException):
         return ""
@@ -1537,8 +1538,8 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
             owner,
             repo_name,
             num,
-            label="status:in-progress",
-            removes=("status:needs-grooming",),
+            label=StatusLabel.IN_PROGRESS,
+            removes=(StatusLabel.NEEDS_GROOMING,),
             create_if_missing=False,
             already_message="  Status: already in-progress",
             applied_message="  Status: in-progress",
@@ -1580,10 +1581,10 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
         owner,
         repo_name,
         num,
-        label="status:verified",
+        label=StatusLabel.VERIFIED,
         colour="0e8a16",
         description="Quality gates passed via /complete-implementation",
-        removes=("status:in-progress",),
+        removes=(StatusLabel.IN_PROGRESS,),
         already_message="  Status: already verified",
         applied_message="  Status: verified",
         output=out,
@@ -1623,10 +1624,10 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
         owner,
         repo_name,
         num,
-        label="status:groomed",
+        label=StatusLabel.GROOMED,
         colour="0075ca",
         description="Grooming complete — all sections written and approved",
-        removes=("status:needs-grooming",),
+        removes=(StatusLabel.NEEDS_GROOMING,),
         already_message="  Status: already groomed",
         applied_message="  Status: groomed",
         output=out,
@@ -1667,7 +1668,7 @@ def apply_status_blocked(item: BacklogItem, repo: str = "", output: Output | Non
         owner,
         repo_name,
         num,
-        label="status:blocked",
+        label=StatusLabel.BLOCKED,
         colour="d93f0b",
         description="Blocked — missing information or a decision",
         already_message="  Status: already blocked",
@@ -1732,7 +1733,7 @@ def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = 
         if lb.startswith("priority:"):
             result.priority = lb.split(":", 1)[1].upper()
             break
-    status_labels = [lb for lb in result.labels if lb.startswith("status:")]
+    status_labels = [lb for lb in result.labels if lb.startswith(STATUS_LABEL_PREFIX)]
     if primary_status := _pick_primary_status_label(status_labels):
         result.status = primary_status.split(":", 1)[1]
     return True
@@ -1773,7 +1774,7 @@ def issue_to_local_fields(issue: IssueNode) -> IssueLocalFields:
     else:
         status = "open"
         for lbl in labels:
-            if lbl.startswith("status:"):
+            if lbl.startswith(STATUS_LABEL_PREFIX):
                 status = lbl.split(":")[1]
                 break
     ms = issue["milestone"]
