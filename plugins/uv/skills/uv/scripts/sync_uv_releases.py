@@ -464,9 +464,7 @@ def update_skill_file(skill_file: Path, version_content: str) -> None:
     content = skill_file.read_text(encoding="utf-8")
 
     if VERSION_SECTION_PATTERN.search(content):
-        new_content = VERSION_SECTION_PATTERN.sub(
-            lambda _: f"## Version Information\n\n{version_content}", content
-        )
+        new_content = VERSION_SECTION_PATTERN.sub(lambda _: f"## Version Information\n\n{version_content}", content)
     else:
         new_content = content.rstrip() + f"\n\n## Version Information\n\n{version_content}\n"
 
@@ -482,14 +480,12 @@ def display_release_summary(releases: list[dict[str, str]]) -> None:
     summary: list[dict[str, int | str]] = []
     for r in releases[:15]:
         cats = categorize_release(r["body"])
-        summary.append(
-            {
-                "version": r["version"],
-                "date": r["date"],
-                "breaking": len(cats["breaking"]),
-                "features": len(cats["features"]),
-            }
-        )
+        summary.append({
+            "version": r["version"],
+            "date": r["date"],
+            "breaking": len(cats["breaking"]),
+            "features": len(cats["features"]),
+        })
     print(json.dumps(summary, separators=(",", ":")))
 
 

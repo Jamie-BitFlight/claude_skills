@@ -504,13 +504,13 @@ max-complexity = 12
 # verbatim; ANN softening (e.g. Any) reflects that the systems below the stub aren't ours to
 # manage — we can't always express their real shape more precisely than upstream does.
 "scripts/validate_codex_skill_activation.py" = [
-    "C901",
     "D",
     "DOC",
-    "PLR0912",
     "TRY",
+    "complex-structure",
+    "too-many-branches",
 ]
-"tests/test_validate_codex_skill_activation.py" = ["RUF069"]
+"tests/test_validate_codex_skill_activation.py" = ["float-equality-comparison"]
 "typings/**" = ["A", "ANN", "N"]
 
 [tool.ruff.lint.pycodestyle]
