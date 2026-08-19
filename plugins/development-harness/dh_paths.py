@@ -49,6 +49,13 @@ import logging
 import os
 from pathlib import Path
 
+# GitPython's own import-time check shells out to locate the git executable
+# and raises ImportError if it isn't found. This module never shells out to
+# git (see _git_common_root's docstring) — it only reads .git marker files
+# directly — so silence that check and let a genuinely missing git surface
+# only if something later actually needs the binary.
+os.environ.setdefault("GIT_PYTHON_REFRESH", "quiet")
+
 import git
 
 # Module-level cache: maps cwd (as str) -> resolved project root Path.

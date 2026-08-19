@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# ///
 """Validate Codex plugin installation and runtime behavior in isolation."""
 
 from __future__ import annotations
@@ -14,8 +17,6 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-
-import git
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_ROOT = REPO_ROOT / "plugins"
@@ -270,7 +271,10 @@ def create_repo_workspace(plugin_name: str) -> ValidationWorkspace:
 
 
 def _initialize_git_project(workspace: ValidationWorkspace) -> None:
-    git.Repo.init(workspace.project_dir)
+    git_binary = shutil.which("git")
+    if git_binary is None:
+        raise HarnessError("git executable was not found on PATH")
+    subprocess.run([git_binary, "init", str(workspace.project_dir)], check=True, capture_output=True, text=True)
 
 
 def write_marketplace_json(marketplace_path: Path, plugin_id: str, plugin_name: str) -> None:

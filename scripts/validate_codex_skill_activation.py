@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# ///
 """Validate explicit, cache-provenanced Codex skill activation without MCP."""
 
 from __future__ import annotations
@@ -23,8 +26,11 @@ BLOCKED_ITEM_TYPES = frozenset({"commandExecution", "fileChange", "mcpToolCall"}
 APP_SERVER_COMMAND = ("codex", "--disable", "apps", "app-server")
 
 
-class HarnessError(RuntimeError):
-    """Raised when cache-provenanced activation cannot be proven safely."""
+# Reuse the harness module's exception type rather than redefining it — two
+# identically-named-but-distinct classes would make this module's `except
+# HarnessError` blind to failures isolated.py itself raises (e.g. from
+# create_temp_workspace / copy_auth_from_current_home, both called below).
+HarnessError = isolated.HarnessError
 
 
 @dataclass(frozen=True)
