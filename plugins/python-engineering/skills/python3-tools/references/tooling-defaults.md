@@ -13,9 +13,12 @@
 
 ## Type Checker
 
+Detection order: `.pre-commit-config.yaml` → CI config → `pyproject.toml`. Do not infer the
+active checker from config-key presence alone (`[tool.mypy]` may be stub config for IDEs).
+
 - **Default**: ty (Astral) for new work
-- **Detection**: check `.pre-commit-config.yaml` then CI, not config file presence
 - **Existing projects on mypy**: keep mypy, do not force migration
+- **Existing projects on pyright/basedpyright**: respect that, do not force ty
 - **IDEs**: keep stub config so built-in checkers stay quiet after migration
 
 ## Linter / Formatter
@@ -42,13 +45,30 @@ convention = "google"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/my_package"]
 ```
 
 ## Pre-commit
 
-Detect from `.git/hooks/pre-commit` line 2. prek is a drop-in Rust replacement.
+Detect from `.git/hooks/pre-commit` line 2. prek is a drop-in Rust replacement using the same config file.
 
 ## TOML
 
-- `tomlkit` for read/write (preserves formatting)
-- `tomllib` (stdlib) for read-only in stdlib scripts
+- `tomlkit` for read/write (preserves formatting) — open in text mode
+- `tomllib` (stdlib) for read-only — `tomllib.load()` requires binary mode (`"rb"`), `tomllib.loads()` takes a string
+
+## PyPI Packaging
+
+```toml
+# pyproject.toml
+[project]
+name = "my-package"
+version = "0.1.0"
+requires-python = ">=3.11"
+classifiers = ["Typing :: Typed"]
+
+[project.scripts]
+my-cli = "my_package.cli:app"
+```
