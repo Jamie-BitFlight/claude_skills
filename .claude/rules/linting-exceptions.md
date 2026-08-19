@@ -64,6 +64,20 @@ These are never eligible for any exception above, including environment-constrai
 
 **Touched Files Must Be Clean**: When files are modified/moved/renamed, all linting issues MUST be resolved before committing. Touching a file means taking responsibility for its quality.
 
+## Per-File Exceptions
+
+Configured in `pyproject.toml`'s `[tool.ruff.lint.per-file-ignores]` (and `[[tool.ty.overrides]]` for
+ty) — never as an inline `# noqa`/`# type: ignore`. This file does not summarize that list: it is
+long, specific, and changes independently of this document, so a copy here would only go stale (as
+the previous version of this section did — it claimed directory-wide codes that didn't match the
+actual config). Read `pyproject.toml` directly for the current entries.
+
+Every entry there names specific rule codes for a specific path pattern, never a bare "everything is
+fine here," and (with rare exceptions treated as bugs to fix, not precedent to copy) carries an inline
+comment stating why — matching one of the five categories above. New entries must do the same: name
+the codes, not the whole rule family unless every code in it genuinely applies, and state the specific
+reason next to the code, not just above the block.
+
 ## `--ignore` and `--unsafe-fixes`
 
 Never pass `--ignore` to `ruff check` to make this repository's CI pass — that suppresses the same
@@ -73,7 +87,8 @@ See [`astral-tool-overrides.md`](./astral-tool-overrides.md) C2 for why this dep
 own `ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gate.
 
 SOURCE: User policy established in conversation (2025-01-15); narrowed 2026-08-19 to require a
-per-instance justification, replace ad hoc categories with rule-conflict / rule-testing /
-externally-managed-vendored / environment-constrained-runtime, and remove blanket per-directory
-exemptions (see `pyproject.toml`'s `[tool.ruff.lint.per-file-ignores]` — those entries still exist
-and are not yet brought into this policy; each needs its own justification or removal).
+per-instance justification and replace ad hoc categories with rule-conflict / rule-testing /
+negative-example / externally-managed-vendored / environment-constrained-runtime. The previous
+version of this file's Per-File Exceptions section claimed 4 directory-wide code lists that didn't
+match `pyproject.toml` at all (verified 2026-08-19) — the actual config is per-file, not per-directory,
+and (with one gap fixed the same day) already carries the required per-entry justification.
