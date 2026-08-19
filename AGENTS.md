@@ -277,9 +277,9 @@ them in plugin-facing documentation describe options for external plugin users.
 
 Suppression policy (inline `# ty: ignore` prohibited; config-level `[[tool.ty.overrides]]`
 relaxation allowed only for the categories in `linting-exceptions.md`) and its rationale live in
-`.claude/rules/astral-tool-overrides.md` (conflict C5) and `.claude/rules/python-development.md`
-("ty Type Checker Errors") — both load every session. The current override list itself lives in
-`pyproject.toml [tool.ty]`, not restated here.
+`.claude/rules/astral-tool-overrides.md` and `.claude/rules/python-development.md` ("ty Type
+Checker Errors") — both load on any `*.py`/`pyproject.toml`/`uv.lock` edit. The current override
+list itself lives in `pyproject.toml [tool.ty]`, not restated here.
 
 Symlinked directories excluded from `ty`/`ruff`: `plugins/uv/skills/uv`.
 
