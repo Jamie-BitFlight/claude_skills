@@ -2,10 +2,7 @@
   "mcpServers": {
     "sequential_thinking": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking@latest"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
     },
     "cocoindex-code": {
       "command": "uvx",

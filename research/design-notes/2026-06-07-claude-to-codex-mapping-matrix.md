@@ -160,7 +160,7 @@ For `claude_skills`, the high-confidence first-stage Codex translation is:
 
 See:
 
-- [2026-06-08-claude-variable-compatibility-matrix.md](/Users/jamienelson/Documents/Codex/2026-06-07/can-you-clone-the-https-github/claude_skills/research/claude-code-plugins/2026-06-08-claude-variable-compatibility-matrix.md:1)
+- [2026-06-08-claude-variable-compatibility-matrix.md](./2026-06-08-claude-variable-compatibility-matrix.md)
 
 Current high-confidence conclusions:
 

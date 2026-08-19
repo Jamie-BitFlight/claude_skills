@@ -1,6 +1,6 @@
 {
   "name": "perl-development",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "description": "Comprehensive Perl 5.30+ development plugin with modular skills for scripting, CPAN ecosystem, environment setup, testing, linting, and validation. Includes specialized agents for script development, code auditing, and CLI architecture.",
   "author": {
     "name": "Jamie Nelson",
@@ -13,10 +13,7 @@
     "longDescription": "Comprehensive Perl 5.30+ development plugin with modular skills for scripting, CPAN ecosystem, environment setup, testing, linting, and validation. Includes specialized agents for script development, code auditing, and CLI architecture.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read"
-    ],
+    "capabilities": ["Interactive", "Read"],
     "defaultPrompt": [
       "Comprehensive Perl 5.30+ development plugin with modular skills for scripting, CPAN ecosystem, environment setup, testing,"
     ]

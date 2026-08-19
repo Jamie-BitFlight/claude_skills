@@ -147,7 +147,7 @@ Do not convert Claude plugin behavior by pattern matching. Every conversion must
 
 | Risk | Required handling |
 | --- | --- |
-| Claude `!`` command pre-resolution in `SKILL.md` | Do not emulate with shell fallback. If Codex has no documented equivalent, rewrite as explicit instructions or mark degraded. |
+| Claude `!`` command pre-resolution in`SKILL.md` | Do not emulate with shell fallback. If Codex has no documented equivalent, rewrite as explicit instructions or mark degraded. |
 | `${CLAUDE_PLUGIN_ROOT}` in skills or MCP config | Do not assume Codex substitution. Prefer skill-local assets/scripts, Codex-documented config, or mark blocked until runtime-proven. |
 | `CLAUDE_ENV_FILE`, `CLAUDE_CODE_SESSION_ID`, and Claude feature flags | Treat as Claude-only unless a Codex-native documented equivalent is found. |
 | Auto-selection mistaken for activation proof | Do not treat trigger matching or plausible answers as evidence that a named skill loaded. Explicitly test activation of the named skill. |

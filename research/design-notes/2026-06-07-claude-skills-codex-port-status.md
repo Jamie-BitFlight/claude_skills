@@ -236,7 +236,7 @@ Important QA correction:
 - Repo-marketplace validation and copied/zipped validation answer different questions:
   - repo-marketplace validation proves Codex can install/use the plugin through the documented marketplace flow
   - copied/zipped validation is an extra portability stress test, not the baseline Codex install model
-- Added [2026-06-08-claude-variable-compatibility-matrix.md](../claude-code-plugins/2026-06-08-claude-variable-compatibility-matrix.md) to classify `CLAUDE_*` usage by portability surface and migration rule.
+- Added [2026-06-08-claude-variable-compatibility-matrix.md](./2026-06-08-claude-variable-compatibility-matrix.md) to classify `CLAUDE_*` usage by portability surface and migration rule.
 - Normalized existing root `.mcp.json` files from a non-documented top-level `mcpServers` wrapper to the documented direct server-map shape.
 - Generated missing root `.mcp.json` files for plugins whose Claude manifests carried inline MCP config:
   - `development-harness`

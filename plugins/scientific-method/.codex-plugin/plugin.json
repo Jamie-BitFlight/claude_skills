@@ -13,11 +13,7 @@
     "longDescription": "Use when debugging, investigating root causes, designing experiments, or performing scientific analysis \u2014 enforces hypothesis-driven reasoning, evidence-first observation, causality validation, and structured output templates. Use when facing unknowns, repeated failures, or complex investigations requiring rigorous methodology.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
-    ],
+    "capabilities": ["Interactive", "Read", "Write"],
     "defaultPrompt": [
       "Use when debugging, investigating root causes, designing experiments, or performing scientific analysis \u2014 enforces"
     ]

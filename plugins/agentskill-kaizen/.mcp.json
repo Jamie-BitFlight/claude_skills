@@ -2,20 +2,11 @@
   "mcpServers": {
     "kaizen-duckdb": {
       "command": "uvx",
-      "args": [
-        "mcp-server-motherduck",
-        "--db-path",
-        ":memory:",
-        "--read-write"
-      ]
+      "args": ["mcp-server-motherduck", "--db-path", ":memory:", "--read-write"]
     },
     "kaizen-analysis": {
       "command": "uv",
-      "args": [
-        "run",
-        "--script",
-        "mcp/server.py"
-      ],
+      "args": ["run", "--script", "mcp/server.py"],
       "cwd": "."
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "litellm",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "description": "When calling LLM APIs from Python code. When connecting to llamafile or local LLM servers. When switching between OpenAI/Anthropic/local providers. When implementing retry/fallback logic for LLM calls. When code imports litellm or uses completion() patterns.",
   "author": {
     "name": "Jamie Nelson",
@@ -13,10 +13,7 @@
     "longDescription": "When calling LLM APIs from Python code. When connecting to llamafile or local LLM servers. When switching between OpenAI/Anthropic/local providers. When implementing retry/fallback logic for LLM calls. When code imports litellm or uses completion() patterns.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read"
-    ],
+    "capabilities": ["Interactive", "Read"],
     "defaultPrompt": [
       "When calling LLM APIs from Python code. When connecting to llamafile or local LLM servers. When switching between"
     ]

@@ -1,6 +1,6 @@
 {
   "name": "orchestrator-discipline",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "description": "Enforces orchestrator context window discipline via PreToolUse hooks and rules. Prevents the orchestrator from reading source files it will not edit, running diagnostic commands that should be delegated, and bypassing delegation with 'small change' rationalizations. Install to structurally prevent investigation escalation anti-patterns.",
   "author": {
     "name": "Jamie Nelson",
@@ -13,11 +13,7 @@
     "longDescription": "Enforces orchestrator context window discipline via PreToolUse hooks and rules. Prevents the orchestrator from reading source files it will not edit, running diagnostic commands that should be delegated, and bypassing delegation with 'small change' rationalizations. Install to structurally prevent investigation escalation anti-patterns.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
-    ],
+    "capabilities": ["Interactive", "Read", "Write"],
     "defaultPrompt": [
       "Enforces orchestrator context window discipline via PreToolUse hooks and rules. Prevents the orchestrator from reading source"
     ]

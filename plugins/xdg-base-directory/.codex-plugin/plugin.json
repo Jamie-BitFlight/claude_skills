@@ -1,6 +1,6 @@
 {
   "name": "xdg-base-directory",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live. When code writes to ~/.appname or hardcoded home paths. When implementing cross-platform file storage with platformdirs.",
   "author": {
     "name": "Jamie Nelson",
@@ -13,10 +13,7 @@
     "longDescription": "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live. When code writes to ~/.appname or hardcoded home paths. When implementing cross-platform file storage with platformdirs.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read"
-    ],
+    "capabilities": ["Interactive", "Read"],
     "defaultPrompt": [
       "When an application needs to store config, data, cache, or state files. When designing where user-specific files should live."
     ]
