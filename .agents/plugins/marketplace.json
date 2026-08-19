@@ -329,18 +329,6 @@
       "category": "Developer Tools"
     },
     {
-      "name": "uv",
-      "source": {
-        "source": "local",
-        "path": "./plugins/uv"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Developer Tools"
-    },
-    {
       "name": "verification-gate",
       "source": {
         "source": "local",

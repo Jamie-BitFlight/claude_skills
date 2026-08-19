@@ -360,7 +360,7 @@ graph TD
 ```mermaid
 graph LR
     A[python-cli-architect] -->|loads| S1[/python3-development:modernpython/]
-    A -->|loads| S2[/python3-development:uv/]
+    A -->|loads| S2[/astral:uv/]
     B[python-pytest-architect] -->|loads| S3[/python3-development:testing/]
 ```
 

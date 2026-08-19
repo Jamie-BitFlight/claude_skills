@@ -281,8 +281,6 @@ relaxation allowed only for the categories in `linting-exceptions.md`) and its r
 Checker Errors") — both load on any `*.py`/`pyproject.toml`/`uv.lock` edit. The current override
 list itself lives in `pyproject.toml [tool.ty]`, not restated here.
 
-Symlinked directories excluded from `ty`/`ruff`: `plugins/uv/skills/uv`.
-
 ### Common ty Failure Patterns
 
 - **`unresolved-attribute` on a `ModuleType`**: almost always means the module's directory is

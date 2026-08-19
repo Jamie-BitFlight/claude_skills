@@ -50,7 +50,7 @@ Uncertain context:
 
 Detect the type checker from **what the repository actually runs** (prefer `.pre-commit-config.yaml`, then CI workflow steps), then confirm with `pyproject.toml`. **Do not** choose **mypy**, **basedpyright**, or **pyright** only because config exists in `pyproject.toml` — repos often keep **stub** tables for the IDE while **ty** is the real gate (e.g. `[tool.mypy]` with `exclude = [".*"]`, `[tool.basedpyright]` with `typeCheckingMode = "off"`, plus `[tool.ty]` and pre-commit `id: ty`).
 
-1. **`ty`** — If hooks or CI invoke `ty` / `ty check` (e.g. pre-commit `id: ty`), or `[tool.ty]` is present and no hook/CI step runs mypy, basedpyright, or pyright as the type checker: run **`uv run ty check`** (paths per project; see `/python3-development:ty`).
+1. **`ty`** — If hooks or CI invoke `ty` / `ty check` (e.g. pre-commit `id: ty`), or `[tool.ty]` is present and no hook/CI step runs mypy, basedpyright, or pyright as the type checker: run **`uv run ty check`** (paths per project; see `/astral:ty`).
 2. **`mypy`** — If hooks or CI **invoke** `mypy` (e.g. `mirrors-mypy`, `id: mypy`, a workflow step running `mypy`): run **`uv run mypy`** per project config. The mere presence of `[tool.mypy]` or `mypy` in dev dependencies is **not** enough when ty is what pre-commit/CI runs.
 3. **`basedpyright`** — When hooks or CI run `basedpyright` / `pyright` analysis via that entrypoint: **`uv run basedpyright`**
 4. **`pyright`** — When hooks or CI run **`pyright`** directly: **`uv run pyright`**

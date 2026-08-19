@@ -6,7 +6,7 @@
 
 **Python Version**: Python 3.11+ is required unless explicitly documented otherwise. Older versions are rare, documented exceptions.
 
-**The model MUST read the official mypy documentation examples before implementing type patterns** (especially when resolving mypy output). Each subsection links to authoritative mypy docs. When using **ty** as the primary checker, still use these patterns; map diagnostics via the `/python3-development:ty` skill and migration reference where ty differs from mypy.
+**The model MUST read the official mypy documentation examples before implementing type patterns** (especially when resolving mypy output). Each subsection links to authoritative mypy docs. When using **ty** as the primary checker, still use these patterns; map diagnostics via the `/astral:ty` skill and migration reference where ty differs from mypy.
 
 ## When to Use Generics
 

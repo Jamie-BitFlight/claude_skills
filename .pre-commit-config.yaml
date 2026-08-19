@@ -199,7 +199,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: true
-        exclude: 'plugins/development-harness/skills/implementation-manager/.*|plugins/uv/skills/uv/.*|examples/solid-review-ab/corpus/.*'
+        exclude: 'plugins/development-harness/skills/implementation-manager/.*|examples/solid-review-ab/corpus/.*'
 
       - id: fix-research-formatting
         name: Fix MD031 and trailing whitespace in research entries
