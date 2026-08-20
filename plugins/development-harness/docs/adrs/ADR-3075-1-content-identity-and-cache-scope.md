@@ -55,7 +55,8 @@ reads the native store directly, not a `FileCache` hit. This is a different cach
 this ADR governs regardless of backend (Collection-layer raw content vs. Navigation-layer
 generated/parsed/paginated documents; durable vs. session-scoped) — not a reason to merge the
 two — but for GitHub specifically it is direct evidence for "re-parsing is cheap," not just an
-assumption.
+assumption. `FileCache.__init__` takes a project-root `Path` and no session parameter; it has no
+session concept and predates the control set this ADR defines.
 
 ## Considered alternatives
 
