@@ -93,7 +93,7 @@ View a single backlog item in detail. Supports pagination for long bodies.
 | `include_content` | `bool` | `True` | When True (default), returns full body and section entries. When False, returns metadata and section inventory only (section names with entry counts, no body or entry content). |
 | `offset` | `int` | `0` | Skip N entry blocks from body start (for pagination) |
 | `limit` | `int` | `0` | Show at most N entry blocks (`0` = all, no truncation) |
-| `map` | `bool` | `False` | Return a flat ordinal dot-path map of the item's structure instead of content. Bounded under 2,000 tokens regardless of item size. Mutually exclusive with `navigate`. |
+| `map` | `bool` | `False` | Return a flat ordinal dot-path map of the item's structure instead of content. Not token-bounded — `map_text` returns in full regardless of size; `over_budget=true` flags large items without truncating or paginating. Mutually exclusive with `navigate`. |
 | `navigate` | `str \| None` | `None` | Dot-path ordinal to fetch: `"4.0"`, `"4.0.1"`, `"4.0.code.0"`. Must match `^\d+(\.\d+)*(\.code\.\d+)?$`. An unknown ordinal returns an error listing every valid ordinal. |
 | `head` | `int \| None` | `None` | Cap tokens returned from the navigated ordinal (1–25,000). Requires `navigate`. |
 | `skip_tokens` | `int` | `0` | Token offset within the navigated content, for continuation. Requires `navigate` and `head`. Distinct from `offset`, which counts entry blocks. |

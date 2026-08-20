@@ -32,10 +32,13 @@ prose and code fences but no sub-headings is a leaf.
 
 ## Drill-down sequence
 
-1. Call `backlog_view(selector="#2969", map=True)`. The response is bounded under 2,000 tokens
-   regardless of item size. Each `map_text` line reads
-   `{ordinal} {title} ({est_tokens}t) — "{first content line}"`. Select the ordinal whose title and
-   preview match the target.
+1. Call `backlog_view(selector="#2969", map=True)`. The response is not currently token-bounded —
+   for a large item `map_text` returns every entry in one response; `over_budget=true` flags that
+   case without truncating or paginating it. (Intended behavior is R2 in
+   [agent-markdown-consumption-contract.md](../../../docs/agent-markdown-consumption-contract.md);
+   the gap is tracked in [#3059](https://github.com/Jamie-BitFlight/claude_skills/issues/3059).)
+   Each `map_text` line reads `{ordinal} {title} ({est_tokens}t) — "{first content line}"`. Select
+   the ordinal whose title and preview match the target.
 2. Call `backlog_view(selector="#2969", navigate="4.0")`. When `has_children=true`, read `child_map`
    and repeat this step with a child ordinal such as `4.0.1`. When `has_children=false`, `content`
    holds the full node.
