@@ -2,9 +2,11 @@
 
 ## Contexts
 
-- [Development Harness — Markdown Consumption](./plugins/development-harness/CONTEXT.md) — how
-  markdown content is collected, generated, and windowed to an AI agent across the plan/task and
-  backlog systems
+- [Development Harness](./plugins/development-harness/CONTEXT.md) — the `development-harness`
+  plugin: a distributable agent work-management system built on SAM (Stateless Agent
+  Methodology). Its 8 code packages (`agent_profile`, `backlog_core`, `dh_core`,
+  `dispatch_schema`, `hooks`, `progressive_markdown`, `sam_schema`, `scripts`) are one toolset
+  the plugin uses internally, not separate contexts.
 
 ## Relationships
 

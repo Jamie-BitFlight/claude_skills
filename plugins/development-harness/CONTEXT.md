@@ -1,10 +1,24 @@
-# Development Harness — Markdown Consumption
+# Development Harness
 
-How markdown content is collected, generated, and windowed to an AI agent across the plan/task
-system and the backlog system. Every consumer is an agent; there is no human reader. Normative
-behaviour lives in `docs/agent-markdown-consumption-contract.md` — this file is vocabulary only.
+Vocabulary for the `development-harness` plugin — one bounded context covering all 8 of its
+packages (`agent_profile`, `backlog_core`, `dh_core`, `dispatch_schema`, `hooks`,
+`progressive_markdown`, `sam_schema`, `scripts`), not one context per package. Every consumer is
+an agent; there is no human reader. The Markdown Consumption terms below (Collection, Generation,
+Navigation, Control set, etc.) are normatively defined in
+`docs/agent-markdown-consumption-contract.md` — this file is vocabulary only, for that area and
+every other area of the plugin as it gets resolved.
 
 ## Language
+
+**SAM (Stateless Agent Methodology)**:
+A constraint-driven development framework, external to this repo, treating an agent as a
+stateless computation engine — complete context in, one verified artifact out, no memory carried
+between calls. The canonical specification lives at `../stateless-agent-methodology/`
+(`bitflight-devops/stateless-agent-methodology` on GitHub) — this plugin implements SAM patterns
+for backlog-driven feature work, it does not define SAM.
+_Avoid_: "the SAM plugin" (there is no such thing — SAM is the methodology; `development-harness`
+is the plugin implementing it); "stateless agent" alone as a synonym for SAM itself (ambiguous
+between the methodology and one literal stateless agent instance).
 
 **Collection**:
 Gathering source content from wherever it lives — issue body, plan file, task file, artifact.
