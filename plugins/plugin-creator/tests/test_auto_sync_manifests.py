@@ -93,6 +93,11 @@ def _changes_with_modified_skill() -> _ComponentChangesDict:
 
 
 def _changes_with_added_skill() -> _ComponentChangesDict:
+    """Return component changes with a single added, standard-path skill (no modified entries)."""
+    return {"added": [{"component_type": "skill", "component_path": "skills/new-skill"}], "deleted": [], "modified": []}
+
+
+def _changes_with_added_skill() -> _ComponentChangesDict:
     """Return component changes with a single added skill."""
     return {
         "added": [{"component_type": "skill", "component_path": "skills/new-skill/SKILL.md"}],
@@ -234,6 +239,43 @@ class TestIdempotency:
         assert json.loads(claude_manifest.read_text(encoding="utf-8"))["version"] == "1.0.1"
         assert json.loads(codex_manifest.read_text(encoding="utf-8"))["version"] == "1.0.2"
         assert json.loads(cursor_manifest.read_text(encoding="utf-8"))["version"] == "1.0.3"
+
+    def test_update_plugin_json_bumps_secondary_manifest_on_added_only_changes(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        """A standard-path addition (no modified entries) still bumps a secondary manifest.
+
+        Tests: the `if modified or any(changes.values())` branch in _update_from_base_ref /
+               _update_from_head, specifically the widening from the earlier
+               `if modified or changes["modified"]` check
+        How: Pass changes with only "added" populated (no "modified") against a plugin that
+             has both a primary (.claude-plugin) and secondary (.codex-plugin) manifest
+        Why: For a secondary manifest, sync_components=False so _update_component_arrays never
+             runs and `modified` stays False -- before this branch widened to any(changes.values()),
+             an added-only change (e.g. a new standard-path skill, auto-discovered so never written
+             to the array) produced NO version bump for secondary manifests at all. Only the
+             primary manifest was covered by the pre-existing modified-only test above.
+        """
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        plugin_name = "test-plugin"
+        original_data = {"name": plugin_name, "version": "1.0.0"}
+        claude_manifest = _make_plugin_json(tmp_path, plugin_name, original_data)
+        codex_manifest = tmp_path / "plugins" / plugin_name / ".codex-plugin" / "plugin.json"
+        codex_manifest.parent.mkdir(parents=True)
+        codex_manifest.write_text(json.dumps({"name": plugin_name, "version": "1.0.0"}, indent=2) + "\n")
+
+        monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: dict(original_data))
+
+        # Act
+        updated, _version = auto_sync.update_plugin_json(plugin_name, _changes_with_added_skill())
+
+        # Assert -- both manifests bumped even though only "added" was populated
+        # (minor bump, since _determine_bump_type treats a non-empty "added" as a new feature)
+        assert updated is True
+        assert json.loads(claude_manifest.read_text(encoding="utf-8"))["version"] == "1.1.0"
+        assert json.loads(codex_manifest.read_text(encoding="utf-8"))["version"] == "1.1.0"
 
     def test_update_plugin_json_reports_manifest_version_divergence(
         self, tmp_path: Path, monkeypatch: Any, capsys: Any
