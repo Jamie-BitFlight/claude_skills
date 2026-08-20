@@ -584,11 +584,18 @@ issue or owner reference links a plan to its work item; it never selects a separ
 
 ### Plan and artifact capability boundary
 
-The configured backend implements the logical plan and artifact capabilities. `sam_plan`,
-`sam_task`, `sam_active_task`, and `artifact_*` calls use that same backend; there is no
-`TASKBACKEND`, independent artifact provider, local filesystem fallback, or per-plan backend
-selection. Remote providers may use a private `FileCache` for stale reads and queued writes.
-Beads, SQLite, and Memory remain native-only and never use YAML or cache storage.
+Backlog items and SAM plans/tasks do NOT share one backend protocol. Backlog operations
+(`backlog_add`, `backlog_view`, etc.) route through `WorkItemBackend`
+(`backlog_core/backend_types.py`). `sam_plan`, `sam_task`, and `sam_active_task` route through a
+separate `TaskBackend` protocol (`dh_core/protocols.py`, re-exported from
+`sam_schema/core/task_backend.py`) — every plan/task CRUD function in `dh_core/operations.py`
+(`create_plan`, `read_plan`, `list_plans`, `read_task`, `claim_task`, etc.) takes a `TaskBackend`
+parameter, not a `WorkItemBackend`. `artifact_*` calls route through `ContentProvider`
+(`backlog_core/backend_types.py`), the same protocol backlog content uses. There is no local
+filesystem fallback or per-plan backend selection — each protocol still resolves to exactly one
+configured backend instance per its own selection rules. Remote providers may use a private
+`FileCache` for stale reads and queued writes. Beads, SQLite, and Memory remain native-only and
+never use YAML or cache storage.
 
 ---
 
