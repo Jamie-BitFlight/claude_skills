@@ -320,6 +320,27 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+def build_collection_warnings(
+    incomplete_queries: list[str], mismatched_queries: list[str], missing_metadata_repositories: list[str]
+) -> list[str]:
+    """Translate collection-completeness gaps into human-readable warnings.
+
+    Returns:
+        One warning string per gap category that actually occurred.
+    """
+    warnings: list[str] = []
+    if incomplete_queries:
+        warnings.append("one or more Code Search queries have uncollected pages")
+    if mismatched_queries:
+        warnings.append("GitHub advertised more Code Search results than its pages returned")
+    if missing_metadata_repositories:
+        warnings.append(
+            f"{len(missing_metadata_repositories)} candidate repositories returned no GraphQL metadata "
+            "(renamed, made private, or deleted) and were dropped -- see missing_metadata_repositories"
+        )
+    return warnings
+
+
 def main() -> int:
     """Collect and write the ranked candidate dataset.
 
@@ -367,17 +388,17 @@ def main() -> int:
 
     repositories = sorted({hit["repository"] for hit in all_hits}, key=str.casefold)
     fetch_metadata(repositories, metadata, args.metadata_delay_seconds, persist)
+    missing_metadata_repositories = [repository for repository in repositories if repository not in metadata]
     candidates = rank_candidates(all_hits, metadata, args.minimum_stars)
-    collection_warnings: list[str] = []
-    if incomplete_queries:
-        collection_warnings.append("one or more Code Search queries have uncollected pages")
-    if mismatched_queries:
-        collection_warnings.append("GitHub advertised more Code Search results than its pages returned")
+    collection_warnings = build_collection_warnings(
+        incomplete_queries, mismatched_queries, missing_metadata_repositories
+    )
     payload = {
         "generated_at": datetime.now(UTC).isoformat(),
         "scope": "metadata-only candidate discovery; no repository trees or source files were inspected",
-        "partial": bool(incomplete_queries or mismatched_queries),
+        "partial": bool(incomplete_queries or mismatched_queries or missing_metadata_repositories),
         "collection_warnings": collection_warnings,
+        "missing_metadata_repositories": missing_metadata_repositories,
         "ranking": "stars descending, then forks descending, then repository name",
         "minimum_stars": args.minimum_stars,
         "explicit_seed_repositories": explicit_seed_repositories,

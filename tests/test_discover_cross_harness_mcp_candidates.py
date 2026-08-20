@@ -104,6 +104,41 @@ class TestRankCandidates:
         assert candidate.default_branch is None
 
 
+class TestBuildCollectionWarnings:
+    """Coverage of ``build_collection_warnings``, including missing-GraphQL-metadata tracking.
+
+    A repository whose GraphQL alias returns null (renamed, made private, or deleted since the
+    code-search hit was recorded) is silently dropped by rank_candidates -- correctly, since it
+    can't be ranked. Without this warning it was indistinguishable in the report from a candidate
+    correctly excluded for being below --minimum-stars.
+    """
+
+    def test_no_gaps_produces_no_warnings(self) -> None:
+        assert discovery.build_collection_warnings([], [], []) == []
+
+    def test_incomplete_queries_produce_a_warning(self) -> None:
+        warnings = discovery.build_collection_warnings(["q1"], [], [])
+
+        assert warnings == ["one or more Code Search queries have uncollected pages"]
+
+    def test_mismatched_queries_produce_a_warning(self) -> None:
+        warnings = discovery.build_collection_warnings([], ["q1"], [])
+
+        assert warnings == ["GitHub advertised more Code Search results than its pages returned"]
+
+    def test_missing_metadata_repositories_produce_a_counted_warning(self) -> None:
+        warnings = discovery.build_collection_warnings([], [], ["octo/renamed", "octo/deleted"])
+
+        assert len(warnings) == 1
+        assert "2 candidate repositories returned no GraphQL metadata" in warnings[0]
+        assert "missing_metadata_repositories" in warnings[0]
+
+    def test_all_three_gap_categories_each_produce_their_own_warning(self) -> None:
+        warnings = discovery.build_collection_warnings(["q1"], ["q2"], ["octo/gone"])
+
+        assert len(warnings) == 3
+
+
 class TestBuildMetadataQuery:
     """Coverage of the GraphQL query builder used by ``fetch_metadata``."""
 
