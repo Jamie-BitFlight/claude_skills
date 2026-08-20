@@ -66,6 +66,13 @@ to the page it renders, indifferent to whether the page came from `file://` or `
 every source implements `get_markdown(source) -> str`, and nothing past that seam is
 source-specific.
 
+The control set (ADR-3082-1) extends this analogy: it is that browser's local cache, not a
+shared server-side one. It serves an already-fetched page back to the same browsing activity
+without hitting the network again — that's what makes a follow-up page request cheap — but it
+isn't there to save a *different* tab, a *different* session, or a repeat visit later from
+re-fetching. Navigation is the frontend the agent talks to; the control set is what that
+frontend caches locally while the agent is looking at one thing.
+
 ### R2 — Everything paginates, including the table of contents
 
 Every response that can exceed the window budget paginates. This applies recursively and

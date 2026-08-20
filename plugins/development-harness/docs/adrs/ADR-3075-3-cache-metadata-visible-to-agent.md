@@ -28,15 +28,18 @@ may use this to decide, on its own, whether to trust what it received.
 A caller may explicitly request revalidation or a forced refresh instead of accepting whatever
 the control set already holds. Both re-run Collection and Generation via the stored command —
 identity is derived from the command plus Generation's output, not from the raw source alone
-(ADR-3075-1), so recomputing current identity from the source alone is not an option. They
-differ only in what happens after: revalidation compares the freshly computed identity to the
-entry's stored identity and, on a match, leaves the existing row as-is rather than overwriting
-it — no write happens, since the stored content is confirmed still current. A forced refresh
-skips the comparison and unconditionally overwrites the row with the fresh document regardless
-of whether the identity matches. **This is not about avoiding a re-parse** — the control set
-stores raw content, not a parsed tree (ADR-3082-1), so serving any page from either path always
-reparses the row's raw content in-memory, the same cost either way. Revalidation's saving is
-narrower: skipping an unnecessary write when nothing actually changed. Revalidation is a
+(ADR-3075-1), so recomputing current identity from the source alone is not an option. **Both
+always write a fresh navigation document, confirmed by the repo owner: the control set is not a
+durable reuse-optimization cache — it is temporary scratch space for one navigation task, for an
+agent to page and jump around in while it locates currently-needed data. Any hit against the
+backend produces a new document; nothing skips the write to avoid "redundant" work, because
+reuse across separate requests was never the point.** Revalidation and forced refresh differ
+only in what's reported, not in whether a write happens: revalidation compares the freshly
+computed identity to the entry's previously-known identity and tells the caller whether it
+changed; a forced refresh skips that comparison and reporting, unconditionally serving the fresh
+document. **This is not about avoiding a re-parse** — the control set stores raw content, not a
+parsed tree (ADR-3082-1), so serving any page from either path always reparses the row's raw
+content in-memory, the same cost either way. Revalidation is a
 caller-triggered path to the same outcome ADR-3075-2's write-triggered invalidation reaches
 automatically — deliberately redundant with it, not a replacement for it, because the automatic
 path cannot see every reason an agent might have to distrust a cached entry.

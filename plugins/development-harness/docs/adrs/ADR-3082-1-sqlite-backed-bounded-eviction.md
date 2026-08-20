@@ -49,12 +49,35 @@ that cost to create what turns out to be an arbitrary boundary between sessions 
 **The key is `content_id` alone** — the command+content-bound identity from ADR-3075-1. No
 `session_id`, anywhere: not in the schema, not as an MCP tool parameter, not read from the CLI's
 environment for this purpose. Two different sessions running the identical command against
-identical content resolve to the same row and share it — this is now a deliberate feature, not
-an accident to guard against: it avoids duplicate storage and duplicate Collection+Generation
-work for the same request made twice. `backlog_view` and `artifact_read` need **no**
-session-identifying parameter added to their signatures for control-set purposes — the entire
-prerequisite ADR-3075-4 stated in its Consequences section (adding a `gate_token`-style or
-`session_id`-style parameter) is void for this reason, not merely revised.
+identical content resolve to the same row on write. **This avoids duplicate storage, not
+duplicate work** — every full request still runs Collection and Generation unconditionally (see
+"Every backend hit always writes a fresh document" below); `content_id` isn't even knowable until
+that work has already happened, since it's a hash of the *generated* output, so there is nothing
+to check in advance that would let a repeat request skip the fetch. The benefit of dropping
+`session_id` from the key is narrower than originally claimed here: two callers producing
+identical content upsert the same row instead of each holding their own permanent duplicate, so
+storage doesn't grow with caller count — it says nothing about compute cost. `backlog_view` and
+`artifact_read` need **no** session-identifying parameter added to their signatures for
+control-set purposes — the entire prerequisite ADR-3075-4 stated in its Consequences section
+(adding a `gate_token`-style or `session_id`-style parameter) is void for this reason, not merely
+revised.
+
+**Every source hit always writes a fresh document, confirmed by the repo owner.** "Backend call"
+is two different things and this ADR must not conflate them: a call to the navigation system
+(the MCP tool or CLI — every request, page 1 or page 2, is one of these) versus Collection and
+Generation actually reaching the original *source* (GitHub, etc.). The control set is not a
+durable reuse-optimization cache — it is temporary scratch space for one navigation task: an
+agent pages and jumps around in a document it just fetched, and the external store exists only
+because the CLI can't hold that document in memory between its own invocations (see Context
+above). A request that reaches the source — an ordinary initial request, revalidation, or a
+forced refresh (ADR-3075-3) — always regenerates and always writes; nothing skips the write to
+avoid "redundant" recomputation, because reuse across separate top-level requests was never the
+design's point. A follow-up page request against a document an agent is *already* navigating
+(R8) is still a call to the navigation system — the caller still invokes a tool — but it does not
+reach the source: it reads the row this task already wrote. **This is a genuine, deliberate
+caching effect, confirmed by the repo owner — a side effect of solving the CLI-not-a-service
+problem, not the reason the control set exists.** It's scoped to one navigation task's own
+follow-up calls, not to avoiding Collection and Generation across separate top-level requests.
 
 ## Decision
 
@@ -162,10 +185,13 @@ eviction is a periodic pass rather than inline on every write — the expensive 
 deleting down to target) runs at most hourly-to-daily, rate-limited by the stored
 `last_cleanup_at` check, not per-write. What remains on the write/read path is just the cheap
 parts: an insert of new content, and a single-row `last_accessed_at` update on read. Second,
-dropping `session_id` from the key (see "Reversal" above) means identical requests across
-different callers now share one row instead of writing duplicate ones — fewer total writes than
-the session-keyed design would have produced, not more. **Confirmed by the repo owner: accepted
-as-is** at this reduced scope. Revisit if contention is ever measured to matter in practice.
+every backend hit always writes regardless of key design (see "Every backend hit always writes a
+fresh document" above), so dropping `session_id` from the key does not reduce write *count* —
+identical requests from different callers still each write. What it reduces is storage: those
+writes upsert one shared row instead of each caller permanently holding its own duplicate, so the
+database doesn't grow with caller count for identical content. **Confirmed by the repo owner:
+accepted as-is** at this reduced scope. Revisit if contention is ever measured to matter in
+practice.
 
 ## Consequences
 

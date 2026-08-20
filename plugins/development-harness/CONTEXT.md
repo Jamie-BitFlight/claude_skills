@@ -56,18 +56,21 @@ supplies markdown text for a source without Navigation ever knowing what that so
 Matches `MarkdownContentProvider` already in code.
 
 **Control set**:
-The single, global store backing Navigation's content identity (R8). One store for every caller,
-not one per tool, subcommand, transport, or session — every operation touching the same generated
-content resolves against the same control set, regardless of which tool or session made the
-request. Out-of-process by necessity, not by preference: the CLI is not a running service — it's
-a fresh OS process per invocation with no memory of any prior call, so it needs external storage
-regardless, and an in-process cache (an MCP server's lifespan context, a module-level dict)
-cannot be shared with it either way. One SQLite database at `$DH_STATE_HOME/control-set.db`
-(WAL mode), rows keyed by `content_id` alone — no `session_id`, not a directory of loose files —
-with a bounded global storage budget (LRU eviction by size, not entry count) and a periodic,
-rate-limited age-based cleanup pass (hourly to daily, not on every write). Holds no authoritative
-data — every row is a disposable cache Collection and Generation can rebuild on demand, so losing
-the whole database costs nothing but a cold cache. See ADR-3082-1.
+Navigation's local cache — the browser-cache half of the browser-chrome analogy above: it serves
+an already-fetched document back to the same navigation task without hitting the source again,
+not a shared server-side cache meant to save a different task or a later visit from re-fetching.
+Every full request still runs Collection and Generation and always writes; only a follow-up page
+request within one task reads the cache instead of hitting the source. One store for every
+caller, not one per tool, subcommand, transport, or session. Out-of-process by necessity, not by
+preference: the CLI is not a running service — it's a fresh OS process per invocation with no
+memory of any prior call, so it needs external storage regardless, and an in-process cache (an
+MCP server's lifespan context, a module-level dict) cannot be shared with it either way. One
+SQLite database at `$DH_STATE_HOME/control-set.db` (WAL mode), rows keyed by `content_id` alone —
+no `session_id`, not a directory of loose files — with a bounded global storage budget (LRU
+eviction by size, not entry count) and a periodic, rate-limited age-based cleanup pass (hourly to
+daily, not on every write). Holds no authoritative data — every row is a disposable cache
+Collection and Generation can rebuild on demand, so losing the whole database costs nothing but a
+cold cache. See ADR-3082-1.
 _Avoid_: "in-process cache" or "shared dict" as a mental model — that shape cannot satisfy
 "same entry regardless of transport" no matter how carefully it's wired. Also avoid describing
 this as "a directory per session" — that was ADR-3075-4's original storage mechanism, superseded
