@@ -6,5 +6,5 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "hooks": "./hooks.json"
+  "hooks": "./hooks/hooks.json"
 }

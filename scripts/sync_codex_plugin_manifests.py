@@ -225,10 +225,11 @@ def sync_manifest(plugin_dir: Path, *, check_only: bool = False) -> bool:
         manifest["apps"] = "./.app.json"
         changed = True
 
-    # Codex auto-detects ./hooks/hooks.json, but plugins with a root-level hooks.json
-    # need an explicit manifest path.
-    if (plugin_dir / "hooks.json").is_file() and manifest.get("hooks") != "./hooks.json":
-        manifest["hooks"] = "./hooks.json"
+    # Codex's plugin validator rejects a top-level "hooks" field outright (see
+    # research/design-notes/2026-06-14-plugin-creator-packaging-assessment.md) and
+    # auto-detects ./hooks/hooks.json on its own -- never write this field.
+    if "hooks" in manifest:
+        del manifest["hooks"]
         changed = True
 
     display_name = title_case_from_kebab(manifest["name"])
