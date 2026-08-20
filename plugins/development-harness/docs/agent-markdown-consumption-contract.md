@@ -151,8 +151,12 @@ selector or an address, never by re-describing the source. The original scope or
 repeated on follow-up calls — it is retained server-side as the entry's stored command (see
 below), not something the caller carries forward. Concretely, an initial request states scope
 (`selector="#2529", section="RT-ICA"` or similar); every request after that states only
-`hash="<identifier>"` plus `page`, `navigate` (R4's address), and `pagesize` (the caller
-override from R2) — nothing about where the content came from.
+`hash="<identifier>"` plus `page`, `navigate` (R4's address), `pagesize` (the caller override
+from R2), and — on transports where the control set is out-of-process (ADR-3075-4) — a
+session-identifying value the request needs to locate its session's store: a `gate_token`-style
+parameter for MCP tools, per ADR-3075-4's Consequences, since `backlog_view` and `artifact_read`
+have no in-process session identity to read from `ctx`; the CLI instead reads
+`CLAUDE_CODE_SESSION_ID` directly and needs no such parameter.
 
 The identifier resolves against cached parsed content. Serving a later page does not
 re-collect from the provider and does not re-parse.
@@ -241,7 +245,7 @@ instead of trusting whatever the control set already holds.
 flowchart TD
     Req([Agent requests content<br>from any source]) --> Coll[Collection: gather source content<br>unbounded — no budget check]
     Coll --> Gen["Generation: assemble the complete document<br>for the requested scope — description +<br>every requested section or artifact —<br>unbounded R1"]
-    Gen --> Nav[Navigation engine: parse, build<br>addressable tree and table of contents,<br>hash the generated document for<br>content identity R8]
+    Gen --> Nav[Navigation engine: parse, build<br>addressable tree and table of contents,<br>hash command + generated document<br>together for content identity R8]
     Nav --> Cache["Cache the generated document<br>for the session, keyed by that identity R8"]
     Cache --> Eng[Window the cached document<br>to the agent]
     Eng --> Measure{Response exceeds<br>window budget?<br>only checked here}
