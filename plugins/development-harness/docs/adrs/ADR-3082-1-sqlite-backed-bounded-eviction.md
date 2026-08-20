@@ -81,14 +81,25 @@ follow-up calls, not to avoiding Collection and Generation across separate top-l
 
 ## Decision
 
-**One SQLite database**, not a directory of files, at a fixed path
-(`$DH_STATE_HOME/control-set.db`), WAL mode — consistent with this repo's existing `sqlite`
-backend convention (`docs/backend-providers.md`) for the choice of engine; that backend's own
-docs do not analyze WAL/writer-serialization behavior, so it is precedent for "SQLite is an
-established storage choice here," not for the contention trade-off named below. Rows are keyed
-by `content_id` alone. Each row stores the generated content (raw, not a parsed tree — see
-"Re-parsing on follow-up pages" below), its hash, the canonicalized generating command, the
-request's `source` (see schema note below), a `stale` marker (see schema note below), `created_at`,
+**One SQLite database**, not a directory of files, at `state_root()/control-set.db` — the
+existing per-project state directory (`dh_paths.py`'s `state_root()`, `~/.dh/projects/{slug}/`
+or `$DH_STATE_HOME/projects/{slug}/` under an override), not a bare `$DH_STATE_HOME`. Every
+other state artifact this repo persists (`backlog/`, `plan/`, `milestones/`, `context/`,
+`reports/`) already nests under `state_root()`; a machine-global path was a review-caught
+mistake in this ADR's first draft — under a shared `$DH_STATE_HOME`, two different repositories
+running the harness could produce the same canonicalized command against unrelated content and
+collide on the same `content_id` row. One database per project makes that collision structurally
+impossible, at zero cost: nothing about the control set's global-not-session-scoped design
+(above) requires sharing storage *across* projects, only across sessions and tools *within* one.
+WAL mode — consistent with this repo's existing `sqlite` backend convention
+(`docs/backend-providers.md`) for the choice of engine; that backend's own docs do not analyze
+WAL/writer-serialization behavior, so it is precedent for "SQLite is an established storage
+choice here," not for the contention trade-off named below. Rows are keyed by `content_id`
+alone — `content_id` does not need to also encode project or backend identity, since one
+database per project already provides that boundary. Each row stores the generated content
+(raw, not a parsed tree — see "Re-parsing on follow-up pages" below), its hash, the
+canonicalized generating command, the request's `source` (see schema note below), a `stale`
+marker (see schema note below), `created_at`,
 and `last_accessed_at`.
 
 **Re-parsing on follow-up pages is allowed, confirmed by the repo owner — this clarifies R8, not
@@ -125,6 +136,18 @@ on clean exit) is actually satisfied by: the check runs opportunistically off of
 any caller, so a crashed or killed process's rows still get swept the next time anything touches
 the database and the cadence has elapsed — just not synchronously with that caller's own
 activity.
+
+**Cleanup must reclaim pages, not just delete rows.** SQLite's default `auto_vacuum = NONE`
+moves a deleted row's pages onto an internal freelist for reuse by future writes — it does not
+shrink the file on disk. Without an explicit reclaim step, the 40MB target bounds *live* row
+storage but not `control-set.db`'s file size, which only grows: a write burst or an oversized
+entry (below) can push the file to a peak that later trimming never gives back. The database is
+created with `PRAGMA auto_vacuum = INCREMENTAL`, and each periodic cleanup pass ends by running
+`PRAGMA incremental_vacuum` to return freed pages to the filesystem. Incremental vacuum was
+chosen over a full `VACUUM`: `VACUUM` rewrites the entire database file and requires an
+exclusive lock for its duration, which is disproportionate to a background maintenance pass on
+a cache running hourly-to-daily; incremental vacuum reclaims pages a chunk at a time without
+that exclusive rewrite.
 
 **The goal, confirmed by the repo owner: avoid evicting an entry an agent is actively navigating
 within.** LRU achieves this structurally, not just incidentally: reading an entry (any page or

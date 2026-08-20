@@ -37,6 +37,19 @@ No component may hand-build a table of contents, a section listing, a content ex
 bounded response of its own. Where such an implementation exists today it is deleted, not
 maintained in parallel. A second implementation is a defect regardless of whether it works.
 
+**Known gap, blocks deletion of the duplicate implementation until resolved.** Today's two
+engines address content differently: `backlog_core`'s `ordinal_mapper.py`/`disclosure_handler.py`
+accepts dot ordinals (`4.0.1`, `4.0.1.code.0`, validated by `_ORDINAL_PATTERN`), while
+`progressive_markdown`'s `indexer.py::_build_selector()` emits hierarchical selectors
+(`h2.1.2`) and `ProgressiveMarkdownNavigator.view_code()` addresses code blocks by ID
+(`code_0001`). Deleting the `ordinal_mapper` path as this requirement mandates, before
+reconciling these grammars, would mean agents can no longer copy an address from a table of
+contents into a follow-up retrieval request (R4) — the surviving engine wouldn't accept the
+addresses the deleted one taught callers to expect. This requirement does not resolve which
+grammar wins or how the reconciliation is built; it records the constraint so the deletion is
+sequenced correctly: the surviving engine must emit or accept the canonical ordinal grammar
+before, not after, `ordinal_mapper` is removed.
+
 Sources include, and are not limited to: issue and item bodies, plan documents, task
 documents, and the reports and artifacts produced during grooming.
 
@@ -225,7 +238,7 @@ but it cannot be an in-process cache (a server-held dict, an MCP lifespan contex
 that, because the CLI is not a running service: it is a separate OS process per invocation with
 no memory of any prior call and no shared memory to an MCP server process, by construction, no
 matter how the MCP side is wired. The store is one out-of-process SQLite database at
-`$DH_STATE_HOME/control-set.db` (WAL mode), rows keyed by `content_id` alone — no
+`state_root()/control-set.db` (per-project, WAL mode), rows keyed by `content_id` alone — no
 session-identifying value anywhere — bounded globally (LRU eviction past a tunable size target)
 with a periodic, rate-limited age-based cleanup pass (hourly to daily, not on every write), so
 entries never accumulate unboundedly and cleanup does not depend on any caller exiting cleanly.

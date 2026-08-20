@@ -64,8 +64,8 @@ or build the table of contents itself — those are Navigation's, derived from t
 (see Navigation and Table of contents below).
 
 **Navigation** (pipeline stage):
-The one system that takes a generated document, gives it a content identity, caches it for the
-session, and windows it to the agent. The only stage where a size budget applies. Source-agnostic:
+The one system that takes a generated document, gives it a content identity, caches it in the
+global control set, and windows it to the agent. The only stage where a size budget applies. Source-agnostic:
 it has no knowledge of what kind of thing it is windowing — issue, PR, plan, artifact, local
 file — the same relationship a browser's chrome has to the page it renders. Global, not
 per-source: one Navigation stage serves every source, never one implementation per source type.
@@ -87,8 +87,8 @@ caller, not one per tool, subcommand, transport, or session. Out-of-process by n
 preference: the CLI is not a running service — it's a fresh OS process per invocation with no
 memory of any prior call, so it needs external storage regardless, and an in-process cache (an
 MCP server's lifespan context, a module-level dict) cannot be shared with it either way. One
-SQLite database at `$DH_STATE_HOME/control-set.db` (WAL mode), rows keyed by `content_id` alone —
-no `session_id`, not a directory of loose files — with a bounded global storage budget (LRU
+SQLite database at `state_root()/control-set.db` (per-project, WAL mode), rows keyed by
+`content_id` alone — no `session_id`, not a directory of loose files — with a bounded global storage budget (LRU
 eviction by size, not entry count) and a periodic, rate-limited age-based cleanup pass (hourly to
 daily, not on every write). Holds no authoritative data — every row is a disposable cache
 Collection and Generation can rebuild on demand, so losing the whole database costs nothing but a

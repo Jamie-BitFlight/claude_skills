@@ -23,8 +23,8 @@ requested scope — description, every requested section or artifact) are both u
 truncated, never budget-checked. Navigation — the one engine described by R1 — is the only
 stage where a size budget is ever applied, and the only stage that parses the document, assigns
 addresses, and derives the table of contents from the resulting tree. It receives a fully
-generated document, gives it a content identity, caches it for the session, and windows it to
-the agent.
+generated document, gives it a content identity, caches it in the global control set
+(ADR-3082-1), and windows it to the agent.
 
 Consequences:
 

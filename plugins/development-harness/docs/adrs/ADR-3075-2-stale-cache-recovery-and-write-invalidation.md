@@ -42,9 +42,16 @@ from what it touched, as a side effect of the write, regardless of which session
 either the write or the original cached request. This is a direct consequence of ADR-3082-1's
 content-keyed reversal: there is one shared entry per `content_id`, not one per session, so there
 is nothing left to scope invalidation *to* — a write from any caller invalidates the one entry
-everyone shares. This does not replace the identity check on read (R8's existing hash-mismatch
-detection); it adds a second, earlier path to the same outcome, so a stale entry is caught
-whether or not a read happens to hit it before a write does. The "concurrent-session blind spot"
+everyone shares. **This is staleness detection's only mechanism, not one of two.** An earlier
+draft of this ADR described the write-triggered mark as running alongside a separate read-time
+hash-mismatch check; R8's later text corrects that framing and this ADR follows it: detection
+never happens by a read re-collecting content to compare hashes — that would mean an ordinary
+read reaching the source, which contradicts the control set's whole purpose (ADR-3082-1's
+"every source hit always writes a fresh document" describes recollection as something a request
+*does*, at a cost, not a passive background check every read performs for free). What a read
+does on a cache hit is check the row's already-set `stale` marker (below) — cheap, no
+recollection — and that marker is set by this write path, not derived independently by the read.
+The "concurrent-session blind spot"
 this ADR's earlier revision named (a write from a different session not being visible to
 invalidation) is resolved as a side effect of the reversal, not merely narrowed — there is no
 "different session's control set" any more for a write to be invisible to.

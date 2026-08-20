@@ -44,6 +44,22 @@ caller-triggered path to the same outcome ADR-3075-2's write-triggered invalidat
 automatically — deliberately redundant with it, not a replacement for it, because the automatic
 path cannot see every reason an agent might have to distrust a cached entry.
 
+**When the fresh document's identity differs from the one the caller held, the storage
+transition mirrors ADR-3075-2's automatic-recovery path exactly — there is no separate,
+revalidation-specific behavior to invent.** Rows are keyed by `content_id` (ADR-3082-1); an
+identity change is a different key, not an in-place update of the old row. The fresh document is
+inserted as a new row under its new `content_id`; the old row is marked `stale` the same way
+write-triggered invalidation marks it (ADR-3075-2's `stale` marker, not deletion — so a caller
+still mid-navigation on the old identifier is told plainly it changed, rather than erroring or
+silently seeing new content under an identifier it never asked to change). The response reports
+the new identity and serves page 1 of the fresh document (or, when the caller's `navigate`
+ordinal no longer resolves, an explicit restart response) — the same recovery shape ADR-3075-2
+defines for an ordinary stale hit, because both paths land in the identical state: an entry
+whose content changed underneath a stored identity. Revalidation reports the identity change
+explicitly (that comparison is the whole point of the `revalidate` mode); forced refresh performs
+the identical transition without reporting it as a change, consistent with forced refresh always
+skipping the comparison (above).
+
 ## Consequences
 
 Response shapes for every operation backed by the control set gain three metadata fields. This
