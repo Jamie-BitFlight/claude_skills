@@ -46,6 +46,16 @@ CHECKPOINT_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
+class QueryGaps:
+    """Collection-completeness signals extracted from a run's query summaries."""
+
+    incomplete_queries: list[str]
+    mismatched_queries: list[str]
+    github_incomplete_queries: list[str]
+    truncated_queries: list[str]
+
+
+@dataclass(frozen=True)
 class Candidate:
     """A code-search candidate enriched only with repository metadata."""
 
@@ -194,6 +204,21 @@ def build_metadata_query(repositories: list[str]) -> str:
     return "query CandidateMetadata {\n" + "\n".join(fields) + "\n}"
 
 
+def _metadata_by_casefold(metadata: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Index metadata by casefolded repository name for case-insensitive lookup.
+
+    An explicit --seed-repository value's casing (whatever the caller typed) can
+    differ from GitHub's canonical nameWithOwner casing that fetch_metadata()
+    stores results under; an exact-key lookup would then silently miss a real
+    match. Repository identifiers are already compared with casefold() elsewhere
+    in this script (deduplicating seeds); this brings metadata lookups in line.
+
+    Returns:
+        The same values, keyed by ``repository.casefold()`` instead of ``repository``.
+    """
+    return {repository.casefold(): value for repository, value in metadata.items()}
+
+
 def fetch_metadata(
     repositories: list[str], metadata: dict[str, dict[str, Any]], delay_seconds: float, persist: Callable[[], None]
 ) -> None:
@@ -202,7 +227,8 @@ def fetch_metadata(
     The existing mapping is updated in place after each completed batch, so a
     rate-limit interruption can continue without repeating completed requests.
     """
-    pending = [repository for repository in repositories if repository not in metadata]
+    known_casefold = _metadata_by_casefold(metadata)
+    pending = [repository for repository in repositories if repository.casefold() not in known_casefold]
     for offset in range(0, len(pending), METADATA_BATCH_SIZE):
         batch = pending[offset : offset + METADATA_BATCH_SIZE]
         response = run_gh_json(["api", "graphql", "-f", f"query={build_metadata_query(batch)}"])
@@ -226,9 +252,10 @@ def rank_candidates(
     for hit in hits:
         hits_by_repository[hit["repository"]].append({"path": hit["path"], "query": hit["query"]})
 
+    metadata_by_casefold = _metadata_by_casefold(metadata)
     candidates: list[Candidate] = []
     for repository, repository_hits in hits_by_repository.items():
-        value = metadata.get(repository)
+        value = metadata_by_casefold.get(repository.casefold())
         if value is None or value["stargazerCount"] < minimum_stars:
             continue
         branch = value.get("defaultBranchRef")
@@ -320,25 +347,72 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def build_collection_warnings(
-    incomplete_queries: list[str], mismatched_queries: list[str], missing_metadata_repositories: list[str]
-) -> list[str]:
+def compute_query_gaps(summaries_by_query: dict[str, dict[str, Any]]) -> QueryGaps:
+    """Extract the four independent collection-completeness signals from query summaries.
+
+    incomplete/mismatched reflect our own pagination bookkeeping; github_incomplete and
+    truncated reflect GitHub's own per-page completeness flag and its hard 1,000-result
+    cap, which are independent of pagination completing cleanly on our side.
+
+    Returns:
+        The four gap categories, each as a list of affected query strings.
+    """
+    return QueryGaps(
+        incomplete_queries=[q for q, summary in summaries_by_query.items() if not summary["complete"]],
+        mismatched_queries=[q for q, summary in summaries_by_query.items() if summary["result_count_mismatch"]],
+        github_incomplete_queries=[q for q, summary in summaries_by_query.items() if summary["incomplete_results"]],
+        truncated_queries=[q for q, summary in summaries_by_query.items() if summary["truncated_by_github_limit"]],
+    )
+
+
+def build_collection_warnings(gaps: QueryGaps, missing_metadata_repositories: list[str]) -> list[str]:
     """Translate collection-completeness gaps into human-readable warnings.
 
     Returns:
         One warning string per gap category that actually occurred.
     """
     warnings: list[str] = []
-    if incomplete_queries:
+    if gaps.incomplete_queries:
         warnings.append("one or more Code Search queries have uncollected pages")
-    if mismatched_queries:
+    if gaps.mismatched_queries:
         warnings.append("GitHub advertised more Code Search results than its pages returned")
     if missing_metadata_repositories:
         warnings.append(
             f"{len(missing_metadata_repositories)} candidate repositories returned no GraphQL metadata "
             "(renamed, made private, or deleted) and were dropped -- see missing_metadata_repositories"
         )
+    if gaps.github_incomplete_queries:
+        warnings.append(
+            "GitHub reported its own Code Search index as incomplete for one or more queries "
+            "(independent of our pagination completing) -- see queries[].incomplete_results"
+        )
+    if gaps.truncated_queries:
+        warnings.append(
+            "one or more queries exceeded GitHub's 1,000-result Code Search cap -- more candidates "
+            "exist than this API can ever return for that query -- see queries[].truncated_by_github_limit"
+        )
     return warnings
+
+
+def reconcile_seed_hits(hits: list[dict[str, str]], explicit_seed_repositories: list[str]) -> list[dict[str, str]]:
+    """Drop stale checkpointed seed hits and add any not yet present.
+
+    A checkpoint can carry explicit_seed hits from a prior invocation whose
+    --seed-repository has since been removed or changed; without reconciling
+    against the current set, a stale repository stays ranked forever while the
+    payload claims to reflect the current, potentially narrower seed list.
+
+    Returns:
+        ``hits`` with stale explicit_seed entries removed and current seeds present.
+    """
+    current_casefold = {repository.casefold() for repository in explicit_seed_repositories}
+    reconciled = [
+        hit for hit in hits if hit["query"] != "explicit_seed" or hit["repository"].casefold() in current_casefold
+    ]
+    for repository in explicit_seed_repositories:
+        if not any(hit["repository"].casefold() == repository.casefold() for hit in reconciled):
+            reconciled.append({"repository": repository, "path": "", "query": "explicit_seed"})
+    return reconciled
 
 
 def main() -> int:
@@ -353,8 +427,7 @@ def main() -> int:
     for repository in explicit_seed_repositories:
         if repository.count("/") != 1 or any(not segment for segment in repository.split("/")):
             raise ValueError(f"Invalid --seed-repository value: {repository}")
-        if not any(hit["repository"].casefold() == repository.casefold() for hit in all_hits):
-            all_hits.append({"repository": repository, "path": "", "query": "explicit_seed"})
+    all_hits = reconcile_seed_hits(all_hits, explicit_seed_repositories)
     for query in DISCOVERY_QUERIES:
         summary = summaries_by_query.setdefault(query, default_query_summary(query))
         summary.setdefault("result_count", sum(hit["query"] == query for hit in all_hits))
@@ -375,28 +448,34 @@ def main() -> int:
             query, args.page_size, args.max_pages, args.delay_seconds, all_hits, summaries_by_query[query], persist
         )
 
-    incomplete_queries = [query for query, summary in summaries_by_query.items() if not summary["complete"]]
-    mismatched_queries = [query for query, summary in summaries_by_query.items() if summary["result_count_mismatch"]]
-    if mismatched_queries and not args.allow_inconsistent:
+    gaps = compute_query_gaps(summaries_by_query)
+    if gaps.mismatched_queries and not args.allow_inconsistent:
         raise RuntimeError(
             "Code Search result count disagrees with GitHub pagination; refusing to rank an inconsistent corpus"
         )
-    if incomplete_queries and not args.allow_partial:
+    if gaps.incomplete_queries and not args.allow_partial:
         raise RuntimeError(
             "Code Search collection is incomplete; rerun with a higher --max-pages or pass --allow-partial explicitly"
         )
 
     repositories = sorted({hit["repository"] for hit in all_hits}, key=str.casefold)
     fetch_metadata(repositories, metadata, args.metadata_delay_seconds, persist)
-    missing_metadata_repositories = [repository for repository in repositories if repository not in metadata]
+    known_metadata_casefold = _metadata_by_casefold(metadata)
+    missing_metadata_repositories = [
+        repository for repository in repositories if repository.casefold() not in known_metadata_casefold
+    ]
     candidates = rank_candidates(all_hits, metadata, args.minimum_stars)
-    collection_warnings = build_collection_warnings(
-        incomplete_queries, mismatched_queries, missing_metadata_repositories
-    )
+    collection_warnings = build_collection_warnings(gaps, missing_metadata_repositories)
     payload = {
         "generated_at": datetime.now(UTC).isoformat(),
         "scope": "metadata-only candidate discovery; no repository trees or source files were inspected",
-        "partial": bool(incomplete_queries or mismatched_queries or missing_metadata_repositories),
+        "partial": bool(
+            gaps.incomplete_queries
+            or gaps.mismatched_queries
+            or missing_metadata_repositories
+            or gaps.github_incomplete_queries
+            or gaps.truncated_queries
+        ),
         "collection_warnings": collection_warnings,
         "missing_metadata_repositories": missing_metadata_repositories,
         "ranking": "stars descending, then forks descending, then repository name",

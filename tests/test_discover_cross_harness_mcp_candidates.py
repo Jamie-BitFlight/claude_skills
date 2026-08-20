@@ -103,6 +103,127 @@ class TestRankCandidates:
 
         assert candidate.default_branch is None
 
+    def test_joins_metadata_case_insensitively(self) -> None:
+        """An explicit seed's casing may differ from GraphQL's canonical nameWithOwner.
+
+        fetch_metadata() stores results keyed by GitHub's canonical casing; a hit whose
+        repository casing came from whatever the caller typed (e.g. --seed-repository
+        Octo/Repo) must still join against metadata keyed "octo/repo" -- an exact-key
+        lookup would silently exclude a real, valid candidate.
+        """
+        hits = [{"repository": "Octo/Repo", "path": ".codex-plugin/plugin.json", "query": "explicit_seed"}]
+        metadata = {"octo/repo": self._metadata("octo/repo", stars=4000, forks=0)}
+
+        candidates = discovery.rank_candidates(hits, metadata, minimum_stars=0)
+
+        assert [c.repository for c in candidates] == ["Octo/Repo"]
+
+
+class TestReconcileSeedHits:
+    """Coverage of ``reconcile_seed_hits`` -- checkpoint seed-list reconciliation.
+
+    A checkpoint created with --seed-repository A/B can be reused after that option is
+    removed or changed; without reconciliation the stale explicit_seed hit stays ranked
+    forever while the payload claims to reflect only the current seed list.
+    """
+
+    def test_drops_a_checkpointed_seed_no_longer_in_the_current_invocation(self) -> None:
+        hits = [{"repository": "octo/stale-seed", "path": "", "query": "explicit_seed"}]
+
+        reconciled = discovery.reconcile_seed_hits(hits, explicit_seed_repositories=[])
+
+        assert reconciled == []
+
+    def test_keeps_a_checkpointed_seed_still_in_the_current_invocation(self) -> None:
+        hits = [{"repository": "octo/kept-seed", "path": "", "query": "explicit_seed"}]
+
+        reconciled = discovery.reconcile_seed_hits(hits, explicit_seed_repositories=["octo/kept-seed"])
+
+        assert reconciled == hits
+
+    def test_matches_current_seeds_case_insensitively_so_it_is_not_dropped_then_readded(self) -> None:
+        hits = [{"repository": "Octo/Cased-Seed", "path": "", "query": "explicit_seed"}]
+
+        reconciled = discovery.reconcile_seed_hits(hits, explicit_seed_repositories=["octo/cased-seed"])
+
+        # Preserves the original hit's casing rather than dropping and re-adding
+        # a second entry under the --seed-repository argument's casing.
+        assert reconciled == hits
+
+    def test_never_drops_a_non_seed_code_search_hit(self) -> None:
+        hits = [{"repository": "octo/from-search", "path": "x.json", "query": "some code search query"}]
+
+        reconciled = discovery.reconcile_seed_hits(hits, explicit_seed_repositories=[])
+
+        assert reconciled == hits
+
+    def test_adds_a_newly_requested_seed_not_yet_in_hits(self) -> None:
+        reconciled = discovery.reconcile_seed_hits([], explicit_seed_repositories=["octo/new-seed"])
+
+        assert reconciled == [{"repository": "octo/new-seed", "path": "", "query": "explicit_seed"}]
+
+
+class TestComputeQueryGaps:
+    """Coverage of ``compute_query_gaps`` -- the four independent completeness signals."""
+
+    @staticmethod
+    def _summary(**overrides: object) -> dict[str, object]:
+        base = {
+            "complete": True,
+            "result_count_mismatch": False,
+            "incomplete_results": False,
+            "truncated_by_github_limit": False,
+        }
+        base.update(overrides)
+        return base
+
+    def test_all_clean_produces_no_gaps(self) -> None:
+        gaps = discovery.compute_query_gaps({"q1": self._summary()})
+
+        assert gaps == discovery.QueryGaps([], [], [], [])
+
+    def test_github_incomplete_results_flagged_even_when_our_pagination_is_complete(self) -> None:
+        """Our own "complete" flag can be True while GitHub's own search was itself incomplete."""
+        gaps = discovery.compute_query_gaps({"q1": self._summary(complete=True, incomplete_results=True)})
+
+        assert gaps.incomplete_queries == []
+        assert gaps.github_incomplete_queries == ["q1"]
+
+    def test_result_cap_truncation_flagged_even_when_our_pagination_is_complete(self) -> None:
+        gaps = discovery.compute_query_gaps({"q1": self._summary(complete=True, truncated_by_github_limit=True)})
+
+        assert gaps.incomplete_queries == []
+        assert gaps.truncated_queries == ["q1"]
+
+    def test_each_gap_category_maps_to_its_own_field(self) -> None:
+        summaries = {
+            "incomplete": self._summary(complete=False),
+            "mismatched": self._summary(result_count_mismatch=True),
+            "github-incomplete": self._summary(incomplete_results=True),
+            "truncated": self._summary(truncated_by_github_limit=True),
+        }
+
+        gaps = discovery.compute_query_gaps(summaries)
+
+        assert gaps.incomplete_queries == ["incomplete"]
+        assert gaps.mismatched_queries == ["mismatched"]
+        assert gaps.github_incomplete_queries == ["github-incomplete"]
+        assert gaps.truncated_queries == ["truncated"]
+
+
+def _gaps(
+    incomplete: list[str] | None = None,
+    mismatched: list[str] | None = None,
+    github_incomplete: list[str] | None = None,
+    truncated: list[str] | None = None,
+) -> Any:
+    return discovery.QueryGaps(
+        incomplete_queries=incomplete or [],
+        mismatched_queries=mismatched or [],
+        github_incomplete_queries=github_incomplete or [],
+        truncated_queries=truncated or [],
+    )
+
 
 class TestBuildCollectionWarnings:
     """Coverage of ``build_collection_warnings``, including missing-GraphQL-metadata tracking.
@@ -114,29 +235,47 @@ class TestBuildCollectionWarnings:
     """
 
     def test_no_gaps_produces_no_warnings(self) -> None:
-        assert discovery.build_collection_warnings([], [], []) == []
+        assert discovery.build_collection_warnings(_gaps(), []) == []
 
     def test_incomplete_queries_produce_a_warning(self) -> None:
-        warnings = discovery.build_collection_warnings(["q1"], [], [])
+        warnings = discovery.build_collection_warnings(_gaps(incomplete=["q1"]), [])
 
         assert warnings == ["one or more Code Search queries have uncollected pages"]
 
     def test_mismatched_queries_produce_a_warning(self) -> None:
-        warnings = discovery.build_collection_warnings([], ["q1"], [])
+        warnings = discovery.build_collection_warnings(_gaps(mismatched=["q1"]), [])
 
         assert warnings == ["GitHub advertised more Code Search results than its pages returned"]
 
     def test_missing_metadata_repositories_produce_a_counted_warning(self) -> None:
-        warnings = discovery.build_collection_warnings([], [], ["octo/renamed", "octo/deleted"])
+        warnings = discovery.build_collection_warnings(_gaps(), ["octo/renamed", "octo/deleted"])
 
         assert len(warnings) == 1
         assert "2 candidate repositories returned no GraphQL metadata" in warnings[0]
         assert "missing_metadata_repositories" in warnings[0]
 
-    def test_all_three_gap_categories_each_produce_their_own_warning(self) -> None:
-        warnings = discovery.build_collection_warnings(["q1"], ["q2"], ["octo/gone"])
+    def test_github_incomplete_results_produce_a_warning_independent_of_our_pagination(self) -> None:
+        """GitHub's own per-page incompleteness flag must be surfaced even when our pagination is clean."""
+        warnings = discovery.build_collection_warnings(_gaps(github_incomplete=["q1"]), [])
 
-        assert len(warnings) == 3
+        assert len(warnings) == 1
+        assert "incomplete" in warnings[0].lower()
+        assert "incomplete_results" in warnings[0]
+
+    def test_github_result_cap_truncation_produces_a_warning(self) -> None:
+        """A query hitting GitHub's 1,000-result cap must be surfaced -- more --max-pages can't fix it."""
+        warnings = discovery.build_collection_warnings(_gaps(truncated=["q1"]), [])
+
+        assert len(warnings) == 1
+        assert "1,000-result" in warnings[0]
+        assert "truncated_by_github_limit" in warnings[0]
+
+    def test_all_five_gap_categories_each_produce_their_own_warning(self) -> None:
+        gaps = _gaps(incomplete=["q1"], mismatched=["q2"], github_incomplete=["q1"], truncated=["q2"])
+
+        warnings = discovery.build_collection_warnings(gaps, ["octo/gone"])
+
+        assert len(warnings) == 5
 
 
 class TestBuildMetadataQuery:
