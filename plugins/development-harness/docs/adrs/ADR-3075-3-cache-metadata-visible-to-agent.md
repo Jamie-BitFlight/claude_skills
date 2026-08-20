@@ -47,6 +47,10 @@ Response shapes for every operation backed by the control set gain three metadat
 composes with R6 (sections and artifacts as one inventory) and R8's existing identifier field —
 it is additive to response shape, not a new response mode.
 
+Revalidation and forced refresh need a concrete way for the caller to ask for them, not just a
+prose description — added to R8's request shape as an optional `refresh` selector (`revalidate`
+or `force`), absent by default.
+
 ## Considered alternative
 
 Keeping identity/command/timestamp purely internal (the ADR-3075-1/3075-2 baseline) was

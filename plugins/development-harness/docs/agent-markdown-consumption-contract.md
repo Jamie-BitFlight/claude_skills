@@ -51,7 +51,7 @@ and the table of contents built from them, exist only after Navigation parses th
 document and builds its addressable tree. Collection and Generation are unbounded — never
 truncated, never budget-checked. The engine's authority is over Navigation only: it receives a
 complete generated document,
-gives it a content identity (R8), caches it for the session, and is the only point anywhere in
+gives it a content identity (R8), caches it globally (ADR-3082-1), and is the only point anywhere in
 the path where a size budget is applied. "Unbounded" is a real cost for a pathological source,
 not a theoretical one — see ADR-3072-1's known limitation for a concrete measurement and why
 this decision does not add a ceiling to fix it.
@@ -154,9 +154,11 @@ below), not something the caller carries forward.
 The control set (ADR-3075-4, ADR-3082-1) is out-of-process and content-keyed only — no
 session-identifying value is part of any request. Concretely, an initial request states scope
 (`selector="#2529", section="RT-ICA"` or similar); every request after that states only
-`hash="<identifier>"` plus `page`, `navigate` (R4's address), and `pagesize` (the caller override
-from R2). Nothing about locating the control set depends on which session, tool, or transport
-made the request — `content_id` alone addresses the row.
+`hash="<identifier>"` plus `page`, `navigate` (R4's address), `pagesize` (the caller override
+from R2), and an optional `refresh` selector — one of `revalidate` or `force` (ADR-3075-3) —
+absent by default, meaning "serve whatever the control set already holds." Nothing about locating
+the control set depends on which session, tool, or transport made the request — `content_id`
+alone addresses the row.
 
 This hash-based shape states intended behaviour, not current behaviour: the
 control set it depends on (ADR-3075-1 through ADR-3075-4) is not yet implemented, and
