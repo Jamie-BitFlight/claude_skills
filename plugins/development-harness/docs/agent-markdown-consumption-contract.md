@@ -173,8 +173,13 @@ Progressive-Disclosure Contract](./mcp-progressive-disclosure-contract.md) docum
 shipped parameter set (`selector` plus `navigate`, repeated on every call) and must be updated
 to this shape once the control set ships.
 
-The identifier resolves against cached parsed content. Serving a later page does not
-re-collect from the provider and does not re-parse.
+The identifier resolves against cached content. Serving a later page does not re-collect from the
+provider and does not re-run Generation — "does not re-parse" means no repeated network
+round-trip and no repeated document assembly, not a promise that the stored raw markdown is never
+turned back into an addressable structure. The control set (ADR-3082-1) stores raw generated
+content, not a parsed tree, and a follow-up call landing on a fresh CLI process reparses that
+stored content in-memory to serve the requested page — a cheap, deterministic, in-process step,
+consistent with ADR-3075-1's premise that re-parsing is cheap.
 
 A request whose identifier no longer matches current content, because of a write this
 contract's own paths can see, is reported as stale and then automatically recovered — see
