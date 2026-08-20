@@ -65,7 +65,8 @@ docs do not analyze WAL/writer-serialization behavior, so it is precedent for "S
 established storage choice here," not for the contention trade-off named below. Rows are keyed
 by `content_id` alone. Each row stores the generated content (raw, not a parsed tree — see
 "Re-parsing on follow-up pages" below), its hash, the canonicalized generating command, the
-request's `source` (see schema note below), `created_at`, and `last_accessed_at`.
+request's `source` (see schema note below), a `stale` marker (see schema note below), `created_at`,
+and `last_accessed_at`.
 
 **Re-parsing on follow-up pages is allowed, confirmed by the repo owner — this clarifies R8, not
 this ADR's schema.** The contract's R8 states a later page "does not re-parse." Taken literally,
@@ -131,6 +132,23 @@ every entry." The schema in this ADR's first draft omitted this — `source` was
 by parsing the stored canonicalized command per row, exactly the full-table scan ADR-3075-2 said
 to avoid. Corrected: `source` is its own column, indexed, populated at write time alongside the
 canonicalized command it's extracted from.
+
+**Schema must include a `stale` marker, not rely on deletion for invalidation.** ADR-3075-2's
+write-triggered invalidation must mark an entry stale without destroying its stored command —
+deleting the row on invalidation would remove the only thing a subsequent stale-identifier
+request can use to auto-regenerate (the request carries only the old `content_id`, not the
+original scope, per R8). Corrected: invalidation sets a `stale` boolean on the row rather than
+deleting it. A stale-identifier read finds the row, sees `stale=true`, re-runs its stored command
+to regenerate under a new identity, and only then does the old row get replaced — not before.
+
+**The 40MB target counts complete row storage, not raw content bytes alone.** As originally
+written, the budget summed only the `content` column, which undercounts real storage: every row
+also carries its canonicalized command, `source`, timestamps, and the `stale` marker, plus
+whatever indexes cover them. A workload of many small or empty generated documents could add
+rows without ever moving the "content" total, growing the database unboundedly while never
+tripping eviction — the opposite of what a bounded-storage design is for. Corrected: the budget
+is measured against total row storage (every column, not content alone), so row count itself is
+implicitly bounded even when individual documents are tiny.
 
 ## Known tradeoff — global write contention (confirmed accepted, not silently assumed)
 

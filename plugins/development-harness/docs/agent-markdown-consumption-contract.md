@@ -185,13 +185,13 @@ re-collecting to compare — it happens by write-triggered invalidation (below),
 the write that changed the source. Recovery does re-collect, automatically, once an entry is
 known stale (below).
 
-A write made through a path outside this contract's Scope, or from a concurrent session, is not
-visible to write-triggered invalidation and is therefore not guaranteed to surface as stale this
-way — an acknowledged blind spot, not an oversight (see ADR-3075-3). An agent that needs
-certainty against that blind spot uses the explicit, caller-requested revalidation or forced
-refresh described in "Cache metadata is visible to the agent" below — an opt-in path the caller
-chooses for confidence before automatic detection would otherwise catch a change, additive to
-write-triggered invalidation, not the only path that ever re-collects.
+Only a write made through a path outside this contract's Scope is invisible to write-triggered
+invalidation — a write from a concurrent session is not a blind spot: invalidation is global
+(ADR-3082-1, ADR-3075-2), so any caller's write reaches the one shared entry. An agent that needs
+certainty against the out-of-Scope-write blind spot uses the explicit, caller-requested
+revalidation or forced refresh described in "Cache metadata is visible to the agent" below — an
+opt-in path the caller chooses for confidence before automatic detection would otherwise catch a
+change, additive to write-triggered invalidation, not the only path that ever re-collects.
 
 The identifier is derived from both the command (source, scope, parameters) and the Generation
 stage's output for that command — not a hash of the raw upstream source alone (ADR-3075-1), and
@@ -245,15 +245,15 @@ not an opt-in the caller must request separately. The explicit revalidation and 
 paths (ADR-3075-3, below) serve a different purpose: gaining certainty before write-triggered
 invalidation would otherwise catch a change, not the only path that ever recollects.
 
-**Writes invalidate within the same session; reads do not have to discover staleness on their
-own** (ADR-3075-2). A control-set entry is not left to be discovered stale only when a later
-read happens to hit it with a mismatched hash. A write that modifies the source a cache entry
-was generated from invalidates that entry, in the writing session's own control set, as a side
-effect of the write. Every mutation path bound by this contract's sources — item updates,
-section writes, artifact registration, task and plan state changes — is a source of invalidation
-for any control-set entry, in that same session's store, generated from what it touched. A write
-from a different session does not scan or mutate another session's control set — see the blind
-spot noted above (ADR-3075-3).
+**Writes invalidate globally; reads do not have to discover staleness on their own**
+(ADR-3075-2, scoping corrected by ADR-3082-1's content-keyed reversal). A control-set entry is
+not left to be discovered stale only when a later read happens to hit it with a mismatched hash.
+A write that modifies the source a cache entry was generated from marks that entry stale (not
+deleted — its stored command survives, see "Stale entries are recoverable" below) as a side
+effect of the write, regardless of which caller made the write. Every mutation path bound by
+this contract's sources — item updates, section writes, artifact registration, task and plan
+state changes — is a source of invalidation for the one shared control-set entry generated from
+what it touched, whichever session or tool happens to have written it.
 
 **Cache metadata is visible to the agent, not only used internally** (ADR-3075-3). Every
 response backed by the control set carries its content identity, the command that produced it,
@@ -272,7 +272,7 @@ flowchart TD
     Req([Agent requests content<br>from any source]) --> Coll[Collection: gather source content<br>unbounded — no budget check]
     Coll --> Gen["Generation: assemble the complete document<br>for the requested scope — description +<br>every requested section or artifact —<br>unbounded R1"]
     Gen --> Nav[Navigation engine: parse, build<br>addressable tree and table of contents,<br>hash command + generated document<br>together for content identity R8]
-    Nav --> Cache["Cache the generated document<br>for the session, keyed by that identity R8"]
+    Nav --> Cache["Cache the generated document<br>globally, keyed by that identity R8"]
     Cache --> Eng[Window the cached document<br>to the agent]
     Eng --> Measure{Response exceeds<br>window budget?<br>only checked here}
 
@@ -325,6 +325,19 @@ The engine described by R1 exists as the `progressive_markdown` package:
 `ProgressiveMarkdownNavigator` and `Paginator` currently have no consumers. The engine's
 parser and indexer are imported by the address-navigation path; its navigation and
 pagination layer is not used by anything.
+
+**A naming caveat on stage boundaries, flagged in review.** `ProgressiveMarkdownNavigator.load()`
+itself calls `provider.get_markdown(source, ...)` — the class named "Navigator" contains a method
+that performs Collection (fetching from the provider). Read narrowly, this looks like it
+contradicts R1's "Navigation never reaches back to a backend." It doesn't, but the class
+boundary doesn't make that obvious: `load()` is the Collection+Generation entry point (it fetches
+and assembles the document once), and the *other* methods on the same object — `map`,
+`view_section`, `view_code`, `links`, `search_sections` — are the actual Navigation stage,
+operating on what `load()` already fetched. One class currently hosts both a Collection+Generation
+step and the Navigation stage proper; the seam described in R1 (`MarkdownContentProvider`) is
+real and does separate them by responsibility, but not by class boundary. Not a contradiction of
+R1's layering, but the class name invites the misreading — worth a rename or a doc comment when
+this code is next touched, not a reason to treat R1 and the shipped code as inconsistent.
 
 Duplicate implementations to delete rather than refactor, in the backlog server layer
 (`backlog_core/server.py`, `backlog_core/operations.py`) shared by the MCP tool and CLI paths

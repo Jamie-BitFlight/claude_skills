@@ -11,10 +11,12 @@ decides they are also caller-visible.
 ## Context
 
 ADR-3075-2 gives the control set automatic write-triggered invalidation, but automatic
-invalidation has blind spots: a write made through a path outside this contract's Scope, a
-write from a concurrent session, or simply an agent that wants certainty rather than trust
-before acting on content it just modified. The repo owner asked for the agent to have its own
-basis for judging freshness, not only the server's.
+invalidation has blind spots: a write made through a path outside this contract's Scope, or
+simply an agent that wants certainty rather than trust before acting on content it just
+modified. (A write from a concurrent session was originally listed here too — no longer a
+blind spot: ADR-3082-1's content-keyed reversal makes write-invalidation global, so a
+concurrent-session write is visible the same as any other.) The repo owner asked for the agent
+to have its own basis for judging freshness, not only the server's.
 
 ## Decision
 
@@ -28,13 +30,16 @@ the control set already holds. Both re-run Collection and Generation via the sto
 identity is derived from the command plus Generation's output, not from the raw source alone
 (ADR-3075-1), so recomputing current identity from the source alone is not an option. They
 differ only in what happens after: revalidation compares the freshly computed identity to the
-entry's stored identity and, on a match, reuses the entry's already-cached *parsed* document
-rather than re-parsing — cheaper than a forced refresh only in that one respect. A forced
-refresh skips the comparison and unconditionally re-parses and re-serves the fresh document
-regardless of whether the identity matches. Revalidation is a caller-triggered path to the same
-outcome ADR-3075-2's write-triggered invalidation reaches automatically — deliberately
-redundant with it, not a replacement for it, because the automatic path cannot see every reason
-an agent might have to distrust a cached entry.
+entry's stored identity and, on a match, leaves the existing row as-is rather than overwriting
+it — no write happens, since the stored content is confirmed still current. A forced refresh
+skips the comparison and unconditionally overwrites the row with the fresh document regardless
+of whether the identity matches. **This is not about avoiding a re-parse** — the control set
+stores raw content, not a parsed tree (ADR-3082-1), so serving any page from either path always
+reparses the row's raw content in-memory, the same cost either way. Revalidation's saving is
+narrower: skipping an unnecessary write when nothing actually changed. Revalidation is a
+caller-triggered path to the same outcome ADR-3075-2's write-triggered invalidation reaches
+automatically — deliberately redundant with it, not a replacement for it, because the automatic
+path cannot see every reason an agent might have to distrust a cached entry.
 
 ## Consequences
 
