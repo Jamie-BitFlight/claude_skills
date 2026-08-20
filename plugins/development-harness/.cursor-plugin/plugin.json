@@ -10,29 +10,18 @@
   "mcpServers": {
     "sequential_thinking": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking@latest"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
     },
     "backlog": {
       "command": "uv",
-      "args": [
-        "run",
-        "--script",
-        "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py"
-      ],
+      "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py"],
       "env": {
         "DH_PROJECT_ROOT": "${workspaceFolder}"
       }
     },
     "sam": {
       "command": "uv",
-      "args": [
-        "run",
-        "--script",
-        "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"
-      ],
+      "args": ["run", "--script", "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"],
       "env": {
         "DH_PROJECT_ROOT": "${workspaceFolder}"
       }
