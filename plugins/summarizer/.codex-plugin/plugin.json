@@ -11,7 +11,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Summarizer",
-    "shortDescription": "Faithful information summarization with fidelity preservation, structured output, and anti-hallucination methodology. Provides skills for file, URL, and image summarization; agents for autonomous summarization tasks; and hooks for validating agent output structure.",
+    "shortDescription": "Faithful information summarization with fidelity preservation, structured output, and anti-hallucination methodology. Provides skills for file, URL, and image summarization; agents for autonomous summarization tasks; and hooks for...",
     "longDescription": "Faithful information summarization with fidelity preservation, structured output, and anti-hallucination methodology. Provides skills for file, URL, and image summarization; agents for autonomous summarization tasks; and hooks for validating agent output structure.",
     "developerName": "jamie-bitflight-skills",
     "category": "Developer Tools",
