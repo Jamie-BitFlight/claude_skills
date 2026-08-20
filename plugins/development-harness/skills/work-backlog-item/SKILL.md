@@ -19,10 +19,8 @@ decision you made in this session). In the self-initiated case you already know 
 directly — go straight to producing the coerced result; there is nothing in <provided_arguments/>
 you don't already know, and no reason to route it through anything else.
 
-Coerce <provided_arguments/> to match this schema yourself, then treat the result as `<input/>`:
-[parse.schema.json](./scripts/parser/parse.schema.json). Never embed <provided_arguments/> in a
-`` !`...` `` line or any other shell-interpreted string to produce `<input/>` — reasoning it out
-against the vocabulary below is the only safe path.
+Coerce <provided_arguments/> to match this schema yourself, using the vocabulary below, then treat
+the result as `<input/>`: [parse.schema.json](./scripts/parser/parse.schema.json).
 
 Argument vocabulary:
 
