@@ -584,11 +584,27 @@ issue or owner reference links a plan to its work item; it never selects a separ
 
 ### Plan and artifact capability boundary
 
-The configured backend implements the logical plan and artifact capabilities. `sam_plan`,
-`sam_task`, `sam_active_task`, and `artifact_*` calls use that same backend; there is no
-`TASKBACKEND`, independent artifact provider, local filesystem fallback, or per-plan backend
-selection. Remote providers may use a private `FileCache` for stale reads and queued writes.
-Beads, SQLite, and Memory remain native-only and never use YAML or cache storage.
+Backlog items and SAM plans/tasks do NOT share one backend protocol, but this is a distinct-interface
+split, not a distinct-storage one. Backlog operations (`backlog_add`, `backlog_view`, etc.) route
+through `WorkItemBackend` (`./backlog_core/backend_types.py`), which is independently configurable
+across the `github`/`sqlite`/`memory`/`beads` families above. `sam_plan` and `sam_task` route
+through a separate `TaskBackend` protocol — defined in `./sam_schema/core/task_backend.py`,
+re-exported by `./dh_core/protocols.py` — and every plan/task CRUD function in
+`./dh_core/operations.py` (`create_plan`, `read_plan`, `list_plans`, `read_task`, `claim_task`,
+etc.) takes a `TaskBackend` parameter, not a `WorkItemBackend`. Concretely, `TaskBackend` is
+implemented by `ContentTaskProvider` (`./sam_schema/core/backends/content.py`), which is not an
+independently-selected backend the way `WorkItemBackend`'s GitHub/SQLite/Beads/Memory choice is —
+it is an adapter that persists plan/task state through the *same* `ContentProvider`
+(`./backlog_core/backend_types.py`) that `artifact_*` calls use, wrapping `InMemoryTaskProvider`'s
+established in-memory behavior. `sam_active_task` is not a `TaskBackend` consumer in the same way as
+`sam_plan`/`sam_task`: it primarily routes through a third, separate protocol, `ContextBackend`
+(`get_context_config().backend`), for session-scoped active-task state, and only incidentally
+resolves a `TaskBackend` on its `update` action (to cross-validate/append task-section content
+against the plan the active-task address points at). There is no local filesystem fallback or
+per-plan backend selection — each protocol still resolves to exactly one configured backend
+instance per its own selection rules. Remote providers may use a private `FileCache` for stale
+reads and queued writes. Beads, SQLite, and Memory remain native-only and never use YAML or cache
+storage.
 
 ---
 

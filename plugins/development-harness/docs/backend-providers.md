@@ -47,7 +47,15 @@ ownership unified:
 | Document | Plan, context, design, validation, or report content | `sam_plan` and `artifact_*` |
 
 This is a domain model, not a permission to select separate stores. The active
-backend owns all three object types and resolves their owner references.
+backend owns all three object types and resolves their owner references — but
+"owns" refers to storage selection, not one shared access protocol. Work
+items go through `WorkItemBackend`; plans and tasks go through a separate
+`TaskBackend` protocol, concretely implemented by `ContentTaskProvider` as an
+adapter over the same `ContentProvider` that `artifact_*` calls use — the
+same underlying configured backend, reached through a different interface.
+`sam_active_task` primarily routes through a third protocol, `ContextBackend`,
+for its session-scoped state. See [AGENTS.md](../AGENTS.md)'s "Plan and artifact
+capability boundary" section for the concrete protocol names and file paths.
 
 ## CLI vs MCP Capability Surface
 
