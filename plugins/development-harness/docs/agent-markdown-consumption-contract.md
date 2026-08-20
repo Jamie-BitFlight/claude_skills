@@ -108,9 +108,14 @@ page selector to traverse it.
 
 ### R6 — Sections and artifacts are one inventory
 
-An agent viewing an item receives, in one response, both the section table of contents and
-the associated reports and artifacts. Both are requestable by name. Discovering what exists
-never requires a second call to a different tool.
+An agent viewing an item receives, in one response, both awareness of its sections and the
+associated reports and artifacts. Both are requestable by name. Discovering what exists never
+requires a second call to a different tool. This is the invariant R6 guarantees; it does not
+require a table-of-contents structure to always be present. When content fits in one page
+(R3), sections and artifacts appear directly in that single response, without table-of-contents
+scaffolding around them — there is nothing to navigate, so there is nothing to name a table of
+contents. The table of contents exists only when there is more than one page's worth of content
+to navigate (R3); R6's discoverability guarantee holds either way.
 
 This requirement changes the response shape of the item-view operation on every transport,
 and supersedes the current arrangement in which artifacts are discovered through a separate
@@ -151,10 +156,17 @@ The one path that does re-collect on a read is explicit, caller-requested revali
 opt-in exception the caller chooses, never something the server does silently on an ordinary
 page request.
 
-The identifier is a hash of the Generation stage's output for the request's specific scope —
-not a hash of the raw upstream source alone (ADR-3075-1). Two different scopes of the same
-source (the whole item vs. one filtered section) produce different generated documents and
-must not collide on one identifier. The cache backing this is held for the duration of the
+The identifier is derived from both the command (source, scope, parameters) and the Generation
+stage's output for that command — not a hash of the raw upstream source alone (ADR-3075-1), and
+not a hash of the generated content alone either. Content-only hashing was flagged in review as
+a real collision: two different commands can produce byte-identical generated documents (a
+coincidence, not a contract violation), and a content-only hash would give them the same
+identifier while the entry retains only one command — a later requery or revalidation could
+then execute the wrong command entirely and return content unrelated to what the caller asked
+for. The identifier binds command and content together precisely so two different commands
+never collide even when their output happens to match. Two different scopes of the same source
+(the whole item vs. one filtered section) produce different generated documents and, by the
+same binding, different identifiers. The cache backing this is held for the duration of the
 requesting session only; it is not persisted across sessions (ADR-3075-1).
 
 **One shared control set for the whole session — out-of-process, not an in-process cache**

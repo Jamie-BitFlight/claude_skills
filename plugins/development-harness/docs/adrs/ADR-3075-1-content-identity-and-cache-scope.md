@@ -15,14 +15,22 @@ parsed tree), and how long the cache backing it lives (session vs. persisted). N
 
 ## Decision
 
-**Identity source:** a hash of the Generation stage's output — the complete assembled document
-for the request's specific scope (whole item, or a named artifact, or a filtered subtree) — not
-a hash of the raw upstream source alone. Two different requested scopes of the same source
-document (the whole item vs. one filtered section) produce different generated documents; if the
-identifier hashed only the shared upstream source, both would collide on the same identifier
-while windowing different content, which breaks R8's "identifier resolves against cached parsed
-content" property. Hashing the generated output is the option that yields a working scheme, not
-merely a style preference between two equally-valid choices.
+**Identity source:** derived from both the command (source, scope, parameters) and the
+Generation stage's output for that command — not a hash of the raw upstream source alone, and
+not a hash of the generated content alone either (the latter corrected after review found it
+insufficient — see below). Two different requested scopes of the same source document (the
+whole item vs. one filtered section) produce different generated documents; if the identifier
+hashed only the shared upstream source, both would collide on the same identifier while
+windowing different content, which breaks R8's "identifier resolves against cached parsed
+content" property.
+
+Content-only hashing was the original decision here and was corrected: two different commands
+can coincidentally produce byte-identical generated output, and a content-only hash would give
+them the same identifier while the control-set entry retains only one producing command — a
+later requery or revalidation (ADR-3075-2, ADR-3075-3) could then execute the wrong command and
+return content unrelated to what the caller asked for. Binding the identifier to the command as
+well as the content closes this — two different commands never collide even when their output
+happens to match.
 
 **Cache scope:** session-scoped only, not persisted across sessions. Re-parsing markdown is
 cheap relative to the rest of what a call already does (network round-trip to the backend); a
