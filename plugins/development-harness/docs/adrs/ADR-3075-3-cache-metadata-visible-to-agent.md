@@ -23,10 +23,15 @@ computes for its own internal use: the content identity (R8's hash), the command
 it (source, scope, parameters — ADR-3075-2), and a timestamp of when it was generated. An agent
 may use this to decide, on its own, whether to trust what it received.
 
-A caller may explicitly request revalidation (cheap: recompute the source's current identity,
-confirm or refute a match) or a forced refresh (unconditionally re-run Collection and
-Generation via the stored command, bypassing the cache regardless of hash match) instead of
-accepting whatever the control set already holds. This is a caller-triggered path to the same
+A caller may explicitly request revalidation or a forced refresh instead of accepting whatever
+the control set already holds. Both re-run Collection and Generation via the stored command —
+identity is derived from the command plus Generation's output, not from the raw source alone
+(ADR-3075-1), so recomputing current identity from the source alone is not an option. They
+differ only in what happens after: revalidation compares the freshly computed identity to the
+entry's stored identity and, on a match, reuses the entry's already-cached *parsed* document
+rather than re-parsing — cheaper than a forced refresh only in that one respect. A forced
+refresh skips the comparison and unconditionally re-parses and re-serves the fresh document
+regardless of whether the identity matches. Revalidation is a caller-triggered path to the same
 outcome ADR-3075-2's write-triggered invalidation reaches automatically — deliberately
 redundant with it, not a replacement for it, because the automatic path cannot see every reason
 an agent might have to distrust a cached entry.

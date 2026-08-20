@@ -42,9 +42,15 @@ documents, and the reports and artifacts produced during grooming.
 
 **Pipeline layering** (ADR-3072-1): three stages, in order — Collection (gathering source
 content from wherever it lives), Generation (assembling the complete document for a requested
-scope: description, table of contents, every requested section or artifact), and Navigation
-(this engine). Collection and Generation are unbounded — never truncated, never budget-checked.
-The engine's authority is over Navigation only: it receives a complete generated document,
+scope: description and every requested section or artifact), and Navigation (this engine).
+Generation supplies Navigation the document to parse; it does not assign addresses or build the
+table of contents itself — `component-architecture.md` gives `progressive_markdown` sole
+ownership of "assigning addresses" and "pagination of every result including a table of
+contents," and R4 requires every table-of-contents entry to carry an address, so those addresses,
+and the table of contents built from them, exist only after Navigation parses the generated
+document and builds its addressable tree. Collection and Generation are unbounded — never
+truncated, never budget-checked. The engine's authority is over Navigation only: it receives a
+complete generated document,
 gives it a content identity (R8), caches it for the session, and is the only point anywhere in
 the path where a size budget is applied. "Unbounded" is a real cost for a pathological source,
 not a theoretical one — see ADR-3072-1's known limitation for a concrete measurement and why
@@ -108,10 +114,13 @@ page selector to traverse it.
 
 ### R6 — Sections and artifacts are one inventory
 
-An agent viewing an item receives, in one response, both awareness of its sections and the
-associated reports and artifacts. Both are requestable by name. Discovering what exists never
-requires a second call to a different tool. This is the invariant R6 guarantees; it does not
-require a table-of-contents structure to always be present. When content fits in one page
+An agent viewing an item discovers both its sections and its associated reports and artifacts
+without a second call to a different tool. Both are requestable by name. This is the invariant
+R6 guarantees — not that both inventories always fit in the first page: sections and artifacts
+are windowed by the same paginated response (R2), so when the combined inventory exceeds one
+page, the caller reaches the remainder with a same-tool page request named by R7's hint, never a
+different tool or a separate lookup. It does not require a table-of-contents structure to always
+be present. When content fits in one page
 (R3), sections and artifacts appear directly in that single response, without table-of-contents
 scaffolding around them — there is nothing to navigate, so there is nothing to name a table of
 contents. The table of contents exists only when there is more than one page's worth of content
@@ -122,9 +131,10 @@ and supersedes the current arrangement in which artifacts are discovered through
 lookup. It states intended behaviour, not current behaviour.
 
 The Generation stage (R1) realizes this directly: sections and artifact content are assembled
-into one document, in one address space (R4), before Navigation windows it. There is no
-separate pagination path for the artifact inventory — it pages exactly as the rest of the
-generated document does (ADR-3072-1).
+into one document before Navigation parses it, assigns it one address space (R4), and windows
+it. There is no separate pagination path for the artifact inventory — it pages exactly as the
+rest of the generated document does (ADR-3072-1), so a combined inventory larger than one page
+is reached by a page request, not by a second call to a different tool.
 
 ### R7 — Hints must be actionable
 
@@ -147,14 +157,25 @@ override from R2) — nothing about where the content came from.
 The identifier resolves against cached parsed content. Serving a later page does not
 re-collect from the provider and does not re-parse.
 
-A request whose identifier no longer matches current content is reported as stale. Pages
-from two different versions of a document are never returned as though they were one
-document. **This is not a contradiction of "does not re-collect" above** (flagged in review —
-worth stating plainly): staleness is detected by write-triggered invalidation (below), a side
-effect of the write that changed the source, not by the read path re-collecting to compare.
-The one path that does re-collect on a read is explicit, caller-requested revalidation — an
-opt-in exception the caller chooses, never something the server does silently on an ordinary
-page request.
+A request whose identifier no longer matches current content, because of a write this
+contract's own paths can see, is reported as stale and then automatically recovered — see
+"Stale entries are recoverable, not dead ends" below (ADR-3075-2) for the recovery behaviour,
+which happens on the same ordinary request and is not gated behind a caller opt-in. Pages from
+two different versions of a document are never returned as though they were one document.
+**This is not a contradiction of "does not re-collect" above** (flagged in review — worth
+stating plainly): the distinction is between re-collecting to *detect* staleness and
+re-collecting to *recover* from it once detected. Detection never happens by the read path
+re-collecting to compare — it happens by write-triggered invalidation (below), a side effect of
+the write that changed the source. Recovery does re-collect, automatically, once an entry is
+known stale (below).
+
+A write made through a path outside this contract's Scope, or from a concurrent session, is not
+visible to write-triggered invalidation and is therefore not guaranteed to surface as stale this
+way — an acknowledged blind spot, not an oversight (see ADR-3075-3). An agent that needs
+certainty against that blind spot uses the explicit, caller-requested revalidation or forced
+refresh described in "Cache metadata is visible to the agent" below — an opt-in path the caller
+chooses for confidence before automatic detection would otherwise catch a change, additive to
+write-triggered invalidation, not the only path that ever re-collects.
 
 The identifier is derived from both the command (source, scope, parameters) and the Generation
 stage's output for that command — not a hash of the raw upstream source alone (ADR-3075-1), and
@@ -190,7 +211,11 @@ command that produced it — the source, scope, and parameters Collection and Ge
 build it — not only its content identity. When a request's identifier no longer matches
 current content, the stored command is used to requery the backend and regenerate the
 document, serving against the new identity and informing the caller the identity changed. The
-caller is not required to restate its whole request from scratch.
+caller is not required to restate its whole request from scratch, and this recovery happens
+automatically on the very request that surfaces the stale identifier — it is not an opt-in the
+caller must request separately. The explicit revalidation and forced-refresh paths (ADR-3075-3,
+below) serve a different purpose: gaining certainty before write-triggered invalidation would
+otherwise catch a change, not the only path that ever recollects.
 
 **Writes invalidate; reads do not have to discover staleness on their own** (ADR-3075-2). A
 control-set entry is not left to be discovered stale only when a later read happens to hit it
@@ -215,8 +240,8 @@ instead of trusting whatever the control set already holds.
 ```mermaid
 flowchart TD
     Req([Agent requests content<br>from any source]) --> Coll[Collection: gather source content<br>unbounded — no budget check]
-    Coll --> Gen["Generation: assemble the complete document<br>for the requested scope — description +<br>table of contents + every requested<br>section or artifact — unbounded R1"]
-    Gen --> Nav[Navigation engine: parse, build<br>addressable tree, hash the generated<br>document for content identity R8]
+    Coll --> Gen["Generation: assemble the complete document<br>for the requested scope — description +<br>every requested section or artifact —<br>unbounded R1"]
+    Gen --> Nav[Navigation engine: parse, build<br>addressable tree and table of contents,<br>hash the generated document for<br>content identity R8]
     Nav --> Cache["Cache the generated document<br>for the session, keyed by that identity R8"]
     Cache --> Eng[Window the cached document<br>to the agent]
     Eng --> Measure{Response exceeds<br>window budget?<br>only checked here}

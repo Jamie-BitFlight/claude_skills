@@ -127,8 +127,13 @@ and durability are already split exactly as intended; delivery is not.
 
 - `backlog_core` owns artifact registration, identity, and the association between an
   artifact and its item — artifact discovery is part of item state. Confirmed:
-  `artifact_register()` computes identity and writes the manifest entry; this is the only
-  place that does.
+  `artifact_manifest_store.py::publish_artifact()` computes content identity
+  (`content_revision`, a sha256 of the artifact content) and writes the manifest entry. Both
+  the `artifact_register()` MCP tool and `_try_register_dispatch_plan_artifact()` (both in
+  `backlog_core/server.py`) route through it — `publish_artifact()` is the shared owner, not
+  `artifact_register()` alone. `artifact_migration.py::_migrate_register_one()` bypasses it: it
+  calls `ArtifactRegistry.register()` and `provider.set_manifest()` directly and never computes
+  `content_revision`. Tracked in #3086.
 - The storage provider owns durability of artifact content. Confirmed: the GitHub backend's
   `put_content()` writes directly when online and queues durably via `FileCache` when
   offline; no other component performs physical persistence.

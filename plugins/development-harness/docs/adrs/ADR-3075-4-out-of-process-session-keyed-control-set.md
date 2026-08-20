@@ -77,6 +77,15 @@ faced this problem; a control-set store holding full generated documents does. N
 — tracked as [#3082](https://github.com/Jamie-BitFlight/claude_skills/issues/3082) so it is not
 silently absent from the design.
 
+**Not harness-neutral.** The only mechanism that populates `CLAUDE_CODE_SESSION_ID` today is
+`hooks/session-start-session-id.cjs`, which fires on Claude Code's `SessionStart` hook event and
+writes the value to `CLAUDE_ENV_FILE` — both are Claude-Code-specific. This repo's plugin
+content targets Codex, OpenCode, and GitHub's coding agent as well, and none of those provide an
+equivalent `SessionStart` event or `CLAUDE_ENV_FILE`-style shell injection. Under those harnesses
+the CLI and an MCP server have no shared mechanism to resolve the same session directory,
+defeating the cross-transport guarantee this ADR exists to provide. Not solved here — tracked as
+[#3085](https://github.com/Jamie-BitFlight/claude_skills/issues/3085).
+
 ## Considered alternative
 
 An in-process cache (module-level dict, FastMCP lifespan context) was the implicit assumption

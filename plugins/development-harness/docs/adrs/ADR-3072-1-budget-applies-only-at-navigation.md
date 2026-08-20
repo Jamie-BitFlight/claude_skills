@@ -19,10 +19,12 @@ from the engine's own `progressive_markdown.models.TOKEN_BUDGET` (env-derived fr
 ## Decision
 
 Collection (gathering source content) and Generation (assembling the complete document for a
-requested scope — description, table of contents, every requested section or artifact) are both
-unbounded: never truncated, never budget-checked. Navigation — the one engine described by R1 —
-is the only stage where a size budget is ever applied. It receives a fully generated document,
-gives it a content identity, caches it for the session, and windows it to the agent.
+requested scope — description, every requested section or artifact) are both unbounded: never
+truncated, never budget-checked. Navigation — the one engine described by R1 — is the only
+stage where a size budget is ever applied, and the only stage that parses the document, assigns
+addresses, and derives the table of contents from the resulting tree. It receives a fully
+generated document, gives it a content identity, caches it for the session, and windows it to
+the agent.
 
 Consequences:
 

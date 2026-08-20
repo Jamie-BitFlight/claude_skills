@@ -8,16 +8,21 @@ behaviour lives in `docs/agent-markdown-consumption-contract.md` — this file i
 
 **Collection**:
 Gathering source content from wherever it lives — issue body, plan file, task file, artifact.
-Unbounded: never truncated, never budget-checked. Already backed by `FileCache`
-(`backlog_core/file_cache.py`), a durable, provider-owned local cache of raw content — a
-Collection re-run is routinely a local cache hit, not a network round-trip. Distinct from
-Control set below: Collection-layer raw content vs. Navigation-layer generated documents;
-durable vs. session-scoped.
+Unbounded: never truncated, never budget-checked. For remote-capable providers (GitHub today),
+already backed by `FileCache` (`backlog_core/file_cache.py`), a durable, provider-owned local
+cache of raw content — a Collection re-run is routinely a local cache hit, not a network
+round-trip. Beads, SQLite, and Memory read and write native state directly and never instantiate
+`FileCache` (see `docs/backend-providers.md`'s provider table) — for those backends Collection
+has no local-cache layer to hit; a re-run reads the native store directly. Distinct from Control
+set below: Collection-layer raw content vs. Navigation-layer generated documents; durable vs.
+session-scoped.
 
 **Generation**:
-Assembling the complete markdown document for a requested scope — description, table of
-contents, and every section or artifact content the request covers — before any windowing.
-Unbounded, same as Collection.
+Assembling the complete markdown document for a requested scope — description, and every
+section or artifact content the request covers — before any windowing. Unbounded, same as
+Collection. Generation supplies Navigation the document to parse; it does not assign addresses
+or build the table of contents itself — those are Navigation's, derived from the parsed tree
+(see Navigation and Table of contents below).
 
 **Navigation** (pipeline stage):
 The one system that takes a generated document, gives it a content identity, caches it for the
