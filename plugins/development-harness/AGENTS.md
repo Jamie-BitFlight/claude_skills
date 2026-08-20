@@ -421,7 +421,8 @@ Load these documents based on what you are doing. They contain the system design
 
 **Modifying markdown consumption, content pagination, table-of-contents/section addressing, or response sizing:**
 
-- Load [Agent Markdown Consumption — Behaviour Specification](./docs/agent-markdown-consumption-contract.md) — normative requirements R1-R7 for how markdown reaches an agent, across every transport
+- Load [Component Architecture](./docs/component-architecture.md) — which package owns what, and the points where two components resemble each other and are not the same. Read this before working in any package in this plugin
+- Load [Agent Markdown Consumption — Behaviour Specification](./docs/agent-markdown-consumption-contract.md) — normative requirements R1-R8 for how markdown reaches an agent, across every transport
 - Load [MCP Progressive-Disclosure Contract](./docs/mcp-progressive-disclosure-contract.md) — mechanical reference for ordinal addressing, navigation parameters, and response shapes
 
 **Modifying `backlog_core/` internals — any backend implementation, GitHub content/CAS storage, offline queueing, or collaborator boundaries within `GitHubBackend`:**
