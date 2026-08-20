@@ -72,12 +72,10 @@ state. Confirm agents are idle — token count stable across two readings — th
 ## Cross-references
 
 - **Mechanism leaks** in task prompts, skills, and task files — the prompt is what a real user would
-  type; schema, paths, model tier, and skill names live in the executor config, not the prompt. The
-  same leak covers a skill narrating itself: the design or safety rationale behind why an instruction
-  is phrased as it is belongs to documentation, not the prompt the executing agent reads. A skill is
-  a prompt, not documentation of its own prompt. Provide CLEAR + CoVe instructions for the executing
-  agent; delete self-description on the same test as any other leak. Full rubric and worked
-  examples: [instruction-hygiene §1–2](../../plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md).
+  type; schema, paths, model tier, and skill names live in the executor config, not the prompt. Covers
+  a skill narrating its own design or safety rationale too, not just the surrounding system's. Full
+  rubric and worked examples:
+  [instruction-hygiene §1–2](../../plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md).
 - **Custom agents only; verify their claims** — never use general-purpose agents for workers (they
   inherit ~100k tokens of tool/skill/MCP descriptions). Treat agent reports as claims, not facts:
   an agent that lacks execution tools cannot run a gate (the orchestrator runs it), and an agent's
