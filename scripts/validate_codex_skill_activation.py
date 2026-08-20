@@ -149,7 +149,19 @@ def load_matrix_target(target: str) -> dict[str, object]:
 
 
 def ensure_no_mcp_configuration(plugin_root: Path) -> None:
-    """Keep MCP-bearing plugins in the separate FastMCP validation lane."""
+    """Keep MCP-bearing plugins in the separate FastMCP validation lane.
+
+    Reads the Codex manifest's mcpServers field directly rather than trusting
+    only conventional filenames -- a plugin can declare MCP servers inline as
+    an object in plugin.json (or reference a non-conventionally-named file),
+    which a filename-only scan would miss and let app-server start those
+    servers before any runtime event could reject it.
+    """
+    manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
+    if manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("mcpServers"):
+            raise HarnessError("Plugin declares MCP configuration; use the FastMCP validation lane")
     names = [path.name for path in plugin_root.rglob("*") if path.name in MCP_CONFIG_NAMES]
     if names:
         raise HarnessError("Plugin declares MCP configuration; use the FastMCP validation lane")

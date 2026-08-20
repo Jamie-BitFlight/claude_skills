@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import subprocess
 import sys
 import time
@@ -32,6 +33,35 @@ def test_activation_timeout_defaults_to_a_bounded_model_turn() -> None:
     ])
 
     assert args.timeout_seconds == 45.0
+
+
+def test_ensure_no_mcp_configuration_rejects_inline_mcp_servers_object(tmp_path: Path) -> None:
+    """An inline mcpServers object in plugin.json is caught, not just conventional filenames.
+
+    Tests: ensure_no_mcp_configuration's manifest-field check
+    How: Write a .codex-plugin/plugin.json with a non-empty inline mcpServers object and
+         no .mcp.json/.mcp.codex.json file anywhere in the tree; assert it is rejected
+    Why: A filename-only scan misses a plugin declaring MCP servers inline as an object,
+         which would let app-server start those servers before any runtime event could
+         reject it (PR #2787 review, validate_codex_skill_activation.py:155)
+    """
+    plugin_dir = tmp_path / "inline-mcp-plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps({"name": "inline-mcp-plugin", "mcpServers": {"my-server": {"command": "node"}}}), encoding="utf-8"
+    )
+
+    with pytest.raises(activation.HarnessError, match="FastMCP validation lane"):
+        activation.ensure_no_mcp_configuration(plugin_dir)
+
+
+def test_ensure_no_mcp_configuration_allows_a_plugin_without_mcp(tmp_path: Path) -> None:
+    """A plugin with no MCP declaration at all passes through untouched."""
+    plugin_dir = tmp_path / "no-mcp-plugin"
+    (plugin_dir / ".codex-plugin").mkdir(parents=True)
+    (plugin_dir / ".codex-plugin" / "plugin.json").write_text(json.dumps({"name": "no-mcp-plugin"}), encoding="utf-8")
+
+    activation.ensure_no_mcp_configuration(plugin_dir)
 
 
 def test_jsonl_decoder_keeps_the_next_buffered_protocol_message() -> None:
