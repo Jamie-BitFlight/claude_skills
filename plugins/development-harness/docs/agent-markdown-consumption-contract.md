@@ -2,7 +2,7 @@
 
 Every consumer of every operation described here is an AI agent. There is no human reader.
 
-Requirements R1–R7 are normative. The open questions section names decisions not yet made;
+Requirements R1–R8 are normative. The open questions section names decisions not yet made;
 until each is resolved, an implementation satisfying the surrounding requirements is correct.
 
 ## Purpose
@@ -10,6 +10,19 @@ until each is resolved, an implementation satisfying the surrounding requirement
 Define one contract for how markdown reaches an agent. An agent must never receive an
 unbounded dump, must never receive silently truncated content, and must always receive
 enough structure to request exactly the part it needs next.
+
+## Scope — operations bound by this contract
+
+Every operation that returns markdown to an agent is bound, on every transport. This
+includes, and is not limited to:
+
+- reading an item and any filtered view of one
+- reading a plan or a task
+- reading an artifact's content
+- any listing operation whose result embeds content rather than only metadata
+
+An operation is not exempt because its content is usually small. Requirements apply to the
+operation, not to a size class of its typical payload.
 
 ## Normative requirements
 
@@ -63,12 +76,29 @@ An agent viewing an item receives, in one response, both the section table of co
 the associated reports and artifacts. Both are requestable by name. Discovering what exists
 never requires a second call to a different tool.
 
+This requirement changes the response shape of the item-view operation on every transport,
+and supersedes the current arrangement in which artifacts are discovered through a separate
+lookup. It states intended behaviour, not current behaviour.
+
 ### R7 — Hints must be actionable
 
 A response that withholds content states what the caller must do to obtain it, using
 addresses valid in that same response. A hint must never recommend retrieving everything as
 its first suggestion, never recommend an action the caller has already exhausted, and never
 name a mechanism absent from the response it accompanies.
+
+### R8 — Paginated content is addressed by content identity
+
+A response that paginates returns a stable identifier derived from the content it paginates,
+alongside the page position. Subsequent pages are requested with that identifier plus a page
+selector or an address, never by re-describing the source.
+
+The identifier resolves against cached parsed content. Serving a later page does not
+re-collect from the provider and does not re-parse.
+
+A request whose identifier no longer matches current content is reported as stale. Pages
+from two different versions of a document are never returned as though they were one
+document.
 
 ## Required flow
 
@@ -99,18 +129,35 @@ flowchart TD
 
 ## Open questions requiring a decision
 
+Each open question is tracked as an issue so a decision made here is discoverable and enforced
+against the work it blocks, rather than existing only as prose in this section.
+
 1. Budget value — one configurable constant for all operations, and what default relative to
-   the ~10,000 token harness cap.
+   the ~10,000 token harness cap. Tracked in #3072.
 2. Compact-form composition when both the table of contents and the artifact inventory are
-   large — page them together, or independently.
+   large — page them together, or independently. Tracked in #3073.
 3. Whether an agent may request an explicit page size, or only accept the configured budget.
+   Tracked in #3074.
+4. Cache lifetime and scope for R8 — held for the duration of a session, or persisted across
+   sessions. Tracked in #3075. Blocks #3062.
+5. Whether R8's identifier is derived from the raw markdown or from the parsed tree. Raw
+   detects every change; parsed would keep pagination stable across cosmetic edits. Tracked in
+   #3076. Blocks #3062.
+
+When an issue above closes, remove its list item here and fold the decision into the relevant
+requirement (R2, R5, R6, or R8) as normative text — this section holds undecided questions
+only, not a permanent record of resolved ones.
 
 ## Implementation appendix — shape to code
 
-The engine described by R1 exists as the `progressive_markdown` package: `Navigator`
-(`map`, `view_section`, `view_code`, `links`, `search_sections`, each taking `page` and
-`budget`), `Paginator` (`paginate_blocks`, `paginate_text`), and a `MarkdownContentProvider`
-protocol for arbitrary sources.
+The engine described by R1 exists as the `progressive_markdown` package:
+`ProgressiveMarkdownNavigator` (`map`, `view_section`, `view_code`, `links`,
+`search_sections`, each taking `page` and `budget`), `Paginator` (`paginate_blocks`,
+`paginate_text`), and a `MarkdownContentProvider` protocol for arbitrary sources.
+
+`ProgressiveMarkdownNavigator` and `Paginator` currently have no consumers. The engine's
+parser and indexer are imported by the address-navigation path; its navigation and
+pagination layer is not used by anything.
 
 Duplicate implementations to delete rather than refactor, in the backlog server layer
 (`backlog_core/server.py`, `backlog_core/operations.py`) shared by the MCP tool and CLI paths

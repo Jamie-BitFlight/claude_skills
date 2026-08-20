@@ -985,7 +985,16 @@ These are CLI-specific display concerns that don't belong in core logic.
 **Responsibility**: Deliver backlog item content progressively. Large items are navigated
 via a token-efficient ordinal map rather than returned in a single call.
 
-Contract reference: `docs/mcp-progressive-disclosure-contract.md`.
+**Ownership**: navigation and pagination belong to the `progressive_markdown` package, which
+provides them for markdown from any source. The modules described here predate that
+consolidation and reimplement navigation on top of the engine's parser and indexer. They are
+a transitional implementation, not the owner of this concern — see
+[Component Architecture](../docs/component-architecture.md) for the boundary and
+[Agent Markdown Consumption](../docs/agent-markdown-consumption-contract.md) for the
+behaviour they must converge on. Do not extend them; add capability to the engine instead.
+
+Contract reference: `docs/mcp-progressive-disclosure-contract.md` for ordinal addressing and
+response shapes.
 
 ### MarkdownIndexer Integration
 

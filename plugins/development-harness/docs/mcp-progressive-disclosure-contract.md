@@ -2,7 +2,7 @@
 
 Behaviour for how markdown reaches an agent is normative in
 [Agent Markdown Consumption — Behaviour Specification](./agent-markdown-consumption-contract.md)
-(R1–R7), across every transport — MCP and CLI alike. This document is mechanical reference,
+(R1–R8), across every transport — MCP and CLI alike. This document is mechanical reference,
 subordinate to that contract: ordinal addressing, navigation parameters, and response shapes
 for one conforming implementation, the `backlog_view` MCP tool. See
 [Backend Providers](./backend-providers.md) "CLI vs MCP Capability Surface" for the CLI
