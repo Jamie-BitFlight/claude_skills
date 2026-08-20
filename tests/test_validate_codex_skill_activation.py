@@ -111,3 +111,62 @@ def test_mcp_events_are_rejected_by_the_read_only_activation_lane() -> None:
         activation.observe_event(
             {"method": "mcpServer/elicitation/request", "params": {}}, observed_methods=[], response_fragments=[]
         )
+
+
+def test_blocked_item_type_is_rejected_by_the_read_only_activation_lane() -> None:
+    """The activation lane fails closed on any observed command/file/MCP-tool execution item.
+
+    This is the single most safety-critical branch in observe_event: it is what
+    keeps the read-only activation lane from silently allowing a skill turn to
+    execute a command, change a file, or call an MCP tool.
+    """
+    with pytest.raises(activation.HarnessError, match="Blocked item type observed: commandExecution"):
+        activation.observe_event(
+            {"method": "item/started", "params": {"item": {"type": "commandExecution"}}},
+            observed_methods=[],
+            response_fragments=[],
+        )
+
+
+def test_malformed_event_params_are_rejected() -> None:
+    """An event whose params are not an object is rejected rather than silently ignored."""
+    with pytest.raises(activation.HarnessError, match="Malformed app-server event"):
+        activation.observe_event(
+            {"method": "item/started", "params": "not-an-object"}, observed_methods=[], response_fragments=[]
+        )
+
+
+def test_approval_request_events_are_rejected() -> None:
+    """The read-only activation lane never grants approval, so a request must fail closed."""
+    with pytest.raises(activation.HarnessError, match="Unexpected approval request"):
+        activation.observe_event(
+            {"method": "item/commandExecution/requestApproval", "params": {}},
+            observed_methods=[],
+            response_fragments=[],
+        )
+
+
+def test_error_events_are_rejected() -> None:
+    """An app-server error event must fail the activation run rather than pass silently."""
+    with pytest.raises(activation.HarnessError, match="error event"):
+        activation.observe_event({"method": "error", "params": {}}, observed_methods=[], response_fragments=[])
+
+
+def test_app_server_client_surfaces_stdout_read_failure_distinct_from_timeout() -> None:
+    """A genuine stdout read failure must surface its own cause, not a generic timeout."""
+
+    class RaisingStdout:
+        def readline(self) -> bytes:
+            raise OSError("stdout pipe closed unexpectedly")
+
+    class FakeProcess:
+        stdin = None
+        stdout = RaisingStdout()
+
+    client = activation.AppServerClient(cast("subprocess.Popen[bytes]", FakeProcess()), time.monotonic() + 1)
+
+    with pytest.raises(activation.HarnessError, match="stdout read failed") as exc_info:
+        client.receive()
+
+    assert not str(exc_info.value).startswith("Timed out")
+    assert isinstance(exc_info.value.__cause__, OSError)

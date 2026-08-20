@@ -1,17 +1,30 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "ruamel.yaml>=0.18.0",
+#     "python-frontmatter>=1.1.0",
+# ]
+# ///
 """Generate the complete, deterministic Codex skill activation matrix scaffold."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parents[1]
 PLUGINS_ROOT = REPO_ROOT / "plugins"
 MATRIX_PATH = REPO_ROOT / "tests" / "fixtures" / "codex-skill-activation-matrix.jsonl"
 OVERRIDES_PATH = REPO_ROOT / "tests" / "fixtures" / "codex-skill-activation-overrides.json"
-FRONTMATTER_NAME = re.compile(r"^name:\s*([^\s#]+)\s*$", re.MULTILINE)
+
+# Reuse the shared ruamel.yaml-backed frontmatter reader instead of hand-rolling
+# a second regex-based YAML frontmatter parser — see plugin-creator's
+# normalize_frontmatter.py for the established sys.path pattern this mirrors.
+sys.path.insert(0, str(REPO_ROOT / "plugins" / "plugin-creator" / "scripts"))
+from frontmatter_utils import load_frontmatter
 
 
 def load_plugin_id(manifest_path: Path) -> str:
@@ -28,17 +41,18 @@ def load_skill_name(skill_path: Path) -> str:
 
     Returns:
         The declared skill name.
+
+    Raises:
+        ValueError: If skill_path has missing or incomplete YAML frontmatter,
+            or frontmatter with no non-empty "name" field.
     """
-    content = skill_path.read_text(encoding="utf-8")
-    if not content.startswith("---\n"):
-        raise ValueError(f"Skill frontmatter is missing: {skill_path}")
-    frontmatter_end = content.find("\n---\n", 4)
-    if frontmatter_end == -1:
-        raise ValueError(f"Skill frontmatter is incomplete: {skill_path}")
-    match = FRONTMATTER_NAME.search(content[4:frontmatter_end])
-    if match is None:
+    post = load_frontmatter(skill_path)
+    if not post.metadata:
+        raise ValueError(f"Skill frontmatter is missing or incomplete: {skill_path}")
+    name = post.metadata.get("name")
+    if not isinstance(name, str) or not name:
         raise ValueError(f"Skill frontmatter has no name: {skill_path}")
-    return match.group(1)
+    return name
 
 
 def build_rows(repo_root: Path = REPO_ROOT) -> list[dict[str, object]]:
@@ -146,7 +160,11 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="Fail if the matrix is stale.")
     args = parser.parse_args()
 
-    rows = apply_overrides(build_rows(), load_overrides())
+    # Pass REPO_ROOT explicitly (rather than relying on build_rows's default
+    # parameter) so tests can monkeypatch generator.REPO_ROOT and have main()
+    # observe it — a bare default is bound once at function-definition time
+    # and would silently ignore any later monkeypatch of the module global.
+    rows = apply_overrides(build_rows(REPO_ROOT), load_overrides())
     rendered = render_rows(rows)
     if args.check:
         matrix_contents = None
