@@ -43,6 +43,20 @@ an executing agent where its model is configured, when it cannot change it.
 The fix for non-functional prose is deletion, not explanation. Replacing a decorative `(Haiku)` tag
 with a paragraph on where the model is set stacks noise on noise — remove the tag and stop.
 
+A skill is a prompt: a clear set of instructions for an exact process to follow, or constraints for
+a task. It is not documentation about itself. It does not say how it works, why it works, or what
+problem an earlier phrasing of it had — a prompt does not describe that it is prompting. If a
+sentence is *about* the skill (its own design, its own safety rationale, an alternative it is
+steering the reader away from and why) rather than a command the reader executes or knowledge the
+reader needs to act, it is self-narration, not instruction. Delete it; if the rationale is worth
+keeping anywhere, that is a docs/ file or a commit message, never the prompt.
+
+Example: `Never embed <input> in a shell-interpreted line — [names the injection vector] —
+reasoning it out instead is the only safe path` narrates the skill's own defensive design. The
+preceding sentence — `Coerce <input> using the vocabulary below` — was already the complete
+instruction; the reader who follows it never constructs a shell-interpreted line in the first
+place, so naming the vulnerability it avoids adds no executable content, only self-description.
+
 ## 3. Single source of truth — no restated or derived values
 
 A value written in two files will drift. Define it once; reference it everywhere else.
