@@ -153,10 +153,12 @@ below), not something the caller carries forward. Concretely, an initial request
 (`selector="#2529", section="RT-ICA"` or similar); every request after that states only
 `hash="<identifier>"` plus `page`, `navigate` (R4's address), `pagesize` (the caller override
 from R2), and — on transports where the control set is out-of-process (ADR-3075-4) — a
-session-identifying value the request needs to locate its session's store: a `gate_token`-style
-parameter for MCP tools, per ADR-3075-4's Consequences, since `backlog_view` and `artifact_read`
-have no in-process session identity to read from `ctx`; the CLI instead reads
-`CLAUDE_CODE_SESSION_ID` directly and needs no such parameter.
+session-identifying value the request needs to locate its session's store: a plain, non-rotating
+`session_id` parameter carrying `CLAUDE_CODE_SESSION_ID`'s value directly for MCP tools, per
+ADR-3075-4's Consequences, since `backlog_view` and `artifact_read` have no in-process session
+identity to read from `ctx` — not a `gate_token`-style parameter, which rotates on every skill
+load and cannot serve as a stable session key; the CLI instead reads `CLAUDE_CODE_SESSION_ID`
+directly and needs no such parameter.
 
 This hash-plus-session-routing shape states intended behaviour, not current behaviour: the
 control set it depends on (ADR-3075-1 through ADR-3075-4) is not yet implemented, and

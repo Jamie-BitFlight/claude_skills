@@ -42,21 +42,24 @@ the same cache entry defeats R8's "resolves against the same cache entry" proper
 thoroughly as the collision this ADR just fixed — from the other direction.
 
 **Cache scope:** session-scoped only, not persisted across sessions. Re-parsing markdown is
-cheap relative to the rest of what a call already does (network round-trip to the backend); a
-persisted cache would need its own storage location, eviction policy, and a plan for backend
-content changing underneath a stale entry, for a cost that profiling has not shown to matter.
-Confirmed by the repo owner: for remote-capable providers (GitHub today), Collection is already
-backed by `FileCache` (`backlog_core/file_cache.py`), an existing durable, provider-owned local
-cache of raw content records — a Collection-stage re-run triggered by ADR-3075-2's
-requery-on-stale behavior is routinely a local cache hit, not a network round-trip. Beads,
-SQLite, and Memory read and write native state directly and never instantiate `FileCache`
-(`docs/backend-providers.md`'s provider table) — for those backends a Collection-stage re-run
-reads the native store directly, not a `FileCache` hit. This is a different cache from the one
-this ADR governs regardless of backend (Collection-layer raw content vs. Navigation-layer
-generated/parsed/paginated documents; durable vs. session-scoped) — not a reason to merge the
-two — but for GitHub specifically it is direct evidence for "re-parsing is cheap," not just an
-assumption. `FileCache.__init__` takes a project-root `Path` and no session parameter; it has no
-session concept and predates the control set this ADR defines.
+cheap relative to whatever Collection itself already costs for a re-run — and for the GitHub
+backend's primary path, that cost is a live network round-trip, not a local cache hit. Verified
+directly against source: `GitHubContentCache.get_content()`
+(`backlog_core/backends/github_content_migration.py`) calls `_read_online_content()` — a live
+API read — whenever GitHub is reachable and no pending write blocks it; `FileCache` is only hit
+on the fallback paths (GitHub unreachable, or the online read fails), not the common case.
+`backlog_view`'s issue-body fetch (`_fetch_issue_graphql` in `gh_client.py`) has no cache layer
+at all — an unconditional network call every time. So a persisted Navigation-layer cache would
+not avoid the network cost Collection already pays on a re-run; it would only save the
+parsing/pagination-computation cost on top of that, which is the smaller of the two and the one
+profiling has not shown to matter. Beads, SQLite, and Memory read and write native state
+directly and never instantiate `FileCache` (`docs/backend-providers.md`'s provider table) — for
+those backends a Collection-stage re-run reads the native store directly. `FileCache` predates
+the control set this ADR defines, has no session concept (`FileCache.__init__` takes a
+project-root `Path`, no session parameter), and functions as an offline-fallback and
+write-durability layer for GitHub specifically — not a read-avoidance cache for Navigation's
+persistence question, and not evidence for "re-parsing is cheap" the way an earlier version of
+this ADR claimed.
 
 ## Considered alternatives
 

@@ -47,15 +47,33 @@ as a prerequisite for any implementation of #3062. **This was originally stated 
 `ctx: Context`" and that was wrong** — checked directly against every existing `ctx: Context`
 usage in `backlog_core/server.py`: `ctx` is used exclusively for `ctx.info()`/`ctx.warning()`/
 `ctx.report_progress()`, a logging and progress channel to the calling client, and carries no
-session identity anywhere in this codebase. The actual established pattern for session
-identity is an explicit `gate_token`-style parameter: `backlog_add` (which does take
-`ctx: Context`) determines the caller's session not from `ctx` but from a `gate_token` string
-(`{session_id}:{hex}`) the client generates via `get-gate-token.mjs` and passes as an ordinary
-parameter — `_read_gate_token`'s own docstring states this exists specifically "so the MCP
-server never needs its own `CLAUDE_CODE_SESSION_ID`." `backlog_view` and `artifact_read`
-currently have neither `ctx: Context` nor a `gate_token`-style parameter. The prerequisite is
-the latter, following the existing pattern — not `ctx: Context`, which would not solve this
-even if added.
+session identity anywhere in this codebase.
+
+**A second correction, found the same way: reusing the `gate_token` pattern was also wrong.**
+`backlog_add` does determine the caller's session from a client-supplied parameter rather than
+`ctx`, but that parameter is not a stable session identifier and does not solve this. Checked
+directly against `get-gate-token.mjs` and `_read_gate_token()` in `backlog_core/server.py`:
+`get-gate-token.mjs` generates a *new* random token and overwrites the single
+`.gate-token` file on every invocation; `_read_gate_token()` validates a caller's token against
+only the file's *current* contents. A token obtained by an earlier call in a session becomes
+invalid the moment anything else in that session reloads the skill and regenerates the file —
+including a paginated request's own later follow-up call. `gate_token`'s actual purpose (per its
+own docstring and the error message `backlog_add` returns on mismatch) is gating unauthorized
+direct tool calls, forcing skill-mediated access to `create`'s duplicate-detection step — not
+carrying session identity for cache routing. Those are different requirements and the same
+mechanism cannot serve both: cache routing needs a value stable for the session's whole
+lifetime; the gate needs a value that becomes invalid, since its entire point is to reject a
+caller that bypassed the skill.
+
+The correct prerequisite is a plain, non-rotating `session_id` parameter carrying the caller's
+`CLAUDE_CODE_SESSION_ID` value directly — following the same reasoning `gate_token`'s docstring
+gives for why the client must pass it explicitly (the MCP server has no way to read the caller's
+own environment), without adopting `gate_token`'s rotation or its access-gating property, neither
+of which cache routing needs. `backlog_view` and `artifact_read` currently have neither
+`ctx: Context` nor any session-identifying parameter. Whether `gate_token` itself should be
+reviewed or replaced as an access-gating mechanism is a separate question, raised by the repo
+owner and tracked as [#3087](https://github.com/Jamie-BitFlight/claude_skills/issues/3087) — out
+of scope for this ADR, which only concerns cache routing.
 
 ## Known gaps — named, not solved by this ADR
 

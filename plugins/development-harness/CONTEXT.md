@@ -23,10 +23,12 @@ between the methodology and one literal stateless agent instance).
 **Collection**:
 Gathering source content from wherever it lives — issue body, plan file, task file, artifact.
 Unbounded: never truncated, never budget-checked. Unrelated to Control set below or to session
-identity: for remote-capable providers (GitHub today), already backed by `FileCache`
-(`backlog_core/file_cache.py`), a durable, provider-owned local cache of raw content keyed by
-project root — `FileCache.__init__` takes no session parameter and has no session concept — so a
-Collection re-run is routinely a local cache hit, not a network round-trip. Beads, SQLite, and
+identity. For remote-capable providers (GitHub today), Collection's primary path is a live
+network read, not a local cache hit — `GitHubContentCache.get_content()` reads online whenever
+GitHub is reachable, and `backlog_view`'s issue-body fetch has no cache layer at all. `FileCache`
+(`backlog_core/file_cache.py`) exists but only serves the offline-fallback path (GitHub
+unreachable, or the online read fails) plus write durability — `FileCache.__init__` takes no
+session parameter and has no session concept. Beads, SQLite, and
 Memory read and write native state directly and never instantiate `FileCache` (see
 `docs/backend-providers.md`'s provider table) — for those backends Collection has no local-cache
 layer to hit; a re-run reads the native store directly. `FileCache` predates this document and
