@@ -504,7 +504,7 @@ def main() -> int:
             env=env,
             label="exec",
         )
-    except (HarnessError, OSError, subprocess.SubprocessError) as err:
+    except (HarnessError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as err:
         print(f"error: {err}", file=sys.stderr)
         return 1
     else:
