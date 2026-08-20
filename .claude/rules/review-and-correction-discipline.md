@@ -78,5 +78,4 @@ state. Confirm agents are idle — token count stable across two readings — th
 - **Custom agents only; verify their claims** — never use general-purpose agents for workers (they
   inherit ~100k tokens of tool/skill/MCP descriptions). Treat agent reports as claims, not facts:
   an agent that lacks execution tools cannot run a gate (the orchestrator runs it), and an agent's
-  "not found" is often a wrong-directory confabulation — verify against primary source. See
-  source-fidelity §4.
+  "not found" is often a wrong-directory confabulation — verify against primary source.
