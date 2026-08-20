@@ -43,6 +43,7 @@ from .models import (
     ViewItemResult,
     parse_issue_number,
 )
+from .rendering import heading_to_unknown_key
 from .section_registry import resolve_section_name, resolve_subsection_name
 
 # ---------------------------------------------------------------------------
@@ -1250,17 +1251,17 @@ def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> di
             else:
                 result[key] = parsed
         else:
-            raw_key = heading_name.lower()
             # Route through the canonical registry resolver — the same
             # write-boundary lookup operations._normalize_section_key uses —
             # so a display heading like "Impact Radius" resolves to its
             # registered snake_case key ("impact_radius"), not the raw
             # lowercased heading text. A name the registry does not recognise
             # (e.g. "Description", an ad hoc heading a caller invented) falls
-            # through to the raw lowercased key unchanged — this legacy .md
-            # path has never unknown__-prefixed unrecognised names, and
-            # changing that is out of scope for this canonicalization fix.
-            key = resolve_section_name(heading_name) or raw_key
+            # through to heading_to_unknown_key(), matching operations.py and
+            # github_sync.py so the same unregistered heading round-trips to
+            # the same storage key regardless of which of the three parse
+            # paths handled it (see #2978).
+            key = resolve_section_name(heading_name) or heading_to_unknown_key(heading_name)
             parsed_section = _parse_section_entries(content, added_date)
             existing_section = result.get(key)
             if isinstance(existing_section, Section):
