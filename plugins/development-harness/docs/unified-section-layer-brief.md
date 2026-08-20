@@ -2,7 +2,9 @@
 
 This contributor brief defines the section-wire contract. Consumer workflows must use the
 configured backlog MCP/CLI operations and must not parse provider bodies, cache files, or wire
-timestamps themselves.
+timestamps themselves. For how the entries and sections defined here are paginated and
+disclosed to an agent, see
+[Agent Markdown Consumption — Behaviour Specification](./agent-markdown-consumption-contract.md).
 
 ## Outcome
 
@@ -72,7 +74,10 @@ Known-input parsing, search, filtering, section addressing, artifact lookup, pla
 progress counting belong in scripts, CLI commands, or MCP tools. Consumer instructions should
 name the operation and interpret its returned evidence; they should not reproduce a grep,
 parser, filter pipeline, or multi-call state update. Keep unique evidence interpretation,
-diagnosis, synthesis, and design decisions in the agent reasoning layer.
+diagnosis, synthesis, and design decisions in the agent reasoning layer. R1 in
+[Agent Markdown Consumption — Behaviour Specification](./agent-markdown-consumption-contract.md)
+states the markdown-engine side of this same boundary — one engine, no duplicate hand-built
+implementations.
 
 ## Contributor acceptance criteria
 

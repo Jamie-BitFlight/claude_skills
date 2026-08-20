@@ -112,8 +112,9 @@ The engine described by R1 exists as the `progressive_markdown` package: `Naviga
 `budget`), `Paginator` (`paginate_blocks`, `paginate_text`), and a `MarkdownContentProvider`
 protocol for arbitrary sources.
 
-Duplicate implementations to delete rather than refactor, in the backlog MCP server and
-`backlog_core`:
+Duplicate implementations to delete rather than refactor, in the backlog server layer
+(`backlog_core/server.py`, `backlog_core/operations.py`) shared by the MCP tool and CLI paths
+that call it:
 
 - the compact manifest, over-budget directory, and section-index builders, which emit a
   bracket-numbered index that neither paginates nor matches the engine's addresses — the
@@ -124,10 +125,12 @@ Duplicate implementations to delete rather than refactor, in the backlog MCP ser
 The address-based navigation path (`disclosure_handler`, `ordinal_mapper`) already routes
 through the engine and is the reference for how the remaining paths should call it.
 
-## Documents this supersedes or unifies
+## Related documents
 
-- The progressive-disclosure contract — documents address-based navigation as an opt-in
-  protocol and does not describe the automatic compact form.
-- The unified section layer brief — defines the cross-provider entry contract and does not
-  reference disclosure or pagination.
-- Neither cross-references the other, and neither states R1.
+- [MCP Progressive-Disclosure Contract](./mcp-progressive-disclosure-contract.md) — mechanical
+  reference for ordinal addressing, navigation parameters, and response shapes on one conforming
+  implementation. Subordinate to this contract for behaviour.
+- [Unified Section Layer Brief](./unified-section-layer-brief.md) — defines the cross-provider
+  entry and ID contract that markdown sources are built from. Complementary, not overlapping:
+  that brief owns entry and ID identity; this contract owns pagination and disclosure of the
+  content built from those entries.
