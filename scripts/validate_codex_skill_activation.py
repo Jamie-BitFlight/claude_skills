@@ -435,10 +435,19 @@ def run_app_server(
 
 
 def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> None:
-    """Run a setup command without exposing its output or ambient credentials."""
+    """Run a setup command without exposing its output or ambient credentials.
+
+    On failure, captured stderr is persisted to a file inside the ephemeral
+    isolated workspace (``cwd``) for post-mortem debugging -- never printed or
+    embedded in the raised error, since it may contain ambient credentials.
+    The workspace is torn down automatically unless the caller passed
+    ``--keep-tempdir``.
+    """
     completed = subprocess.run(argv, cwd=cwd, env=env, text=True, capture_output=True, check=False)
     if completed.returncode != 0:
-        raise HarnessError(f"{label} failed with exit code {completed.returncode}")
+        stderr_log = cwd / f"{label.replace(' ', '_')}.stderr.log"
+        stderr_log.write_text(completed.stderr, encoding="utf-8")
+        raise HarnessError(f"{label} failed with exit code {completed.returncode}; stderr saved to {stderr_log}")
 
 
 def write_evidence(path: Path, evidence: dict[str, object]) -> None:

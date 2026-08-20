@@ -170,3 +170,25 @@ def test_app_server_client_surfaces_stdout_read_failure_distinct_from_timeout() 
 
     assert not str(exc_info.value).startswith("Timed out")
     assert isinstance(exc_info.value.__cause__, OSError)
+
+
+def test_run_silent_persists_stderr_to_workspace_on_failure(tmp_path: Path) -> None:
+    """A failing setup command's stderr is saved for post-mortem, never raised raw.
+
+    Tests: run_silent's failure path
+    How: Run a command that writes a secret-shaped string to stderr and exits
+         non-zero; assert the raised error names a saved-file path rather than
+         embedding the stderr content, and that file contains it
+    Why: The original bare "failed with exit code N" gave no diagnostic trail;
+         embedding raw stderr in the error/log risks leaking ambient
+         credentials the command may have echoed
+    """
+    argv = [sys.executable, "-c", "import sys; sys.stderr.write('token=super-secret-value\\n'); sys.exit(3)"]
+
+    with pytest.raises(activation.HarnessError, match="failed with exit code 3") as exc_info:
+        activation.run_silent(argv, cwd=tmp_path, env={}, label="test command")
+
+    assert "super-secret-value" not in str(exc_info.value)
+    stderr_log = tmp_path / "test_command.stderr.log"
+    assert stderr_log.is_file()
+    assert "token=super-secret-value" in stderr_log.read_text(encoding="utf-8")
