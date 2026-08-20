@@ -6,6 +6,9 @@
 **Related:** Corrects an implicit assumption in [ADR-3075-1](./ADR-3075-1-content-identity-and-cache-scope.md)
 and the initial R8 wording — neither specified storage locality, and both were written as
 though an in-process cache would satisfy "one shared control set." It does not.
+**Superseded in part by:** [ADR-3082-1](./ADR-3082-1-sqlite-backed-bounded-eviction.md) — the
+storage mechanism below (a directory of files) is replaced by a single SQLite database. The
+out-of-process, session-keyed decision this ADR makes is unchanged.
 
 ## Context
 
@@ -67,15 +70,16 @@ to write-triggered invalidation (ADR-3075-2) racing a concurrent requery. This A
 specify a locking scheme — that is deferred to implementation, tracked as
 [#3081](https://github.com/Jamie-BitFlight/claude_skills/issues/3081) — but the concurrency
 hazard is a real gap in what "session-keyed" solves, not an incidental detail.
+[ADR-3082-1](./ADR-3082-1-sqlite-backed-bounded-eviction.md)'s move to a single SQLite database
+partially mitigates this (WAL mode makes individual statements atomic across concurrent OS
+processes) but does not solve it — the full check-cap/evict/insert sequence still needs an
+explicit transaction, which #3081 remains open to specify.
 
-**No stated cleanup or TTL.** Control-set entries can hold full generated documents, and
-ADR-3072-1's known limitation already establishes this is not a hypothetical size — item #2953
-alone generates an estimated 270,946+ tokens. Without a cleanup mechanism for
-`$DH_STATE_HOME/sessions/{id}/` directories after a session ends, entries accumulate on disk
-unboundedly across every session ever run. `get-gate-token.mjs`'s single small token file never
-faced this problem; a control-set store holding full generated documents does. Not solved here
-— tracked as [#3082](https://github.com/Jamie-BitFlight/claude_skills/issues/3082) so it is not
-silently absent from the design.
+**No stated cleanup or TTL.** Resolved by
+[ADR-3082-1](./ADR-3082-1-sqlite-backed-bounded-eviction.md) — bounded per-session LRU eviction
+plus an opportunistic cross-session age-based sweep, replacing the directory-of-files storage
+this ADR originally specified. Tracked as
+[#3082](https://github.com/Jamie-BitFlight/claude_skills/issues/3082) for implementation.
 
 **Not harness-neutral.** The only mechanism that populates `CLAUDE_CODE_SESSION_ID` today is
 `hooks/session-start-session-id.cjs`, which fires on Claude Code's `SessionStart` hook event and

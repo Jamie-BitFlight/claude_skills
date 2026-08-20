@@ -202,20 +202,24 @@ same binding, different identifiers. The cache backing this is held for the dura
 requesting session only; it is not persisted across sessions (ADR-3075-1).
 
 **One shared control set for the whole session — out-of-process, not an in-process cache**
-(ADR-3075-4). The control set is a single store for the whole session, not reinstantiated per
-operation, per subcommand, or per transport — but it cannot be an in-process cache (a
-server-held dict, an MCP lifespan context) and satisfy that, because the CLI is a separate OS
-process per invocation with no shared memory to an MCP server process, by construction, no
-matter how the MCP side is wired. The store is out-of-process, keyed by session — the same
-pattern already used by `get-gate-token.mjs`, which persists to
-`$DH_STATE_HOME/sessions/{CLAUDE_CODE_SESSION_ID}/` (default `~/.dh/sessions/...`) using the
-session-ID environment variable both MCP-tool-calling agents and CLI invocations already share.
-An item viewed through one MCP tool and then again through a different tool, or through the
-CLI, still hits the same entry if the request scope and content identity match — because both
-sides read and write the same session-keyed store on disk, not because either holds the other
-in memory. A cache scoped to one process is a violation of R1 (a second, narrower
-implementation of what the engine already owns), not a smaller version of a correct
-implementation.
+(ADR-3075-4, storage mechanism per ADR-3082-1). The control set is a single store for the whole
+session, not reinstantiated per operation, per subcommand, or per transport — but it cannot be
+an in-process cache (a server-held dict, an MCP lifespan context) and satisfy that, because the
+CLI is not a running service: it is a separate OS process per invocation with no memory of any
+prior call and no shared memory to an MCP server process, by construction, no matter how the MCP
+side is wired. The store is one out-of-process SQLite database at
+`$DH_STATE_HOME/control-set.db` (WAL mode), rows keyed by `(session_id, content_id)` using the
+session-ID environment variable both MCP-tool-calling agents and CLI invocations already share —
+bounded per session (LRU eviction past a tunable cap) with an opportunistic cross-session
+age-based sweep on every write, so entries never accumulate unboundedly and cleanup does not
+depend on any session exiting cleanly. An item viewed through one MCP tool and then again
+through a different tool, or through the CLI, still hits the same entry if the request scope and
+content identity match and the entry has not since been evicted — because both sides read and
+write the same session-keyed rows, not because either holds the other in memory. If the entry
+has been evicted, the response states plainly that the content must be requested again, not a
+generic error or silent empty result. A cache scoped to one process is a violation of R1 (a
+second, narrower implementation of what the engine already owns), not a smaller version of a
+correct implementation.
 
 **Stale entries are recoverable, not dead ends** (ADR-3075-2). A control-set entry retains the
 command that produced it — the source, scope, and parameters Collection and Generation used to

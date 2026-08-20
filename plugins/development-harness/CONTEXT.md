@@ -57,13 +57,17 @@ Matches `MarkdownContentProvider` already in code.
 The single, session-shared store backing Navigation's content identity (R8). One store for the
 whole session, not one per tool, subcommand, or transport — every operation touching the same
 generated content resolves against the same control set, regardless of which tool made the
-request. Out-of-process by necessity, not by preference: the CLI is a separate OS process per
-invocation, so an in-process cache (an MCP server's lifespan context, a module-level dict)
-cannot be shared with it. Session-keyed on disk, following the existing
-`$DH_STATE_HOME/sessions/{CLAUDE_CODE_SESSION_ID}/` pattern (`get-gate-token.mjs`), not a new
-storage convention.
+request. Out-of-process by necessity, not by preference: the CLI is not a running service — it's
+a fresh OS process per invocation with no memory of any prior call, so it needs external storage
+regardless, and an in-process cache (an MCP server's lifespan context, a module-level dict)
+cannot be shared with it either way. One SQLite database at `$DH_STATE_HOME/control-set.db`
+(WAL mode), rows keyed by `(session_id, content_id)` — not a directory of loose files — with a
+bounded per-session entry cap (LRU eviction) and an opportunistic cross-session age-based sweep
+on every write. See ADR-3082-1.
 _Avoid_: "in-process cache" or "shared dict" as a mental model — that shape cannot satisfy
-"same entry regardless of transport" no matter how carefully it's wired.
+"same entry regardless of transport" no matter how carefully it's wired. Also avoid describing
+this as "a directory per session" — that was ADR-3075-4's original storage mechanism, superseded
+by ADR-3082-1.
 
 **Navigate** (action):
 Requesting content at a specific address from the table of contents. Matches the `navigate`
