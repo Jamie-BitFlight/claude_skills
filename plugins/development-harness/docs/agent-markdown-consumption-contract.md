@@ -129,15 +129,24 @@ flowchart TD
 
 ## Open questions requiring a decision
 
+Each open question is tracked as an issue so a decision made here is discoverable and enforced
+against the work it blocks, rather than existing only as prose in this section.
+
 1. Budget value — one configurable constant for all operations, and what default relative to
-   the ~10,000 token harness cap.
+   the ~10,000 token harness cap. Tracked in #3072.
 2. Compact-form composition when both the table of contents and the artifact inventory are
-   large — page them together, or independently.
+   large — page them together, or independently. Tracked in #3073.
 3. Whether an agent may request an explicit page size, or only accept the configured budget.
+   Tracked in #3074.
 4. Cache lifetime and scope for R8 — held for the duration of a session, or persisted across
-   sessions.
+   sessions. Tracked in #3075. Blocks #3062.
 5. Whether R8's identifier is derived from the raw markdown or from the parsed tree. Raw
-   detects every change; parsed would keep pagination stable across cosmetic edits.
+   detects every change; parsed would keep pagination stable across cosmetic edits. Tracked in
+   #3076. Blocks #3062.
+
+When an issue above closes, remove its list item here and fold the decision into the relevant
+requirement (R2, R5, R6, or R8) as normative text — this section holds undecided questions
+only, not a permanent record of resolved ones.
 
 ## Implementation appendix — shape to code
 
