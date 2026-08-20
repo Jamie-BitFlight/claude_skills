@@ -149,16 +149,22 @@ A response that paginates returns a stable identifier derived from the content i
 alongside the page position. Subsequent pages are requested with that identifier plus a page
 selector or an address, never by re-describing the source. The original scope or query is not
 repeated on follow-up calls — it is retained server-side as the entry's stored command (see
-below), not something the caller carries forward. Concretely, an initial request states scope
-(`selector="#2529", section="RT-ICA"` or similar); every request after that states only
-`hash="<identifier>"` plus `page`, `navigate` (R4's address), `pagesize` (the caller override
-from R2), and — on transports where the control set is out-of-process (ADR-3075-4) — a
-session-identifying value the request needs to locate its session's store: a plain, non-rotating
-`session_id` parameter carrying `CLAUDE_CODE_SESSION_ID`'s value directly for MCP tools, per
-ADR-3075-4's Consequences, since `backlog_view` and `artifact_read` have no in-process session
-identity to read from `ctx` — not a `gate_token`-style parameter, which rotates on every skill
-load and cannot serve as a stable session key; the CLI instead reads `CLAUDE_CODE_SESSION_ID`
-directly and needs no such parameter.
+below), not something the caller carries forward.
+
+On transports where the control set is out-of-process (ADR-3075-4), every request — including
+the initial one — carries a session-identifying value the request needs to locate its session's
+store: a plain, non-rotating `session_id` parameter carrying `CLAUDE_CODE_SESSION_ID`'s value
+directly for MCP tools, per ADR-3075-4's Consequences, since `backlog_view` and `artifact_read`
+have no in-process session identity to read from `ctx` — not a `gate_token`-style parameter,
+which rotates on every skill load and cannot serve as a stable session key; the CLI instead reads
+`CLAUDE_CODE_SESSION_ID` directly and needs no such parameter. The initial write into the control
+set happens on the first call, not the second — the row cannot be keyed by `(session_id,
+content_id)` without `session_id` at that point, so this is not optional on follow-ups only.
+
+Concretely, an initial request states scope (`selector="#2529", section="RT-ICA"` or similar)
+plus `session_id` on MCP transports; every request after that states only `hash="<identifier>"`
+plus `page`, `navigate` (R4's address), `pagesize` (the caller override from R2), and
+`session_id` again.
 
 This hash-plus-session-routing shape states intended behaviour, not current behaviour: the
 control set it depends on (ADR-3075-1 through ADR-3075-4) is not yet implemented, and
