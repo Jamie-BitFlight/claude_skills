@@ -283,14 +283,23 @@ class TestGitCommonRootResourceCleanup:
 
         Tests: resource cleanup for the Repo object built inside _git_common_root
         How: Spy on git.Repo.close; resolve a real repo; assert close was called
-             exactly once for *this* repo instance
+             at least once for *this* repo instance
         Why: An unclosed Repo leaks file handles/locks across repeated resolutions.
              The spy patches git.Repo.close at the class level, so it also
              observes close() calls on unrelated Repo instances constructed
-             elsewhere in the same test process (e.g. finalized by GC during a
-             full-suite run) -- filter to calls on this repo_path specifically
-             instead of asserting a bare global call_count, which is flaky
-             under full-suite/xdist execution.
+             elsewhere in the same test process -- filter to calls on this
+             repo_path specifically instead of asserting a bare global
+             call_count. ">= 1" rather than "== 1": GitPython's own Repo
+             calls close() from *both* __exit__ (our `with` block) and
+             __del__ (confirmed via direct instrumentation -- id(repo) and
+             working_dir both match across the two calls); the __del__ call
+             only fires once Python's cyclic GC actually collects the
+             object (this Repo sits in a reference cycle, so refcounting
+             alone never triggers it), which is inherently timing-dependent
+             -- not something this test can or should pin to exactly one.
+             __del__ wraps its close() call in try/except specifically to
+             make a second close() call safe, so more than one is correct,
+             not a leak.
         """
         # Arrange
         repo_path = tmp_path / "repo"
@@ -303,7 +312,7 @@ class TestGitCommonRootResourceCleanup:
         # Assert -- working_dir survives close(), so it reliably identifies
         # which Repo instance a given close() call targeted.
         calls_for_this_repo = [call for call in close_spy.call_args_list if call.args[0].working_dir == str(repo_path)]
-        assert len(calls_for_this_repo) == 1
+        assert len(calls_for_this_repo) >= 1
 
 
 class TestGitCommonRootHangProtection:
