@@ -18,6 +18,9 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from run_bounded import terminate_process_tree
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_ROOT = REPO_ROOT / "plugins"
 MARKETPLACE_NAME = "isolated-codex-plugin-validation"
@@ -137,6 +140,15 @@ def create_parser() -> argparse.ArgumentParser:
         "--git-project",
         action="store_true",
         help="Initialize the isolated project directory as a Git repository before running Codex.",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=120.0,
+        help=(
+            "Maximum duration for each marketplace/install/exec subprocess before its full "
+            "process tree is terminated. Default: 120."
+        ),
     )
     return parser
 
@@ -383,21 +395,38 @@ def build_env(path_prefix: str, codex_home: Path) -> dict[str, str]:
     return env
 
 
-def run_command(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> subprocess.CompletedProcess[str]:
-    """Run a subprocess and echo its output in a readable form.
+def run_command(
+    argv: list[str], *, cwd: Path, env: dict[str, str], label: str, timeout_seconds: float
+) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess, echo its output, and terminate its full process tree on timeout.
+
+    Marketplace registration, plugin installation, and ``codex exec`` can all stall (a wedged
+    model call, a hung install step); an unbounded ``subprocess.run()`` would then block this
+    validation harness from ever reaching its cleanup path, and Codex may spawn descendants a
+    plain parent-process timeout would not remove.
 
     Returns:
         The completed subprocess result.
+
+    Raises:
+        HarnessError: If the command times out or exits non-zero.
     """
     print(f"[{label}] {' '.join(shlex.quote(part) for part in argv)}")
-    completed = subprocess.run(argv, cwd=cwd, env=env, text=True, capture_output=True, check=False)
-    if completed.stdout:
-        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n")
-    if completed.stderr:
-        print(completed.stderr, end="" if completed.stderr.endswith("\n") else "\n", file=sys.stderr)
-    if completed.returncode != 0:
-        raise HarnessError(f"{label} failed with exit code {completed.returncode}")
-    return completed
+    process = subprocess.Popen(
+        argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        terminate_process_tree(process)
+        raise HarnessError(f"{label} timed out after {timeout_seconds:g} seconds") from exc
+    if stdout:
+        print(stdout, end="" if stdout.endswith("\n") else "\n")
+    if stderr:
+        print(stderr, end="" if stderr.endswith("\n") else "\n", file=sys.stderr)
+    if process.returncode != 0:
+        raise HarnessError(f"{label} failed with exit code {process.returncode}")
+    return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
 
 
 def print_plan(
@@ -487,12 +516,14 @@ def main() -> int:
             cwd=workspace.project_dir,
             env=env,
             label="marketplace",
+            timeout_seconds=args.timeout_seconds,
         )
         run_command(
             ["codex", "plugin", "add", f"{workspace.plugin_id}@{workspace.marketplace_name}"],
             cwd=workspace.project_dir,
             env=env,
             label="install",
+            timeout_seconds=args.timeout_seconds,
         )
         if args.package_only:
             print("Package-only validation complete: marketplace registered and plugin installed; codex exec skipped.")
@@ -503,6 +534,7 @@ def main() -> int:
             cwd=workspace.project_dir,
             env=env,
             label="exec",
+            timeout_seconds=args.timeout_seconds,
         )
     except (HarnessError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as err:
         print(f"error: {err}", file=sys.stderr)

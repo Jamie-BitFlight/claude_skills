@@ -35,8 +35,10 @@ def test_package_only_run_skips_exec_stage(monkeypatch: pytest.MonkeyPatch, caps
     """Package-only mode registers and installs the plugin without invoking a model."""
     commands: list[list[str]] = []
 
-    def fake_run_command(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> None:
-        del cwd, env
+    def fake_run_command(
+        argv: list[str], *, cwd: Path, env: dict[str, str], label: str, timeout_seconds: float
+    ) -> None:
+        del cwd, env, timeout_seconds
         commands.append(argv)
         assert label in {"marketplace", "install"}
 
@@ -113,6 +115,67 @@ def test_git_project_fixture_creates_repository() -> None:
         assert (workspace.project_dir / ".git").is_dir()
     finally:
         validator.cleanup_workspace(workspace)
+
+
+# ---------------------------------------------------------------------------
+# run_command — bounded process-tree execution
+# ---------------------------------------------------------------------------
+
+
+def test_run_command_terminates_the_full_process_tree_on_timeout(tmp_path: Path) -> None:
+    """A stalled command is terminated -- including its descendants -- not left running.
+
+    Tests: run_command's timeout path
+    How: Run a parent that spawns a child ignoring SIGTERM, with a short timeout; assert
+         HarnessError names the timeout, then poll for the child process actually exiting
+    Why: marketplace registration, install, and codex exec can all stall; an unbounded
+         subprocess.run() would block the harness from ever reaching cleanup, and a
+         plain (non-tree-aware) termination can leave descendants orphaned holding
+         ports/files (see PR #2787 review, validate_codex_plugin_isolated.py:393)
+    """
+    import os
+    import time
+
+    marker = tmp_path / "child.pid"
+    script = tmp_path / "spawn_stubborn_child.py"
+    script.write_text(
+        "import os, signal, subprocess, sys, time\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        f"child = subprocess.Popen([sys.executable, '-c', 'import signal,time; "
+        f"signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)'])\n"
+        f"open({str(marker)!r}, 'w').write(str(child.pid))\n"
+        "time.sleep(30)\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(validator.HarnessError, match="timed out after"):
+        validator.run_command(
+            [sys.executable, str(script)], cwd=tmp_path, env={}, label="stubborn", timeout_seconds=0.3
+        )
+
+    # The child pid file is written before the parent's own long sleep, so it exists
+    # once the parent process has actually started (racy only in the "not written
+    # yet" direction, which the loop below tolerates).
+    deadline = time.monotonic() + 5
+    child_pid: int | None = None
+    while time.monotonic() < deadline and child_pid is None:
+        if marker.is_file() and marker.read_text(encoding="utf-8").strip():
+            child_pid = int(marker.read_text(encoding="utf-8").strip())
+        else:
+            time.sleep(0.05)
+    assert child_pid is not None, "child process never reported its pid"
+
+    # Assert -- the SIGTERM-ignoring child was escalated to SIGKILL, not left running
+    deadline = time.monotonic() + 5
+    child_alive = True
+    while time.monotonic() < deadline and child_alive:
+        try:
+            os.kill(child_pid, 0)
+        except ProcessLookupError:
+            child_alive = False
+        else:
+            time.sleep(0.05)
+    assert not child_alive, f"descendant pid {child_pid} survived process-tree termination"
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ import shutil
 import signal
 import subprocess
 import sys
+from typing import Any
 
 TIMEOUT_EXIT_CODE = 124
 TERMINATION_GRACE_SECONDS = 0.5
@@ -61,7 +62,7 @@ def process_group_is_alive(pgid: int) -> bool:
     return True
 
 
-def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
+def terminate_process_tree(process: subprocess.Popen[Any]) -> None:
     """Terminate the isolated process group, escalating after a short grace period."""
     if os.name != "posix":
         terminate_windows_process_tree(process.pid)
