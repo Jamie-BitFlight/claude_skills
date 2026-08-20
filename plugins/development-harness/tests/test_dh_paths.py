@@ -282,8 +282,15 @@ class TestGitCommonRootResourceCleanup:
         """_git_common_root closes the GitPython Repo it constructs.
 
         Tests: resource cleanup for the Repo object built inside _git_common_root
-        How: Spy on git.Repo.close; resolve a real repo; assert close was called once
-        Why: An unclosed Repo leaks file handles/locks across repeated resolutions
+        How: Spy on git.Repo.close; resolve a real repo; assert close was called
+             exactly once for *this* repo instance
+        Why: An unclosed Repo leaks file handles/locks across repeated resolutions.
+             The spy patches git.Repo.close at the class level, so it also
+             observes close() calls on unrelated Repo instances constructed
+             elsewhere in the same test process (e.g. finalized by GC during a
+             full-suite run) -- filter to calls on this repo_path specifically
+             instead of asserting a bare global call_count, which is flaky
+             under full-suite/xdist execution.
         """
         # Arrange
         repo_path = tmp_path / "repo"
@@ -293,8 +300,10 @@ class TestGitCommonRootResourceCleanup:
         # Act
         dh_paths._git_common_root(repo_path)
 
-        # Assert
-        assert close_spy.call_count == 1
+        # Assert -- working_dir survives close(), so it reliably identifies
+        # which Repo instance a given close() call targeted.
+        calls_for_this_repo = [call for call in close_spy.call_args_list if call.args[0].working_dir == str(repo_path)]
+        assert len(calls_for_this_repo) == 1
 
 
 class TestGitCommonRootHangProtection:
