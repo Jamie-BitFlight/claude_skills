@@ -76,6 +76,7 @@ class SectionKey(StrEnum):
     RESOURCES = "resources"
     IMPACT = "impact"
     IMPACT_RADIUS = "impact_radius"
+    SYSTEMS_INVENTORY = "systems_inventory"
     DEPENDENCIES = "dependencies"
     PRIORITY = "priority"
     BENEFITS = "benefits"
@@ -109,6 +110,7 @@ _SECTION_DISPLAY: tuple[tuple[SectionKey, str], ...] = (
     (SectionKey.RESOURCES, "Resources"),
     (SectionKey.IMPACT, "Impact"),
     (SectionKey.IMPACT_RADIUS, "Impact Radius"),
+    (SectionKey.SYSTEMS_INVENTORY, "Systems Inventory"),
     (SectionKey.DEPENDENCIES, "Dependencies"),
     (SectionKey.PRIORITY, "Priority"),
     (SectionKey.BENEFITS, "Benefits"),
