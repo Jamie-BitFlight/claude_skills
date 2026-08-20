@@ -20,6 +20,21 @@ _Avoid_: "the SAM plugin" (there is no such thing — SAM is the methodology; `d
 is the plugin implementing it); "stateless agent" alone as a synonym for SAM itself (ambiguous
 between the methodology and one literal stateless agent instance).
 
+**Backend**:
+The data provider Collection reaches — the configured `WorkItemBackend` in most cases (GitHub,
+SQLite, Beads, or Memory; see `docs/backend-providers.md`), accessed through
+`MarkdownContentProvider` (a thinner, markdown-specific adapter protocol in front of it, not a
+competing concept). Confirmed by the repo owner: "backend" always means the data-providing
+system, never a call to the MCP tool or CLI — those are Frontend below.
+_Avoid_: "backend call" for an MCP tool invocation or CLI request — that ambiguity caused real
+confusion in this session's design discussion. A backend call is specifically Collection
+reaching this data provider.
+
+**Frontend**:
+MCP, CLI, and the local navigator together — everything on the agent-facing side of a backend
+call. The control set (below) is part of the Frontend: it's Navigation's local cache, not
+something the Backend knows about or participates in.
+
 **Collection**:
 Gathering source content from wherever it lives — issue body, plan file, task file, artifact.
 Unbounded: never truncated, never budget-checked. Unrelated to Control set below or to session

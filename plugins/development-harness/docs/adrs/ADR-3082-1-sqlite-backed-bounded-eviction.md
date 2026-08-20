@@ -51,7 +51,7 @@ that cost to create what turns out to be an arbitrary boundary between sessions 
 environment for this purpose. Two different sessions running the identical command against
 identical content resolve to the same row on write. **This avoids duplicate storage, not
 duplicate work** — every full request still runs Collection and Generation unconditionally (see
-"Every backend hit always writes a fresh document" below); `content_id` isn't even knowable until
+"Every source hit always writes a fresh document" below); `content_id` isn't even knowable until
 that work has already happened, since it's a hash of the *generated* output, so there is nothing
 to check in advance that would let a repeat request skip the fetch. The benefit of dropping
 `session_id` from the key is narrower than originally claimed here: two callers producing
@@ -185,7 +185,7 @@ eviction is a periodic pass rather than inline on every write — the expensive 
 deleting down to target) runs at most hourly-to-daily, rate-limited by the stored
 `last_cleanup_at` check, not per-write. What remains on the write/read path is just the cheap
 parts: an insert of new content, and a single-row `last_accessed_at` update on read. Second,
-every backend hit always writes regardless of key design (see "Every backend hit always writes a
+every source hit always writes regardless of key design (see "Every source hit always writes a
 fresh document" above), so dropping `session_id` from the key does not reduce write *count* —
 identical requests from different callers still each write. What it reduces is storage: those
 writes upsert one shared row instead of each caller permanently holding its own duplicate, so the
