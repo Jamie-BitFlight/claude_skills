@@ -134,6 +134,7 @@ def test_run_command_terminates_the_full_process_tree_on_timeout(tmp_path: Path)
          ports/files (see PR #2787 review, validate_codex_plugin_isolated.py:393)
     """
     import os
+    import subprocess
     import time
 
     marker = tmp_path / "child.pid"
@@ -165,7 +166,10 @@ def test_run_command_terminates_the_full_process_tree_on_timeout(tmp_path: Path)
             time.sleep(0.05)
     assert child_pid is not None, "child process never reported its pid"
 
-    # Assert -- the SIGTERM-ignoring child was escalated to SIGKILL, not left running
+    # Assert -- the SIGTERM-ignoring child was escalated to SIGKILL, not left running.
+    # A zombie (unreaped by its now-dead parent) still answers kill(pid, 0), so check
+    # `ps` state too -- a container without a proper init/subreaper may leave the
+    # descendant zombied rather than reaped, which is a terminated process, not a live one.
     deadline = time.monotonic() + 5
     child_alive = True
     while time.monotonic() < deadline and child_alive:
@@ -174,6 +178,11 @@ def test_run_command_terminates_the_full_process_tree_on_timeout(tmp_path: Path)
         except ProcessLookupError:
             child_alive = False
         else:
+            status = subprocess.run(
+                ["ps", "-o", "stat=", "-p", str(child_pid)], capture_output=True, text=True, check=False
+            )
+            child_alive = status.returncode == 0 and "Z" not in status.stdout
+        if child_alive:
             time.sleep(0.05)
     assert not child_alive, f"descendant pid {child_pid} survived process-tree termination"
 
