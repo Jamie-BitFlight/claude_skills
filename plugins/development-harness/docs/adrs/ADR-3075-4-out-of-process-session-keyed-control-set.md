@@ -39,9 +39,20 @@ convention this decision reuses, not a new storage mechanism invented for R8.
 
 ## Consequences
 
-`backlog_view` and `artifact_read` need `ctx: Context` (or equivalent) added to their
-signatures as a prerequisite for any implementation of #3062 — this was not previously called
-out as required plumbing anywhere in this contract or its ADRs, and is now explicit.
+`backlog_view` and `artifact_read` need a session-identifying value added to their signatures
+as a prerequisite for any implementation of #3062. **This was originally stated as "add
+`ctx: Context`" and that was wrong** — checked directly against every existing `ctx: Context`
+usage in `backlog_core/server.py`: `ctx` is used exclusively for `ctx.info()`/`ctx.warning()`/
+`ctx.report_progress()`, a logging and progress channel to the calling client, and carries no
+session identity anywhere in this codebase. The actual established pattern for session
+identity is an explicit `gate_token`-style parameter: `backlog_add` (which does take
+`ctx: Context`) determines the caller's session not from `ctx` but from a `gate_token` string
+(`{session_id}:{hex}`) the client generates via `get-gate-token.mjs` and passes as an ordinary
+parameter — `_read_gate_token`'s own docstring states this exists specifically "so the MCP
+server never needs its own `CLAUDE_CODE_SESSION_ID`." `backlog_view` and `artifact_read`
+currently have neither `ctx: Context` nor a `gate_token`-style parameter. The prerequisite is
+the latter, following the existing pattern — not `ctx: Context`, which would not solve this
+even if added.
 
 ## Known gaps — named, not solved by this ADR
 
