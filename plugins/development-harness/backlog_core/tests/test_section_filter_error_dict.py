@@ -514,3 +514,92 @@ class TestSectionHitRegressionGuard:
             f"section_filter_miss must not be True when sections=[{_VALID_SECTION!r}] "
             f"successfully matches.  Got: {resp.get('section_filter_miss')!r}."
         )
+
+
+# ---------------------------------------------------------------------------
+# Issue #2974 — distinguish "genuinely absent" from "mis-keyed content exists"
+# ---------------------------------------------------------------------------
+
+# A body with one recognized section ("Story") and one heading literally
+# carrying the raw ``unknown__``-prefixed storage key — the signature #2956
+# leaves on content whose write-time heading never resolved through
+# section_registry.resolve_section_name() and fell back to
+# heading_to_unknown_key().  Neither singular nor plural filters below
+# request this heading; its mere presence in the item is what must be
+# surfaced.  The literal ``unknown__`` prefix (rather than an unregistered
+# display title like "Description", which is legitimately non-canonical by
+# design — see operations._normalize_section_key's reserved-name docstring)
+# is the unambiguous, false-positive-free signal the fix keys off of.
+_UNRESOLVED_HEADING = "unknown__zorbulon_frobnication_ledger"
+_MISKEYED_BODY = f"## Story\n\nReal content.\n\n## {_UNRESOLVED_HEADING}\n\nMis-keyed content.\n"
+
+# A body with only recognized sections (plus "Description", a legitimate,
+# deliberately unregistered heading — see the comment above) — no
+# unknown__-prefixed heading anywhere.
+_CLEAN_BODY = "## Story\n\nReal content.\n\n## Description\n\nAlso real.\n"
+
+
+class TestSectionMissErrorDictUnresolvedSections:
+    """A section-filter miss reports whether unresolved (mis-keyed) content exists.
+
+    Before the #2974 fix, ``section_filter_miss: True`` was identical whether the
+    requested section was genuinely absent or merely unreachable under an
+    unrecognized heading — a caller could not distinguish "nothing here" from
+    "something's here but mis-keyed."  ``unresolved_sections`` closes that gap.
+    """
+
+    def test_miss_with_unresolved_heading_reports_unresolved_sections_singular(self, mocker: MockerFixture) -> None:
+        """section=<miss> reports 'unresolved_sections' when a mis-keyed heading exists.
+
+        Arrange: body has 'Story' (recognized) and a raw ``unknown__``-prefixed
+                 heading (mis-keyed, never resolved at write time).
+        Act: call backlog_view(summary=False, section=<nonexistent>).
+        Assert: 'unresolved_sections' is present and names the unresolved heading.
+        """
+        _patch_github_body(mocker, issue_num=2974, body=_MISKEYED_BODY)
+
+        resp = asyncio.run(server.backlog_view(selector="2974", summary=False, section=_NONEXISTENT_FILTER))
+
+        assert "unresolved_sections" in resp, (
+            f"Miss response must report 'unresolved_sections' when the item has a "
+            f"mis-keyed heading. Got keys: {sorted(resp.keys())}."
+        )
+        unresolved = resp["unresolved_sections"]
+        assert isinstance(unresolved, list)
+        assert _UNRESOLVED_HEADING in unresolved, f"Expected {_UNRESOLVED_HEADING!r} in {unresolved!r}."
+
+    def test_miss_with_unresolved_heading_reports_unresolved_sections_plural(self, mocker: MockerFixture) -> None:
+        """sections=[<miss>] reports 'unresolved_sections' when a mis-keyed heading exists.
+
+        Mirrors the singular-path test above but exercises the plural
+        ``sections=[...]`` filter (``_filter_view_sections``), confirming both
+        miss paths funnel through the same fixed signal.
+        """
+        _patch_github_body(mocker, issue_num=2974, body=_MISKEYED_BODY)
+
+        resp = asyncio.run(server.backlog_view(selector="2974", summary=False, sections=[_NONEXISTENT_FILTER]))
+
+        assert "unresolved_sections" in resp, (
+            f"Plural miss response must report 'unresolved_sections' when the item has a "
+            f"mis-keyed heading. Got keys: {sorted(resp.keys())}."
+        )
+        unresolved = resp["unresolved_sections"]
+        assert isinstance(unresolved, list)
+        assert _UNRESOLVED_HEADING in unresolved, f"Expected {_UNRESOLVED_HEADING!r} in {unresolved!r}."
+
+    def test_miss_without_unresolved_heading_omits_unresolved_sections(self, mocker: MockerFixture) -> None:
+        """section=<miss> omits 'unresolved_sections' when nothing is mis-keyed.
+
+        Arrange: body has only recognized sections ('Story', 'Description').
+        Act: call backlog_view(summary=False, section=<nonexistent>).
+        Assert: 'unresolved_sections' key is absent — the miss is genuinely
+                "nothing here," not "something's here but mis-keyed."
+        """
+        _patch_github_body(mocker, issue_num=2974, body=_CLEAN_BODY)
+
+        resp = asyncio.run(server.backlog_view(selector="2974", summary=False, section=_NONEXISTENT_FILTER))
+
+        assert "unresolved_sections" not in resp, (
+            f"Miss response must NOT report 'unresolved_sections' when every section "
+            f"in the item is recognized. Got: {resp.get('unresolved_sections')!r}."
+        )

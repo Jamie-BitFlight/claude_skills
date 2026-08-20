@@ -160,11 +160,17 @@ Real content after fence.
 
 
 def test_parse_md_body_sections_plain_sections_present() -> None:
-    """Plain ## sections without entry blocks produce Section objects."""
+    """Plain ## sections without entry blocks produce Section objects.
+
+    "Description" is not a registered SECTION_HEADING (see operations.py's
+    reserved-name guard), so it falls through to the unknown__ prefix like
+    any other unrecognised heading — matching the write and GitHub-parse
+    paths (#2978).
+    """
     result = parse_md_body_sections(_PLAIN_SECTIONS_BODY)
 
     assert "story" in result
-    assert "description" in result
+    assert "unknown__description" in result
     assert "context" in result
 
 
@@ -190,7 +196,7 @@ def test_parse_md_body_sections_plain_section_content_preserved() -> None:
     """Section content is captured verbatim in the entry."""
     result = parse_md_body_sections(_PLAIN_SECTIONS_BODY)
 
-    description = result["description"]
+    description = result["unknown__description"]
     assert isinstance(description, Section)
     assert "This is the description paragraph." in description.entries[0].content
 
@@ -351,8 +357,8 @@ def test_parse_md_body_sections_fenced_code_block_not_split() -> None:
     """## inside a fenced code block is not treated as a heading."""
     result = parse_md_body_sections(_FENCED_CODE_BODY)
 
-    # Only "description" should be present; the ## inside the fence is not a section
-    assert "description" in result
+    # Only "unknown__description" should be present; the ## inside the fence is not a section
+    assert "unknown__description" in result
     # The heading-looking line inside the fence must NOT appear as a key
     assert "this looks like a heading but is inside a fence" not in result
 
@@ -361,7 +367,7 @@ def test_parse_md_body_sections_fenced_code_content_preserved() -> None:
     """Content after a fenced block is captured in the section entry."""
     result = parse_md_body_sections(_FENCED_CODE_BODY)
 
-    description = result["description"]
+    description = result["unknown__description"]
     assert isinstance(description, Section)
     assert "Real content after fence." in description.entries[0].content
 

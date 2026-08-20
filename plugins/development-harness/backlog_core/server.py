@@ -1330,6 +1330,25 @@ def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Out
     ``suggestion`` key only when difflib finds a close match in ``valid_names``
     (SequenceMatcher ratio >= 0.6, equivalent to Levenshtein-adjacent proximity).
 
+    Adds an ``unresolved_sections`` key (issue #2974) when *valid_names* contains
+    a raw ``unknown__``-prefixed storage key — the signature left by content
+    stored under a mis-keyed, unrecognized heading (#2956) that
+    :func:`~.section_registry.resolve_section_name` could not resolve at write
+    time.  The ``unknown__`` prefix is checked literally (not via
+    ``resolve_section_name`` here) because many legitimate, non-canonical
+    headings exist in real item bodies (e.g. ``"Description"``) that are not
+    registered in :mod:`.section_registry` yet were never mis-keyed — flagging
+    every unregistered name would produce false positives on ordinary items.
+    Both the singular ``section=`` path (``_apply_body_section_filter`` /
+    ``_assemble_view_compact``) and the plural ``sections=[...]`` path
+    (``_filter_view_sections``) populate *valid_names* from the item's actual
+    section inventory, so this single check distinguishes "the requested name
+    genuinely has no match, and nothing about this item is unresolved" (key
+    absent) from "no match, but this item also has unresolved mis-keyed
+    content the caller should investigate rather than assume absent" (key
+    present, non-empty) — previously both cases produced an identical
+    ``section_filter_miss: True`` with no way to tell them apart.
+
     Args:
         filter_expr: The section filter string the caller supplied.
         valid_names: Known section names at the time of the miss.
@@ -1344,6 +1363,9 @@ def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Out
         "section_filter_miss": True,
         **out.to_dict(),
     }
+    unresolved_names = [name for name in valid_names if name.startswith("unknown__")]
+    if unresolved_names:
+        error_dict["unresolved_sections"] = unresolved_names
     if valid_names and filter_expr:
         matches = _difflib.get_close_matches(filter_expr, valid_names, n=1, cutoff=0.6)
         if matches:
