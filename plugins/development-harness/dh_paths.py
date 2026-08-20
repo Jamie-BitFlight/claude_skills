@@ -46,7 +46,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
-import logging
 import os
 from pathlib import Path
 
@@ -62,8 +61,6 @@ import git
 # Module-level cache: maps cwd (as str) -> resolved project root Path.
 # _git_common_root() populates this on first call per cwd.
 _root_cache: dict[str, Path] = {}
-
-_log = logging.getLogger(__name__)
 
 # IDE-specific env vars (after WORKSPACE_FOLDER_PATHS). Cursor before Claude so
 # competing hosts do not prefer the other's convention when both are present.
@@ -316,7 +313,6 @@ def infer_project_root(cwd: Path | None = None) -> Path:
             "WORKSPACE_FOLDER_PATHS, CURSOR_PROJECT_ROOT, or CLAUDE_PROJECT_DIR, or pass "
             "--project-dir."
         )
-        _log.info("%s", msg)
         raise RuntimeError(msg) from exc
     except GitResolutionTimeoutError as exc:
         msg = (
@@ -325,7 +321,6 @@ def infer_project_root(cwd: Path | None = None) -> Path:
             "filesystem). Set DH_PROJECT_ROOT, WORKSPACE_FOLDER_PATHS, CURSOR_PROJECT_ROOT, or "
             "CLAUDE_PROJECT_DIR, or pass --project-dir, to bypass git resolution entirely."
         )
-        _log.info("%s", msg)
         raise RuntimeError(msg) from exc
 
 

@@ -15,7 +15,6 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import logging
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -476,18 +475,15 @@ class TestInferProjectRoot:
         assert infer_project_root() == ws_side
 
     def test_infer_fails_with_runtime_error_when_no_project_root_is_available(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """When all strategies fail, log the cause and raise an actionable error."""
+        """When all strategies fail, raise an actionable error."""
         monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
-        caplog.set_level(logging.INFO, logger="dh_paths")
         with pytest.raises(RuntimeError, match="Could not resolve the git project root"):
             infer_project_root(tmp_path)
-
-        assert "Could not resolve the git project root" in caplog.text
 
 
 # ---------------------------------------------------------------------------
