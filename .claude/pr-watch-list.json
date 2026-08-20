@@ -1,0 +1,4 @@
+{
+  "$schema": "internal — list of PR numbers a cloud routine should actively monitor for new reviews/comments. Not a general PR index; PRs not on this list are ignored by the watcher routine.",
+  "watched_prs": [3080]
+}
