@@ -46,7 +46,9 @@ scope: description, table of contents, every requested section or artifact), and
 (this engine). Collection and Generation are unbounded — never truncated, never budget-checked.
 The engine's authority is over Navigation only: it receives a complete generated document,
 gives it a content identity (R8), caches it for the session, and is the only point anywhere in
-the path where a size budget is applied.
+the path where a size budget is applied. "Unbounded" is a real cost for a pathological source,
+not a theoretical one — see ADR-3072-1's known limitation for a concrete measurement and why
+this decision does not add a ceiling to fix it.
 
 **Navigation is source-agnostic.** It has no knowledge of, and no need to know, what kind of
 thing it is windowing — an issue, a PR, a plan, an artifact, a local file. It receives markdown
@@ -142,7 +144,12 @@ re-collect from the provider and does not re-parse.
 
 A request whose identifier no longer matches current content is reported as stale. Pages
 from two different versions of a document are never returned as though they were one
-document.
+document. **This is not a contradiction of "does not re-collect" above** (flagged in review —
+worth stating plainly): staleness is detected by write-triggered invalidation (below), a side
+effect of the write that changed the source, not by the read path re-collecting to compare.
+The one path that does re-collect on a read is explicit, caller-requested revalidation — an
+opt-in exception the caller chooses, never something the server does silently on an ordinary
+page request.
 
 The identifier is a hash of the Generation stage's output for the request's specific scope —
 not a hash of the raw upstream source alone (ADR-3075-1). Two different scopes of the same
@@ -150,13 +157,20 @@ source (the whole item vs. one filtered section) produce different generated doc
 must not collide on one identifier. The cache backing this is held for the duration of the
 requesting session only; it is not persisted across sessions (ADR-3075-1).
 
-**One shared cache, not one per tool.** The cache is a single control set for the whole
-session — not reinstantiated per operation, per subcommand, or per transport. Every operation
-bound by this contract (Scope) that touches the same generated content within one session
-resolves against the same cache entry. An item viewed through one MCP tool and then again
-through a different tool, or through the CLI, still hits the same entry if the request scope
-and content identity match. A cache scoped to one tool call is a violation of R1 (a second,
-narrower implementation of what the engine already owns), not a smaller version of a correct
+**One shared control set for the whole session — out-of-process, not an in-process cache**
+(ADR-3075-4). The control set is a single store for the whole session, not reinstantiated per
+operation, per subcommand, or per transport — but it cannot be an in-process cache (a
+server-held dict, an MCP lifespan context) and satisfy that, because the CLI is a separate OS
+process per invocation with no shared memory to an MCP server process, by construction, no
+matter how the MCP side is wired. The store is out-of-process, keyed by session — the same
+pattern already used by `get-gate-token.mjs`, which persists to
+`$DH_STATE_HOME/sessions/{CLAUDE_CODE_SESSION_ID}/` (default `~/.dh/sessions/...`) using the
+session-ID environment variable both MCP-tool-calling agents and CLI invocations already share.
+An item viewed through one MCP tool and then again through a different tool, or through the
+CLI, still hits the same entry if the request scope and content identity match — because both
+sides read and write the same session-keyed store on disk, not because either holds the other
+in memory. A cache scoped to one process is a violation of R1 (a second, narrower
+implementation of what the engine already owns), not a smaller version of a correct
 implementation.
 
 **Stale entries are recoverable, not dead ends** (ADR-3075-2). A control-set entry retains the
@@ -219,11 +233,19 @@ flowchart TD
 
 The five questions previously open in this section (#3072–#3076) are resolved and folded into
 R1, R2, R6, and R8 above. The reasoning, rejected alternatives, and why each choice is hard to
-reverse are recorded in `docs/adrs/ADR-3072-1-budget-applies-only-at-navigation.md` and
-`docs/adrs/ADR-3075-1-content-identity-and-cache-scope.md`, not restated here.
+reverse are recorded in ADRs, not restated here:
+[ADR-3072-1](./adrs/ADR-3072-1-budget-applies-only-at-navigation.md) (budget/layering),
+[ADR-3075-1](./adrs/ADR-3075-1-content-identity-and-cache-scope.md) (identity/scope),
+[ADR-3075-2](./adrs/ADR-3075-2-stale-cache-recovery-and-write-invalidation.md) (requery on
+stale, write invalidation),
+[ADR-3075-3](./adrs/ADR-3075-3-cache-metadata-visible-to-agent.md) (agent-visible cache
+metadata), and
+[ADR-3075-4](./adrs/ADR-3075-4-out-of-process-session-keyed-control-set.md) (out-of-process,
+session-keyed store).
 
 Vocabulary introduced by these decisions — Collection, Generation, Navigation, Navigate, table
-of contents, budget — is defined once in `CONTEXT.md`, not duplicated in this contract.
+of contents, budget — is defined once in [`CONTEXT.md`](../CONTEXT.md), not duplicated in this
+contract.
 
 ## Implementation appendix — shape to code
 

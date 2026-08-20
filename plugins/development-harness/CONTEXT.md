@@ -8,7 +8,11 @@ behaviour lives in `docs/agent-markdown-consumption-contract.md` — this file i
 
 **Collection**:
 Gathering source content from wherever it lives — issue body, plan file, task file, artifact.
-Unbounded: never truncated, never budget-checked.
+Unbounded: never truncated, never budget-checked. Already backed by `FileCache`
+(`backlog_core/file_cache.py`), a durable, provider-owned local cache of raw content — a
+Collection re-run is routinely a local cache hit, not a network round-trip. Distinct from
+Control set below: Collection-layer raw content vs. Navigation-layer generated documents;
+durable vs. session-scoped.
 
 **Generation**:
 Assembling the complete markdown document for a requested scope — description, table of
@@ -30,12 +34,16 @@ supplies markdown text for a source without Navigation ever knowing what that so
 Matches `MarkdownContentProvider` already in code.
 
 **Control set**:
-The single, session-shared cache backing Navigation's content identity (R8). One instance for
-the whole session, not one per tool, subcommand, or transport — every operation touching the
-same generated content resolves against the same control set, regardless of which tool made
-the request.
-_Avoid_: building a per-tool or per-subcommand cache and calling it session-scoped — session
-describes the cache's lifetime, not its instance count.
+The single, session-shared store backing Navigation's content identity (R8). One store for the
+whole session, not one per tool, subcommand, or transport — every operation touching the same
+generated content resolves against the same control set, regardless of which tool made the
+request. Out-of-process by necessity, not by preference: the CLI is a separate OS process per
+invocation, so an in-process cache (an MCP server's lifespan context, a module-level dict)
+cannot be shared with it. Session-keyed on disk, following the existing
+`$DH_STATE_HOME/sessions/{CLAUDE_CODE_SESSION_ID}/` pattern (`get-gate-token.mjs`), not a new
+storage convention.
+_Avoid_: "in-process cache" or "shared dict" as a mental model — that shape cannot satisfy
+"same entry regardless of transport" no matter how carefully it's wired.
 
 **Navigate** (action):
 Requesting content at a specific address from the table of contents. Matches the `navigate`

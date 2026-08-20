@@ -28,6 +28,13 @@ merely a style preference between two equally-valid choices.
 cheap relative to the rest of what a call already does (network round-trip to the backend); a
 persisted cache would need its own storage location, eviction policy, and a plan for backend
 content changing underneath a stale entry, for a cost that profiling has not shown to matter.
+Confirmed by the repo owner: Collection itself is already backed by `FileCache`
+(`backlog_core/file_cache.py`), an existing durable, provider-owned local cache of raw content
+records — a Collection-stage re-run triggered by ADR-3075-2's requery-on-stale behavior is
+routinely a local cache hit, not a network round-trip. This is a different cache from the one
+this ADR governs (Collection-layer raw content vs. Navigation-layer generated/parsed/paginated
+documents; durable vs. session-scoped) — not a reason to merge the two — but it is direct
+evidence for "re-parsing is cheap," not just an assumption.
 
 ## Considered alternatives
 

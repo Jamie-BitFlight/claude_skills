@@ -35,6 +35,18 @@ Consequences:
   of `tail` against a tool response, so the caller depends on the server accepting an explicit,
   smaller page-size request to peek at part of a large result.
 
+**Known limitation — "unbounded" has a practical ceiling, even though this decision imposes
+none.** Collection and Generation being unbounded means the first-generation cost for a
+pathological item is paid in full before Navigation ever gets to window it — this is a real
+cost, not merely a theoretical one: a peer review reproduced item #2953 at an estimated 270,946
+tokens across 91 sections, and its `map` response alone (over 125,000 characters) overflowed
+the harness's own tool-result cap. This decision does not impose a ceiling on Collection or
+Generation — doing so would reintroduce the truncation this whole contract exists to forbid.
+The ceiling that exists in practice is whatever the source itself imposes (an issue body's
+practical size, GitHub's own body-size limits) — not a budget this contract enforces. An item
+this large remains navigable once generated (R2 forbids dropping addressable nodes), the cost
+is concentrated at first generation, not spread across every page request.
+
 ## Considered alternative
 
 Per-operation budget constants (the pre-existing state) were considered and rejected — no
