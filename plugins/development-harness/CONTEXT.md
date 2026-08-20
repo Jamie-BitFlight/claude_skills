@@ -56,18 +56,18 @@ supplies markdown text for a source without Navigation ever knowing what that so
 Matches `MarkdownContentProvider` already in code.
 
 **Control set**:
-The single, session-shared store backing Navigation's content identity (R8). One store for the
-whole session, not one per tool, subcommand, or transport — every operation touching the same
-generated content resolves against the same control set, regardless of which tool made the
+The single, global store backing Navigation's content identity (R8). One store for every caller,
+not one per tool, subcommand, transport, or session — every operation touching the same generated
+content resolves against the same control set, regardless of which tool or session made the
 request. Out-of-process by necessity, not by preference: the CLI is not a running service — it's
 a fresh OS process per invocation with no memory of any prior call, so it needs external storage
 regardless, and an in-process cache (an MCP server's lifespan context, a module-level dict)
 cannot be shared with it either way. One SQLite database at `$DH_STATE_HOME/control-set.db`
-(WAL mode), rows keyed by `(session_id, content_id)` — not a directory of loose files — with a
-bounded per-session storage budget (LRU eviction by size, not entry count) and an opportunistic
-cross-session age-based sweep on every write. Holds no authoritative data — every row is a
-disposable cache Collection and Generation can rebuild on demand, so losing the whole database
-costs nothing but a cold cache. See ADR-3082-1.
+(WAL mode), rows keyed by `content_id` alone — no `session_id`, not a directory of loose files —
+with a bounded global storage budget (LRU eviction by size, not entry count) and a periodic,
+rate-limited age-based cleanup pass (hourly to daily, not on every write). Holds no authoritative
+data — every row is a disposable cache Collection and Generation can rebuild on demand, so losing
+the whole database costs nothing but a cold cache. See ADR-3082-1.
 _Avoid_: "in-process cache" or "shared dict" as a mental model — that shape cannot satisfy
 "same entry regardless of transport" no matter how carefully it's wired. Also avoid describing
 this as "a directory per session" — that was ADR-3075-4's original storage mechanism, superseded

@@ -5,6 +5,10 @@
 **Issue:** [#3075](https://github.com/Jamie-BitFlight/claude_skills/issues/3075) and
 [#3076](https://github.com/Jamie-BitFlight/claude_skills/issues/3076), both blocking
 [#3062](https://github.com/Jamie-BitFlight/claude_skills/issues/3062)
+**Superseded in part by:** [ADR-3082-1](./ADR-3082-1-sqlite-backed-bounded-eviction.md) — the
+"session-scoped only" cache-scope decision below is reversed there: entries age out by a global
+TTL and size budget, not by session boundaries, and can be read across sessions. The identity
+scheme below (command+content-bound hash) is unchanged.
 
 ## Context
 

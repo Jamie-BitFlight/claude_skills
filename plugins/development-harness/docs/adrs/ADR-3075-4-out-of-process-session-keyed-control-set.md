@@ -6,9 +6,13 @@
 **Related:** Corrects an implicit assumption in [ADR-3075-1](./ADR-3075-1-content-identity-and-cache-scope.md)
 and the initial R8 wording — neither specified storage locality, and both were written as
 though an in-process cache would satisfy "one shared control set." It does not.
-**Superseded in part by:** [ADR-3082-1](./ADR-3082-1-sqlite-backed-bounded-eviction.md) — the
-storage mechanism below (a directory of files) is replaced by a single SQLite database. The
-out-of-process, session-keyed decision this ADR makes is unchanged.
+**Superseded by:** [ADR-3082-1](./ADR-3082-1-sqlite-backed-bounded-eviction.md), on two points.
+First: the storage mechanism below (a directory of files) is replaced by a single SQLite
+database. Second, in a later revision of that same ADR: **the session-keyed decision itself is
+reversed** — the control set is content-keyed only, no `session_id` anywhere. Only the
+out-of-process decision below (not in-process, not a server-held dict) is still current. The
+"Decision" and "Consequences" sections below are kept for history; read ADR-3082-1's "Reversal:
+content-keyed, not session-keyed" section for what's actually current.
 
 ## Context
 
@@ -99,14 +103,13 @@ plus an opportunistic cross-session age-based sweep, replacing the directory-of-
 this ADR originally specified. Tracked as
 [#3082](https://github.com/Jamie-BitFlight/claude_skills/issues/3082) for implementation.
 
-**Not harness-neutral.** The only mechanism that populates `CLAUDE_CODE_SESSION_ID` today is
-`hooks/session-start-session-id.cjs`, which fires on Claude Code's `SessionStart` hook event and
-writes the value to `CLAUDE_ENV_FILE` — both are Claude-Code-specific. This repo's plugin
-content targets Codex, OpenCode, and GitHub's coding agent as well, and none of those provide an
-equivalent `SessionStart` event or `CLAUDE_ENV_FILE`-style shell injection. Under those harnesses
-the CLI and an MCP server have no shared mechanism to resolve the same session directory,
-defeating the cross-transport guarantee this ADR exists to provide. Not solved here — tracked as
-[#3085](https://github.com/Jamie-BitFlight/claude_skills/issues/3085).
+**Not harness-neutral.** Named against this ADR's original session-keyed design. Moot for the
+control set specifically now that ADR-3082-1 reversed session-keying — a content-keyed store
+needs no session-identifying value from any harness, so there is nothing left for this gap to
+apply to on that path. Tracked as
+[#3085](https://github.com/Jamie-BitFlight/claude_skills/issues/3085), flagged there for the repo
+owner to close or repurpose — `CLAUDE_CODE_SESSION_ID` may still matter to something else in this
+codebase (e.g. `gate_token`, tracked separately in #3087) independent of the control set.
 
 ## Considered alternative
 

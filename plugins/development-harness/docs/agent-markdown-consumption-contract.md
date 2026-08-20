@@ -151,22 +151,14 @@ selector or an address, never by re-describing the source. The original scope or
 repeated on follow-up calls — it is retained server-side as the entry's stored command (see
 below), not something the caller carries forward.
 
-On transports where the control set is out-of-process (ADR-3075-4), every request — including
-the initial one — carries a session-identifying value the request needs to locate its session's
-store: a plain, non-rotating `session_id` parameter carrying `CLAUDE_CODE_SESSION_ID`'s value
-directly for MCP tools, per ADR-3075-4's Consequences, since `backlog_view` and `artifact_read`
-have no in-process session identity to read from `ctx` — not a `gate_token`-style parameter,
-which rotates on every skill load and cannot serve as a stable session key; the CLI instead reads
-`CLAUDE_CODE_SESSION_ID` directly and needs no such parameter. The initial write into the control
-set happens on the first call, not the second — the row cannot be keyed by `(session_id,
-content_id)` without `session_id` at that point, so this is not optional on follow-ups only.
+The control set (ADR-3075-4, ADR-3082-1) is out-of-process and content-keyed only — no
+session-identifying value is part of any request. Concretely, an initial request states scope
+(`selector="#2529", section="RT-ICA"` or similar); every request after that states only
+`hash="<identifier>"` plus `page`, `navigate` (R4's address), and `pagesize` (the caller override
+from R2). Nothing about locating the control set depends on which session, tool, or transport
+made the request — `content_id` alone addresses the row.
 
-Concretely, an initial request states scope (`selector="#2529", section="RT-ICA"` or similar)
-plus `session_id` on MCP transports; every request after that states only `hash="<identifier>"`
-plus `page`, `navigate` (R4's address), `pagesize` (the caller override from R2), and
-`session_id` again.
-
-This hash-plus-session-routing shape states intended behaviour, not current behaviour: the
+This hash-based shape states intended behaviour, not current behaviour: the
 control set it depends on (ADR-3075-1 through ADR-3075-4) is not yet implemented, and
 `backlog_view`'s current parameters carry no `hash` or session-routing field. [MCP
 Progressive-Disclosure Contract](./mcp-progressive-disclosure-contract.md) documents today's
@@ -211,26 +203,29 @@ then execute the wrong command entirely and return content unrelated to what the
 for. The identifier binds command and content together precisely so two different commands
 never collide even when their output happens to match. Two different scopes of the same source
 (the whole item vs. one filtered section) produce different generated documents and, by the
-same binding, different identifiers. The cache backing this is held for the duration of the
-requesting session only; it is not persisted across sessions (ADR-3075-1).
+same binding, different identifiers. The cache backing this has no fixed retention window tied
+to any session — see ADR-3082-1's "Reversal: content-keyed, not session-keyed", which corrects
+ADR-3075-1's original "session-scoped only" framing: entries age out by a global TTL and size
+budget, not by the requesting session ending, and an entry can outlive the session that created
+it or be read by a different session entirely.
 
-**One shared control set for the whole session — out-of-process, not an in-process cache**
-(ADR-3075-4, storage mechanism per ADR-3082-1). The control set is a single store for the whole
-session, not reinstantiated per operation, per subcommand, or per transport — but it cannot be
-an in-process cache (a server-held dict, an MCP lifespan context) and satisfy that, because the
-CLI is not a running service: it is a separate OS process per invocation with no memory of any
-prior call and no shared memory to an MCP server process, by construction, no matter how the MCP
-side is wired. The store is one out-of-process SQLite database at
-`$DH_STATE_HOME/control-set.db` (WAL mode), rows keyed by `(session_id, content_id)` using the
-session-ID environment variable both MCP-tool-calling agents and CLI invocations already share —
-bounded per session (LRU eviction past a tunable cap) with an opportunistic cross-session
-age-based sweep on every write, so entries never accumulate unboundedly and cleanup does not
-depend on any session exiting cleanly. An item viewed through one MCP tool and then again
-through a different tool, or through the CLI, still hits the same entry if the request scope and
-content identity match and the entry has not since been evicted — because both sides read and
-write the same session-keyed rows, not because either holds the other in memory. If the entry
-has been evicted, the response states plainly that the content must be requested again, not a
-generic error or silent empty result. A cache scoped to one process is a violation of R1 (a
+**One shared, global control set — out-of-process, not an in-process cache** (ADR-3075-4,
+storage mechanism and content-keying per ADR-3082-1). The control set is a single store for
+every caller, not reinstantiated per operation, per subcommand, per transport, or per session —
+but it cannot be an in-process cache (a server-held dict, an MCP lifespan context) and satisfy
+that, because the CLI is not a running service: it is a separate OS process per invocation with
+no memory of any prior call and no shared memory to an MCP server process, by construction, no
+matter how the MCP side is wired. The store is one out-of-process SQLite database at
+`$DH_STATE_HOME/control-set.db` (WAL mode), rows keyed by `content_id` alone — no
+session-identifying value anywhere — bounded globally (LRU eviction past a tunable size target)
+with a periodic, rate-limited age-based cleanup pass (hourly to daily, not on every write), so
+entries never accumulate unboundedly and cleanup does not depend on any caller exiting cleanly.
+An item viewed through one MCP tool and then again through a different tool, through the CLI, or
+by an entirely different session, still hits the same entry if the request scope and content
+identity match and the entry has not since been evicted — because every caller reads and writes
+the same content-keyed rows, not because any of them hold state in memory. If the entry has been
+evicted, the response states plainly that the content must be requested again, not a generic
+error or silent empty result. A cache scoped to one process is a violation of R1 (a
 second, narrower implementation of what the engine already owns), not a smaller version of a
 correct implementation.
 
@@ -312,8 +307,9 @@ reverse are recorded in ADRs, not restated here:
 stale, write invalidation),
 [ADR-3075-3](./adrs/ADR-3075-3-cache-metadata-visible-to-agent.md) (agent-visible cache
 metadata), and
-[ADR-3075-4](./adrs/ADR-3075-4-out-of-process-session-keyed-control-set.md) (out-of-process,
-session-keyed store).
+[ADR-3075-4](./adrs/ADR-3075-4-out-of-process-session-keyed-control-set.md) (out-of-process
+store; its session-keying decision is superseded by
+[ADR-3082-1](./adrs/ADR-3082-1-sqlite-backed-bounded-eviction.md), which is content-keyed only).
 
 Vocabulary introduced by these decisions — Collection, Generation, Navigation, Navigate, table
 of contents, budget — is defined once in [`CONTEXT.md`](../CONTEXT.md), not duplicated in this
