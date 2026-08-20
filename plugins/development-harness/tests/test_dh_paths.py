@@ -15,6 +15,7 @@ Tests cover:
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -383,6 +384,53 @@ class TestGitCommonRootHangProtection:
         # Act / Assert
         with pytest.raises(RuntimeError, match="unreachable network filesystem"):
             dh_paths.infer_project_root(tmp_path)
+
+    def test_hung_worker_is_left_as_a_daemon_thread_not_an_executor_thread(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A timed-out worker must be exempt from being joined at interpreter shutdown.
+
+        Tests: the abandoned worker thread's daemon flag
+        How: Stub git.Repo to hang; trigger a timeout; inspect the still-running thread
+        Why: A concurrent.futures.ThreadPoolExecutor worker is joined by an atexit hook
+             regardless of shutdown(wait=False), so a genuinely wedged filesystem call
+             would hang the whole process at exit, not just this function -- reproduced
+             directly (see PR #2787 review) by observing a subprocess exit code 124 despite
+             the timeout firing correctly inside it. A daemon threading.Thread is exempt
+             from that join.
+        """
+        # Arrange
+        threads_before = set(threading.enumerate())
+        self._install_hanging_repo_stub(monkeypatch)
+
+        # Act
+        with pytest.raises(dh_paths.GitResolutionTimeoutError):
+            dh_paths._git_common_root(tmp_path)
+
+        # Assert -- the abandoned worker is a daemon thread, exempt from interpreter-exit join
+        new_threads = set(threading.enumerate()) - threads_before
+        assert new_threads, "expected the timed-out worker thread to still be running"
+        assert all(thread.daemon for thread in new_threads)
+
+    def test_real_git_error_propagates_unchanged_across_the_worker_thread(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A genuine GitPython error raised inside the worker reaches the caller's thread unchanged.
+
+        Tests: cross-thread exception forwarding for the non-hang, non-timeout path
+        How: Stub git.Repo to raise InvalidGitRepositoryError immediately; call _git_common_root
+        Why: Exceptions do not cross thread boundaries automatically -- the worker must
+             forward the original exception via the result queue, not just a timeout
+        """
+
+        def _raise(*args: object, **kwargs: object) -> git.Repo:
+            del args, kwargs
+            raise git.exc.InvalidGitRepositoryError(str(tmp_path))
+
+        monkeypatch.setattr(dh_paths.git, "Repo", _raise)
+
+        with pytest.raises(git.exc.InvalidGitRepositoryError):
+            dh_paths._git_common_root(tmp_path)
 
 
 # ---------------------------------------------------------------------------

@@ -44,9 +44,10 @@ MCP layout: **Claude Code** uses ``.claude-plugin/plugin.json`` (and may merge
 
 from __future__ import annotations
 
-import concurrent.futures
 import json
 import os
+import queue
+import threading
 from pathlib import Path
 
 # GitPython's own import-time check shells out to locate the git executable
@@ -99,24 +100,42 @@ def _resolve_repo_with_timeout(cwd_key: str) -> git.Repo:
             Git repository.
         git.exc.NoSuchPathError: If the directory does not exist.
     """
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    try:
-        future = executor.submit(git.Repo, cwd_key, search_parent_directories=True)
+    # A ThreadPoolExecutor worker is not killable: interpreter shutdown joins
+    # every ThreadPoolExecutor thread via an atexit hook regardless of
+    # shutdown(wait=False), so a genuinely wedged stat() call would hang the
+    # whole process at exit, not just this function. A daemon threading.Thread
+    # is exempt from that join -- the interpreter exits with it still running.
+    result: queue.Queue[git.Repo | Exception] = queue.Queue(maxsize=1)
+
+    def _construct() -> None:
+        # This runs on a worker thread, so the exceptions this function
+        # documents (InvalidGitRepositoryError, NoSuchPathError) plus the
+        # realistic filesystem-walk failure modes (permission denied, a
+        # dangling mount) must be forwarded across the thread boundary via
+        # the queue to be re-raised on the caller's thread -- Python does not
+        # propagate thread exceptions itself. Anything outside this set is a
+        # genuine bug in GitPython or this wrapper: it is deliberately left
+        # to Python's default thread-exception reporting (printed to stderr,
+        # thread dies) rather than caught here, so the caller times out with
+        # an accurate GitResolutionTimeoutError instead of this masking an
+        # unexpected failure mode as if it were the exceptions above.
         try:
-            return future.result(timeout=_GIT_RESOLUTION_TIMEOUT_SECONDS)
-        except concurrent.futures.TimeoutError as exc:
-            raise GitResolutionTimeoutError(
-                f"git.Repo() did not resolve {cwd_key} within "
-                f"{_GIT_RESOLUTION_TIMEOUT_SECONDS:g} seconds (e.g. an unreachable network "
-                "filesystem)."
-            ) from exc
-    finally:
-        # ponytail: the worker thread is abandoned, not joined, on timeout --
-        # Python cannot interrupt a blocked stat() syscall. It exits on its own
-        # once the underlying I/O returns (or leaks until process exit on a
-        # truly wedged mount). Upgrade to a subprocess-based bound (see
-        # scripts/run_bounded.py) if reclaiming the thread becomes necessary.
-        executor.shutdown(wait=False)
+            result.put(git.Repo(cwd_key, search_parent_directories=True))
+        except (git.exc.InvalidGitRepositoryError, git.exc.NoSuchPathError, OSError) as exc:
+            result.put(exc)
+
+    threading.Thread(target=_construct, daemon=True).start()
+    try:
+        value = result.get(timeout=_GIT_RESOLUTION_TIMEOUT_SECONDS)
+    except queue.Empty as exc:
+        raise GitResolutionTimeoutError(
+            f"git.Repo() did not resolve {cwd_key} within "
+            f"{_GIT_RESOLUTION_TIMEOUT_SECONDS:g} seconds (e.g. an unreachable network "
+            "filesystem)."
+        ) from exc
+    if isinstance(value, Exception):
+        raise value
+    return value
 
 
 def _git_common_root(resolved_cwd: Path) -> Path:
