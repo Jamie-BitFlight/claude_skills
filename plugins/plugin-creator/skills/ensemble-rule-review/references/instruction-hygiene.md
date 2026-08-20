@@ -43,6 +43,15 @@ an executing agent where its model is configured, when it cannot change it.
 The fix for non-functional prose is deletion, not explanation. Replacing a decorative `(Haiku)` tag
 with a paragraph on where the model is set stacks noise on noise — remove the tag and stop.
 
+The test covers the skill narrating itself, not just the surrounding system: a sentence explaining
+why an instruction is phrased as it is — the design or safety rationale behind it — is knowledge
+about the prompt, not for the reader executing it, so it leaks exactly like an architecture
+explanation does. `Never embed <input> in a shell-interpreted line — [names the injection vector] —
+reasoning it out instead is the only safe path` leaked this way: the preceding instruction (`coerce
+<input> using the vocabulary below`) already left the reader no path to constructing that line, so
+naming the vulnerability it forecloses added no executable content — only self-description. Delete
+on the same test as any other leak.
+
 ## 3. Single source of truth — no restated or derived values
 
 A value written in two files will drift. Define it once; reference it everywhere else.
