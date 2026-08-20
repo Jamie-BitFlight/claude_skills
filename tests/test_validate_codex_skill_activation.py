@@ -192,3 +192,54 @@ def test_run_silent_persists_stderr_to_workspace_on_failure(tmp_path: Path) -> N
     stderr_log = tmp_path / "test_command.stderr.log"
     assert stderr_log.is_file()
     assert "token=super-secret-value" in stderr_log.read_text(encoding="utf-8")
+
+
+def test_run_app_server_isolates_and_tree_terminates_the_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The app-server subprocess is started in its own process group and tree-terminated.
+
+    Tests: run_app_server's Popen call and its finally-block cleanup
+    How: Monkeypatch subprocess.Popen and AppServerClient.request to avoid a real codex
+         binary; assert Popen received start_new_session=True and
+         isolated.terminate_process_tree was called with the exact process object
+    Why: codex app-server can spawn helper processes; the original cleanup terminated
+         only the direct child, so descendants could survive both a successful run and
+         a timeout (see PR #2787 review, validate_codex_skill_activation.py:429)
+    """
+    popen_calls: list[dict[str, object]] = []
+    terminated: list[object] = []
+
+    class FakeProcess:
+        stdin = None
+        stdout = io.BytesIO()
+
+    def fake_popen(*args: object, **kwargs: object) -> FakeProcess:
+        del args
+        popen_calls.append(kwargs)
+        return FakeProcess()
+
+    def fake_request(self: object, *args: object, **kwargs: object) -> None:
+        del self, args, kwargs
+        raise activation.HarnessError("stop before any real protocol I/O")
+
+    def fake_terminate_process_tree(process: object) -> None:
+        terminated.append(process)
+
+    monkeypatch.setattr(activation.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(activation.AppServerClient, "request", fake_request)
+    monkeypatch.setattr(activation.isolated, "terminate_process_tree", fake_terminate_process_tree)
+
+    with pytest.raises(activation.HarnessError, match="stop before any real protocol I/O"):
+        activation.run_app_server(
+            env={},
+            project_dir=tmp_path,
+            skill_name="plugin:skill",
+            skill_path=tmp_path / "SKILL.md",
+            task_text="task",
+            timeout_seconds=1.0,
+        )
+
+    assert popen_calls[0]["start_new_session"] is True
+    assert len(terminated) == 1
+    assert isinstance(terminated[0], FakeProcess)

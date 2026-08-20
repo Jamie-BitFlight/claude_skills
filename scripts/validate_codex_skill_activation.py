@@ -359,6 +359,7 @@ def run_app_server(
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
     observed_methods: list[str] = []
     response_fragments: list[str] = []
@@ -426,12 +427,10 @@ def run_app_server(
     finally:
         if process.stdin is not None:
             process.stdin.close()
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
+        # Terminates the whole process group (see start_new_session=True above),
+        # not just this direct child -- codex app-server can spawn helper
+        # processes that would otherwise survive both a clean run and a timeout.
+        isolated.terminate_process_tree(process)
 
 
 def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> None:
