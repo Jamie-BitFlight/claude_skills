@@ -48,7 +48,16 @@ command, the request's `source` (see schema note below), `created_at`, and `last
 `session_id` may hold at most **40MB** of total content (tunable), not a fixed entry count. On a
 write that would push a session over that budget, entries for that session are evicted
 least-recently-accessed first (**LRU, confirmed by the repo owner**) until the write fits.
-Reading an entry updates its `last_accessed_at` — see "Known tradeoff" below for what this costs.
+
+**The goal, confirmed by the repo owner: avoid evicting an entry an agent is actively navigating
+within.** LRU achieves this structurally, not just incidentally: reading an entry (any page or
+address request against it) updates its `last_accessed_at`, so an entry under active navigation
+is by construction the most-recently-touched one in its session and is always evicted last under
+budget pressure. This is a best-effort property, not a guarantee — a paused multi-page read
+(fetch page 1, long gap, fetch page 2) can still lose to a burst of new content in the same
+session during the gap. Confirmed by the repo owner: that residual case is acceptable — the
+"eviction is not an error" fallback below means the agent just re-queries, which is a nice-to-avoid
+cost, not a correctness problem. See "Known tradeoff" below for what read-triggered writes cost.
 
 Confirmed by the repo owner: an agent-level keying granularity (one store per subagent, not per
 session) was considered and rejected — there is no identifier that reliably survives a subagent
