@@ -186,12 +186,33 @@ def test_run_silent_persists_stderr_to_workspace_on_failure(tmp_path: Path) -> N
     argv = [sys.executable, "-c", "import sys; sys.stderr.write('token=super-secret-value\\n'); sys.exit(3)"]
 
     with pytest.raises(activation.HarnessError, match="failed with exit code 3") as exc_info:
-        activation.run_silent(argv, cwd=tmp_path, env={}, label="test command")
+        activation.run_silent(argv, cwd=tmp_path, env={}, label="test command", timeout_seconds=5.0)
 
     assert "super-secret-value" not in str(exc_info.value)
     stderr_log = tmp_path / "test_command.stderr.log"
     assert stderr_log.is_file()
     assert "token=super-secret-value" in stderr_log.read_text(encoding="utf-8")
+
+
+def test_run_silent_terminates_the_full_process_tree_on_timeout(tmp_path: Path) -> None:
+    """A stalled setup command (marketplace/plugin registration) does not hang the validator.
+
+    Tests: run_silent's timeout path
+    How: Run a script that ignores SIGTERM with a short timeout; assert HarnessError
+         names the timeout and the process is actually gone afterward
+    Why: run_silent previously used subprocess.run() with no timeout and no process
+         group -- a stalled `codex plugin marketplace add`/`codex plugin add` would
+         hang the validator forever (PR #2787 review, validate_codex_skill_activation.py:445)
+    """
+    script = tmp_path / "stubborn.py"
+    script.write_text(
+        "import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(30)\n", encoding="utf-8"
+    )
+
+    with pytest.raises(activation.HarnessError, match="timed out after"):
+        activation.run_silent(
+            [sys.executable, str(script)], cwd=tmp_path, env={}, label="stubborn", timeout_seconds=0.3
+        )
 
 
 def test_run_app_server_isolates_and_tree_terminates_the_process(

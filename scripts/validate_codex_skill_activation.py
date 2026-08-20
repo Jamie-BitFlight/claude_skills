@@ -433,20 +433,29 @@ def run_app_server(
         isolated.terminate_process_tree(process)
 
 
-def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str) -> None:
+def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str, timeout_seconds: float) -> None:
     """Run a setup command without exposing its output or ambient credentials.
 
     On failure, captured stderr is persisted to a file inside the ephemeral
     isolated workspace (``cwd``) for post-mortem debugging -- never printed or
     embedded in the raised error, since it may contain ambient credentials.
     The workspace is torn down automatically unless the caller passed
-    ``--keep-tempdir``.
+    ``--keep-tempdir``. A stalled setup command (marketplace/plugin registration)
+    is terminated -- including its process tree -- rather than hanging the
+    validator forever; see isolated.run_command's identical rationale.
     """
-    completed = subprocess.run(argv, cwd=cwd, env=env, text=True, capture_output=True, check=False)
-    if completed.returncode != 0:
+    process = subprocess.Popen(
+        argv, cwd=cwd, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True
+    )
+    try:
+        _stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        isolated.terminate_process_tree(process)
+        raise HarnessError(f"{label} timed out after {timeout_seconds:g} seconds") from exc
+    if process.returncode != 0:
         stderr_log = cwd / f"{label.replace(' ', '_')}.stderr.log"
-        stderr_log.write_text(completed.stderr, encoding="utf-8")
-        raise HarnessError(f"{label} failed with exit code {completed.returncode}; stderr saved to {stderr_log}")
+        stderr_log.write_text(stderr, encoding="utf-8")
+        raise HarnessError(f"{label} failed with exit code {process.returncode}; stderr saved to {stderr_log}")
 
 
 def write_evidence(path: Path, evidence: dict[str, object]) -> None:
@@ -548,12 +557,14 @@ def main() -> int:
             cwd=workspace.project_dir,
             env=env,
             label="marketplace registration",
+            timeout_seconds=args.timeout_seconds,
         )
         run_silent(
             ["codex", "plugin", "add", f"{workspace.plugin_id}@{workspace.marketplace_name}"],
             cwd=workspace.project_dir,
             env=env,
             label="plugin installation",
+            timeout_seconds=args.timeout_seconds,
         )
         cache_root = workspace.codex_home / "plugins" / "cache" / workspace.marketplace_name / workspace.plugin_id
         installed = resolve_installed_skill(cache_root, skill_name)
