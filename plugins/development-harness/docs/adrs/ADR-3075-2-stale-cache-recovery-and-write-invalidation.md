@@ -20,16 +20,27 @@ invalidate the cache entry directly.
 
 **Recoverable staleness.** Each control-set entry stores the command that produced it — the
 source, scope, and parameters Collection and Generation used — alongside its content identity.
-On a stale-identifier request, that stored command re-runs Collection and Generation, produces
-a new identity, and serves the caller against it, rather than erroring and requiring the caller
-to reconstruct its original request from scratch.
+On a stale-identifier request, that stored command re-runs Collection and Generation, producing
+a new identity. Page boundaries and ordinal addresses can shift when the underlying source
+changes, so recovery does not re-apply the request's original page or `navigate` selector to
+the regenerated document — that would risk skipping or duplicating content, or resolving an
+address to a different node than the caller intended. Recovery instead serves page 1 of the
+regenerated document under the new identity (or, when a `navigate` ordinal no longer resolves,
+an explicit restart response pointing the caller back to the table of contents), informing the
+caller the identity changed — rather than erroring and requiring the caller to reconstruct its
+original request from scratch. This is what keeps R8's no-mixed-versions guarantee: pages are
+never served by applying an old request's addressing to a new document's structure.
 
-**Write-triggered invalidation.** Every write path that can modify a source this contract
-reads from — item updates, section writes, artifact registration, task and plan state changes
-— invalidates any control-set entry generated from what it touched, as a side effect of the
-write. This does not replace the identity check on read (R8's existing hash-mismatch
-detection); it adds a second, earlier path to the same outcome, so a stale entry is caught
-whether or not a read happens to hit it before a write does.
+**Write-triggered invalidation, same session only.** Every write path that can modify a source
+this contract reads from — item updates, section writes, artifact registration, task and plan
+state changes — invalidates any control-set entry in the writing session's own control set that
+was generated from what it touched, as a side effect of the write. This does not replace the
+identity check on read (R8's existing hash-mismatch detection); it adds a second, earlier path
+to the same outcome, so a stale entry is caught whether or not a read happens to hit it before a
+write does. A write from a different session, or through a path outside this contract's Scope,
+is not visible to this invalidation — it does not scan or mutate another session's control set —
+and is not guaranteed to surface as stale this way; this is the concurrent-session blind spot
+ADR-3075-3 documents, not a gap in this decision's own scope.
 
 ## Consequences
 

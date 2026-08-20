@@ -15,6 +15,13 @@ map down to full section, sub-heading, or code-fence content.
 Design decisions are specified in the architecture spec for issue #2529 (artifact type
 `architect`). This document describes the shipped contract — what agents observe.
 
+R8's hash-plus-session-routing follow-up-call shape (ADR-3075-1 through ADR-3075-4) is not
+reflected below: that control set is not yet implemented, and `backlog_view` currently has no
+`hash` or session-routing parameter. Every example in this document — including "Typical
+Navigation Flow" below — uses today's shipped shape, repeating `selector` on every call. Update
+this document's examples and response shapes to the hash-plus-session shape once the control
+set ships.
+
 ---
 
 ## Ordinal Grammar

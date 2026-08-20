@@ -158,6 +158,13 @@ parameter for MCP tools, per ADR-3075-4's Consequences, since `backlog_view` and
 have no in-process session identity to read from `ctx`; the CLI instead reads
 `CLAUDE_CODE_SESSION_ID` directly and needs no such parameter.
 
+This hash-plus-session-routing shape states intended behaviour, not current behaviour: the
+control set it depends on (ADR-3075-1 through ADR-3075-4) is not yet implemented, and
+`backlog_view`'s current parameters carry no `hash` or session-routing field. [MCP
+Progressive-Disclosure Contract](./mcp-progressive-disclosure-contract.md) documents today's
+shipped parameter set (`selector` plus `navigate`, repeated on every call) and must be updated
+to this shape once the control set ships.
+
 The identifier resolves against cached parsed content. Serving a later page does not
 re-collect from the provider and does not re-parse.
 
@@ -214,20 +221,27 @@ implementation.
 command that produced it — the source, scope, and parameters Collection and Generation used to
 build it — not only its content identity. When a request's identifier no longer matches
 current content, the stored command is used to requery the backend and regenerate the
-document, serving against the new identity and informing the caller the identity changed. The
-caller is not required to restate its whole request from scratch, and this recovery happens
-automatically on the very request that surfaces the stale identifier — it is not an opt-in the
-caller must request separately. The explicit revalidation and forced-refresh paths (ADR-3075-3,
-below) serve a different purpose: gaining certainty before write-triggered invalidation would
-otherwise catch a change, not the only path that ever recollects.
+document. Recovery does not re-apply the request's original page or `navigate` address selector
+to the regenerated document — page boundaries and addresses can shift underneath it, and
+honoring the old selector risks skipping, duplicating, or misresolving content. Recovery serves
+page 1 of the regenerated document under the new identity instead (or an explicit restart
+response, for a `navigate` ordinal that no longer resolves), informing the caller the identity
+changed — this is what keeps the "never mixed-versions" guarantee above true rather than
+contradicting it. The caller is not required to restate its whole request from scratch, and this
+recovery happens automatically on the very request that surfaces the stale identifier — it is
+not an opt-in the caller must request separately. The explicit revalidation and forced-refresh
+paths (ADR-3075-3, below) serve a different purpose: gaining certainty before write-triggered
+invalidation would otherwise catch a change, not the only path that ever recollects.
 
-**Writes invalidate; reads do not have to discover staleness on their own** (ADR-3075-2). A
-control-set entry is not left to be discovered stale only when a later read happens to hit it
-with a mismatched hash. A write that modifies the source a cache entry was generated from
-invalidates that entry as a side effect of the write. Every mutation path bound by this
-contract's sources — item updates, section writes, artifact registration, task and plan state
-changes — is a source of invalidation for any control-set entry generated from what it
-touched.
+**Writes invalidate within the same session; reads do not have to discover staleness on their
+own** (ADR-3075-2). A control-set entry is not left to be discovered stale only when a later
+read happens to hit it with a mismatched hash. A write that modifies the source a cache entry
+was generated from invalidates that entry, in the writing session's own control set, as a side
+effect of the write. Every mutation path bound by this contract's sources — item updates,
+section writes, artifact registration, task and plan state changes — is a source of invalidation
+for any control-set entry, in that same session's store, generated from what it touched. A write
+from a different session does not scan or mutate another session's control set — see the blind
+spot noted above (ADR-3075-3).
 
 **Cache metadata is visible to the agent, not only used internally** (ADR-3075-3). Every
 response backed by the control set carries its content identity, the command that produced it,
