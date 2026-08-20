@@ -141,10 +141,14 @@ flowchart TD
 
 ## Implementation appendix — shape to code
 
-The engine described by R1 exists as the `progressive_markdown` package: `Navigator`
-(`map`, `view_section`, `view_code`, `links`, `search_sections`, each taking `page` and
-`budget`), `Paginator` (`paginate_blocks`, `paginate_text`), and a `MarkdownContentProvider`
-protocol for arbitrary sources.
+The engine described by R1 exists as the `progressive_markdown` package:
+`ProgressiveMarkdownNavigator` (`map`, `view_section`, `view_code`, `links`,
+`search_sections`, each taking `page` and `budget`), `Paginator` (`paginate_blocks`,
+`paginate_text`), and a `MarkdownContentProvider` protocol for arbitrary sources.
+
+`ProgressiveMarkdownNavigator` and `Paginator` currently have no consumers. The engine's
+parser and indexer are imported by the address-navigation path; its navigation and
+pagination layer is not used by anything.
 
 Duplicate implementations to delete rather than refactor, in the backlog server layer
 (`backlog_core/server.py`, `backlog_core/operations.py`) shared by the MCP tool and CLI paths
