@@ -43,6 +43,29 @@ convention this decision reuses, not a new storage mechanism invented for R8.
 signatures as a prerequisite for any implementation of #3062 — this was not previously called
 out as required plumbing anywhere in this contract or its ADRs, and is now explicit.
 
+## Known gaps — named, not solved by this ADR
+
+**Concurrent writers within one session.** `CLAUDE_CODE_SESSION_ID` is shared not only across
+one agent's own MCP-vs-CLI calls but across every subagent this repo's `TeamCreate` and
+parallel `Agent()` patterns spawn within that session — they inherit the same session ID. That
+means multiple OS processes (a parallel review team all viewing or grooming the same item, for
+example) can perform a concurrent read-modify-write against the same session-keyed store.
+`get-gate-token.mjs` is not precedent for this: it only ever performs one atomic
+`writeFileSync` of a single value, never a keyed read-modify-write, and has nothing analogous
+to write-triggered invalidation (ADR-3075-2) racing a concurrent requery. This ADR does not
+specify a locking scheme — that is deferred to implementation, tracked as
+[#3081](https://github.com/Jamie-BitFlight/claude_skills/issues/3081) — but the concurrency
+hazard is a real gap in what "session-keyed" solves, not an incidental detail.
+
+**No stated cleanup or TTL.** Control-set entries can hold full generated documents, and
+ADR-3072-1's known limitation already establishes this is not a hypothetical size — item #2953
+alone generates an estimated 270,946+ tokens. Without a cleanup mechanism for
+`$DH_STATE_HOME/sessions/{id}/` directories after a session ends, entries accumulate on disk
+unboundedly across every session ever run. `get-gate-token.mjs`'s single small token file never
+faced this problem; a control-set store holding full generated documents does. Not solved here
+— tracked as [#3082](https://github.com/Jamie-BitFlight/claude_skills/issues/3082) so it is not
+silently absent from the design.
+
 ## Considered alternative
 
 An in-process cache (module-level dict, FastMCP lifespan context) was the implicit assumption

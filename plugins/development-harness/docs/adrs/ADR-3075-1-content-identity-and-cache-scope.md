@@ -32,6 +32,15 @@ return content unrelated to what the caller asked for. Binding the identifier to
 well as the content closes this — two different commands never collide even when their output
 happens to match.
 
+**Command canonicalization is required before hashing, not optional.** The command must be
+serialized to a stable, canonical form — fixed key order, defaults resolved to explicit values
+before hashing, not left implicit — before it contributes to the identifier. Two calls that are
+semantically the same request (same source, scope, parameters) but happen to serialize
+differently (different kwarg order, one passing a default explicitly and the other omitting it)
+must not hash differently. An identifier scheme that lets semantically identical requests miss
+the same cache entry defeats R8's "resolves against the same cache entry" property as
+thoroughly as the collision this ADR just fixed — from the other direction.
+
 **Cache scope:** session-scoped only, not persisted across sessions. Re-parsing markdown is
 cheap relative to the rest of what a call already does (network round-trip to the backend); a
 persisted cache would need its own storage location, eviction policy, and a plan for backend
