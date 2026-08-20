@@ -1,5 +1,13 @@
 # MCP Progressive-Disclosure Contract
 
+Behaviour for how markdown reaches an agent is normative in
+[Agent Markdown Consumption — Behaviour Specification](./agent-markdown-consumption-contract.md)
+(R1–R7), across every transport — MCP and CLI alike. This document is mechanical reference,
+subordinate to that contract: ordinal addressing, navigation parameters, and response shapes
+for one conforming implementation, the `backlog_view` MCP tool. See
+[Backend Providers](./backend-providers.md) "CLI vs MCP Capability Surface" for the CLI
+equivalent's current parameter parity.
+
 The `backlog_view` MCP tool exposes progressive disclosure for backlog items — a two-call
 navigation protocol that lets agents browse large items incrementally, from a token-efficient
 map down to full section, sub-heading, or code-fence content.
@@ -166,20 +174,31 @@ NavigateResponse:
 
 ## Typical Navigation Flow
 
-```text
-1. backlog_view(selector="#2529", map=true)
-   → MapResponse: map_text lists ordinals at sections and entries
+Per R3 in the behaviour contract, the compact form — including the table of contents — returns
+automatically once a plain `backlog_view` call would exceed the token budget; no `map=true`
+call is required to reach it. The steps below assume the agent already holds a table of
+contents (from that automatic compact form, or from an explicit `map=true` call) and is
+drilling into an ordinal:
 
-2. backlog_view(selector="#2529", navigate="4.0")
+```text
+1. backlog_view(selector="#2529", navigate="4.0")
    → NavigateResponse
      if has_children=true  → read child_map, navigate to a child ordinal
      if has_children=false → read content directly
 
-3. backlog_view(selector="#2529", navigate="4.0.1")
+2. backlog_view(selector="#2529", navigate="4.0.1")
    → NavigateResponse: prose with [code:...] tokens for any fences
 
-4. backlog_view(selector="#2529", navigate="4.0.1.code.0")
+3. backlog_view(selector="#2529", navigate="4.0.1.code.0")
    → NavigateResponse: raw code fence body
+```
+
+An explicit `map=true` call remains available to request the table of contents directly,
+without first triggering the budget check:
+
+```text
+backlog_view(selector="#2529", map=true)
+→ MapResponse: map_text lists ordinals at sections and entries
 ```
 
 ---
@@ -190,8 +209,9 @@ The resolution index inside `OrdinalPathMapper` is built eagerly to all depths d
 `build_map()`. `resolve()` and `valid_ordinals()` operate on this complete index.
 
 The `map_text` field in `MapResponse` is bounded by the token budget (from
-`progressive_markdown.list_navigator.TOKEN_BUDGET`). Deep ordinals may be absent from the
-rendered map text but remain resolvable via `navigate=`.
+`progressive_markdown.list_navigator.TOKEN_BUDGET`). See R2 in the behaviour contract for the
+pagination requirement governing what happens when the full index exceeds that budget — no
+addressable ordinal may be dropped or elided.
 
 Source: architecture spec §5.3 and `backlog_core/ordinal_mapper.py`.
 
