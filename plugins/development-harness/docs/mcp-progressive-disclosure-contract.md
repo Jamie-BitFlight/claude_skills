@@ -15,6 +15,14 @@ map down to full section, sub-heading, or code-fence content.
 Design decisions are specified in the architecture spec for issue #2529 (artifact type
 `architect`). This document describes the shipped contract — what agents observe.
 
+R8's hash-only follow-up-call shape (ADR-3075-1 through ADR-3082-1) is not reflected
+below: that control set is not yet implemented, and `backlog_view` currently has no `hash`
+parameter. There is no session-identifying value anywhere in that shape — ADR-3082-1 reversed
+session-keying, so the control set is addressed by `content_id` alone. Every example in this
+document — including "Typical Navigation Flow" below — uses today's shipped shape, repeating
+`selector` on every call. Update this document's examples and response shapes to the hash-only
+shape once the control set ships.
+
 ---
 
 ## Ordinal Grammar

@@ -122,18 +122,33 @@ response rather than by querying separate tools.
 Artifact identity and retrieval are provider-independent: the same name resolves the same
 artifact regardless of which provider stores it.
 
-Ownership divides as follows, because three packages each touch artifacts and only one owns
-each concern:
+Ownership divides as follows. Verified against the current code (not assumed): registration
+and durability are already split exactly as intended; delivery is not.
 
 - `backlog_core` owns artifact registration, identity, and the association between an
-  artifact and its item — artifact discovery is part of item state.
-- The storage provider owns durability of artifact content.
-- `progressive_markdown` owns delivery of artifact content to an agent, on the same terms as
-  any other markdown.
+  artifact and its item — artifact discovery is part of item state. Confirmed:
+  `artifact_manifest_store.py::publish_artifact()` computes content identity
+  (`content_revision`, a sha256 of the artifact content) and writes the manifest entry. Both
+  the `artifact_register()` MCP tool and `_try_register_dispatch_plan_artifact()` (both in
+  `backlog_core/server.py`) route through it — `publish_artifact()` is the shared owner, not
+  `artifact_register()` alone. `artifact_migration.py::_migrate_register_one()` bypasses it: it
+  calls `ArtifactRegistry.register()` and `provider.set_manifest()` directly and never computes
+  `content_revision`. Tracked in #3086.
+- The storage provider owns durability of artifact content. Confirmed: the GitHub backend's
+  `put_content()` writes directly when online and queues durably via `FileCache` when
+  offline; no other component performs physical persistence.
+- `progressive_markdown` **should** own delivery of artifact content to an agent, on the same
+  terms as any other markdown — this is intended behaviour, not current behaviour.
+  `artifact_read()` today calls the provider's `get_content()` directly and returns raw
+  content, with no engine involvement at all. This is the same "second implementation"
+  pattern R1 forbids elsewhere: artifact content delivery is a markdown consumption path with
+  no navigation, pagination, or content identity, entirely outside the engine described by R1.
+  Tracked in #3078.
 
-Discovery is not a provider concern and not an engine concern. An artifact listed as
-registered whose content cannot be retrieved is a defect in the boundary between the first
-two, not an expected outcome.
+Discovery is not a provider concern and not an engine concern. An artifact registered as
+`current` whose content cannot be retrieved is a defect — concretely, `artifact_migration.py`
+can write a manifest entry with `status: current` before its content write is confirmed to
+succeed, with no verification step tying the two together. Tracked in #3055.
 
 ## Provider independence
 
