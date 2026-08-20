@@ -21,14 +21,21 @@ is the plugin implementing it); "stateless agent" alone as a synonym for SAM its
 between the methodology and one literal stateless agent instance).
 
 **Backend**:
-The data provider Collection reaches — the configured `WorkItemBackend` in most cases (GitHub,
-SQLite, Beads, or Memory; see `docs/backend-providers.md`), accessed through
-`MarkdownContentProvider` (a thinner, markdown-specific adapter protocol in front of it, not a
-competing concept). Confirmed by the repo owner: "backend" always means the data-providing
-system, never a call to the MCP tool or CLI — those are Frontend below.
+The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
+data-providing system, never a call to the MCP tool or CLI — those are Frontend below. Not one
+universal instance: backlog items route through `WorkItemBackend` (GitHub, SQLite, Beads, or
+Memory; see `docs/backend-providers.md`), accessed through `MarkdownContentProvider` (a thinner,
+markdown-specific adapter in front of it). SAM plans and tasks currently do **not** share that
+`WorkItemBackend` — they route through a separate `TaskBackend` protocol
+(`dh_core/protocols.py`), confirmed by the repo owner and verified against `dh_core/operations.py`
+(`create_plan(backend: TaskBackend, ...)` etc.). This contradicts `AGENTS.md`'s current "that same
+backend... there is no TASKBACKEND" claim — tracked as [#3088](https://github.com/Jamie-BitFlight/claude_skills/issues/3088),
+not corrected here since it's outside this document's scope.
 _Avoid_: "backend call" for an MCP tool invocation or CLI request — that ambiguity caused real
 confusion in this session's design discussion. A backend call is specifically Collection
-reaching this data provider.
+reaching a data provider. Also avoid assuming "the backend" means one shared instance across
+backlog items and SAM — verify which protocol (`WorkItemBackend` vs `TaskBackend`) a given
+subsystem actually uses before making that claim.
 
 **Frontend**:
 MCP, CLI, and the local navigator together — everything on the agent-facing side of a backend
