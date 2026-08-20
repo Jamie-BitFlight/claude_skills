@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rewrite Room"
+  short_description: "Route documentation work to the right writing workflow"
+  default_prompt: "Use $the-rewrite-room to handle this documentation task."

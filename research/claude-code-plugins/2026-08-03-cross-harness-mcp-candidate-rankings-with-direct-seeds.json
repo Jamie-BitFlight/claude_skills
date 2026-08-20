@@ -1,0 +1,166 @@
+{
+  "generated_at": "2026-08-03T03:16:08.047117+00:00",
+  "scope": "metadata-only candidate discovery; no repository trees or source files were inspected",
+  "partial": true,
+  "collection_warnings": ["GitHub advertised more Code Search results than its pages returned"],
+  "ranking": "stars descending, then forks descending, then repository name",
+  "minimum_stars": 4000,
+  "explicit_seed_repositories": [
+    "Chachamaru127/claude-code-harness",
+    "infragate/capa",
+    "wshobson/agents"
+  ],
+  "queries": [
+    {
+      "query": "mcpServers path:.codex-plugin filename:plugin.json",
+      "pages_fetched": 10,
+      "total_count": 852,
+      "incomplete_results": false,
+      "truncated_by_max_pages": false,
+      "truncated_by_github_limit": false,
+      "complete": true,
+      "result_count": 846,
+      "result_count_mismatch": true
+    },
+    {
+      "query": "mcp_servers path:.codex-plugin filename:plugin.json",
+      "pages_fetched": 1,
+      "total_count": 4,
+      "incomplete_results": false,
+      "truncated_by_max_pages": false,
+      "truncated_by_github_limit": false,
+      "complete": true,
+      "result_count": 4,
+      "result_count_mismatch": false
+    }
+  ],
+  "candidate_repositories_before_uptake_filter": 853,
+  "eligible_candidates": [
+    {
+      "repository": "affaan-m/ECC",
+      "stars": 237100,
+      "forks": 36039,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/affaan-m/ECC",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "thedotmack/claude-mem",
+      "stars": 89348,
+      "forks": 7778,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/thedotmack/claude-mem",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "MemPalace/mempalace",
+      "stars": 57992,
+      "forks": 7454,
+      "archived": false,
+      "default_branch": "develop",
+      "url": "https://github.com/MemPalace/mempalace",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "wshobson/agents",
+      "stars": 38437,
+      "forks": 4113,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/wshobson/agents",
+      "discovery_hits": [
+        {
+          "path": "",
+          "query": "explicit_seed"
+        }
+      ]
+    },
+    {
+      "repository": "mksglu/context-mode",
+      "stars": 19569,
+      "forks": 1396,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/mksglu/context-mode",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "yusufkaraaslan/Skill_Seekers",
+      "stars": 14681,
+      "forks": 1489,
+      "archived": false,
+      "default_branch": "development",
+      "url": "https://github.com/yusufkaraaslan/Skill_Seekers",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "mrexodia/ida-pro-mcp",
+      "stars": 11020,
+      "forks": 1302,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/mrexodia/ida-pro-mcp",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "Q00/ouroboros",
+      "stars": 5253,
+      "forks": 532,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/Q00/ouroboros",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    },
+    {
+      "repository": "zhongerxin/Cowart",
+      "stars": 5217,
+      "forks": 405,
+      "archived": false,
+      "default_branch": "main",
+      "url": "https://github.com/zhongerxin/Cowart",
+      "discovery_hits": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "query": "mcpServers path:.codex-plugin filename:plugin.json"
+        }
+      ]
+    }
+  ]
+}

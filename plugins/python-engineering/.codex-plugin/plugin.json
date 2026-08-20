@@ -1,10 +1,21 @@
 {
   "name": "python-engineering",
-  "version": "9.26.8",
+  "version": "9.26.9",
   "description": "Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI, web, data/science, and constrained environments.",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Python Engineering",
+    "shortDescription": "Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI, web, data/science, and constrained environments.",
+    "longDescription": "Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI, web, data/science, and constrained environments.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read"],
+    "defaultPrompt": [
+      "Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell"
+    ]
+  }
 }

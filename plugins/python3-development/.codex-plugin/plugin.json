@@ -1,10 +1,22 @@
 {
   "name": "python3-development",
-  "version": "8.4.24",
+  "version": "8.4.25",
   "description": "Python 3.11+ development workflows including CLI apps with Typer/Rich, script writing, test development, code review, linting troubleshooting, and pyproject.toml configuration. Provides TDD patterns, modern type hints, PEP 723 metadata, and solutions for common Python errors.",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Python3 Development",
+    "shortDescription": "Python 3.11+ development workflows including CLI apps with Typer/Rich, script writing, test development, code review, linting troubleshooting, and pyproject.toml configuration. Provides TDD patterns, modern type hints, PEP 723 metadata,...",
+    "longDescription": "Python 3.11+ development workflows including CLI apps with Typer/Rich, script writing, test development, code review, linting troubleshooting, and pyproject.toml configuration. Provides TDD patterns, modern type hints, PEP 723 metadata, and solutions for common Python errors.",
+    "developerName": "Jamie Nelson",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Python 3.11+ development workflows including CLI apps with Typer/Rich, script writing, test development, code review, linting"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
 }

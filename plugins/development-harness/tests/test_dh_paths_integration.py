@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import dh_paths
+import git
 import pytest
 from backlog_core import models
 from backlog_core.artifact_provider import GitHubArtifactProvider
@@ -41,8 +42,6 @@ from dh_paths import backlog_dir, compute_slug, context_dir, ensure_dirs, plan_d
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from pytest_mock import MockerFixture
 
 
 # ---------------------------------------------------------------------------
@@ -397,14 +396,11 @@ class TestWorktreeStateIsolation:
         # Assert — not visible in project_b's backlog
         assert not (backlog_dir(project_b) / "p1-alpha-item.md").exists()
 
-    def test_worktree_resolves_to_main_repo_state_root(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture
-    ) -> None:
+    def test_worktree_resolves_to_main_repo_state_root(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Verify a worktree resolves to the same state root as the main repo.
 
         Tests: git_project_root returns main repo root for linked worktrees
-        How: Mock subprocess.run to return common .git dir pointing to main repo;
-             call git_project_root from worktree cwd; assert slug matches main repo
+        How: Create a real linked worktree and compare state-root slugs
         Why: Worktrees must share state with the main repo, not create separate dirs
         """
         # Arrange
@@ -412,16 +408,12 @@ class TestWorktreeStateIsolation:
         dh_paths._root_cache.clear()
 
         main_repo = tmp_path / "main-repo"
-        main_repo.mkdir()
-        git_common_dir = main_repo / ".git"
-        git_common_dir.mkdir()
+        main = git.Repo.init(main_repo)
+        (main_repo / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+        main.index.add(["tracked.txt"])
+        main.index.commit("initial commit")
         worktree = tmp_path / "worktree-branch"
-        worktree.mkdir()
-
-        def _mock_git(args: list[str], **kwargs: object) -> object:
-            return type("CP", (), {"stdout": str(git_common_dir) + "\n", "returncode": 0})()
-
-        mocker.patch("subprocess.run", side_effect=_mock_git)
+        main.git.worktree("add", str(worktree))
 
         # Act
         root_from_main = dh_paths.git_project_root(cwd=main_repo)

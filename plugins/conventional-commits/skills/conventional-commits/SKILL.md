@@ -411,19 +411,11 @@ echo "module.exports = {extends: ['@commitlint/config-conventional']}" > commitl
 echo 'feat(api): add new endpoint' | npx commitlint
 ```
 
-For comprehensive commitlint configuration guidance, activate the commitlint skill:
-
-```text
-Skill(skill: "commitlint:commitlint")
-```
+For comprehensive commitlint configuration guidance, use the guidance in this document. If your workspace has an installed commitlint plugin, you can defer to it for project-specific rules and examples.
 
 ### Pre-commit Hooks
 
-Enforce commit message format with pre-commit hooks. For complete pre-commit setup guidance, activate the pre-commit skill:
-
-```text
-Skill(skill: "python3-development:pre-commit")
-```
+Enforce commit message format with pre-commit hooks. If your workspace has an installed pre-commit plugin, you can use it for hook setup guidance; otherwise configure hooks directly.
 
 ### Changelog Generation
 
@@ -494,12 +486,12 @@ Refs: 676104e, a215868
 
 **Commit message validation and enforcement:**
 
-- `commitlint` - Configure and use commitlint for commit message validation. Activate: `Skill(skill: "commitlint:commitlint")`
-- `pre-commit` - Set up pre-commit hooks for automated validation. Activate: `Skill(skill: "python3-development:pre-commit")`
+- `commitlint` - Configure and use commitlint for commit message validation. If an installed commitlint plugin is available, use it for project-specific rules; otherwise follow the guidance in this document.
+- `pre-commit` - Set up pre-commit hooks for automated validation. If an installed pre-commit plugin is available, use it for hook setup guidance; otherwise configure hooks directly.
 
 **Git workflow tools:**
 
-- `commit-staged` - Generate conventional commit messages from diffs. Activate: `Skill(skill: "commit-staged")`
+- `commit-staged` - Optional commit-message generator from diffs. If you have it installed, you can use it; otherwise generate the Conventional Commit header manually from the diff and this reference.
 
 ## References
 

@@ -55,6 +55,34 @@ claude --plugin-dir ./plugins/holistic-linting          # Load multiple plugins
 /plugin validate ./plugins/plugin-name                  # Validate plugin structure
 ```
 
+### MCP Server Validation
+
+Read [Codex MCP Runtime Guide](./docs/codex-mcp-runtime.md) before configuring
+or validating a Codex marketplace MCP. It documents Codex's literal `env`
+behavior, `env_vars` pass-through, the two-root `cwd` plus `PWD` pattern, and
+host prerequisites for FastMCP and project hooks.
+
+For a FastMCP server, use the active `fastmcp-creator:fastmcp-client-cli` skill for protocol
+checks and `fastmcp-creator:fastmcp-python-tests` for Python tests when the harness exposes them.
+If either is unavailable, read its corresponding `SKILL.md` under
+`plugins/fastmcp-creator/skills/` before choosing test commands; do not invent an invocation or
+test pattern from memory.
+
+Validate separate concerns separately:
+
+1. **Server protocol and tools**: from outside the plugin directory, use `fastmcp list` to
+   discover tools and `fastmcp call` to invoke one against the configured stdio command. Use a
+   non-sensitive temporary fixture and assert a successful, meaningful response.
+2. **Codex plugin integration**: install the plugin from an isolated local marketplace and
+   invoke a named MCP tool through Codex. Do not count manually opening `SKILL.md` or starting a
+   server process as proof that Codex loaded the plugin.
+3. **Claude plugin integration**: start Claude with the packaged plugin and invoke a named MCP
+   tool. If Claude authentication is unavailable, record this as blocked rather than inferring
+   runtime compatibility from static configuration.
+
+FastMCP client syntax is versioned. Run `fastmcp call --help` before relying on an invocation
+from documentation; for FastMCP 3.4.5, use explicit `--command` and `--target` options together.
+
 ### MCP Server Scripts
 
 ```bash
@@ -356,6 +384,10 @@ Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `bac
   the QG plan it generates internally — passing the QG plan back in produces a spurious second
   `qg-qg-...` plan and re-runs quality gates on an already-complete pass
 
+`plan/` is ignored working context. Use it to design and coordinate in-progress work, but do not
+force-add or commit its contents. Put durable user-facing documentation in `docs/` or `research/`
+only when that is explicitly part of the requested deliverable.
+
 ### Other Tools' Rule Files
 
 Rule files outside `.claude/rules/` that other harnesses read — not a full rule-file index:
@@ -384,7 +416,7 @@ this file) was removed to avoid two files drifting out of sync.
 4. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
 5. **pytest parallelism**: Tests run with `-n auto --dist loadgroup` (xdist). Tests marked with `@pytest.mark.xdist_group` run in same worker.
 6. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
-7. **Markdown lint exclusions**: `plan/` and `.claude/backlog/` are excluded from markdownlint (they may have intentionally relaxed formatting).
+7. **Ignored planning context**: `plan/` and `.claude/backlog/` are ignored working context and excluded from markdownlint. Do not force-add either directory.
 8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 9. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
 10. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism.
@@ -394,6 +426,8 @@ this file) was removed to avoid two files drifting out of sync.
 14. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.
 15. **No `git stash` on the primary checkout**: compare against a clean baseline in an isolated worktree instead — other agents may be mid-write there.
 16. **Bounded subprocess execution**: `scripts/run_bounded.py` runs a command with a timeout and terminates its full process group (POSIX process-group signals; `taskkill /T /F` on Windows) on expiry, including descendants a bare `subprocess.run(timeout=...)` would leave behind. Wrap any external command invocation that may hang or spawn children with `uv run --script scripts/run_bounded.py --timeout-seconds <n> -- <command>`.
+17. **MCP runtime tests**: Load the active FastMCP client skill first; if it is unavailable, read the bundled FastMCP client guidance. Invoke the client through a `uv`-managed environment rather than assuming a host-global `fastmcp` binary, and run it from outside the plugin directory. Never use a native agent MCP tool. Wrap each actual `list` or `call` with `uv run --script scripts/run_bounded.py --timeout-seconds 5 -- <command>`; it terminates the process tree on expiry. Retain a redacted result and mark timeouts or startup failures as failed/blocked.
+18. **Validation warnings**: Warnings fail validation unless a versioned, scope-limited exception is recorded in the relevant plan with an expiry/review condition. Never disable pytest's strict configuration to make a warning non-fatal; a minimal runner must explicitly retain `--strict-config` and install each configured pytest plugin it needs.
 
 ## File Locations Quick Reference
 

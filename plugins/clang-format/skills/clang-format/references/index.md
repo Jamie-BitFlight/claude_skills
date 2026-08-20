@@ -167,8 +167,15 @@ clang-format integrates with popular editors:
 
 - **VS Code**: Install "Clang-Format" extension
 - **CLion**: Built-in support (detects `.clang-format`)
-- **Vim**: Use clang-format.py script
-- **Emacs**: Use clang-format.el
+- **Vim**: Use `assets/integrations/vimrc-clang-format.vim`
+- **Emacs**: Use `assets/integrations/emacs-clang-format.el`
+
+These integrations call the external `clang-format` binary, so make sure it is installed and discoverable before wiring them up:
+
+```bash
+clang-format --version
+command -v clang-format
+```
 
 See [CLI Usage](cli-usage.md) for detailed integration instructions.
 

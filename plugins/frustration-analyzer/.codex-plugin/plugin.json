@@ -1,11 +1,23 @@
 {
   "name": "frustration-analyzer",
-  "version": "0.2.27",
-  "description": "Read The Fucking Prompt — finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
+  "version": "0.2.28",
+  "description": "Read The Fucking Prompt \u2014 finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
   "author": {
     "name": "Jamie-BitFlight"
   },
   "license": "MIT",
   "keywords": ["transcripts", "frustration", "rage-receipt", "duckdb", "session-analysis", "png"],
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Frustration Analyzer",
+    "shortDescription": "Read The Fucking Prompt \u2014 finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
+    "longDescription": "Read The Fucking Prompt \u2014 finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
+    "developerName": "Jamie-BitFlight",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Read The Fucking Prompt \u2014 finds the strongest user reaction to an AI instruction-following failure in a chosen session,"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
 }

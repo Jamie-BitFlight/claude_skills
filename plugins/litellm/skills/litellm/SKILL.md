@@ -372,8 +372,8 @@ export LITELLM_LOG="INFO"  # Enable LiteLLM debug logging
 
 For comprehensive documentation on related tools:
 
-- **llamafile**: Activate the llamafile skill using `Skill(command: "llamafile:llamafile")` for llamafile server setup, model management, and local LLM deployment patterns
-- **uv**: Activate the `astral:uv` skill (if installed) for Python project management, dependency handling, and virtual environment workflows
+- **llamafile**: If your workspace has an installed llamafile plugin, use it for server setup, model management, and local LLM deployment patterns. Otherwise, follow the endpoint and model-prefix guidance in this document directly.
+- **uv**: If your workspace has an installed Python/uv plugin, use it for project management, dependency handling, and virtual environment workflows. Otherwise, use standard `uv` commands and project-local environments.
 
 ## References
 

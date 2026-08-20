@@ -11,7 +11,7 @@ This skill implements mandatory verification checkpoints that prevent pattern-ma
 
 **When to use this skill:**
 
-- Before executing ANY implementation action (Bash, Write, Edit, NotebookEdit)
+- Before executing ANY implementation action (Bash, Write, Edit, or any other write-capable action)
 - After stating a hypothesis about what system/component has an issue
 - When choosing between multiple implementation approaches
 - When detecting potential pattern-matching from training data
@@ -49,15 +49,15 @@ EXAMPLE: "Hypothesis: The issue affects [specific system/component]"
 **Verification methods:**
 
 - Read relevant files to confirm system state
-- Check official documentation for expected behavior (use MCP tools: Ref for docs, exa for code context)
+- Check official documentation for expected behavior using the documentation and search tools available in your environment
 - Test or execute commands to observe actual behavior
 - Grep for configuration or implementation details
 
 **Test:**
 
-- Have I used Read/Grep/MCP tools (Ref/exa)/Bash (read-only) to gather evidence?
+- Have I used read-only file reads, project search, or read-only shell commands to gather evidence?
 - Can I cite specific files, line numbers, or outputs supporting my hypothesis?
-- Note: Prefer MCP tools (mcp**Ref for documentation, mcp**exa for code examples) over WebFetch for higher fidelity
+- Note: Prefer authoritative documentation and project-local evidence over ad hoc web fetching when possible
 
 **If NO:**
 
@@ -132,16 +132,15 @@ REQUIRED: Either:
 
 - Solution appears immediately without investigation
 - Executing command within 1-2 tool calls of error observation
-- Not using Read/Grep/MCP tools (Ref/exa) to verify before acting
+- Not using read-only file reads, project search, or documentation lookup to verify before acting
 - Thinking "this is the standard way to do X" without checking if project uses standard approach
 - Recognizing error pattern and jumping to common solution
 
-**Note on research tools:** Prefer MCP tools for verification:
+**Note on research tools:** Prefer authoritative sources for verification:
 
-- `mcp__Ref__ref_search_documentation` for high-fidelity documentation (verbatim source)
-- `mcp__exa__get_code_context_exa` for code examples and library usage
-- `mcp__exa__web_search_exa` for web research with LLM-optimized output
-- WebFetch as fallback only when MCP tools don't provide needed content
+- Use authoritative documentation and code-search tools available in your environment for high-fidelity evidence
+- Use web research only when project-local evidence and authoritative documentation are insufficient
+- Prefer the most direct source available, then cite what you observed
 
 > [Web resource access, definitive guide for getting accurate data for high quality results](./references/accessing_online_resources.md)
 
@@ -317,19 +316,19 @@ This skill works in conjunction with:
 - **agent-orchestration**: Orchestrator ensures sub-agents follow verification protocol
 - **holistic-linting**: Verification ensures fixes target root cause, not symptoms
 
-### Integration with CLAUDE.md Rules
+### Integration with Workspace Verification Rules
 
-This skill enforces existing CLAUDE.md verification protocols by adding structural gates:
+This skill enforces existing workspace verification protocols by adding structural gates:
 
-**CLAUDE.md states:** "The model must verify behavior with authoritative sources"
+**Workspace rules state:** "The model must verify behavior with authoritative sources"
 
 **This skill enforces:** "Cannot execute until verification completed and documented"
 
-**CLAUDE.md states:** "Never cargo cult code without verification"
+**Workspace rules state:** "Never cargo cult code without verification"
 
 **This skill enforces:** "Checkpoint 4 detects and blocks pattern-matching behavior"
 
-**CLAUDE.md states:** "Distinguish verified information from assumptions"
+**Workspace rules state:** "Distinguish verified information from assumptions"
 
 **This skill enforces:** "Checkpoint 2 requires evidence before proceeding"
 

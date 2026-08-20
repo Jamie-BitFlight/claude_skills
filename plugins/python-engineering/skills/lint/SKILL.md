@@ -1,7 +1,6 @@
 ---
 name: lint
 description: Runs deterministic Python quality checks against a path or scope — formatting, linting, type checking, and typing-boundary policy. Use when checking or fixing code quality via prek, ruff, ty, pytest, or the check-typing-boundaries policy script. Reports results grouped by category; fixes only when explicitly requested.
-disable-model-invocation: true
 argument-hint: '[path or scope]'
 ---
 

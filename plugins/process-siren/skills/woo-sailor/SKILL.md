@@ -2,7 +2,6 @@
 name: woo-sailor
 description: Optimize processes in a file or directory by converting prose/bullet workflows to Mermaid diagrams — delegates to the process-siren:process-siren agent. Use when given a single SKILL.md, agent file, CLAUDE.md, or rules file to convert, or a directory containing any of those. Supports --dry-run or --report for read-only planning mode.
 argument-hint: <file-or-directory> [--dry-run|--report]
-disable-model-invocation: true
 user-invocable: true
 context: fork
 agent: process-siren:process-siren

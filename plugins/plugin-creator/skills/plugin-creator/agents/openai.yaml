@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plugin Creator"
+  short_description: "Create a plugin through a structured delivery workflow"
+  default_prompt: "Use $plugin-creator to create this plugin."

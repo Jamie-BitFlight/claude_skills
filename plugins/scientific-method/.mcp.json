@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "experiment-registry": {
+      "command": "uv",
+      "args": ["run", "--script", "mcp/experiment-registry/server.py"],
+      "cwd": ".",
+      "env_vars": ["PWD", "CODEX_THREAD_ID"]
+    }
+  }
+}
