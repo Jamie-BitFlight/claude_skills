@@ -8,6 +8,44 @@ Navigation, Control set, etc.) are normatively defined in
 `docs/agent-markdown-consumption-contract.md` — this file is vocabulary only, for that area and
 every other area of the plugin as it gets resolved.
 
+## Dispatch Roles
+
+Three roles govern who may dispatch further agents and on whose behalf, defined by relationship —
+never by capability, and never by whether an agent happens to dispatch further work. See
+ADR-3113-1 for the incident that required stating this precisely.
+
+**Orchestrator**:
+The single interactive agent acting directly on behalf of the human. Exactly one per session,
+always. Defined by relationship, not capability: the orchestrator is whichever agent received the
+task directly from the human — not whichever agent happens to be dispatching subagents at a given
+moment. A subagent dispatching further subagents does not become the orchestrator by doing so; it
+remains a Manager or Worker, acting on behalf of whoever dispatched it.
+_Avoid_: "the orchestrator" as a synonym for "whoever is executing this skill" — that usage is the
+mechanism behind the #3060 incident (ADR-3113-1): a skill written in first person for the
+orchestrator, handed to a dispatched Worker, was read as license to dispatch further agents the
+Worker was never assigned to dispatch.
+
+**Manager**:
+A subagent explicitly assigned, by its own dispatcher, to decompose a scoped piece of work and
+dispatch further subagents within that scope. The assignment is always stated as data — in the
+delegation prompt, or in the SAM task's `executor` field once typed (see #3100) — never inferred
+from a loaded skill's own voice, and never adopted on the subagent's own initiative. Sub-dispatch
+is legitimate and valuable when assigned this way; see ADR-3113-1 for why unassigned adoption,
+not dispatch itself, is the actual defect.
+_Avoid_: "orchestrator" for this role — a Manager acts on behalf of its dispatcher, not on behalf
+of the human directly, and the two roles carry different obligations (see Orchestrator above).
+
+**Worker**:
+A subagent assigned one unit of work to execute directly. Never dispatches further subagents,
+regardless of what any skill it loads is written to instruct — a skill written for a Manager or
+the Orchestrator does not change a Worker's own assignment. On receiving an instruction to run a
+skill that speaks as if to a dispatcher, a Worker reports the conflict (`STATUS: BLOCKED`) rather
+than complying. `dh:task-worker` is this plugin's canonical Worker implementation.
+_Avoid_: assuming role is detectable from the environment or harness — role is always explicit,
+asserted by the dispatcher. This plugin targets Claude Code, Codex, and OpenCode; a detection
+mechanism tied to one harness's internals (e.g. inspecting a system prompt) does not port to the
+others and is not a sanctioned pattern even where it happens to work.
+
 ## Language
 
 **SAM (Stateless Agent Methodology)**:
