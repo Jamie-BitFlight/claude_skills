@@ -514,10 +514,9 @@ interface TeamConfig {
 
 SOURCE: [`core/src/agent-teams-service.ts` lines 11–23](https://github.com/langmartai/lm-assist/blob/104c96f89c8d51ed9d94d7de927142b28ff7df7c/core/src/agent-teams-service.ts#L11-L23), [`lines 38–45`](https://github.com/langmartai/lm-assist/blob/104c96f89c8d51ed9d94d7de927142b28ff7df7c/core/src/agent-teams-service.ts#L38-L45).
 
-**Correction**: The previous version of this document stated the path as
-`~/.claude/teams/<team-name>.json` (flat file). The actual path is
-`~/.claude/teams/<team-name>/config.json` (directory + config.json). Verified against
-`AgentTeamsService.getTeam()` which reads `path.join(this.teamsDir, teamName, 'config.json')`.
+The team config path is `~/.claude/teams/<team-name>/config.json` (directory + config.json).
+Verified against `AgentTeamsService.getTeam()` which reads
+`path.join(this.teamsDir, teamName, 'config.json')`.
 
 SOURCE: [`core/src/agent-teams-service.ts` line 39](https://github.com/langmartai/lm-assist/blob/104c96f89c8d51ed9d94d7de927142b28ff7df7c/core/src/agent-teams-service.ts#L39).
 

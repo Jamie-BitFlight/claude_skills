@@ -1,7 +1,5 @@
 # Plugin Creator Workflow Diagram
 
-<!-- Converted from mixed ASCII + sparse mermaid: complete agentic plugin creation workflow -->
-
 This diagram set covers the full agentic workflow for creating Claude Code plugins.
 Each diagram corresponds to a named phase in [SKILL.md](../SKILL.md).
 
