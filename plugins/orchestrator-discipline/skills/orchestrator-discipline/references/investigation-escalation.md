@@ -203,8 +203,6 @@ Total: ~500 chars consumed in orchestrator context.
 
 **Same root cause as investigation escalation** — orchestrator reads instead of waiting or delegating. The surface form differs: instead of reading source files, the orchestrator reads a running agent's output file mid-execution.
 
-**Observed in**: Session 77509a5e (2026-02-19, dasel plugin creation).
-
 ### What Happens
 
 The orchestrator launches a background agent with `run_in_background: true`, then calls `TaskOutput` with `block=false` on the running agent's output file to "peek" at progress. This pulls the raw JSONL agent transcript — full message payloads, tool call records, intermediate reasoning — directly into the orchestrator's context window.
