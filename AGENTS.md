@@ -249,6 +249,11 @@ flat directives, not `Edit`-trimming words from its existing structure.
 ### Markdown (Skills/Commands/Agents)
 
 - Skills are AI-facing documentation, NOT user documentation
+- Shipped skill/agent/reference content has exactly one reader: the agent executing it at runtime,
+  in whatever install it ends up in — never the plugin's own maintainer. Never write a maintenance
+  aside ("don't restate this here", "keep this in sync with X", "note for future editors") into
+  that content; the maintainer editing this repo is not that content's audience and never reads it
+  as instructions. Put maintenance notes in a commit message, PR description, or ADR instead.
 - Use imperative language ("The model MUST...")
 - No decorative `**bold**` — a model reads it as no stronger a signal than plain text. Use
   imperative wording for emphasis, backtick code-spans for literal identifiers (tool names, config
