@@ -339,16 +339,23 @@ acceptance-criteria-structured:   # optional, list of criterion objects
     check-command: "uv run pytest tests/test_auth.py"   # required, str
     expected-baseline: "any"  # optional, str — defaults to "any"
     expected-final: "pass"    # optional, str — defaults to "pass"
-issue: 1234                   # optional, integer issue number only
-owner_reference: "bd-a3f8"    # optional, str — provider-native owner identifier
 ```
 
 Acceptance criteria are accepted only as `acceptance-criteria-structured` criterion objects.
 A plain list of criterion strings is not a plan field; unrecognized plan-level keys are dropped
 silently, so criteria written that way never reach the plan.
 
-`issue` accepts an integer only. A non-numeric owner identifier goes in `owner_reference`.
-Passing both `issue` and `owner_reference` in the same call is rejected.
+`issue` and `owner_reference` associate the plan with an existing owner and are mutually
+exclusive — passing both in the same `create` call is rejected. Add at most one, matching the
+active backend:
+
+```yaml
+issue: 1234                   # GitHub backend: integer issue number only
+```
+
+```yaml
+owner_reference: "bd-a3f8"    # Beads (or other provider-native) backend: opaque owner identifier
+```
 
 Task fields — one object per task, used in `tasks` or in `append_task`:
 
