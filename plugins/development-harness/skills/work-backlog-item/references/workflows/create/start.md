@@ -112,9 +112,10 @@ Do not use `force=true` unless the user has already confirmed proceeding despite
 MCP and CLI are two equivalent interfaces to the same underlying `add_item()` operation — follow
 this workflow's `scope.md` read (above) and the field rules in Step 1/Step 2 regardless of which
 interface writes the item. Prefer MCP when available; use the CLI for scripting/dispatch contexts.
-The `backlog_add` tool's own `description` field (`backlog_core/server.py`) carries the canonical
-submission-quality template and is visible in the tool schema to any MCP caller — this workflow
-applies that same template; do not restate it here.
+The canonical submission-quality template lives in both interfaces' own schemas — the `backlog_add`
+tool's `description` field (`backlog_core/server.py`) for MCP callers, and `backlog add`'s
+`--description` help text (`sam_schema/backlog.py`) for CLI callers — this workflow applies that
+same template; do not restate it here.
 
 **MCP:**
 

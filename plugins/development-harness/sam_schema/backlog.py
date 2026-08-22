@@ -38,7 +38,17 @@ def _filter_pairs(filters: list[str] | None) -> dict[str, str] | None:
 @app.command("add")
 def add(
     title: Annotated[str, typer.Option("--title", help="Backlog item title")],
-    description: Annotated[str, typer.Option("--description", help="Item description")] = "",
+    description: Annotated[
+        str,
+        typer.Option(
+            "--description",
+            help=(
+                "Item description — cover the goal, reproduction steps (for a defect), impact, a "
+                "user story, the payoff, and existing observations; leave out prescriptive "
+                "solutions or fixes"
+            ),
+        ),
+    ] = "",
     priority: Annotated[str, typer.Option("--priority", help="Priority level (P0/P1/P2/Ideas)")] = "P1",
     source: Annotated[str, typer.Option("--source", help="Source of the item")] = "Not specified",
     type_: Annotated[str, typer.Option("--type", help="Item type (Feature/Bug/etc.)")] = "Feature",
