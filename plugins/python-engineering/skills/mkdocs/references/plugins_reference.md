@@ -178,19 +178,33 @@ Basic usage:
 With options:
 
 ```markdown
-::: mypackage.mymodule.MyClass options: show_source: false members: - method1 - method2 heading_level: 3
+::: mypackage.mymodule.MyClass
+    options:
+      show_source: false
+      members:
+        - method1
+        - method2
+      heading_level: 3
 ```
 
 Select specific members:
 
 ```markdown
-::: mypackage.mymodule options: members: - MyClass - my_function
+::: mypackage.mymodule
+    options:
+      members:
+        - MyClass
+        - my_function
 ```
 
 With custom handler:
 
 ```markdown
-::: mypackage.mymodule handler: python options: show_source: true show_root_heading: true
+::: mypackage.mymodule
+    handler: python
+    options:
+      show_source: true
+      show_root_heading: true
 ```
 
 ### Common Patterns
@@ -198,13 +212,20 @@ With custom handler:
 #### Document entire package
 
 ```markdown
-::: mypackage options: show_submodules: true
+::: mypackage
+    options:
+      show_submodules: true
 ```
 
 #### Document class with selected methods
 
 ```markdown
-::: mypackage.MyClass options: members: - **init** - important_method show_source: false
+::: mypackage.MyClass
+    options:
+      members:
+        - __init__
+        - important_method
+      show_source: false
 ```
 
 #### Cross-references
@@ -258,6 +279,8 @@ mkdocs_gen_files.set_edit_path("generated/hello.md", "gen_pages.py")
 #### Generate API Reference Pages
 
 ```python
+from pathlib import Path
+
 import mkdocs_gen_files
 
 for path in sorted(Path("src").rglob("*.py")):
@@ -284,6 +307,8 @@ for path in sorted(Path("src").rglob("*.py")):
 #### Generate Navigation
 
 ```python
+from pathlib import Path
+
 import mkdocs_gen_files
 
 # Create a nav file for literate-nav
