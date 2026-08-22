@@ -114,8 +114,7 @@ this workflow's `scope.md` read (above) and the field rules in Step 1/Step 2 reg
 interface writes the item. Prefer MCP when available; use the CLI for scripting/dispatch contexts.
 The canonical submission-quality template lives in both interfaces' own schemas — the `backlog_add`
 tool's `description` field (`backlog_core/server.py`) for MCP callers, and `backlog add`'s
-`--description` help text (`sam_schema/backlog.py`) for CLI callers — this workflow applies that
-same template; do not restate it here.
+`--description` help text (`sam_schema/backlog.py`) for CLI callers.
 
 **MCP:**
 
