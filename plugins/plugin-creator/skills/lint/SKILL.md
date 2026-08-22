@@ -12,4 +12,6 @@ $ARGUMENTS
 
 Run `uvx skilllint@latest check <path>` via Bash, using the exact literal path in <provided_path/>. Never splice <provided_path/> directly into a `` !`...` `` injection line or any other shell-interpreted string — it is caller-supplied text and may contain characters (`;`, `` ` ``, `$()`, `|`) that corrupt shell parsing on contact.
 
-@${CLAUDE_PLUGIN_ROOT}/references/ERROR_CODES.md
+Read the findings straight from the command output. Each one carries its error code, severity, the
+field or path it applies to, and the suggested fix. Report those to the user and act on them; do
+not look up a code anywhere else. Re-run with `--fix` to apply the auto-fixable ones.

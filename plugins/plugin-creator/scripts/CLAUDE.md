@@ -60,7 +60,7 @@ uvx skilllint@latest check --no-color <path>
 - Unquoted colons in descriptions — adds quotes to prevent YAML parsing failures
 - Adds `name:` field to plugin skills when absent (derived from directory name; required per agentskills.io spec)
 
-**Error Codes:** 23 error codes across 9 validators - see ERROR_CODES.md
+**Error Codes:** Each finding printed by `skilllint` carries its own code, severity, and suggested fix — read them from the command output.
 
 ### create_plugin.py
 

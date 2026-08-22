@@ -186,7 +186,7 @@ uvx skilllint@latest check --check {path}
 - Unquoted colons in descriptions — adds quotes to prevent YAML parsing failures
 - Missing `name:` fields in plugin skills (skilllint auto-adds name: from directory name; required per agentskills.io spec)
 
-**Error Codes:** See [ERROR_CODES.md](./scripts/ERROR_CODES.md) for complete reference (23 codes across 9 validators)
+**Error Codes:** Each finding printed by `skilllint` carries its own code, severity, and suggested fix — read them from the command output.
 
 ---
 
