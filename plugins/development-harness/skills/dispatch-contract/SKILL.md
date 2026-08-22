@@ -39,13 +39,16 @@ position.
 
 Then choose the target against that list:
 
-- A prebuilt specialist that fits the work and whose declared tool list covers every operation on
-  the list is the target. Dispatch it by name, and pass the task reference when there is one. Both
-  the dh agent roster and any agents the consuming harness supplies are candidates, and an empty
-  list leaves any fitting specialist viable.
-- A specialist that fits the work but cannot reach every operation on the list is not a dispatch
-  target. Dispatch `subagent_type="dh:task-worker"` and name that specialist in the prompt for the
-  worker to load through `profile_load`. The specialist's behavior still arrives; the operations
+- A prebuilt specialist is the target when it fits the work, its declared tool list covers every
+  operation on the list, and it declares `dh:dispatch-contract` in its own `skills:` frontmatter.
+  Dispatch it by name, and pass the task reference when there is one. Both the dh agent roster and
+  any agents the consuming harness supplies are candidates. An empty operation list drops the last
+  two conditions — an agent that calls none of these operations needs neither the reach nor this
+  contract — so any fitting specialist is viable.
+- A specialist that fits the work but misses either condition — an operation it cannot reach, or
+  this contract it does not declare — is not a dispatch target. Dispatch
+  `subagent_type="dh:task-worker"` and name that specialist in the prompt for the worker to load
+  through `profile_load`. The specialist's behavior still arrives; the operations and this contract
   arrive with the worker.
 - No specialist fits, and a generic agent is what you would otherwise reach for: dispatch
   `subagent_type="dh:task-worker"` in its place. Never dispatch `general-purpose` from a dh skill
@@ -54,12 +57,17 @@ Then choose the target against that list:
   the dh tools and skills the workflow needs, and it loads the specialist named by the task's
   `agent:` field as a profile.
 
-Read a candidate's declared tool list rather than inferring reach from its name. The dh roster
-declares the SAM and artifact operations; agents published by other plugins — a language plugin's
-design or implementation specialists — generally declare none of them, so a fitting specialist from
+Read a candidate's declared tool list and its declared `skills:` list rather than inferring either
+from its name. A dispatched agent starts with an empty conversation and inherits nothing its
+dispatcher loaded, so this contract reaches an executor only through that agent's own `skills:`
+frontmatter — an agent that does not declare it executes without it. The dh roster declares the SAM
+and artifact operations and this contract; agents published by other plugins — a language plugin's
+design or implementation specialists — generally declare neither, so a fitting specialist from
 another plugin usually reaches the work as a profile rather than as a dispatch target.
 
-Each unreachable operation fails silently in its own way. A specialist missing the SAM task
+Each missing condition fails silently in its own way. A specialist dispatched without this
+contract writes its result to a filesystem path or leaves it in its response text, so the next
+stage reads nothing where it expected a registered artifact. A specialist missing the SAM task
 operations produces output but never claims or closes the task, so the plan never advances and the
 work stays invisible to every later stage. One missing the artifact operations cannot read its
 inputs or register its output, so the next stage reads nothing where it expected a deliverable.
@@ -79,7 +87,7 @@ flowchart TD
     D([Dispatch about to be made]) --> Ops["List the dh operations the work requires:<br>SAM task operations when a task is handed over,<br>artifact operations when it reads or registers one,<br>profile_load when it adopts another agent's behavior"]
     Ops --> Fit{"A prebuilt specialist fits this work?"}
     Fit -->|No| Worker
-    Fit -->|Yes| Covers{"Its declared tool list reaches<br>every operation on the list?"}
+    Fit -->|Yes| Covers{"Its declared tool list reaches every operation,<br>and its skills frontmatter declares dh:dispatch-contract?"}
     Covers -->|Yes| Spec[Dispatch that specialist by name]
     Covers -->|No| Worker["Dispatch dh:task-worker, never general-purpose,<br>naming the specialist as the profile to load"]
     Spec --> Run[Run the work, calling those operations directly]
@@ -87,9 +95,9 @@ flowchart TD
 ```
 
 When adding a dispatch step to any dh skill, reference file, or workflow document, apply the same
-check: list the operations the step requires, then ask whether a prebuilt specialist both fits the
-work and reaches all of them. Name that specialist when it does. Write
-`subagent_type="dh:task-worker"` wherever the fitting specialist falls short of that list — naming
+check: list the operations the step requires, then ask whether a prebuilt specialist fits the work,
+reaches all of them, and declares this contract. Name that specialist when it does. Write
+`subagent_type="dh:task-worker"` wherever the fitting specialist falls short of any of those — naming
 it as the profile to load — and wherever a generic agent would otherwise be named.
 
 ## Artifacts and plans are logical records, not files

@@ -5,6 +5,8 @@ tools: Glob, Grep, ListMcpResourcesTool, Read, Write, Edit, ReadMcpResourceTool,
 model: sonnet
 color: cyan
 memory: project
+skills:
+  - dh:dispatch-contract
 ---
 
 You are the impact analyst for the development harness backlog grooming workflow.

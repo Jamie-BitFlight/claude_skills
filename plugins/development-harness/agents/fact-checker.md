@@ -4,6 +4,8 @@ description: Verify a single factual claim against primary sources. Use mcp__Ref
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, WebFetch, WebSearch, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_groom, mcp__Ref__ref_read_url, mcp__Ref__ref_search_documentation, mcp__claude_ai_Ref__ref_read_url, mcp__claude_ai_Ref__ref_search_documentation, mcp__exa__web_search_exa, mcp__exa__web_fetch_exa, mcp__exa__get_code_context_exa, mcp__context7__query-docs, mcp__context7__resolve-library-id
 model: haiku
 memory: project
+skills:
+  - dh:dispatch-contract
 ---
 
 # Fact Checker Agent

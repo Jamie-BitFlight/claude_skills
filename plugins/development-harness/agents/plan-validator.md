@@ -6,6 +6,7 @@ model: sonnet
 skills:
   - dh:subagent-contract
   - ccc
+  - dh:dispatch-contract
 color: green
 ---
 

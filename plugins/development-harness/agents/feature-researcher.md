@@ -7,6 +7,7 @@ skills:
   - dh:subagent-contract
   - ccc
   - dh:create-artifact
+  - dh:dispatch-contract
 color: cyan
 ---
 

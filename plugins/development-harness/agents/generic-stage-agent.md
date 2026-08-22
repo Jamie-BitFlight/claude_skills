@@ -3,6 +3,8 @@ name: generic-stage-agent
 description: Generic SDLC stage agent that executes workflow steps using loaded domain skills and quality gates
 tools: Read, Write, Edit, Bash, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
+skills:
+  - dh:dispatch-contract
 ---
 
 # Generic Stage Agent

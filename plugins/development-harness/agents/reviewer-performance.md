@@ -6,6 +6,7 @@ tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artif
 skills:
   - dh:subagent-contract
   - dh:file-classification
+  - dh:dispatch-contract
 user-invocable: false
 color: orange
 ---
