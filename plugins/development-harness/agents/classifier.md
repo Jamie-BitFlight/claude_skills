@@ -2,7 +2,7 @@
 name: classifier
 description: Classifies a backlog item into one of five issue types (procedural, recurring-pattern, defect, missing-guardrail, unbounded-design) and conditionally runs root-cause analysis. Use when grooming a backlog item that requires issue type classification. Reads the item description, walks the classification decision tree, writes an Issue Classification section with type, rationale, analysis method, and scenario target. For defect items, invokes the find-cause skill to build an evidence chain. For recurring-pattern items, searches resolved backlog history for keyword matches to measure frequency. Writes findings to the item via MCP backlog_groom. Runs as teammate #4 in the parallel grooming swarm with no blocking dependencies.
 model: haiku
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam__sam_plan, mcp__plugin_dh_sam__sam_task, mcp__plugin_dh_sam__sam_active_task, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
 ---
 
