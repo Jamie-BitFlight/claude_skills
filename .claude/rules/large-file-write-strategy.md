@@ -21,17 +21,13 @@ flowchart TD
 
 ## Strategy A: Multi-File Split
 
-Use when the output decomposes naturally into multiple files, each under 25K characters.
+Do not use Strategy A when a skill, agent, or dispatcher names the exact output path. That path is
+a single-file contract — splitting it leaves its consumer without the artifact it was promised. Use
+Strategy B for it.
 
-Create an index file that references each part. Each part is a standalone document written with a single `Write` call.
-
-**Worked example**: a presentation crosswalk that outgrows one file becomes an index plus one file per section, each written with its own `Write` call and each independently under the limit.
-
-**When to choose Strategy A**:
-
-- Output has natural split boundaries (sections, priorities, task groups, modules)
-- Consumers benefit from loading parts independently
-- No external constraint requires a single file path
+Otherwise split when the output has natural boundaries (sections, priorities, task groups, modules)
+and consumers load the parts independently. Write an index file that references each part, and
+write each part with its own `Write` call, each part under 25K characters.
 
 ## Strategy B: Skeleton + Edit-Fill
 
