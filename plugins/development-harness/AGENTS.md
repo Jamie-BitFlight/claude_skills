@@ -157,7 +157,7 @@ authoritative flag mapping.
 Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
 associate the returned logical address with the owning work item through `backlog_update`.
 
-**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id=<owner>, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
+**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id=<owner>, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate. `artifact_read` resolves by type alone, keeping only the most recently created entry when more than one exists — a second agent registering under an already-owned type does not add a sibling the reader can distinguish; it silently displaces the owner's entry the instant it registers later, inverting whatever gate reads that type.
 
 **Registration:** Producers call `artifact_register` after creating document-artifact content.
 Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores
