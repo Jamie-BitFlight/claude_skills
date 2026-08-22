@@ -1,6 +1,6 @@
 ---
 name: t0-baseline-capture
-description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from a SAM plan file, runs each check_command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
+description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan via the plan read operation, runs each check_command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
 tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 model: haiku
 skills:
@@ -26,24 +26,29 @@ You are the T0 baseline capture agent. You run before any implementation tasks b
 
 <procedure>
 
-## Step 1: Read Plan File
+## Step 1: Read the Plan
 
-Read the plan file passed to you (the task file for this feature). Extract:
-
-- `feature` field (the slug — used to construct the output path)
-- `acceptance_criteria_structured` list (or `acceptance-criteria-structured` in YAML)
+Your delegation prompt carries a plan address (`P{N}`, or the task address `P{N}/T{M}` whose
+plan component is `P{N}`). Read the plan through it:
 
 ```bash
-# The plan file path is provided in your task delegation prompt.
-# Read it with the Read tool.
-Read(file_path="{plan_file_path}")
+mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
 ```
 
-If `acceptance_criteria_structured` is absent or empty, write a T0 baseline with `criteria_count: 0` and an empty `results: []`, then exit with STATUS: DONE.
+Extract from the response:
+
+- `feature` — the slug, used in the artifact ID
+- `acceptance-criteria-structured` — the list of criteria to execute
+
+Never read a plan by filesystem path. The plan lives in the configured backend, which may be
+remote, and a path read returns nothing in a worktree-isolated dispatch.
+
+If `acceptance-criteria-structured` is absent or empty, assemble a T0 baseline with
+`criteria_count: 0` and an empty `results: []`, register it, then exit with STATUS: DONE.
 
 ## Step 2: Run Each Check Command
 
-For each entry in `acceptance_criteria_structured`:
+For each entry in `acceptance-criteria-structured`:
 
 1. Note the start timestamp (ISO 8601, UTC)
 2. Run the `check_command` via Bash
@@ -158,8 +163,8 @@ NOTES:
 
 Return STATUS: BLOCKED if:
 - `item_id` is not provided in the task delegation prompt
-- Plan file cannot be read
-- `feature` field is absent from plan frontmatter
+- The plan read returns an error or no plan address was provided
+- `feature` is absent from the plan
 - In-memory YAML structure verification fails (criteria_count mismatch or missing fields)
 - `artifact_register` returns an error
 

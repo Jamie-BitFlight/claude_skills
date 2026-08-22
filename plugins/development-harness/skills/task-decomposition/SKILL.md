@@ -1,6 +1,6 @@
 ---
 name: task-decomposition
-description: Decomposes a contextualized plan into atomic, independently executable task files with complete embedded context. Use after SAM Stage 3 Context Integration produces the contextualized plan artifact — when the plan is ready for TASK file generation with CLEAR ordering, CoVe checks, and dependency graphs for parallel execution.
+description: Decomposes a contextualized plan into atomic, independently executable tasks with complete embedded context, registered through the plan API. Use after SAM Stage 3 Context Integration produces the contextualized plan artifact — when the plan is ready for task generation with CLEAR ordering, CoVe checks, and dependency graphs for parallel execution.
 user-invocable: false
 ---
 
@@ -31,7 +31,7 @@ flowchart TD
     CoVe --> A5[5. Map dependencies]
     A5 --> A6[6. Assign roles]
     A6 --> Gate{Evaluate complexity}
-    Gate -->|Manageable| Done([ARTIFACT:TASK files])
+    Gate -->|Manageable| Done([Tasks registered in the plan])
     Gate -->|High complexity or novel architecture| Escalate([Human touchpoint — confirm decomposition])
 ```
 
@@ -52,8 +52,8 @@ Split along natural seams:
 
 ### Step 2 — Embed Complete Context
 
-Each task file IS the complete prompt. The executing agent has NO memory of
-previous stages. Embed everything needed:
+The task IS the complete prompt. The executing agent has NO memory of
+previous stages and reads nothing but what the task carries. Embed everything needed:
 
 - Relevant excerpts from ARTIFACT:PLAN (not "see plan" — inline it)
 - File paths and line ranges from contextualization
@@ -170,25 +170,32 @@ call `append_task` for the same plan from multiple agents or sessions simultaneo
 the full single-writer contract, see the `CLAUDE.md` gotcha note in
 `plugins/development-harness/CLAUDE.md`.
 
-Each file contains YAML frontmatter followed by CLEAR-ordered sections:
+Each task definition carries these routing fields. Any key outside the accepted set is
+rejected — do not invent fields:
 
-```markdown
----
-task: TASK-001
+```yaml
+task: T1
 title: <descriptive imperative title>
 status: not-started
-role: <architect / implementer / test-designer / code-reviewer / docs-writer>
+agent: <architect / implementer / test-designer / code-reviewer / docs-writer>
 dependencies: []
 priority: <1-5 based on dependency depth>
 complexity: <low / medium / high>
 accuracy-risk: <low / medium / high>
 parallelize-with: []
-parallel-rationale: <why parallelization is safe>
----
+```
 
+Record why parallelization is safe in `context-notes`; there is no separate rationale field.
+
+The task's prose fields hold the CLEAR-ordered content. Each heading below names the field
+that carries it — `context-notes`, `objective`, `requirements`, `constraints`,
+`expected-outputs`, `acceptance-criteria`, `verification-steps`, `handoff` — and any
+remaining narrative goes in `body`:
+
+```markdown
 ## Context
 
-<embedded context from plan — NOT "see PLAN.md">
+<the context this task needs, written out in full — never a pointer to another document>
 
 ## Objective
 
@@ -243,7 +250,7 @@ After decomposition, evaluate whether escalation is needed:
 
 ```mermaid
 flowchart TD
-    Tasks([Task files generated]) --> Q1{Novel architecture pattern?}
+    Tasks([Tasks generated]) --> Q1{Novel architecture pattern?}
     Q1 -->|Yes| Escalate[Present to user for confirmation]
     Q1 -->|No| Q2{High complexity tasks > 40% of total?}
     Q2 -->|Yes| Escalate
@@ -256,8 +263,9 @@ flowchart TD
 
 ## Behavioral Rules
 
-- Every task must be self-contained — an agent reading ONLY the task file can execute it
-- Never reference PLAN.md or DISCOVERY.md by "see X" — inline the relevant content
+- Every task must be self-contained — an agent given ONLY that task can execute it
+- Never point at an upstream artifact by "see X" — inline the content the task needs. The
+  executing agent has no guaranteed access to the discovery or plan artifact you read
 - Never assign specific agent names — use roles
 - Tasks must not have circular dependencies
 - Each acceptance criterion must be verifiable by the executing agent alone
