@@ -155,7 +155,7 @@ metadata:
 
 ### Body Sections
 
-Sections are populated incrementally as the item moves through the lifecycle. A newly created item has Description only. Downstream skills add the rest — Acceptance Criteria is a grooming output, not an intake one.
+Sections are populated incrementally as the item moves through the lifecycle. An item created through `backlog_add` has Description only; downstream skills add the rest. Other creation paths may supply more — `group-items-to-milestone` authors a story-format body when it creates a missing issue.
 
 ```text
 1.  Description                    (written by: create-backlog-item)
