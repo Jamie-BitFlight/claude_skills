@@ -343,8 +343,6 @@ async def test_auth_domain():
 1. [FastMCP Contrib](https://gofastmcp.com/patterns/contrib) (accessed 2026-03-05)
 2. [FastMCP Cli](https://gofastmcp.com/patterns/cli) (accessed 2026-03-05)
 3. [FastMCP Showcase](https://gofastmcp.com/community/showcase) (accessed 2026-03-05)
-4. `plan/feature-context-fastmcp-creator-v3-overhaul.md` — GitHub usage research (accessed 2026-03-05)
-5. `plan/feature-context-fastmcp-creator-v3-overhaul.md` — Real-World Usage Patterns (accessed 2026-03-05)
 6. [FastMCP Cli](https://gofastmcp.com/patterns/cli)
 7. [FastMCP Contrib](https://gofastmcp.com/patterns/contrib)
 8. [FastMCP Showcase](https://gofastmcp.com/community/showcase)

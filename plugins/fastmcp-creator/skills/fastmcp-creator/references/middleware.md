@@ -1,8 +1,6 @@
-<!-- Extracted from advanced.md to reduce file size. Canonical middleware reference. --> [1]
-
 ## Middleware
 
-CONSTRAINT: Middleware is a FastMCP-specific concept — it is not part of the MCP protocol specification. Available since FastMCP 2.9.0.
+CONSTRAINT: Middleware is a FastMCP-specific concept — it is not part of the MCP protocol specification. Available since FastMCP 2.9.0. [1]
 
 PATTERN: Middleware forms a pipeline around every operation. Requests flow through each middleware in order; responses flow back in reverse. The key decision point is `call_next(context)` — calling it continues the chain, not calling it stops processing entirely.
 

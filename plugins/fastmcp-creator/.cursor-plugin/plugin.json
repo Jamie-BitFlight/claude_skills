@@ -1,7 +1,7 @@
 {
   "name": "fastmcp-creator",
   "description": "Build FastMCP 3.x Python MCP servers \u2014 covers provider/transform architecture (including CodeMode, Tool Search, and server-level transforms), component versioning, session state, authorization (MultiAuth, PropelAuth, connection-pooled token verifiers), evaluation creation, Pydantic validation, async patterns, STDIO and HTTP transports, nginx reverse proxy deployment, background tasks, Prefab Apps UI, security patterns, client SDK usage, testing, deployment, and migration from FastMCP v2. TypeScript is a legacy reference only and is not updated for v3.",
-  "version": "4.2.8",
+  "version": "4.2.9",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
