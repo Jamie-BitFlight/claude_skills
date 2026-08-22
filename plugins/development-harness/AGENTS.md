@@ -241,28 +241,12 @@ The manifest schema is documented in [./skills/development-harness/references/la
 
 ## Dispatch Pattern (Extension Rules)
 
-**`dh:task-worker` is the universal dispatch agent for all dh workflows. It must be used for every agent dispatch — no exceptions.**
+The runtime contract an executing agent follows — dispatch target, how a task's `agent:` field
+resolves after dispatch, and the artifact-versus-filesystem boundary — lives in the
+`/dh:dispatch-contract` skill. Load it rather than restating it here or in any agent file.
 
-**Every dh skill and extension point dispatches `dh:task-worker`; specialist behavior is loaded internally through the task's `agent:` profile.**
-
-### Why
-
-`dh:task-worker` carries full dh tool permissions (SAM MCP, backlog MCP). When a task's `agent:` field is set, `task-worker` reads it via SAM MCP and passes it to `profile_load` to load specialist behavior internally. This ensures the SAM lifecycle (claim → execute → `sam_task(config={"action":"state"})`) is always owned by an agent that has the tools to execute it.
-
-Dispatching `dh:task-worker` preserves SAM and backlog MCP access so the worker can execute the complete SAM lifecycle and update task state.
-
-### The `agent:` field in SAM task YAML is not an orchestrator routing directive
-
-The `agent:` field is read by `task-worker` — not by the orchestrator. The orchestrator always passes only the task reference (plan address + task ID). `task-worker` internally calls `profile_load(agent_name=...)` to specialize its behavior for that task.
-
-```mermaid
-flowchart TD
-    Orchestrator([Orchestrator]) -->|"subagent_type='dh:task-worker'"| Worker[dh:task-worker]
-    Worker -->|"sam_task(plan, task, config={action:read})"| SAM[SAM MCP]
-    SAM -->|"agent: field value"| Worker
-    Worker -->|"profile_load(agent_name=...)"| Profile[Specialist behavior loaded]
-    Profile --> Execute[Execute task with full dh tool permissions]
-```
+The mechanism specific to this plugin's implementation: `task-worker` reads the task's `agent:`
+value via SAM MCP and passes it to `profile_load` to load specialist behavior internally.
 
 ### Extension rule
 
@@ -331,6 +315,7 @@ When adding a new dispatch step to any dh skill, reference file, or workflow doc
 
 - `/dh:dispatch` - Dispatch tasks to agents using teams-first parallel execution; prefer over implement-feature when milestone-scoped work needs concurrent agent dispatch
 - `/dh:dh-meta-docs` - Plugin meta-documentation
+- `/dh:dispatch-contract` - Runtime execution contract: dispatch target, task `agent:` field resolution, artifact-vs-filesystem boundary
 - `/dh:interop` - Cross-plugin interoperability
 - `/dh:subagent-contract` - Subagent contract definitions
 

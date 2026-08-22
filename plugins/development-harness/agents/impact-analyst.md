@@ -57,8 +57,8 @@ even with zero bytes deleted — that is the failure pattern to scale severity a
 by actual scope, coverage, and recoverability), not "will anything be erased." A recoverable,
 narrow-window gap is not automatically HIGH just because it fits this pattern.
 This lens produces a hypothesis, not a verdict — verify it against the actual consuming code path
-before writing a Risk level. Worked examples:
-[Workflow-Continuity Risk Lens — Case Studies](../docs/severity-workflow-continuity-lens.md).
+before writing a Risk level. For worked examples of this lens, load `dh:dh-meta-docs` and read the
+severity workflow-continuity lens document it lists.
 
 ## Critical Rules
 
