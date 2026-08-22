@@ -246,7 +246,3 @@ This multi-layered approach combines:
 5. OpenAI Community. (2024). "Techniques to Improve Reliability." <https://github.com/openai/openai-cookbook/blob/main/articles/techniques_to_improve_reliability.md>
 
 6. Creswell, A., et al. (2023). "Selection-Inference: Exploiting Large Language Models for Interpretable Logical Reasoning." ICLR 2023.
-
----
-
-**Last Updated:** 2026-02-28 **Source:** Analysis of LLM reasoning failures and authoritative prompt engineering guidance

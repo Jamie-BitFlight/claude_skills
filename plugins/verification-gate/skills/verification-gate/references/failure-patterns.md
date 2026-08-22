@@ -2,7 +2,7 @@
 
 This document catalogs real-world examples of verification failures and demonstrates how the verification gate checkpoints prevent them.
 
-## Pattern 1: The PEP 723 Misalignment (From Transcript Analysis)
+## Pattern 1: The PEP 723 Misalignment
 
 ### Failure Sequence
 
@@ -359,7 +359,7 @@ Test failures mean "code and test disagree" - must determine which is correct. N
 3. Pattern recognition overrides explicit reasoning
 4. Action executes on pattern-matched system, not reasoned system
 
-**Example from transcript:**
+**Example:**
 
 - System 2: "PEP 723 dependencies" (explicitly stated)
 - System 1: "ModuleNotFoundError" → `uv sync` (pattern-matched)
@@ -462,9 +462,3 @@ When reviewing past work for verification failures:
 2. **Determine which checkpoint would have blocked it:** Usually Checkpoint 3 (alignment)
 3. **Extract the lesson:** What evidence-gathering would have revealed the misalignment?
 4. **Document the pattern:** Add to this reference for future prevention
-
-This reference grows as new failure patterns are observed and analyzed.
-
----
-
-**Last Updated:** 2026-02-28 **Source:** Real-world verification failure analysis from transcript and historical incidents

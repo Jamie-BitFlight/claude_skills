@@ -81,10 +81,3 @@ VALIDATION:
   - skilllint-check: PASS|FAIL    (uvx skilllint@latest exit code on output skill)
   - frontmatter-check: PASS|FAIL  (required fields present in SKILL.md)
 ```
-
-## Compliance Notes
-
-Prior to this canonical definition, `rewrite-room-cite` used a divergent VALIDATION format
-that reported numeric counts rather than validator PASS/FAIL outcomes. That format is not
-compliant with this contract. All agents must use the `validators run and PASS/FAIL results`
-format defined in the Base Format section above.
