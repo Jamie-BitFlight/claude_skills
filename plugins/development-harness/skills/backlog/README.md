@@ -159,7 +159,7 @@ Sections are populated incrementally as the item moves through the lifecycle. A 
 
 ```text
 1.  Description                    (written by: create-backlog-item)
-2.  Acceptance Criteria            (written by: create-backlog-item)
+2.  Acceptance Criteria            (written by: groom-backlog-item)
 3.  Research First                 (optional — written by: create-backlog-item)
 4.  Suggested Location             (optional — written by: create-backlog-item)
 5.  Fact-Check                     (written by: groom-backlog-item Step 4)

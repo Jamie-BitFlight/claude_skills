@@ -52,7 +52,7 @@ Sections appear in this order. All sections after Description are populated incr
 
 ```
 1.  Description                        (written by: create-backlog-item — body prose)
-2.  Acceptance Criteria                (written by: create-backlog-item — bullet list)
+2.  Acceptance Criteria                (written by: groom-backlog-item — bullet list)
 3.  Research First                     (written by: create-backlog-item — optional)
 4.  Suggested Location                 (written by: create-backlog-item — optional)
 5.  Fact-Check                         (written by: groom-backlog-item Step 4)
