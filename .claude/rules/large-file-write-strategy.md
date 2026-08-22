@@ -2,9 +2,11 @@
 
 ## Scope
 
-This policy applies to agents that produce documents exceeding **25,000 characters** in a single output: `swarm-task-planner`, `python-cli-design-spec`, `codebase-analyzer`, `ecosystem-researcher`, and `feature-researcher`. Any agent producing a document that may exceed 25K characters follows this strategy.
+This policy applies to any agent that writes a document to the filesystem with a single `Write` call and may exceed **25,000 characters**. The 25K threshold reflects the practical reliability limit of one `Write` call; beyond it, writes risk truncation, timeout, or silent data loss.
 
-The 25K threshold reflects the practical reliability limit of a single `Write` tool call. Beyond this size, writes risk truncation, timeout, or silent data loss. The strategies below ensure all content reaches disk intact.
+It does not apply to output stored through an MCP operation. An agent that returns its result through a plan, task, or artifact operation writes no file, so no `Write` limit applies to it. Size limits on that path belong to the configured provider, are not 25K, and are not addressed here — check the provider before assuming one exists.
+
+Determine which case applies by reading what the agent's dispatcher instructs it to call, not by the size of what it produces.
 
 ## Decision Flowchart
 
@@ -23,7 +25,7 @@ Use when the output decomposes naturally into multiple files, each under 25K cha
 
 Create an index file that references each part. Each part is a standalone document written with a single `Write` call.
 
-**Canonical example**: The `swarm-task-planner` agent's 500-line progressive disclosure policy already implements Strategy A. Plans under 500 lines produce a single `PLAN.md`. Plans at or above 500 lines produce a `PLAN/` directory with `index.md` and per-priority part files (e.g., `priority-1-foundation.md`, `priority-2-features.md`). Each part stays under the 25K character limit independently.
+**Worked example**: a presentation crosswalk that outgrows one file becomes an index plus one file per section, each written with its own `Write` call and each independently under the limit.
 
 **When to choose Strategy A**:
 
