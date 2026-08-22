@@ -132,8 +132,8 @@ Related observation, possibly a separate defect: on #3151 the item metadata carr
 **Verdict: VERIFIED**
 
 Before the fix, parsing.py lines 652-658 show:
-- `role = ROLE_MAP.get(item_type, "developer using Claude Code skills")`
-- `benefit = BENEFIT_MAP.get(item_type, "the product improves")`
+- `role = ROLE_MAP.get(item_type, "developer using Claude Code skills")`  
+- `benefit = BENEFIT_MAP.get(item_type, "the product improves")`  
 - `goal = title.rstrip(".")`
 - `f"## Story\n\nAs a **{role}**, I want to **{goal.lower()}** so that **{benefit}**."`
 
@@ -454,7 +454,7 @@ Condition 10 is the disposition question. It is DERIVABLE rather than MISSING be
 
 *Git history evidence (commits since fix base):*
 - `6214055af` — "resolve backlog_view read-path/section-key visibility bug (#2956)"
-- `c527427e8` — "remaining PR #2987 Copilot review findings (#3015)"
+- `c527427e8` — "remaining PR #2987 Copilot review findings (#3015)"  
 - `f98a87941` — "distinguish absent from mis-keyed sections in view filter (#3047)"
 - Plus: "reject Description as section write target", "heal stale non-canonical section keys", "merge colliding section headings"
 - **Count**: 6+ commits addressing section-key corruption, synthetic content visibility, and malformed entries
@@ -623,7 +623,7 @@ Same problem class appears at minimum across these commits (git history since de
 - Commit `c527427e8` / Issue #3015: Section-key and collision fixes
 - Commit `f98a87941` / Issue #3047: "distinguish absent from mis-keyed sections" — synthetic/malformed entry differentiation
 - Regression guard `test_backlog_core_parsing.py:797-815`: "old synthetic header bug"
-- Current: Issue #3152 — Story and Acceptance Criteria generated at creation
+- Current: Issue #3152 — Story and Acceptance Criteria generated at creation  
 - Mentioned: Issue #3153 — sentinel values written where dates are read
 
 **Root cause of recurring pattern**
