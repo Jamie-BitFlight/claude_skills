@@ -51,6 +51,46 @@ class TestWrapEntryDoesNotNest:
         assert _RAW_CONTENT in result
         assert result.endswith("</div>")
 
+    def test_wrapper_with_a_non_timestamp_id_is_wrapped_normally(self) -> None:
+        """An entry-shaped block whose ID is not a timestamp is not adopted as an entry.
+
+        Tests: The already-wrapped guard requires a well-formed entry ID
+        How: Submit an HTML example documenting the entry format, with a label ID
+        Why: Adopting it would persist "example-id" as the entry ID; a later
+             ``since=`` read then raises in _parse_entry_timestamp — the same crash
+             the zero-date fix below closes, reintroduced through the guard itself
+        """
+        documented_example = "<div><sub>example-id</sub>\n\nthis is what an entry looks like\n</div>"
+
+        result = wrap_entry(documented_example)
+
+        assert result != documented_example
+        assert result.startswith("<div><sub>")
+        assert documented_example in result
+
+    def test_non_timestamp_id_does_not_break_the_since_filter(self) -> None:
+        """Wrapping a documented example keeps the section filterable by ``since``."""
+        documented_example = "<div><sub>example-id</sub>\n\nexample body\n</div>"
+
+        wrapped = wrap_entry(documented_example)
+
+        assert parse_entries(wrapped, since="2026-01-01", added_date="2026-08-22") != []
+
+    def test_dedup_suffixed_id_is_still_recognised(self) -> None:
+        """``_resolve_duplicate_ids`` appends ``-N``; such an ID is still a real entry.
+
+        Why: Tightening the guard must not reject IDs the codebase itself produces.
+        """
+        suffixed = "<div><sub>2026-08-22T14:58:39Z-1</sub>\n\nsecond entry that day\n</div>"
+
+        assert wrap_entry(suffixed) == suffixed
+
+    def test_zero_date_id_is_still_recognised(self) -> None:
+        """The zero-date fallback ID is a real (if unknown-timestamp) entry ID."""
+        legacy = "<div><sub>0000-00-00T00:00:00Z</sub>\n\nlegacy unwrapped seed\n</div>"
+
+        assert wrap_entry(legacy) == legacy
+
     def test_content_merely_mentioning_a_div_is_still_wrapped(self) -> None:
         """Prose that references a div but is not itself an entry block still gets wrapped.
 

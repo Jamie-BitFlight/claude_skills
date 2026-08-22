@@ -63,7 +63,7 @@ Use `AskUserQuestion`: "Which items to add? (comma-separated numbers, or 'all', 
 
 For each selected item with no `**Issue**: #N`:
 
-Build story-format body (Story / Description / Acceptance Criteria / Context). Create issue using the Python script (preferred — handles label creation automatically):
+Build the body from Description and Context only. Do NOT synthesise a Story or Acceptance Criteria section: both are grooming outputs, written during refinement from information that does not exist at creation time. A section emitted here satisfies `groom/finalize.md`'s required-sections gate without anyone having written a criterion, and a Story derived from the title inverts the meaning of any item titled after the thing to be removed (#3152). Create the issue using the Python script (preferred — handles label creation automatically):
 
 ```bash
 uv run .claude/skills/gh/scripts/github_project_setup.py issue create \

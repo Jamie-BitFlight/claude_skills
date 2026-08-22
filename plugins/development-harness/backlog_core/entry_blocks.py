@@ -17,9 +17,16 @@ _ISO_TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?
 # Prefix of the fallback entry ID assigned to unwrapped (legacy) content when no real
 # ``added`` date is available. It is not a representable date, so it can never be parsed.
 _ZERO_DATE_PREFIX = "0000-00-00"
+# An entry ID: an ISO timestamp, optionally carrying the ``-N`` dedup suffix
+# ``_resolve_duplicate_ids`` appends. The zero-date fallback ID matches this shape too.
+_ENTRY_ID_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(?:-\d+)?"
 # Matches a string that is ENTIRELY one or more complete entry blocks. Greedy ``.*`` so the
-# match runs to the final ``</div>`` rather than the first.
-_ALREADY_WRAPPED_RE = re.compile(r"\A<div><sub>[^<]+</sub>\s*.*</div>\Z", re.DOTALL)
+# match runs to the final ``</div>`` rather than the first. The ``<sub>`` must hold a
+# well-formed entry ID: content that merely looks like an entry block but carries an arbitrary
+# label — an HTML example documenting the entry format, say — must be wrapped normally rather
+# than adopted as an entry. Adopting it would persist the label as the entry ID, and any later
+# ``since=`` read would then raise in ``_parse_entry_timestamp``.
+_ALREADY_WRAPPED_RE = re.compile(rf"\A<div><sub>{_ENTRY_ID_PATTERN}</sub>\s*.*</div>\Z", re.DOTALL)
 
 
 def _parse_entry_timestamp(entry_id: str) -> datetime:
