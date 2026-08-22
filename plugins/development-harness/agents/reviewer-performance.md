@@ -132,7 +132,7 @@ mcp__plugin_dh_backlog__artifact_register(
   artifact_type="codebase-analysis",
   artifact_id="code-review-performance-{issue_number}",
   content={structured_verdict_json},
-  status="complete",
+  status="current",
   agent="reviewer-performance"
 )
 ```

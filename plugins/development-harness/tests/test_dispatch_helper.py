@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from dispatch_helper import build_dispatch_prompt
 from manifest_schema import LanguageManifest, ProjectDetection, QualityGates
 
@@ -26,7 +24,8 @@ class TestBuildDispatchPrompt:
         prompt = build_dispatch_prompt(
             stage="implementation",
             manifest=manifest,
-            task_file="plan/tasks-1-auth/T1.md",
+            plan="P123-auth",
+            task="T1",
             stage_workflow_skill="development-harness:execution",
             cross_cutting_skill="development-harness:implementation",
         )
@@ -36,7 +35,7 @@ class TestBuildDispatchPrompt:
         assert "development-harness:implementation" in prompt
         assert "python3-implementation" in prompt
         assert "python3-implementation-cli" in prompt
-        assert "plan/tasks-1-auth/T1.md" in prompt
+        assert 'sam_task(plan="P123-auth", task="T1"' in prompt
         assert "uv run ruff format" in prompt
         assert "uv run ruff check" in prompt
         assert "uv run pytest" in prompt
@@ -53,7 +52,8 @@ class TestBuildDispatchPrompt:
         prompt = build_dispatch_prompt(
             stage="discovery",
             manifest=manifest,
-            task_file="plan/task.md",
+            plan="P123-auth",
+            task="T1",
             stage_workflow_skill="development-harness:discovery",
             cross_cutting_skill=None,
         )
@@ -76,14 +76,15 @@ class TestBuildDispatchPrompt:
         prompt = build_dispatch_prompt(
             stage="discovery",
             manifest=manifest,
-            task_file="plan/task.md",
+            plan="P123-auth",
+            task="T1",
             stage_workflow_skill="development-harness:discovery",
             cross_cutting_skill=None,
         )
-        assert "plan/task.md" in prompt
+        assert 'sam_task(plan="P123-auth", task="T1"' in prompt
 
-    def test_output_artifact_path_included(self) -> None:
-        """I5: Dispatch prompt should include the output artifact path."""
+    def test_output_artifact_target_included(self) -> None:
+        """I5: Dispatch prompt routes stage output through artifact_register, not a file path."""
         manifest = LanguageManifest(
             name="python3",
             language="python",
@@ -94,12 +95,18 @@ class TestBuildDispatchPrompt:
         prompt = build_dispatch_prompt(
             stage="implementation",
             manifest=manifest,
-            task_file="plan/task.md",
+            plan="P123-auth",
+            task="T1",
             stage_workflow_skill="development-harness:execution",
             cross_cutting_skill=None,
-            output_artifact_path=Path("plan/output/T1-result.md"),
+            item_id=1770,
+            artifact_type="architect",
+            artifact_id="architect-auth",
         )
-        assert "plan/output/T1-result.md" in prompt
+        assert "artifact_register(item_id=1770" in prompt
+        assert 'artifact_type="architect"' in prompt
+        assert 'artifact_id="architect-auth"' in prompt
+        assert ".md" not in prompt
 
     def test_files_template_variable_documented(self) -> None:
         """N5: Dispatch prompt should document {files} template variable contract."""
@@ -113,7 +120,8 @@ class TestBuildDispatchPrompt:
         prompt = build_dispatch_prompt(
             stage="implementation",
             manifest=manifest,
-            task_file="plan/task.md",
+            plan="P123-auth",
+            task="T1",
             stage_workflow_skill="development-harness:execution",
             cross_cutting_skill=None,
         )
@@ -133,7 +141,8 @@ class TestBuildDispatchPrompt:
         prompt = build_dispatch_prompt(
             stage="implementation",
             manifest=manifest,
-            task_file="plan/task.md",
+            plan="P123-auth",
+            task="T1",
             stage_workflow_skill="development-harness:execution",
             cross_cutting_skill="development-harness:implementation",
         )

@@ -1,7 +1,7 @@
 ---
 name: t0-baseline-capture
 description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan via the plan read operation, runs each check-command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
-tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
+tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 model: haiku
 skills:
   - dh:subagent-contract
@@ -29,7 +29,8 @@ You are the T0 baseline capture agent. You run before any implementation tasks b
 ## Step 1: Read the Plan
 
 Your delegation prompt carries a plan address (`P{N}`, or the task address `P{N}/T{M}` whose
-plan component is `P{N}`). Read the plan through it:
+plan component is `P{N}`). Read the plan through it — it is a logical identifier, not a
+filesystem path, so never open it with a file read:
 
 ```bash
 mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
@@ -138,7 +139,7 @@ mcp__plugin_dh_backlog__artifact_register(
     artifact_type="T0-baseline",
     artifact_id="T0-baseline-{slug}",
     content={yaml_string},
-    status="complete",
+    status="current",
     agent="t0-baseline-capture"
 )
 ```

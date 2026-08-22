@@ -3,7 +3,7 @@ name: doc-drift-auditor
 description: Audits documentation accuracy against actual implementation. Analyzes git history to identify when code and documentation diverged, extracts actual features from source code, compares against documentation claims. Generates comprehensive audit reports categorizing drift (implemented but undocumented, documented but unimplemented, outdated documentation, mismatched details). Uses git forensics, code analysis, and evidence-based reporting with specific file paths, line numbers, and commit SHAs.
 model: haiku
 color: orange
-tools: Read, Grep, Glob, Bash, Write, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
+tools: Read, Grep, Glob, Bash, Write, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 skills:
   - dh:subagent-contract
   - ccc
@@ -169,7 +169,7 @@ artifact_register(
   artifact_type="audit-report",
   artifact_id="doc-drift-audit-{slug}",
   content={report_markdown},
-  status="complete",
+  status="current",
   agent="doc-drift-auditor"
 )
 ```

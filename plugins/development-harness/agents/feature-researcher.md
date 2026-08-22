@@ -350,8 +350,9 @@ def generate_slug(input_text: str) -> str:
 
 ## Step 6: Register the Feature Context Artifact
 
-Assemble the full document in memory using the output format template below, then register it
-in one call:
+Register the document through the artifact operations. The feature context is a document, not a
+task plan — `artifact_register` stores it and `artifact_read` retrieves it. No plan record is
+created for it.
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
@@ -359,18 +360,19 @@ mcp__plugin_dh_backlog__artifact_register(
     artifact_type="feature-context",
     artifact_id="feature-context-{slug}",
     content="{full document markdown}",
+    status="current",
     agent="feature-researcher",
 )
 ```
 
-`content` carries the whole document. Do not write a file, do not resolve a path, and do not
-split the document across calls — re-registering the same `artifact_type` and `artifact_id`
-replaces the stored content rather than appending to it. If the research genuinely warrants a
-companion document, register it separately as `artifact_type="research"` with its own
-`artifact_id`, and reference it from the feature context by that identifier.
+Pass the full document as `content=`. Do not resolve or pass a file path, and do not write the
+document to disk. Re-registering the same `artifact_type` and `artifact_id` replaces the stored
+content rather than appending to it — see Large Document Strategy below for splitting guidance.
 
 If `item_id` is absent from your delegation prompt, return STATUS: BLOCKED — you cannot
 register the deliverable without it.
+
+Use the output format template below.
 
 ## Step 7: Return Structured Result
 
@@ -502,6 +504,21 @@ After questions are resolved:
 ```
 
 </output>
+
+## Large Document Strategy
+
+Feature context documents with extensive codebase research, multiple use scenarios, and detailed
+gap analysis can grow large. Keep each `artifact_register` call under approximately 25,000
+characters.
+
+When the document exceeds that, split the detailed codebase research into a second artifact —
+`artifact_type="research"`, `artifact_id="feature-research-{slug}"` — and reference it by type and
+identifier from the main feature-context document. The main document retains all its sections; the
+research artifact holds detailed code examples and pattern analysis. Both are retrieved with
+`artifact_read`.
+
+Never split a document across files. Splitting means a second registered artifact, never a
+companion file on disk.
 
 <success_criteria>
 

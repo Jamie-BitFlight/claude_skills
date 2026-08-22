@@ -92,7 +92,10 @@ When all workers return:
 3. Run verification (tests, linter) across the full changeset
 4. Relay synthesis findings to user or feed into next wave
 
-File pointer pattern: instruct workers to write findings to `.tmp/scratch/reports/` and return the path, or register artifacts via `artifact_register` and return the artifact type. Read reports, not inline summaries, to keep orchestrator context lean.
+Artifact pointer pattern: instruct workers to register findings via `artifact_register` with the
+full text as `content=`, and to return only the artifact type and identifier. Retrieve each with
+`artifact_read` when you need the detail. This keeps orchestrator context lean without any worker
+writing a file for another step to read.
 
 ### 6 — Clean Up
 

@@ -159,10 +159,10 @@ Use the `dispatch_create_plan` MCP tool (on the backlog server) to create or upd
 
 **Parameters:**
 
-- `milestone_number` — GitHub milestone number; the tool writes to `plan/milestone-{N}-dispatch.yaml`
+- `milestone_number` — GitHub milestone number; the tool stores the plan under a provider-owned reference keyed by it. Retrieve it with `dispatch_read(milestone_number)`, never by opening a path
 - `plan` — typed DispatchPlan object containing the full dispatch plan (accepts both kebab-case and snake_case keys)
-- `overwrite` — Allow replacing an existing plan file; set to `True` when re-grooming (default: `False`)
-- `validate` — Run `validate_plan_integrity()` after writing and include results in response (default: `True`)
-- `issue` — Optional GitHub issue number; when provided, auto-registers the plan file as a `dispatch-plan` artifact
+- `overwrite` — Allow replacing an existing stored plan; set to `True` when re-grooming (default: `False`)
+- `validate` — Run `validate_plan_integrity()` after storing and include results in response (default: `True`)
+- `issue` — Optional GitHub issue number; when provided, auto-registers the plan as a `dispatch-plan` artifact
 
 **Response:** Returns `milestone_number`, `wave_count`, `item_count`, `is_valid`, `errors`, `warnings`, and `messages`. On error, the response contains an `error` key with a description.

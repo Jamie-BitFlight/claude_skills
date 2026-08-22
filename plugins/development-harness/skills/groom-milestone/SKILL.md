@@ -27,7 +27,7 @@ All items in the milestone are groomed, dependency-analyzed, and conflict-groupe
 - A dependency graph (item-to-item) is produced with conflict groups identified
 - Any items recommended for splitting have been split (user-approved)
 - Any items recommended for addition have been added (user-approved)
-- Dispatch plan file written at `plan/milestone-{N}-dispatch.yaml`
+- Dispatch plan stored via `dispatch_create_plan(milestone_number={N}, ...)` and retrievable with `dispatch_read({N})`
 
 ## Workflow
 
@@ -105,7 +105,7 @@ The dispatch plan is persisted via the `dispatch_create_plan` MCP tool, which va
 - No items in milestone: report, suggest running `/group-items-to-milestone` first
 - Grooming agent fails for an item: log the error, continue grooming remaining items, report all failures at the end
 - Impact Radius missing after grooming: re-trigger groom for that item once; if still missing, flag as BLOCKED in the report
-- Wave ordering or dependency reference errors found during plan build: fix before writing the plan file and calling `dispatch_wave_start`
+- Wave ordering or dependency reference errors found during plan build: fix before calling `dispatch_create_plan` and `dispatch_wave_start`
 
 ## Backend Requirements
 

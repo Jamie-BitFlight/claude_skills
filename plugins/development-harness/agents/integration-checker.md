@@ -73,10 +73,10 @@ The orchestrator aggregates your findings. Use consistent format with categorize
 
 For each module in the feature, extract what it provides and what it should consume.
 
-**From task file, extract:**
+Read the plan record through the plan operations — task plans are SAM state, not registry content:
 
-```bash
-mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="task-plan")
+```text
+mcp__plugin_dh_sam__sam_plan(plan="{plan_address}", config={"action": "read"})
 ```
 
 > **Backend note**: When `BACKLOG_BACKEND=beads`, `issue_number` is a bead ID (string, e.g. `bd-a3f8`), not a GitHub issue number (integer). The MCP layer accepts both types transparently.

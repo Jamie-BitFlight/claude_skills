@@ -74,17 +74,20 @@ Then verify each level against the actual codebase.
 
 ## Step 1: Load Context
 
-Read the architecture spec and task file to understand:
+Read the architecture spec and the plan record to understand:
 
 > The backlog item's Concerns section may contain `CONTRACT:` prefixed entries added by the `contract-verification` agent after each task completed. These represent method signature or type contract mismatches against the architect spec. Review them alongside task-agent concerns when verifying the feature.
 
 - What was the feature supposed to achieve (goals)?
 - What did the tasks claim to deliver (artifacts)?
 
-```bash
+```text
 mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="architect")
-mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="task-plan")
+mcp__plugin_dh_sam__sam_plan(plan="{plan_address}", config={"action": "read"})
 ```
+
+The architecture spec is registry content; the plan is a SAM record. Each is read through the
+operation that owns it — task plans are never retrieved with `artifact_read`.
 
 > **Backend note**: When `BACKLOG_BACKEND=beads`, `issue_number` is a bead ID (string, e.g. `bd-a3f8`), not a GitHub issue number (integer). The MCP layer accepts both types transparently.
 

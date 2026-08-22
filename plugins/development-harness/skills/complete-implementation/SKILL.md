@@ -590,7 +590,7 @@ If the T6 (Context Refinement) sub-agent output contained a `DIVERGENCE_REQUIRIN
 
 ```text
 Plan artifacts have intent divergences requiring your review.
-See: [annotated artifact paths from agent output]
+See: [annotated artifact types and identifiers from agent output]
 Divergences:
   [list from DIVERGENCE_REQUIRING_REVIEW block]
 ```

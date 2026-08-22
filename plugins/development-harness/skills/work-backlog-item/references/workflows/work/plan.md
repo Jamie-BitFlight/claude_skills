@@ -54,7 +54,7 @@ flowchart TD
     Q2 -->|"Yes"| Found
     Q2 -->|"No — still not found"| Warn["Log warning: Plan not found for {title}<br>Skip backlog_update<br>Proceed to Step 4.4"]
     Found --> Update["CLI: backlog update<br>--selector={title} --plan=P{id}"]
-    Update --> RecordIssue["If item has Issue: #N,<br>record it in plan file header comment"]
+    Update --> RecordIssue["If item has Issue = #N,<br>set it on the plan record via sam_plan update"]
     RecordIssue --> Done([Step 4.3 complete])
     Warn --> Done
 ```
@@ -67,10 +67,11 @@ flowchart TD
 
 ### 4.3.2: Record Issue Number
 
-If the backlog item body contains `**Issue**: #N`, write a comment in the plan file header:
+If the backlog item body contains `**Issue**: #N`, record the association on the plan record
+itself. The plan is backend state, not a file — there is no header to comment on:
 
-```yaml
-# Issue: #N
+```text
+mcp__plugin_dh_sam__sam_plan(plan="P{id}", config={"action": "update", "set_fields_json": {"issue": N}})
 ```
 
 **Constraint:** Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` in task-level commit messages. Issue closure is handled exclusively by `/dh:complete-implementation` in its final commit step.

@@ -284,25 +284,27 @@ def generate_slug(topic: str, mode: str) -> str:
 
 ## Step 5: Write Output Document
 
-Create the research document using the SAM MCP tool:
+Register the research document through the artifact operations:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "research-{mode}-{slug}", "goal": "{mode} research for {topic}", "tasks": []})
+mcp__plugin_dh_backlog__artifact_register(
+    item_id={item_id},
+    artifact_type="research",
+    artifact_id="research-{mode}-{slug}",
+    content="{document body}",
+    status="current",
+    agent="ecosystem-researcher",
+)
 ```
 
-Then append the document content as a markdown section using:
-
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "research-{mode}-{slug}", "task_id": null, "section": "{MODE}", "content": "{document body}"})
-```
-
-Pass the config dict to `sam_plan(action='create')` and receive the plan address back. Do not resolve or pass a file path.
+Pass the full document as `content=`. Do not resolve or pass a file path.
 
 Use the appropriate output template for the research mode.
 
 ## Step 6: Return Structured Result
 
-Return DONE or BLOCKED status to orchestrator with document path.
+Return DONE or BLOCKED status to the orchestrator with the artifact type and identifier — never
+the document body and never a path.
 
 </process>
 

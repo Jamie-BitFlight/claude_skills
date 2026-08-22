@@ -191,7 +191,7 @@ Before calling `sam_plan`, estimate the total number of tasks the plan will cont
 | < 16 tasks | Monolithic `create` — single call |
 | >= 16 tasks | Incremental append — three-step sequence |
 
-**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends all task objects in a single MCP call; large task lists increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this.
+**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends all task objects in a single MCP call; large task lists increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this. Keep every individual `sam_plan`/`sam_task` call under approximately 25,000 characters regardless of path — if a single task's content would exceed that on its own, patch its large fields after creation (see below) instead of inflating the `create`/`append_task` payload.
 
 #### Path A — Monolithic create (< 16 tasks)
 
