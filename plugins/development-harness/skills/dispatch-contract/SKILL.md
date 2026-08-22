@@ -15,49 +15,57 @@ a task you were dispatched to run.
   reference (plan address plus task ID). It does not read the task's `agent:` field to route.
 - Task executor — the dispatched agent. It owns the complete SAM lifecycle for that task: claim,
   execute, write state back.
-- Agent profile — specialist behavior an agent loads into itself from the task's `agent:` field.
-  A profile is behavior, not a dispatch target.
+- Agent profile — specialist behavior an agent loads into itself, named either by the task's
+  `agent:` field or by the dispatch prompt. A profile is behavior, not a dispatch target.
 
 ## Choose the dispatch target
 
-Decide which shape a dispatch is before choosing its `subagent_type`: does it hand over a plan
-address plus a task ID and expect the dispatched agent to claim that task, do the work, and write
-the task's state back? That question is observable at dispatch time from what the dispatch passes
-— it does not depend on knowing anything about the dispatching workflow's own position or stage.
+Every dispatch resolves the same way. Name the operations the dispatched agent will have to call,
+then dispatch an agent that can reach all of them.
 
-If yes — the dispatch is handing over a SAM task for execution — choose the target this way:
+Read the required operations off the dispatch itself — what it hands over, and what its prompt
+instructs the agent to do. This does not depend on knowing the dispatching workflow's own stage or
+position.
 
-- A prebuilt specialist that fits the work is the target. Dispatch it by name and pass the task
-  reference. Both the dh agent roster and any agents the consuming harness supplies are candidates.
-- When no specialist fits and a generic agent is what you would otherwise reach for, dispatch
+- It hands over a plan address and a task ID for execution: the agent claims the task, registers it
+  as active, and writes its state back, so it needs `sam_plan`, `sam_task`, `sam_active_task`, and
+  the ability to load `dh:start-task`.
+- Its prompt reads an input artifact or registers its output as one: `artifact_read`,
+  `artifact_list`, `artifact_register`.
+- It names a specialist whose behavior the dispatched agent has to adopt rather than already being:
+  `profile_load`.
+- It calls none of these — an independent reviewer whose finding is its response, a contract check
+  run after a task closes: the list is empty.
+
+Then choose the target against that list:
+
+- A prebuilt specialist that fits the work and whose declared tool list covers every operation on
+  the list is the target. Dispatch it by name, and pass the task reference when there is one. Both
+  the dh agent roster and any agents the consuming harness supplies are candidates, and an empty
+  list leaves any fitting specialist viable.
+- A specialist that fits the work but cannot reach every operation on the list is not a dispatch
+  target. Dispatch `subagent_type="dh:task-worker"` and name that specialist in the prompt for the
+  worker to load through `profile_load`. The specialist's behavior still arrives; the operations
+  arrive with the worker.
+- No specialist fits, and a generic agent is what you would otherwise reach for: dispatch
   `subagent_type="dh:task-worker"` in its place. Never dispatch `general-purpose` from a dh skill
-  or extension point: it has no SAM or backlog tool access, so it cannot claim the task or write
-  its state back, and that failure is silent. `dh:task-worker` is the same blank canvas arriving
-  with the dh tools and skills the workflow needs, and it loads the specialist named by the task's
-  `agent:` field through `profile_load` as a profile.
+  or extension point — it has no SAM or backlog tool access, so it cannot claim a task or write its
+  state back, and that failure is silent. `dh:task-worker` is the same blank canvas arriving with
+  the dh tools and skills the workflow needs, and it loads the specialist named by the task's
+  `agent:` field as a profile.
 
-Either target must be able to load `dh:start-task` and reach the SAM task operations `sam_plan`,
-`sam_task`, and `sam_active_task`. `start-task` performs the claim, the active-task registration,
-and the completion write-back through those operations. A specialist whose declared tool list omits
-them produces output but never claims or closes the task, so the plan never advances and the work
-stays invisible to every later stage — dispatch `dh:task-worker` for that task instead and let the
-specialist's behavior arrive as a profile.
+Read a candidate's declared tool list rather than inferring reach from its name. The dh roster
+declares the SAM and artifact operations; agents published by other plugins — a language plugin's
+design or implementation specialists — generally declare none of them, so a fitting specialist from
+another plugin usually reaches the work as a profile rather than as a dispatch target.
 
-If no — the dispatch hands over no task to claim — choose the target by what the step itself
-requires:
-
-- The step requires dh operations of its own — it reads or registers an artifact, loads an agent
-  profile, or reads plan or task state. Before dispatching the agent the step names, check that
-  agent's declared tool list against every dh operation the step's prompt will call. When the tool
-  list omits any of them, dispatch `subagent_type="dh:task-worker"` instead and have it load that
-  agent through `profile_load` as a profile, exactly as a SAM-task dispatch does. Dispatching the
-  named agent directly leaves those calls unavailable to it, so it cannot read its inputs or
-  register its output, and the stage produces nothing the next stage can read.
-- The step requires no dh operations — an independent reviewer verifying already-completed work, a
-  contract check run after a task closes, or any other verifier whose finding is its response —
-  keep the dispatch's own named agent. Routing this shape through `dh:task-worker` makes the worker
-  look up a specialist profile and run `start-task` instead of performing the review, so the review
-  or verification never happens and its output is silently lost.
+Each unreachable operation fails silently in its own way. A specialist missing the SAM task
+operations produces output but never claims or closes the task, so the plan never advances and the
+work stays invisible to every later stage. One missing the artifact operations cannot read its
+inputs or register its output, so the next stage reads nothing where it expected a deliverable.
+Routing work that requires no operations at all through `dh:task-worker` is the same error
+inverted: the worker looks up a profile and runs `start-task` instead of performing the review, so
+the review never happens and its finding is lost.
 
 ## A task's `agent:` field is not a routing directive
 
@@ -68,24 +76,21 @@ against what each available agent can do, and never depends on the task's stored
 
 ```mermaid
 flowchart TD
-    Dispatch([SAM task handed over for execution]) --> Fit{"A prebuilt specialist fits this work?"}
-    Fit -->|Yes| Tools{"It reaches sam_plan, sam_task, sam_active_task?"}
-    Tools -->|Yes| Spec[Dispatch that specialist by name]
-    Tools -->|No| Worker
-    Fit -->|"No — a generic agent is the alternative"| Worker["Dispatch dh:task-worker, never general-purpose"]
-    Worker --> Profile["Read the task, load its agent: field through profile_load"]
-    Spec --> Start[Load dh:start-task]
-    Profile --> Start
-    Start --> Lifecycle[Claim, execute, write task state back]
+    D([Dispatch about to be made]) --> Ops["List the dh operations the work requires:<br>SAM task operations when a task is handed over,<br>artifact operations when it reads or registers one,<br>profile_load when it adopts another agent's behavior"]
+    Ops --> Fit{"A prebuilt specialist fits this work?"}
+    Fit -->|No| Worker
+    Fit -->|Yes| Covers{"Its declared tool list reaches<br>every operation on the list?"}
+    Covers -->|Yes| Spec[Dispatch that specialist by name]
+    Covers -->|No| Worker["Dispatch dh:task-worker, never general-purpose,<br>naming the specialist as the profile to load"]
+    Spec --> Run[Run the work, calling those operations directly]
+    Worker --> Run
 ```
 
 When adding a dispatch step to any dh skill, reference file, or workflow document, apply the same
-questions: is a plan address and task ID being handed over for execution, does a prebuilt
-specialist fit the work, and does it reach the SAM task operations? Name that specialist when it
-does. Write `subagent_type="dh:task-worker"` wherever a generic agent would otherwise be named. If
-the dispatch is not handing over a SAM task at all, name the specific agent the dispatch requires —
-unless the step calls dh operations that agent's declared tool list omits, in which case write
-`subagent_type="dh:task-worker"` and have it load that agent as a profile.
+check: list the operations the step requires, then ask whether a prebuilt specialist both fits the
+work and reaches all of them. Name that specialist when it does. Write
+`subagent_type="dh:task-worker"` wherever the fitting specialist falls short of that list — naming
+it as the profile to load — and wherever a generic agent would otherwise be named.
 
 ## Artifacts and plans are logical records, not files
 
