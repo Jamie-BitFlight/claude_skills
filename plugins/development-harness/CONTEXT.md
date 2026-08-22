@@ -16,6 +16,15 @@ further agents; the scope of the assignment is what differs. See
 [ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
 incident that required stating this precisely.
 
+**Dispatcher**:
+The agent that invoked another agent with its prompt. A relation, not a role — an Orchestrator, a
+Manager, or a Worker is a dispatcher with respect to any agent it invokes, and the same agent is a
+dispatcher in one direction and a dispatched agent in the other. An agent's dispatcher is the only
+party that can observe what an assignment hands over, so scope enforcement belongs there.
+_Avoid_: naming a dispatched agent's invoker by a role term. The invoker may be any of the three
+roles below, so calling it "the manager" or "the orchestrator" asserts more than the dispatched
+agent can know.
+
 **Orchestrator**:
 The single interactive agent acting directly on behalf of the human; exactly one per session. Its
 assignment is the human's request in full, so it owns whatever workflow level that request enters
