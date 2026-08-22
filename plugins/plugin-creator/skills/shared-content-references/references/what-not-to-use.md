@@ -14,8 +14,8 @@ Degrade to plain files on a Windows checkout — git symlinks (mode 120000) beco
 files containing the link path, not the target content, unless the `repair-symlinks`
 pre-commit hook runs first.
 
-SOURCE: `AGENTS.md` §Gotchas item 3. Symlinks also carry their own validator error class,
-`SL001` (malformed symlink target), documented in `plugins/plugin-creator/docs/ERROR_CODES.md`.
+SOURCE: `AGENTS.md` §Gotchas item 3. Symlinks also carry their own validator error class —
+`skilllint` reports `SL001` for a malformed symlink target, with the explanation in its output.
 
 ## Copy-paste
 

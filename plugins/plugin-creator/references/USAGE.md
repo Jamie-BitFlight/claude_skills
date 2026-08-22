@@ -704,7 +704,6 @@ uvx skilllint@latest check plugins/my-plugin
 
 ## See Also
 
-- [ERROR_CODES.md](./ERROR_CODES.md) - Complete error code reference
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Validator design and implementation
 - [skilllint](https://pypi.org/project/skilllint) - Source code
 - [Claude Code Plugin Documentation](https://docs.claude.com/plugins) - Official plugin documentation

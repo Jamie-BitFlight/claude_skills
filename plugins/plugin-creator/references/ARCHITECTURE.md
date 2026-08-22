@@ -586,9 +586,7 @@ def main(path: Path, ...) -> None:
     ]
 ```
 
-**Step 4**: Document error codes in ERROR_CODES.md
-
-**Step 5**: Add tests (create `tests/test_my_new_validator.py`)
+**Step 4**: Add tests (create `tests/test_my_new_validator.py`)
 
 ### Adding Auto-Fix Capability
 
@@ -642,9 +640,8 @@ ValidationIssue(
 )
 ```
 
-**Step 3**: Document in ERROR_CODES.md
-
-**Step 4**: Add to summary table in ERROR_CODES.md
+Give the code a `message` and `suggestion` that stand on their own — the code and its explanation
+reach the caller through `skilllint` output, not through a separate catalogue.
 
 ---
 
@@ -871,7 +868,6 @@ def test_token_count_deterministic(text):
 
 ## See Also
 
-- [ERROR_CODES.md](./ERROR_CODES.md) - Complete error code reference
 - [USAGE.md](./USAGE.md) - CLI usage and workflow examples
 - [skilllint](https://pypi.org/project/skilllint) - Source code
 - [PEP 723](https://peps.python.org/pep-0723/) - Inline script metadata

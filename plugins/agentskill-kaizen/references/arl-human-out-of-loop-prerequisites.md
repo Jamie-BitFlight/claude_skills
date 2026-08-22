@@ -68,7 +68,7 @@ All documents identify these recurring human decision points:
 **1. Deterministic Backpressure**
 
 - **SAM Framework:** "Always run deterministic checks (tests/linters/static analysis/checklists) and treat failures as ground truth" (README.md, line 153)
-- **Plugin-Creator:** Error codes E001-E023 provide deterministic validation without human judgment (plugin-creator/CLAUDE.md, ERROR_CODES.md)
+- **Plugin-Creator:** `skilllint` error codes provide deterministic validation without human judgment — each finding carries its code, severity, and suggested fix in the tool's output
 - **Autonomous Refinement Research:** "Cross-reference each finding against the source file with line evidence. False positives have no line evidence."
 
 **Success Factor:** When outcomes are binary (pass/fail) with objective evidence (test output, linter errors, file:line references), machines eliminate human review need. This is the strongest category of gate replacement.
@@ -95,7 +95,7 @@ All documents identify these recurring human decision points:
 | Condition | Evidence from Documents |
 |-----------|------------------------|
 | **Complete context provided upfront** | SAM: "Task files contain all answers needed for the task" (README.md, line 155) |
-| **Binary pass/fail criteria exist** | SAM: "Deterministic backpressure" (README.md, line 153); Plugin-Creator: ERROR_CODES.md |
+| **Binary pass/fail criteria exist** | SAM: "Deterministic backpressure" (README.md, line 153); Plugin-Creator: `skilllint` error codes |
 | **Scope is constrained** | Process Realignment: "Simple: Single-module, no external interfaces" (line 44) |
 | **Verification is structural** | Autonomous Refinement: "Every heading must appear" |
 | **Dependencies are explicit** | SAM: Artifact interdependency chains |
