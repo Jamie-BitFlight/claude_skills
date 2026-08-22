@@ -101,6 +101,7 @@ CONTEXT:
 - Location: [Where to look]
 - Scope: [Boundaries]
 - Constraints: [Hard requirements vs Preferences]
+- Commands: [Exact commands this phase runs, or "discover the ones this project defines"]
 
 ECOSYSTEM CONTEXT:
 - [Session-specific facts the agent cannot find in project instructions or tool descriptions]
@@ -121,8 +122,8 @@ YOUR TASK:
 | process | Analyze the material the read and gather phases produced. Choose an approach. Report the approach and why alternatives were ruled out. Do not edit any file. |
 | verify | Check the chosen approach against the actual code and environment named in CONTEXT. Report where it holds and where it fails. Do not implement a fix. |
 | write | Make the change described in DEFINITION OF SUCCESS. Touch only the files named in CONTEXT. |
-| validate | Run the lint, type-check, and build commands named in CONTEXT. Report exact command output, pass and fail alike. Do not silence a failure without stating the fix. |
-| test | Run the test suite named in CONTEXT. Add tests covering the change. Report exact command output. |
+| validate | Run the lint, type-check, and build commands named in CONTEXT Commands. Where none are named, discover the ones this project defines and report which you ran. Report exact command output, pass and fail alike. Do not silence a failure without stating the fix. |
+| test | Run the test suite named in CONTEXT Commands. Where none is named, discover the invocation this project defines and report which you ran. Add tests covering the change. Report exact command output. |
 | report | Summarize what changed and the evidence supporting it. Cite the specific files, commands, and outputs. State no claim the evidence does not support. |
 | review | Independently critique the result named in CONTEXT against DEFINITION OF SUCCESS. Report gaps, contradictions, or unsupported claims. Do not fix them. |
 
@@ -133,7 +134,7 @@ Authoring guidance (for the orchestrator filling in this template — do not inc
 - OBSERVATIONS: Pass-through only — data already in your context (user messages, prior agent reports, command outputs you already received). Include `file:line` references if already known. Include verbatim error messages, not paraphrased. Do NOT pre-gather data for the agent (for example, do not run `ruff check .` before delegating to a linting agent). Do NOT read, grep, or glob files to find context for the agent — the agent has full tool access and an empty context window; it does its own discovery. No interpretations ("I think"), no assumptions ("probably"). SOURCE: [agent-orchestration SKILL.md](./../agent-orchestration/SKILL.md) — Pre-Delegation Verification Checklist section.
 - DEFINITION OF SUCCESS: The "WHAT". Measurable outcomes the agent can verify. When the agent will produce more than roughly one line of output, instruct it to write results to a file and return only the path — this keeps orchestrator context lean. Example: `Write findings to .tmp/reports/NAME-YYYYMMDD.md. Return: STATUS: DONE + file path.` When directing agents to write to `.tmp/`, verify `.tmp/` is ignored by version control before committing.
 - DELIVERY: State the delivery channel explicitly. The channel that carries an agent's final response back to its dispatcher differs between harnesses. Name the channel this dispatch expects, and name the artifact fallback: the full result written to a file whose path the agent returns. A result that exists only in the agent's final response text may never be read. Do not assume the dispatcher receives anything the prompt did not ask the agent to send.
-- CONTEXT: The "WHERE" and "WHY". Location narrows scope; constraints bound the solution space.
+- CONTEXT: The "WHERE" and "WHY". Location narrows scope; constraints bound the solution space. Commands is the one slot that carries literal invocations — the quality gates a `validate` or `test` dispatch has to run. Name them when this project defines them; write the discovery instruction when it does not, and never leave the slot blank on those two phases. Naming a project's own gate is not prescribing HOW: the gate is the acceptance bar, not the implementation.
 
 ---
 
@@ -161,5 +162,6 @@ Check before sending:
 - [ ] Contains only factual observations
 - [ ] No assumptions stated as facts
 - [ ] Defines WHAT and WHY, not HOW
-- [ ] Lists resources without prescribing tools
+- [ ] Lists resources without prescribing tools, apart from the quality gates named in CONTEXT Commands
+- [ ] A `validate` or `test` dispatch names its commands in CONTEXT Commands or instructs the agent to discover them
 - [ ] Names the delivery channel and where any longer artifact is written
