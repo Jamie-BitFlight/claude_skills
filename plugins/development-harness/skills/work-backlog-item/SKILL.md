@@ -4,12 +4,6 @@ description: "Use when working, planning, grooming, or closing a backlog item. B
 argument-hint: '[#N | --auto {title} | --language {lang} | --stack {stack} | item-title-substring | close {title} | resolve {title} [--force] | setup-github | --quick {title} | progress | resume [{title}]]'
 user-invocable: true
 ---
-<gate_token>
-
-!`node "${CLAUDE_PLUGIN_ROOT}/skills/work-backlog-item/scripts/get-gate-token.mjs"`
-
-</gate_token>
-
 <provided_arguments>
 $ARGUMENTS
 </provided_arguments>

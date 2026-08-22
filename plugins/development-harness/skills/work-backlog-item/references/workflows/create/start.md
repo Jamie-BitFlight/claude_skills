@@ -109,10 +109,12 @@ Do not use `force=true` unless the user has already confirmed proceeding despite
 
 ## Step 4: Write via MCP or CLI
 
-Two equivalent interfaces exist. MCP is gated (requires reading this scope boundary first, enforced
-via a session `gate_token`); the CLI is not — the CLI path has no `gate_token` parameter and does
-not enforce reading `create/scope.md` first. This is a known, accepted gap for the CLI path, not
-an oversight. Prefer MCP when available; use the CLI for scripting/dispatch contexts.
+MCP and CLI are two equivalent interfaces to the same underlying `add_item()` operation — follow
+this workflow's `scope.md` read (above) and the field rules in Step 1/Step 2 regardless of which
+interface writes the item. Prefer MCP when available; use the CLI for scripting/dispatch contexts.
+The `backlog_add` tool's own `description` field (`backlog_core/server.py`) carries the canonical
+submission-quality template and is visible in the tool schema to any MCP caller — this workflow
+applies that same template; do not restate it here.
 
 **MCP:**
 
@@ -122,13 +124,9 @@ mcp__plugin_dh_backlog__backlog_add(
     priority='{priority}',
     description='{description}',
     source='{source}',
-    type='{type}',
-    gate_token='<gate_token>'
+    type='{type}'
 )
 ```
-
-`gate_token` is required and is provided by the skill at load time via the `<gate_token>` tag
-injected from the session gate token file.
 
 **CLI:**
 

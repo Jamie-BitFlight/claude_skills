@@ -20,9 +20,9 @@
       "id": "G8.create.backlog_add",
       "skill": "create",
       "source_file": "create/start.md:Step 4: Write via MCP",
-      "step_label": "mcp__plugin_dh_backlog__backlog_add(title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}', gate_token='<gate_token>')",
+      "step_label": "mcp__plugin_dh_backlog__backlog_add(title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}')",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_add",
-      "call_params": "title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}', gate_token='<gate_token>'",
+      "call_params": "title='{title}', priority='{priority}', description='{description}', source='{source}', type='{type}'",
       "routes_to_protocol_method": "create_issue_for_item",
       "per_backend": {
         "github": "API create issue",

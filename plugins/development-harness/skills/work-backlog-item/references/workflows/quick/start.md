@@ -82,10 +82,6 @@ or issue reference is passed as `item_ref`.
      --description "{title}"
    ```
 
-   Note: the CLI's `backlog add` has no `gate_token` parameter — unlike the MCP `backlog_add` tool,
-   it does not require or enforce reading `create/scope.md` first. This is a known, accepted gap
-   for the CLI path, not an oversight — do not attempt to invent a token for it.
-
    Note: When arriving via the proactive fix gate with no prior backlog item, this creation step
    is the correct path. The gate's complexity classification already confirmed the fix is trivial —
    no grooming or RT-ICA is needed.
