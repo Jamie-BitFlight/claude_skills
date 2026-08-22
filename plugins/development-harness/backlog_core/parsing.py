@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+from pydantic import BaseModel
 from ruamel.yaml import YAML, YAMLError
 
 # ---------------------------------------------------------------------------
@@ -48,6 +49,7 @@ from .section_registry import resolve_section_name, resolve_subsection_name
 # Public API
 # ---------------------------------------------------------------------------
 __all__ = [
+    "SectionSpan",
     "build_body_extra_only",
     "build_issue_body",
     "build_issue_body_from_file",
@@ -759,27 +761,71 @@ def extract_sections(text: str) -> dict[str, str]:
     return {f"## {name}": content for name, content in _split_body_h2(text)}
 
 
-def split_body_sections(body: str) -> list[tuple[str, str]]:
+class SectionSpan(BaseModel):
+    """One entry-block-aware ``## ``/``### `` section boundary in a markdown body.
+
+    Produced by :func:`split_body_sections`, the single structural boundary
+    detector shared by every ``operations.py`` consumer that used to
+    re-implement section-boundary detection with its own naive line regex
+    (see :class:`_EntryDivBlock` for why that was wrong).
+
+    Attributes:
+        name: Heading text with the ``#`` marker stripped and whitespace trimmed.
+        start: Char offset of the start of the heading's own source line in
+            the original ``body`` string.
+        end: Char offset of the next section's ``start`` (or ``len(body)`` for
+            the final section) — the exclusive end of the full section slice
+            (heading line plus content).
+        content: Section content with the heading line stripped and
+            leading/trailing whitespace trimmed.
+    """
+
+    name: str
+    start: int
+    end: int
+    content: str
+
+
+def split_body_sections(body: str) -> list[SectionSpan]:
     """Split *body* into ``## ``/``### ``-delimited sections, entry-block aware.
 
     The shared structural boundary detector for callers that need the same
-    flat, mixed-level ``## ``/``### `` contract as
-    ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``) — but routed
-    through :func:`_split_body_h2`'s marko-AST splitter so a heading-shaped
-    line inside a ``<div><sub>...</sub>...</div>`` entry block (see
-    :class:`_EntryDivBlock`) is never misidentified as a section boundary.
-    This is the same guard :func:`extract_sections` already applies for
-    ``## ``-only splitting, generalized to also match ``### ``.
+    flat, mixed-level ``## ``/``### `` contract the deleted
+    ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``) used to provide —
+    but routed through the marko-AST heading positions shared with
+    :func:`_split_body_h2`, so a heading-shaped line inside a
+    ``<div><sub>...</sub>...</div>`` entry block (see :class:`_EntryDivBlock`)
+    is never misidentified as a section boundary. This is the same guard
+    :func:`extract_sections` already applies for ``## ``-only splitting,
+    generalized to also match ``### `` and to carry char offsets so callers
+    that slice the raw body (rather than only reading section content) have
+    a single shared boundary source too.
 
     Args:
         body: Full issue/item body text.
 
     Returns:
-        List of ``(heading_name, content)`` tuples in document order.
-        ``heading_name`` is the heading text (level marker stripped) with
-        whitespace trimmed. ``content`` does not include the heading line.
+        List of :class:`SectionSpan` in document order.
     """
-    return _split_body_h2(body, levels=frozenset({_H2_LEVEL, _H3_LEVEL}))
+    levels = frozenset({_H2_LEVEL, _H3_LEVEL})
+    raw_lines, positioned = _ast_heading_positions(body, levels)
+    if not positioned:
+        return []
+
+    line_starts: list[int] = []
+    offset = 0
+    for line in raw_lines:
+        line_starts.append(offset)
+        offset += len(line) + 1
+
+    spans: list[SectionSpan] = []
+    for i, (line_idx, heading_name) in enumerate(positioned):
+        content_end_line = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
+        content = _slice_content(raw_lines, line_idx + 1, content_end_line)
+        start = line_starts[line_idx]
+        end = line_starts[positioned[i + 1][0]] if i + 1 < len(positioned) else len(body)
+        spans.append(SectionSpan(name=heading_name, start=start, end=end, content=content))
+    return spans
 
 
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
@@ -1066,6 +1112,47 @@ def _map_headings_to_lines(
     return result
 
 
+def _ast_heading_positions(body: str, levels: frozenset[int]) -> tuple[list[str], list[tuple[int, str]]]:
+    """Return source lines and AST-verified heading positions for *levels*.
+
+    The single shared computation behind both :func:`_split_body_h2` and
+    :func:`split_body_sections`: each calls this once per invocation instead
+    of independently re-running the marko AST parse and line-mapping pass,
+    so the two boundary consumers cannot drift from one another.
+
+    Args:
+        body: Raw markdown body text (everything after frontmatter).
+        levels: Heading depths to treat as boundaries.
+
+    Returns:
+        A ``(raw_lines, positioned)`` tuple. ``raw_lines`` is
+        ``body.splitlines()``. ``positioned`` is the ``(line_idx,
+        heading_text)`` list from :func:`_map_headings_to_lines`, empty when
+        no heading at *levels* exists.
+    """
+    raw_lines = body.splitlines()
+    ast_headings = _ast_headings_at_levels(body, levels)
+    if not ast_headings:
+        return raw_lines, []
+    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_levels=levels)
+    return raw_lines, positioned
+
+
+def _slice_content(raw_lines: list[str], content_start: int, content_end: int) -> str:
+    """Join and trim a line range into one section's content string.
+
+    Args:
+        raw_lines: Full source line list (``body.splitlines()``).
+        content_start: 0-indexed first line of the section content (the line
+            after the heading).
+        content_end: 0-indexed line one past the section content's last line.
+
+    Returns:
+        The joined, whitespace-trimmed content string.
+    """
+    return "\n".join(raw_lines[content_start:content_end]).strip()
+
+
 def _split_body_h2(body: str, levels: frozenset[int] = frozenset({_H2_LEVEL})) -> list[tuple[str, str]]:
     """Split markdown body on heading boundaries using the marko AST.
 
@@ -1078,12 +1165,11 @@ def _split_body_h2(body: str, levels: frozenset[int] = frozenset({_H2_LEVEL})) -
     Defaults to ``## `` (level 2) only, matching this function's original
     contract used by :func:`extract_sections` and :func:`parse_md_body_sections`.
     Pass ``levels=frozenset({2, 3})`` to treat ``## `` and ``### `` as a single
-    flat, mixed-level sequence of boundaries — the same contract as
-    ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``), but entry-block
-    aware so a heading-shaped line inside a ``<div><sub>...</sub>...</div>``
-    entry is never misidentified as a section boundary (see
-    :func:`extract_sections`'s docstring for why the naive regex scan this
-    replaces was wrong).
+    flat, mixed-level sequence of boundaries — the same contract
+    :func:`split_body_sections` uses, but entry-block aware so a
+    heading-shaped line inside a ``<div><sub>...</sub>...</div>`` entry is
+    never misidentified as a section boundary (see :func:`extract_sections`'s
+    docstring for why the naive regex scan this replaces was wrong).
 
     Args:
         body: Raw markdown body text (everything after frontmatter).
@@ -1094,18 +1180,14 @@ def _split_body_h2(body: str, levels: frozenset[int] = frozenset({_H2_LEVEL})) -
         The heading_name is the heading text with whitespace stripped.
         Content does not include the heading line itself.
     """
-    ast_headings = _ast_headings_at_levels(body, levels)
-    if not ast_headings:
+    raw_lines, positioned = _ast_heading_positions(body, levels)
+    if not positioned:
         return []
-
-    raw_lines = body.splitlines()
-    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_levels=levels)
 
     segments: list[tuple[str, str]] = []
     for i, (line_idx, heading_name) in enumerate(positioned):
-        content_start = line_idx + 1
         content_end = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
-        content = "\n".join(raw_lines[content_start:content_end]).strip()
+        content = _slice_content(raw_lines, line_idx + 1, content_end)
         segments.append((heading_name, content))
 
     return segments

@@ -61,6 +61,7 @@ from .models import (
     reference_is_title_derived,
 )
 from .parsing import (
+    SectionSpan,
     find_fuzzy_duplicates,
     find_item,
     items_needing_issues,
@@ -2175,10 +2176,11 @@ def _build_sections_metadata(
     Boundary detection is delegated to :func:`~backlog_core.parsing.split_body_sections`,
     the marko-AST splitter also used by :func:`~backlog_core.parsing.extract_sections`
     (see that function's docstring). A naive line regex — this function's previous
-    implementation, and still ``_SECTION_BOUNDARY_RE`` itself — misidentifies a
-    heading-shaped line inside a ``<div><sub>...</sub>...</div>`` entry block's own
-    content as a real section boundary; the shared splitter is entry-block aware and
-    cannot make that mistake (#3157).
+    implementation, and every other body-section consumer in this module until
+    #3157 — misidentifies a heading-shaped line inside a
+    ``<div><sub>...</sub>...</div>`` entry block's own content as a real section
+    boundary; the shared splitter is entry-block aware and cannot make that
+    mistake.
 
     Args:
         body: Full issue/item body text.
@@ -2207,10 +2209,11 @@ def _build_sections_metadata(
             entry_show = show
 
     sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {}
-    for sec_name, sec_body in section_segments:
+    for span in section_segments:
+        sec_name = span.name
         if section_name_filter is not None and sec_name.lower() != section_name_filter.lower():
             continue
-        entries = parse_entries(sec_body, show=entry_show, since=since)
+        entries = parse_entries(span.content, show=entry_show, since=since)
         entry_dicts: list[SectionEntryDict] = [
             SectionEntryDict(id=e.id, struck=e.struck, content=e.content) for e in entries
         ]
@@ -2243,9 +2246,10 @@ def _build_sections_compact(body: str) -> list[dict[str, str | int]]:
     entry filters — it always returns all sections with their active and struck
     entry counts.
 
-    Uses ``_SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``) for boundary detection,
-    matching the same rule as ``_build_sections_metadata`` so both functions
-    agree on section structure for the same body.
+    Boundary detection is delegated to
+    :func:`~backlog_core.parsing.split_body_sections`, the same entry-block-aware
+    marko-AST splitter :func:`_build_sections_metadata` uses, so both functions
+    agree on section structure for the same body (#3157).
 
     Args:
         body: Full issue/item body text.
@@ -2254,18 +2258,12 @@ def _build_sections_compact(body: str) -> list[dict[str, str | int]]:
         List of dicts, each with ``name`` (str), ``num_entries`` (int active),
         and ``num_struck`` (int struck).
     """
-    section_headers = list(_SECTION_BOUNDARY_RE.finditer(body))
-
     result: list[dict[str, str | int]] = []
-    for i, hdr in enumerate(section_headers):
-        sec_name = hdr.group(1).strip()
-        start = hdr.end()
-        end = section_headers[i + 1].start() if i + 1 < len(section_headers) else len(body)
-        sec_body = body[start:end]
-        entries = parse_entries(sec_body, show="all")
+    for span in split_body_sections(body):
+        entries = parse_entries(span.content, show="all")
         active_count = sum(1 for e in entries if not e.struck)
         struck_count = sum(1 for e in entries if e.struck)
-        result.append({"name": sec_name, "num_entries": active_count, "num_struck": struck_count})
+        result.append({"name": span.name, "num_entries": active_count, "num_struck": struck_count})
     return result
 
 
@@ -2294,21 +2292,18 @@ def _entry_owning_headers(body: str) -> list[str | None]:
     """
     entry_spans = [(m.start(), m.end()) for m in ENTRY_RE.finditer(body)]
     # A ``## ``/``### `` line INSIDE an entry block's content is part of that
-    # entry's text, not a real section boundary — exclude it so a later entry is
-    # not mis-attributed to a header embedded in a prior entry (#2495 C4).
-    headers = [
-        hdr
-        for hdr in _SECTION_BOUNDARY_RE.finditer(body)
-        if not any(start <= hdr.start() < end for start, end in entry_spans)
-    ]
+    # entry's text, not a real section boundary. ``split_body_sections`` is
+    # already entry-block aware (#3157), so no separate exclusion filter is
+    # needed here — a heading-shaped line inside an entry never produces a span.
+    spans = split_body_sections(body)
     owners: list[str | None] = []
     for entry_start, _entry_end in entry_spans:
         owner: str | None = None
-        for hdr in headers:
-            if hdr.start() <= entry_start:
+        for span in spans:
+            if span.start <= entry_start:
                 # Reproduce the source header line verbatim (its ``## ``/``### `` marker
                 # and text) so a paged subsection keeps the level it had.
-                owner = hdr.group(0).strip()
+                owner = body[span.start : span.end].splitlines()[0].strip()
             else:
                 break
         owners.append(owner)
@@ -2477,36 +2472,34 @@ def _populate_yaml_item_compact(result: ViewItemResult, item: BacklogItem) -> No
 # Public API: VIEW — helpers
 # ---------------------------------------------------------------------------
 
-_SECTION_BOUNDARY_RE = re.compile(r"^#{2,3} (.+?)$", re.MULTILINE)
 
+def _slice_body_by_header_indices(body: str, spans: list[SectionSpan], indices: list[int]) -> str:
+    """Concatenate the *body* slices for the given *span* *indices* in order.
 
-def _slice_body_by_header_indices(body: str, headers: list[re.Match[str]], indices: list[int]) -> str:
-    """Concatenate the *body* slices for the given *header* *indices* in order.
+    The single shared body-slicing implementation (issue #2495, findings #8/#10;
+    #3157): both the singular ``section=`` resolver
+    (:func:`_apply_body_section_filter`) and the plural ``sections=[...]``
+    resolver (:func:`narrow_body_to_named_sections`) delegate the
+    header-find -> index -> slice-join mechanics here.  Only the *matching
+    contract* (how an index list is derived from a filter expression) differs
+    between the two callers; the slicing geometry is identical and lives once.
 
-    The single shared body-slicing implementation (issue #2495, findings #8/#10):
-    both the singular ``section=`` resolver (:func:`_apply_body_section_filter`)
-    and the plural ``sections=[...]`` resolver (:func:`narrow_body_to_named_sections`)
-    delegate the header-find -> index -> slice-join mechanics here.  Only the
-    *matching contract* (how an index list is derived from a filter expression)
-    differs between the two callers; the slicing geometry is identical and lives
-    once.
-
-    Each slice runs from its header's start to the next header's start (or end of
-    *body* for the final header), so the header line and its body travel together.
+    Each slice runs from its span's ``start`` to its ``end`` (the next span's
+    ``start``, or end of *body* for the final span — see
+    :class:`~backlog_core.parsing.SectionSpan`), so the header line and its
+    body travel together.
 
     Args:
         body: Full issue body text.
-        headers: Ordered ``## ``/``### `` header matches from
-            :data:`_SECTION_BOUNDARY_RE` over *body*.
-        indices: Indices into *headers* to keep, already in document order.
+        spans: Ordered ``## ``/``### `` section spans from
+            :func:`~backlog_core.parsing.split_body_sections` over *body*.
+        indices: Indices into *spans* to keep, already in document order.
 
     Returns:
         The concatenated slices for *indices* (empty string when *indices* is
         empty).
     """
-    return "".join(
-        body[headers[i].start() : (headers[i + 1].start() if i + 1 < len(headers) else len(body))] for i in indices
-    )
+    return "".join(body[spans[i].start : spans[i].end] for i in indices)
 
 
 def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) -> str:
@@ -2535,11 +2528,11 @@ def _apply_body_section_filter(result: ViewItemResult, body: str, section: str) 
     Returns:
         The (possibly narrowed) body slice.
     """
-    headers = list(_SECTION_BOUNDARY_RE.finditer(body))
-    names = [hdr.group(1).strip() for hdr in headers]
+    spans = split_body_sections(body)
+    names = [span.name for span in spans]
     matched = _resolve_section_indices(names, section)
     if matched:
-        body = _slice_body_by_header_indices(body, headers, matched)
+        body = _slice_body_by_header_indices(body, spans, matched)
     else:
         result.section_filter_miss = True
         result.section_filter_valid_names = names
@@ -2577,14 +2570,14 @@ def narrow_body_to_named_sections(body: str, names: list[str]) -> tuple[str, boo
     # with the structured-dict arm (``_filter_view_sections``) and the metadata arm
     # (#2495 minor).  No behaviour change for ASCII names.
     wanted = {n.casefold() for n in names}
-    headers = list(_SECTION_BOUNDARY_RE.finditer(body))
-    matched = [i for i, hdr in enumerate(headers) if hdr.group(1).strip().casefold() in wanted]
+    spans = split_body_sections(body)
+    matched = [i for i, span in enumerate(spans) if span.name.casefold() in wanted]
     if not matched:
         return body, False
     # Exact case-insensitive name matching above is the plural ``sections=[...]``
     # contract; only the slice-join mechanics are shared with the singular
     # ``section=`` path (#2495 findings #8/#10).
-    return _slice_body_by_header_indices(body, headers, matched), True
+    return _slice_body_by_header_indices(body, spans, matched), True
 
 
 def _assemble_view_compact(
@@ -2680,9 +2673,10 @@ def _sections_from_body_or_yaml(
     if ENTRY_RE.search(body):
         return _build_sections_metadata(body, show, since, section=None)
     # Plain-text body with section headers but no entry blocks.
-    if _SECTION_BOUNDARY_RE.search(body):
+    body_spans = split_body_sections(body)
+    if body_spans:
         if item and item.sections:
-            body_header_names = {hdr.group(1).strip() for hdr in _SECTION_BOUNDARY_RE.finditer(body)}
+            body_header_names = {span.name for span in body_spans}
             yaml_section_names = set(item.sections.keys())
             if body_header_names.issubset(yaml_section_names):
                 # YAML covers all body headers — use it to preserve real entry IDs.
