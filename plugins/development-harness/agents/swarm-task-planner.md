@@ -274,7 +274,7 @@ Before calling `sam_plan`, estimate the total number of tasks the plan will cont
 | < 16 tasks | Monolithic `create` — single call |
 | >= 16 tasks | Incremental append — three-step sequence |
 
-**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends all task objects in a single MCP call; large task lists increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this. See #1770 for the architectural decision record.
+**Note**: For 16+ task plans, use the incremental path. The monolithic `create` call sends all task objects in a single MCP call; large task lists increase the risk of timeouts mid-call. The incremental path (create empty → append_task × N → finalize) sends one task per call and avoids this.
 
 #### Path A — Monolithic create (< 16 tasks)
 
@@ -319,29 +319,57 @@ all downstream tools. Record it and pass it to the plan-validator and any other 
 PLAN.md / PLAN/ disk files are optional human-readable summaries — they do not replace SAM
 registration and must never be written as the only plan artifact.
 
-The field reference below is an authoring aid for drafting each task's fields before it is passed
-as a `task_dict`/`TaskDefinition` object to `sam_plan` (Path A) or `append_task` (Path B) above. It
-is not itself submitted to any tool as a YAML blob — the fields map onto the typed object shape:
+The field reference below is an authoring aid for drafting fields before they are passed to
+`sam_plan`. It is not itself submitted to any tool as a YAML blob — the fields map onto typed
+object shapes. Two separate shapes are involved and must never be merged into one mapping:
+plan-level fields belong in the `config` object of the `create` call; task fields belong inside
+each object of `tasks` (Path A) or inside the single `task` object of `append_task` (Path B).
+
+Plan-level fields — the `config` object passed to `sam_plan(action='create')`:
 
 ```yaml
-tasks:
-  - task: T01
-    title: "..."
-    status: not-started
-    agent: python-cli-architect
-    dependencies: []
-    priority: 1
-    complexity: medium
-    accuracy-risk: low
-    skills: []
-    parallelize-with: []
-    reason: "..."
-    handoff: "..."
-issue: ""  # str | int — GitHub integer issue number or beads string ID (e.g., "bd-a3f8")
-acceptance_criteria:
-  - "AC1: ..."
-context: ""
+action: create
+slug: "auth-system"           # required, str
+goal: "..."                   # required, str
+tasks: []                     # list of task objects — shape below
+context: ""                   # optional, str — plan-level markdown prose
+acceptance-criteria-structured:   # optional, list of criterion objects
+  - criterion-id: "AC1"       # required, str
+    description: "..."        # optional, str
+    check-command: "uv run pytest tests/test_auth.py"   # required, str
+    expected-baseline: "any"  # optional, str — defaults to "any"
+    expected-final: "pass"    # optional, str — defaults to "pass"
+issue: 1234                   # optional, integer issue number only
+owner_reference: "bd-a3f8"    # optional, str — provider-native owner identifier
 ```
+
+Acceptance criteria are accepted only as `acceptance-criteria-structured` criterion objects.
+A plain list of criterion strings is not a plan field; unrecognized plan-level keys are dropped
+silently, so criteria written that way never reach the plan.
+
+`issue` accepts an integer only. A non-numeric owner identifier goes in `owner_reference`.
+Passing both `issue` and `owner_reference` in the same call is rejected.
+
+Task fields — one object per task, used in `tasks` or in `append_task`:
+
+```yaml
+task: T01                     # required, str — task id
+title: "..."                  # required, str
+status: not-started
+agent: python-cli-architect
+dependencies: []
+blocked-by: []
+parallelize-with: []
+priority: 1                   # int 1–5, 1 = highest
+complexity: medium            # low | medium | high
+accuracy-risk: low            # low | medium | high
+skills: []
+reason: "..."
+acceptance-criteria: "..."    # markdown string on the task, not a list of criterion objects
+handoff: "..."
+```
+
+Unknown keys on a task object are rejected outright rather than dropped.
 
 Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering, before being passed into the task object's fields. `sam_plan` validates required fields and persists the plan.
 
