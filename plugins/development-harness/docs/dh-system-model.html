@@ -1259,7 +1259,7 @@ flowchart LR
     <thead><tr><th>Step</th><th>Tool</th><th>Reads</th><th>Writes</th><th>Backend-specific behaviour</th></tr></thead>
     <tbody>
       <tr><td>1–3</td><td>Collect + validate fields</td><td>User input, <code>backlog_list(search=...)</code> for duplicate detection</td><td>Field set in memory</td><td>—</td></tr>
-      <tr><td>4</td><td><code>backlog_add(title, priority, description, source, type, gate_token)</code></td><td>Validated field set</td><td>Backend item created; response contains <code>item_ref</code></td><td>GitHub → Issue; beads → bd issue; SQLite → row; memory → dict</td></tr>
+      <tr><td>4</td><td><code>backlog_add(title, priority, description, source, type)</code></td><td>Validated field set</td><td>Backend item created; response contains <code>item_ref</code></td><td>GitHub → Issue; beads → bd issue; SQLite → row; memory → dict</td></tr>
       <tr><td>5–6</td><td>Use returned <code>item_ref</code></td><td><code>item_ref</code> from <code>backlog_add</code> response</td><td>Confirmation shown; <code>item_ref</code> used for all downstream selectors</td><td>Status implicitly <code>needs-grooming</code> at creation</td></tr>
     </tbody>
   </table>
