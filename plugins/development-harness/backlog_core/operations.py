@@ -69,6 +69,7 @@ from .parsing import (
     now_iso,
     parse_issue_selector,
     parse_sam_task_metadata,
+    split_body_sections,
     title_to_slug,
     today,
     view_result_from_local_item,
@@ -2171,6 +2172,14 @@ def _build_sections_metadata(
 ) -> dict[str, SectionEntryMetadata | GroomedSectionMetadata]:
     """Extract ``### ``- or ``## ``-delimited sections from *body* into a metadata dict.
 
+    Boundary detection is delegated to :func:`~backlog_core.parsing.split_body_sections`,
+    the marko-AST splitter also used by :func:`~backlog_core.parsing.extract_sections`
+    (see that function's docstring). A naive line regex — this function's previous
+    implementation, and still ``_SECTION_BOUNDARY_RE`` itself — misidentifies a
+    heading-shaped line inside a ``<div><sub>...</sub>...</div>`` entry block's own
+    content as a real section boundary; the shared splitter is entry-block aware and
+    cannot make that mistake (#3157).
+
     Args:
         body: Full issue/item body text.
         show: Controls both section and entry filtering.
@@ -2185,7 +2194,7 @@ def _build_sections_metadata(
     Returns:
         Mapping of section name to entry metadata.
     """
-    section_headers = list(_SECTION_BOUNDARY_RE.finditer(body))
+    section_segments = split_body_sections(body)
 
     # Determine whether show is a section-name filter or an entry-level filter.
     # The explicit ``section`` parameter takes precedence over a section name derived from ``show``.
@@ -2198,11 +2207,7 @@ def _build_sections_metadata(
             entry_show = show
 
     sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {}
-    for i, hdr in enumerate(section_headers):
-        sec_name = hdr.group(1).strip()
-        start = hdr.end()
-        end = section_headers[i + 1].start() if i + 1 < len(section_headers) else len(body)
-        sec_body = body[start:end]
+    for sec_name, sec_body in section_segments:
         if section_name_filter is not None and sec_name.lower() != section_name_filter.lower():
             continue
         entries = parse_entries(sec_body, show=entry_show, since=since)

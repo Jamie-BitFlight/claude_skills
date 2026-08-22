@@ -74,6 +74,7 @@ __all__ = [
     "parse_item_file",
     "parse_md_body_sections",
     "parse_sam_task_metadata",
+    "split_body_sections",
     "title_to_slug",
     "today",
     "view_result_from_local_item",
@@ -758,6 +759,29 @@ def extract_sections(text: str) -> dict[str, str]:
     return {f"## {name}": content for name, content in _split_body_h2(text)}
 
 
+def split_body_sections(body: str) -> list[tuple[str, str]]:
+    """Split *body* into ``## ``/``### ``-delimited sections, entry-block aware.
+
+    The shared structural boundary detector for callers that need the same
+    flat, mixed-level ``## ``/``### `` contract as
+    ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``) — but routed
+    through :func:`_split_body_h2`'s marko-AST splitter so a heading-shaped
+    line inside a ``<div><sub>...</sub>...</div>`` entry block (see
+    :class:`_EntryDivBlock`) is never misidentified as a section boundary.
+    This is the same guard :func:`extract_sections` already applies for
+    ``## ``-only splitting, generalized to also match ``### ``.
+
+    Args:
+        body: Full issue/item body text.
+
+    Returns:
+        List of ``(heading_name, content)`` tuples in document order.
+        ``heading_name`` is the heading text (level marker stripped) with
+        whitespace trimmed. ``content`` does not include the heading line.
+    """
+    return _split_body_h2(body, levels=frozenset({_H2_LEVEL, _H3_LEVEL}))
+
+
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
     """Merge GitHub issue body into local body by section.
 
@@ -943,11 +967,32 @@ def _extract_heading_text(node: _MarkoHeading) -> str:
     return "".join(parts).strip()
 
 
+def _ast_headings_at_levels(text: str, levels: frozenset[int]) -> list[str]:
+    """Return heading texts at the given levels from the marko AST, in document order.
+
+    Uses :data:`_ENTRY_AWARE_MARKDOWN` so ``#``-prefixed lines inside fenced
+    code blocks or entry-block content are never misidentified as headings.
+    Passing more than one level (e.g. ``frozenset({2, 3})``) returns a single
+    flat, mixed-level list in document order — headings are direct top-level
+    AST children regardless of level, so no nesting is implied between them.
+
+    Args:
+        text: Raw markdown text to scan.
+        levels: Heading depths to include (2 for ``##``, 3 for ``###``).
+
+    Returns:
+        Ordered list of heading text strings.
+    """
+    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
+    return [
+        _extract_heading_text(child)
+        for child in doc.children
+        if isinstance(child, _MarkoHeading) and child.level in levels
+    ]
+
+
 def _ast_h2_headings(text: str) -> list[str]:
     """Return level-2 heading texts from the marko AST in document order.
-
-    Uses :data:`_ENTRY_AWARE_MARKDOWN` so ``##`` lines inside fenced code
-    blocks or entry-block content are never misidentified as headings.
 
     Args:
         text: Raw markdown body text.
@@ -955,12 +1000,7 @@ def _ast_h2_headings(text: str) -> list[str]:
     Returns:
         Ordered list of heading text strings (after ``## ``).
     """
-    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
-    return [
-        _extract_heading_text(child)
-        for child in doc.children
-        if isinstance(child, _MarkoHeading) and child.level == _H2_LEVEL
-    ]
+    return _ast_headings_at_levels(text, frozenset({_H2_LEVEL}))
 
 
 def _ast_h3_headings(text: str) -> list[str]:
@@ -972,15 +1012,12 @@ def _ast_h3_headings(text: str) -> list[str]:
     Returns:
         Ordered list of heading text strings (after ``### ``).
     """
-    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
-    return [
-        _extract_heading_text(child)
-        for child in doc.children
-        if isinstance(child, _MarkoHeading) and child.level == _H3_LEVEL
-    ]
+    return _ast_headings_at_levels(text, frozenset({_H3_LEVEL}))
 
 
-def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target_level: int) -> list[tuple[int, str]]:
+def _map_headings_to_lines(
+    ast_headings: list[str], raw_lines: list[str], target_levels: frozenset[int]
+) -> list[tuple[int, str]]:
     """Map AST heading texts to their 0-indexed source line numbers.
 
     The AST decides *which* lines are real headings; this function only
@@ -994,7 +1031,9 @@ def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target
     Args:
         ast_headings: Heading texts extracted from the marko AST, in order.
         raw_lines: Source lines of the text (``text.splitlines()``).
-        target_level: Heading depth to match (2 for ``##``, 3 for ``###``).
+        target_levels: Heading depths to match (e.g. ``frozenset({2})`` for
+            ``## `` only, or ``frozenset({2, 3})`` to match ``## `` and
+            ``### `` as equal-priority flat boundaries).
 
     Returns:
         List of ``(line_index, heading_text_from_source)`` tuples.
@@ -1020,34 +1059,47 @@ def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target
         if in_fence:
             continue
         m = _ATX_HEADING_RE.match(line)
-        if m and len(m.group(1)) == target_level:
+        if m and len(m.group(1)) in target_levels:
             result.append((idx, m.group(2).strip()))
             ast_idx += 1
 
     return result
 
 
-def _split_body_h2(body: str) -> list[tuple[str, str]]:
-    """Split markdown body on ``## `` headings using the marko AST.
+def _split_body_h2(body: str, levels: frozenset[int] = frozenset({_H2_LEVEL})) -> list[tuple[str, str]]:
+    """Split markdown body on heading boundaries using the marko AST.
 
-    marko correctly identifies ATX headings while ignoring ``##`` lines inside
-    fenced code blocks.  Heading positions are then mapped back to source lines
-    so that raw content (including HTML entry blocks) is extracted verbatim.
+    marko correctly identifies ATX headings while ignoring ``#``-prefixed
+    lines inside fenced code blocks or entry-block content (see
+    :class:`_EntryDivBlock`).  Heading positions are then mapped back to
+    source lines so that raw content (including HTML entry blocks) is
+    extracted verbatim.
+
+    Defaults to ``## `` (level 2) only, matching this function's original
+    contract used by :func:`extract_sections` and :func:`parse_md_body_sections`.
+    Pass ``levels=frozenset({2, 3})`` to treat ``## `` and ``### `` as a single
+    flat, mixed-level sequence of boundaries — the same contract as
+    ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``), but entry-block
+    aware so a heading-shaped line inside a ``<div><sub>...</sub>...</div>``
+    entry is never misidentified as a section boundary (see
+    :func:`extract_sections`'s docstring for why the naive regex scan this
+    replaces was wrong).
 
     Args:
         body: Raw markdown body text (everything after frontmatter).
+        levels: Heading depths to treat as boundaries. Defaults to ``{2}``.
 
     Returns:
         List of ``(heading_name, content)`` tuples in document order.
-        The heading_name is the text after ``## `` with whitespace stripped.
+        The heading_name is the heading text with whitespace stripped.
         Content does not include the heading line itself.
     """
-    ast_headings = _ast_h2_headings(body)
+    ast_headings = _ast_headings_at_levels(body, levels)
     if not ast_headings:
         return []
 
     raw_lines = body.splitlines()
-    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=2)
+    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_levels=levels)
 
     segments: list[tuple[str, str]] = []
     for i, (line_idx, heading_name) in enumerate(positioned):
@@ -1086,7 +1138,7 @@ def _split_h3_subsections(content: str) -> dict[str, str]:
         return {}
 
     raw_lines = content.splitlines()
-    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=3)
+    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_levels=frozenset({_H3_LEVEL}))
 
     subsections: dict[str, str] = {}
     for i, (line_idx, raw_sub_name) in enumerate(positioned):
@@ -1221,7 +1273,7 @@ def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> di
     if segments:
         raw_lines = body_text.splitlines()
         ast_headings = _ast_h2_headings(body_text)
-        positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=2)
+        positioned = _map_headings_to_lines(ast_headings, raw_lines, target_levels=frozenset({_H2_LEVEL}))
         if positioned:
             first_heading_line = positioned[0][0]
             pre_heading_text = "\n".join(raw_lines[:first_heading_line]).strip()
