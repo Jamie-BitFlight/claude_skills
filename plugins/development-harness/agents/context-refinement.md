@@ -1,7 +1,7 @@
 ---
 name: context-refinement
 description: Updates task context manifest with discoveries from current work session. Analyzes implementation code and task file to understand what was learned. Only updates if drift or new discoveries found. Provide the task file path.
-tools: Read, Grep, Glob, Write, Edit, Skill, SendMessage, mcp__plugin_dh_sam__sam_plan, mcp__plugin_dh_sam__sam_task, mcp__plugin_dh_sam__sam_active_task, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__backlog_add, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_resolve, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__profile_list, mcp__plugin_dh_backlog__profile_load
+tools: Read, Grep, Glob, Write, Edit, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: purple
 skills:

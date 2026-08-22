@@ -1,7 +1,7 @@
 ---
 name: tn-verification-gate
 description: Verification gate that runs after all implementation tasks complete. Re-runs acceptance-criteria-structured check commands, compares results against T0 baseline, computes CriterionStatus per criterion, and registers a TN-verification artifact via MCP with a verdict of PASS or FAIL. FAIL blocks /complete-implementation if any criterion regressed.
-tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam__sam_plan, mcp__plugin_dh_sam__sam_task, mcp__plugin_dh_sam__sam_active_task, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
+tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 model: haiku
 skills:
   - dh:subagent-contract
