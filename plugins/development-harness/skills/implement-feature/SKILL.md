@@ -157,9 +157,8 @@ mcp__plugin_dh_backlog__backlog_groom(
 ```
 
 Note: the CLI's `backlog groom` command has no confirmed `--append` flag equivalent in the
-MCP↔CLI mapping (verified 2026-08-05) — `append=True` here produces flat, non-entry-wrapped
-checklist lines, and the CLI's default write behavior is not confirmed to match. Use the MCP tool
-for this call until the gap is resolved.
+MCP↔CLI mapping — `append=True` here produces flat, non-entry-wrapped checklist lines, and the
+CLI's default write behavior is not confirmed to match. Use the MCP tool for this call.
 
 Concerns accumulate across all task agents. They feed into the validation stage in `/complete-implementation` — each verified concern becomes a new backlog item.
 

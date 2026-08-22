@@ -69,8 +69,8 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:rt-ica', args='#42')`)
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
 ```
 
-Note: the CLI's `backlog view` has no `summary` toggle (documented gap in the MCP↔CLI mapping,
-verified 2026-08-05) — it always returns the flatter, full-content equivalent of `summary=false`.
+Note: the CLI's `backlog view` has no `summary` toggle — it always returns the flatter,
+full-content equivalent of `summary=false`.
 
 2. Extract: `title`, `description`, `sections['Acceptance Criteria']`,
    `sections['Expected Behavior']`, `sections['Impact Radius']`, and any other populated sections.

@@ -9,9 +9,7 @@ agents.
 file for schema version, summary tokens, and SKIP patterns. Do NOT duplicate or embed these
 definitions in agent instruction bodies.
 
-**#1430 compatibility**: The `gate(verdicts) -> GateResult` interface defined in §2.4 is
-stable. Issue #1430 replaces the gate function body only; callers and schema version routing
-remain unchanged.
+**Gate interface**: The `gate(verdicts) -> GateResult` interface defined in §2.4 is stable.
 
 ---
 
@@ -157,14 +155,13 @@ if all_skip:
 PASS
 ```
 
-**#1430 compatibility contract:**
+**Gate interface contract:**
 
-- The `schema_version: "1.0"` field allows #1430 to detect schema version and apply
+- The `schema_version: "1.0"` field allows future consumers to detect schema version and apply
   confidence/deduplication logic
-- The `findings` array structure is stable; #1430 may add `confidence` and `dedup_key` fields
-  per finding without breaking v1 consumers
-- Issue #1430 replaces the gate function body only; callers (the skill body) do not change
-- The stub consolidation above implements the stable interface; #1430 swaps only the internals
+- The `findings` array structure is stable; future revisions may add `confidence` and
+  `dedup_key` fields per finding without breaking v1 consumers
+- The stub consolidation above implements the stable interface
 
 ---
 

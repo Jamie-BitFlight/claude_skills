@@ -261,10 +261,9 @@ Apply gate in this order:
 
 4. **All other combinations** (any APPROVE, remaining SKIP) → gate PASSES.
 
-**#1430 compatibility contract:** The gate interface is stable:
+**Gate interface:** The gate interface is stable:
 `gate(verdicts: list[VerdictBlock]) -> GateResult` where `GateResult = {passed: bool,
-summary_line: str, blocking_findings: list[Finding]}`. Issue #1430 replaces the gate function
-body only — callers (this step) do not change.
+summary_line: str, blocking_findings: list[Finding]}`.
 
 ### Summary Line Format
 
