@@ -14,17 +14,33 @@ STRUCK_RE = re.compile(r"<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summar
 # Used in two places: detecting unwrapped seeds in the legacy entry path, and filtering
 # entries by the ``since`` parameter (entry IDs may carry a dedup suffix like ``-0``, ``-1``).
 _ISO_TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
+# Prefix of the fallback entry ID assigned to unwrapped (legacy) content when no real
+# ``added`` date is available. It is not a representable date, so it can never be parsed.
+_ZERO_DATE_PREFIX = "0000-00-00"
+# Matches a string that is ENTIRELY one or more complete entry blocks. Greedy ``.*`` so the
+# match runs to the final ``</div>`` rather than the first.
+_ALREADY_WRAPPED_RE = re.compile(r"\A<div><sub>[^<]+</sub>\s*.*</div>\Z", re.DOTALL)
 
 
 def _parse_entry_timestamp(entry_id: str) -> datetime:
     """Extract the ISO timestamp prefix from an entry ID and return a UTC-aware datetime.
 
     Returns:
-        UTC-aware datetime parsed from the ISO timestamp prefix of ``entry_id``.
+        UTC-aware datetime parsed from the ISO timestamp prefix of ``entry_id``, or
+        ``datetime.min`` (UTC) when ``entry_id`` carries the zero-date fallback prefix,
+        which encodes an unknown timestamp rather than a real one.
 
     Raises:
-        ValueError: If ``entry_id`` does not start with a valid ISO timestamp.
+        ValueError: If ``entry_id`` neither starts with the zero-date fallback prefix nor
+            with a valid ISO timestamp.
     """
+    if entry_id.startswith(_ZERO_DATE_PREFIX):
+        # The zero-date fallback means "this entry's timestamp is unknown", not "year zero".
+        # datetime.fromisoformat rejects it outright, which previously made any ``since``
+        # filter raise on a section holding legacy unwrapped content. An entry with no known
+        # timestamp is not at or after any real cutoff, so sort it before every real one and
+        # let the caller's comparison exclude it.
+        return datetime.min.replace(tzinfo=UTC)
     m = _ISO_TIMESTAMP_RE.match(entry_id)
     if not m:
         msg = f"Entry ID does not contain a valid ISO timestamp prefix: {entry_id!r}"
@@ -39,9 +55,19 @@ def _parse_entry_timestamp(entry_id: str) -> datetime:
 def wrap_entry(content: str) -> str:
     """Wrap content in a timestamped entry block.
 
+    Content that is already exactly one or more complete entry blocks is returned unchanged.
+    ``backlog_view`` renders entries with their ``<div><sub>...</sub>`` wrapper visible, so a
+    caller that echoes back what it read submits pre-wrapped content. Wrapping it again nests
+    the blocks, and the nested form does not survive a body round-trip: the wrapper leaks into
+    the entry's own content and the section splitter emits a stray ``</div>`` entry carrying an
+    empty ID.
+
     Returns:
-        HTML div string with ``<sub>`` timestamp and content.
+        HTML div string with ``<sub>`` timestamp and content, or ``content`` unchanged when it
+        is already wrapped.
     """
+    if _ALREADY_WRAPPED_RE.match(content.strip()):
+        return content.strip()
     return f"<div><sub>{now_iso()}</sub>\n\n{content}\n</div>"
 
 
