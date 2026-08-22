@@ -19,15 +19,25 @@ a task you were dispatched to run.
 - Agent profile — specialist behavior the task-worker loads into itself. A profile is behavior,
   not a dispatch target.
 
-## Dispatch `dh:task-worker`, always
+## Dispatch `dh:task-worker` to execute a SAM task
 
-Every dh dispatch uses `subagent_type="dh:task-worker"`. No task type, complexity level, or
-specialist role changes this.
+Decide which shape a dispatch is before choosing its `subagent_type`: does it hand over a plan
+address plus a task ID and expect the dispatched agent to claim that task, do the work, and write
+the task's state back? That question is observable at dispatch time from what the dispatch passes
+— it does not depend on knowing anything about the dispatching workflow's own position or stage.
 
-`dh:task-worker` carries the dh tool permissions the SAM lifecycle requires. Dispatching any other
-subagent type strands the task: the dispatched agent can produce output but cannot claim the task
-or write its state back, so the plan never advances and the work stays invisible to every later
-stage.
+If yes — the dispatch is handing over a SAM task for execution — dispatch
+`subagent_type="dh:task-worker"` always. No task type, complexity level, or specialist role
+changes this. `dh:task-worker` carries the dh tool permissions the SAM lifecycle requires.
+Dispatching any other subagent type for a SAM task execution strands the task: the dispatched
+agent can produce output but cannot claim the task or write its state back, so the plan never
+advances and the work stays invisible to every later stage.
+
+If no — the dispatch is an independent reviewer verifying already-completed work, a contract check
+run after a task closes, or any other verifier with no SAM task of its own to claim — keep the
+dispatch's own named agent. Routing this shape through `dh:task-worker` makes the worker look up
+the completed task's specialist profile and re-run `start-task` instead of performing the review,
+so the review or verification never happens and its output is silently lost.
 
 ## A task's `agent:` field is not a routing directive
 
@@ -45,9 +55,10 @@ flowchart TD
     Execute --> State[Write task state back]
 ```
 
-When adding a dispatch step to any dh skill, reference file, or workflow document, write
-`subagent_type="dh:task-worker"` and pass the task reference. Let the task's own specialist field
-select the specialist.
+When adding a dispatch step to any dh skill, reference file, or workflow document, apply the same
+question: is a plan address and task ID being handed over for execution? If yes, write
+`subagent_type="dh:task-worker"` and pass the task reference — let the task's own specialist field
+select the specialist. If no, name the specific agent the dispatch requires.
 
 ## Artifacts and plans are logical records, not files
 

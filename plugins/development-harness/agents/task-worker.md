@@ -4,6 +4,7 @@ description: Universal SAM task executor — receives a task reference via `star
 model: sonnet
 skills:
   - dh:subagent-contract
+  - dh:dispatch-contract
 ---
 
 # Task Worker

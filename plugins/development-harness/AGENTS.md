@@ -250,11 +250,8 @@ value via SAM MCP and passes it to `profile_load` to load specialist behavior in
 
 ### Extension rule
 
-When adding a new dispatch step to any dh skill, reference file, or workflow document:
-
-- Dispatch `subagent_type="dh:task-worker"` — always
-- Keep `subagent_type="dh:task-worker"` regardless of task complexity
-- The `agent:` field in the task YAML selects the specialist; the orchestrator does not
+When adding a new dispatch step to any dh skill, reference file, or workflow document, apply the
+dispatch-target decision defined in `/dh:dispatch-contract` rather than repeating it here.
 
 ---
 
