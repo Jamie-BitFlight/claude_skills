@@ -22,7 +22,6 @@ from backlog_core.models import BackendAvailability, BackendStatus, BacklogError
 from backlog_core.server import mcp
 from fastmcp.client import Client
 
-from tests.conftest import TEST_GATE_TOKEN
 from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
@@ -115,14 +114,11 @@ async def test_backlog_update_sam_task_status_forwards_repo() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_backlog_add_success_returns_merged_result(gate_token: str):
+async def test_backlog_add_success_returns_merged_result():
     """backlog_add passes params to operations.add_item and merges output."""
     op_result = {"file_path": "/tmp/p1-my-item.md", "title": "My Item", "priority": "P1"}
     with patch("dh_core.operations.add_item", return_value=op_result) as mock_add:
-        response = await _call(
-            "backlog_add",
-            {"title": "My Item", "priority": "P1", "description": "A test item", "gate_token": gate_token},
-        )
+        response = await _call("backlog_add", {"title": "My Item", "priority": "P1", "description": "A test item"})
 
     mock_add.assert_called_once()
     call_kwargs = mock_add.call_args.kwargs
@@ -136,7 +132,7 @@ async def test_backlog_add_success_returns_merged_result(gate_token: str):
     assert "errors" in response
 
 
-async def test_backlog_add_passes_optional_params(gate_token: str):
+async def test_backlog_add_passes_optional_params():
     """backlog_add forwards source, type_, and force to operations."""
     op_result = {"file_path": "/tmp/p0-bug.md", "title": "Bug", "priority": "P0"}
     with patch("dh_core.operations.add_item", return_value=op_result) as mock_add:
@@ -149,7 +145,6 @@ async def test_backlog_add_passes_optional_params(gate_token: str):
                 "source": "CI pipeline",
                 "type": "Bug",
                 "force": True,
-                "gate_token": gate_token,
             },
         )
 
@@ -159,19 +154,16 @@ async def test_backlog_add_passes_optional_params(gate_token: str):
     assert call_kwargs["force"] is True
 
 
-async def test_backlog_add_backlog_error_returns_error_key(gate_token: str):
+async def test_backlog_add_backlog_error_returns_error_key():
     """backlog_add catches BacklogError and includes error key in response."""
     with patch("dh_core.operations.add_item", side_effect=BacklogError("duplicate found")):
-        response = await _call(
-            "backlog_add",
-            {"title": "Dupe", "priority": "P1", "description": "Already exists", "gate_token": gate_token},
-        )
+        response = await _call("backlog_add", {"title": "Dupe", "priority": "P1", "description": "Already exists"})
 
     assert response["error"] == "duplicate found"
     assert "messages" in response
 
 
-async def test_backlog_add_output_messages_included(gate_token: str):
+async def test_backlog_add_output_messages_included():
     """backlog_add includes output messages from the Output collector."""
     out = Output()
     out.info("created file")
@@ -183,59 +175,10 @@ async def test_backlog_add_output_messages_included(gate_token: str):
         return {"file_path": "/tmp/p1-item.md"}
 
     with patch("dh_core.operations.add_item", side_effect=_add_with_messages):
-        response = await _call(
-            "backlog_add", {"title": "Item", "priority": "P1", "description": "Test", "gate_token": gate_token}
-        )
+        response = await _call("backlog_add", {"title": "Item", "priority": "P1", "description": "Test"})
 
     assert "created file" in response["messages"]
     assert "no github token" in response["warnings"]
-
-
-async def test_backlog_add_gate_rejects_missing_token():
-    """backlog_add returns error when gate_token is absent or wrong."""
-    with patch("dh_core.operations.add_item") as mock_add:
-        response_missing = await _call("backlog_add", {"title": "X", "priority": "P1", "description": "Y"})
-        response_wrong = await _call(
-            "backlog_add", {"title": "X", "priority": "P1", "description": "Y", "gate_token": "wrong-value"}
-        )
-
-    mock_add.assert_not_called()
-    assert (
-        response_missing["error"]
-        == "Gate token required. Load /dh:work-backlog-item create — the skill provides the gate_token at load time."
-    )
-    assert (
-        response_wrong["error"]
-        == 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
-    )
-
-
-@pytest.mark.e2e
-def test_gate_token_file_readable_at_runtime() -> None:
-    """Gate token written by get-gate-token.mjs must be readable via _read_gate_token().
-
-    Finds the token file by scanning ~/.dh/sessions/, reads it, verifies the
-    {session_id}:{hex} format, then confirms _read_gate_token() returns the same value.
-    """
-    import os
-    from pathlib import Path
-
-    from backlog_core.server import _read_gate_token
-
-    dh_state_home = os.environ.get("DH_STATE_HOME", "")
-    dh_root = Path(dh_state_home).expanduser() if dh_state_home else Path.home() / ".dh"
-    sessions_dir = dh_root / "sessions"
-
-    candidates = (
-        [p for d in sessions_dir.iterdir() if (p := d / ".gate-token").exists()] if sessions_dir.exists() else []
-    )
-    assert candidates, f"No .gate-token file found under {sessions_dir}"
-
-    token = candidates[0].read_text(encoding="utf-8").strip()
-    assert ":" in token, f"Token format invalid — expected session_id:hex, got {token!r}"
-
-    result = _read_gate_token(token)
-    assert result == token, f"_read_gate_token() returned {result!r}, expected {token!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -1770,7 +1713,7 @@ async def test_backlog_view_show_non_numeric_string_passed_as_str():
     [
         (
             "backlog_add",
-            {"title": "T", "priority": "P1", "description": "D", "gate_token": TEST_GATE_TOKEN},
+            {"title": "T", "priority": "P1", "description": "D"},
             "dh_core.operations.add_item",
             {"file_path": "f"},
         ),
@@ -1802,11 +1745,7 @@ async def test_output_fields_always_present_on_success(tool_name, params, mock_t
 @pytest.mark.parametrize(
     ("tool_name", "params", "mock_target"),
     [
-        (
-            "backlog_add",
-            {"title": "T", "priority": "P1", "description": "D", "gate_token": TEST_GATE_TOKEN},
-            "dh_core.operations.add_item",
-        ),
+        ("backlog_add", {"title": "T", "priority": "P1", "description": "D"}, "dh_core.operations.add_item"),
         ("backlog_list", {}, "dh_core.operations.list_items"),
         ("backlog_view", {"selector": "#1"}, "dh_core.operations.view_item"),
         ("backlog_sync", {}, "dh_core.operations.sync_items"),
@@ -1872,7 +1811,7 @@ def test_mcp_server_name_is_backlog_mcp():
 # ---------------------------------------------------------------------------
 
 
-async def test_backlog_add_passes_output_instance_to_operations(gate_token: str):
+async def test_backlog_add_passes_output_instance_to_operations():
     """backlog_add provides an Output instance as the 'output' keyword arg."""
     captured: list[Output] = []
 
@@ -1881,7 +1820,7 @@ async def test_backlog_add_passes_output_instance_to_operations(gate_token: str)
         return {"file_path": "/tmp/p1-x.md"}
 
     with patch("dh_core.operations.add_item", side_effect=_capture):
-        await _call("backlog_add", {"title": "X", "priority": "P1", "description": "D", "gate_token": gate_token})
+        await _call("backlog_add", {"title": "X", "priority": "P1", "description": "D"})
 
     assert len(captured) == 1
     assert isinstance(captured[0], Output)
@@ -1907,12 +1846,10 @@ async def test_backlog_list_passes_output_instance_to_operations():
 # ---------------------------------------------------------------------------
 
 
-async def test_backlog_add_no_error_key_on_success(gate_token: str):
+async def test_backlog_add_no_error_key_on_success():
     """Successful backlog_add response must not contain an 'error' key."""
     with patch("dh_core.operations.add_item", return_value={"file_path": "/tmp/p1-ok.md"}):
-        response = await _call(
-            "backlog_add", {"title": "OK", "priority": "P1", "description": "Fine", "gate_token": gate_token}
-        )
+        response = await _call("backlog_add", {"title": "OK", "priority": "P1", "description": "Fine"})
 
     assert "error" not in response
 

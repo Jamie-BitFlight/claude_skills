@@ -192,19 +192,8 @@ async def test_query_filter_absent_key_returns_empty(dh_env: dict[str, str]) -> 
 # ---------------------------------------------------------------------------
 
 
-def _setup_gate_token(dh_state_home: str, session_id: str = "test-session", token: str = "abc123") -> str:
-    """Create a gate token file and return the full token string for MCP backlog_add."""
-    gate_dir = Path(dh_state_home) / "sessions" / session_id
-    gate_dir.mkdir(parents=True, exist_ok=True)
-    full_token = f"{session_id}:{token}"
-    (gate_dir / ".gate-token").write_text(full_token)
-    return full_token
-
-
 async def test_backlog_add_parity(dh_env: dict[str, str]) -> None:
     """Backlog add via CLI and MCP both create items with equivalent metadata."""
-    gate_token = _setup_gate_token(dh_env["DH_STATE_HOME"])
-
     cli_result = _invoke_cli([
         "backlog",
         "add",
@@ -218,13 +207,7 @@ async def test_backlog_add_parity(dh_env: dict[str, str]) -> None:
     mcp_result = await call_mcp_tool(
         _backlog_mcp,
         "backlog_add",
-        {
-            "title": "Parity MCP Add",
-            "priority": "P1",
-            "description": "mcp test",
-            "gate_token": gate_token,
-            "force": True,
-        },
+        {"title": "Parity MCP Add", "priority": "P1", "description": "mcp test", "force": True},
     )
 
     assert cli_result["title"] == "Parity CLI Add"
