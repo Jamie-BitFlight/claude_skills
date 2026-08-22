@@ -126,8 +126,8 @@ handles any external tracker sync on task completion. No additional call is requ
 5. **Record divergence observations during implementation.**
 
    While implementing, if you discover that the architect spec or feature-context
-   describes something that does not match what you are implementing, append a
-   divergence note to the task file under a `## Divergence Notes` section.
+   describes something that does not match what you are implementing, record a
+   divergence note on the task through the SAM task update operation.
 
    **When to record**: Record a divergence note when ALL of these hold:
    - You are implementing something that differs from what the architect spec or
@@ -136,22 +136,42 @@ handles any external tracker sync on task completion. No additional call is requ
      name, different import path)
    - The difference affects the observable behavior, structure, or scope of the feature
 
-   **Divergence note format**:
+   Write the note and its running count in one call. The `append_section` heading, the note
+   body, and the `divergence-notes` field update are non-exclusive sub-operations of a single
+   `update` action:
+
+   ```python
+   mcp__plugin_dh_sam__sam_task(
+       plan="P{N}",
+       task="T{M}",
+       config={
+           "action": "update",
+           "append_section": "Divergence Notes",
+           "section_content": "{note body}",
+           "set_fields_json": {"divergence-notes": {new_count}},
+       },
+   )
+   ```
+
+   `{new_count}` is the task's current `divergence-notes` value plus one. Read the current value
+   from `sam_task(plan="P{N}", task="T{M}", config={"action": "read"})` before the update call.
+
+   The `append_section` value supplies the `## Divergence Notes` heading — `{note body}` carries
+   no heading of its own:
 
 ````markdown
-## Divergence Notes
-
 ### DN-1: {Brief title}
 
-- **Plan artifact**: `artifact_read(item_id={N}, artifact_type="architect")`, section "{section name}"
-- **Plan claim**: "{quoted text from plan artifact}"
-- **Actual implementation**: "{what was actually done and why}"
-- **Classification**: design-refinement | intent-divergence
-- **Recorded**: {ISO timestamp}
+- Plan artifact: `artifact_read(item_id={N}, artifact_type="architect")`, section "{section name}"
+- Plan claim: "{quoted text from plan artifact}"
+- Actual implementation: "{what was actually done and why}"
+- Classification: design-refinement | intent-divergence
+- Recorded: {ISO timestamp}
 ````
 
-   After appending a note, update `divergence-notes: {count}` in YAML frontmatter
-   (or add `**Divergence Notes**: {count}` in legacy format).
+   Never record a divergence note by editing a file. The task is addressed logically; on a remote
+   backend no task file exists to edit, and a file written in one worktree is unreadable from
+   another, so a file-based note is silently lost.
 
    For full artifact classification rules and divergence thresholds, see
    [plan-artifact-lifecycle.md](../../docs/plan-artifact-lifecycle.md).

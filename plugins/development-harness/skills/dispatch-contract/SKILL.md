@@ -18,7 +18,7 @@ a task you were dispatched to run.
 - Agent profile — specialist behavior an agent loads into itself from the task's `agent:` field.
   A profile is behavior, not a dispatch target.
 
-## Choose the dispatch target for a SAM task
+## Choose the dispatch target
 
 Decide which shape a dispatch is before choosing its `subagent_type`: does it hand over a plan
 address plus a task ID and expect the dispatched agent to claim that task, do the work, and write
@@ -43,11 +43,21 @@ them produces output but never claims or closes the task, so the plan never adva
 stays invisible to every later stage — dispatch `dh:task-worker` for that task instead and let the
 specialist's behavior arrive as a profile.
 
-If no — the dispatch is an independent reviewer verifying already-completed work, a contract check
-run after a task closes, or any other verifier with no SAM task of its own to claim — keep the
-dispatch's own named agent. Routing this shape through `dh:task-worker` makes the worker look up
-the completed task's specialist profile and re-run `start-task` instead of performing the review,
-so the review or verification never happens and its output is silently lost.
+If no — the dispatch hands over no task to claim — choose the target by what the step itself
+requires:
+
+- The step requires dh operations of its own — it reads or registers an artifact, loads an agent
+  profile, or reads plan or task state. Before dispatching the agent the step names, check that
+  agent's declared tool list against every dh operation the step's prompt will call. When the tool
+  list omits any of them, dispatch `subagent_type="dh:task-worker"` instead and have it load that
+  agent through `profile_load` as a profile, exactly as a SAM-task dispatch does. Dispatching the
+  named agent directly leaves those calls unavailable to it, so it cannot read its inputs or
+  register its output, and the stage produces nothing the next stage can read.
+- The step requires no dh operations — an independent reviewer verifying already-completed work, a
+  contract check run after a task closes, or any other verifier whose finding is its response —
+  keep the dispatch's own named agent. Routing this shape through `dh:task-worker` makes the worker
+  look up a specialist profile and run `start-task` instead of performing the review, so the review
+  or verification never happens and its output is silently lost.
 
 ## A task's `agent:` field is not a routing directive
 
@@ -73,7 +83,9 @@ When adding a dispatch step to any dh skill, reference file, or workflow documen
 questions: is a plan address and task ID being handed over for execution, does a prebuilt
 specialist fit the work, and does it reach the SAM task operations? Name that specialist when it
 does. Write `subagent_type="dh:task-worker"` wherever a generic agent would otherwise be named. If
-the dispatch is not handing over a SAM task at all, name the specific agent the dispatch requires.
+the dispatch is not handing over a SAM task at all, name the specific agent the dispatch requires —
+unless the step calls dh operations that agent's declared tool list omits, in which case write
+`subagent_type="dh:task-worker"` and have it load that agent as a profile.
 
 ## Artifacts and plans are logical records, not files
 
