@@ -29,27 +29,6 @@ from tests.helpers import call_mcp_tool
 logger = logging.getLogger(__name__)
 
 
-def _find_latest_gate_token() -> str:
-    """Return the contents of the most recently modified .gate-token file.
-
-    Scans ``{DH_STATE_HOME}/sessions/*/.gate-token`` (or ``~/.dh/sessions/``
-    when ``DH_STATE_HOME`` is not set).  In e2e live tests there is no skill
-    injection, so the test must locate the token file itself rather than
-    receiving it through context.
-
-    Returns:
-        The raw token string, or an empty string when no file is found.
-    """
-    from pathlib import Path
-
-    dh_root = Path(os.environ.get("DH_STATE_HOME", Path.home() / ".dh"))
-    candidates = list(dh_root.glob("sessions/*/.gate-token"))
-    if not candidates:
-        return ""
-    latest = max(candidates, key=lambda p: p.stat().st_mtime)
-    return latest.read_text(encoding="utf-8").strip()
-
-
 # ---------------------------------------------------------------------------
 # Module-level skip + mark
 # ---------------------------------------------------------------------------
@@ -117,22 +96,6 @@ def live_items(tmp_path_factory, monkeypatch_class):
     _bp_set_config(_BPBacklogConfig(backend=GitHubBackend()))
 
     test_id = str(uuid.uuid4())[:8]
-
-    # Write gate token file so backlog_add passes its gate validation.
-    # The server reads the token from {DH_STATE_HOME}/sessions/{session_id}/.gate-token
-    # at request time. CLAUDE_CODE_SESSION_ID must also be set in the process environment
-    # so that both the server's validation path and _read_gate_token() (called inline in
-    # test bodies to supply the gate_token parameter) resolve to the same file.
-    live_session_id = f"live-test-session-{test_id}"
-    # Token must be {session_id}:{hex} — _read_gate_token() splits on ':' to locate the
-    # session directory, then compares the full string against the file contents.
-    raw_hex = (str(uuid.uuid4()).replace("-", "") + str(uuid.uuid4()).replace("-", ""))[:64]
-    live_gate_token = f"{live_session_id}:{raw_hex}"
-    token_dir = tmp_root / "dh_state" / "sessions" / live_session_id
-    token_dir.mkdir(parents=True, exist_ok=True)
-    (token_dir / ".gate-token").write_text(live_gate_token, encoding="utf-8")
-    monkeypatch_class.setenv("CLAUDE_CODE_SESSION_ID", live_session_id)
-
     ctx: dict = {
         "test_id": test_id,
         "backlog_dir": bd,
@@ -223,7 +186,6 @@ class TestLiveLifecycle:
                 "description": "Live validation test item",
                 "source": "test",
                 "force": True,
-                "gate_token": _find_latest_gate_token(),
             },
         )
 
@@ -349,7 +311,6 @@ class TestLiveLifecycle:
                 "description": "Item to be resolved",
                 "source": "test",
                 "force": True,
-                "gate_token": _find_latest_gate_token(),
             },
         )
         # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.

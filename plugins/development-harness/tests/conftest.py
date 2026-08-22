@@ -186,35 +186,22 @@ def write_test_item() -> object:
 
 
 # ---------------------------------------------------------------------------
-# Gate token fixtures
+# State isolation
 # ---------------------------------------------------------------------------
-
-_TEST_SESSION_ID = "test-session-id-for-gate-token"
-TEST_GATE_TOKEN = f"{_TEST_SESSION_ID}:test-fixed-gate-token-aabbccdd"
 
 
 @pytest.fixture(autouse=True)
-def _patch_gate_token(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
-    """Write the fixed gate token to a temp session file for all non-e2e tests.
+def _isolated_state_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
+    """Redirect DH_STATE_HOME to a temp directory for all non-e2e tests.
 
-    Sets DH_STATE_HOME so that backlog_core.server._read_gate_token() finds the
-    token at the path encoded in the token value itself. Skips for tests marked
-    with @pytest.mark.e2e so that live validation tests use the real token written
-    by the skill at load time.
+    Without this, dh_paths.state_root() falls back to the real ~/.dh/projects/{slug}/
+    directory, letting any test that reaches it (dispatch state, SAM context, etc.)
+    read or write real user state. Skips for tests marked @pytest.mark.e2e, which
+    set up their own DH_STATE_HOME to exercise the real runtime path.
     """
     if request.node.get_closest_marker("e2e"):
         return
-    dh_state = tmp_path / "dh_state"
-    token_dir = dh_state / "sessions" / _TEST_SESSION_ID
-    token_dir.mkdir(parents=True, exist_ok=True)
-    (token_dir / ".gate-token").write_text(TEST_GATE_TOKEN, encoding="utf-8")
-    monkeypatch.setenv("DH_STATE_HOME", str(dh_state))
-
-
-@pytest.fixture
-def gate_token() -> str:
-    """Return the fixed gate token used by the file-backed server in tests."""
-    return TEST_GATE_TOKEN
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
 
 
 # ---------------------------------------------------------------------------

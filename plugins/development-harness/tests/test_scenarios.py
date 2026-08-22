@@ -18,7 +18,6 @@ from backlog_core.backend_protocol import get_config
 from backlog_core.models import ReconcileRequest, ReconcileResult, ReconcileScope, Section
 from backlog_core.server import mcp
 
-from tests.conftest import TEST_GATE_TOKEN as _SESSION_GATE_TOKEN
 from tests.helpers import call_mcp_tool
 
 # ---------------------------------------------------------------------------
@@ -66,7 +65,6 @@ class TestCreateBacklogItem:
                 "description": "A test item",
                 "source": "test",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
 
@@ -557,13 +555,7 @@ class TestErrorPaths:
 
         result = await _call(
             "backlog_add",
-            {
-                "title": "Duplicate Detection Test",
-                "priority": "P1",
-                "description": "A duplicate",
-                "force": False,
-                "gate_token": _SESSION_GATE_TOKEN,
-            },
+            {"title": "Duplicate Detection Test", "priority": "P1", "description": "A duplicate", "force": False},
         )
 
         assert "error" in result
@@ -606,7 +598,6 @@ class TestRecursionGuardScenarios:
                 "description": "Follow-up identified when recursion depth limit was reached",
                 "source": "Depth limit exceeded on #42 at depth 5",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
 
@@ -629,7 +620,6 @@ class TestRecursionGuardScenarios:
                 "description": "Blocked for planning — needs scoping before implementation",
                 "source": "BLOCKED-FOR-PLANNING",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
         assert "error" not in first
@@ -644,7 +634,6 @@ class TestRecursionGuardScenarios:
                 "description": "Blocked for planning — needs scoping before implementation",
                 "source": "BLOCKED-FOR-PLANNING",
                 "force": False,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
 
@@ -663,7 +652,6 @@ class TestRecursionGuardScenarios:
                 "description": "Separate domain concern identified during quality gate",
                 "source": "Quality gate follow-up from #42 — out-of-scope: separate domain concern",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
 
@@ -689,7 +677,6 @@ class TestRecursionGuardScenarios:
                 "description": "Item created when scope section absent — defaults to in-scope",
                 "source": "in-scope default",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
 
@@ -747,7 +734,6 @@ class TestLifecycles:
                 "description": "Full lifecycle test",
                 "source": "test",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
         assert create_result["title"] == "Lifecycle Close Item"
@@ -787,7 +773,6 @@ class TestLifecycles:
                 "description": "Will be resolved",
                 "source": "test",
                 "force": True,
-                "gate_token": _SESSION_GATE_TOKEN,
             },
         )
         assert create_result["item_ref"] == "#71"
