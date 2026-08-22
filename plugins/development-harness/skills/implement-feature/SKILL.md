@@ -96,24 +96,20 @@ Spawn one teammate per ready task. When only one task is ready, a single Agent c
 For each task being dispatched:
 
 - Choose the `subagent_type` with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) — the task definition's `agent` field is read after dispatch, not by the orchestrator.
-- Check the task's `skills` list from the ready-tasks JSON output.
-- If `skills` is non-empty, include skill-loading instructions in the delegation prompt:
+- Launch the chosen agent with the task reference as its entire prompt:
 
 ```text
-Before starting work, load these skills: {comma-separated skill names}.
-For each skill, call: Skill(skill="{skill-name}")
+{plan_ref}/{task_id}
 ```
 
-- If `skills` is empty or missing, do not add skill-loading instructions (backward compatible).
-- Launch the chosen agent with a prompt that invokes `start-task`:
-
-```text
-Skill(skill="start-task", args="{plan_ref} --task {task_id}")
-```
-
-> **Note**: Task-level skills are additive to agent-level skills. If the agent definition
-> already declares skills via its frontmatter, task-level skills supplement them (they do not
-> replace agent-level skills). Loading the same skill twice is a no-op.
+- Do not name a skill in the delegation prompt. A dispatch carries a task reference; the receiver
+  resolves what to load from it. `dh:task-worker` reads the task record, loads the profile named
+  in its `agent` field, and the task-execution skill it delegates to loads the task's own
+  `skills` list; a specialist dispatched directly already carries its own behavior. A skill name
+  written into a dispatch prompt is an instruction whose scope the receiver cannot check against
+  its own — that is the route by which a plan-level workflow reaches a task-level agent.
+- Do not restate the task's `skills` list in the prompt. The receiver reads it from the task
+  record, and task-level skills stay additive to whatever the agent profile declares.
 
 ### Agent Health Check (While Waiting)
 
@@ -345,8 +341,5 @@ If the issue number is not known, skip registration.
 
 ## Completion Gate
 
-When all tasks show `COMPLETE`, invoke:
-
-```text
-Skill(skill="complete-implementation", args="{plan_ref}")
-```
+When all tasks show `COMPLETE`, load the `dh:complete-implementation` skill with `{plan_ref}` as
+its argument, in this workflow's own context. Never pass that skill name to a dispatched agent.
