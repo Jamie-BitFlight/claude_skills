@@ -444,7 +444,7 @@ The harness ships 27 specialist agents invoked automatically during pipeline sta
 
 **Execution:**
 
-- `task-worker` — Fallback SAM task executor for work no prebuilt specialist covers; claims, executes, and reports the task while loading the specialist profile named by its `agent:` field
+- `task-worker` — Blank-canvas SAM task executor dispatched in place of a generic agent; claims, executes, and reports the task while loading the specialist profile named by its `agent:` field
 
 ---
 

@@ -350,7 +350,7 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 
 **Execution:**
 
-- `@dh:task-worker` - Fallback SAM task executor for work no prebuilt specialist covers; loads specialist profiles through each task's `agent:` field
+- `@dh:task-worker` - Blank-canvas SAM task executor dispatched in place of a generic agent; loads specialist profiles through each task's `agent:` field
 - `@dh:backlog-item-groomer` - Groom a backlog item with RT-ICA assessment and resource map
 
 ---

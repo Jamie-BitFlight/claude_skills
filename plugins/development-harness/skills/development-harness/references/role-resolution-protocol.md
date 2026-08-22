@@ -99,7 +99,7 @@ Parse the manifest's Role Fulfillment section and map each abstract role to a co
 
 **Dispatch routing rule:**
 
-Record the resolved agent name in the task's `agent:` field, then choose the dispatch target with the two checks in `dh:dispatch-contract`: dispatch the resolved specialist when it covers the work and reaches the SAM task operations `sam_plan`, `sam_task`, and `sam_active_task`; otherwise dispatch `subagent_type="dh:task-worker"`, which reads the `agent:` field via SAM MCP and calls `profile_load(agent_name=...)` to load that specialist behavior into itself. Either way the orchestrator passes only the task reference.
+Record the resolved agent name in the task's `agent:` field, then choose the dispatch target with the decision in `dh:dispatch-contract`. The orchestrator passes only the task reference.
 
 **Agent reference format in manifests:**
 

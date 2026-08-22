@@ -77,7 +77,7 @@ orchestrator-span
 This is distinct from groom swarm TeamCreate, which names specialists directly. The join
 must distinguish these two shapes or every task-worker span resolves to the wrong actor.
 
-SOURCE: `plugins/development-harness/CLAUDE.md` → "Dispatch Pattern"
+SOURCE: `plugins/development-harness/skills/dispatch-contract/SKILL.md`
 
 ### Conditional topology
 
