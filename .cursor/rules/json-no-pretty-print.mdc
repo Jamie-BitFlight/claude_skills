@@ -1,12 +1,21 @@
 ---
-description: Do not pretty-print JSON by default for machine or LLM consumption
+description: Do not pretty-print JSON emitted at runtime for machine or LLM consumption
 alwaysApply: true
 ---
 
 # JSON output (no pretty-print by default)
 
-When emitting JSON for **scripts, tools, MCP, or any path where output is consumed by programs or LLMs** (not a human reading a terminal for debugging):
+Scope: JSON a program emits at runtime — script stdout, CLI results, MCP tool payloads, API
+responses, generated report files. Anything a process prints or writes for another program or an
+LLM to parse.
 
-- Use **`JSON.stringify(value)`** only — do **not** use `JSON.stringify(value, null, 2)` or other spacing/indent by default.
-- Extra newlines and indentation are **token cost** for models and add no parsing benefit.
+- Emit compact JSON: `JSON.stringify(value)`, `json.dumps(data)`, `model_dump_json()`. Never
+  `JSON.stringify(value, null, 2)`, never `indent=`.
+- Indentation and newlines are token cost for a model and add no parsing benefit.
 
+Out of scope: JSON files committed to the repository as configuration or data — `package.json`,
+`tsconfig.json`, `biome.json`, every harness plugin manifest (`.claude-plugin/plugin.json`,
+`.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`), `marketplace.json`, test fixtures,
+snapshots. Humans read and edit these, git diffs them line by line, and non-AI tooling consumes
+them. Keep their existing pretty-printed formatting. Never reformat one as part of an unrelated
+change, and never cite this rule to justify compacting one.
