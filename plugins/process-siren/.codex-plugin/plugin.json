@@ -6,13 +6,7 @@
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "keywords": [
-    "mermaid",
-    "process",
-    "workflow",
-    "diagram",
-    "flowchart"
-  ],
+  "keywords": ["mermaid", "process", "workflow", "diagram", "flowchart"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Process Siren",
@@ -20,11 +14,7 @@
     "longDescription": "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes process quality methodology for improving ambiguous or incomplete processes before conversion.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
-    ],
+    "capabilities": ["Interactive", "Read", "Write"],
     "defaultPrompt": [
       "Converts bullet steps, ASCII art, markdown tables, and prose workflows into Mermaid diagrams for AI-facing documents. Includes"
     ]

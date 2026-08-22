@@ -22,11 +22,7 @@
     "longDescription": "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, and missing tooling opportunities for continuous improvement",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": [
-      "Interactive",
-      "Read",
-      "Write"
-    ],
+    "capabilities": ["Interactive", "Read", "Write"],
     "defaultPrompt": [
       "Analyze Claude Code agent session transcripts to identify inefficiencies, anti-patterns, repeated mistakes, missing tooling"
     ]
