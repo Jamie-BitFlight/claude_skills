@@ -38,10 +38,17 @@ as **labels naming a key in that JSON** — not variables passed into the file. 
 "the value from the `item_ref` key," never "the parser provides `item_ref`."
 
 **Agent `tools:` frontmatter** requires exact, correctly-cased tool names
-(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`) — wildcards (`*`) and short-form MCP
-aliases (`mcp__context-mode__ctx_stats` instead of the full
-`mcp__plugin_context-mode_context-mode__ctx_stats`) silently resolve to zero tools, with no error
-raised.
+(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`). A name that does not match a live
+tool is dropped silently, with no error raised; the rest of the grant still resolves. A name for a
+tool on an MCP server that is not connected in the session behaves the same way — dropped, not
+granted. Verify every MCP name against the running server, not against another agent file.
+
+Bare `*` grants every tool. A server-scoped wildcard (`mcp__plugin_dh_backlog__*`) does not scope
+anything: it grants the full tool set, so an agent written expecting one server's tools silently
+receives all of them. Never write a server-scoped wildcard — enumerate the tool names.
+
+Measured 2026-08-22 against four probe agents. Harness tool resolution changes; re-measure before
+relying on any claim in this paragraph.
 
 After editing any SKILL.md, invoke the skill and confirm it still renders correctly with no
 unexpected prompts or extra steps.
