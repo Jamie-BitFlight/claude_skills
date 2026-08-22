@@ -577,10 +577,19 @@ class TestBuildIssueBody:
             suggested_location="packages/foo/",
         )
 
-    def test_build_issue_body_contains_story_section(self) -> None:
+    def test_build_issue_body_omits_story_section(self) -> None:
+        """No Story section is generated at creation.
+
+        Tests: A user story is a grooming output, not an intake artifact
+        How: Assert the header is absent for a fully populated item
+        Why: The generated story template-filled the lowercased title into an
+             "I want to {goal}" slot, which inverts the meaning of any item
+             whose title names the thing to be removed (#3152)
+        """
         body = build_issue_body(self._full_item())
 
-        assert "## Story" in body
+        assert "## Story" not in body
+        assert "I want to" not in body
 
     def test_build_issue_body_contains_description_section(self) -> None:
         body = build_issue_body(self._full_item())
@@ -588,10 +597,20 @@ class TestBuildIssueBody:
         assert "## Description" in body
         assert "This feature adds X to Y." in body
 
-    def test_build_issue_body_contains_acceptance_criteria_section(self) -> None:
+    def test_build_issue_body_omits_acceptance_criteria_section(self) -> None:
+        """No Acceptance Criteria section is generated at creation.
+
+        Tests: Acceptance criteria are a grooming output, not an intake artifact
+        How: Assert the header and both placeholder criteria are absent
+        Why: groom/finalize.md gates on a non-empty Acceptance Criteria section.
+             A template-filled section emitted at creation satisfies that gate
+             without anyone having written a criterion (#3152)
+        """
         body = build_issue_body(self._full_item())
 
-        assert "## Acceptance Criteria" in body
+        assert "## Acceptance Criteria" not in body
+        assert "Work matches description" not in body
+        assert "Plan or implementation complete" not in body
 
     def test_build_issue_body_contains_context_section_with_source(self) -> None:
         body = build_issue_body(self._full_item())
@@ -635,10 +654,29 @@ class TestBuildIssueBody:
 
         body = build_issue_body(item)
 
-        assert "## Story" in body
         assert "## Description" in body
-        assert "## Acceptance Criteria" in body
         assert "## Context" in body
+        assert "## Story" not in body
+        assert "## Acceptance Criteria" not in body
+
+    def test_build_issue_body_never_derives_content_from_title(self) -> None:
+        """No section content is synthesised from the item title.
+
+        Tests: Root-cause guard — title text must not leak into generated prose
+        How: Use a title whose intent inverts when dropped into a goal slot
+        Why: The Story generator produced "I want to <lowercased title>", which
+             asserted the opposite of items titled after the thing to remove.
+             Nothing in the body may be derived from the title again (#3152)
+        """
+        item = BacklogItem(
+            title="Remove the deprecated file-based task language",
+            description="The file-based language must go.",
+            item_type="Refactor",
+        )
+
+        body = build_issue_body(item)
+
+        assert "remove the deprecated file-based task language" not in body.lower()
 
 
 # ---------------------------------------------------------------------------

@@ -433,22 +433,6 @@ TYPE_TO_LABEL: dict[str, str] = {
     "chore": "type:chore",
 }
 
-ROLE_MAP: dict[str, str] = {
-    "Feature": "developer using Claude Code skills",
-    "Bug": "developer relying on this plugin",
-    "Refactor": "maintainer of the codebase",
-    "Docs": "developer reading the documentation",
-    "Chore": "maintainer of the project infrastructure",
-}
-
-BENEFIT_MAP: dict[str, str] = {
-    "Feature": "the tooling becomes more capable and complete",
-    "Bug": "the tool works correctly and reliably",
-    "Refactor": "the code is cleaner and more maintainable",
-    "Docs": "documentation is accurate and trustworthy",
-    "Chore": "the project infrastructure stays healthy",
-}
-
 FIELD_TO_INDEX: dict[str, int] = {
     "description": 0,
     "suggested location": 1,
