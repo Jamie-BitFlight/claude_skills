@@ -1405,36 +1405,6 @@ if _args.project_dir is not None:
     _init_models(_args.project_dir)
 
 
-def _read_gate_token(gate_token: str) -> str | None:
-    """Read the session gate token file and return its contents for comparison.
-
-    The token is generated and written by
-    ``skills/work-backlog-item/scripts/get-gate-token.mjs`` when the skill loads.
-    The token format is ``{session_id}:{hex_token}`` — the session ID is extracted
-    from the caller-provided value so the MCP server never needs its own
-    CLAUDE_CODE_SESSION_ID to locate the file.
-
-    Args:
-        gate_token: The value passed by the caller. Must contain a ``:`` separating
-            the session ID from the random hex portion.
-
-    Returns:
-        The file contents (the full ``{session_id}:{hex_token}`` string), or None
-        when the format is invalid or the file cannot be read.
-    """
-    colon = gate_token.find(":")
-    if colon < 1:
-        return None
-    session_id = gate_token[:colon]
-    dh_state_home = _os.environ.get("DH_STATE_HOME", "")
-    dh_root = Path(dh_state_home).expanduser() if dh_state_home else Path.home() / ".dh"
-    token_path = dh_root / "sessions" / session_id / ".gate-token"
-    try:
-        return token_path.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Lifespan: launch singleton background sync once per server process.
 # FastMCP 3.x already guards against concurrent lifespan re-entry via its
@@ -1711,45 +1681,40 @@ async def sync_now(
     )
 )
 async def backlog_add(
-    ctx: Context,
     title: Annotated[str, Field(description="Item title")],
     priority: Annotated[str, Field(description="Priority level: P0, P1, P2, or Ideas")],
-    description: Annotated[str, Field(description="Item description")],
+    description: Annotated[
+        str,
+        Field(
+            description=(
+                "Item description. A good submission covers: the goal, reproduction steps (for a "
+                "defect), impact, a user story, the payoff, and any existing observations that add "
+                "context. Leave out prescriptive solutions or fixes — that design work happens with "
+                "rigor during the grooming phase. If a candidate fix is already known, note it under "
+                "a 'User-provided context:' line instead of stating it as the requirement."
+            )
+        ),
+    ],
     source: Annotated[str, Field(description="Where this item came from")] = "Not specified",
     type_: Annotated[
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
     force: Annotated[bool, Field(description="Skip fuzzy duplicate check")] = False,
-    gate_token: Annotated[
-        str | None,
-        Field(
-            description="Required gate token. Load /dh:work-backlog-item (or /dh:create-backlog-item) — the skill injects the token at load time via the <gate_token> tag."
-        ),
-    ] = None,
 ) -> dict:
     """Add a new item through the configured backend and optionally create its native issue.
 
     Use priority P0 for must-have, P1 for should-have, P2 for could-have,
     or Ideas for exploratory items.
 
+    For guided creation with classification and research support, use
+    /dh:work-backlog-item create instead of calling this tool directly — it applies
+    the same description template below plus duplicate detection (also enforced
+    here unconditionally) and item-type classification.
+
     Returns:
         Dict with file_path, title, priority, issue number (if created),
         and output messages/warnings. On error, dict contains an error key.
     """
-    if not gate_token:
-        return {
-            "error": "Gate token required. Load /dh:work-backlog-item create — the skill provides the gate_token at load time."
-        }
-    expected_token = _read_gate_token(gate_token)
-    if expected_token is None:
-        await ctx.warning("Gate token file unreadable — format invalid or session file missing")
-        return {
-            "error": 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
-        }
-    if gate_token != expected_token:
-        return {
-            "error": 'Direct backlog_add calls are not permitted. Load and follow /dh:work-backlog-item create -- "<description>" — it will provide the required gate_token.'
-        }
     out = Output()
     try:
         result = await asyncio.to_thread(
