@@ -13,7 +13,7 @@ hooks:
 
 # Start Task (SAM Task Execution Helper)
 
-You are implementing a specific task from a SAM task file.
+You are implementing a specific task in a SAM plan, addressed as `P{id}/T{id}`. The backend resolves that address and returns the task — no path is involved.
 
 <task_input>
 $ARGUMENTS
@@ -79,7 +79,7 @@ $ARGUMENTS
 
 2a. **Load task-level skills** (if present):
    - Read `task.skills` from the `TaskAssignment` model (an array of skill names).
-   - If absent or empty, skip (backward compatible with older task files).
+   - If absent or empty, skip (backward compatible with tasks recorded before this field existed).
    - For each skill name, invoke: `Skill(skill="{skill-name}")`
    - If a skill fails to load, log a warning and continue. Do not abort task execution.
    - **Redundancy note**: The orchestrator (`/implement-feature`) may also include skill-loading instructions in the delegation prompt. This is intentional redundancy — loading a skill twice is a no-op.
