@@ -306,10 +306,21 @@ and Handoff each map to the identically named field above; Context maps to `cont
 CLEAR sections with no dedicated field — Inputs, and CoVe Checks when Accuracy Risk is medium or
 high — go into `body` as markdown headings, in CLEAR order.
 
-When a task's markdown fields are large enough that sending them inside the `create` or
-`append_task` payload risks a timeout mid-call, submit the task with its structural fields first,
-then append each large section with `sam_plan(action='update', task_id='{task_id}',
-append_section_name='{heading}', section_content='{markdown}')`. One section per call.
+When a task's markdown is large enough that sending all of it in one `create` or `append_task`
+call risks a timeout mid-call, submit the task with its structural fields and its `body`, then
+patch each large field afterwards — one call per field, using the kebab-case field names listed
+above as `set_fields_json` keys:
+
+```text
+mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "update", "task_id": "{task_id}", "set_fields_json": {"requirements": "{markdown}"}})
+```
+
+`body` is the exception: it is writable only in the `create` or `append_task` payload, so carry it
+in the call that creates the task however large it is.
+
+Never route content that has a dedicated field through `append_section_name`. That parameter
+appends a markdown section without writing any named field, so the field it was meant to fill stays
+empty and every consumer reading that field gets nothing.
 
 ## Bookend Task Generation
 
