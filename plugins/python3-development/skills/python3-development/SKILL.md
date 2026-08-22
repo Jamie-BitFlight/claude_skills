@@ -55,7 +55,6 @@ Load `/python3-development:specialist-skill-routing` when the task involves uv, 
 - `references/user-project-conventions.md` — Conventions from production projects; consult when starting or matching an existing project style
 - `references/modern-modules.md` - 50+ library guides with usage patterns and best practices
 - `references/tool-library-registry.md` - Development tools catalog for linting, testing, and build automation
-- `references/api_reference.md` - API specifications and integration guides
 - `references/python-development-orchestration.md` - Detailed workflow patterns for TDD, feature addition, refactoring, and code review
 
 **Specialist Skills** (routing commands — see **Domain-Specific Skill Routing**):
@@ -273,8 +272,6 @@ These templates implement the patterns documented in `references/user-project-co
 **Module Reference**: `references/modern-modules.md` - Comprehensive guide to 50+ modern Python libraries with deep-dive documentation for each module including usage patterns and best practices
 
 **Tool Registry**: `references/tool-library-registry.md` - Catalog of development tools, their purposes, and usage patterns for linting, testing, and build automation
-
-**API Documentation**: `references/api_reference.md` - API specifications, integration guides, and programmatic interface documentation
 
 #### Navigating Large References
 
