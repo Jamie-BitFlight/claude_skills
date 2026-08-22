@@ -21,24 +21,26 @@ always. Defined by relationship, not capability: the orchestrator is whichever a
 task directly from the human — not whichever agent happens to be dispatching subagents at a given
 moment. A subagent dispatching further subagents does not become the orchestrator by doing so; it
 remains a Manager or Worker, acting on behalf of whoever dispatched it.
-_Avoid_: "the orchestrator" as a synonym for "whoever is executing this skill" — that usage is the
-mechanism behind the #3060 incident (ADR-3113-1): a skill written in first person for the
-orchestrator, handed to a dispatched Worker, was read as license to dispatch further agents the
-Worker was never assigned to dispatch.
+_Avoid_: "the orchestrator" as a synonym for "whoever is executing this skill". A skill written in
+first person for the orchestrator, handed to a dispatched Worker, reads as license to dispatch
+further agents the Worker was never assigned to dispatch — see
+[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md).
 
 **Manager**:
 A subagent explicitly assigned, by its own dispatcher, to decompose a scoped piece of work and
 dispatch further subagents within that scope. The assignment is always stated as data — in the
-delegation prompt, or in the SAM task's `executor` field once typed (see #3100) — never inferred
-from a loaded skill's own voice, and never adopted on the subagent's own initiative. Sub-dispatch
-is legitimate and valuable when assigned this way; see ADR-3113-1 for why unassigned adoption,
-not dispatch itself, is the actual defect.
+delegation prompt, or in a SAM task field carrying the executor type — never inferred from a
+loaded skill's own voice, and never adopted on the subagent's own initiative. Sub-dispatch is
+legitimate and valuable when assigned this way;
+[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) covers why
+unassigned adoption, not dispatch itself, is the actual defect.
 _Avoid_: "orchestrator" for this role — a Manager acts on behalf of its dispatcher, not on behalf
 of the human directly, and the two roles carry different obligations (see Orchestrator above).
 
 **Worker**:
 A subagent assigned one unit of work to execute directly — a SAM task, or a direct prompt with no
-SAM reference (`dh:task-worker` is dispatched both ways; see AGENTS.md's Dispatch Pattern). A
+SAM reference (`dh:task-worker` is dispatched both ways; see the Dispatch Pattern section in
+[AGENTS.md](./AGENTS.md)). A
 Worker's own assignment may explicitly name a specific skill to invoke, including one that itself
 dispatches a fixed, bounded set of subagents to complete that one unit of work — a quality-gate
 task naming `dh:multi-perspective-review`, which fans out four reviewers, is the Worker's
