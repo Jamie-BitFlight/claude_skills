@@ -10,51 +10,46 @@ every other area of the plugin as it gets resolved.
 
 ## Dispatch Roles
 
-Three roles govern who may dispatch further agents and on whose behalf, defined by relationship —
-never by capability, and never by whether an agent happens to dispatch further work. See
+These terms name the scope an agent's assignment covers — not a capability it holds or is denied.
+Every agent may decompose its own assignment however the work requires, including by dispatching
+further agents; the scope of the assignment is what differs. See
 [ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
 incident that required stating this precisely.
 
 **Orchestrator**:
-The single interactive agent acting directly on behalf of the human. Exactly one per session,
-always. Defined by relationship, not capability: the orchestrator is whichever agent received the
-task directly from the human — not whichever agent happens to be dispatching subagents at a given
-moment. A subagent dispatching further subagents does not become the orchestrator by doing so; it
-remains a Manager or Worker, acting on behalf of whoever dispatched it.
+The single interactive agent acting directly on behalf of the human; exactly one per session. Its
+assignment is the human's request in full, so it owns whatever workflow level that request enters
+at. Defined by relationship: whichever agent received the task from the human, not whichever agent
+happens to be dispatching subagents at a given moment. Dispatching further agents does not make a
+subagent the orchestrator.
 _Avoid_: "the orchestrator" as a synonym for "whoever is executing this skill". A skill written in
-first person for the orchestrator, handed to a dispatched Worker, reads as license to dispatch
-further agents the Worker was never assigned to dispatch — see
-[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md).
+first person for the orchestrator, read by an agent whose assignment is one task inside that
+skill's own loop, reads as instruction to re-enter the loop that produced its assignment.
 
 **Manager**:
-A subagent explicitly assigned, by its own dispatcher, to decompose a scoped piece of work and
-dispatch further subagents within that scope. The assignment is always stated as data — in the
-delegation prompt, or in a SAM task field carrying the executor type — never inferred from a
-loaded skill's own voice, and never adopted on the subagent's own initiative. Sub-dispatch is
-legitimate and valuable when assigned this way;
-[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) covers why
-unassigned adoption, not dispatch itself, is the actual defect.
-_Avoid_: "orchestrator" for this role — a Manager acts on behalf of its dispatcher, not on behalf
-of the human directly, and the two roles carry different obligations (see Orchestrator above).
+An agent whose assignment covers a scoped body of work and its decomposition — the dispatcher
+hands over the scope, and how it is broken down and distributed is part of the assignment. Acts
+on behalf of the agent that assigned the scope, not on behalf of the human directly.
+_Avoid_: "orchestrator" for this role — a Manager's scope is bounded by what its dispatcher handed
+over, and it reports to that dispatcher rather than to the human (see Orchestrator above).
 
 **Worker**:
-A subagent assigned one unit of work to execute directly — a SAM task with a task ID to delegate to
-`start-task`, or a direct prompt carrying its own explicit instructions and no such task ID (it may
-still mention a plan address for read-only reference, e.g. a verification task that reads the plan
-to check criteria against it — `dh:task-worker` is dispatched both ways; see the Dispatch Pattern
-section in [AGENTS.md](./AGENTS.md)). A
-Worker's own assignment may explicitly name a specific skill to invoke, including one that itself
-dispatches a fixed, bounded set of subagents to complete that one unit of work — a quality-gate
-task naming `dh:multi-perspective-review`, which fans out four reviewers, is the Worker's
-assignment, not a role it inferred. What a Worker never does is independently drive an open-ended,
-multi-round dispatch loop across an entire plan — that requires the Manager role, explicitly
-assigned. On receiving an instruction to run a plan-managing skill it was not assigned to run, a
-Worker reports the conflict (`STATUS: BLOCKED`) rather than complying. `dh:task-worker` is this
+An agent whose assignment covers one unit of work. Two forms, both executed directly:
+a SAM task reference with a task ID to delegate to `start-task`, or a direct prompt carrying its
+own explicit instructions and no such task ID (it may still carry a plan address for read-only
+reference — e.g. a verification task that reads the plan to check criteria against it).
+`dh:task-worker` is dispatched both ways throughout the plugin; see the Dispatch Pattern section
+in [AGENTS.md](./AGENTS.md). The dispatcher passes the task reference and does not choose a
+specialist — the dispatched agent reads the task and resolves its own agent profile from it.
+An assignment may name a specific skill to invoke, including one that fans out its own bounded set
+of subagents; running it is executing the assignment, not widening it. `dh:task-worker` is this
 plugin's canonical Worker implementation.
-_Avoid_: assuming role is detectable from the environment or harness — role is always explicit,
-asserted by the dispatcher. This plugin targets Claude Code, Codex, and OpenCode; a detection
-mechanism tied to one harness's internals (e.g. inspecting a system prompt) does not port to the
-others and is not a sanctioned pattern even where it happens to work.
+_Avoid_: assuming scope is detectable from the environment or harness — an agent cannot observe
+which workflow level dispatched it. Scope is carried in the assignment itself, and prevention
+belongs with the dispatching agent, which can observe what it is about to hand over. This plugin
+targets Claude Code, Codex, and OpenCode; a detection mechanism tied to one harness's internals
+(e.g. inspecting a system prompt) does not port to the others and is not a sanctioned pattern even
+where it happens to work.
 
 ## Language
 
