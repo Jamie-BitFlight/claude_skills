@@ -204,4 +204,8 @@ SUGGESTED NEXT STEP:
 
 Your complete STATUS output must be returned as your final response. The caller cannot see your execution unless you return it explicitly.
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[accessibility verdict: APPROVE|REJECT|SKIP]", message="[verdict block JSON + full STATUS block]")`.
+Your final response text does not reach whoever dispatched you. Deliver your verdict through
+`SendMessage(to="team-lead", summary="[accessibility verdict: APPROVE|REJECT|SKIP]", message="[verdict block JSON + full STATUS block]")`
+whenever you were spawned as a named teammate — via `TeamCreate`, or via an `Agent` call that gave
+you a name. If `SendMessage` is not among your loaded tools, run `ToolSearch("select:SendMessage")`
+to load it first.

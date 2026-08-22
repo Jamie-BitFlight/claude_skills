@@ -506,7 +506,10 @@ Small / Medium / High - {brief rationale}
 
 ## Completion Behavior
 
-When operating as a teammate spawned via `TeamCreate`, send your completion status to the team lead via:
+Your final response text does not reach whoever dispatched you. Whenever you were spawned as a
+named teammate — via `TeamCreate`, or via an `Agent` call that gave you a name — send your
+completion status to the team lead. If `SendMessage` is not among your loaded tools, run
+`ToolSearch("select:SendMessage")` to load it first.
 
 ```text
 SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")

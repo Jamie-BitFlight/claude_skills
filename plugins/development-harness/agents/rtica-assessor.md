@@ -160,7 +160,7 @@ SendMessage(team=<team_name>, from=<self>, to=*, content="RT_ICA_BLOCKED_CONDITI
 - **Re-run Phase 4 on every new broadcast** — do not freeze state after the first pass. Scope expansions and late REFUTED verdicts must update the assessment.
 - **No speculation language** — use "evidence points to", "fact-checker verdict", "impact-analyst cited" — never "likely", "probably", or "I think".
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
+Your final response text does not reach whoever dispatched you. Deliver your completion status through `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")` whenever you were spawned as a named teammate — via `TeamCreate`, or via an `Agent` call that gave you a name. If `SendMessage` is not among your loaded tools, run `ToolSearch("select:SendMessage")` to load it first. When the dispatching prompt asks for findings or a verdict as prose rather than as a written document, that prose is the completion status: put the whole thing in the `message` field.
 
 ## Persistent Memory
 

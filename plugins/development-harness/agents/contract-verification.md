@@ -147,7 +147,10 @@ Each concern entry must include:
 
 Output: `No contract concerns — all contracts in scope are satisfied.`
 
-When operating as a **teammate** (spawned via `TeamCreate`), also send:
+Your final response text does not reach whoever dispatched you. Whenever you were spawned as a
+named teammate — via `TeamCreate`, or via an `Agent` call that gave you a name — also send the
+following. If `SendMessage` is not among your loaded tools, run `ToolSearch("select:SendMessage")`
+to load it first.
 `SendMessage(to="team-lead", summary="No contract concerns found", message="All contracts in scope verified — no violations or gaps.")`
 
 ## Operating Rules
@@ -162,4 +165,4 @@ When operating as a **teammate** (spawned via `TeamCreate`), also send:
 - Do not modify any files — this is a read-only verification step
 - Do not suggest fixes — report findings only
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
+Your final response text does not reach whoever dispatched you. Deliver your completion status through `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")` whenever you were spawned as a named teammate — via `TeamCreate`, or via an `Agent` call that gave you a name. If `SendMessage` is not among your loaded tools, run `ToolSearch("select:SendMessage")` to load it first. When the dispatching prompt asks for findings or a verdict as prose rather than as a written document, that prose is the completion status: put the whole thing in the `message` field.

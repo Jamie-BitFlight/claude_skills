@@ -714,7 +714,15 @@ Return a brief confirmation. DO NOT include document contents.
 
 </critical_rules>
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
+Your final response text does not reach whoever dispatched you. Deliver every result through
+`SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`
+whenever you were spawned as a named teammate — via `TeamCreate`, or via an `Agent` call that gave
+you a name. If `SendMessage` is not among your loaded tools, run `ToolSearch("select:SendMessage")`
+to load it first.
+
+When the dispatching prompt asks for findings, analysis, or a verdict as prose rather than as a
+written document, that prose is the completion status: put the whole thing in the `message` field.
+Never end your turn with a report that exists only in your final response text.
 
 <structured_returns>
 

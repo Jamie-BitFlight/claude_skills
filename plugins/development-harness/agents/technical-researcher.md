@@ -191,7 +191,10 @@ Conflicts resolved: {count}
 
 Return the full research note content directly to the caller.
 
-When operating as a **teammate** (spawned via `TeamCreate`), also send:
+Your final response text does not reach whoever dispatched you. Whenever you were spawned as a
+named teammate — via `TeamCreate`, or via an `Agent` call that gave you a name — also send the
+following. If `SendMessage` is not among your loaded tools, run `ToolSearch("select:SendMessage")`
+to load it first.
 
 ```text
 SendMessage(to="team-lead", summary="Technical research complete — {technology}", message="[your full STATUS block]")

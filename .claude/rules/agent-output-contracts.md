@@ -36,11 +36,20 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
-When operating as a **teammate** (spawned via `TeamCreate`), also send:
+A named agent's final response text does not reach its dispatcher. Whenever an agent was spawned
+as a named teammate — via `TeamCreate`, or via an `Agent` call that gave it a name — the STATUS
+block must also go out through `SendMessage`, or it is lost:
 
 ```
 SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
 ```
+
+`SendMessage` may be a deferred tool, absent from an agent's loaded schemas. An agent that cannot
+see it must run `ToolSearch("select:SendMessage")` before calling it.
+
+Findings requested as prose are covered by this too: the prose is the STATUS block, and it goes in
+the `message` field. A report that exists only in an agent's final response text was never
+delivered.
 
 ## The "Write to File" Anti-Pattern
 

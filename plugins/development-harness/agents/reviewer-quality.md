@@ -158,7 +158,10 @@ Reason: {what is missing — e.g., changed-files list not present in task body}
 
 ## SendMessage (Required When Operating as a Teammate)
 
-When spawned via `TeamCreate`, you MUST send your verdict to the team lead via `SendMessage`.
+Your final response text does not reach whoever dispatched you. Whenever you were spawned as a
+named teammate — via `TeamCreate`, or via an `Agent` call that gave you a name — you MUST send
+your verdict to the team lead via `SendMessage`. If `SendMessage` is not among your loaded tools,
+run `ToolSearch("select:SendMessage")` to load it first.
 
 ```text
 SendMessage(
