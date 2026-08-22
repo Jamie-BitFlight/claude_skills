@@ -215,9 +215,12 @@ guess:
   *repeated key* at each value — a more direct, unambiguous token-level association for an LLM
   parsing the output, with no risk of misparsing when a cell value contains whitespace. Emit
   compact JSON (`json.dumps(data)` / `model_dump_json()`, no `indent=`) for this — output a script
-  or CLI emits for an agent to parse. This does **not** apply to static repo config files
-  (`package.json`, `.claude-plugin/*.json`, `marketplace.json`) — those are read by humans
-  browsing the repo and by non-AI tooling (npm, git), and stay pretty-printed.
+  or CLI emits for an agent to parse. The rule governs JSON a program emits at runtime, nothing
+  else. It does not apply to JSON files committed to the repo as configuration or data — every
+  harness plugin manifest (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`),
+  `package.json`, `marketplace.json`, tool configs, fixtures, snapshots. Humans read and edit
+  those, git diffs them line by line, and non-AI tooling consumes them; they keep their existing
+  pretty-printed formatting. Never reformat one as part of an unrelated change.
 - **`logging` is for debug/trace/forensic output only** — never for primary output a calling agent
   needs to read or parse. Status messages, results, and errors meant to be consumed by the caller
   go through direct stdout/stderr emission (`typer.echo()`, `print()`, structured JSON), not a
