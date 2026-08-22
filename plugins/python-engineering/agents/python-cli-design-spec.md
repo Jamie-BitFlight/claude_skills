@@ -80,8 +80,8 @@ Load these before writing the spec:
 ## Document Size
 
 One registration call carries the whole document. There is no sectioned append and no per-section
-call. Whether the configured content provider imposes a size limit, and what it does on overflow,
-depends on which provider is configured and is not something the registering agent is told.
+call. The provider rejects an oversized record before any network call rather than truncating it, so
+an over-large spec fails loudly instead of arriving cut.
 
 Keep the `architect` artifact to the interfaces, contracts, data models, and decisions. Register
 supporting depth — extended testing strategy, integration pattern catalogues, migration notes — as
