@@ -7,7 +7,7 @@ description: Comprehensive guide for creating and managing MkDocs documentation 
 
 Build and maintain static documentation sites from Markdown with MkDocs and the Material theme.
 
-## Workflow
+<workflow>
 
 ```mermaid
 flowchart TD
@@ -19,7 +19,9 @@ flowchart TD
     Q1 -->|CI/CD deployment, GitHub/GitLab Pages| Examples[Load reference — real_world_examples.md]
 ```
 
-## Reference Files
+</workflow>
+
+<reference_catalog>
 
 ### CLI Reference
 
@@ -27,7 +29,7 @@ Every `mkdocs` subcommand (`new`, `build`, `serve`, `gh-deploy`), global flags, 
 variables, and exit codes. Load when scaffolding a new project, running a local preview server,
 producing a production build, or deploying to GitHub Pages via the CLI.
 
-`references/cli_reference.md`
+[CLI Reference](./references/cli_reference.md)
 
 ### Configuration Reference
 
@@ -35,7 +37,7 @@ Every `mkdocs.yml` setting — project info, `nav`, `docs_dir`/`site_dir`, theme
 extensions, plugin registration, hooks, and multi-file config inheritance (`INHERIT`) — with valid
 values for each. Load when writing or editing `mkdocs.yml`.
 
-`references/configuration_reference.md`
+[Configuration Reference](./references/configuration_reference.md)
 
 ### Material Theme Reference
 
@@ -44,7 +46,7 @@ typography, navigation features (tabs, sections, instant loading), search, socia
 versioning (mike), git repository integration, and icons/logos. Load when customizing the
 Material theme's look, navigation behavior, or built-in features.
 
-`references/material_theme_reference.md`
+[Material Theme Reference](./references/material_theme_reference.md)
 
 ### Plugins Reference
 
@@ -54,7 +56,7 @@ Configuration for the plugin ecosystem: `mkdocstrings` (API docs from Python doc
 `mkdocs-git-latest-changes-plugin`. Load when integrating any of these plugins or generating docs
 from source.
 
-`references/plugins_reference.md`
+[Plugins Reference](./references/plugins_reference.md)
 
 ### Real-World Examples
 
@@ -62,9 +64,11 @@ Production MkDocs deployments — GitHub Pages and GitLab Pages CI/CD workflows,
 repositories using MkDocs, and common multi-plugin configuration patterns. Load when setting up a
 deployment pipeline or wanting a working reference configuration to adapt.
 
-`references/real_world_examples.md`
+[Real-World Examples](./references/real_world_examples.md)
 
-## Quick Start
+</reference_catalog>
+
+<quick_start>
 
 ```bash
 uv add --dev mkdocs mkdocs-material
@@ -82,3 +86,20 @@ theme:
 nav:
   - Home: index.md
 ```
+
+</quick_start>
+
+<sources>
+
+Each `references/*.md` file carries its own "Official Resources"/"Resources" section citing the
+upstream MkDocs, Material for MkDocs, and plugin documentation it was built from. Primary sources:
+
+- MkDocs — [mkdocs.org](https://www.mkdocs.org/) (accessed 2026-08-20)
+- Material for MkDocs — [squidfunk.github.io/mkdocs-material](https://squidfunk.github.io/mkdocs-material/) (accessed 2026-08-20)
+- MkDocs Plugin Catalog — [github.com/mkdocs/catalog](https://github.com/mkdocs/catalog) (accessed 2026-08-20)
+
+`references/configuration_reference.md`'s `site_name`/`site_url` settings were spot-verified
+against the live MkDocs configuration guide on 2026-08-20 and matched (type, required/default,
+description).
+
+</sources>
