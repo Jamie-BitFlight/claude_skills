@@ -2,7 +2,7 @@
   "fix": true,
   "noProgress": true,
   "noBanner": true,
-  "ignores": [".claude/**", "plan/**", "plans/**", ".planning/**", "graphify-out/**", "AGENTS.md", ".claude/skills/**"],
+  "ignores": [".claude/**", "plan/**", "plans/**", ".planning/**", "graphify-out/**", "AGENTS.md", ".claude/skills/**", "**/tests/fixtures/**"],
   "config": {
     "MD003": false,
     "MD007": {

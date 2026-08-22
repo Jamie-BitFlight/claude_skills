@@ -360,7 +360,7 @@ On #3151, metadata carries groomed: "2026-08-22" while label is status:needs-gro
 
 Claim H and I (safety-critical): build_issue_body has exactly one non-test caller repo-wide at gh_client.py:1277 on create path only; Story does not appear in finalize.md required or optional sections. Both VERIFIED.
 
-A: Generated sections removed by fix — VERIFIED. Before 0454b350b: parsing.py lines 656-661 generated Story and Acceptance Criteria. After: removed. Tests changed from contains_to omits_.
+A: Generated sections removed by fix — VERIFIED. Before 0454b350b: parsing.py lines 656-661 generated Story and Acceptance Criteria. After: removed. Tests changed from contains_ to omits_.
 
 B: parsing.py template-fills Story from title — VERIFIED. Lines 650-661 show goal.lower() substituted into "I want to {goal}" slot with hardcoded role and benefit from maps.
 
