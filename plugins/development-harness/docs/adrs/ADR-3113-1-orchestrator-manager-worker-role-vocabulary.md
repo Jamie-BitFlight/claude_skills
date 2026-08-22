@@ -110,6 +110,21 @@ bounded, assignment-named fan-out, not the open-ended role self-assignment this 
 The definitions above reflect the corrected, narrower boundary: what's prohibited is independently
 driving a plan's dispatch loop, not dispatch in any form.
 
+**Revised again during the same PR review, confirmed against source before accepting.** A third
+finding showed the "direct prompt" bucket was still too narrow: `close/start.md`'s Step 5.5
+dispatches `dh:task-worker` with a plan address (e.g. `P{id}`) for an acceptance-criteria
+verification, but no task ID — a caller that fits neither "SAM task reference" (no task ID present)
+nor the prior wording of "direct prompt... with no plan/task ID attached" (a plan address *is*
+present). The Worker definition and `task-worker.md` are corrected again: the deciding signal is
+whether a task ID is present to delegate to `start-task`, not whether any plan reference appears at
+all. A direct prompt may legitimately carry a plan address for read-only reference.
+
+This same PR review also flagged Claude-Code-specific tool names (`TeamCreate`, `SendMessage`,
+literal `Skill(skill="...")` call syntax) surviving in `task-worker.md`'s frontmatter and
+Completion Report — this plugin targets Claude Code, Codex, and OpenCode, and prose describing what
+a Worker does should name the capability (dispatch as part of a coordinated group, report back to
+the group's lead) rather than one harness's specific tool. Corrected in the same pass.
+
 ## Consequences
 
 - `task-worker.md`'s Identity section changes from an open self-concept ("become whatever the task

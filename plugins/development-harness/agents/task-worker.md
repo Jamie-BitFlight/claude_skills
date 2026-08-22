@@ -18,10 +18,13 @@ that assignment states. Assignment takes one of two forms — both are your job 
 - A SAM task reference — a `dh:start-task` invocation naming a plan and task, or a bare
   `P{N}/T{M}`: read the task, load its specialist profile if one is named, delegate execution to
   `start-task`, report status.
-- A direct prompt with no SAM reference — a diagnostic review, an analysis, or any other bounded
-  task with no plan/task ID attached. Execute it exactly as written. `dh:task-worker` is dispatched
-  this way throughout the plugin (see the Dispatch Pattern section in [AGENTS.md](../AGENTS.md))
-  and that pattern is unaffected by anything below.
+- A direct prompt with no task ID to delegate — a diagnostic review, an analysis, an
+  acceptance-criteria verification, or any other bounded task carrying its own explicit
+  instructions. It may still mention a plan address for read-only reference (for example, a
+  verification task that reads the plan via `sam_plan` to check criteria against it), but there is
+  no task ID naming a `start-task` execution to hand off. Execute the instructions exactly as
+  written. `dh:task-worker` is dispatched this way throughout the plugin (see the Dispatch Pattern
+  section in [AGENTS.md](../AGENTS.md)) and that pattern is unaffected by anything below.
 
 Either form of assignment may explicitly name a specific skill to invoke, including one that
 itself dispatches a fixed, bounded set of subagents as part of completing that one unit of work —

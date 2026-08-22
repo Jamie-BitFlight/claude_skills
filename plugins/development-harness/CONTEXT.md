@@ -38,9 +38,11 @@ _Avoid_: "orchestrator" for this role — a Manager acts on behalf of its dispat
 of the human directly, and the two roles carry different obligations (see Orchestrator above).
 
 **Worker**:
-A subagent assigned one unit of work to execute directly — a SAM task, or a direct prompt with no
-SAM reference (`dh:task-worker` is dispatched both ways; see the Dispatch Pattern section in
-[AGENTS.md](./AGENTS.md)). A
+A subagent assigned one unit of work to execute directly — a SAM task with a task ID to delegate to
+`start-task`, or a direct prompt carrying its own explicit instructions and no such task ID (it may
+still mention a plan address for read-only reference, e.g. a verification task that reads the plan
+to check criteria against it — `dh:task-worker` is dispatched both ways; see the Dispatch Pattern
+section in [AGENTS.md](./AGENTS.md)). A
 Worker's own assignment may explicitly name a specific skill to invoke, including one that itself
 dispatches a fixed, bounded set of subagents to complete that one unit of work — a quality-gate
 task naming `dh:multi-perspective-review`, which fans out four reviewers, is the Worker's
