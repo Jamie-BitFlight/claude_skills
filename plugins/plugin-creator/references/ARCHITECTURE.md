@@ -540,7 +540,6 @@ class MyNewValidator:
                     message="Description of issue",
                     code="XX001",  # New error code
                     suggestion="How to fix",
-                    docs_url=f"{ERROR_CODE_BASE_URL}#xx001",
                 )
             )
 
@@ -636,7 +635,6 @@ ValidationIssue(
     message="Human-readable description",
     code=XX001,  # Use constant
     suggestion="How to fix",
-    docs_url=f"{ERROR_CODE_BASE_URL}#xx001",
 )
 ```
 
