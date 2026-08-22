@@ -437,16 +437,3 @@ April 2025: Intuit publishes internal platform experience
 
 - [Pyyne: The Twelve-Factor App Methodology](https://www.pyyne.com/post/the-twelve-factor-app-methodology) — Douglas Cardoso (15 Apr 2025, accessed 2026-02-26)
 - [Capital One: Twelve-Factor Apps in Container Ready Applications](https://www.capitalone.com/tech/software-engineering/container-ready-applications-with-twelve-factor-app-and-microservices-architecture/) — Jimmy Ray (22 Jan 2019, accessed 2026-02-26)
-
----
-
-## Research Notes
-
-**Verification Status**: All major claims have been verified through primary source documentation or recent publications with clear attribution.
-
-**Source Quality Assessment**:
-- **High credibility**: 12factor.net official sources, Heroku, CNCF, AWS, O'Reilly, Martin Fowler
-- **Medium credibility**: Developer blogs (IBM Developer, Stackademic), vendor guidance (CircleCI, Thoughtworks)
-- **Methodology**: Web search conducted 2026-02-26 using Exa search engine; URLs and access dates documented per citation standards
-
-**Known Limitations**: The 12-factor modernization is an ongoing, open-source process. The document represents the current state (Q1 2026) but will continue to evolve as community contributions are merged. Readers should check <https://12factor.net> for the latest changes and the GitHub repository for detailed discussion of proposed updates.

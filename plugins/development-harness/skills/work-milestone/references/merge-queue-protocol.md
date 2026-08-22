@@ -86,7 +86,7 @@ When a heavy conflict triggers assign_back:
 
 The resolution backlog item is added to the current milestone and dispatched in the next wave like any other item. The orchestrator assigns it a worktree agent with the conflicting diffs embedded in the prompt. The agent can make a design decision and implement a clean merge.
 
-> **Key difference from prior design**: No PR is created (branches are local-only). No mid-flight agent notification is possible — agents have already terminated before merging begins. Conflict resolution becomes a new backlog item dispatched in the next wave.
+> No PR is created (branches are local-only). No mid-flight agent notification is possible — agents have already terminated before merging begins. Conflict resolution becomes a new backlog item dispatched in the next wave.
 
 ## Quality Gate Commands
 

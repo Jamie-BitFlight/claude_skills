@@ -170,7 +170,7 @@ CONSTRAINT: These v2 patterns are deprecated or removed. Generate only the v3 fo
 All core features (tools, resources, prompts, providers, transforms, auth, tasks, elicitation,
 client SDK, deployment) are available in FastMCP 3.0.
 
-### FastMCP 3.1 — Available (baseline for this skill's original content)
+### FastMCP 3.1 — Available
 
 The following features were added in FastMCP 3.1.0 and require `fastmcp>=3.1.0`:
 
@@ -228,10 +228,10 @@ All v3 reference files sourced from <https://gofastmcp.com> (published docs) and
 - [./references/observability.md](./references/observability.md) — OTEL instrumentation, automatic spans, OTLP exporters, environment variable configuration
 - [./references/real-world-patterns.md](./references/real-world-patterns.md) — ProxyProvider, mount(), SkillsProvider, showcase
 
-Preserved references (not overwritten):
+Preserved references:
 
 - [./references/evaluation-guide.md](./references/evaluation-guide.md) — evaluating server quality
-- [./references/typescript-mcp-server.md](./references/typescript-mcp-server.md) — TypeScript MCP SDK (out of v3 overhaul scope)
+- [./references/typescript-mcp-server.md](./references/typescript-mcp-server.md) — TypeScript MCP SDK
 - [./references/claude-code-mcp-integration.md](./references/claude-code-mcp-integration.md) — `.mcp.json` config, Claude Code deployment
 
 ---

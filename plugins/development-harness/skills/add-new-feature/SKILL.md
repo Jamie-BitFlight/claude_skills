@@ -555,8 +555,6 @@ When all phases complete, provide the user:
 
 ### Discovered During Implementation
 
-[Date: 2026-05-23 / Session: issue #1527]
-
-**Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. The problem with the pre-#1527 pattern was that the orchestrator received the content inline in the agent response — the JSONL session output grew to 300KB or more, which the orchestrator cannot process. The architect agent therefore calls `artifact_register(content=...)` directly, the selected provider stores the body, and the orchestrator receives only `STATUS: DONE`.
+**Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. Inline delivery in the agent response would grow the JSONL session output to 300KB or more, which the orchestrator cannot process. The architect agent therefore calls `artifact_register(content=...)` directly, the selected provider stores the body, and the orchestrator receives only `STATUS: DONE`.
 
 **This workflow requires `content=` on every `artifact_register` call** so later phases receive the body from `artifact_read`. A registration without content does not satisfy the phase handoff.

@@ -403,14 +403,6 @@ This documentation is organized for quick navigation by version, feature, and us
 
 ---
 
-## Contributing Updates
-
-This documentation reflects Hatchling's official release history as documented in:
-
-1. GitHub release notes (<https://github.com/pypa/hatch/releases>)
-2. Official changelog (<https://hatch.pypa.io/dev/history/hatchling/>)
-3. Project documentation (<https://hatch.pypa.io/>)
-
 ## Document Format
 
 All documents follow:

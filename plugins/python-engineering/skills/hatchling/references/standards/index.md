@@ -252,16 +252,7 @@ For comprehensive hatchling documentation, see:
 - `../advanced-features/index.md` - Detailed build customization
 - `../build-system/` - Build system setup
 
-## Document Maintenance
-
-These standards documents are maintained to reflect:
-
-- Current PyPA specifications
-- Latest PEP approvals (as of 2025)
-- Hatchling's implementation details
-- Real-world best practices
-
-**Last Updated**: November 2025 **Specification Versions**:
+**Specification Versions**:
 
 - Core Metadata: 2.5 (September 2025)
 - PEP 440: Current (Version Identification)

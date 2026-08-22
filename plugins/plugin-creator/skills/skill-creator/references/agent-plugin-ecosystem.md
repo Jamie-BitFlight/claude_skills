@@ -1,5 +1,3 @@
-<!-- Migrated from skills/agent-plugin-ecosystem/ — pure reference content -->
-
 # Agent Plugin Ecosystem
 
 This skill provides verified ecosystem facts for agents writing plugin manifests, skill files, and agent files. When loaded, use it to produce output that targets the correct schema and platform — and to avoid writing files that silently fail validation on a different vendor.

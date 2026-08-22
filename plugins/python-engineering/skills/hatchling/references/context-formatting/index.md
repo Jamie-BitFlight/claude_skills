@@ -489,4 +489,4 @@ These references are based on the Hatch project, which is licensed under MIT.
 
 ---
 
-**Last Updated**: 2024-11 **Hatchling Versions Covered**: 1.1.0 - 1.22.x **Format**: Markdown, targeting Hatch v1.2.0+ for modern context formatting support **Audience**: Claude AI assistants helping users with Hatchling configuration
+**Hatchling Versions Covered**: 1.1.0 - 1.22.x **Audience**: Claude AI assistants helping users with Hatchling configuration

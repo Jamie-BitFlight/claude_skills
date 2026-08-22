@@ -242,7 +242,7 @@ Additional escalation points exist within stages (e.g., NEEDS_WORK loop limits, 
 
 ## Complete-Implementation Pre-Phase Gates
 
-The `/dh:complete-implementation` skill runs quality gates after all S5 execution tasks reach COMPLETE status. Before building the QG plan, it runs a sequence of pre-phase checks. As of commit f230ae0d, the sequence is:
+The `/dh:complete-implementation` skill runs quality gates after all S5 execution tasks reach COMPLETE status. Before building the QG plan, it runs a sequence of pre-phase checks. The sequence is:
 
 **Pre-Phase 1: TN Verification Check** — checks for a TN verification report from `tn-verification-gate`. If regressed criteria are found, emits `COMPLETION BLOCKED — TN Verification Failed` and stops.
 

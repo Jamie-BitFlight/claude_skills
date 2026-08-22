@@ -3,8 +3,6 @@
 Pre-write validation gate (Step 8.7) — verifies groomer agent output contains all required
 sections with minimum content before writing to the canonical item file.
 
-SOURCE: Architect spec Issue #398, Section 7 (Groomer Output Validation AC3)
-
 ---
 
 ## Required Section Schema

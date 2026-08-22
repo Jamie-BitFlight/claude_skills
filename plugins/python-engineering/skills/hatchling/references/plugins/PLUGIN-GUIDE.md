@@ -407,4 +407,4 @@ Most Hatchling plugins are open source. Contributions are welcome:
 
 ---
 
-**Last Updated**: November 2024 **Hatchling Version**: 1.24+
+**Hatchling Version**: 1.24+

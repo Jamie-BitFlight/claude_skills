@@ -196,5 +196,3 @@ This documentation covers:
 - Python: 3.8+
 - pip: 21.3+
 - build: 1.0.0+
-
-Last updated: 2024

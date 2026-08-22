@@ -201,12 +201,9 @@ list is where a single Sonnet pass silently drops criteria).
 
 1. **`python-engineering` and `python3-development` are near-duplicate plugins** — both
    carry analyze-test-failures, comprehensive-test-review, modernpython, review/python3-review,
-   snakepolish, test-failure-mindset, typer, ty, etc. Per repo-owner direction (conversation
-   2026-05-30), `python3-development` is being wound down in favour of `python-engineering` and
-   kept only so existing users do not break — so convert the `python-engineering` copies and SKIP
-   the `python3-development` duplicates. This is owner guidance for this catalog, not a deprecation
-   notice published in the plugin's own manifest or README; verify against the plugin before
-   relying on it elsewhere.
+   snakepolish, test-failure-mindset, typer, ty, etc. `python3-development` is being wound down in
+   favour of `python-engineering` and kept only so existing users do not break — so convert the
+   `python-engineering` copies and SKIP the `python3-development` duplicates.
 2. **The framework already exists in-repo** (Tier 0). Standardize from it rather than
    designing from scratch.
 3. **Replication is the corroboration signal at repo scale** — code-review (C1), summarizer
@@ -280,16 +277,13 @@ clusters the first pass missed. Marked NEW (missed by pass 1) or CONFIRMED.
   rulesets. The whole skill fails the When-to-Use gate; individual rule-bearing phases do not.
   For stinkysnake, the ensemble targets are Phase 2 (type-gap inventory), Phase 3 (modernization
   construct/PEP roster), and Phase 4 (plan review); Phases 6/8/9 are work-partition fan-outs.
-  See `composing-in-workflows.md`. (Correction: an earlier pass mis-scored these as flat fit4
-  rulesets.)
+  See `composing-in-workflows.md`.
 
 ### python3-development — DO NOT CONVERT (deprecated plugin)
 
-Per repo-owner direction (conversation 2026-05-30), `python3-development` is being wound down in
-favour of `python-engineering` and kept only so existing users do not break. Do NOT convert any of
-its skills/agents; their live equivalents in `python-engineering` are the conversion targets
-instead. (Owner guidance for this catalog — not a deprecation notice in the plugin's own manifest
-or README. The candidates below are recorded for completeness only.)
+`python3-development` is being wound down in favour of `python-engineering` and kept only so
+existing users do not break. Do NOT convert any of its skills/agents; their live equivalents in
+`python-engineering` are the conversion targets instead.
 
 - quality-gate — 5 sequential gates / 15+ criteria — fit5 — NEW — SKIP (use python-engineering)
 - type-system-design-patterns — 4-step audit / 12+ per interface — fit5 — NEW — SKIP (use python-engineering)
@@ -301,7 +295,7 @@ or README. The candidates below are recorded for completeness only.)
 
 1. The whole `python3-development` plugin (`python3-standards` 40+ criteria hub, `quality-gate`,
    distinct 18-item `code-reviewer`, `type-system-design-patterns`) — nearly invisible in pass 1.
-   NOTE: per owner direction (meta-finding 1) do NOT convert `python3-development`; recorded for completeness only.
+   Do NOT convert `python3-development` (see meta-finding 1).
 2. plugin-creator authoring-workflow cluster (`plugin-creator`, `plugin-lifecycle`,
    `skill-creator`, `refactor-skill`, `prompt-optimization`, `subagent-refactoring-methodology`).
 3. plugin-creator CoVe/grading agents (`grader`, `comparator`, `ai-doc-optimizer`,

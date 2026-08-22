@@ -541,8 +541,7 @@ See `typer-rich-tables.md` "The Goal: Zero Data Loss" for the full argument.
 
 ### Do not pin `COLUMNS`
 
-Earlier versions of this guide recommended `NO_COLOR=1 COLUMNS=200 python my_cli.py`.
-That is wrong for diagnostic tools. Pinning `COLUMNS=200` means any row with content
+Pinning `COLUMNS=200` means any row with content
 longer than 200 columns is silently wrapped or truncated — the exact failure mode
 the tool exists to prevent. Use `COLUMNS=N` only when you have an actual fixed
 display surface to fit into (a 120-col dashboard pane, a printed report).

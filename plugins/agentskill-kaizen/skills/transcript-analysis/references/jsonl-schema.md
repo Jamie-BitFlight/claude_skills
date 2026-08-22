@@ -4,7 +4,7 @@
 
 **MCP exposure:** same markdown is returned by **`kaizen-analysis`** tool `get_transcript_jsonl_schema` and resource **`kaizen://session-log/schema`**.
 
-Use that document to build **any** DuckDB `json_extract` path or filter on `type` / nested fields. The file below is retained only as a short orientation; do not duplicate long schema blocks here.
+Use that document to build **any** DuckDB `json_extract` path or filter on `type` / nested fields.
 
 ## Record types (summary)
 

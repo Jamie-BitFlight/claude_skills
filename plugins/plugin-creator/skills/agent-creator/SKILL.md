@@ -290,11 +290,7 @@ C) **Plugin** - Part of a plugin (saved to plugin directory; auto-discovered fro
 4. **DO NOT TOUCH `plugin.json`.** Claude Code auto-discovers every `.md` file in the plugin's `agents/` directory. Writing the `agents` array — even to add one entry — OVERRIDES auto-discovery: the declared list becomes the *complete* list and every unlisted agent becomes invisible.
 
    > **AUTO-DISCOVERY RULE — DO NOT REGISTER**
-   > Agents in the default `agents/` directory are auto-discovered. The `agents` array in `plugin.json` exists ONLY for agents stored in non-default paths. Never introduce the `agents` key for agents in the default location.
-   >
-   > **Incident history**:
-   > - 2026-03-17: `python3-development` committed a 2-entry `agents` array; 17 of 19 agents disappeared.
-   > - 2026-04-12: `development-harness` commit 30260566 auto-added a 2-entry `agents` array via a buggy pre-commit hook; 21 of 23 agents would have disappeared. Hook fixed in the same session; this instruction block corrected at the same time.
+   > Agents in the default `agents/` directory are auto-discovered. The `agents` array in `plugin.json` exists ONLY for agents stored in non-default paths. Never introduce the `agents` key for agents in the default location. Declaring the key overrides auto-discovery entirely: the declared list becomes the complete set and every unlisted agent becomes invisible.
    >
    > If the plugin already has an `agents` array (Mode B — manual allowlist for non-default paths), READ it first, carry forward every existing entry, and append the new one. Never write a single-entry array.
 5. VALIDATE plugin.json still has no `agents` key (unless the plugin uses non-default paths):

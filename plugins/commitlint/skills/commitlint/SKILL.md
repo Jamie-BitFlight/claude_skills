@@ -502,7 +502,3 @@ For Conventional Commits format specification and examples, use the reference in
 
 - [Conventional Commits](https://www.conventionalcommits.org/) - Commit message format specification
 - [Cosmiconfig](https://github.com/cosmiconfig/cosmiconfig) - Configuration file discovery mechanism
-
-### Source Attribution
-
-This skill was created from reference documentation at `the commit-polish repository` (2025-12-01)

@@ -18,7 +18,7 @@ Two hooks fire automatically on every tool call:
 
 **Diagnostic Command Gate** — fires on `Bash` calls matching diagnostic commands (`ty check`, `ruff check`, `mypy`, `pytest`, `eslint`, `cargo check`, etc.). Reminds the orchestrator to delegate the command to an Explore agent instead.
 
-**Bash Built-In Tool Enforcement Gate** — fires on `Bash` calls that should use built-in Claude Code tools (`Read`, `Grep`, `Glob`). **Blocking** — exits 2 to prevent the command and redirect to the correct tool. SOURCE: 28 violations in session e3280e97 (2026-03-02).
+**Bash Built-In Tool Enforcement Gate** — fires on `Bash` calls that should use built-in Claude Code tools (`Read`, `Grep`, `Glob`). **Blocking** — exits 2 to prevent the command and redirect to the correct tool.
 
 The Source File Read Warning and Diagnostic Command Gate are **non-blocking** — they inject `additionalContext` to surface the decision, not prevent it. The Bash Built-In Tool Enforcement Gate is **blocking** — it exits 2 to structurally enforce the rule.
 
@@ -88,8 +88,6 @@ flowchart TD
 **Blocking**: YES — exits with code 2 to prevent the command and provide redirect message.
 
 **Does NOT trigger on**: Pipeline uses (`git log | grep`, `uv run | head`), `cat /dev/stdin`, `cat -`, `ls -la`
-
-SOURCE: 28 violations observed in session e3280e97 (2026-03-02); installed as structural enforcement.
 
 ### Diagnostic Command Gate
 

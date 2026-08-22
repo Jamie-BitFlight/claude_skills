@@ -179,6 +179,3 @@ The section only earns its place when it contains information the agent cannot f
 | "Maximize parallel execution" | NO | In CLAUDE.md; inherited |
 | Toolchain conventions (uv, pnpm, cargo) | NO | In project CLAUDE.md; inherited |
 | Generic MCP server list (Ref, context7, exa) | NO | In tool descriptions; inherited |
-
-SOURCE: Agent context audit (2026-02-17) confirming what sub-agents automatically inherit vs what must be provided.
-SOURCE: Prior diagnostic session identifying 6 structural causes of orchestrator tool-enumeration anti-pattern (2026-02-17)

@@ -158,6 +158,3 @@ mypy --install-types --non-interactive mypackage
 - [Python Packaging User Guide](https://packaging.python.org/)
 - [Hatchling Source Code](https://github.com/pypa/hatch/tree/master/backend)
 
-## Contributing
-
-Found an issue or want to add more special configuration documentation? Please contribute to the [claude_skills repository](https://github.com/yourusername/claude_skills).

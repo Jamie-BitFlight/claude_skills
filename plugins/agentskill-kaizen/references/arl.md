@@ -1,4 +1,3 @@
-<!-- Migrated from plugin-creator/skills/arl/ — pure ARL reference content -->
 # Autonomous Refinement Loop (ARL) — Knowledge Reference
 
 **Autonomous Refinement Loop (ARL)** is pattern research into what an AI assistant needs — in information, tools, verification mechanisms, access to external resources, and knowledge of past failures — to produce outcomes that match the user's vision without requiring the human to be a synchronous blocking gate during execution.

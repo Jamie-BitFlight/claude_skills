@@ -376,8 +376,6 @@ Each document contains:
 
 ## About This Documentation
 
-**Created:** November 2024 **Coverage:** Hatchling v1.0.0 through v1.27.0 **Source:** Official Hatchling releases and GitHub changelog **Format:** Keep a Changelog style with Semantic Versioning
-
 This documentation is organized for quick navigation by version, feature, and use case. Each document focuses on a specific aspect while cross-referencing related topics.
 
 ### Document Details
@@ -403,14 +401,6 @@ This documentation is organized for quick navigation by version, feature, and us
 
 ---
 
-## Contributing Updates
-
-This documentation reflects Hatchling's official release history as documented in:
-
-1. GitHub release notes (<https://github.com/pypa/hatch/releases>)
-2. Official changelog (<https://hatch.pypa.io/dev/history/hatchling/>)
-3. Project documentation (<https://hatch.pypa.io/>)
-
 ## Document Format
 
 All documents follow:
@@ -422,13 +412,3 @@ All documents follow:
 - **Configuration examples** for practical use
 - **Best practices** sections for guidance
 
-## Questions or Feedback?
-
-- Check this index for navigation help
-- Search relevant document for your topic
-- Refer to official Hatchling documentation
-- Check GitHub issues for known problems
-
----
-
-**Last Updated:** November 2024 **Coverage:** Hatchling v1.0.0 through v1.27.0 **Format:** Markdown (GitHub-compatible)

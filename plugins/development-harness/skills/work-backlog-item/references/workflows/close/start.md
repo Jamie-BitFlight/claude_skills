@@ -106,8 +106,8 @@ If operation is `resolve`:
 
 4. Extract acceptance criteria from the `backlog_view` response. Call `backlog view --selector "{title}"`, then read `response["sections"]["Acceptance Criteria"]`. The field format is a bullet list:
 
-   Note: the CLI's `backlog view` has no `summary` toggle (documented gap in the MCP↔CLI mapping,
-   verified 2026-08-05) — it always returns the flatter, full-content equivalent of `summary=false`.
+   Note: the CLI's `backlog view` has no `summary` toggle — it always returns the flatter,
+   full-content equivalent of `summary=false`.
 
    ```markdown
    **Acceptance Criteria**:

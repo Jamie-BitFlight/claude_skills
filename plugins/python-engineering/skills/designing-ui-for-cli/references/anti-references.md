@@ -1,6 +1,6 @@
 # Anti-references
 
-Patterns to refuse on sight. Each row is a match-and-rewrite rule: when about to write the pattern, restructure the element instead. The four entries at the bottom of the table preserve the legacy guidance from this skill's earlier draft; the entries above them are CLI-native traps that the impeccable design system surfaces but the original list missed.
+Patterns to refuse on sight. Each row is a match-and-rewrite rule: when about to write the pattern, restructure the element instead.
 
 For register-specific refuse-lists (brand-CLI vs product-CLI permissions and bans), see [register-decision.md](./register-decision.md). The list below applies to both registers — these are absolute bans, not register choices.
 

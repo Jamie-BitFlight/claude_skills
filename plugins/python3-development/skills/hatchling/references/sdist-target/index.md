@@ -205,4 +205,4 @@ hatch build -t sdist
 
 ---
 
-**Last Updated:** 2025-11-02 **Target Audience:** Python package maintainers, Hatchling users, build system integrators
+**Target Audience:** Python package maintainers, Hatchling users, build system integrators

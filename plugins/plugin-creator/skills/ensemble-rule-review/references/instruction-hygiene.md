@@ -113,8 +113,7 @@ right. This prevents the reframe over-correcting into the opposite bias — "alw
 becoming "always capable/heterogeneous". The de-bias of this skill used exactly this step: an
 adversarial-defender pass kept the cheap-mechanical path as a real option instead of deleting it.
 
-SOURCE: observed failures while building the SOLID A/B harness for this methodology
-(session 2026-06-03). A shared task prompt carried the output schema, ruleset/corpus/findings paths,
+A shared task prompt carried the output schema, ruleset/corpus/findings paths,
 the location format, and a "follow skill X" instruction. Executor files carried decorative `(Haiku)`
 and "high-intelligence pass" annotations and an explanation of where the model is configured. The
 output schema was duplicated across the README, the arm skills, and the arm agents, with drifted

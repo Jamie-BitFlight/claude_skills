@@ -156,5 +156,3 @@ flowchart TD
     S9["9. Time the walkthrough — can a novice follow in 5 minutes?"] --> S10
     S10["10. Confirm auditable — can execution be traced after the fact?"] --> Done(["Improved process ready"])
 ```
-
-SOURCE: Synthesized from user-provided source material (2026-02-26) drawing on Lean, Six Sigma/DMAIC, BPR, Design Thinking, Systems Thinking, Theory of Constraints, and process design literature including Deming, Drucker, Gawande (*The Checklist Manifesto*), Meadows (*Thinking in Systems*), Norman (*The Design of Everyday Things*), Allen (*Getting Things Done*), Clear (*Atomic Habits*), and Taleb.
