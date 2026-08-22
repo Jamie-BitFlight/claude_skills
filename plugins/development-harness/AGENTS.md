@@ -239,19 +239,11 @@ The manifest schema is documented in [./skills/development-harness/references/la
 
 ---
 
-## Dispatch Pattern (Extension Rules)
+## Dispatch Pattern
 
-The runtime contract an executing agent follows — dispatch target, how a task's `agent:` field
-resolves after dispatch, and the artifact-versus-filesystem boundary — lives in the
-`/dh:dispatch-contract` skill. Load it rather than restating it here or in any agent file.
-
-The mechanism specific to this plugin's implementation: `task-worker` reads the task's `agent:`
-value via SAM MCP and passes it to `profile_load` to load specialist behavior internally.
-
-### Extension rule
-
-When adding a new dispatch step to any dh skill, reference file, or workflow document, apply the
-dispatch-target decision defined in `/dh:dispatch-contract` rather than repeating it here.
+Dispatch behaviour is defined in the `dispatch-contract` skill
+([./skills/dispatch-contract/SKILL.md](./skills/dispatch-contract/SKILL.md)) — that skill is the
+one an executing agent loads, so the decision belongs there and nowhere else.
 
 ---
 
@@ -358,7 +350,7 @@ dispatch-target decision defined in `/dh:dispatch-contract` rather than repeatin
 
 **Execution:**
 
-- `@dh:task-worker` - Universal dispatch and task executor; loads specialist profiles through each task's `agent:` field
+- `@dh:task-worker` - Fallback SAM task executor for work no prebuilt specialist covers; loads specialist profiles through each task's `agent:` field
 - `@dh:backlog-item-groomer` - Groom a backlog item with RT-ICA assessment and resource map
 
 ---

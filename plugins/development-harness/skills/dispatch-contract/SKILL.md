@@ -11,27 +11,37 @@ a task you were dispatched to run.
 
 ## Dispatch role vocabulary
 
-- Orchestrator — the agent that dispatches. It passes only a task reference (plan address plus
-  task ID). It does not choose a specialist and does not read task content to route.
-- Task-worker — the dispatched agent (`dh:task-worker`). It reads the task, resolves the
-  specialist profile, and owns the complete SAM lifecycle for that task: claim, execute, update
-  state.
-- Agent profile — specialist behavior the task-worker loads into itself. A profile is behavior,
-  not a dispatch target.
+- Orchestrator — the agent that dispatches. It chooses a dispatch target by fit and passes a task
+  reference (plan address plus task ID). It does not read the task's `agent:` field to route.
+- Task executor — the dispatched agent. It owns the complete SAM lifecycle for that task: claim,
+  execute, write state back.
+- Agent profile — specialist behavior an agent loads into itself from the task's `agent:` field.
+  A profile is behavior, not a dispatch target.
 
-## Dispatch `dh:task-worker` to execute a SAM task
+## Choose the dispatch target for a SAM task
 
 Decide which shape a dispatch is before choosing its `subagent_type`: does it hand over a plan
 address plus a task ID and expect the dispatched agent to claim that task, do the work, and write
 the task's state back? That question is observable at dispatch time from what the dispatch passes
 — it does not depend on knowing anything about the dispatching workflow's own position or stage.
 
-If yes — the dispatch is handing over a SAM task for execution — dispatch
-`subagent_type="dh:task-worker"` always. No task type, complexity level, or specialist role
-changes this. `dh:task-worker` carries the dh tool permissions the SAM lifecycle requires.
-Dispatching any other subagent type for a SAM task execution strands the task: the dispatched
-agent can produce output but cannot claim the task or write its state back, so the plan never
-advances and the work stays invisible to every later stage.
+If yes — the dispatch is handing over a SAM task for execution — choose the target this way:
+
+- A prebuilt specialist that fits the work is the target. Dispatch it by name and pass the task
+  reference. Both the dh agent roster and any agents the consuming harness supplies are candidates.
+- When no specialist fits and a generic agent is what you would otherwise reach for, dispatch
+  `subagent_type="dh:task-worker"` in its place. Never dispatch `general-purpose` from a dh skill
+  or extension point: it has no SAM or backlog tool access, so it cannot claim the task or write
+  its state back, and that failure is silent. `dh:task-worker` is the same blank canvas arriving
+  with the dh tools and skills the workflow needs, and it loads the specialist named by the task's
+  `agent:` field through `profile_load` as a profile.
+
+Either target must be able to load `dh:start-task` and reach the SAM task operations `sam_plan`,
+`sam_task`, and `sam_active_task`. `start-task` performs the claim, the active-task registration,
+and the completion write-back through those operations. A specialist whose declared tool list omits
+them produces output but never claims or closes the task, so the plan never advances and the work
+stays invisible to every later stage — dispatch `dh:task-worker` for that task instead and let the
+specialist's behavior arrive as a profile.
 
 If no — the dispatch is an independent reviewer verifying already-completed work, a contract check
 run after a task closes, or any other verifier with no SAM task of its own to claim — keep the
@@ -41,24 +51,29 @@ so the review or verification never happens and its output is silently lost.
 
 ## A task's `agent:` field is not a routing directive
 
-That field is read by the task-worker after dispatch, not by the orchestrator before it. Reading
-it as a routing instruction and dispatching that name directly is the most common way this
-contract gets broken.
+That field is read by the dispatched agent after dispatch, not by the orchestrator before it.
+Reading it as a routing instruction and dispatching that name directly is the most common way this
+contract gets broken. Choosing a target by fit is a different act: it weighs what the work needs
+against what each available agent can do, and never depends on the task's stored `agent:` value.
 
 ```mermaid
 flowchart TD
-    Orchestrator([Orchestrator]) -->|"subagent_type='dh:task-worker' plus task reference"| Worker[dh:task-worker]
-    Worker -->|"read the task"| SAM[SAM task operation]
-    SAM -->|"specialist name"| Worker
-    Worker -->|"load that profile"| Profile[Specialist behavior loaded in-place]
-    Profile --> Execute[Execute with full dh tool permissions]
-    Execute --> State[Write task state back]
+    Dispatch([SAM task handed over for execution]) --> Fit{"A prebuilt specialist fits this work?"}
+    Fit -->|Yes| Tools{"It reaches sam_plan, sam_task, sam_active_task?"}
+    Tools -->|Yes| Spec[Dispatch that specialist by name]
+    Tools -->|No| Worker
+    Fit -->|"No — a generic agent is the alternative"| Worker["Dispatch dh:task-worker, never general-purpose"]
+    Worker --> Profile["Read the task, load its agent: field through profile_load"]
+    Spec --> Start[Load dh:start-task]
+    Profile --> Start
+    Start --> Lifecycle[Claim, execute, write task state back]
 ```
 
 When adding a dispatch step to any dh skill, reference file, or workflow document, apply the same
-question: is a plan address and task ID being handed over for execution? If yes, write
-`subagent_type="dh:task-worker"` and pass the task reference — let the task's own specialist field
-select the specialist. If no, name the specific agent the dispatch requires.
+questions: is a plan address and task ID being handed over for execution, does a prebuilt
+specialist fit the work, and does it reach the SAM task operations? Name that specialist when it
+does. Write `subagent_type="dh:task-worker"` wherever a generic agent would otherwise be named. If
+the dispatch is not handing over a SAM task at all, name the specific agent the dispatch requires.
 
 ## Artifacts and plans are logical records, not files
 

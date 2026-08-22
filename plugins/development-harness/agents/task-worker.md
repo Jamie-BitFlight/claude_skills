@@ -1,6 +1,6 @@
 ---
 name: task-worker
-description: Universal SAM task executor — receives a task reference via `start-task` (args `{plan} --task {id}`) in the prompt, loads the specialist agent profile from the task's agent field, then delegates the full SAM lifecycle (claim, active-task registration, implementation, completion) to the start-task skill. Use when dispatching parallel work as part of a coordinated group, or when any agent needs to execute a SAM task.
+description: Fallback SAM task executor — a blank canvas that receives a task reference via `start-task` (args `{plan} --task {id}`) in the prompt, loads the specialist agent profile named by the task's agent field, then delegates the full SAM lifecycle (claim, active-task registration, implementation, completion) to the start-task skill. Use when executing a SAM task that no prebuilt specialist covers, or when the fitting specialist cannot reach the SAM task operations needed to claim and close the task.
 model: sonnet
 skills:
   - dh:subagent-contract

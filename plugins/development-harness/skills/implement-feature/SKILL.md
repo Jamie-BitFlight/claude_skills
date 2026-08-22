@@ -95,7 +95,7 @@ Spawn one teammate per ready task. When only one task is ready, a single Agent c
 
 For each task being dispatched:
 
-- Always dispatch `dh:task-worker` as the `subagent_type`. The task definition's `agent` field is not a routing directive for the orchestrator — it is read internally by `task-worker` via the SAM MCP (`sam_task` action) and passed to `profile_load` to specialize `task-worker`'s behavior. The orchestrator passes only the task reference (`plan_ref` + task ID).
+- Choose the `subagent_type` with the two checks in `dh:dispatch-contract` — dispatch a prebuilt specialist when one covers the work and reaches the SAM task operations, otherwise dispatch `dh:task-worker`. The task definition's `agent` field is not a routing directive for the orchestrator — it is read after dispatch via the SAM MCP (`sam_task` action) and passed to `profile_load` to specialize `task-worker`'s behavior. The orchestrator passes only the task reference (`plan_ref` + task ID).
 - Check the task's `skills` list from the ready-tasks JSON output.
 - If `skills` is non-empty, include skill-loading instructions in the delegation prompt:
 
@@ -105,7 +105,7 @@ For each skill, call: Skill(skill="{skill-name}")
 ```
 
 - If `skills` is empty or missing, do not add skill-loading instructions (backward compatible).
-- Launch `dh:task-worker` with a prompt that invokes `start-task`:
+- Launch the chosen agent with a prompt that invokes `start-task`:
 
 ```text
 Skill(skill="start-task", args="{plan_ref} --task {task_id}")
