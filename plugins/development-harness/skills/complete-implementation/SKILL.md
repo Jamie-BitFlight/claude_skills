@@ -635,6 +635,25 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_
 an entry, report the provider read error and stop; registered content must remain readable through
 the same provider boundary.
 
+**If no `code-review` entry exists**, the plan may predate that artifact type — a verdict recorded
+by an earlier run is registered under `codebase-analysis`. Enumerate that type:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type codebase-analysis
+```
+
+Keep only entries whose `agent` field is `code-reviewer` and take the one with the latest
+`created_at` as `{legacy_artifact_id}`. Read that entry by its own identifier — a read by
+`codebase-analysis` alone returns whichever analysis document was registered last, which is not a
+verdict:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{legacy_artifact_id}"
+```
+
+Treat its content as the review report for the checks below. When no `codebase-analysis` entry
+carries `agent` `code-reviewer`, no earlier verdict exists — continue.
+
 Check the `verdict` field in the report:
 
 - `PASS` — no blocking findings; skip the entire routing section (no follow-ups to route)

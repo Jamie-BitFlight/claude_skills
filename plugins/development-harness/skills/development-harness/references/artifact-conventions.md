@@ -48,13 +48,12 @@ Artifacts are stored and retrieved via two distinct MCP systems. No stage reads 
 Document-level artifacts (discovery, plan, context integration) are managed by the backlog MCP server:
 
 - **Write:** `artifact_register(item_id=item_id, artifact_type=artifact_type, artifact_id=artifact_id, agent=agent, content=content)` — stores non-empty provider-owned content, then registers its logical identifier through the revision-safe manifest.
-- **Read:** `artifact_read(item_id=item_id, artifact_type=artifact_type)` — returns `{artifact_type, path, content, status}` from the configured provider. The `path` response field carries the registered logical `artifact_id`.
-- **List:** `artifact_list(item_id=item_id, artifact_type=None)` — enumerates registered artifacts for an issue.
+- **Read:** `artifact_read(item_id=item_id, artifact_type=artifact_type)` — returns `{artifact_type, path, content, status}` from the configured provider. The `path` response field carries the registered logical `artifact_id`. Selection is by owner and type alone: when several entries share one type, the most recently registered entry is returned and the others are reported as skipped in the response warnings.
+- **List:** `artifact_list(item_id=item_id, artifact_type=None)` — enumerates registered artifacts for an issue, each with its `artifact_id`, `agent`, `status`, and `created_at`.
 
-Artifact types used in the S1–S7 pipeline:
+Each artifact type, the agent that produces it, and when to use it are listed in the type table in [create-artifact](../../create-artifact/SKILL.md). `ArtifactType` in `backlog_core/models.py` defines the accepted strings.
 
-- `"feature-context"` — S1 Discovery output
-- `"architect"` — S2 Plan output (updated by S3 Context Integration)
+A type is either multi-entry — several current documents per owner, such as one codebase analysis per focus area — or single-entry, one document per owner, such as a gate verdict. Any document a gate reads by type alone requires its own single-entry type. Sharing a type with a multi-entry class hands the gate whichever document was registered last. To read one specific entry of a multi-entry type, discover it with `artifact_list` and pass its `artifact_id` to the provider-neutral CLI's `artifact read`.
 
 Task plans are SAM-owned records, not artifact-registry content. Use `sam_plan` and `sam_task` for
 their complete lifecycle; never register or read task-plan content with `artifact_register` or

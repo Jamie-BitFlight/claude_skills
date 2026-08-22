@@ -189,6 +189,13 @@ Consumer agents MUST:
 Registration is idempotent for the same owner, type, and logical name. A retry
 may update the existing entry; it MUST NOT create a second current entry.
 
+A type holds either several current entries per owner or exactly one.
+`artifact_read` selects by owner and type alone and returns the most recently
+registered entry, so a record read by type as a decision — a review verdict, a
+verification result — MUST have a type of its own and MUST NOT share one with a
+multi-entry class such as codebase analysis. Address one entry of a multi-entry
+type by the `artifact_id` that `artifact_list` returned for it.
+
 </manifest_policy>
 
 <migration_policy>
@@ -199,6 +206,12 @@ Apply this policy to new records. Preserve existing human intent and generated
 content while it is being read. Existing records may contain path fields or
 provider-specific references; treat those fields as migration metadata and
 rewrite them only through the configured backend's migration operation.
+
+When a class of record moves to its own artifact type, entries already
+registered under the former type stay there; nothing backfills them. A consumer
+of the new type that finds no entry MUST look under the former type, keep only
+the entries whose producing agent matches, and read the selected one by its
+`artifact_id` before concluding that no record exists.
 
 Do not make a file path the canonical artifact identity, add a second backend
 selector, or silently copy an old record into a new authority. A migration is

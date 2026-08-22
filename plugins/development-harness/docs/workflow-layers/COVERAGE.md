@@ -7,7 +7,7 @@ a layer: if COLLECTED, query its data; if a GAP, it is a named pending pass — 
 All files live in `plugins/development-harness/docs/workflow-layers/`.
 
 Resolution: **medium-high**. Skeleton + connections + 8 annotation layers collected and
-spot-checked. Graph rebuilt from layer data (231 nodes, 436 edges, 21 gap edges, 0 orphan
+spot-checked. Graph rebuilt from layer data (235 nodes, 440 edges, 21 gap edges, 0 orphan
 edges). Explorer renders all 6 overlays.
 
 ---
@@ -19,7 +19,7 @@ edges). Explorer renders all 6 overlays.
 | L0 — forks | Every forking decision across 5 lifecycle skills: diamond/prose condition, branches, `evaluated_by`, file-ref expansion links | `L0-forks.json` | COLLECTED | 111 forks, 5 skills, 23 file-ref links. Spot-checked verbatim. 103 orchestrator / 5 parser / 3 agent |
 | L1 — traces | Each fork branch followed to terminal; cross-file/skill connections; loop-backs | `L1-trace-*.json` (4 files) | COLLECTED | 273 traces, 105 cross-file connections, 0 UNRESOLVED. 3 skill-handoffs falsified against source |
 | G1 — failure modes | Every failure point per skill + where each bounces to | `G1-failure-modes.json` | COLLECTED | 48 failure modes: 29 pure STOP, 9 bounce, 5 escalate, 5 create_backlog_item |
-| G2 — artifacts | Full artifact set per step + producer/consumer/storage | `G2-artifacts.json` | COLLECTED | 14 artifacts, 0 orphan consumers |
+| G2 — artifacts | Full artifact set per step + producer/consumer/storage | `G2-artifacts.json` | COLLECTED | 16 artifacts, 0 orphan consumers |
 | G3 — actor types | Per-action: orchestrator-raw / agent-structured-task / agent-raw-prompt | `G3-actor-types.json` | COLLECTED | 68 actions: 51 orchestrator-raw, 12 agent-raw-prompt, 5 agent-structured-task |
 | G4 — concurrency | Dispatch topology: TeamCreate vs Agent, waves, barriers, siblings | `G4-concurrency.json` | COLLECTED | 15 dispatch points, 5 conditional dispatches |
 | G5 — optionality | Per-step: mandatory / conditional / skippable-by-flag | `G5-optionality.json` | COLLECTED | 49 steps: 8 mandatory, 30 conditional, 11 skippable-by-flag |
