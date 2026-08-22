@@ -1,6 +1,6 @@
 {
   "name": "brainstorming-skill",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches to problems. Use when users request help with ideation, content planning, product features, marketing campaigns, strategic planning, creative writing, or any task requiring structured idea generation. The skill provides 30+ research-validated prompt patterns across 14 categories with exact templates, success metrics, and domain-specific applications.",
   "author": {
     "name": "Jamie Nelson",
@@ -13,7 +13,10 @@
     "longDescription": "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches to problems. Use when users request help with ideation, content planning, product features, marketing campaigns, strategic planning, creative writing, or any task requiring structured idea generation. The skill provides 30+ research-validated prompt patterns across 14 categories with exact templates, success metrics, and domain-specific applications.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
-    "capabilities": ["Interactive", "Read"],
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
     "defaultPrompt": [
       "This skill should be used when users need to generate ideas, explore creative solutions, or systematically brainstorm approaches"
     ]
