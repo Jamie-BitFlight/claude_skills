@@ -42,7 +42,7 @@ Field derivation:
 |---|---|
 | `title` | Use `item_title` exactly after trimming outer whitespace. |
 | `priority` | Use explicit user-provided priority if present and valid. Otherwise assign `P1` only when the input contains explicit urgency evidence such as `critical`, `required`, `must`, or an explicit priority flag. Assign `P2` for `nice to have` or `optional`. Otherwise default to `P2`. Do not infer `P0` unless the user explicitly stated `P0`. |
-| `description` | Classify the item using scope.md Step 0 first. If **BEHAVIORAL/PROCESS**: preserve the full procedural description as written — do not strip. If **MIXED**: preserve the behavioral spec as written; isolate file/code prescriptions as `**User-provided context**: {verbatim text}`. If **PRODUCT/FEATURE**: write a problem-only summary. Keep only: what is broken, missing, or requested; where it was observed; and what impact it has. Remove implementation steps, architecture ideas, suggested fixes, and file-level prescriptions as defined by the scope boundary rules above. If the user supplied a possible fix, preserve it as `**User-provided context**: {verbatim text}` and not as a requirement. If the input contains lines beginning with `?` or `Research:`, preserve them under `**Research first**: {content}`. |
+| `description` | Classify the item using scope.md Step 0 first. If **BEHAVIORAL/PROCESS**: preserve the full procedural description as written — do not strip. If **MIXED**: preserve the behavioral spec as written; isolate file/code prescriptions as `**User-provided context**: {verbatim text}`. If **PRODUCT/FEATURE**: write a problem-only summary covering the goal, reproduction steps (for a defect), impact, a user story, the payoff, and existing observations that add context. Remove implementation steps, architecture ideas, suggested fixes, and file-level prescriptions as defined by the scope boundary rules above. If the user supplied a possible fix, preserve it as `**User-provided context**: {verbatim text}` and not as a requirement. If the input contains lines beginning with `?` or `Research:`, preserve them under `**Research first**: {content}`. |
 | `source` | If a research file was used, set `source` to `Agent task - auto-derived from research/{filename}`. Otherwise set `source` to `Agent task - auto-derived from input`. |
 | `type` | Assign `Bug` for defect reports, `Feature` for new requested capability, `Refactor` for restructuring-only work, `Docs` for documentation-only work, and `Chore` otherwise. |
 
@@ -62,7 +62,7 @@ Use `AskUserQuestion` to collect any missing required fields:
 
 1. Title: "What is the title for this backlog item?"
 2. Priority: "What priority? P0 (must-have), P1 (should-have), P2 (could-have), or Ideas (exploratory)"
-3. Description: "Describe the item. Cover: (1) what is broken, missing, or requested, (2) where it was observed, and (3) what impact it has. Do not describe the fix or implementation approach."
+3. Description: "Describe the item. Cover the goal, reproduction steps (for a defect), impact, a user story, the payoff, and existing observations that add context. Do not describe the fix or implementation approach."
 4. Source: "Where did this come from? (for example: session observation, user report, CI failure)"
 5. Type: "What type? Feature, Bug, Refactor, Docs, or Chore"
 
