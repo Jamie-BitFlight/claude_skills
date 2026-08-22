@@ -6,28 +6,7 @@ related: [README.md, global-fields.md, environment-fields.md, optional-dependenc
 
 # Research Summary: Context Formatting & Dynamic Configuration in Hatchling
 
-Reference documentation summarizing research on context formatting and dynamic configuration in Hatchling. Use this to understand the evidence base and verification approach for all context formatting features.
-
-## Research Scope
-
-**Topic Investigated**: Context Formatting & Dynamic Configuration in Hatchling
-
-**Topics Researched**:
-
-- Context formatting for dependencies
-- Context formatting for optional dependencies
-- Dynamic field resolution
-- Configuration interpolation
-- Environment-based configuration
-
-**Research Date**: November 2024
-
-**Information Sources Evaluated**:
-
-- Official Hatch/Hatchling documentation
-- GitHub repository and release notes
-- MCP (Model Context Protocol) tools
-- Web-based technical documentation
+Reference documentation summarizing context formatting and dynamic configuration in Hatchling.
 
 ## Key Findings
 
@@ -282,34 +261,6 @@ test = "pytest tests/ -k py{matrix:python:39}"
 - PyPA packaging standards
 - TOML configuration format (PEP 518)
 
-## Research Methodology
-
-### Sources Evaluated
-
-1. **Official Documentation** (High Authority)
-
-   - Hatch.pypa.io technical documentation
-   - GitHub repository /docs/ directory
-   - Release notes and changelogs
-
-2. **Code Examples** (High Authority)
-
-   - Real Hatchling configurations
-   - Official test cases
-   - Community project examples
-
-3. **Community Resources** (Medium Authority)
-   - GitHub discussions and issues
-   - Real-world monorepo configurations
-   - Expert commentary in issues
-
-### Verification Approach
-
-- Cross-referenced claims across multiple official sources
-- Checked historical documentation for version accuracy
-- Verified examples against multiple independent sources
-- Confirmed current status through release notes
-
 ## Recommendations for Further Research
 
 ### Areas for Deeper Investigation
@@ -331,7 +282,3 @@ test = "pytest tests/ -k py{matrix:python:39}"
 Context formatting and dynamic configuration in Hatchling are well-documented, actively maintained features that enable flexible, portable project configurations. The implementation is stable and widely used in production monorepos and complex projects.
 
 **Key Takeaway**: Context formatting is most valuable for monorepo development and environment-aware configurations, providing concrete benefits in portability, maintainability, and build flexibility.
-
----
-
-**Research Completed**: November 2024 **Documentation Quality**: Comprehensive (2,450 lines across 6 files) **Confidence Level**: High (based on primary sources and consistent patterns) **Suitable for**: Production use, documented in official sources, actively maintained

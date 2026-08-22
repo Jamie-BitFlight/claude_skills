@@ -160,8 +160,6 @@ except TimeoutError, ConnectionRefusedError:
 
 ## Working Examples
 
-See `.claude/worktrees/video1_python_314/code_python_3_14/` for runnable demos:
-
 - `demo7_t_string.py`, `demo8_t_String_sql.py` — t-string rendering and SQL injection prevention
 - `demo9_basic_type_annotation.py` through `demo12_*` — deferred annotation evaluation
 - `demo13_circular_ref*.py` — circular imports resolved by deferred annotations
