@@ -12,7 +12,8 @@ every other area of the plugin as it gets resolved.
 
 Three roles govern who may dispatch further agents and on whose behalf, defined by relationship —
 never by capability, and never by whether an agent happens to dispatch further work. See
-ADR-3113-1 for the incident that required stating this precisely.
+[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
+incident that required stating this precisely.
 
 **Orchestrator**:
 The single interactive agent acting directly on behalf of the human. Exactly one per session,
@@ -36,11 +37,16 @@ _Avoid_: "orchestrator" for this role — a Manager acts on behalf of its dispat
 of the human directly, and the two roles carry different obligations (see Orchestrator above).
 
 **Worker**:
-A subagent assigned one unit of work to execute directly. Never dispatches further subagents,
-regardless of what any skill it loads is written to instruct — a skill written for a Manager or
-the Orchestrator does not change a Worker's own assignment. On receiving an instruction to run a
-skill that speaks as if to a dispatcher, a Worker reports the conflict (`STATUS: BLOCKED`) rather
-than complying. `dh:task-worker` is this plugin's canonical Worker implementation.
+A subagent assigned one unit of work to execute directly — a SAM task, or a direct prompt with no
+SAM reference (`dh:task-worker` is dispatched both ways; see AGENTS.md's Dispatch Pattern). A
+Worker's own assignment may explicitly name a specific skill to invoke, including one that itself
+dispatches a fixed, bounded set of subagents to complete that one unit of work — a quality-gate
+task naming `dh:multi-perspective-review`, which fans out four reviewers, is the Worker's
+assignment, not a role it inferred. What a Worker never does is independently drive an open-ended,
+multi-round dispatch loop across an entire plan — that requires the Manager role, explicitly
+assigned. On receiving an instruction to run a plan-managing skill it was not assigned to run, a
+Worker reports the conflict (`STATUS: BLOCKED`) rather than complying. `dh:task-worker` is this
+plugin's canonical Worker implementation.
 _Avoid_: assuming role is detectable from the environment or harness — role is always explicit,
 asserted by the dispatcher. This plugin targets Claude Code, Codex, and OpenCode; a detection
 mechanism tied to one harness's internals (e.g. inspecting a system prompt) does not port to the

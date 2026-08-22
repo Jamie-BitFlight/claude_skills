@@ -68,11 +68,18 @@ not by whether an agent happens to dispatch further work:
   delegation prompt (or, once #3100 lands, in the SAM task's `executor` field) — never inferred
   from a loaded skill's own voice, and never adopted on the subagent's own initiative. Acts on
   behalf of whoever assigned it the scope, not on behalf of the human directly.
-- **Worker** — a subagent assigned one unit of work to execute directly. Never dispatches further
-  subagents, regardless of what any skill it loads is written to instruct. On receiving an
-  instruction to run a skill that speaks as if to a dispatcher, a Worker reports the conflict
-  (`STATUS: BLOCKED`) instead of complying. `dh:task-worker` is this plugin's canonical Worker
-  implementation.
+- **Worker** — a subagent assigned one unit of work to execute directly, whether that assignment
+  is a SAM task or a direct prompt with no SAM reference (`dh:task-worker` is dispatched both ways
+  throughout the plugin — see AGENTS.md's Dispatch Pattern, "used for every agent dispatch — no
+  exceptions"). A Worker's assignment may explicitly name a specific skill to invoke, including one
+  that itself dispatches a fixed, bounded set of subagents to complete that one unit of work — a
+  quality-gate task naming `dh:multi-perspective-review`, which fans out four reviewers, is the
+  Worker's assignment, not a coordinating role it inferred. What a Worker never does is
+  independently drive an open-ended, multi-round dispatch loop across an entire plan — deciding
+  what's ready, batching, and repeatedly spawning further task-workers as the plan progresses —
+  that requires the Manager role, explicitly assigned. On receiving an instruction to run a
+  plan-managing skill it was not assigned to run, a Worker reports the conflict (`STATUS: BLOCKED`)
+  instead of complying. `dh:task-worker` is this plugin's canonical Worker implementation.
 
 Role is always explicit, asserted by the dispatcher, carried as data in the delegation prompt —
 never detected by an agent introspecting its own harness or environment. This is what makes the
@@ -81,18 +88,35 @@ a manager, or a worker" depends on a mechanism any one harness happens to expose
 
 This vocabulary is written into `CONTEXT.md` as the plugin's authoritative definition (single
 source of truth — skills reference the terms, they do not restate the definitions). `task-worker.md`
-is rewritten to embody the Worker role as a closed, positive job enumeration rather than an
-open-ended "become whatever is needed." `post-planning.md` gets an explicit warning at the one
-confirmed instance of this incident's proximate cause: `dh:implement-feature`'s invocation runs
-inline in the orchestrating agent's own context and must never be copied into a delegation prompt
-for a task-scoped subagent.
+is rewritten to state the Worker role's boundary explicitly — execute the assignment as given,
+including a specific skill the assignment names, but never independently drive a plan's dispatch
+loop — rather than the open-ended "become whatever is needed" it carried before. `post-planning.md`
+gets an explicit warning at the one confirmed instance of this incident's proximate cause:
+`dh:implement-feature`'s invocation runs inline in the orchestrating agent's own context and must
+never be copied into a delegation prompt for a task-scoped subagent.
+
+**Revised during PR review (#3114), confirmed against source before accepting.** The first draft
+of the Worker definition and `task-worker.md`'s rewrite stated a closed SAM-task-only job
+enumeration with no dispatch of any kind. Two independent review findings, each verified against
+the actual referenced source before this revision was made, showed that was too narrow and would
+have broken existing, intentional behavior: (1) `AGENTS.md` (`plugins/development-harness/AGENTS.md`,
+"Dispatch Pattern" section) states `dh:task-worker` is dispatched with a direct prompt and no SAM
+task reference throughout the plugin — confirmed against `groom/error.md` (a diagnostic-review
+dispatch) and `groom-backlog-item/references/drift-check.md` (a plan-drift analysis dispatch),
+neither of which has any SAM task to read; (2) the quality-gate Phase 0 task
+(`sam_schema/core/quality_gates.py`'s `_phase_body`) explicitly instructs its task-worker to invoke
+`dh:multi-perspective-review`, which fans out four reviewer agents by design — a legitimate,
+bounded, assignment-named fan-out, not the open-ended role self-assignment this ADR exists to stop.
+The definitions above reflect the corrected, narrower boundary: what's prohibited is independently
+driving a plan's dispatch loop, not dispatch in any form.
 
 ## Consequences
 
 - `task-worker.md`'s Identity section changes from an open self-concept ("become whatever the task
-  requires") to a closed enumeration (read task → `profile_load` → delegate to `start-task` →
-  report → stop), with an explicit BLOCKED path for a role conflict instead of language that
-  discourages surfacing one.
+  requires") to a stated boundary: execute the assignment as given — a SAM task via `start-task`,
+  or a direct prompt naming a specific skill, including one that fans out its own fixed subagents —
+  but never independently drive a plan's multi-round dispatch loop. Explicit BLOCKED routing
+  replaces language that discouraged surfacing a role conflict.
 - `implement-feature/SKILL.md` itself is not rewritten by this ADR — its "orchestrator" language is
   correct when the skill runs in the orchestrator's or an assigned manager's own context, which is
   the only way it is designed to run. The gap this ADR closes is that nothing previously stopped
@@ -106,7 +130,7 @@ for a task-scoped subagent.
 - No tool-permission change accompanies this ADR. `task-worker.md` intentionally carries no
   restricted `tools:` list — it must be able to adopt the full capability set of whatever
   specialist profile `profile_load` injects, which a static allowlist would break. The safety
-  mechanism here is entirely behavioral (the closed job enumeration and the BLOCKED path), not
+  mechanism here is entirely behavioral (the stated role boundary and the BLOCKED path), not
   structural.
 
 ## Considered alternatives

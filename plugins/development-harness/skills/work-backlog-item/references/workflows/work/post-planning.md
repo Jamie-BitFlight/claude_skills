@@ -14,7 +14,9 @@ Skip the interactive report. Instead, continue directly to implementation:
    one that dispatches `dh:task-worker` per task for the rest of the loop. Never copy this
    invocation into a delegation prompt for a `dh:task-worker` subagent: `implement-feature`'s
    Progress Loop is written for whoever runs it to dispatch further agents, which is not a
-   Worker's job (see CONTEXT.md's Dispatch Roles, ADR-3113-1). If the current agent needs a fresh
+   Worker's job (see [CONTEXT.md](../../../../../CONTEXT.md)'s Dispatch Roles,
+   [ADR-3113-1](../../../../../docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md)).
+   If the current agent needs a fresh
    worktree before running this, acquire one directly (`EnterWorktree`) and then make this call
    itself — do not hand the whole invocation to a subagent as a workaround.
 
