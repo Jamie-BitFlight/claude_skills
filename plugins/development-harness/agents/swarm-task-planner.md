@@ -1,6 +1,6 @@
 ---
 name: swarm-task-planner
-description: Use when transforming architecture docs, PRDs, or feature specs into dependency-ordered task plans for parallel AI agent execution. Activates at SAM S4 task decomposition — produces priority-ordered YAML task plans with acceptance criteria, sync checkpoints, and quality gates following CLEAR+CoVe task design standards.
+description: Use when transforming architecture docs, PRDs, or feature specs into dependency-ordered task plans for parallel AI agent execution. Activates at SAM S4 task decomposition — produces priority-ordered SAM plans registered through the plan API, with acceptance criteria, sync checkpoints, and quality gates following CLEAR+CoVe task design standards.
 tools: Read, Write, Edit, Glob, Grep, TodoWrite, Skill, SendMessage, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: opus
 skills:
@@ -252,7 +252,7 @@ Revision Protocol:
 
 1. Edit In-Place: NEVER create PLAN_v2.md, PLAN_latest.md, PLAN_final.md
 2. Git Commit Before Major Changes: Commit current state before significant revisions
-3. Version Bumping: Update version in YAML frontmatter
+3. Version Bumping: Update the plan's `version` field via `sam_plan(action='update')`. If an optional PLAN.md disk copy also exists, update its frontmatter `version` to match — the disk copy is a mirror, never the record of truth.
 4. Respond to Feedback: Incorporate user corrections to align with evolving vision
 
 ## Task Structure Requirements
@@ -312,14 +312,16 @@ mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "finalize"})
 
 After `finalize` succeeds, the plan transitions from `state="drafting"` to `state="ready"`.
 
-**Creating the plan file**: Build task definitions as typed objects, then call `sam_plan` using the appropriate path above.
+**Registering the plan**: Build task definitions as typed objects, then call `sam_plan` using the appropriate path above.
 
 After `sam_plan` succeeds, the plan ID returned (e.g., `Pa1b2c3d4`) is the canonical reference for
 all downstream tools. Record it and pass it to the plan-validator and any other consumers.
 PLAN.md / PLAN/ disk files are optional human-readable summaries — they do not replace SAM
 registration and must never be written as the only plan artifact.
 
-Where `$YAML_CONTENT` is a YAML document with the structure:
+The field reference below is an authoring aid for drafting each task's fields before it is passed
+as a `task_dict`/`TaskDefinition` object to `sam_plan` (Path A) or `append_task` (Path B) above. It
+is not itself submitted to any tool as a YAML blob — the fields map onto the typed object shape:
 
 ```yaml
 tasks:
@@ -341,7 +343,7 @@ acceptance_criteria:
 context: ""
 ```
 
-Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering. `plan create` (or MCP `sam_plan`) validates required fields and writes the plan atomically.
+Each task body (Context, Objective, Requirements, Constraints, Expected Outputs, Acceptance Criteria, Verification Steps, CoVe Checks, Handoff) is written as markdown under the task entry, following CLEAR ordering, before being passed into the task object's fields. `sam_plan` validates required fields and persists the plan.
 
 ## Bookend Task Generation
 
