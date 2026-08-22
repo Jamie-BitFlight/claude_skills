@@ -72,8 +72,8 @@ Only `name` and `description` are required. All other fields are optional.
 |:------|:---------|:------------|
 | `name` | **Yes** | Unique identifier: lowercase letters and hyphens, max 64 chars. Hooks receive this as `agent_type`. Filename need not match |
 | `description` | **Yes** | When Claude should delegate to this subagent. Write clearly — Claude uses this for routing. Include "use proactively" to encourage automatic delegation |
-| `tools` | No | Allowlist of tools the subagent can use. Inherits all tools when omitted. Use `Agent(worker, researcher)` syntax to restrict which subagent types can be spawned. See [./references/tool-and-permission-control.md](./references/tool-and-permission-control.md) |
-| `disallowedTools` | No | Denylist — removed from inherited or specified list. When both fields set, `disallowedTools` applied first |
+| `tools` | No | Allowlist of tools the subagent can use. Inherits all tools when omitted. Accepts exact tool names and MCP server-level patterns (`mcp__<server>` or `mcp__<server>__*`). Use `Agent(worker, researcher)` syntax to restrict which subagent types can be spawned. A subagent whose entries all resolve to nothing refuses to launch. See [./references/tool-and-permission-control.md](./references/tool-and-permission-control.md) |
+| `disallowedTools` | No | Denylist — removed from inherited or specified list. Accepts the same MCP server-level patterns as `tools`. When both fields set, `disallowedTools` applied first |
 | `model` | No | Model to use: `sonnet`, `opus`, `haiku`, a full model ID (e.g., `claude-opus-4-7`), or `inherit`. Defaults to `inherit`. See [./references/model-and-effort.md](./references/model-and-effort.md) |
 | `permissionMode` | No | Permission mode: `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, or `plan`. **Silently ignored for plugin subagents.** See [./references/tool-and-permission-control.md](./references/tool-and-permission-control.md) |
 | `maxTurns` | No | Maximum agentic turns before the subagent stops |

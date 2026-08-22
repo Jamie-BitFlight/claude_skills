@@ -38,17 +38,19 @@ as **labels naming a key in that JSON** — not variables passed into the file. 
 "the value from the `item_ref` key," never "the parser provides `item_ref`."
 
 **Agent `tools:` frontmatter** requires exact, correctly-cased tool names
-(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`). A name that does not match a live
-tool is dropped silently, with no error raised; the rest of the grant still resolves. A name for a
-tool on an MCP server that is not connected in the session behaves the same way — dropped, not
-granted. Verify every MCP name against the running server, not against another agent file.
+(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`). Separator format is free — comma,
+comma-without-space, space, and a YAML list all parse identically; write comma-and-space. Verify
+every MCP name against the running server, not against another agent file.
 
-Bare `*` grants every tool. A server-scoped wildcard (`mcp__plugin_dh_backlog__*`) does not scope
-anything: it grants the full tool set, so an agent written expecting one server's tools silently
-receives all of them. Never write a server-scoped wildcard — enumerate the tool names.
+An entry that matches no live tool is dropped and the rest of the grant still resolves. When every
+entry resolves to nothing the subagent refuses to launch, reporting that it "would be spawned with
+zero tools" and naming the unresolved entries.
 
-Measured 2026-08-22 against four probe agents. Harness tool resolution changes; re-measure before
-relying on any claim in this paragraph.
+Grant a whole MCP server with `mcp__<server>__*` or `mcp__<server>` — both forms grant every tool
+that server exposes and compose with named tools. A plugin-bundled server registers as
+`mcp__plugin_<plugin-name>_<server-name>`. Either form grants nothing while that server is
+disconnected, so an agent whose `tools:` list is MCP-only cannot be invoked at all until the server
+returns. Give such an agent at least one non-MCP tool unless that runtime dependency is intended.
 
 After editing any SKILL.md, invoke the skill and confirm it still renders correctly with no
 unexpected prompts or extra steps.
