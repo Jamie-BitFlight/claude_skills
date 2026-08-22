@@ -45,7 +45,8 @@ def add(
             help=(
                 "Item description — cover the goal, reproduction steps (for a defect), impact, a "
                 "user story, the payoff, and existing observations; leave out prescriptive "
-                "solutions or fixes"
+                "solutions or fixes, preserving any candidate fix under a 'User-provided "
+                "context:' line instead of stating it as the requirement"
             ),
         ),
     ] = "",
