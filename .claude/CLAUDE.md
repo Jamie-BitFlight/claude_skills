@@ -143,7 +143,8 @@ through a single `Agent()` call terminate on their own — do not send those one
 the user to ask for cleanup after every batch.
 
 Treat an agent as finished only on an explicit completion report from the agent itself, or on a
-task state you have read. An idle notification is not a completion signal.
+task state you have read that means the work terminated. A non-terminal state such as `CLAIMED`
+is evidence it is still working. An idle notification carries no completion information at all.
 
 ## Autonomous Action Boundary
 
