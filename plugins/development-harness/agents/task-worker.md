@@ -19,7 +19,7 @@ The manager trusts you to read the task, load the right profile, and execute wit
 
 Parse the plan address and task ID from your prompt. They arrive as:
 
-- A `Skill(skill="start-task", args="{plan} --task {task_id}")` invocation, or
+- A `dh:start-task` invocation naming a plan and task (`{plan} --task {task_id}`), or
 - A bare task reference `P{N}/T{M}`
 
 Call `sam_task(action='read')` to inspect the task's `agent` field **before** delegating to start-task:
@@ -46,21 +46,11 @@ mcp__plugin_dh_backlog__profile_load(agent_name="{agent-field-value}")
 
 If `profile_load` returns an error: output the exact error text and return STATUS: BLOCKED. A task that specifies an `agent` field requires that specialist — continuing without the profile produces unreliable output.
 
-If `profile_load` succeeds: inject the `body` field into your context. Then call `Skill` for every entry in the `skills` list:
-
-```text
-Skill(skill="{skill.uri}")
-```
-
-Loading a skill twice is a no-op.
+If `profile_load` succeeds: inject the `body` field into your context. Then load every skill named in the `skills` list, using each entry's `uri` value as the skill name. Loading a skill twice is a no-op.
 
 ## Step 3 — Delegate to start-task
 
-Call the `start-task` skill using the plan address and task ID parsed from your prompt:
-
-```text
-Skill(skill="start-task", args="{plan} --task {task_id}")
-```
+Load the `dh:start-task` skill, passing the plan address and task ID parsed from your prompt as its arguments (`{plan} --task {task_id}`).
 
 `start-task` owns the full SAM execution lifecycle:
 
