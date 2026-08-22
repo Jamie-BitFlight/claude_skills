@@ -3296,7 +3296,7 @@ async def artifact_register(
         Field(
             description=(
                 "Artifact type: feature-context, architect, task-plan, T0-baseline, TN-verification, "
-                "codebase-analysis, research"
+                "codebase-analysis, research, dispatch-plan, audit-report, perspective-review"
             )
         ),
     ],

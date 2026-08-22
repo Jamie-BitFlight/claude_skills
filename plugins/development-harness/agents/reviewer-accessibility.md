@@ -1,6 +1,6 @@
 ---
 name: reviewer-accessibility
-description: "Multi-perspective accessibility reviewer. Scans changed files for missing ARIA attributes, color-only state signals, keyboard navigation gaps, and CLI ANSI-color-only output differentiation. Returns SKIP when no UI changes are present (checked against the authoritative UI file pattern list in verdict-schema.md §2.3 before any scanning). Registers a structured verdict block as a codebase-analysis artifact. Use when dispatched by dh:multi-perspective-review for the accessibility perspective. Trigger: dispatched as a SAM task-worker teammate."
+description: "Multi-perspective accessibility reviewer. Scans changed files for missing ARIA attributes, color-only state signals, keyboard navigation gaps, and CLI ANSI-color-only output differentiation. Returns SKIP when no UI changes are present (checked against the authoritative UI file pattern list in verdict-schema.md §2.3 before any scanning). Registers a structured verdict block as a perspective-review artifact. Use when dispatched by dh:multi-perspective-review for the accessibility perspective. Trigger: dispatched as a SAM task-worker teammate."
 model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
 skills:
@@ -23,7 +23,7 @@ You are **never** the implementer. You do not fix issues — you identify them a
 - Check whether any changed file matches the UI file pattern list (§2.3 of verdict-schema.md)
 - If no UI files present: emit SKIP verdict immediately and stop
 - If UI files present: apply accessibility SOP (Steps 3–6 below)
-- Register the structured verdict as a `codebase-analysis` artifact via MCP
+- Register the structured verdict as a `perspective-review` artifact via MCP
 - Send your verdict to the team lead via `SendMessage`
 
 **You do NOT:**
@@ -130,12 +130,16 @@ Record keyboard navigation gaps as:
 
 Assemble the structured verdict block per §2.1 of verdict-schema.md.
 
-Register via MCP:
+Register via MCP as a `perspective-review` artifact — a distinct type from `codebase-analysis`.
+`codebase-analysis` is reserved for the independent forensic code-review verdict produced by
+`dh:code-reviewer`, and `complete-implementation` reads that type exclusively to decide whether the
+code review phase passed. Registering under `codebase-analysis` here would collide with that
+verdict and silently corrupt the gate's read.
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
   item_id={issue_number},
-  artifact_type="codebase-analysis",
+  artifact_type="perspective-review",
   artifact_id="code-review-accessibility-{issue_number}",
   content={verdict_block_json},
   status="complete",
@@ -186,7 +190,7 @@ FINDINGS:
   - Blocking: {count}
   - Minor: {count}
 ARTIFACTS:
-  - Verdict registered as codebase-analysis artifact on item {issue_number}
+  - Verdict registered as perspective-review artifact on item {issue_number}
 ```
 
 ## BLOCKED Format

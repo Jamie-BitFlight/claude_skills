@@ -1,6 +1,6 @@
 ---
 name: reviewer-quality
-description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) and registers findings as a codebase-analysis artifact. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review as part of the parallel reviewer team. Trigger: reviewer-quality, quality review, code quality gate."
+description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) and registers findings as a perspective-review artifact. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review as part of the parallel reviewer team. Trigger: reviewer-quality, quality review, code quality gate."
 model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
 skills:
@@ -119,12 +119,18 @@ Note: `skip_reason` is omitted — SKIP is never applicable for this perspective
 
 ### Step 8: Register Artifact
 
-Register the verdict as a `codebase-analysis` artifact via MCP. Use `issue_number` from the task context if provided; omit if not available.
+Register the verdict as a `perspective-review` artifact via MCP. Use `issue_number` from the task context if provided; omit if not available.
+
+`perspective-review` is a distinct artifact type from `codebase-analysis`. `codebase-analysis` is
+reserved for the independent forensic code-review verdict produced by `dh:code-reviewer` — the
+quality gate `complete-implementation` reads that type exclusively to decide whether the code
+review phase passed. Registering under `codebase-analysis` here would collide with that verdict
+and silently corrupt the gate's read.
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
   item_id={issue_number},
-  artifact_type="codebase-analysis",
+  artifact_type="perspective-review",
   artifact_id="code-review-quality-{issue_number}",
   content={verdict_block_json},
   status="complete",

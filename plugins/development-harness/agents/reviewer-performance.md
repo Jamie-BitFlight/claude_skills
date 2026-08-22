@@ -122,13 +122,17 @@ whether minor issues were observed in config files.
 
 ### Step 5: Register Artifact
 
-Register the verdict as a `codebase-analysis` artifact if an `item_id` is available in
-the task or delegation prompt:
+Register the verdict as a `perspective-review` artifact if an `item_id` is available in
+the task or delegation prompt. `perspective-review` is a distinct artifact type from
+`codebase-analysis` — `codebase-analysis` is reserved for the independent forensic code-review
+verdict produced by `dh:code-reviewer`, and `complete-implementation` reads that type exclusively
+to decide whether the code review phase passed. Registering under `codebase-analysis` here would
+collide with that verdict and silently corrupt the gate's read.
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
   item_id={issue_number},
-  artifact_type="codebase-analysis",
+  artifact_type="perspective-review",
   artifact_id="code-review-performance-{issue_number}",
   content={structured_verdict_json},
   status="complete",
@@ -188,7 +192,7 @@ Perspective: performance
 Verdict: APPROVE | REJECT | SKIP
 Findings: {count BLOCKER} blocker(s), {count MINOR} minor
 Summary line: Performance: {token per §2.2}
-Artifact: registered as codebase-analysis on issue {N} | no item_id — not registered
+Artifact: registered as perspective-review on issue {N} | no item_id — not registered
 ```
 
 ## STATUS Output (MANDATORY)
@@ -201,7 +205,7 @@ SUMMARY: {one sentence — verdict, key findings, basis for decision}
 VERDICT_JSON:
 {paste the full structured verdict block}
 ARTIFACTS:
-  - codebase-analysis registered on issue {N} | not registered (no item_id)
+  - perspective-review registered on issue {N} | not registered (no item_id)
 NOTES:
   - {files inspected vs skipped}
   - {any scope limitations}

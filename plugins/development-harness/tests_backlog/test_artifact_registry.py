@@ -377,6 +377,46 @@ class TestArtifactRegistryRegister:
         ca_entries = registry.get_by_type(manifest_after_second, ArtifactType.CODEBASE_ANALYSIS)
         assert len(ca_entries) == 2
 
+    def test_perspective_review_artifacts_do_not_collide_with_codebase_analysis(
+        self, registry: ArtifactRegistry, empty_manifest: ArtifactManifest
+    ) -> None:
+        """A perspective reviewer's verdict and a code-reviewer's verdict stay in separate types.
+
+        Tests: ArtifactType.PERSPECTIVE_REVIEW exists and is distinct from CODEBASE_ANALYSIS
+        How: Register one codebase-analysis entry (simulating dh:code-reviewer) and one
+             perspective-review entry (simulating a dh:multi-perspective-review reviewer) for
+             the same item; assert get_by_type(CODEBASE_ANALYSIS) returns only the code-reviewer
+             entry.
+        Why: dh:multi-perspective-review's Phase T0 (perspective reviewers) and Phase T1
+             (dh:code-reviewer) declare no dependency ordering, so registering both verdicts
+             under codebase-analysis let the most-recently-registered entry mask the other one
+             regardless of which agent produced it — complete-implementation's quality gate reads
+             codebase-analysis expecting the code-reviewer's PASS/NEEDS-WORK/FAIL verdict and must
+             never receive a perspective reviewer's APPROVE/REJECT/SKIP verdict instead.
+        """
+        # Arrange
+        code_review_entry = ArtifactEntry(
+            artifact_type=ArtifactType.CODEBASE_ANALYSIS, artifact_id="code-review-T1-foo", agent="code-reviewer"
+        )
+        perspective_entry = ArtifactEntry(
+            artifact_type=ArtifactType.PERSPECTIVE_REVIEW,
+            artifact_id="code-review-quality-42",
+            agent="reviewer-quality",
+        )
+
+        # Act
+        manifest_after_first = registry.register(empty_manifest, code_review_entry)
+        manifest_after_second = registry.register(manifest_after_first, perspective_entry)
+
+        # Assert
+        assert len(manifest_after_second.artifacts) == 2
+        ca_entries = registry.get_by_type(manifest_after_second, ArtifactType.CODEBASE_ANALYSIS)
+        assert len(ca_entries) == 1
+        assert ca_entries[0].agent == "code-reviewer"
+        pr_entries = registry.get_by_type(manifest_after_second, ArtifactType.PERSPECTIVE_REVIEW)
+        assert len(pr_entries) == 1
+        assert pr_entries[0].agent == "reviewer-quality"
+
     def test_register_auto_stamps_created_at_when_empty(
         self, registry: ArtifactRegistry, empty_manifest: ArtifactManifest
     ) -> None:

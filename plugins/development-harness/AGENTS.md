@@ -153,11 +153,12 @@ authoritative flag mapping.
 | `TN-verification` | `@dh:tn-verification-gate` | Post-implementation verification |
 | `dispatch-plan` | `dispatch_create_plan` | Milestone dispatch plan |
 | `audit-report` | **`@dh:doc-drift-auditor`** | Documentation drift audit; NOT used by `@dh:code-reviewer` |
+| `perspective-review` | `@dh:reviewer-quality`, `@dh:reviewer-performance`, `@dh:reviewer-accessibility` | Per-perspective verdict from `dh:multi-perspective-review` Phase T0; NOT used by `@dh:code-reviewer` |
 
 Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
 associate the returned logical address with the owning work item through `backlog_update`.
 
-**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id=<owner>, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate.
+**CRITICAL — type ownership is exclusive:** `codebase-analysis` is owned by `@dh:code-reviewer`. `audit-report` is owned by `@dh:doc-drift-auditor`. `perspective-review` is owned by the `dh:multi-perspective-review` perspective reviewers. These types must not be cross-assigned. `complete-implementation` reads the code review verdict via `artifact_read(item_id=<owner>, artifact_type="codebase-analysis")` — a wrong type silently skips the quality gate. This is why the four perspective reviewers dispatched by Phase T0 (Multi-Perspective Review) register under `perspective-review` rather than `codebase-analysis`: T0 and Phase T1 (Code Review, owned by `@dh:code-reviewer`) declare no dependency ordering between them, so a perspective reviewer registering under `codebase-analysis` could be the most recently registered entry of that type at the moment Phase T1's gate reads it — masking the actual code-review verdict with an incompatible schema.
 
 **Registration:** Producers call `artifact_register` after creating document-artifact content.
 Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores

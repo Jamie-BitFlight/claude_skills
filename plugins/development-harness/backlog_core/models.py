@@ -1575,6 +1575,7 @@ class ArtifactType(StrEnum):
     RESEARCH = "research"
     DISPATCH_PLAN = "dispatch-plan"
     AUDIT_REPORT = "audit-report"
+    PERSPECTIVE_REVIEW = "perspective-review"
 
 
 class ArtifactStatus(StrEnum):
