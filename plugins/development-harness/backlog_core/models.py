@@ -1574,6 +1574,7 @@ class ArtifactType(StrEnum):
     T0_BASELINE = "T0-baseline"
     TN_VERIFICATION = "TN-verification"
     CODEBASE_ANALYSIS = "codebase-analysis"
+    CODE_REVIEW = "code-review"
     RESEARCH = "research"
     DISPATCH_PLAN = "dispatch-plan"
     AUDIT_REPORT = "audit-report"

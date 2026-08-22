@@ -520,7 +520,7 @@ The following diagram is the authoritative procedure for SAM Dispatch Loop phase
 flowchart TD
     Done{Which task<br>just completed?}
     Done -->|T0 Multi-Perspective Review| T0Post["Any REJECT — trigger Recursive Follow-up Handling<br>(same path as T1 NEEDS_WORK)."]
-    Done -->|T1 Code Review| T1Post["Read codebase-analysis artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
+    Done -->|T1 Code Review| T1Post["Read code-review artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
     Done -->|T4 Drift Audit| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
     T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{qg_plan_address}', task='T5',<br>config={action:'state', status:'skipped'})"]
     T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
@@ -627,11 +627,11 @@ orchestrator skips recursion.
 Retrieve the review report registered by `@dh:code-reviewer` during Phase 1:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "codebase-analysis"
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "code-review"
 ```
 
 **If `artifact_read` returns an error**, call
-`artifact_list(item_id={item_ref}, artifact_type="codebase-analysis")`. If the manifest contains
+`artifact_list(item_id={item_ref}, artifact_type="code-review")`. If the manifest contains
 an entry, report the provider read error and stop; registered content must remain readable through
 the same provider boundary.
 

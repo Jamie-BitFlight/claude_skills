@@ -34,7 +34,7 @@ flowchart TD
     Start([ARTIFACT:EXECUTION + ARTIFACT:PLAN]) --> R1[1. Resolve task context]
     R1 --> R2[2. Dispatch @dh:code-reviewer]
     R2 --> R3[3. Consume verdict from STATUS output]
-    R3 --> R4[4. Read codebase-analysis artifact]
+    R3 --> R4[4. Read code-review artifact]
     R4 --> Decide{Verdict?}
     Decide -->|PASS| Complete[Verdict — COMPLETE]
     Decide -->|NEEDS-WORK or FAIL| NeedsWork[Verdict — NEEDS_WORK]
@@ -74,12 +74,12 @@ Task is S6 forensic review with subagent_type="dh:code-reviewer"
 Context: task_file_path={task_file_path}, item_id={item_id},
   implementation_files={expected_outputs}
 Output: STATUS block containing Verdict (PASS / FAIL / NEEDS-WORK) and ARTIFACTS
-  section confirming codebase-analysis artifact registered on issue #{item_id}
+  section confirming code-review artifact registered on issue #{item_id}
 ```
 
 The agent independently reads the task, detects the stack, verifies acceptance criteria,
 applies universal and stack-specific quality dimensions, and registers the review report
-as a `codebase-analysis` artifact via `artifact_register`.
+as a `code-review` artifact via `artifact_register`.
 
 ### Step 3 — Consume Verdict
 
@@ -91,12 +91,12 @@ Parse the agent's STATUS output:
 If the agent returns STATUS: BLOCKED, propagate the block upstream with the agent's
 NEEDED section as the reason.
 
-### Step 4 — Read codebase-analysis Artifact
+### Step 4 — Read code-review Artifact
 
 Retrieve the registered review report:
 
 ```text
-artifact_read(item_id={item_id}, artifact_type="codebase-analysis")
+artifact_read(item_id={item_id}, artifact_type="code-review")
 ```
 
 Use this to populate the SAM task's Review Results section and to extract blocking findings
@@ -121,11 +121,11 @@ sam_task(
 ## NEEDS_WORK Remediation Loop
 
 When the verdict is NEEDS_WORK or FAIL, extract blocking findings from the
-`codebase-analysis` artifact's "Required changes (blocking)" or "Blocking" section.
+`code-review` artifact's "Required changes (blocking)" or "Blocking" section.
 
 ```mermaid
 flowchart TD
-    NW([NEEDS_WORK verdict]) --> Extract[Extract blocking findings from codebase-analysis artifact]
+    NW([NEEDS_WORK verdict]) --> Extract[Extract blocking findings from code-review artifact]
     Extract --> Create[Create remediation TASK files — one per blocking finding]
     Create --> Stage5[Stage 5 — Execute remediation tasks]
     Stage5 --> Stage6[Stage 6 — Re-review via @dh:code-reviewer]
@@ -136,14 +136,14 @@ flowchart TD
 
 Remediation tasks follow the same CLEAR format as original tasks. They:
 
-- Reference the specific blocking finding (file:line from the codebase-analysis artifact)
+- Reference the specific blocking finding (file:line from the code-review artifact)
 - Define acceptance criteria that directly resolve the blocking finding
 
 ## Behavioral Rules
 
 - Never review your own execution — producer and reviewer must differ
 - Verdict is sourced from `@dh:code-reviewer` STATUS output — do not invent it
-- Blocking findings for remediation come from the `codebase-analysis` artifact — do not
+- Blocking findings for remediation come from the `code-review` artifact — do not
   invent them from the agent's STATUS summary
 - Do not add new requirements — review against the ORIGINAL acceptance criteria only
 - Verification Gap findings are always BLOCKING (see `@dh:code-reviewer` agent for the
@@ -152,6 +152,6 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 ## Success Criteria
 
 - `@dh:code-reviewer` returns STATUS: DONE with a PASS, FAIL, or NEEDS-WORK verdict
-- `codebase-analysis` artifact is registered on issue #{item_id}
+- `code-review` artifact is registered on issue #{item_id}
 - Review Results appended to the SAM task via `sam_task(action='update')`
 - Blocking findings (if any) have concrete remediation tasks created

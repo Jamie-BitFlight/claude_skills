@@ -25,7 +25,7 @@ changing the caller interface.
 | Argument | Type | Description |
 |----------|------|-------------|
 | `--diff <git-range>` | **required** | Git range passed to `git diff --name-only`. Examples: `HEAD~1..HEAD`, `main..feature-branch`, `abc123..def456`. |
-| `--issue <N>` | optional | GitHub issue number used for artifact registration and ephemeral plan linkage. |
+| `--issue <N>` | optional | GitHub issue number used for ephemeral plan linkage and slug derivation. |
 | `--slug <str>` | optional | Explicit slug override. When omitted, derived from `--issue` or current git branch. |
 
 Parse arguments from the invocation arguments string. Abort with usage message if `--diff` is

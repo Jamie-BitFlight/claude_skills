@@ -377,6 +377,44 @@ class TestArtifactRegistryRegister:
         ca_entries = registry.get_by_type(manifest_after_second, ArtifactType.CODEBASE_ANALYSIS)
         assert len(ca_entries) == 2
 
+    def test_code_review_verdict_survives_later_codebase_analysis_entries(
+        self, registry: ArtifactRegistry, empty_manifest: ArtifactManifest
+    ) -> None:
+        """A code-review verdict stays the sole entry of its type when analysis documents follow.
+
+        Tests: ArtifactType.CODE_REVIEW is distinct from ArtifactType.CODEBASE_ANALYSIS
+        How: Register a code-review verdict, then two later codebase-analysis documents from other
+             producers; assert get_by_type(CODE_REVIEW) still returns exactly the verdict.
+        Why: complete-implementation and forensic-review read the review verdict by type alone, and
+             a read by type returns only the most recently created entry. codebase-analysis is
+             intentionally multi-entry (one document per focus area or diagram), so the verdict
+             cannot share that type without a later analysis document winning the gate's read.
+        """
+        # Arrange
+        verdict = ArtifactEntry(
+            artifact_type=ArtifactType.CODE_REVIEW, artifact_id="code-review-T1-auth", agent="code-reviewer"
+        )
+        analysis = ArtifactEntry(
+            artifact_type=ArtifactType.CODEBASE_ANALYSIS,
+            artifact_id="codebase-patterns-auth",
+            agent="codebase-analyzer",
+        )
+        graph = ArtifactEntry(
+            artifact_type=ArtifactType.CODEBASE_ANALYSIS,
+            artifact_id="architecture-graph-auth",
+            agent="code-review-architecture",
+        )
+
+        # Act
+        manifest = registry.register(empty_manifest, verdict)
+        manifest = registry.register(manifest, analysis)
+        manifest = registry.register(manifest, graph)
+
+        # Assert
+        review_entries = registry.get_by_type(manifest, ArtifactType.CODE_REVIEW)
+        assert [e.artifact_id for e in review_entries] == ["code-review-T1-auth"]
+        assert len(registry.get_by_type(manifest, ArtifactType.CODEBASE_ANALYSIS)) == 2
+
     def test_register_auto_stamps_created_at_when_empty(
         self, registry: ArtifactRegistry, empty_manifest: ArtifactManifest
     ) -> None:

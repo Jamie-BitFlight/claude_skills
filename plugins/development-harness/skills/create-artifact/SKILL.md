@@ -60,7 +60,8 @@ One of the recognized type strings:
 | artifact_type | Producing agent | When to use |
 |---|---|---|
 | `feature-context` | feature-researcher | Discovery document: WHO/WHAT/WHEN/WHY analysis |
-| `codebase-analysis` | codebase-analyzer | Codebase pattern/architecture/testing documents |
+| `codebase-analysis` | codebase-analyzer, code-review-architecture | Codebase pattern/architecture/testing documents and dependency graphs; several per item |
+| `code-review` | code-reviewer | Code review verdict; exactly one per item, read by the quality gate |
 | `architect` | python-cli-design-spec | Architecture spec with interfaces and contracts |
 | `T0-baseline` | t0-baseline-capture | Pre-implementation baseline of acceptance criteria |
 | `TN-verification` | tn-verification-gate | Post-implementation verification results |
