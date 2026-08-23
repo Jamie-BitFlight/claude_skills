@@ -127,7 +127,7 @@
         {
           "skill": "complete-implementation",
           "source_file": "skills/complete-implementation/references/read-code-review-verdict.md:## Step A — Read by identifier",
-          "action": "artifact read --item-id {item_ref} --artifact-type code-review --artifact-id {review_artifact_id} — verdict drives the fix loop and follow-up routing; falls back to artifact list on code-review, then on codebase-analysis filtered to agent code-reviewer for plans predating the type",
+          "action": "artifact read --item-id {item_ref} --artifact-type code-review --artifact-id {review_artifact_id} — verdict drives the fix loop and follow-up routing; falls back to artifact list on code-review, then to the same artifact_id under codebase-analysis for plans predating the type; every selection is an exact artifact_id match",
           "agent": null
         },
         {

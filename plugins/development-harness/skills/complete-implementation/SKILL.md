@@ -624,13 +624,11 @@ orchestrator skips recursion.
 
 ### Step 1: Detect Follow-up Plans
 
-Resolve the review report `@dh:code-reviewer` registered during Phase 1 into `{review_report}` by
-running [./references/read-code-review-verdict.md](./references/read-code-review-verdict.md). That
-procedure reads the `code-review` entry by its `artifact_id` (the type holds one entry per reviewed
-task), falls back to `artifact_list` when T1's STATUS output named no identifier, then to a
-`codebase-analysis` entry produced by `code-reviewer` for plans predating the type. If it yields no
-report it resets and re-dispatches T1, and blocks rather than continuing — an absent verdict is not
-a passing verdict.
+Resolve `{review_report}` by running
+[./references/read-code-review-verdict.md](./references/read-code-review-verdict.md). It derives this
+quality-gate plan's own `artifact_id` and matches it exactly, everywhere it looks — `code-review`
+holds one entry per reviewed task and this item also holds the feature plan's. When nothing matches
+it resets and re-dispatches T1, then blocks. An absent verdict is not a passing verdict.
 
 Check the `verdict` field in the report:
 

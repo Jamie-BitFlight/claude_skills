@@ -215,9 +215,17 @@ rewrite them only through the configured backend's migration operation.
 
 When a class of record moves to its own artifact type, entries already
 registered under the former type stay there; nothing backfills them. A consumer
-of the new type that finds no entry MUST look under the former type, keep only
-the entries whose producing agent matches, and read the selected one by its
-`artifact_id` before concluding that no record exists.
+of the new type that finds no entry MUST look under the former type before
+concluding that no record exists.
+
+Select that entry by the same `artifact_id` it would have addressed under the new
+type. A type migration moves `artifact_type`; it does not change how the producer
+builds `artifact_id`, so the record still carries the identifier the consumer
+already derived. Matching on the producing agent alone is not sufficient — one
+owner accumulates that agent's records for every unit it ever reviewed, and
+accepting the wrong one substitutes an unrelated stale record for a current one
+that was never written. When no entry matches the identifier exactly, no record
+exists; report that rather than selecting the nearest candidate.
 
 Do not make a file path the canonical artifact identity, add a second backend
 selector, or silently copy an old record into a new authority. A migration is
