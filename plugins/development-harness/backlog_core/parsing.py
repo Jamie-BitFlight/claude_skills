@@ -912,6 +912,33 @@ def _div_depth_delta(line: str) -> int:
 _FENCE_RE = re.compile(r" {0,3}(`{3,}|~{3,})")
 
 
+# How a scan treats <div>/</div> tags that sit inside a fenced code block.
+# STRICT ignores them entirely — correct for a valid entry quoting an HTML example.
+# LENIENT ignores opening tags but still counts closing ones, which recovers the real
+# wrapper close when the entry holds a fence that is itself never closed, without giving
+# up fence opacity for the heading-shaped lines inside it.
+_SCAN_STRICT = 0
+_SCAN_LENIENT = 1
+
+
+def _wrapper_depth_delta(line: str, *, in_fence: bool, mode: int) -> int:
+    """Return one line's contribution to ``<div>``/``</div>`` nesting depth.
+
+    Args:
+        line: Source line to scan.
+        in_fence: Whether the line is a fence delimiter or fenced content.
+        mode: ``_SCAN_STRICT`` or ``_SCAN_LENIENT``.
+
+    Returns:
+        The net depth change this line contributes under *mode*.
+    """
+    if not in_fence:
+        return _div_depth_delta(line)
+    if mode == _SCAN_LENIENT:
+        return -len(_DIV_CLOSE_TAG_RE.findall(line))
+    return 0
+
+
 class _FenceState:
     """Tracks whether a line-by-line scan is currently inside a fenced code block.
 
@@ -1032,19 +1059,18 @@ class _EntryDivBlock(_MarkoBlockElement):
         return bool(source.expect_re(_ENTRY_DIV_OPEN_RE))
 
     @classmethod
-    def _scan_close(cls, source: _MarkoSource, *, fence_aware: bool) -> bool:
-        """Scan ahead for the wrapper's close, then rewind to where the scan started.
+    def _scan_close(cls, source: _MarkoSource, mode: int) -> bool:
+        """Scan ahead for the wrapper's close under *mode*, then rewind to the start.
 
         Uses ``Source.anchor``/``Source.reset`` so the scan leaves no trace for the real
         parse.
 
         Args:
             source: The parser source, positioned at the wrapper's opening line.
-            fence_aware: When true, tags inside a fenced code block do not count toward
-                nesting depth.
+            mode: ``_SCAN_STRICT`` or ``_SCAN_LENIENT``.
 
         Returns:
-            ``True`` when ``<div>``/``</div>`` nesting returns to zero before EOF.
+            ``True`` when nesting returns to zero before the end of the document.
         """
         source.anchor()
         fence = _FenceState()
@@ -1056,9 +1082,7 @@ class _EntryDivBlock(_MarkoBlockElement):
                 if line is None:
                     break
                 source.consume()
-                if fence_aware and fence.opaque(line):
-                    continue
-                depth += _div_depth_delta(line)
+                depth += _wrapper_depth_delta(line, in_fence=fence.opaque(line), mode=mode)
                 if depth <= 0:
                     closed = True
                     break
@@ -1067,27 +1091,25 @@ class _EntryDivBlock(_MarkoBlockElement):
         return closed
 
     @classmethod
-    def _close_mode(cls, source: _MarkoSource) -> bool | None:
-        """Return the fence mode under which the wrapper closes, or ``None`` if it never does.
+    def _close_mode(cls, source: _MarkoSource) -> int | None:
+        """Return the scan mode under which the wrapper closes, or ``None`` if it never does.
 
-        Fence-aware scanning is tried first, because the common real case is a valid entry
-        quoting an HTML example whose ``<div>`` must not count as wrapper structure. It is
-        not sufficient alone: an entry holding a fence that is itself never closed makes
-        every later line look fenced, including the wrapper's own ``</div>``, so a closed
-        wrapper is judged unterminated and everything after it is consumed. Falling back to
-        a fence-blind scan recovers that case, and the mode is returned rather than
-        discarded so the parse below counts depth the same way this decision did.
+        ``_SCAN_STRICT`` is tried first: the common real case is a valid entry quoting an
+        HTML example, whose tags must not count as wrapper structure at all.
+        ``_SCAN_LENIENT`` then recovers an entry holding a fence that is itself never
+        closed — without it, every later line looks fenced, the entry's own ``</div>``
+        included, and a closed wrapper is judged unterminated. The mode is returned rather
+        than discarded so the parse counts depth exactly as this decision did.
 
         Args:
             source: The parser source, positioned at the wrapper's opening line.
 
         Returns:
-            ``True`` or ``False`` naming the mode that found the close, or ``None`` when
-            neither mode finds one.
+            The mode that found the close, or ``None`` when neither does.
         """
-        for fence_aware in (True, False):
-            if cls._scan_close(source, fence_aware=fence_aware):
-                return fence_aware
+        for mode in (_SCAN_STRICT, _SCAN_LENIENT):
+            if cls._scan_close(source, mode):
+                return mode
         return None
 
     @classmethod
@@ -1106,13 +1128,7 @@ class _EntryDivBlock(_MarkoBlockElement):
         """
         mode = cls._close_mode(source)
         closes = mode is not None
-        # When nothing closes the wrapper, scan the bound fence-blind. An unclosed fence
-        # inside the entry would otherwise make every later line — the next heading
-        # included — look like fenced content, and the recovery that exists to preserve
-        # later sections would consume them instead. Exposing a quoted heading from a
-        # doubly-malformed entry is the lesser failure; losing real sections is the one
-        # this whole path exists to prevent.
-        fence_aware = mode if mode is not None else False
+        scan = mode if mode is not None else _SCAN_LENIENT
         fence = _FenceState()
         lines: list[str] = []
         depth = 0
@@ -1120,14 +1136,16 @@ class _EntryDivBlock(_MarkoBlockElement):
             line = source.next_line()
             if line is None:
                 break
-            in_fence = fence_aware and fence.opaque(line)
-            if not closes and not in_fence and lines and _ATX_ANY_RE.match(line):
+            in_fence = fence.opaque(line)
+            if not closes and lines and _ATX_ANY_RE.match(line):
+                # Nothing closes this wrapper, so bound it at the next heading without
+                # regard to fence state. A fence the entry never closed would otherwise
+                # hide that heading too, and the recovery that exists to preserve later
+                # sections would consume them instead.
                 break
             lines.append(line)
             source.consume()
-            if in_fence:
-                continue
-            depth += _div_depth_delta(line)
+            depth += _wrapper_depth_delta(line, in_fence=in_fence, mode=scan)
             if closes and depth <= 0:
                 break
         return "".join(lines)

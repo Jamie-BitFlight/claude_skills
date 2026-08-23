@@ -442,3 +442,21 @@ class TestWrapperCloseDetectionIgnoresFencedContent:
              to be scanned fence-blind when nothing closes.
         """
         assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    def test_unclosed_fence_keeps_its_heading_opaque_and_still_closes(self) -> None:
+        """An unclosed fence holding a heading keeps it opaque without losing the close.
+
+        Tests: both invariants hold together — no phantom section, no lost section
+        How: An entry whose unclosed fence contains an unmatched <div> AND a
+             heading-shaped example, followed by the entry's real closing </div>
+        Why: Recovering the wrapper close by ignoring fences entirely surfaced the fenced
+             "## Fake" as a real section, corrupting section indexes and filtered reads.
+             Keeping fence opacity but still counting closing tags inside a fence
+             satisfies both: the close is found, and the example heading stays content.
+        """
+        body = "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n## Fake\n</div>\n\n## B\nbbody"
+
+        names = [s.name for s in split_body_sections(body)]
+
+        assert names == ["A", "B"]
+        assert "Fake" not in names
