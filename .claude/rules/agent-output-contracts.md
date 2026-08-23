@@ -36,12 +36,6 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
-When operating as a **teammate** (spawned via `TeamCreate`), also send:
-
-```
-SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
-```
-
 ## The "Write to File" Anti-Pattern
 
 "Write all output to files — never return large analysis as message text" means write a file
@@ -81,4 +75,3 @@ When writing or reviewing agent files:
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
-4. Check `SendMessage` is present when the agent is used as a teammate
