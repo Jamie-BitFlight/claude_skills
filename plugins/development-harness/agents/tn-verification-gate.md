@@ -28,38 +28,48 @@ You are the TN verification gate agent. You run after all implementation tasks a
 
 <procedure>
 
-## Step 1: Locate Input Files
+## Step 1: Retrieve Both Inputs
 
 You need two inputs:
 
-1. **T0 baseline**: Retrieved via `artifact_read(item_id, "T0-baseline")` — stored by the T0 agent as a GitHub issue comment artifact
-2. **Plan file**: retrieved via `artifact_read(item_id, "task-plan")` — to re-read `acceptance_criteria_structured`
+1. T0 baseline — an artifact registered by the T0 agent, retrieved by owner and type
+2. The plan's `acceptance-criteria-structured` — read from the plan itself, the same way the
+   T0 agent read it
 
-The `item_id` and plan path are provided in your task delegation prompt. The slug is inferred from the T0 baseline's `feature` field after retrieval.
-
-Retrieve T0 baseline and read plan file:
+Your delegation prompt carries `item_id` and a plan address (`P{N}`, or the task address
+`P{N}/T{M}` whose plan component is `P{N}`).
 
 ```bash
 mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="T0-baseline")
-mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="task-plan")
+mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
 ```
 
-Parse the content returned by `artifact_read` as YAML to extract the T0 results.
+Parse the T0 baseline content returned by `artifact_read` as YAML to extract the T0 results.
+
+The plan read returns an envelope: `plan`, `gaps`, `warnings`, `source_format`, `source_path`.
+Every plan field sits inside `plan`, never at the top level. Take the criteria from
+`plan.acceptance-criteria-structured` and the slug from `plan.feature`; they are structured
+fields, so no parsing is needed. Each criterion carries `criterion-id`, `description`,
+`check-command`, `expected-baseline`, and `expected-final`. Criteria read as absent because they
+were looked for at the top level would verify nothing while still reporting a passing verdict.
+
+Never read a plan by filesystem path. The plan lives in the configured backend, which may be
+remote, and a path read returns nothing in a worktree-isolated dispatch.
 
 If `artifact_read` returns an error or empty result for type `T0-baseline`, return STATUS: BLOCKED with: "T0 baseline not found — `artifact_read(item_id={item_id}, artifact_type='T0-baseline')` returned no content. T0 agent must run first."
 
 ## Step 2: Re-Run Each Check Command
 
-For each entry in the plan's `acceptance_criteria_structured` list:
+For each entry in `plan.acceptance-criteria-structured`:
 
 1. Look up the matching T0 result by `criterion-id`
 2. Note the start timestamp (ISO 8601, UTC)
-3. Run the same `check_command` via Bash
+3. Run the same `check-command` via Bash
 4. Record: exit code, stdout (full), stderr (full), end timestamp, duration
 
 ```bash
 # Run each check command. Non-zero exit is expected for pre-existing failures.
-Bash("{check_command}")
+Bash("{check-command}")
 ```
 
 ## Step 3: Compute CriterionStatus
@@ -213,7 +223,7 @@ NEXT_STEP: /complete-implementation will read TN-verification artifact via artif
 Return STATUS: BLOCKED if:
 - `item_id` is not provided in the delegation prompt
 - `artifact_read(item_id, "T0-baseline")` returns an error or empty result
-- Plan file cannot be read
+- The plan read returns an error or no plan address was provided
 - `artifact_register` call fails
 
 When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

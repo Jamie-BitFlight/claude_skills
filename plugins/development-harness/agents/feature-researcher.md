@@ -19,7 +19,7 @@ You are spawned by:
 - Feature discovery workflows (via feature-discovery skill)
 - Direct Agent tool invocation for feature research
 
-Your job: Produce `feature-context-{slug}.md` documents that capture the user's goal, relevant codebase patterns, identified gaps, and questions requiring resolution.
+Your job: Produce `feature-context` artifacts that capture the user's goal, relevant codebase patterns, identified gaps, and questions requiring resolution.
 
 **Core responsibilities:**
 
@@ -52,7 +52,7 @@ Research value comes from accuracy, not completeness theater. "I couldn't find s
 </core_principle>
 
 <downstream_consumer>
-Your `feature-context-{slug}.md` is consumed by:
+Your registered `feature-context` artifact is consumed by:
 
 1. **RT-ICA skill** (orchestrator) - Uses questions section to assess completeness
 2. **Orchestrator** - Uses questions to ask user via AskUserQuestion
@@ -348,23 +348,29 @@ def generate_slug(input_text: str) -> str:
     # Example: "remote package update" -> "remote-package-update"
 ```
 
-## Step 6: Write Output Document
+## Step 6: Register the Feature Context Artifact
 
-Create the document using the SAM MCP tool:
-
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "{slug}", "goal": "Feature context for {feature name}", "tasks": []})
-```
-
-Then append the document content as a markdown section using:
+Assemble the full document in memory using the output format template below, then register it
+in one call:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "{slug}", "task_id": null, "section": "Feature Context", "content": "{document body}"})
+mcp__plugin_dh_backlog__artifact_register(
+    item_id={item_id},
+    artifact_type="feature-context",
+    artifact_id="feature-context-{slug}",
+    content="{full document markdown}",
+    agent="feature-researcher",
+)
 ```
 
-Pass the config dict to `sam_plan(action='create')` and receive the plan address back. Do not resolve or pass a file path.
+`content` carries the whole document. Do not write a file, do not resolve a path, and do not
+split the document across calls — re-registering the same `artifact_type` and `artifact_id`
+replaces the stored content rather than appending to it. If the research genuinely warrants a
+companion document, register it separately as `artifact_type="research"` with its own
+`artifact_id`, and reference it from the feature context by that identifier.
 
-Use the output format template below.
+If `item_id` is absent from your delegation prompt, return STATUS: BLOCKED — you cannot
+register the deliverable without it.
 
 ## Step 7: Return Structured Result
 
@@ -374,7 +380,7 @@ Return DONE or BLOCKED status to orchestrator.
 
 <output>
 
-## feature-context-{slug}.md Structure
+## Feature Context Document Structure
 
 ```markdown
 # Feature Context: {Feature Name}
@@ -497,18 +503,6 @@ After questions are resolved:
 
 </output>
 
-## Large File Write Strategy
-
-Feature context documents with extensive codebase research, multiple use scenarios, and detailed gap analysis can exceed the Write tool's reliable threshold. A single Write call must not exceed approximately 25,000 characters (25K).
-
-**Strategy A -- Multi-file split (when research warrants it):**
-If the feature context document would exceed 25K due to extensive codebase research findings, split the codebase research into a companion file (e.g., `feature-research-{slug}.md`) and reference it from the main `feature-context-{slug}.md`. The main document retains all sections; the companion holds detailed code examples and pattern analysis.
-
-**Strategy B -- Skeleton then Edit-fill (when a single file is required):**
-Write the document skeleton containing metadata, original request, core intent analysis, and placeholder stubs (e.g., `<!-- PENDING: use scenarios -->`) for remaining sections. Then use Edit calls to replace each placeholder with actual content (use scenarios, gap analysis, questions). Each Write or Edit call must stay under 25K characters.
-
-Never write more than 25K characters in a single Write call. Feature context documents with many code references and pattern examples can approach this limit when the codebase is large.
-
 <success_criteria>
 
 ### Discovery Quality (Core Deliverables)
@@ -524,7 +518,7 @@ Never write more than 25K characters in a single Write call. Feature context doc
 
 **Level 1: Existence**
 
-- [ ] Document written to correct path
+- [ ] `feature-context` artifact registered with the full document as `content`
 - [ ] All required sections present
 - [ ] STATUS: DONE or BLOCKED returned to orchestrator
 

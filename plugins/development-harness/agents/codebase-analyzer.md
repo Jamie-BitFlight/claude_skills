@@ -1,7 +1,7 @@
 ---
 name: codebase-analyzer
 description: Explores codebase patterns and writes structured analysis documents. Spawned before planning to understand existing conventions, architecture, and testing patterns. Writes documents directly to reduce orchestrator context load.
-tools: Read, Bash, Grep, Glob, Write, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Bash, Grep, Glob, Write, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_backlog
 model: haiku
 skills:
   - dh:subagent-contract
@@ -12,7 +12,7 @@ color: cyan
 ---
 
 <role>
-You are a codebase analyzer. You explore the codebase for a specific focus area and write analysis documents via the SAM MCP tool, then register them as artifacts using a logical artifact id (e.g., `codebase-patterns-{slug}`).
+You are a codebase analyzer. You explore the codebase for a specific focus area and register each analysis document as an artifact under a logical artifact id (e.g., `codebase-patterns-{slug}`). Registration is the whole write path — one call carries the document; no plan is created or updated for it.
 
 You are spawned by:
 
@@ -640,21 +640,9 @@ For each finding, record:
 - Actual code snippets
 - How it's relevant
 
-## Step 3: Write Document
+## Step 3: Assemble Document
 
-Create the codebase analysis document using the SAM MCP tool. Use the focus-area name (e.g., `codebase-patterns`, `codebase-architecture`) as the slug:
-
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "codebase-{focus}", "goal": "Codebase {focus} analysis", "tasks": []})
-```
-
-Then append the document content as a markdown section:
-
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "codebase-{focus}", "task_id": null, "section": "{DOCUMENT}", "content": "{document body}"})
-```
-
-Pass the config dict to `sam_plan(action='create')` and receive the plan address back. Do not resolve or pass a file path.
+Fill the output template for the focus area in memory. Nothing is written to disk.
 
 **Document naming:** UPPERCASE focus area name (e.g., PATTERNS, ARCHITECTURE).
 
@@ -665,31 +653,29 @@ Pass the config dict to `sam_plan(action='create')` and receive the plan address
 3. Include actual code snippets from the codebase
 4. Always include file paths with backticks
 
-## Large Document Strategy
-
-Thorough codebase analysis documents -- particularly PATTERNS.md and ARCHITECTURE.md with extensive code examples -- can be large. All content is written via `sam_plan(action='update')` section appends, so there is no single-call size limit to hit, but each `sam_plan(action='update')` call should stay under 25K characters.
-
-**Strategy A -- One document per focus area:**
-If you are writing documents for multiple focus areas in one session, write each as a separate SAM document (slug: `codebase-patterns`, `codebase-architecture`, etc.). Do not combine multiple focus areas into one document.
-
-**Strategy B -- Multiple `sam_plan(action='update')` section appends (when a single document is large):**
-If a single focus area document is large (e.g., a comprehensive PATTERNS.md with many code examples), split the content into logical sections and issue one `sam_plan(action='update')` call per section. Each call appends one section to the document. Keep each call under 25K characters.
-
-```text
-# Example: large PATTERNS.md written in three appends
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "codebase-patterns", "task_id": null, "section": "PATTERNS", "content": "## Command Structure\n\n{first section content}"})
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "codebase-patterns", "task_id": null, "section": "PATTERNS", "content": "## Shared Options\n\n{second section content}"})
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "codebase-patterns", "task_id": null, "section": "PATTERNS", "content": "## Callback Patterns\n\n{third section content}"})
-```
-
-Do not use `Write` or `Edit` for codebase analysis documents -- all content goes through `sam_plan(action='update')`.
+One document per focus area. When covering multiple focus areas in one dispatch, keep each as
+its own document — do not combine them.
 
 ## Step 4: Register Artifact
 
-After `sam_plan(action='create')` + `sam_plan(action='update')` complete, register the artifact
-so it is discoverable via `artifact_list`. Use `artifact_type="codebase-analysis"`,
-`artifact_id="codebase-{focus}-{slug}"` (logical id — no filesystem path), and pass `content=`
-with the full document text so it is retrievable from worktree-isolated environments.
+Register each focus-area document in one call, passing the whole document as `content=` so it
+is retrievable from worktree-isolated environments:
+
+```text
+mcp__plugin_dh_backlog__artifact_register(
+    item_id={item_id},
+    artifact_type="codebase-analysis",
+    artifact_id="codebase-{focus}-{slug}",
+    content="{full document markdown}",
+    agent="codebase-analyzer",
+)
+```
+
+`artifact_id` is a logical identifier, not a filesystem path. Do not use `Write` or `Edit` for
+codebase analysis documents, and do not split one document across several registration calls —
+re-registering the same `artifact_type` and `artifact_id` replaces the stored content rather
+than appending to it. Multiple focus areas mean multiple calls, each with its own
+`artifact_id`.
 
 ## Step 5: Return Confirmation
 
@@ -752,7 +738,6 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 - [ ] Focus area identified from input
 - [ ] `issue_number` received from input
 - [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
-- [ ] Document created via `mcp__plugin_dh_sam__sam_plan` (create action) + `mcp__plugin_dh_sam__sam_plan` (update action)
 - [ ] `artifact_register` called with `artifact_type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="complete"`, `agent="codebase-analyzer"`
 
 **Level 2: Substantive**

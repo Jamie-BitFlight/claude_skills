@@ -1,6 +1,6 @@
 ---
 name: task-decomposition
-description: Decomposes a contextualized plan into atomic, independently executable task files with complete embedded context. Use after SAM Stage 3 Context Integration produces the contextualized plan artifact — when the plan is ready for TASK file generation with CLEAR ordering, CoVe checks, and dependency graphs for parallel execution.
+description: Decomposes a contextualized plan into atomic, independently executable tasks with complete embedded context, registered through the plan API. Use after SAM Stage 3 Context Integration produces the contextualized plan artifact — when the plan is ready for task generation with CLEAR ordering, CoVe checks, and dependency graphs for parallel execution.
 user-invocable: false
 ---
 
@@ -29,9 +29,9 @@ flowchart TD
     A4 -->|Yes| CoVe[4a. Add CoVe checks]
     A4 -->|No| A5[4b. Skip CoVe]
     CoVe --> A5[5. Map dependencies]
-    A5 --> A6[6. Assign roles]
+    A5 --> A6[6. Assign agents]
     A6 --> Gate{Evaluate complexity}
-    Gate -->|Manageable| Done([ARTIFACT:TASK files])
+    Gate -->|Manageable| Done([Tasks registered in the plan])
     Gate -->|High complexity or novel architecture| Escalate([Human touchpoint — confirm decomposition])
 ```
 
@@ -52,8 +52,8 @@ Split along natural seams:
 
 ### Step 2 — Embed Complete Context
 
-Each task file IS the complete prompt. The executing agent has NO memory of
-previous stages. Embed everything needed:
+The task IS the complete prompt. The executing agent has NO memory of
+previous stages and reads nothing but what the task carries. Embed everything needed:
 
 - Relevant excerpts from ARTIFACT:PLAN (not "see plan" — inline it)
 - File paths and line ranges from contextualization
@@ -94,17 +94,28 @@ Build the dependency graph:
 - Identify which tasks can run in parallel (no shared file conflicts)
 - Document WHY parallelization is safe for each parallel group
 
-### Step 6 — Assign Roles
+### Step 6 — Assign Agents
 
-Assign abstract roles, NOT specific agents:
+Classify each task by the role that does its work, then resolve that role to a real agent name
+before writing it into the task's `agent` field:
 
 - `architect` — design decisions, structural changes
-- `implementer` — write production code
+- `design-spec` — interfaces, data models, module boundaries
 - `test-designer` — write tests and fixtures
 - `code-reviewer` — review and quality assessment
-- `docs-writer` — documentation and comments
 
-Role-to-agent resolution happens at execution time via the language manifest.
+Resolve a role through the project's language manifest: detect the language from the project-root
+markers, read the manifest's `Role Fulfillment` section, and take the agent it maps that role to.
+Manifest entries carry a leading `@` — `@dh:code-reviewer` — and `agent` stores the same name
+without it. The stored value stays plugin-qualified.
+
+Write no `agent` value at all when the manifest omits that role, no manifest matches the project,
+or the work is production code, documentation, or anything else no role above covers. The
+executing worker then runs the task with no specialist profile, which is the documented fallback.
+
+`agent` is passed verbatim to `profile_load` at execution time. An abstract role name matches no
+agent, and a bare name that two plugins both ship resolves ambiguously; either one ends the task
+blocked before any work starts.
 
 ## Input
 
@@ -170,25 +181,32 @@ call `append_task` for the same plan from multiple agents or sessions simultaneo
 the full single-writer contract, see the `CLAUDE.md` gotcha note in
 `plugins/development-harness/CLAUDE.md`.
 
-Each file contains YAML frontmatter followed by CLEAR-ordered sections:
+Each task definition carries these routing fields. Any key outside the accepted set is
+rejected — do not invent fields:
 
-```markdown
----
-task: TASK-001
+```yaml
+task: T1
 title: <descriptive imperative title>
 status: not-started
-role: <architect / implementer / test-designer / code-reviewer / docs-writer>
+agent: <plugin-qualified agent resolved from the language manifest — omit when no role applies>
 dependencies: []
 priority: <1-5 based on dependency depth>
 complexity: <low / medium / high>
 accuracy-risk: <low / medium / high>
 parallelize-with: []
-parallel-rationale: <why parallelization is safe>
----
+```
 
+Record why parallelization is safe in `context-notes`; there is no separate rationale field.
+
+The task's prose fields hold the CLEAR-ordered content. Each heading below names the field
+that carries it — `context-notes`, `objective`, `requirements`, `constraints`,
+`expected-outputs`, `acceptance-criteria`, `verification-steps`, `handoff` — and any
+remaining narrative goes in `body`:
+
+```markdown
 ## Context
 
-<embedded context from plan — NOT "see PLAN.md">
+<the context this task needs, written out in full — never a pointer to another document>
 
 ## Objective
 
@@ -243,7 +261,7 @@ After decomposition, evaluate whether escalation is needed:
 
 ```mermaid
 flowchart TD
-    Tasks([Task files generated]) --> Q1{Novel architecture pattern?}
+    Tasks([Tasks generated]) --> Q1{Novel architecture pattern?}
     Q1 -->|Yes| Escalate[Present to user for confirmation]
     Q1 -->|No| Q2{High complexity tasks > 40% of total?}
     Q2 -->|Yes| Escalate
@@ -256,9 +274,11 @@ flowchart TD
 
 ## Behavioral Rules
 
-- Every task must be self-contained — an agent reading ONLY the task file can execute it
-- Never reference PLAN.md or DISCOVERY.md by "see X" — inline the relevant content
-- Never assign specific agent names — use roles
+- Every task must be self-contained — an agent given ONLY that task can execute it
+- Never point at an upstream artifact by "see X" — inline the content the task needs. The
+  executing agent has no guaranteed access to the discovery or plan artifact you read
+- Never write an abstract role name into `agent` — write the plugin-qualified agent the language
+  manifest maps that role to, or omit the field
 - Tasks must not have circular dependencies
 - Each acceptance criterion must be verifiable by the executing agent alone
 
@@ -268,5 +288,5 @@ flowchart TD
 - Every plan component maps to at least one task
 - Dependency graph has no cycles
 - Parallel groups have no shared file conflicts
-- Roles assigned (not agents) for every task
+- Every `agent` value present is plugin-qualified and resolvable by `profile_load`
 - CoVe checks present on medium/high accuracy-risk tasks only

@@ -127,13 +127,18 @@ Updated `ARTIFACT:PLAN` with the following section appended:
 - Files unchanged — <list>
 ```
 
-Also update the Contextualization Status at the bottom of PLAN.md:
+End the same content with the status marker, so the re-registered `architect` artifact
+records that Stage 3 ran:
 
 ```markdown
 ## Contextualization Status
 
 - [x] Grounded in codebase (completed by Stage 3)
 ```
+
+Both the `## Contextualization` section and this status marker are part of the single
+`content=` string passed to `artifact_register` in Step 4. There is no separate document
+to update.
 
 ## Role Resolution
 
