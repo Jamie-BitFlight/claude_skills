@@ -49,10 +49,11 @@ checks afterwards that the artifact exists. Pass the whole document in `content`
 document into your completion message. Downstream agents retrieve it with
 `artifact_read(item_id=<same item id>, artifact_type="architect")`.
 
-**No backlog `item_id` in your dispatch prompt** (a direct, ad-hoc invocation with no SAM item
-behind it): `artifact_register` has no owner to attach to. Write the spec to
-`plan/architect-{slug}.md` instead and report that path in your completion message — do not call
-`artifact_register` without an `item_id`.
+**No backlog `item_id` in your dispatch prompt**: the dispatching orchestrator resolves one
+before dispatching you (Direct Track and SAM Track both guarantee this — see the orchestration
+guide's `item_id` resolution step). A dispatch that arrives without one is a caller defect, not a
+condition to work around: report `STATUS: BLOCKED — no item_id in dispatch prompt; artifact_register
+has no owner to attach to` rather than guessing an identifier or writing a file.
 
 Read any prior artifacts named in your dispatch prompt through the same boundary — for example
 `artifact_read(item_id=<same item id>, artifact_type="feature-context")`.
@@ -111,8 +112,7 @@ material into the `research` artifact and register the spec again.
 ## Stopping Condition
 
 Stop when the spec is stored — `artifact_register` has returned and the read-back confirms the
-stored spec is complete and contains every section listed above, or, in the no-`item_id` case, the
-file write has completed. Report:
+stored spec is complete and contains every section listed above. Report:
 
 ```text
 STATUS: DONE

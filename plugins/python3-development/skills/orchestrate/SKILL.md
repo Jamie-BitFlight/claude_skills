@@ -56,10 +56,21 @@ Agent routing — delegate rather than implement:
 - Python code → subagent_type="python3-development:python-cli-architect"
 - Tests → subagent_type="python3-development:python-pytest-architect"
 - Code review → subagent_type="python3-development:code-reviewer"
-- Architecture design → subagent_type="python3-development:python-cli-design-spec"
+- Architecture design → subagent_type="python3-development:python-cli-design-spec" — requires a resolved `item_id` (see below)
 - Task breakdown → subagent_type="dh:swarm-task-planner"
 - Requirements → subagent_type="spec-analyst"
 - Stdlib-only script → Skill(skill: "python3-development:stdlib-scripting")
+
+#### Resolving `item_id` for `python-cli-design-spec`
+
+`python-cli-design-spec` registers its spec as an artifact against a backlog item — it has no
+file-write fallback, so every dispatch, Direct Track included, must resolve an `item_id` first:
+
+1. Task already names a tracked item (`#N` GitHub issue or a Beads ID) → use it as `item_id`.
+2. Otherwise call `mcp__plugin_dh_backlog__backlog_add(title=<task title>, priority=<P0|P1|P2|Ideas>, description=<task description>)` and capture the returned issue number (or backend-native identifier) as `item_id`. Treat an `error` key in the response as a hard stop — report it, do not fall back to a file write.
+
+Pass the resolved `item_id` in the delegation context alongside Outcomes/Constraints/Known
+issues/File paths below.
 
 Each delegation must include:
 
@@ -67,6 +78,7 @@ Each delegation must include:
 - Constraints: user requirements, compatibility, scope boundaries
 - Known issues: error messages already in context (pass-through, not pre-gathered)
 - File paths: where to start looking — not what you found there
+- `item_id`: required for `python-cli-design-spec` dispatches — resolved per the previous section
 
 Do NOT read source files before delegating. Agents search and read files for themselves — pass file paths, not file contents. Pre-gathering wastes orchestrator context and duplicates work the agent will do anyway.
 

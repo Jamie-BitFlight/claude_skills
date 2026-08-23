@@ -32,6 +32,12 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 
 **Context to include in the prompt** means: file paths, outcomes, and user requirements only. Do not pass file contents, summaries, or pre-gathered data — agents discover and read files themselves.
 
+**Design/Architecture steps below dispatch `python-cli-design-spec`**, which registers its spec
+as an artifact against a backlog item and has no file-write fallback. Before any Design or
+Architecture step in the workflows below: use an `item_id` already named by the task (`#N` GitHub
+issue or Beads ID), or call `mcp__plugin_dh_backlog__backlog_add(title=..., priority=..., description=...)`
+and capture the returned issue number as `item_id`. Include `item_id` in that step's Context.
+
 ## Core Workflow Patterns
 
 ### 1. TDD Workflow (Test-Driven Development)
@@ -48,7 +54,7 @@ The adversarial design step reads the actual codebase, not the architecture spec
 
 ```mermaid
 flowchart TD
-    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: component interfaces, module layout, CLI command tree"]
+    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths, item_id<br>Output: architect artifact registered against item_id (interfaces, layout, CLI command tree)"]
     S2["2. Write Tests<br>subagent_type=python-engineering:python-pytest-architect<br>Context: architecture design file path<br>Output: tests/ directory with failing test suite"]
     S3{"3. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: tests/ path, load python-engineering:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
@@ -72,8 +78,8 @@ flowchart TD
 User: "Build a CLI tool to process CSV files with progress bars"
 
 1. Task is Design with subagent_type="python-engineering:python-cli-design-spec"
-   Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking
-   Output: Architecture design file with component list, module layout, CLI command tree
+   Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking; item_id resolved per the Delegation Rule above
+   Output: architect artifact registered against item_id — read via artifact_read(item_id, artifact_type="architect")
 
 2. Task is Write Tests with subagent_type="python-engineering:python-pytest-architect"
    Context to include in the prompt: Path to architecture design file from step 1
@@ -102,7 +108,7 @@ Before delegating Requirements Gathering, read `git log --oneline -10` and pass 
 ```mermaid
 flowchart TD
     S1["1. Requirements Gathering<br>subagent_type=spec-analyst<br>Context: codebase path, user request verbatim<br>Output: requirements doc with acceptance criteria"]
-    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: design showing integration points with existing code"]
+    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path, item_id<br>Output: architect artifact registered against item_id, showing integration points"]
     S3["3. Implementation Planning<br>subagent_type=dh:swarm-task-planner<br>Context: architecture design path, existing test patterns path<br>Output: ordered task list with file targets and acceptance criteria per task"]
     S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: task list path, relevant existing file paths<br>Output: new feature implementation in packages/"}
     S5["5. Testing<br>subagent_type=python-engineering:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
