@@ -7,7 +7,7 @@ a layer: if COLLECTED, query its data; if a GAP, it is a named pending pass — 
 All files live in `plugins/development-harness/docs/workflow-layers/`.
 
 Resolution: **medium-high**. Skeleton + connections + 8 annotation layers collected and
-spot-checked. Graph rebuilt from layer data (235 nodes, 440 edges, 21 gap edges, 0 orphan
+spot-checked. Graph rebuilt from layer data (234 nodes, 439 edges, 21 gap edges, 0 orphan
 edges). Explorer renders all 6 overlays.
 
 ---
