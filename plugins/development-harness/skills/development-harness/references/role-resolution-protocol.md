@@ -99,7 +99,7 @@ Parse the manifest's Role Fulfillment section and map each abstract role to a co
 
 **Dispatch routing rule:**
 
-Regardless of what role resolves to, the orchestrator always dispatches `subagent_type="dh:task-worker"`. The resolved agent name is recorded in the task's `agent:` field. `task-worker` reads this field via SAM MCP and calls `profile_load(agent_name=...)` to load specialist behavior internally. The orchestrator passes only the task reference; specialist behavior is selected by the worker's internal profile loading.
+Record the resolved agent name in the task's `agent:` field, then choose the dispatch target with the decision in `dh:dispatch-contract`. The orchestrator passes only the task reference.
 
 **Agent reference format in manifests:**
 
