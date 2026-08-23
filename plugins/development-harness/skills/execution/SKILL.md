@@ -107,10 +107,10 @@ collecting results.
 Execution results stored via SAM:
 
 ```text
-sam_plan(
-    address="{plan_address}/T{NNN}",
-    append_section="Execution Results",
-    section_content="{execution markdown below}"
+sam_task(
+    plan="{plan_address}",
+    task="T{NNN}",
+    config={"action": "update", "append_section": "Execution Results", "section_content": "{execution markdown below}"}
 )
 ```
 

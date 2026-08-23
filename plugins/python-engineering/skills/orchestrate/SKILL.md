@@ -55,21 +55,20 @@ flowchart TD
 
 ### SAM task creation format (when creating tasks directly)
 
-When `mcp__plugin_dh_sam__sam_create` is called directly (e.g., from `create-feature-task`):
+When `mcp__plugin_dh_sam__sam_plan` is called directly with the `create` action (e.g., from
+`create-feature-task`), each entry in `tasks` carries:
 
 ```yaml
+task: "<task id, e.g. T1>"
 title: "<short imperative title>"
-description: |
+body: |
   <what must be true when this task is done>
-acceptance_criteria:
+
+  ## Acceptance Criteria
   - Given <context>, when <action>, then <observable result>
-phases:
-  - name: <phase name>
-    tasks:
-      - <concrete subtask>
 ```
 
-Update task status with `mcp__plugin_dh_sam__sam_update` as phases complete.
+Update task status with `mcp__plugin_dh_sam__sam_task(plan="{plan}", task="{task}", config={"action": "state", "status": "complete"})` as phases complete.
 
 ## Step 3B — Direct Track
 

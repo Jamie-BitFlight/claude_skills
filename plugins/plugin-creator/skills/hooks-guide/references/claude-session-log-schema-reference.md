@@ -354,7 +354,7 @@ Appears in **assistant** records. Records a tool call made by the model.
 }
 ```
 
-`name` is the tool name — e.g., `Bash`, `Read`, `mcp__plugin_dh_sam__sam_ready`.
+`name` is the tool name — e.g., `Bash`, `Read`, `mcp__plugin_dh_sam__sam_plan`.
 
 ### `tool_result`
 
