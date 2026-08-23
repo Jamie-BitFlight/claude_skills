@@ -23,9 +23,12 @@ Write findings to .tmp/scratch/reports/YYYYMMDD-<slug>.md
 Return: STATUS: DONE + path to the file
 ```
 
-The returned path is for the requesting agent to read directly. Never pass it on as the input of a
-later step, agent, or gate — anything a subsequent step reads is an inter-step handoff and goes
-through the artifact or plan operations instead.
+The returned path is for the requesting agent to read directly. Do not invent an ad hoc handoff by
+passing it to a later step, agent, or gate that the producing workflow does not already define —
+that step reads results through the artifact or plan operations instead. Exception: when a skill's
+own documented pipeline explicitly names a scratch path as the input to its next stage (for example
+passing a change plan or a draft-output path from one stage to a validator or verifier stage within
+that same skill), that skill's stage definitions govern and the handoff is allowed.
 
 ## Hard rule
 
