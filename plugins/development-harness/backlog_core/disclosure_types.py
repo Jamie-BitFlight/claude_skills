@@ -9,7 +9,7 @@ value objects or MCP response shapes, not ingress validators).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 
@@ -60,6 +60,14 @@ class MapResponse:
     over_budget: bool
     """``True`` when ``total_est_tokens`` exceeds the configured token budget."""
 
+    struck_ordinals: list[str] = field(default_factory=list)
+    """Ordinals of every struck (retracted) entry or descendant in the map (#3187).
+
+    Explicit field rather than requiring callers to parse ``[struck] `` markers
+    out of ``map_text`` — the "No Invented Limits" data-completeness contract
+    this project follows requires struck state to be addressable, not merely
+    visible in formatted text."""
+
 
 @dataclass(frozen=True, slots=True)
 class NavigateResponse:
@@ -109,6 +117,15 @@ class NavigateResponse:
     to a child ordinal rather than using ``content`` directly.
     """
 
+    struck: bool = False
+    """``True`` when the resolved ordinal addresses a struck (retracted) entry,
+    or a descendant of one (#3187).  ``False`` for level-1 section aggregates,
+    which have no single-entry identity."""
+
+    entry_id: str = ""
+    """Stable identifier of the owning entry; ``""`` when the resolved ordinal
+    has no entry identity (level-1 sections)."""
+
 
 @dataclass(frozen=True, slots=True)
 class BoundedResponse:
@@ -138,6 +155,15 @@ class BoundedResponse:
 
     ``None`` when ``truncated`` is ``False``.
     """
+
+    struck: bool = False
+    """``True`` when the resolved ordinal addresses a struck (retracted) entry,
+    or a descendant of one (#3187).  Struck state is metadata, not content, so
+    it survives token-bounded windowing even when ``content`` is truncated."""
+
+    entry_id: str = ""
+    """Stable identifier of the owning entry; ``""`` when the resolved ordinal
+    has no entry identity (level-1 sections)."""
 
 
 @dataclass(frozen=True, slots=True)

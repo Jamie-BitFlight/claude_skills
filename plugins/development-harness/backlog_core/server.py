@@ -2551,11 +2551,14 @@ async def backlog_view(
 
     Returns:
         When map=True: dict with map_text (ordinal structure, <2,000 tokens), selector,
-        total_sections, total_est_tokens, and over_budget flag.
+        total_sections, total_est_tokens, over_budget flag, and struck_ordinals (every
+        struck/retracted ordinal in the map).
         When navigate=<ordinal> (no head): dict with ordinal, title, content,
-        total_tokens, truncated=False.
+        total_tokens, truncated=False, struck, and entry_id.
         When navigate=<ordinal> + head=N: dict with ordinal, title, content, total_tokens,
-        returned_tokens, truncated, and next_call hint when truncated=True.
+        returned_tokens, truncated, next_call hint when truncated=True, struck, and entry_id.
+        struck/entry_id reflect the addressed entry (or its descendant); False/"" for
+        level-1 section ordinals, which have no single-entry identity.
         When summary=True (default, no disclosure params): compact dict with issue_number,
         title, labels, status, plan_address, sections_index, _summary, _full_chars, and _hint.
         When summary=False: dict with title, priority, issue, plan, file_path, body,

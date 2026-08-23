@@ -362,6 +362,8 @@ class BacklogViewDisclosureHandler:
                         truncated=bounded.truncated,
                         child_map=bounded.content,
                         has_children=True,
+                        struck=unit.struck,
+                        entry_id=unit.entry_id,
                     )
                 return self._handle_extract(
                     selector, request.navigate_ordinal, request.head_tokens, request.skip_tokens, mapper
@@ -388,8 +390,9 @@ class BacklogViewDisclosureHandler:
 
         Returns:
             ``MapResponse`` with formatted ``map_text``, ``total_sections``
-            (level-1 count), ``total_est_tokens`` (level-1 sum only), and
-            ``over_budget`` flag.
+            (level-1 count), ``total_est_tokens`` (level-1 sum only),
+            ``over_budget`` flag, and ``struck_ordinals`` (#3187) — the
+            ordinals of every struck entry or descendant in the map.
         """
         level1_entries = [e for e in entries if "." not in e.ordinal]
         total_est_tokens = sum(e.est_tokens for e in level1_entries)
@@ -400,6 +403,7 @@ class BacklogViewDisclosureHandler:
             total_est_tokens=total_est_tokens,
             map_text=map_text,
             over_budget=total_est_tokens > TOKEN_BUDGET,
+            struck_ordinals=[e.ordinal for e in entries if e.struck],
         )
 
     def _handle_navigate(self, ordinal: str, mapper: OrdinalPathMapper) -> NavigateResponse:
@@ -422,6 +426,9 @@ class BacklogViewDisclosureHandler:
             - ``has_children=False``, ``content`` set to the full body text or
               raw fence body, ``child_map=None`` for leaves and code blocks.
 
+            Both branches carry ``struck``/``entry_id`` (#3187) mirrored
+            directly from the resolved ``ResolvedUnit``.
+
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not in the resolution
                 map.  The exception carries ``valid_ordinals`` so callers can
@@ -439,10 +446,18 @@ class BacklogViewDisclosureHandler:
                 truncated=False,
                 child_map=unit.child_map,
                 has_children=True,
+                struck=unit.struck,
+                entry_id=unit.entry_id,
             )
         # Leaf or code-block node: return full content directly.
         return NavigateResponse(
-            ordinal=ordinal, title=unit.title, content=unit.content, total_tokens=unit.total_tokens, truncated=False
+            ordinal=ordinal,
+            title=unit.title,
+            content=unit.content,
+            total_tokens=unit.total_tokens,
+            truncated=False,
+            struck=unit.struck,
+            entry_id=unit.entry_id,
         )
 
     def _handle_extract(
@@ -471,7 +486,10 @@ class BacklogViewDisclosureHandler:
         Returns:
             ``BoundedResponse`` with ``next_call`` populated when truncated,
             ``None`` otherwise.  When the node is a sub-heading parent,
-            ``content`` holds the bounded ``child_map`` text.
+            ``content`` holds the bounded ``child_map`` text.  ``struck``/
+            ``entry_id`` (#3187) are mirrored from the resolved
+            ``ResolvedUnit`` — struck state is metadata, not content, so it
+            survives windowing even when ``content`` is truncated.
 
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not in the resolution
@@ -496,4 +514,6 @@ class BacklogViewDisclosureHandler:
             returned_tokens=bounded.returned_tokens,
             truncated=bounded.truncated,
             next_call=next_call,
+            struck=unit.struck,
+            entry_id=unit.entry_id,
         )
