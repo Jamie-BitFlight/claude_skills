@@ -28,6 +28,7 @@ scanned call. The scan catches undeclared writers; the map covers the producers 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -38,9 +39,11 @@ _AGENTS_MD = _PLUGIN_ROOT / "AGENTS.md"
 
 _OWNER_TABLE_HEADING = "| Type | Registering agents | Gate-read | Notes |"
 
-# MCP tool form: artifact_register(item_id=..., artifact_type="x", ..., agent="y"). No observed call
-# nests parentheses in its body, so a non-greedy match to the first ")" bounds a single call.
-_TOOL_CALL_RE = re.compile(r"artifact_register\((?P<body>.*?)\)", re.DOTALL)
+# MCP tool form: artifact_register(item_id=..., artifact_type="x", ..., agent="y"). Only the opening
+# delimiter is matched here — the closing one is found by _iter_tool_call_bodies, because a regex
+# cannot balance nested parentheses and a non-greedy match to the first ")" would end a call early
+# at any nested expression, hiding every argument written after it.
+_TOOL_CALL_OPEN_RE = re.compile(r"artifact_register\(")
 # CLI form: `... artifact register \` followed by one --flag per continuation line.
 _CLI_CALL_RE = re.compile(r"artifact\s+register\b[^\n]*\n(?:[ \t]*--[^\n]*\n?)*")
 
@@ -67,6 +70,48 @@ _DEFAULT_AGENT = ""
 Mirrors ``backlog_core.server.artifact_register``'s signature. Resolving an omitted agent to this
 value rather than skipping the call is what stops an unattributed write passing the owner map.
 """
+
+
+def _iter_tool_call_bodies(text: str) -> Iterator[str]:
+    """Yield the argument text of each ``artifact_register(...)`` call in ``text``.
+
+    Walks forward from each opening delimiter tracking parenthesis depth, treating parentheses
+    inside single- or double-quoted strings as literal characters and honouring backslash escapes.
+    A nested call such as ``content=build_report()`` therefore does not terminate the argument list,
+    and arguments written after it stay visible to the field patterns.
+
+    An opening delimiter whose match is never closed yields nothing: there is no argument list to
+    attribute, and prose that merely names ``artifact_register(`` is not a registration.
+
+    Args:
+        text: The markdown to scan.
+
+    Yields:
+        The text between each call's parentheses, exclusive.
+    """
+    for match in _TOOL_CALL_OPEN_RE.finditer(text):
+        start = match.end()
+        depth = 1
+        quote: str | None = None
+        index = start
+        while index < len(text):
+            char = text[index]
+            if quote is not None:
+                if char == "\\":
+                    index += 2
+                    continue
+                if char == quote:
+                    quote = None
+            elif char in "\"'":
+                quote = char
+            elif char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    yield text[start:index]
+                    break
+            index += 1
 
 
 def _is_placeholder(value: str) -> bool:
@@ -187,9 +232,7 @@ def parse_registrations(text: str, source: str) -> list[Registration]:
     Returns:
         One entry per attributable call, keyed on the agent the call names or defaults to.
     """
-    chunks = [
-        (m.group("body"), _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE) for m in _TOOL_CALL_RE.finditer(text)
-    ]
+    chunks = [(body, _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE) for body in _iter_tool_call_bodies(text)]
     chunks += [(m.group(0), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE) for m in _CLI_CALL_RE.finditer(text)]
     found: list[Registration] = []
     for chunk, type_re, agent_re, agent_present_re in chunks:
@@ -327,3 +370,40 @@ def test_parse_registrations_attributes_an_omitted_agent_to_the_default() -> Non
     call = 'artifact_register(item_id=1, artifact_type="architect", artifact_id="plan/a.md")'
 
     assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [("architect", _DEFAULT_AGENT)]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        'artifact_register(content=build_report(), artifact_type="research", agent="swarm-task-planner")',
+        'artifact_register(artifact_type="research", content=build_report(), agent="swarm-task-planner")',
+        'artifact_register(content=f"{a}({b})", artifact_type="research", agent="swarm-task-planner")',
+        'artifact_register(\n  content=render(load(path)),\n  artifact_type="research",\n  agent="swarm-task-planner",\n)',
+    ],
+    ids=["nested-first", "nested-middle", "paren-inside-string", "nested-multiline"],
+)
+def test_parse_registrations_reads_past_nested_expressions(call: str) -> None:
+    """A nested expression before the ownership fields does not truncate the call.
+
+    Tests: _iter_tool_call_bodies parenthesis balancing and string awareness
+    How: Parse calls whose content argument contains a nested call or a parenthesis inside a string,
+         placed before and after the artifact_type and agent arguments.
+    Why: A non-greedy match to the first ')' ends the argument list at the nested expression, so
+         every field written after it disappears and the registration is skipped in silence. An
+         undeclared type or writer spelled that way would pass a green guard.
+    """
+    assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [
+        ("research", "swarm-task-planner")
+    ]
+
+
+def test_iter_tool_call_bodies_ignores_an_unclosed_call() -> None:
+    """An opening delimiter that is never closed yields no call body.
+
+    Tests: _iter_tool_call_bodies termination
+    How: Scan prose that names artifact_register( without closing it.
+    Why: There is no argument list to attribute, and prose naming the function is not a
+         registration. Yielding the remainder of the document instead would attribute every
+         subsequent artifact_type mention to that one sentence.
+    """
+    assert list(_iter_tool_call_bodies("Call artifact_register( with the type and agent.")) == []
