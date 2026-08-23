@@ -106,8 +106,8 @@ before writing it into the task's `agent` field:
 
 Resolve a role through the project's language manifest: detect the language from the project-root
 markers, read the manifest's `Role Fulfillment` section, and take the agent it maps that role to.
-Manifest entries carry a leading `@` — `@python3-development:code-reviewer` — and `agent` stores
-the same name without it. The stored value stays plugin-qualified.
+Manifest entries carry a leading `@` — `@dh:code-reviewer` — and `agent` stores the same name
+without it. The stored value stays plugin-qualified.
 
 Write no `agent` value at all when the manifest omits that role, no manifest matches the project,
 or the work is production code, documentation, or anything else no role above covers. The
