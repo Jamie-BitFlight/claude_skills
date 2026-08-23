@@ -508,6 +508,47 @@ def _rewrite_replace(
     return "\n\n".join(parts)
 
 
+def resolve_entry_id(stored_ids: list[str], entry_id: str) -> int:
+    """Return the index *entry_id* targets, after positional collision resolution.
+
+    Applies :func:`_resolve_duplicate_ids` to a throwaway id-only copy of
+    *stored_ids*, so a caller-supplied ``-N``-suffixed id -- the form
+    backlog_view returns when two entries in one section share a stored id --
+    resolves to the correct position instead of matching nothing. This is the
+    single implementation of "which entry does this id target": both
+    :func:`_rewrite_by_entry_id` (indexing ``spans``) and
+    ``operations._resolve_section_entry`` (indexing a ``Section``'s
+    ``entries``) resolve against *this* function rather than each keeping a
+    private copy of the resolution loop.
+
+    Because *stored_ids* is copied 1:1 into the throwaway ``Entry`` list
+    below, the returned index always aligns positionally with *stored_ids*
+    itself -- and with any other list built from the same source in the same
+    order (e.g. ``spans`` or a ``Section``'s ``entries``). No further
+    positional pairing (``zip`` or otherwise) is needed or correct at the
+    call site.
+
+    Args:
+        stored_ids: A section's entry ids, in storage order.
+        entry_id: The id to resolve, as returned by backlog_view.
+
+    Returns:
+        Index into *stored_ids* that *entry_id* targets.
+
+    Raises:
+        EntryNotFoundError: When ``entry_id`` matches neither a raw id nor a
+            collision-resolved id. Names every id backlog_view would show for
+            *stored_ids*.
+    """
+    id_entries = [Entry(id=stored_id, content="") for stored_id in stored_ids]
+    _resolve_duplicate_ids(id_entries)
+    resolved_ids = [e.id for e in id_entries]
+    for idx, resolved_id in enumerate(resolved_ids):
+        if resolved_id == entry_id:
+            return idx
+    raise EntryNotFoundError(entry_id, resolved_ids)
+
+
 def _rewrite_by_entry_id(
     existing_body: str, spans: list[EntrySpan], is_legacy: bool, new_content: str | None, entry_id: str, added_date: str
 ) -> str:
@@ -523,14 +564,9 @@ def _rewrite_by_entry_id(
             raise EntryNotFoundError(entry_id, [legacy_ts])
         result_parts.append(wrap_entry(new_content) if new_content else "")
     else:
-        id_entries = [Entry(id=s.entry_id, content="") for s in spans]
-        _resolve_duplicate_ids(id_entries)
-        available = [e.id for e in id_entries]
-        if entry_id not in available:
-            raise EntryNotFoundError(entry_id, available)
-
-        for span, id_entry in zip(spans, id_entries, strict=False):
-            if id_entry.id == entry_id:
+        target_idx = resolve_entry_id([s.entry_id for s in spans], entry_id)
+        for idx, span in enumerate(spans):
+            if idx == target_idx:
                 if new_content:
                     result_parts.append(wrap_entry_with_timestamp(new_content, span.entry_id))
             else:

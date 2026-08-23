@@ -27,7 +27,7 @@ from typing_extensions import TypedDict
 from . import models as _models
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
-from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries
+from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -41,6 +41,7 @@ from .models import (
     ContentUnavailableError,
     DuplicateItemError,
     Entry,
+    EntryNotFoundError,
     GroomedData,
     GroomedSectionMetadata,
     IssueLocalFields,
@@ -838,6 +839,31 @@ def _extract_subsection_body(body: str, section_name: str) -> str:
     return sub_match.group(1).strip()
 
 
+def _resolve_section_entry(entries: list[Entry], entry_id: str) -> Entry:
+    """Locate the entry that *entry_id* targets, resolving stored-id collisions positionally.
+
+    Thin wrapper around :func:`~.entry_blocks.resolve_entry_id` -- the single
+    positional collision-resolution implementation, shared with
+    :func:`~.entry_blocks._rewrite_by_entry_id` so backlog_view's read path
+    and this write path always agree on which entry a given id targets.
+
+    Args:
+        entries: A section's entry list, in storage order.
+        entry_id: The id to resolve, as returned by backlog_view.
+
+    Returns:
+        The matching :class:`Entry` object, by identity, from *entries* --
+        callers mutate it in place.
+
+    Raises:
+        EntryNotFoundError: When ``entry_id`` matches no entry in *entries*,
+            even after collision resolution. Names every id backlog_view
+            would show for *entries*, so a stale or mistyped id fails loudly
+            instead of silently creating a duplicate entry.
+    """
+    return entries[resolve_entry_id([e.id for e in entries], entry_id)]
+
+
 def _apply_groomed_entries(
     section: Section,
     groomed_content: str,
@@ -862,6 +888,10 @@ def _apply_groomed_entries(
 
     Raises:
         ValueError: When ``replace_section`` is ``True`` but ``reason`` is empty.
+        EntryNotFoundError: When ``entry_id`` is set but matches no entry in
+            ``section`` (see :func:`_resolve_section_entry`). backlog_update
+            and backlog_groom document this as the contract: an id matching no
+            entry is an error naming the available ids, never a silent no-op.
     """
     if append:
         section.entries.append(Entry(id=now_iso(), content=groomed_content))
@@ -879,11 +909,8 @@ def _apply_groomed_entries(
         section.entries.append(Entry(id=now_iso(), content=groomed_content))
         return
     if entry_id:
-        for entry in section.entries:
-            if entry.id == entry_id:
-                entry.content = groomed_content
-                return
-        section.entries.append(Entry(id=entry_id, content=groomed_content))
+        target = _resolve_section_entry(section.entries, entry_id)
+        target.content = groomed_content
         return
     # Default: append only when content is non-empty and not already present.
     # Identical content in any existing unstruck entry is treated as idempotent.
@@ -3653,7 +3680,10 @@ def strike_entry(
 
     Raises:
         ItemNotFoundError: If item cannot be found.
-        ValueError: If entry_id not found in the item body.
+        EntryNotFoundError: If entry_id matches no entry in any section
+            searched (see :func:`_resolve_section_entry` — resolution is
+            collision-aware, matching what backlog_view returns for a
+            section holding two entries with the same stored id).
     """
     out = output or Output()
     items = get_config().backend.list_work_items()
@@ -3666,24 +3696,22 @@ def strike_entry(
         raise BacklogError(msg)
 
     struck_at = now_iso()
-    found = False
+    target: Entry | None = None
+    available: list[str] = []
     for section_name, section_data in item.sections.items():
         if not isinstance(section_data, Section) or (section and section_name.lower() != section.lower()):
             continue
-        for entry in section_data.entries:
-            if entry.id == entry_id:
-                entry.struck = True
-                entry.struck_at = struck_at
-                entry.struck_reason = reason
-                found = True
-                break
-        if found:
-            break
-    if not found:
-        msg = f"Entry '{entry_id}' not found in item '{item.title}'"
-        if section:
-            msg += f" section '{section}'"
-        raise ValueError(msg)
+        try:
+            target = _resolve_section_entry(section_data.entries, entry_id)
+        except EntryNotFoundError as exc:
+            available.extend(exc.available)
+            continue
+        break
+    if target is None:
+        raise EntryNotFoundError(entry_id, available)
+    target.struck = True
+    target.struck_at = struck_at
+    target.struck_reason = reason
 
     backend = get_config().backend
     backend.put_work_item(item)
