@@ -74,7 +74,7 @@ Task is S6 forensic review with subagent_type="dh:code-reviewer"
 Context: task_file_path={task_file_path}, item_id={item_id},
   implementation_files={expected_outputs}
 Output: STATUS block containing Verdict (PASS / FAIL / NEEDS-WORK) and ARTIFACTS
-  section confirming code-review artifact registered on issue #{item_id}
+  section naming the code-review artifact_id registered on issue #{item_id}
 ```
 
 The agent independently reads the task, detects the stack, verifies acceptance criteria,
@@ -93,11 +93,26 @@ NEEDED section as the reason.
 
 ### Step 4 — Read code-review Artifact
 
-Retrieve the registered review report:
+Take `{artifact_id}` from the ARTIFACTS section of the agent's STATUS output in Step 3 and retrieve
+that entry:
 
 ```text
-artifact_read(item_id={item_id}, artifact_type="code-review")
+artifact_read(item_id={item_id}, artifact_type="code-review", artifact_id="{artifact_id}")
 ```
+
+Address the entry by its `artifact_id`. One `code-review` entry exists per reviewed task, so when
+two tasks of this work item have been reviewed, omitting `artifact_id` returns whichever review
+registered last — which may be another task's.
+
+If the STATUS output named no `artifact_id`, enumerate the type and select the entry yourself:
+
+```text
+artifact_list(item_id={item_id}, artifact_type="code-review")
+```
+
+Take the entry whose `artifact_id` contains this task's `{task_id}`; when none does, take the latest
+`created_at` and record in the Review Results section that the verdict was matched by recency rather
+than by identifier.
 
 Use this to populate the SAM task's Review Results section and to extract blocking findings
 for remediation task creation.
@@ -117,6 +132,8 @@ sam_task(
 - `ARTIFACT:EXECUTION` + `ARTIFACT:TASK` via `sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})`
 - `item_id` — must be present; used by `@dh:code-reviewer` for `artifact_register` and
   by this skill for `artifact_read`
+- `artifact_id` — returned by `@dh:code-reviewer` in its STATUS ARTIFACTS section; addresses the
+  verdict for this task specifically
 
 ## NEEDS_WORK Remediation Loop
 
@@ -152,6 +169,6 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 ## Success Criteria
 
 - `@dh:code-reviewer` returns STATUS: DONE with a PASS, FAIL, or NEEDS-WORK verdict
-- `code-review` artifact is registered on issue #{item_id}
+- `code-review` artifact is registered on issue #{item_id} and its `artifact_id` is named in the agent's STATUS output
 - Review Results appended to the SAM task via `sam_task(action='update')`
 - Blocking findings (if any) have concrete remediation tasks created

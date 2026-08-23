@@ -385,10 +385,13 @@ class TestArtifactRegistryRegister:
         Tests: ArtifactType.CODE_REVIEW is distinct from ArtifactType.CODEBASE_ANALYSIS
         How: Register a code-review verdict, then two later codebase-analysis documents from other
              producers; assert get_by_type(CODE_REVIEW) still returns exactly the verdict.
-        Why: complete-implementation and forensic-review read the review verdict by type alone, and
-             a read by type returns only the most recently created entry. codebase-analysis is
-             intentionally multi-entry (one document per focus area or diagram), so the verdict
-             cannot share that type without a later analysis document winning the gate's read.
+        Why: complete-implementation and forensic-review branch on the review verdict, and a read
+             that omits artifact_id returns only the most recently created entry of the type.
+             codebase-analysis is intentionally multi-entry (one document per focus area or
+             diagram), so the verdict cannot share that type without a later analysis document
+             winning the gate's read. The consumers address the verdict by artifact_id because
+             code-reviewer registers one entry per reviewed task; keeping the type private is what
+             bounds that set to this one producer's entries.
         """
         # Arrange
         verdict = ArtifactEntry(
@@ -414,6 +417,37 @@ class TestArtifactRegistryRegister:
         review_entries = registry.get_by_type(manifest, ArtifactType.CODE_REVIEW)
         assert [e.artifact_id for e in review_entries] == ["code-review-T1-auth"]
         assert len(registry.get_by_type(manifest, ArtifactType.CODEBASE_ANALYSIS)) == 2
+
+    def test_two_reviewed_tasks_leave_two_addressable_code_review_entries(
+        self, registry: ArtifactRegistry, empty_manifest: ArtifactManifest
+    ) -> None:
+        """Reviewing two tasks of one item registers two entries, each addressable by its own id.
+
+        Tests: ArtifactRegistry.register keys identity on (artifact_type, artifact_id)
+        How: Register two code-review verdicts from the same agent under different artifact_ids;
+             assert both survive and each is selectable by its own artifact_id.
+        Why: code-reviewer registers one verdict per reviewed task, so code-review is multi-entry
+             even though it has a single producer. complete-implementation and forensic-review must
+             therefore pass artifact_id — a read of the type alone would return only T2's verdict
+             and branch the T1 gate on another task's findings.
+        """
+        # Arrange
+        t1 = ArtifactEntry(
+            artifact_type=ArtifactType.CODE_REVIEW, artifact_id="code-review-T1-auth", agent="code-reviewer"
+        )
+        t2 = ArtifactEntry(
+            artifact_type=ArtifactType.CODE_REVIEW, artifact_id="code-review-T2-auth", agent="code-reviewer"
+        )
+
+        # Act
+        manifest = registry.register(empty_manifest, t1)
+        manifest = registry.register(manifest, t2)
+
+        # Assert
+        entries = registry.get_by_type(manifest, ArtifactType.CODE_REVIEW)
+        assert sorted(e.artifact_id for e in entries) == ["code-review-T1-auth", "code-review-T2-auth"]
+        by_id = [e for e in entries if e.artifact_id == "code-review-T1-auth"]
+        assert len(by_id) == 1
 
     def test_register_auto_stamps_created_at_when_empty(
         self, registry: ArtifactRegistry, empty_manifest: ArtifactManifest

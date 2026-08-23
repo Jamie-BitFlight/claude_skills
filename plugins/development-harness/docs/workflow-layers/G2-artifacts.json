@@ -120,20 +120,20 @@
       "produced_by": {
         "skill": "complete-implementation",
         "source_file": "agents/code-reviewer.md:### Step 8: Assemble and Register Report",
-        "action": "artifact_register(item_id={item_id}, artifact_type='code-review', artifact_id='code-review-{task_id}-{slug}', content={report_markdown}, status='complete', agent='code-reviewer')",
+        "action": "artifact_register(item_id={item_id}, artifact_type='code-review', artifact_id='code-review-{task_id}-{slug}', content={report_markdown}, status='current', agent='code-reviewer')",
         "agent": "code-reviewer"
       },
       "consumed_by": [
         {
           "skill": "complete-implementation",
-          "source_file": "skills/complete-implementation/SKILL.md:## Recursive Follow-up Handling:### Step 1: Detect Follow-up Plans",
-          "action": "artifact read --item-id {item_ref} --artifact-type code-review — verdict drives the fix loop and follow-up routing",
+          "source_file": "skills/complete-implementation/references/read-code-review-verdict.md:## Step A — Read by identifier",
+          "action": "artifact read --item-id {item_ref} --artifact-type code-review --artifact-id {review_artifact_id} — verdict drives the fix loop and follow-up routing; falls back to artifact list on code-review, then on codebase-analysis filtered to agent code-reviewer for plans predating the type",
           "agent": null
         },
         {
           "skill": "forensic-review",
           "source_file": "skills/forensic-review/SKILL.md:### Step 4 — Read code-review Artifact",
-          "action": "artifact_read(item_id={item_id}, artifact_type='code-review')",
+          "action": "artifact_read(item_id={item_id}, artifact_type='code-review', artifact_id='{artifact_id}')",
           "agent": null
         }
       ],

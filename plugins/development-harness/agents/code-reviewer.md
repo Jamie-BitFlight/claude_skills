@@ -174,9 +174,23 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-The artifact type MUST be `"code-review"`. `code-review` holds exactly one document per work item — this verdict — and `complete-implementation` and `forensic-review` read it via `artifact_read(item_id, artifact_type="code-review")` to decide whether the review passed. Do NOT use `"codebase-analysis"` (that type carries the analysis documents `dh:codebase-analyzer` and `dh:code-review-architecture` write, several per item) or `"audit-report"` (reserved for `dh:doc-drift-auditor`). A read by type alone returns only the most recently registered entry, so registering this verdict under a shared type hands the gate whichever document was written last.
+The artifact type MUST be `"code-review"`. `code-reviewer` is its only registering agent, so no other
+producer can displace what a consumer reads. Do NOT use `"codebase-analysis"` (that type carries the
+analysis documents `dh:codebase-analyzer` and `dh:code-review-architecture` write, several per item)
+or `"audit-report"` (reserved for `dh:doc-drift-auditor`). A read by type alone returns only the most
+recently registered entry, so registering this verdict under a shared type hands the gate whichever
+document was written last.
 
-Where `{task_id}` is the task identifier from the SAM plan (e.g., `T3`) and `{slug}` is derived from the plan slug. Do not write to `~/.dh/` filesystem paths — register via MCP only.
+Where `{task_id}` is the task identifier from the SAM plan (e.g., `T3`) and `{slug}` is derived from
+the plan slug. Do not write to `~/.dh/` filesystem paths — register via MCP only.
+
+One `code-review` entry exists per reviewed task, not per work item: reviewing two tasks of the same
+item registers two entries under this type. `complete-implementation` and `forensic-review`
+therefore read the verdict by `artifact_id`, not by type alone —
+`artifact_read(item_id, artifact_type="code-review", artifact_id="code-review-{task_id}-{slug}")`.
+Report the `artifact_id` you actually used verbatim in the ARTIFACTS section of your STATUS output;
+that string is how the caller addresses this verdict, and a caller that cannot read it back branches
+on another task's review.
 
 </workflow>
 
@@ -244,7 +258,7 @@ Return this as your final response after registering the artifact:
 STATUS: DONE
 SUMMARY: {one paragraph — verdict, criteria status, key findings}
 ARTIFACTS:
-  - Review report: registered as artifact code-review / code-review-{task_id}-{slug} on item {item_id}
+  - Review report: registered as artifact type `code-review`, artifact_id `code-review-{task_id}-{slug}` on item {item_id} — substitute the real values; the caller reads this verdict back by that artifact_id
   - Verdict: PASS | FAIL | NEEDS-WORK
   - Criteria met: {N}/{total}
   - Blocking findings: {count}

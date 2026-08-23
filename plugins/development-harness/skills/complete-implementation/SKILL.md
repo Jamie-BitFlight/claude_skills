@@ -624,35 +624,13 @@ orchestrator skips recursion.
 
 ### Step 1: Detect Follow-up Plans
 
-Retrieve the review report registered by `@dh:code-reviewer` during Phase 1:
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "code-review"
-```
-
-**If `artifact_read` returns an error**, call
-`artifact_list(item_id={item_ref}, artifact_type="code-review")`. If the manifest contains
-an entry, report the provider read error and stop; registered content must remain readable through
-the same provider boundary.
-
-**If no `code-review` entry exists**, the plan may predate that artifact type — a verdict recorded
-by an earlier run is registered under `codebase-analysis`. Enumerate that type:
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type codebase-analysis
-```
-
-Keep only entries whose `agent` field is `code-reviewer` and take the one with the latest
-`created_at` as `{legacy_artifact_id}`. Read that entry by its own identifier — a read by
-`codebase-analysis` alone returns whichever analysis document was registered last, which is not a
-verdict:
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{legacy_artifact_id}"
-```
-
-Treat its content as the review report for the checks below. When no `codebase-analysis` entry
-carries `agent` `code-reviewer`, no earlier verdict exists — continue.
+Resolve the review report `@dh:code-reviewer` registered during Phase 1 into `{review_report}` by
+running [./references/read-code-review-verdict.md](./references/read-code-review-verdict.md). That
+procedure reads the `code-review` entry by its `artifact_id` (the type holds one entry per reviewed
+task), falls back to `artifact_list` when T1's STATUS output named no identifier, then to a
+`codebase-analysis` entry produced by `code-reviewer` for plans predating the type. If it yields no
+report it resets and re-dispatches T1, and blocks rather than continuing — an absent verdict is not
+a passing verdict.
 
 Check the `verdict` field in the report:
 
@@ -669,7 +647,8 @@ Check the `verdict` field in the report:
   or fix task `blocked`): report `COMPLETION BLOCKED — Blocking Code Review Findings Not
   Resolved`, do NOT route to backlog, stop, do not apply `status:verified`.
 
-If `artifact_list` also finds no match, fall back to the SAM MCP search:
+A `NEEDS-WORK` or `FAIL` report names the follow-up plans the reviewer created. If it names none,
+search SAM for plans the reviewer created without recording them in the report:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}-followup"
@@ -677,7 +656,9 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}-foll
 
 Use the parent plan's resolved `{slug}`.
 
-If both `artifact_read` and the SAM search return empty: skip the entire routing section (no follow-ups to route).
+If the report names no follow-up plan and the SAM search returns empty, skip the entire routing
+section — there is nothing to route. Reaching this point requires a verdict that was read; an
+unreadable verdict blocks in the procedure above and never arrives here.
 
 **Error handling**: If the SAM fallback returns plans from a different feature slug, filter results
 to the parent `{slug}`. Store each retained result's opaque `plan_ref` for follow-up operations.
