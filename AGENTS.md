@@ -471,7 +471,7 @@ When asked to check or address PR reviews, always fetch BOTH levels of feedback:
 gh pr view <N> -R Jamie-BitFlight/claude_skills --json reviews,reviewDecision
 
 # 2. Inline comments on specific lines — this is where substantive findings live
-gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {path, line, body}]'
+gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {id, path, line, body}]'
 ```
 
 `reviewDecision` being empty and `state: COMMENTED` does NOT mean no findings. Codex and other bots post substantive per-line feedback as inline comments, not as blocking review verdicts. Checking only the top-level state misses these entirely.
@@ -495,8 +495,8 @@ that addresses it — or why no change was warranted. "Fixed" alone tells the ne
 nothing.
 
 A decision that spans threads rather than answering one — a sequencing choice between PRs, a
-rebase disposition plan — goes on the PR itself via `gh pr comment <N>`, before the work it
-governs.
+rebase disposition plan — goes on the PR itself via
+`gh pr comment <N> -R Jamie-BitFlight/claude_skills`, before the work it governs.
 
 ## GitHub CLI Conventions
 
