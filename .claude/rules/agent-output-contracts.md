@@ -42,6 +42,9 @@ When operating as a **teammate** (spawned via `TeamCreate`), also send:
 SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
 ```
 
+That send is a notification, never the record. Put anything a later step reads in a named
+destination that step can read back — a task section, an artifact, a review thread.
+
 ## The "Write to File" Anti-Pattern
 
 "Write all output to files — never return large analysis as message text" means write a file
@@ -77,8 +80,12 @@ Never write these as agent output instructions:
 
 ## Enforcement
 
-When writing or reviewing agent files:
+When writing or reviewing an agent file, and when launching one:
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
-4. Check `SendMessage` is present when the agent is used as a teammate
+4. Check the agent's `tools:` grant includes `SendMessage` before dispatching it anywhere it must
+   report to another agent. A teammate is the exception — team coordination tools stay available
+   to a teammate whatever `tools:` restricts. This is a grant check, not a prose check: the agent
+   needs the capability, not an explanation of the tool.
+5. Check that any result a later step reads is written to a named destination, not only messaged
