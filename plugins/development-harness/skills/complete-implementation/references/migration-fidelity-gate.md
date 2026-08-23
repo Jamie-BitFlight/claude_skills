@@ -15,7 +15,7 @@ flowchart TD
     D2 --> D3["For each task in the plan, call<br>sam_task(plan='{plan_id}', task='{task_id}', config={action:'read'})<br>and check acceptance_criteria field<br>for: 'delete', 'remove source',<br>'after migration complete', 'drop the source'<br>Note: acceptance_criteria is a direct str field on Task model"]
     D3 --> Signal{"Any migration signal found<br>across issue title, body, or task criteria?"}
     Signal -->|"No signal found"| Skip(["Skip gate — proceed to Artifact Discovery"])
-    Signal -->|"Signal found — gate activates"| Fid1{"Evidence exists (file path or commit SHA)<br>that fidelity check ran on REAL production records<br>(not only synthetic fixtures) with zero data loss?"}
+    Signal -->|"Signal found — gate activates"| Fid1{"Evidence exists (verification summary or commit SHA)<br>that fidelity check ran on REAL production records<br>(not only synthetic fixtures) with zero data loss?"}
     Fid1 -->|"Confirmed"| Fid2
     Fid1 -->|"Unconfirmed"| CollectF1["Record: Fidelity check on real data — unconfirmed"]
     CollectF1 --> Fid2
@@ -32,7 +32,7 @@ flowchart TD
     Fid4 -->|"Unconfirmed"| CollectF4["Record: Deletion deferred or confirmed — unconfirmed"]
     CollectF4 --> AllConfirmed
     AllConfirmed -->|"No — all confirmed"| Proceed(["Proceed to Artifact Discovery"])
-    AllConfirmed -->|"Yes — unconfirmed items remain"| Blocked["COMPLETION BLOCKED — Migration Fidelity Gate<br>List each unconfirmed item<br>To unblock: run verify_migration_fidelity.py against real production data<br>OR provide a commit SHA showing completeness assertion ran on real files<br>Do NOT build QG plan, dispatch T1, or apply SAM state until resolved"]
+    AllConfirmed -->|"Yes — unconfirmed items remain"| Blocked["COMPLETION BLOCKED — Migration Fidelity Gate<br>List each unconfirmed item<br>To unblock: run verify_migration_fidelity.py against real production data<br>and read the verdict from its JSON summary, never from a report path<br>OR provide a commit SHA showing completeness assertion ran on real files<br>Do NOT build QG plan, dispatch T1, or apply SAM state until resolved"]
 ```
 
 ## On-Block Output
@@ -45,11 +45,14 @@ COMPLETION BLOCKED — Migration Fidelity Gate
 Unconfirmed items:
 - [list each unchecked item]
 
-To unblock: run `uv run plugins/development-harness/scripts/verify_migration_fidelity.py`
-against real production data and provide the path to the generated report in
-`.tmp/scratch/reports/`. A passing report (zero data loss, all sections preserved) confirms
-items 1 and 2. Alternatively, a commit SHA showing the completeness assertion was run on
+To unblock: run `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/verify_migration_fidelity.py"` against real
+production data and report its JSON summary. A pass — `classification_counts.CONTENT_LOSS` of 0 and `errors` of 0, exit status 0 —
+confirms items 1 and 2. Alternatively, a commit SHA showing the completeness assertion was run on
 real files is accepted.
+
+Read the verdict from that summary. Do not accept a filesystem path to a report as the evidence,
+and do not open one: a path that resolves where the script ran does not resolve here, so the gate
+reads nothing and passes on an empty file.
 ```
 
 Do NOT build the QG plan, dispatch T1, or apply any SAM state until all items above are confirmed.

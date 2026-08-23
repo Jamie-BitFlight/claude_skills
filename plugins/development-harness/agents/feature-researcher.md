@@ -150,20 +150,22 @@ Research value comes from accuracy, not completeness theater.
 
 <process>
 
-## Step 1: Detect Input Type
+## Step 1: Identify the Input
 
-Read the input from your prompt. It will be one of:
+Read the input from your prompt. It arrives in one of two forms:
 
-- **Simple Description**: "add a command that validates configuration files"
-- **Existing Document Path**: "{project_path}/plan/architect-feature.md"
+- A plain description of the feature — "add a command that validates configuration files".
+- A prior artifact the orchestrator names by `item_id` and `artifact_type`, most often an
+  `architect` document.
 
-```python
-def detect_input_type(input_text: str) -> str:
-    if input_text.endswith(".md") and "/" in input_text:
-        if file_exists(input_text):
-            return "existing_document"
-    return "simple_description"
-```
+Read a named artifact with `artifact_read(item_id={item_id}, artifact_type="{artifact_type}")`.
+Discover what the backlog item already carries with `artifact_list(item_id={item_id})`.
+
+Never accept a filesystem path as the input document, and never resolve one. A path that resolves
+in one worktree does not resolve in another, so a path-based input returns an empty read instead of
+an error.
+
+Record which form arrived — `description`, or the artifact type you read.
 
 ## Step 2: Extract Core Intent
 
@@ -216,7 +218,7 @@ Examples of HOW content to triage:
 - "add a `compact=True` flag that returns fields id, name, status" → intent: bounded/lightweight responses; search codebase for existing compact/summary patterns; assess; route `compact=True` + field list as architect-research with viability finding inline
 - "use offset/limit pagination consistent with the backlog_view pattern" → intent: paginated result access; search codebase for `backlog_view` pagination at its source; assess consistency; route pattern choice as architect-research with evidence
 
-This step runs regardless of input type (simple description or existing document path).
+This step runs for either input form — a plain description or a named artifact.
 
 ## Step 2.5: Fetch Primary Sources from Research Artifact Frontmatter
 
@@ -390,8 +392,8 @@ Return DONE or BLOCKED status to orchestrator.
 ## Document Metadata
 
 - **Generated**: {YYYY-MM-DD}
-- **Input Type**: {simple_description|existing_document}
-- **Source**: {original input or file path}
+- **Input Form**: {description|artifact}
+- **Source**: {verbatim request text, or the item_id and artifact_type read}
 - **Status**: DISCOVERY_COMPLETE
 
 ---
@@ -524,7 +526,7 @@ companion file on disk.
 
 ### Discovery Quality (Core Deliverables)
 
-- [ ] Input type detected correctly
+- [ ] Input form identified correctly — description or named artifact
 - [ ] Core intent (WHO/WHAT/WHEN/WHY) captured
 - [ ] At least 2 similar patterns identified with file references
 - [ ] At least 2 use scenarios documented
