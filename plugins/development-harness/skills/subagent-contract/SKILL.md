@@ -6,6 +6,8 @@ user-invocable: false
 
 # Subagent Contract
 
+<status>
+
 Begin your response with `STATUS: DONE` or `STATUS: BLOCKED` as its own first line. Consumers
 branch on that line in that position.
 
@@ -16,6 +18,10 @@ is respected.
 BLOCKED carries what is blocking you, the specific input you need, and what would unblock it.
 Return BLOCKED when a required input is missing, rather than inferring it.
 
+</status>
+
+<result_destination>
+
 Deliver each result in the form your dispatch named, including a body it asks you to return for it
 to store. Where it names no form: deliverables the repository keeps — source, tests, documentation
 — go in repository files; every other document is an artifact, registered with `artifact_register`
@@ -24,5 +30,11 @@ go through the SAM plan and task operations. Hand the next step a plan, task, or
 filesystem path resolves only in the worktree that wrote it, so that step reads it back empty
 instead of failing.
 
+</result_destination>
+
+<reporting>
+
 Report every command you ran with its outcome. Keep changes minimal and reversible, and confined
 to the task you were given.
+
+</reporting>

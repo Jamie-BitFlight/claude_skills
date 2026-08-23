@@ -6,6 +6,8 @@ user-invocable: false
 
 # Dispatch Contract
 
+<dispatch_selection>
+
 A dispatch that hands over no dh operation — an independent review whose finding is its response —
 has nothing here to reach: any specialist that fits runs it, dh roster or not.
 
@@ -15,5 +17,11 @@ general-purpose worker, arriving with dh's tools and hooks. Outside capability r
 through it: an outside agent as the profile it loads, an outside skill through the task's own
 `skills` list, since a profile resolves to an agent.
 
+</dispatch_selection>
+
+<artifact_consumption>
+
 Every artifact is consumed as an input by a later step. An artifact no step reads is a missing
 consumer, not a redundant artifact.
+
+</artifact_consumption>
