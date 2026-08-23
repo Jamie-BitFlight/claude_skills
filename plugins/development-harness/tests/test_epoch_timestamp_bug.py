@@ -380,6 +380,54 @@ def test_apply_groomed_entries_collision_suffixed_id_updates_correct_entry() -> 
 
 
 # ---------------------------------------------------------------------------
+# Finding 7c — the entry_blocks.rewrite_section path and the
+# operations._apply_groomed_entries path must resolve an identical
+# stored-id collision to the identical target entry (#3183 consolidation)
+# ---------------------------------------------------------------------------
+
+
+def test_rewrite_section_and_apply_groomed_entries_resolve_same_collision_id() -> None:
+    """Both entry-id resolution call sites must agree on which entry a suffixed id targets.
+
+    entry_blocks._rewrite_by_entry_id (used by rewrite_section, the markdown-body
+    path) and operations._apply_groomed_entries (used by backlog_update/
+    backlog_groom, the live Section path) both resolve entry_id through the single
+    shared implementation, entry_blocks.resolve_entry_id. This test is the
+    regression guard for that consolidation: if a future edit reintroduces a
+    second, independent resolution implementation in either caller, this test
+    fails as soon as the two disagree on which entry a collision-suffixed id
+    targets.
+    """
+    from backlog_core.entry_blocks import rewrite_section, wrap_entry_with_timestamp
+
+    shared_id = "2026-01-01T00:00:00Z"
+    target_id = f"{shared_id}-1"
+
+    # entry_blocks path: rewrite_section replaces the entry the suffixed id targets.
+    body = f"{wrap_entry_with_timestamp('first', shared_id)}\n\n{wrap_entry_with_timestamp('second', shared_id)}"
+    rewritten = rewrite_section(body, new_content="REPLACED", entry_id=target_id)
+    rewritten_entries = parse_entries(rewritten, show="all")
+    assert [e.content for e in rewritten_entries] == ["first", "REPLACED"], (
+        "rewrite_section must resolve the '-1' suffix to the SECOND colliding entry"
+    )
+
+    # operations path: _apply_groomed_entries updates the entry the same suffixed id targets.
+    section = Section(entries=[Entry(id=shared_id, content="first"), Entry(id=shared_id, content="second")])
+    _apply_groomed_entries(
+        section,
+        "REPLACED",
+        append=False,
+        replace_section=False,
+        reason=None,
+        entry_id=target_id,
+        added_date="0000-00-00",
+    )
+    assert [e.content for e in section.entries] == ["first", "REPLACED"], (
+        "_apply_groomed_entries must resolve the '-1' suffix to the SAME (second) colliding entry"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Regression — since filtering must use datetime comparison, not string comparison
 # ---------------------------------------------------------------------------
 

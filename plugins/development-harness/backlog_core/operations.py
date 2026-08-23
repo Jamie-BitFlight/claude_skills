@@ -27,7 +27,7 @@ from typing_extensions import TypedDict
 from . import models as _models
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
-from .entry_blocks import _render_entry_raw, _resolve_duplicate_ids, find_entry_spans, parse_entries
+from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -842,11 +842,10 @@ def _extract_subsection_body(body: str, section_name: str) -> str:
 def _resolve_section_entry(entries: list[Entry], entry_id: str) -> Entry:
     """Locate the entry that *entry_id* targets, resolving stored-id collisions positionally.
 
-    Applies the same positional collision resolution backlog_view uses
-    (:func:`~.entry_blocks._resolve_duplicate_ids`) to a throwaway copy of
-    *entries*' ids, so a caller-supplied ``-N``-suffixed id -- the form
-    backlog_view returns when two entries in one section share a stored id --
-    resolves to the correct entry instead of matching nothing.
+    Thin wrapper around :func:`~.entry_blocks.resolve_entry_id` -- the single
+    positional collision-resolution implementation, shared with
+    :func:`~.entry_blocks._rewrite_by_entry_id` so backlog_view's read path
+    and this write path always agree on which entry a given id targets.
 
     Args:
         entries: A section's entry list, in storage order.
@@ -857,17 +856,12 @@ def _resolve_section_entry(entries: list[Entry], entry_id: str) -> Entry:
         callers mutate it in place.
 
     Raises:
-        EntryNotFoundError: When ``entry_id`` matches neither a raw id nor a
-            collision-resolved id. Names every id backlog_view would show for
-            *entries*, so a stale or mistyped id fails loudly instead of
-            silently creating a duplicate entry.
+        EntryNotFoundError: When ``entry_id`` matches no entry in *entries*,
+            even after collision resolution. Names every id backlog_view
+            would show for *entries*, so a stale or mistyped id fails loudly
+            instead of silently creating a duplicate entry.
     """
-    id_entries = [Entry(id=e.id, content="") for e in entries]
-    _resolve_duplicate_ids(id_entries)
-    for entry, id_entry in zip(entries, id_entries, strict=True):
-        if id_entry.id == entry_id:
-            return entry
-    raise EntryNotFoundError(entry_id, [e.id for e in id_entries])
+    return entries[resolve_entry_id([e.id for e in entries], entry_id)]
 
 
 def _apply_groomed_entries(
