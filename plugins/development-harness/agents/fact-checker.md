@@ -5,6 +5,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, Skill, WebFetch, WebSearch, SendMess
 model: haiku
 memory: project
 skills:
+  - dh:subagent-contract
   - dh:dispatch-contract
 ---
 

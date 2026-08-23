@@ -304,9 +304,9 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 
 - `/dh:dispatch` - Dispatch tasks to agents using teams-first parallel execution; prefer over implement-feature when milestone-scoped work needs concurrent agent dispatch
 - `/dh:dh-meta-docs` - Plugin meta-documentation
-- `/dh:dispatch-contract` - Runtime execution contract: dispatch target, task `agent:` field resolution, artifact-vs-filesystem boundary
+- `/dh:dispatch-contract` - Which agent a dh workflow dispatches, and the artifact consumer invariant
 - `/dh:interop` - Cross-plugin interoperability
-- `/dh:subagent-contract` - Subagent contract definitions
+- `/dh:subagent-contract` - Where a dispatched step's output goes, and how it signals state upstream
 
 ---
 

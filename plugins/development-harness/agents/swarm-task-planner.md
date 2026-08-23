@@ -7,6 +7,7 @@ skills:
   - dh:clear-cove-task-design
   - dh:create-artifact
   - python-engineering:specialist-skill-routing
+  - dh:subagent-contract
   - dh:dispatch-contract
 ---
 

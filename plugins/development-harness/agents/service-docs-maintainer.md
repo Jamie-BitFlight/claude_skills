@@ -7,6 +7,7 @@ color: yellow
 memory: project
 skills:
   - mattpocock-skills:writing-for-agents
+  - dh:subagent-contract
   - dh:dispatch-contract
 ---
 

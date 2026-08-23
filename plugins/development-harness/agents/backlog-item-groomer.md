@@ -6,6 +6,7 @@ model: sonnet
 memory: project
 skills:
   - dh:planner-rt-ica
+  - dh:subagent-contract
   - dh:dispatch-contract
 ---
 
