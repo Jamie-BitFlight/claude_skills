@@ -201,6 +201,60 @@ def test_extract_task_info_from_prompt_plan_address_not_found() -> None:
 
 
 # ---------------------------------------------------------------------------
+# extract_task_info_from_prompt — bare address form (implement-feature dispatch)
+# ---------------------------------------------------------------------------
+# implement-feature/SKILL.md dispatches dh:task-worker with the task reference as its
+# ENTIRE prompt, in the bare form "{plan_ref}/{task_id}" — no /start-task prefix, no
+# Skill() wrapper.
+
+
+def test_extract_task_info_from_prompt_bare_address_form(tmp_path: Path) -> None:
+    """Bare "{plan_ref}/{task_id}" prompt (implement-feature's dispatch form) resolves."""
+    # Arrange
+    resolved = tmp_path / "Pdec8934d-my-feature.yaml"
+    resolved.touch()
+    prompt = "Pdec8934d/T01"
+
+    # Act
+    with patch.object(_hook_mod, "resolve_plan_address", return_value=resolved) as mock_resolve:
+        task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T01"
+    assert task_file == resolved
+    mock_resolve.assert_called_once_with("Pdec8934d", ANY)
+
+
+def test_extract_task_info_from_prompt_bare_address_form_strips_whitespace(tmp_path: Path) -> None:
+    """Leading/trailing whitespace around the bare address form is tolerated."""
+    # Arrange
+    resolved = tmp_path / "Pdec8934d-my-feature.yaml"
+    resolved.touch()
+    prompt = "  Pdec8934d/T01\n"
+
+    # Act
+    with patch.object(_hook_mod, "resolve_plan_address", return_value=resolved):
+        task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_id == "T01"
+    assert task_file == resolved
+
+
+def test_extract_task_info_from_prompt_bare_address_form_embedded_not_matched() -> None:
+    """A plan/task address embedded in a longer prompt is NOT treated as the bare form."""
+    # Arrange
+    prompt = "Please review Pdec8934d/T01 as part of code review."
+
+    # Act
+    task_file, task_id = extract_task_info_from_prompt(prompt)
+
+    # Assert
+    assert task_file is None
+    assert task_id is None
+
+
+# ---------------------------------------------------------------------------
 # extract_task_info_from_prompt — file path form (regression tests)
 # ---------------------------------------------------------------------------
 
