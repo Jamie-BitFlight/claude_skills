@@ -104,15 +104,23 @@ Address the entry by its `artifact_id`. One `code-review` entry exists per revie
 two tasks of this work item have been reviewed, omitting `artifact_id` returns whichever review
 registered last — which may be another task's.
 
-If the STATUS output named no `artifact_id`, enumerate the type and select the entry yourself:
+If the STATUS output named no `artifact_id`, derive it — `code-reviewer` registers
+`code-review-{task_id}-{slug}`, where `{slug}` is the slug half of this plan's address — and confirm
+it exists:
 
 ```text
 artifact_list(item_id={item_id}, artifact_type="code-review")
 ```
 
-Take the entry whose `artifact_id` contains this task's `{task_id}`; when none does, take the latest
-`created_at` and record in the Review Results section that the verdict was matched by recency rather
-than by identifier.
+Match `artifact_id` exactly. Never select by substring and never fall back to the latest
+`created_at`: this work item also holds the quality gate's `code-review-T1-qg-{slug}` verdict and
+the verdicts of every other task reviewed against it, and several of those contain this task's
+`{task_id}` as a substring. A loose match returns another task's review, which Step 5 would then
+append to this task's Review Results and mine for remediation findings that belong elsewhere.
+
+If no entry matches exactly, stop and report BLOCKED naming the identifier that was expected and the
+identifiers `artifact_list` returned. Step 2 dispatched the reviewer moments earlier, so a missing
+verdict is a failure to report, not a condition to work around.
 
 Use this to populate the SAM task's Review Results section and to extract blocking findings
 for remediation task creation.

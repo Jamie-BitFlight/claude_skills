@@ -10,8 +10,11 @@ verdict. Address the entry by its identifier.
 
 ## Step A — Read by identifier
 
-Take `{review_artifact_id}` from the ARTIFACTS section of T1's STATUS output. It is
-`code-review-T1-{slug}` unless the agent reported a different identifier; the reported value wins.
+`{review_artifact_id}` is `code-review-T1-qg-{slug}`. `code-reviewer` derives the `{slug}` half of
+its `artifact_id` from the plan it was dispatched under, and T1 is dispatched under the quality-gate
+plan whose slug is `qg-{slug}` — not the feature plan's `{slug}`. Use the identifier T1's STATUS
+ARTIFACTS section reports when it names one; otherwise use the derived value. Do not shorten either
+to a substring.
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "code-review" --artifact-id "{review_artifact_id}"
@@ -19,22 +22,28 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_
 
 On success, that content is `{review_report}` — return to the caller.
 
-## Step B — T1's STATUS output named no identifier
+## Step B — Step A found no such entry
 
-This is the usual case when resuming a plan whose T1 completed in an earlier session. Enumerate the
-type and select the entry:
+Confirm what the type does hold before concluding anything:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type code-review
 ```
 
-Take the entry whose `artifact_id` contains `T1`. When none does, take the latest `created_at`. Read
-it through Step A with that `artifact_id`.
+Match `artifact_id` exactly against `code-review-T1-qg-{slug}`. Never select by substring and never
+fall back to the latest `created_at`. One work item holds the verdicts of every task ever reviewed
+against it: the feature plan's own forensic review registers `code-review-{task_id}-{slug}` under
+the same type, and both that and the quality-gate verdict contain `T1`. A substring or recency match
+can hand this gate the feature plan's earlier `PASS` in place of the quality gate's `FAIL`.
 
-If `artifact read` returns an error while `artifact list` shows an entry, report the provider read
-error and stop. Registered content must remain readable through the same provider boundary.
+If an entry matches exactly, read it through Step A. If none does, go to Step C — no `code-review`
+entry for this quality-gate plan exists, whatever else the type holds.
 
-## Step C — No `code-review` entry exists at all
+If `artifact read` returns an error while `artifact list` shows the matching entry, report the
+provider read error and stop. Registered content must remain readable through the same provider
+boundary.
+
+## Step C — No `code-review` entry for this quality-gate plan
 
 The plan may predate that artifact type: a verdict recorded by an earlier run is registered under
 `codebase-analysis`. Enumerate that type:
@@ -43,10 +52,12 @@ The plan may predate that artifact type: a verdict recorded by an earlier run is
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type codebase-analysis
 ```
 
-Keep only entries whose `agent` field is `code-reviewer` and take the one with the latest
-`created_at` as `{legacy_artifact_id}`. Read that entry by its own identifier — a read by
-`codebase-analysis` alone returns whichever analysis document was registered last, which is not a
-verdict:
+Keep only entries whose `agent` field is `code-reviewer`. Prefer the one whose `artifact_id` ends in
+`-qg-{slug}`; a legacy verdict registered under a plan that predates the quality-gate split may not
+carry that suffix, in which case take the latest `created_at` among the `code-reviewer` entries and
+record in the completion report that the verdict was matched by recency. Call the selection
+`{legacy_artifact_id}` and read it by its own identifier — a read by `codebase-analysis` alone
+returns whichever analysis document was registered last, which is not a verdict:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{legacy_artifact_id}"
