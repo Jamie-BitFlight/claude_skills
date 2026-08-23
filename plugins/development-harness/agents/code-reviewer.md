@@ -7,6 +7,7 @@ skills:
   - dh:subagent-contract
   - dh:file-classification
   - ccc
+  - dh:dispatch-contract
 color: orange
 ---
 

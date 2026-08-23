@@ -64,9 +64,9 @@ instructions, loads skills, calls tools in order, produces outputs, hands contro
 
 ### Two-hop dispatch (profile-load-mediated)
 
-implement-feature dispatches `subagent_type="dh:task-worker"` always. task-worker reads
-the SAM task `agent:` field and calls `profile_load(agent_name=...)` to specialize itself.
-The span tree is:
+When implement-feature dispatches `subagent_type="dh:task-worker"` — the case where no prebuilt
+specialist covers the task — task-worker reads the SAM task `agent:` field and calls
+`profile_load(agent_name=...)` to specialize itself. The span tree is:
 
 ```
 orchestrator-span
@@ -77,7 +77,7 @@ orchestrator-span
 This is distinct from groom swarm TeamCreate, which names specialists directly. The join
 must distinguish these two shapes or every task-worker span resolves to the wrong actor.
 
-SOURCE: `plugins/development-harness/CLAUDE.md` → "Dispatch Pattern"
+SOURCE: `plugins/development-harness/skills/dispatch-contract/SKILL.md`
 
 ### Conditional topology
 

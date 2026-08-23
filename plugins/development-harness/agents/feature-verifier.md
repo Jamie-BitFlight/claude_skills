@@ -8,6 +8,7 @@ skills:
   - dh:final-verification
   - dh:validation-protocol
   - ccc
+  - dh:dispatch-contract
 color: green
 ---
 

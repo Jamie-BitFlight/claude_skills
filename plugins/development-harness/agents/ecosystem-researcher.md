@@ -4,6 +4,7 @@ description: Researches domain ecosystems and technology landscapes before roadm
 tools: Read, Grep, Glob, Write, Skill, SendMessage, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_dh_sam
 skills:
   - dh:subagent-contract
+  - dh:dispatch-contract
 model: haiku
 color: blue
 ---

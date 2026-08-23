@@ -7,6 +7,7 @@ color: cyan
 skills:
   - dh:subagent-contract
   - ccc
+  - dh:dispatch-contract
 ---
 
 # Context-Gathering Agent

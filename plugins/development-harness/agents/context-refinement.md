@@ -7,6 +7,7 @@ color: purple
 skills:
   - dh:subagent-contract
   - ccc
+  - dh:dispatch-contract
 ---
 
 # Context Refinement Agent
