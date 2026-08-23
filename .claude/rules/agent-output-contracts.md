@@ -36,16 +36,13 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
-When operating as a teammate, also send the STATUS block to your lead:
+When operating as a teammate, also report the STATUS block to whoever dispatched you,
+through whatever channel your harness provides.
 
-```
-SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
-```
-
-The message is a notification, never the record. Anything a later step reads goes to a
+That report is a notification, never the record. Anything a later step reads goes to a
 named destination that step can read back — a task section, an artifact, a review thread.
-A result that exists only as a message is lost when the session ends, and cannot be read
-at all by a harness without this tool.
+A result that exists only as a report is lost when the session ends, and unreachable from
+any other session, machine, or harness.
 
 ## The "Write to File" Anti-Pattern
 
