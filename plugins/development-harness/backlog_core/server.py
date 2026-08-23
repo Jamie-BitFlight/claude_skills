@@ -3318,15 +3318,7 @@ async def artifact_register(
             description="Backlog item identifier — GitHub issue number (int) or beads nanoid string (e.g. 'bd-a3f8')"
         ),
     ],
-    artifact_type: Annotated[
-        str,
-        Field(
-            description=(
-                "Artifact type: feature-context, architect, task-plan, T0-baseline, TN-verification, "
-                "codebase-analysis, research"
-            )
-        ),
-    ],
+    artifact_type: Annotated[ArtifactType, Field(description="Artifact type registered against the work item")],
     artifact_id: Annotated[
         str,
         Field(
@@ -3344,7 +3336,7 @@ async def artifact_register(
             description="Artifact body written through the selected content provider before its manifest registration.",
         ),
     ],
-    status: Annotated[str, Field(description="Lifecycle status: draft, current, superseded, archived")] = "current",
+    status: Annotated[ArtifactStatus, Field(description="Lifecycle status of the artifact")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, Field(description="Name of the producing agent")] = "",
 ) -> dict:
     """Upsert an artifact entry in provider-owned logical content.
@@ -3358,20 +3350,18 @@ async def artifact_register(
 
     Returns:
         Dict with registered (bool), artifact_count (int), action (str),
-        content_stored (bool), and output messages/warnings. On error, dict
-        contains an error key.
+        content_stored (bool), and output messages/warnings.
+
+    Raises:
+        BacklogError: The selected backend could not store the artifact or its manifest.
     """
     out = Output()
     try:
-        if not content:
-            return {"error": "Artifact content must not be empty.", **out.to_dict()}
         provider = _get_artifact_provider()
-        artifact_type_enum = ArtifactType(artifact_type)
-        status_enum = ArtifactStatus(status)
         entry = ArtifactEntry(
-            artifact_type=artifact_type_enum,
+            artifact_type=artifact_type,
             artifact_id=artifact_id,
-            status=status_enum,
+            status=status,
             created_at=_datetime.now(UTC).isoformat(),
             agent=agent,
         )
@@ -3388,8 +3378,6 @@ async def artifact_register(
 
         result = await asyncio.to_thread(_run)
         return {**result.model_dump(), **out.to_dict()}
-    except (ValueError, KeyError) as e:
-        return {"error": f"Invalid parameter: {e}", **out.to_dict()}
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
@@ -3415,7 +3403,11 @@ async def artifact_list(
 
     Returns:
         Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings. On error, dict contains an error key.
+        messages/warnings.
+
+    Raises:
+        ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
+        BacklogError: The selected backend could not resolve the manifest.
     """
     out = Output()
     try:
@@ -3432,8 +3424,6 @@ async def artifact_list(
 
         artifacts = await asyncio.to_thread(_run)
         return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
-    except (ValueError, KeyError) as e:
-        return {"error": f"Invalid parameter: {e}", **out.to_dict()}
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
@@ -3459,7 +3449,12 @@ async def artifact_get(
 
     Returns:
         Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings. Returns error key when type is not found.
+        messages/warnings. Returns error key when type is not found — an absent
+        artifact is data, not a failed call.
+
+    Raises:
+        ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
+        BacklogError: The selected backend could not resolve the manifest.
     """
     out = Output()
     try:
@@ -3475,8 +3470,6 @@ async def artifact_get(
         if not artifacts:
             return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
         return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
-    except (ValueError, KeyError) as e:
-        return {"error": f"Invalid parameter: {e}", **out.to_dict()}
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 
@@ -3494,16 +3487,35 @@ async def artifact_read(
         ),
     ],
     artifact_type: Annotated[str, Field(description="Artifact type whose content to read")],
+    artifact_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Logical identifier of the specific artifact to read. Omit to read the most "
+                "recently registered artifact of this type."
+            )
+        ),
+    ] = None,
 ) -> dict:
     """Read provider-owned logical content for a registered artifact.
 
     The selected ContentProvider resolves the artifact by owner, type, and
     logical identifier. This layer does not access local artifact files.
 
+    Omitting ``artifact_id`` returns the most recently registered entry of the type.
+    Supplying it addresses one specific entry, matching
+    ``dh_core.operations.artifact_read`` and the ``artifact read --artifact-id`` CLI
+    option, so both surfaces can address an artifact the same way.
+
     Returns:
         Dict with type (str), path (str), content (str), status (str), and
         output messages/warnings. Returns error key on type-not-found or when
-        the selected provider has no matching content.
+        the selected provider has no matching content — an absent artifact is
+        data, not a failed call.
+
+    Raises:
+        ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
+        BacklogError: The selected backend could not resolve the manifest.
     """
     out = Output()
     try:
@@ -3514,6 +3526,11 @@ async def artifact_read(
             manifest = _load_manifest(provider, item_id)
             entries = _artifact_registry.get_by_type(manifest, type_enum)
             _require_artifact_entries(entries, f"No artifacts of type '{artifact_type}' found for item #{item_id}")
+            if artifact_id is not None:
+                entries = [entry for entry in entries if entry.artifact_id == artifact_id]
+                _require_artifact_entries(
+                    entries, f"No artifact with id '{artifact_id}' of type '{artifact_type}' found for item #{item_id}"
+                )
             # Sort by created_at desc so the most recently registered entry comes first.
             # Entries without a timestamp sort last (empty string is smallest; stable sort
             # preserves insertion order among multiple undated entries).
@@ -3533,8 +3550,6 @@ async def artifact_read(
 
         result = await asyncio.to_thread(_run)
         return {**result.model_dump(mode="json"), **out.to_dict()}
-    except (ValueError, KeyError) as e:
-        return {"error": f"Invalid parameter: {e}", **out.to_dict()}
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}
 

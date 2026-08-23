@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+import inspect
 
-from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition
+import pytest
+from pydantic import BaseModel, ValidationError
+
+from sam_schema.cli_inputs import CreatePlanInput
+from sam_schema.core import action_models
+from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition, UpdatePlanConfig
 
 
 def test_create_plan_schema_describes_provider_neutral_identity() -> None:
@@ -65,3 +69,66 @@ def test_task_definition_rejects_id_not_matching_task_id_pattern() -> None:
     """An ID outside TASK_ID_PATTERN is still rejected after widening to the canonical pattern."""
     with pytest.raises(ValidationError, match="id"):
         TaskDefinition.model_validate({"id": "invalid-id", "title": "Implement"})
+
+
+# ---------------------------------------------------------------------------
+# Closed-object contract on every action config (#3162)
+# ---------------------------------------------------------------------------
+
+
+def _action_config_models() -> list[type[BaseModel]]:
+    """Return every concrete action-config model exposed on the SAM tool surface."""
+    base = action_models._ActionConfigBase
+    return [
+        member
+        for _, member in inspect.getmembers(action_models, inspect.isclass)
+        if issubclass(member, base) and member is not base
+    ]
+
+
+def test_plan_update_config_rejects_parameters_that_do_not_exist() -> None:
+    """A plan-level section append was instructed for months and silently wrote nothing.
+
+    ``plan_slug``, ``section`` and ``content`` are not ``UpdatePlanConfig`` fields. While
+    the config accepted unknown keys the call returned success having applied no patch,
+    so the agent's output was lost with no signal at the call site (#3162).
+    """
+    with pytest.raises(ValidationError, match="plan_slug"):
+        UpdatePlanConfig.model_validate({
+            "action": "update",
+            "plan_slug": "auth-system",
+            "section": "Findings",
+            "content": "Research output",
+        })
+
+
+@pytest.mark.parametrize("model", _action_config_models(), ids=lambda m: m.__name__)
+def test_action_config_schema_advertises_a_closed_object(model: type[BaseModel]) -> None:
+    """Each config branch must publish ``additionalProperties: false``.
+
+    The enclosing tool schema already closes its top level, but a calling agent reads the
+    branch schema to learn which keys exist. A branch that advertises nothing invites the
+    invented parameter and then discards it.
+    """
+    assert model.model_json_schema().get("additionalProperties") is False, (
+        f"{model.__name__} does not advertise a closed object, so an unknown key on this "
+        "action is neither rejected nor visible as invalid in the published schema."
+    )
+
+
+def test_cli_create_plan_passes_no_keys_the_config_forbids() -> None:
+    """``plan create`` re-validates its own dump, so a stray key would break the CLI.
+
+    ``sam_plan.create`` builds the action config from ``CreatePlanInput.to_config()``'s
+    dump plus ``owner_reference``. Closing the model turns any key outside the field set
+    into a hard CLI failure, so the round trip is asserted directly.
+    """
+    config = CreatePlanInput(slug="auth-system", goal="Ship auth", tasks=[], context=None, issue=None).to_config()
+
+    payload = {**config.model_dump(), "owner_reference": None}
+
+    assert set(payload) <= set(CreatePlanConfig.model_fields), (
+        "plan create would pass keys the closed config rejects: "
+        f"{sorted(set(payload) - set(CreatePlanConfig.model_fields))}"
+    )
+    assert CreatePlanConfig.model_validate(payload).slug == "auth-system"

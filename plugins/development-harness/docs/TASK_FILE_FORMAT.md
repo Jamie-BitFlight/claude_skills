@@ -121,20 +121,22 @@ mcp__plugin_dh_sam__sam_active_task(config={"action":"clear"})
 
 #### Deprecated Tools (migration reference only)
 
-The following 8 tools are replaced by the 3-tool interface above. They return a
-`ToolError` when called and must not appear in new agent code or skill files.
+The tools named below are replaced by the 3-tool interface above. They return a
+`ToolError` when called and must not appear in new agent code or skill files. The deprecated
+column names them without call syntax deliberately — writing a removed name in call form is the
+instruction shape this table exists to retire.
 
 | Deprecated tool | Replaced by |
 |---|---|
-| `sam_read(plan, task)` | `sam_task(plan, task, config={"action":"read"})` |
-| `sam_claim(plan, task)` | `sam_task(plan, task, config={"action":"claim"})` |
-| `sam_state(plan, task, status)` | `sam_task(plan, task, config={"action":"state","status":...})` |
-| `sam_update(plan, context)` | `sam_plan(plan, config={"action":"update","context":...})` |
-| `sam_update(plan, task, ...)` | `sam_task(plan, task, config={"action":"update",...})` |
-| `sam_ready(plan)` | `sam_plan(plan, config={"action":"ready"})` |
-| `sam_status(plan)` | `sam_plan(plan, config={"action":"status"})` |
-| `sam_list(...)` | `sam_plan(config={"action":"list",...})` |
-| `sam_create(...)` | `sam_plan(config={"action":"create",...})` |
+| `sam_read` | `sam_task(plan, task, config={"action":"read"})` |
+| `sam_claim` | `sam_task(plan, task, config={"action":"claim"})` |
+| `sam_state` | `sam_task(plan, task, config={"action":"state","status":...})` |
+| `sam_update`, plan-level | `sam_plan(plan, config={"action":"update","context":...})` |
+| `sam_update`, task-level | `sam_task(plan, task, config={"action":"update",...})` |
+| `sam_ready` | `sam_plan(plan, config={"action":"ready"})` |
+| `sam_status` | `sam_plan(plan, config={"action":"status"})` |
+| `sam_list` | `sam_plan(config={"action":"list",...})` |
+| `sam_create` | `sam_plan(config={"action":"create",...})` |
 
 ### DH CLI Adapter
 

@@ -4,7 +4,7 @@ description: Performs holistic code review after feature implementation. Checks 
 model: sonnet
 color: yellow
 memory: project
-tools: Read, Write, Glob, Grep, Skill, Bash, SendMessage
+tools: Read, Write, Glob, Grep, Skill, Bash, SendMessage, mcp__plugin_dh_sam__sam_plan
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-testing
@@ -138,7 +138,7 @@ invoking the Skill tool, which would terminate your flow prematurely.
 
 ### Step 7: Create Follow-up Tasks
 
-For each significant issue found (including HIGH/MEDIUM priority issues from the automated analysis), create a follow-up plan file using `mcp__plugin_dh_sam__sam_create` as
+For each significant issue found (including HIGH/MEDIUM priority issues from the automated analysis), create a follow-up plan using `mcp__plugin_dh_sam__sam_plan` as
 described in the Task File Format section.
 </workflow>
 
@@ -162,69 +162,48 @@ perceived impact large enough to warrant its own grooming?
 - Has perceived impact large enough to warrant its own grooming, research, and architecture decision
 - Involves changing a shared component in a way that affects multiple features
 
-**Required output format**: Every follow-up task file must include:
-1. Top-level `scope:` YAML field: `scope: in-scope` or `scope: out-of-scope`
-2. A `## Scope` section in the task body with the classification value
-3. A `## Scope Rationale` section with at least one sentence explaining the classification
+Required output format: every follow-up task must carry the classification in its `body`, as a
+`## Scope` section holding the classification value and a `## Scope Rationale` section holding at
+least one sentence explaining it. The task model has no `scope` field; a task submitted with one
+is rejected.
 
 ## Task File Format
 
-### Creating Follow-up Files with SAM
+### Creating Follow-up Plans with SAM
 
-Use `mcp__plugin_dh_sam__sam_create` to create follow-up task files. This produces a versioned YAML plan file
-in `~/.dh/projects/{slug}/plan/` with an auto-assigned plan number (`plan/P{NNN}-{slug}.yaml` relative to the dh state root).
+Use `mcp__plugin_dh_sam__sam_plan` with the `create` action. The plan is stored by the configured
+backend and addressed logically — no filesystem path is returned or needed.
 
-**CRITICAL: Task identifier key is `task:` — NEVER use `id:`.**
-
-The tasks_yaml passed to `sam_create` MUST use `task:` as the identifier field. Using `id:` is
-wrong and will produce a malformed plan.
-
-**Correct tasks_yaml structure:**
-
-```yaml
-tasks:
-  - task: T1
-    title: "Brief title of the fix"
-    status: not-started
-    agent: python-cli-architect
-    dependencies: []
-    priority: 2
-    complexity: low
-    skills: []
-    scope: in-scope
-    body: |
-      ## Objective
-      Describe what needs to be done.
-
-      ## Acceptance Criteria
-      - Criterion 1
-```
-
-**Command:**
+Each entry in `tasks` is a task definition. Its identifier key is `task` (`id` is also accepted);
+`title` is required. `agent`, `dependencies`, `priority`, `complexity`, `skills`, and `body` are
+optional. Any other key is rejected, so classification and detail belong inside `body`.
 
 ```text
-mcp__plugin_dh_sam__sam_create(
-  slug="{feature-slug}-followup-{issue-number}",
-  goal="{one-sentence goal describing the fix}",
-  tasks_yaml="tasks:\n  - task: T1\n    title: \"{Brief Title}\"\n    status: not-started\n    agent: python-cli-architect\n    dependencies: []\n    priority: 2\n    complexity: low\n    skills: []\n    scope: in-scope\n    body: |\n      ## Objective\n      {describe the fix needed}\n"
-)
+mcp__plugin_dh_sam__sam_plan(config={
+  "action": "create",
+  "slug": "{feature-slug}-followup-{issue-number}",
+  "goal": "{one-sentence goal describing the fix}",
+  "tasks": [
+    {
+      "task": "T1",
+      "title": "{Brief Title}",
+      "status": "not-started",
+      "agent": "python-cli-architect",
+      "dependencies": [],
+      "priority": 2,
+      "complexity": "low",
+      "body": "## Objective\n{describe the fix needed}\n\n## Scope\nin-scope\n\n## Scope Rationale\n{one sentence}\n\n## Acceptance Criteria\n- {criterion}\n"
+    }
+  ]
+})
 ```
 
-**Output:** JSON with the created file path:
+Output: the created plan's logical address. Use that address in your ARTIFACTS `Task files:` list.
 
-```json
-{"path": "plan/P005-{feature-slug}-followup-{issue-number}.yaml", "plan_number": 5, "task_count": 1}
-```
+To determine the slug: take the feature slug from the plan the review covers (e.g.
+`data-validation`) and pass `{feature-slug}-followup-{issue-number}`.
 
-**To determine the slug:**
-
-1. READ the original task file path (e.g., `~/.dh/projects/{slug}/plan/P004-data-validation.yaml`)
-2. EXTRACT the feature slug (e.g., `data-validation`)
-3. PASS `{feature-slug}-followup-{issue-number}` as the slug argument
-
-**Priority values:** 1 (critical) through 5 (low). Complexity: `low`, `medium`, or `high` (lowercase).
-
-**IMPORTANT:** Use the `path` value from the JSON output in your ARTIFACTS `Task files:` list.
+Priority values: 1 (critical) through 5 (low). Complexity: `low`, `medium`, or `high` (lowercase).
 
 ## Output Format (MANDATORY)
 

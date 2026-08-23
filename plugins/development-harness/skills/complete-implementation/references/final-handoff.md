@@ -53,7 +53,7 @@ flowchart TD
     Fetch["backlog_list(title='{slug}')<br>Slug-filtered search — mandatory, not substitutable"] --> ItemFound{"First result returned<br>(item found)?"}
     ItemFound -->|"No — zero results"| NothingQueued["Clear context and run:<br>/dh:work-backlog-item — nothing queued —"]
     ItemFound -->|"Yes"| PlanSet{"item.plan set and non-empty?<br>(boolean check only)"}
-    PlanSet -->|"Yes — plan is set"| ResolvePlan["sam_list(search='{slug}')<br>Use returned plan address (full stem)<br>Do NOT pass item.plan directly to SAM"]
+    PlanSet -->|"Yes — plan is set"| ResolvePlan["sam_plan(config={'action':'list','search':'{slug}'})<br>Use returned plan address (full stem)<br>Do NOT pass item.plan directly to SAM"]
     PlanSet -->|"No — plan not set"| WorkItem["Clear context and run:<br>/dh:work-backlog-item {item.title}"]
     ResolvePlan --> ImplementFeature["Clear context and run:<br>/dh:implement-feature {plan_address}"]
     ImplementFeature --> Done([Handoff complete])

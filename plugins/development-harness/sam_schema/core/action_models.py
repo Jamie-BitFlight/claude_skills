@@ -31,9 +31,17 @@ class _ActionConfigBase(BaseModel):
 
     Sets ``populate_by_name=True`` once so every subclass inherits it without
     repeating the ``model_config = ConfigDict(populate_by_name=True)`` line.
+
+    ``extra="forbid"`` closes every config branch. The enclosing tool schema already
+    emits ``additionalProperties: false`` at its top level, but each branch published
+    nothing, so a parameter that does not exist on the selected action was dropped and
+    the call reported success having written nothing — the mechanism behind the invented
+    ``plan_slug``/``section``/``content`` plan update (#3162). Forbidding extras rejects
+    such a call and, just as importantly, advertises the closed key set in the schema the
+    calling agent reads before composing the call.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 __all__ = [
