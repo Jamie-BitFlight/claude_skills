@@ -44,7 +44,7 @@ over, and it reports to that dispatcher rather than to the human (see Orchestrat
 
 **Worker**:
 An agent whose assignment covers one unit of work. Two forms, both executed directly:
-a SAM task reference with a task ID to delegate to `start-task`, or a direct prompt carrying its
+a SAM task reference with a task ID, which it runs by loading `start-task`, or a direct prompt carrying its
 own explicit instructions and no such task ID (it may still carry a plan address for read-only
 reference — e.g. a verification task that reads the plan to check criteria against it).
 `dh:task-worker` is dispatched both ways throughout the plugin; see the Dispatch Pattern section
