@@ -105,6 +105,11 @@ def _load_fixture(name: str) -> dict[str, object]:
 def _make_sections(*specs: tuple[str, list[str]]) -> list[NormalizedSection]:
     """Build ``list[NormalizedSection]`` with correct 0-based index values.
 
+    All entries are live (``struck=False``).  Use ``_make_struck_sections`` for
+    fixtures that need a struck entry — this helper's public signature is left
+    unchanged so its ~50 existing callers are unaffected (#3187 fixture-safety
+    mandate).
+
     Args:
         specs: Sequence of ``(title, [entry_content, ...])`` tuples.
 
@@ -115,7 +120,41 @@ def _make_sections(*specs: tuple[str, list[str]]) -> list[NormalizedSection]:
     for idx, (title, entries) in enumerate(specs):
         out.append(
             NormalizedSection(
-                index=idx, title=title, entries=[NormalizedEntry(index=i, content=c) for i, c in enumerate(entries)]
+                index=idx,
+                title=title,
+                entries=[
+                    NormalizedEntry(index=i, content=c, struck=False, entry_id=f"{idx}-{i}")
+                    for i, c in enumerate(entries)
+                ],
+            )
+        )
+    return out
+
+
+def _make_struck_sections(*specs: tuple[str, list[tuple[str, bool, str]]]) -> list[NormalizedSection]:
+    """Build ``list[NormalizedSection]`` with per-entry struck flags and entry IDs.
+
+    Separate helper (not an overload of ``_make_sections``) so struck-specific
+    fixtures are explicit at the call site without touching the ~50 existing
+    ``_make_sections`` callers (#3187 fixture-safety mandate).
+
+    Args:
+        specs: Sequence of ``(title, [(entry_content, struck, entry_id), ...])`` tuples.
+
+    Returns:
+        Ordered list where each section's ``index`` equals its position, and each
+        entry carries the exact ``struck``/``entry_id`` values supplied.
+    """
+    out: list[NormalizedSection] = []
+    for idx, (title, entries) in enumerate(specs):
+        out.append(
+            NormalizedSection(
+                index=idx,
+                title=title,
+                entries=[
+                    NormalizedEntry(index=i, content=content, struck=struck, entry_id=entry_id)
+                    for i, (content, struck, entry_id) in enumerate(entries)
+                ],
             )
         )
     return out
@@ -1211,3 +1250,170 @@ class TestOrdinalGeneratorValidatorAgreement:
         """A code-fence ordinal, attached to the root or any nested heading, matches the regex."""
         ordinal = _entry_ordinal_for_code(parent, k)
         assert _ORDINAL_PATTERN.fullmatch(ordinal), f"{ordinal!r} does not match _ORDINAL_PATTERN"
+
+
+# ---------------------------------------------------------------------------
+# Struck-entry marking through progressive disclosure (#3187) — TDD RED
+# ---------------------------------------------------------------------------
+#
+# These tests pin the behavioral contract from the #3187 solution design brief
+# (.tmp/scratch/solution-design-struck-progressive-disclosure-3187.md §3.3, §5.2).
+# They are expected to FAIL until a later implementation pass:
+#
+# - Adds ``struck``/``entry_id`` (defaulted) to ``OrdinalEntry`` and ``ResolvedUnit``.
+# - Adds the ``_entry_block_text()`` helper and ``_STRUCK_CONTENT_MARKER`` /
+#   ``_STRUCK_MAP_MARKER`` constants.
+# - Changes ``build_map()``'s level-1 content join to use ``_entry_block_text``.
+# - Stamps struck/entry_id onto level-2 ``OrdinalEntry``/``_SubtreeNode`` and their
+#   indexed sub-heading subtree via ``dataclasses.replace``.
+# - Changes ``format_map_line()`` to prefix a struck marker before the title.
+#
+# Until then, failures are expected in one of two forms — both are the RIGHT
+# reason (feature not yet implemented downstream of NormalizedEntry):
+#
+# - ``AttributeError`` — accessing ``.struck``/``.entry_id`` on ``OrdinalEntry``/
+#   ``ResolvedUnit``, which do not carry those fields yet.
+# - ``AssertionError`` — the struck marker is absent from map/content text because
+#   ``build_map()``'s section-content join and ``format_map_line()`` do not emit it yet.
+
+
+class TestBuildMapLevelOneAggregateMarksStruckEntries:
+    """``build_map()``'s level-1 aggregate content must flag struck entries in-band (AC-4).
+
+    This is the row the #3187 brief calls the gate: a half-fix that only adds
+    fields to ``NormalizedEntry`` and the response types, without also changing
+    the level-1 content join, still merges struck and live text into one
+    indistinguishable string here.
+    """
+
+    def test_level1_content_contains_marker_before_struck_entry_not_before_live(self) -> None:
+        """resolve('0').content must contain '[struck:{entry_id}]' immediately before the
+        struck entry's text, and must NOT contain a marker anywhere near the live entry.
+        """
+        sections = _make_struck_sections((
+            "Mixed",
+            [("Struck body text.", True, "id-struck"), ("Live body text.", False, "id-live")],
+        ))
+        mapper = OrdinalPathMapper(sections)
+        mapper.build_map()
+        resolved = mapper.resolve("0")
+
+        assert "[struck:id-struck]" in resolved.content, (
+            f"Level-1 aggregate content must carry the struck marker for the struck entry; got: {resolved.content!r}"
+        )
+        marker_pos = resolved.content.index("[struck:id-struck]")
+        body_pos = resolved.content.index("Struck body text.")
+        assert marker_pos < body_pos, "Struck marker must precede the struck entry's own text."
+        assert "[struck:id-live]" not in resolved.content, (
+            "The live entry must never be marked struck — no marker keyed to its entry_id."
+        )
+        assert "Live body text." in resolved.content, "Live entry text must still be present, unmarked."
+
+
+class TestFormatMapLineStruckMarker:
+    """``format_map_line()`` must prefix a struck marker before the title (§3.3).
+
+    The marker sits outside the 50-char title truncation window so a long
+    struck title's ellipsis can never eat it.
+    """
+
+    def test_struck_level2_entry_emits_marker_before_truncated_title(self) -> None:
+        """A struck level-2 entry's map line starts with '{ordinal} [struck] ', and the
+        title is still truncated with an ellipsis when it exceeds 50 chars.
+        """
+        long_title = "A" * 80
+        sections = _make_struck_sections((
+            "Sec",
+            [(f"# {long_title}\nbody one", True, "ts-struck"), ("second entry body", False, "ts-live")],
+        ))
+        mapper = OrdinalPathMapper(sections)
+        entries = mapper.build_map()
+
+        struck_entry = next(e for e in entries if e.ordinal == "0.0")
+        live_entry = next(e for e in entries if e.ordinal == "0.1")
+
+        # AttributeError expected here until OrdinalEntry carries a struck field.
+        assert struck_entry.struck is True, (
+            f"Level-2 OrdinalEntry for the struck source entry must report struck=True; got {struck_entry!r}."
+        )
+        assert live_entry.struck is False, (
+            f"Level-2 OrdinalEntry for the live source entry must report struck=False; got {live_entry!r}."
+        )
+
+        struck_line = mapper.format_map_line(struck_entry)
+        live_line = mapper.format_map_line(live_entry)
+
+        assert struck_line.startswith("0.0 [struck] "), (
+            f"Struck marker must precede the (possibly truncated) title; got {struck_line!r}."
+        )
+        assert "…" in struck_line, f"Long title must still be truncated with an ellipsis; got {struck_line!r}."
+        assert "[struck] " not in live_line, f"Live entry's map line must carry no struck marker; got {live_line!r}."
+
+
+class TestResolveSubHeadingInsideStruckEntryInheritsStruckState:
+    """A sub-heading node inside a struck entry inherits the parent's struck flag
+    and entry_id (AC-5 precondition — the actual EXTRACT/head windowing test lives
+    in ``test_disclosure_handler.py`` and ``test_struck_progressive_disclosure.py``).
+    """
+
+    def test_level3_sub_heading_resolves_struck_true_with_parent_entry_id(self) -> None:
+        """resolve('0.0.0') on a sub-heading inside a struck entry returns struck=True
+        and entry_id equal to the parent entry's entry_id — not the sub-heading's own
+        (sub-headings have no independent entry identity).
+        """
+        content = "### First\n\nFirst body.\n\n### Second\n\nSecond body.\n"
+        # Two entries in the section (not one) so the level-2 emission gate
+        # (entry_count > 1) fires and level-3 sub-ordinals are indexed — mirrors
+        # the module's own structured_entry_doc fixture convention.
+        sections = _make_struck_sections((
+            "Groomed",
+            [(content, True, "ts-parent"), ("Second entry.", False, "ts-sibling")],
+        ))
+        mapper = OrdinalPathMapper(sections)
+        mapper.build_map()
+        assert "0.0.0" in mapper.valid_ordinals(), (
+            "Precondition: entry content with 2+ root headings must index a level-3 sub-ordinal '0.0.0'. "
+            f"Valid ordinals: {mapper.valid_ordinals()}"
+        )
+
+        unit = mapper.resolve("0.0.0")
+
+        assert unit.struck is True, (  # AttributeError expected until ResolvedUnit carries struck
+            f"Sub-heading inside a struck entry must resolve struck=True; got {unit!r}."
+        )
+        assert unit.entry_id == "ts-parent", (
+            f"Sub-heading must inherit the parent entry's entry_id 'ts-parent'; got {unit.entry_id!r}."
+        )
+
+
+class TestZeroStruckSectionMapOutputUnchanged:
+    """Regression guard (AC-7): a section with no struck entries produces identical
+    map output regardless of which fixture builder constructed it — proving the
+    struck-marker machinery introduces nothing for an all-live section.
+
+    Unlike the tests above, this class is expected to PASS in both the RED and the
+    GREEN phase: it protects an invariant that must never change.
+    """
+
+    def test_all_live_section_output_identical_via_either_builder(self) -> None:
+        """A section built via ``_make_sections`` and the same content built via
+        ``_make_struck_sections`` with ``struck=False`` on every entry must produce
+        byte-identical ordinal, title, est_tokens, and preview for every map entry.
+        """
+        plain = _make_sections(("Live", ["first live entry", "second live entry"]))
+        struck_free = _make_struck_sections((
+            "Live",
+            [("first live entry", False, "ts-1"), ("second live entry", False, "ts-2")],
+        ))
+
+        plain_entries = OrdinalPathMapper(plain).build_map()
+        struck_free_entries = OrdinalPathMapper(struck_free).build_map()
+
+        plain_shape = [(e.ordinal, e.title, e.est_tokens, e.first_line_preview) for e in plain_entries]
+        struck_free_shape = [(e.ordinal, e.title, e.est_tokens, e.first_line_preview) for e in struck_free_entries]
+
+        assert plain_shape == struck_free_shape, (
+            f"All-live section map output must be identical regardless of builder.\n"
+            f"Via _make_sections:        {plain_shape}\n"
+            f"Via _make_struck_sections: {struck_free_shape}"
+        )

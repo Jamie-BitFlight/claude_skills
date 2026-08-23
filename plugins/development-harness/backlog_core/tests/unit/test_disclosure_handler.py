@@ -107,9 +107,13 @@ def _load_fixture(name: str) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))  # type: ignore[return-value]
 
 
-def _entry_dict(content: str, entry_id: str = "test-id") -> SectionEntryDict:
-    """Minimal SectionEntryDict for test fixtures."""
-    return SectionEntryDict(id=entry_id, struck=False, content=content)
+def _entry_dict(content: str, entry_id: str = "test-id", struck: bool = False) -> SectionEntryDict:
+    """Minimal SectionEntryDict for test fixtures.
+
+    ``struck`` defaults to ``False`` (additive parameter, no call-site churn) —
+    callers exercising struck-entry behavior (#3187) pass ``struck=True`` explicitly.
+    """
+    return SectionEntryDict(id=entry_id, struck=struck, content=content)
 
 
 def _section(contents: list[str]) -> SectionEntryMetadata:
@@ -1038,3 +1042,123 @@ class TestNavigateOnParentResponse:
         assert result.has_children is True, "has_children must be True for sub-heading parent in EXTRACT mode (§4.4)."
         assert result.child_map is not None, "child_map must not be None when has_children=True."
         assert result.truncated is True, "truncated must be True when child_map text exceeds head=1 token (§4.4)."
+
+
+# ---------------------------------------------------------------------------
+# Struck-entry visibility through the disclosure handler (#3187) - TDD RED
+# ---------------------------------------------------------------------------
+#
+# These tests pin the handler-level behavioral contract from the #3187 solution
+# design brief (.tmp/scratch/solution-design-struck-progressive-disclosure-3187.md
+# section 3.4, section 5.2). They are expected to FAIL until a later
+# implementation pass adds ``struck_ordinals`` to ``MapResponse`` and
+# ``struck``/``entry_id`` to ``NavigateResponse``/``BoundedResponse``, and
+# threads them through
+# ``BacklogViewDisclosureHandler._handle_map/_handle_navigate/_handle_extract``.
+#
+# Failures are expected as ``AttributeError`` (the response dataclasses do not
+# carry these fields yet) - the RIGHT reason for this phase.
+
+
+@pytest.fixture
+def struck_view_result() -> ViewItemResult:
+    """Two-entry section where entry 0 is struck and entry 1 is live (#3187 shape).
+
+    Mirrors item #3187's own RT-ICA section: a struck snapshot entry followed by
+    a live final entry, both within one section - the level-2 emission gate fires
+    (entry_count > 1) so both ordinals ("0.0", "0.1") are independently addressable.
+    """
+    sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {
+        "RT-ICA": SectionEntryMetadata(
+            num_entries=1,
+            num_struck=1,
+            entries=[
+                _entry_dict("RT-ICA Snapshot: original assessment.", entry_id="ts-struck", struck=True),
+                _entry_dict("RT-ICA Final: resolved assessment.", entry_id="ts-live", struck=False),
+            ],
+        )
+    }
+    body = _body_sections_block([("RT-ICA", 2)])
+    return ViewItemResult(sections=sections, body=body, sections_index="")
+
+
+class TestMapModeStruckOrdinals:
+    """MAP mode's ``struck_ordinals`` field lists exactly the struck ordinals (AC-1)."""
+
+    @_skip_without_real_enc
+    def test_struck_ordinals_lists_exactly_the_struck_ordinal(
+        self, struck_view_result: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """``MapResponse.struck_ordinals`` contains '0.0' and NOT '0.1'."""
+        mocker.patch("backlog_core.operations.view_item", return_value=struck_view_result)
+
+        result = BacklogViewDisclosureHandler().handle("synthetic-selector", DisclosureRequestParser().parse(map=True))
+
+        assert isinstance(result, MapResponse), f"Expected MapResponse; got {type(result).__name__}."
+        assert result.struck_ordinals == ["0.0"], (
+            f"struck_ordinals must list exactly the struck ordinal '0.0'; got {result.struck_ordinals!r}."
+        )
+
+
+class TestNavigateModeStruckAndEntryId:
+    """NAVIGATE on a struck ordinal reports struck=True; its live sibling reports
+    struck=False - both carry their own entry_id (AC-1, AC-2, bidirectional).
+    """
+
+    @_skip_without_real_enc
+    def test_navigate_struck_ordinal_reports_struck_true_with_entry_id(
+        self, struck_view_result: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """NAVIGATE on '0.0' (struck) returns struck=True, entry_id='ts-struck'."""
+        mocker.patch("backlog_core.operations.view_item", return_value=struck_view_result)
+
+        result = BacklogViewDisclosureHandler().handle(
+            "synthetic-selector", DisclosureRequestParser().parse(navigate="0.0")
+        )
+
+        assert isinstance(result, NavigateResponse), f"Expected NavigateResponse; got {type(result).__name__}."
+        assert result.struck is True, f"Struck sibling must report struck=True; got {result.struck!r}."
+        assert result.entry_id == "ts-struck", f"entry_id must be 'ts-struck'; got {result.entry_id!r}."
+
+    @_skip_without_real_enc
+    def test_navigate_live_sibling_reports_struck_false_with_entry_id(
+        self, struck_view_result: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """NAVIGATE on '0.1' (live) returns struck=False, entry_id='ts-live' - the
+        bidirectional half of AC-2: a live sibling is never reported as struck.
+        """
+        mocker.patch("backlog_core.operations.view_item", return_value=struck_view_result)
+
+        result = BacklogViewDisclosureHandler().handle(
+            "synthetic-selector", DisclosureRequestParser().parse(navigate="0.1")
+        )
+
+        assert isinstance(result, NavigateResponse)
+        assert result.struck is False, f"Live sibling must report struck=False; got {result.struck!r}."
+        assert result.entry_id == "ts-live", f"entry_id must be 'ts-live'; got {result.entry_id!r}."
+
+
+class TestExtractModeStruckSurvivesWindowing:
+    """EXTRACT (``head=N``) on a struck ordinal preserves struck=True across
+    token-bounded windowing (AC-5) - the struck flag is metadata, not content,
+    so truncating the content window must never lose it.
+    """
+
+    @_skip_without_real_enc
+    def test_extract_on_struck_ordinal_preserves_struck_flag(
+        self, struck_view_result: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """EXTRACT on '0.0' (struck) with head=1 still returns struck=True, entry_id set."""
+        mocker.patch("backlog_core.operations.view_item", return_value=struck_view_result)
+
+        result = BacklogViewDisclosureHandler().handle(
+            "synthetic-selector", DisclosureRequestParser().parse(navigate="0.0", head=1)
+        )
+
+        assert isinstance(result, BoundedResponse), f"Expected BoundedResponse; got {type(result).__name__}."
+        assert result.struck is True, (
+            f"BoundedResponse for a struck ordinal must report struck=True; got {result.struck!r}."
+        )
+        assert result.entry_id == "ts-struck", (
+            f"entry_id must survive windowing as 'ts-struck'; got {result.entry_id!r}."
+        )

@@ -14,6 +14,10 @@ Behavioral contract pinned by this file:
    item (#2515) normalizes to a non-empty list, guarding against the gated-path trap.
 4. **Ordinals match position**: ``NormalizedSection.index`` equals its 0-based position
    in the returned list.
+5. **Struck and entry_id preserved** (#3187): ``NormalizedEntry.struck`` and
+   ``NormalizedEntry.entry_id`` are sourced exactly from each ``SectionEntryDict``'s
+   ``struck``/``id`` fields — never inferred or defaulted — and entry count in
+   equals entry count out for a mixed struck/live section.
 
 Implementation note for T12
 ---------------------------
@@ -60,9 +64,13 @@ def _body_sections_block(order: list[tuple[str, int]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _entry_dict(content: str, entry_id: str = "test-id") -> SectionEntryDict:
-    """Create a minimal SectionEntryDict for test fixtures."""
-    return SectionEntryDict(id=entry_id, struck=False, content=content)
+def _entry_dict(content: str, entry_id: str = "test-id", struck: bool = False) -> SectionEntryDict:
+    """Create a minimal SectionEntryDict for test fixtures.
+
+    ``struck`` defaults to ``False`` (additive parameter, no call-site churn) —
+    callers exercising struck-entry behavior pass ``struck=True`` explicitly.
+    """
+    return SectionEntryDict(id=entry_id, struck=struck, content=content)
 
 
 def _section(contents: list[str]) -> SectionEntryMetadata | GroomedSectionMetadata:
@@ -264,6 +272,58 @@ class TestNormalizedEntryStructure:
         for i, entry in enumerate(tasks_section.entries):
             assert isinstance(entry, NormalizedEntry), f"Entry {i} must be NormalizedEntry; got {type(entry).__name__}."
             assert entry.index == i, f"NormalizedEntry.index must be {i} (0-based within section); got {entry.index}."
+
+
+# ---------------------------------------------------------------------------
+# TC-N6: NormalizedEntry.struck / entry_id sourced exactly from SectionEntryDict (#3187)
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizedEntryStruckAndEntryId:
+    """NormalizedEntry.struck and .entry_id are sourced exactly from SectionEntryDict.
+
+    Regression coverage for #3187: the progressive-disclosure read path previously
+    dropped both fields between ``SectionEntryDict`` and downstream consumers, making
+    a retracted (struck) entry indistinguishable from live content.
+    """
+
+    def test_struck_and_live_entries_map_struck_flag_and_entry_id_correctly(self) -> None:
+        """A mixed section's entries map struck=True/False and entry_id exactly (AC-1, AC-2, AC-6)."""
+        entries: list[SectionEntryDict] = [
+            _entry_dict("struck body", entry_id="ts-struck", struck=True),
+            _entry_dict("live body", entry_id="ts-live", struck=False),
+        ]
+        section_meta = SectionEntryMetadata(num_entries=1, num_struck=1, entries=entries)
+        sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {"Mixed": section_meta}
+        body = _body_sections_block([("Mixed", 2)])
+
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
+
+        assert len(normalized) == 1
+        struck_entry, live_entry = normalized[0].entries
+        assert struck_entry.struck is True, f"First entry must report struck=True; got {struck_entry.struck!r}."
+        assert struck_entry.entry_id == "ts-struck", (
+            f"First entry_id must be 'ts-struck'; got {struck_entry.entry_id!r}."
+        )
+        assert live_entry.struck is False, f"Second entry must report struck=False; got {live_entry.struck!r}."
+        assert live_entry.entry_id == "ts-live", f"Second entry_id must be 'ts-live'; got {live_entry.entry_id!r}."
+
+    def test_mixed_section_entry_count_out_equals_entry_count_in(self) -> None:
+        """normalize() must not drop or add entries for a mixed struck/live section (AC-3)."""
+        entries: list[SectionEntryDict] = [
+            _entry_dict("a", entry_id="e0", struck=True),
+            _entry_dict("b", entry_id="e1", struck=False),
+            _entry_dict("c", entry_id="e2", struck=True),
+        ]
+        section_meta = SectionEntryMetadata(num_entries=1, num_struck=2, entries=entries)
+        sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {"Mixed": section_meta}
+        body = _body_sections_block([("Mixed", 3)])
+
+        normalized = ItemContentNormalizer().normalize(ViewItemResult(sections=sections, body=body, sections_index=""))
+
+        assert len(normalized[0].entries) == len(entries), (
+            f"Entry count out ({len(normalized[0].entries)}) must equal entry count in ({len(entries)})."
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ Does NOT:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from progressive_markdown.indexer import MarkdownIndexer
@@ -29,7 +29,7 @@ from backlog_core.disclosure_types import OrdinalNotFoundError
 if TYPE_CHECKING:
     from progressive_markdown.models import CodeBlock, SectionNode
 
-    from backlog_core.content_normalizer import NormalizedSection
+    from backlog_core.content_normalizer import NormalizedEntry, NormalizedSection
 
 # ---------------------------------------------------------------------------
 # Format constants (architect spec §5.5)
@@ -50,6 +50,15 @@ _FENCE_PATTERN: re.Pattern[str] = re.compile(r"```[^\n]*\n.*?```", re.DOTALL)
 # full content is returned, not a child map.
 _MIN_ROOT_SECTIONS_FOR_PARENT: int = 2
 
+# In-band struck markers (#3187). Reuses the ``[code:{ordinal}]`` token
+# convention already established by ``_replace_code_fences_with_tokens``.
+_STRUCK_CONTENT_MARKER: str = "[struck:{entry_id}]"
+"""Prefix inserted before a struck entry's own text in aggregate content
+(``build_map()``'s level-1 join and ``resolve()``'s level-1 aggregate)."""
+
+_STRUCK_MAP_MARKER: str = "[struck] "
+"""Prefix inserted before a struck entry's title in a formatted map line."""
+
 
 # ---------------------------------------------------------------------------
 # Value objects (public)
@@ -69,12 +78,20 @@ class OrdinalEntry:
         first_line_preview: First non-empty, non-heading line of the content;
             max ``_PREVIEW_MAX`` chars; empty string when content has no body
             text.
+        struck: ``True`` when this ordinal addresses a struck (retracted)
+            entry, or a sub-heading/code fence nested inside one (#3187).
+            Defaulted ``False`` — a level-1 section aggregate is never itself
+            struck; only entries and their descendants carry the flag.
+        entry_id: Stable identifier of the owning entry; ``""`` when this
+            ordinal has no entry identity (level-1 sections).
     """
 
     ordinal: str
     title: str
     est_tokens: int
     first_line_preview: str
+    struck: bool = False
+    entry_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +115,11 @@ class ResolvedUnit:
         child_map: Pre-rendered listing of direct sub-heading children using
             the same ``format_map_line`` format as MAP responses.  Non-empty
             only when ``has_sub_heading_children`` is ``True``.
+        struck: ``True`` when this ordinal addresses a struck (retracted)
+            entry, or a descendant of one (#3187).  Defaulted ``False`` for
+            level-1 section aggregates, which have no single-entry identity.
+        entry_id: Stable identifier of the owning entry; ``""`` when this
+            ordinal has no entry identity (level-1 sections).
     """
 
     ordinal: str
@@ -109,6 +131,8 @@ class ResolvedUnit:
     child_ordinals: list[str] = field(default_factory=list)
     code_block_ordinals: list[str] = field(default_factory=list)
     child_map: str = ""
+    struck: bool = False
+    entry_id: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +159,11 @@ class _SubtreeNode:
         is_code_block: True iff this ordinal addresses a code fence body.
         child_ordinals: Direct sub-heading child ordinals (document order).
         code_block_ordinals: Direct-body fence ordinals (document order).
+        struck: ``True`` when this node addresses a struck (retracted) entry,
+            or a descendant of one (#3187).  Defaulted ``False`` for level-1
+            section aggregates.
+        entry_id: Stable identifier of the owning entry; ``""`` when this
+            node has no entry identity (level-1 sections).
     """
 
     ordinal: str
@@ -145,11 +174,35 @@ class _SubtreeNode:
     is_code_block: bool
     child_ordinals: list[str]
     code_block_ordinals: list[str]
+    struck: bool = False
+    entry_id: str = ""
 
 
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _entry_block_text(entry: NormalizedEntry) -> str:
+    r"""Return entry content, prefixed with an in-band struck marker when struck.
+
+    This is the AC-4 fix (#3187): the level-1 section aggregate join must not
+    merge struck and live entry text into one indistinguishable string.
+    Prefixing the marker in-band means a caller reading the aggregate
+    ``content`` (e.g. via ``navigate`` on a level-1 ordinal) can still tell
+    which entry was struck, even though the aggregate has no per-entry field.
+
+    Args:
+        entry: The normalized entry to render.
+
+    Returns:
+        ``entry.content`` unchanged when live; ``"{marker}\\n{content}"`` when
+        struck, where the marker is ``_STRUCK_CONTENT_MARKER`` formatted with
+        the entry's ``entry_id``.
+    """
+    if not entry.struck:
+        return entry.content
+    return f"{_STRUCK_CONTENT_MARKER.format(entry_id=entry.entry_id)}\n{entry.content}"
 
 
 def _extract_entry_title(content: str) -> str:
@@ -342,6 +395,14 @@ class OrdinalPathMapper:
         ``valid_ordinals()``.  Calling ``build_map()`` again replaces the
         previous index.
 
+        Struck entries (#3187): the level-1 aggregate content is joined via
+        ``_entry_block_text()``, which prefixes an in-band
+        ``[struck:{entry_id}]`` marker before a struck entry's own text — the
+        aggregate has no per-entry field, so this is the only way a caller
+        reading the merged content can tell struck from live text apart.
+        Level-2 entries and their indexed sub-ordinal subtree inherit the
+        source entry's ``struck``/``entry_id`` directly.
+
         Returns:
             Ordered list of ``OrdinalEntry``.  Within each section, the
             level-1 entry appears first, followed by level-2 entries; each
@@ -355,7 +416,9 @@ class OrdinalPathMapper:
             level1_ordinal = str(section.index)
 
             # Canonical section content: all entry bodies joined by blank lines.
-            section_content = "\n\n".join(e.content for e in section.entries)
+            # _entry_block_text prefixes struck entries with an in-band marker
+            # so the merged aggregate never presents struck text as live (#3187 AC-4).
+            section_content = "\n\n".join(_entry_block_text(e) for e in section.entries)
             section_tokens = len(self._enc.encode(section_content)) if section_content else 0
             level1_preview = _extract_preview(section_content)
 
@@ -392,6 +455,12 @@ class OrdinalPathMapper:
                     level2_ordinal, entry_content
                 )
 
+                # Stamp the source entry's struck/entry_id onto every node in
+                # its indexed subtree — a sub-heading or code fence inside a
+                # struck entry is itself struck (#3187 AC-5 precondition).
+                sub_ents = [replace(e, struck=entry.struck, entry_id=entry.entry_id) for e in sub_ents]
+                sub_idx = {k: replace(v, struck=entry.struck, entry_id=entry.entry_id) for k, v in sub_idx.items()}
+
                 resolution_index[level2_ordinal] = _SubtreeNode(
                     ordinal=level2_ordinal,
                     title=entry_title,
@@ -401,6 +470,8 @@ class OrdinalPathMapper:
                     is_code_block=False,
                     child_ordinals=[],
                     code_block_ordinals=[],
+                    struck=entry.struck,
+                    entry_id=entry.entry_id,
                 )
                 resolution_index.update(sub_idx)
 
@@ -412,6 +483,8 @@ class OrdinalPathMapper:
                             title=entry_title,
                             est_tokens=final_tokens,
                             first_line_preview=final_preview,
+                            struck=entry.struck,
+                            entry_id=entry.entry_id,
                         )
                     )
                     entries.extend(sub_ents)
@@ -425,10 +498,13 @@ class OrdinalPathMapper:
 
         Format::
 
-            {ordinal} {title} ({est_tokens}t) [— "{preview}"]
+            {ordinal} [{struck marker}]{title} ({est_tokens}t) [— "{preview}"]
 
         The em-dash (U+2014) and preview clause are omitted entirely when
-        ``entry.first_line_preview`` is the empty string.
+        ``entry.first_line_preview`` is the empty string.  The struck marker
+        (``"[struck] "``) is emitted immediately before the title, OUTSIDE
+        the title's truncation window, so it can never be eaten by the
+        ellipsis (#3187 §3.3).
 
         Caps enforced:
 
@@ -447,7 +523,8 @@ class OrdinalPathMapper:
         if len(title) > _TITLE_MAX:
             title = title[: _TITLE_MAX - 1] + _ELLIPSIS
 
-        base = f"{entry.ordinal} {title} ({entry.est_tokens}t)"
+        marker = _STRUCK_MAP_MARKER if entry.struck else ""
+        base = f"{entry.ordinal} {marker}{title} ({entry.est_tokens}t)"
 
         if entry.first_line_preview:
             preview = entry.first_line_preview
@@ -491,6 +568,8 @@ class OrdinalPathMapper:
                 child_ordinals=node.child_ordinals,
                 code_block_ordinals=node.code_block_ordinals,
                 child_map=child_map,
+                struck=node.struck,
+                entry_id=node.entry_id,
             )
         raise OrdinalNotFoundError(ordinal, self.valid_ordinals())
 
@@ -527,7 +606,14 @@ class OrdinalPathMapper:
         lines: list[str] = []
         for co in child_ordinals:
             cn = self._resolution_index[co]
-            entry = OrdinalEntry(ordinal=cn.ordinal, title=cn.title, est_tokens=cn.total_tokens, first_line_preview="")
+            entry = OrdinalEntry(
+                ordinal=cn.ordinal,
+                title=cn.title,
+                est_tokens=cn.total_tokens,
+                first_line_preview="",
+                struck=cn.struck,
+                entry_id=cn.entry_id,
+            )
             lines.append(self.format_map_line(entry))
         return "\n".join(lines)
 

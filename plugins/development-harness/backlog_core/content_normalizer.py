@@ -21,13 +21,34 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class NormalizedEntry:
-    """One content entry within a section."""
+    """One content entry within a section.
+
+    ``struck`` and ``entry_id`` are REQUIRED (no defaults) by design: a defaulted
+    ``struck=False`` would let a future producer silently report a struck entry
+    as live, reintroducing the exact defect this shape closes (#3187 — the
+    progressive-disclosure read path dropping ``struck``/``id`` so a retracted
+    entry became indistinguishable from live content). There is exactly one
+    production construction site (``_build_entries`` below) and one test-fixture
+    site; the type checker enforces both supply real values.
+    """
 
     index: int
     """0-based position within the parent section."""
 
     content: str
     """Raw markdown text of the entry."""
+
+    struck: bool
+    """``True`` when the entry has been struck (retracted); mirrors
+    ``SectionEntryDict.struck``.  Never inferred or defaulted — always sourced
+    directly from the entry's own record."""
+
+    entry_id: str
+    """Stable identifier for this entry; mirrors ``SectionEntryDict.id``.
+
+    Named ``entry_id`` (not ``id``) to stay unambiguous alongside the ``ordinal``
+    identity fields already present on downstream types (``OrdinalEntry``,
+    ``ResolvedUnit``, ``_SubtreeNode``)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,8 +145,11 @@ def _build_entries(section: SectionEntryMetadata | GroomedSectionMetadata) -> li
     if not _is_entry_section_metadata(section):
         return []
     # After TypeGuard narrowing, section is SectionEntryMetadata.
-    # section["entries"] is list[SectionEntryDict]; each entry["content"] is str.
-    return [NormalizedEntry(index=i, content=entry["content"]) for i, entry in enumerate(section["entries"])]
+    # section["entries"] is list[SectionEntryDict]; each entry carries content, struck, id.
+    return [
+        NormalizedEntry(index=i, content=entry["content"], struck=entry["struck"], entry_id=entry["id"])
+        for i, entry in enumerate(section["entries"])
+    ]
 
 
 # ---------------------------------------------------------------------------
