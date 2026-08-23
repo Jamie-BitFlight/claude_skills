@@ -432,7 +432,8 @@ mcp__plugin_dh_sam__sam_plan(
                  "body": "Audit documentation for drift in {slug} (work item {item_ref}). item_id={item_ref} (REQUIRED — register the audit-report artifact against it; block if absent). project_root is the repository root (your current working directory)."},
                 {"id": "T5", "title": "Documentation Update",     "agent": "service-docs-maintainer","dependencies": ["T4"],"priority": 1, "complexity": "low",
                  "body": "Update documentation to resolve the drift found in T4 for {slug} (work item {item_ref}). item_id={item_ref} (read the audit-report artifact registered against it). project_root is the repository root (your current working directory)."},
-                {"id": "T6", "title": "Context Refinement",       "agent": "context-refinement","dependencies": ["T5"],    "priority": 1, "complexity": "medium"}
+                {"id": "T6", "title": "Context Refinement",       "agent": "context-refinement","dependencies": ["T5"],    "priority": 1, "complexity": "medium",
+                 "body": "Refine context and audit plan artifacts for {slug} (work item {item_ref}). plan_address={plan_address} (REQUIRED — this is the original feature plan to analyze; the address used to dispatch this task is a separate quality-gate plan used only to claim and complete your own task). item_id={item_ref} (needed only to read and annotate the architect and feature-context artifacts — if empty, skip that part and report it as a gap)."}
             ]}
 )
 ```

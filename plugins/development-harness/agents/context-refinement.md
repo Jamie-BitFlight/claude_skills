@@ -20,6 +20,21 @@ Check IF context has drifted or new discoveries were made during the implementat
 
 You've been called at the end of a work session (typically after `/dh:implement-feature` tasks complete) to check if any new context was discovered that wasn't in the original context manifest. Your job is to capture institutional knowledge.
 
+## Inputs
+
+- `plan_address` — the address of the feature implementation plan to analyze (REQUIRED). When you
+  are dispatched as a quality-gate task, this is the original feature plan, not the quality-gate
+  plan tracking your own dispatch — use whichever address your delegation prompt names for
+  analysis, never the address used only to claim and complete your own task.
+- `item_id` — the backlog item ID (GitHub issue number, or bead ID when using beads backend) that
+  owns the plan's artifacts. Needed only for Step 1.3 and Steps 5-8 (reading and annotating the
+  architecture spec and feature-context artifacts). Resolve it in this order:
+  1. Use the value given directly in your delegation prompt, if present.
+  2. Otherwise, read it from the `issue` field of the Step 1 plan-record response.
+  3. If neither source yields a value, `item_id` is unavailable — skip Step 1.3 and Steps 5-8
+     entirely, perform only the context-manifest update (Steps 2-4), and report the skip as an
+     interface gap in your NOTES (see Output Format).
+
 ## Process
 
 ### Step 1: Read the Plan Record and Architecture Spec
@@ -30,16 +45,19 @@ You've been called at the end of a work session (typically after `/dh:implement-
    mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P{N}")
    ```
 
-   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), and all task fields.
+   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), the `issue` field (fallback source for `item_id` — see Inputs), and all task fields.
 
 2. LOCATE the "Context Manifest" content in the `context` field of the JSON response
-3. READ the architecture spec through the artifact operations:
+3. If `item_id` is available (see Inputs), read the architecture spec through the artifact operations:
 
    ```text
    mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="architect")
    ```
 
    The spec is registry content addressed by type, not a path — do not open a file for it.
+
+   If `item_id` is not available, skip this step and Steps 5-8 — proceed to Step 2 using only the
+   Context Manifest as your basis for comparison.
 
 ### Step 2: Analyze Implementation for Discoveries
 
@@ -116,6 +134,9 @@ During implementation, we discovered that [what was found]. This wasn't document
 ```
 
 ### Step 5: Locate Plan Artifacts and Intent Source
+
+Skip this step and Steps 6-8 entirely if `item_id` is not available (see Inputs) — the plan
+artifact freshness check requires it.
 
 1. Retrieve the feature context: `artifact_read(item_id={item_id}, artifact_type="feature-context")`
 2. Retrieve the architecture spec: `artifact_read(item_id={item_id}, artifact_type="architect")`
@@ -257,6 +278,7 @@ RISKS:
   - None identified
 NOTES:
   - Implementation followed documented patterns
+  - [If item_id was unavailable: "Plan artifact freshness check (Steps 5-8) skipped — no item_id in delegation prompt or plan record. Interface gap: report to orchestrator."]
 ```
 
 ### On Success - Context Updated
