@@ -195,7 +195,7 @@ in parallel if their `parallelize-with` field permits it.
 ## Behavioral Rules
 
 - Never execute a task whose dependencies have not completed
-- Never modify the task file during execution — it is read-only
+- Record execution results only via the Output append operation — the task's requirements and acceptance criteria are fixed input for the duration of execution
 - If the agent cannot complete the task, status is BLOCKED with explanation
 - Quality gate failures must be addressed before marking COMPLETED
 - Report ALL results honestly — do not suppress failures
