@@ -60,6 +60,12 @@ targets Claude Code, Codex, and OpenCode; a detection mechanism tied to one harn
 (e.g. inspecting a system prompt) does not port to the others and is not a sanctioned pattern even
 where it happens to work.
 
+**Why dispatch stays inside dh** (gotcha):
+dh governs only what it wraps: an agent dispatched by its own name carries hooks, permissions and
+tools dh neither controls nor can verify against the task. This, not tool reach, is why an outside
+skill or agent is loaded as a `dh:task-worker` profile rather than dispatched directly, and why
+`general-purpose` is never a target. The runtime rule is in `skills/dispatch-contract/`.
+
 ## Language
 
 **SAM (Stateless Agent Methodology)**:
