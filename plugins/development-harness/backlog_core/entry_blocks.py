@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from .models import Entry
+from .models import Entry, EntryNotFoundError
 from .parsing import now_iso
 
 ENTRY_RE = re.compile(r"<div><sub>([^<]+)</sub>\s*(.*?)</div>", re.DOTALL)
@@ -328,15 +328,15 @@ def _rewrite_by_entry_id(
     result_parts: list[str] = []
     if is_legacy:
         legacy_ts = f"{added_date}T00:00:00Z"
-        if entry_id == legacy_ts:
-            result_parts.append(wrap_entry(new_content) if new_content else "")
-        else:
-            result_parts.append(wrap_entry_with_timestamp(existing_body.strip(), legacy_ts))
-            if new_content:
-                result_parts.append(wrap_entry(new_content))
+        if entry_id != legacy_ts:
+            raise EntryNotFoundError(entry_id, [legacy_ts])
+        result_parts.append(wrap_entry(new_content) if new_content else "")
     else:
         id_entries = [Entry(id=m.group(1), content="") for m in entries_raw]
         _resolve_duplicate_ids(id_entries)
+        available = [e.id for e in id_entries]
+        if entry_id not in available:
+            raise EntryNotFoundError(entry_id, available)
 
         for m, id_entry in zip(entries_raw, id_entries, strict=False):
             if id_entry.id == entry_id:
@@ -362,6 +362,7 @@ def rewrite_section(
 
     Raises:
         ValueError: If ``replace=True`` but ``reason`` is not provided.
+        EntryNotFoundError: If ``entry_id`` matches no entry in ``existing_body``.
     """
     entries_raw = list(ENTRY_RE.finditer(existing_body))
     is_legacy = not entries_raw and bool(existing_body.strip())

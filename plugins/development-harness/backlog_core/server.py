@@ -2897,7 +2897,16 @@ async def backlog_update(
         Field(description="New description text for the item. Updates the local file only — no GitHub sync."),
     ] = None,
     entry_id: Annotated[
-        str | None, Field(description="Timestamp ID of an existing entry to replace within the section")
+        str | None,
+        Field(
+            description=(
+                "ID of an existing entry to replace within the section, as returned by "
+                "backlog_view. When two entries in one section share a stored ID, backlog_view "
+                "returns them with a positional '-N' suffix and that suffixed form is the one "
+                "that targets them. An id matching no entry is an error naming the available "
+                "ids, never a silent no-op."
+            )
+        ),
     ] = None,
     replace_section: Annotated[
         bool, Field(description="Strike all existing entries in the section and append new content")
@@ -2970,7 +2979,16 @@ async def backlog_groom(
         str | None, Field(description="Content for the named section (use with section parameter)")
     ] = None,
     entry_id: Annotated[
-        str | None, Field(description="Timestamp ID of an existing entry to replace within the section")
+        str | None,
+        Field(
+            description=(
+                "ID of an existing entry to replace within the section, as returned by "
+                "backlog_view. When two entries in one section share a stored ID, backlog_view "
+                "returns them with a positional '-N' suffix and that suffixed form is the one "
+                "that targets them. An id matching no entry is an error naming the available "
+                "ids, never a silent no-op."
+            )
+        ),
     ] = None,
     replace_section: Annotated[
         bool, Field(description="Strike all existing entries in the section and append new content")
@@ -3559,7 +3577,18 @@ async def backlog_strike_entry(
             description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
         ),
     ],
-    entry_id: Annotated[str, Field(description="Timestamp ID of the entry to strike")],
+    entry_id: Annotated[
+        str,
+        Field(
+            description=(
+                "ID of the entry to strike, as returned by backlog_view for this section. "
+                "When two entries in one section share a stored ID, backlog_view returns them "
+                "with a positional '-N' suffix and that suffixed form is the one that targets "
+                "them. An id matching no entry is an error naming the available ids, never a "
+                "silent no-op."
+            )
+        ),
+    ],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
 ) -> dict:

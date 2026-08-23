@@ -514,6 +514,24 @@ class ItemNotFoundError(BacklogError):
         super().__init__(f"No item found for: {selector}")
 
 
+class EntryNotFoundError(BacklogError):
+    """Raised when an ``entry_id`` matches no entry in the target section.
+
+    Returning the section unchanged instead would report success while writing nothing —
+    the caller cannot tell "replaced" from "silently did nothing". The available IDs are
+    named so the caller can retry against a real one; an entry whose stored ID collides
+    with another in the same section is read back with a positional ``-N`` suffix, and
+    that suffixed form is the one that targets it.
+    """
+
+    def __init__(self, entry_id: str, available: list[str]) -> None:
+        """Initialize with the unmatched ID and the IDs that were available."""
+        self.entry_id = entry_id
+        self.available = available
+        listed = ", ".join(repr(i) for i in available) if available else "none"
+        super().__init__(f"No entry with id {entry_id!r} in this section. Available ids: {listed}")
+
+
 _AMBIGUOUS_TITLE_PREVIEW_LIMIT = 10
 
 

@@ -155,7 +155,7 @@ metadata:
 
 ### Body Sections
 
-Sections are populated incrementally as the item moves through the lifecycle. An item created through `backlog_add` has Description only; downstream skills add the rest. Other creation paths may supply more — `group-items-to-milestone` authors a story-format body when it creates a missing issue.
+Sections are populated incrementally as the item moves through the lifecycle. An item created through `backlog_add` has Description only; downstream skills add the rest. Every creation path obeys the same rule — `group-items-to-milestone` copies across the sections an item already holds when it creates a missing issue, and authors none of its own.
 
 ```text
 1.  Description                    (written by: create-backlog-item)

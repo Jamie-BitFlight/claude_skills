@@ -13,7 +13,7 @@ from typing import cast
 import pytest
 
 from backlog_core.entry_blocks import _parse_entry_timestamp, parse_entries, rewrite_section, wrap_entry
-from backlog_core.models import Section
+from backlog_core.models import EntryNotFoundError, Section
 from backlog_core.parsing import parse_md_body_sections
 
 _AGENT_SUBMITTED_PREWRAPPED = (
@@ -277,3 +277,66 @@ class TestAlreadyWrappedGuardRejectsPartialInput:
         wrapped = wrap_entry(impossible)
 
         assert parse_entries(wrapped, since="2026-01-01") != []
+
+
+class TestUnmatchedEntryIdIsLoud:
+    """Targeting an entry that does not exist must be an error, not a silent no-op.
+
+    ``entry_id`` is the only way to replace or strike one specific entry. Returning the
+    section unchanged reported success while writing nothing, so a caller could not tell
+    "replaced" from "did nothing". The collision case made this reachable without any caller
+    mistake: entries sharing a stored ID are read back with a positional ``-N`` suffix, so the
+    bare ID visible in the wire format matched nothing.
+    """
+
+    def test_unmatched_entry_id_raises(self) -> None:
+        """A target that matches no entry raises instead of returning the body unchanged."""
+        body = "<div><sub>2026-08-22T10:00:00Z</sub>alpha</div>"
+
+        with pytest.raises(EntryNotFoundError, match="No entry with id"):
+            rewrite_section(body, new_content="REPLACED", entry_id="2026-01-01T00:00:00Z")
+
+    def test_error_names_the_available_ids(self) -> None:
+        """The error states which IDs exist, so the caller can retry against a real one."""
+        body = "<div><sub>2026-08-22T10:00:00Z</sub>alpha</div>"
+
+        with pytest.raises(EntryNotFoundError) as excinfo:
+            rewrite_section(body, new_content="REPLACED", entry_id="nope-2026-01-01T00:00:00Z")
+
+        assert excinfo.value.available == ["2026-08-22T10:00:00Z"]
+        assert "2026-08-22T10:00:00Z" in str(excinfo.value)
+
+    def test_colliding_stored_ids_report_the_suffixed_forms(self) -> None:
+        """The bare stored ID of a collided pair raises and names the forms that do target.
+
+        Why: Two legacy entries in one section share the sentinel ID. Targeting the ID the
+             wire format actually shows silently rewrote nothing; the caller had no way to
+             learn that the '-0'/'-1' forms are what it must pass.
+        """
+        collided = "<div><sub>0000-00-00T00:00:00Z</sub>alpha</div>\n\n<div><sub>0000-00-00T00:00:00Z</sub>beta</div>"
+
+        with pytest.raises(EntryNotFoundError) as excinfo:
+            rewrite_section(collided, new_content="REPLACED", entry_id="0000-00-00T00:00:00Z")
+
+        assert excinfo.value.available == ["0000-00-00T00:00:00Z-0", "0000-00-00T00:00:00Z-1"]
+
+    def test_a_real_target_still_replaces(self) -> None:
+        """The guard is not over-broad — a matching ID still replaces that entry only."""
+        collided = "<div><sub>0000-00-00T00:00:00Z</sub>alpha</div>\n\n<div><sub>0000-00-00T00:00:00Z</sub>beta</div>"
+
+        out = rewrite_section(collided, new_content="REPLACED", entry_id="0000-00-00T00:00:00Z-1")
+
+        assert [e.content for e in parse_entries(out)] == ["alpha", "REPLACED"]
+
+    def test_unmatched_target_on_legacy_content_raises(self) -> None:
+        """Unwrapped legacy content reports its one synthetic ID rather than appending.
+
+        Why: The legacy branch previously turned an unmatched targeted replace into a blind
+             append, which is a different write than the one the caller asked for.
+        """
+        with pytest.raises(EntryNotFoundError) as excinfo:
+            rewrite_section(
+                "legacy prose", new_content="REPLACED", entry_id="2026-01-01T00:00:00Z", added_date="2026-08-22"
+            )
+
+        assert excinfo.value.available == ["2026-08-22T00:00:00Z"]

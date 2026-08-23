@@ -63,12 +63,12 @@ Use `AskUserQuestion`: "Which items to add? (comma-separated numbers, or 'all', 
 
 For each selected item with no `**Issue**: #N`:
 
-Build story-format body (Story / Description / Acceptance Criteria / Context) by reading the item's own content. Never derive a section from the item title: a title usually names an undesired current state, so slotting it into an `I want to {goal}` clause asserts a desire for the very thing the item exists to remove (#3152). Write each acceptance criterion as an observable check someone could run; omit the section entirely rather than emitting a placeholder such as `Work matches description`, which passes `groom/finalize.md`'s non-empty check while asserting nothing. Create the issue using the Python script (preferred — handles label creation automatically):
+Build the issue body from the sections the item already holds. Copy each one across; omit every section the item does not have. Author nothing here: `groom-backlog-item` writes Story and Acceptance Criteria, and this workflow runs before grooming, so it has no source for either. Never derive a section from the item title — a title usually names an undesired current state, so slotting it into an `I want to {goal}` clause asserts a desire for the very thing the item exists to remove (#3152). Never emit a placeholder such as `Work matches description`, which passes `groom/finalize.md`'s non-empty check while asserting nothing. An item created through `backlog_add` carries Description only; a body containing Description alone is the correct output, not an incomplete one. Create the issue using the Python script (preferred — handles label creation automatically):
 
 ```bash
 uv run .claude/skills/gh/scripts/github_project_setup.py issue create \
   --title "{type}: {title}" \
-  --body "{story body}" \
+  --body "{issue body}" \
   --priority-label "priority:{p0|p1|p2|idea}" \
   --type-label "type:{feature|bug|refactor|docs|chore}" \
   --milestone {number}
