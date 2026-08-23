@@ -905,21 +905,12 @@ def _div_depth_delta(line: str) -> int:
     return len(_DIV_OPEN_TAG_RE.findall(line)) - len(_DIV_CLOSE_TAG_RE.findall(line))
 
 
-def _entry_div_closes(remaining: str) -> bool:
-    """Return whether a ``<div>`` opened at the start of *remaining* closes before EOF.
-
-    Args:
-        remaining: Source text from the opening marker to the end of the document.
-
-    Returns:
-        ``True`` when ``<div>``/``</div>`` nesting returns to zero within *remaining*.
-    """
-    depth = 0
-    for line in remaining.splitlines():
-        depth += _div_depth_delta(line)
-        if depth <= 0:
-            return True
-    return False
+# Any ATX heading line, at the up-to-three-spaces indent CommonMark permits. Used only to
+# bound an unterminated entry wrapper; real heading detection is the parser's job.
+_ATX_ANY_RE = re.compile(r" {0,3}#{1,6}\s")
+# Captures the text of an ATX heading line, so a section name keeps the exact inline
+# spelling callers filter and index against.
+_ATX_SOURCE_RE = re.compile(r" {0,3}#{1,6}\s+(.*)$")
 
 
 def _original_offsets(body: str) -> list[int] | None:
@@ -988,39 +979,68 @@ class _EntryDivBlock(_MarkoBlockElement):
 
     @classmethod
     def match(cls, source: _MarkoSource) -> bool:
-        """Return whether the current line opens an entry block that actually closes.
-
-        An opening marker whose ``</div>`` never arrives is not an entry block. Claiming
-        it anyway makes :meth:`parse` consume to EOF, so every heading after a truncated
-        wrapper disappears from the AST and from every consumer built on it. Refusing the
-        match instead leaves the text to marko's ordinary HTML-block and paragraph
-        handling, which still exposes those later headings.
+        """Return whether the current line opens an entry block.
 
         Returns:
-            ``True`` when the line opens an entry block whose nesting returns to zero
-            before the end of the document.
+            ``True`` when the line matches the entry-block open marker.
         """
-        if not source.expect_re(_ENTRY_DIV_OPEN_RE):
-            return False
-        return _entry_div_closes(source._buffer[source.pos :])  # ruff: ignore[private-member-access]
+        return bool(source.expect_re(_ENTRY_DIV_OPEN_RE))
+
+    @classmethod
+    def _wrapper_closes(cls, source: _MarkoSource) -> bool:
+        """Return whether the wrapper opening at the current position closes before EOF.
+
+        Scans ahead from the current position and rewinds to it, using ``Source.anchor``
+        and ``Source.reset`` so the scan leaves no trace for the real parse below.
+
+        Returns:
+            ``True`` when ``<div>``/``</div>`` nesting returns to zero before the end of
+            the document.
+        """
+        source.anchor()
+        depth = 0
+        closed = False
+        try:
+            while not source.exhausted:
+                line = source.next_line()
+                if line is None:
+                    break
+                source.consume()
+                depth += _div_depth_delta(line)
+                if depth <= 0:
+                    closed = True
+                    break
+        finally:
+            source.reset()
+        return closed
 
     @classmethod
     def parse(cls, source: _MarkoSource) -> str:
-        """Consume every line until ``<div>``/``</div`` nesting returns to zero.
+        """Consume the entry block, bounding it at the next heading when it never closes.
+
+        A wrapper whose ``</div>`` never arrives is malformed input, and consuming to EOF
+        erases every heading after it from the AST and from every consumer built on it.
+        Handing the text back to marko instead does not help: a CommonMark type-6 HTML
+        block runs to the next blank line, and a malformed body need not contain one, so
+        the later headings are lost either way. Treating the next heading as the wrapper's
+        end keeps its own text opaque and keeps every following section addressable.
 
         Returns:
             The raw, verbatim source text of the entry block.
         """
+        closes = cls._wrapper_closes(source)
         lines: list[str] = []
         depth = 0
         while not source.exhausted:
             line = source.next_line()
             if line is None:
                 break
+            if not closes and lines and _ATX_ANY_RE.match(line):
+                break
             lines.append(line)
             source.consume()
             depth += _div_depth_delta(line)
-            if depth <= 0:
+            if closes and depth <= 0:
                 break
         return "".join(lines)
 
@@ -1103,8 +1123,9 @@ def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str
     for child in doc.children:
         if not isinstance(child, _MarkoHeading) or child.level not in levels:
             continue
-        start = _heading_line_start(normalized, getattr(child, "raw_start", 0))
-        spans.append((mapping[start] if mapping is not None else start, _extract_heading_text(child)))
+        norm_start = _heading_line_start(normalized, getattr(child, "raw_start", 0))
+        start = mapping[norm_start] if mapping is not None else norm_start
+        spans.append((start, _heading_name_from_source(body, start) or _extract_heading_text(child)))
     return spans
 
 
@@ -1133,7 +1154,12 @@ def _section_spans(body: str, levels: frozenset[int]) -> list[SectionSpan]:
 
 
 def _extract_heading_text(node: _MarkoHeading) -> str:
-    """Reconstruct heading text from all inline children of a marko Heading node.
+    """Reconstruct heading text from all inline descendants of a marko Heading node.
+
+    Recurses. A heading containing emphasis, strong text, code or a link nests its
+    ``RawText`` one or more levels down, and stringifying the intermediate node instead
+    yields marko's ``repr`` — ``## **Impact Radius**`` became the literal section name
+    ``"[<RawText children='Impact Radius'>]"``.
 
     Args:
         node: Parsed marko Heading node.
@@ -1142,10 +1168,39 @@ def _extract_heading_text(node: _MarkoHeading) -> str:
         Heading text as a plain string with inline formatting stripped.
     """
     parts: list[str] = []
-    for inline in node.children:
-        raw = getattr(inline, "children", "")
-        parts.append(raw if isinstance(raw, str) else str(raw))
+
+    def collect(inline: object) -> None:
+        children = getattr(inline, "children", None)
+        if isinstance(children, str):
+            parts.append(children)
+        elif isinstance(children, list):
+            for child in children:
+                collect(child)
+
+    collect(node)
     return "".join(parts).strip()
+
+
+def _heading_name_from_source(body: str, start: int) -> str:
+    """Return the heading's name exactly as the source line spells it.
+
+    The name is taken from the source rather than from the AST so that inline markup
+    round-trips: the section registry, compact indexes and ``section=`` filters all match
+    against the spelling a caller sees in the body, so ``## **Impact Radius**`` must stay
+    ``**Impact Radius**`` and not collapse to ``Impact Radius``. This is what the deleted
+    line scanner produced, and callers depend on it.
+
+    Args:
+        body: Full body text.
+        start: Char offset of the first character of the heading's own line.
+
+    Returns:
+        The heading text with the ``#`` marker and surrounding whitespace removed, or an
+        empty string when the line is not an ATX heading (a setext heading, say).
+    """
+    line = body[start:].split("\n", 1)[0].rstrip("\r")
+    match = _ATX_SOURCE_RE.match(line)
+    return match.group(1).strip() if match else ""
 
 
 def _slice_content(body: str, content_start: int, content_end: int) -> str:

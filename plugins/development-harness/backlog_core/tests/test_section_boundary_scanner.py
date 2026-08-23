@@ -293,3 +293,79 @@ class TestBoundariesComeFromTheParserNotARescan:
             assert crlf[span.start : span.start + 2] == "##", (
                 f"start offset {span.start} for {span.name!r} does not land on the heading line"
             )
+
+
+class TestSectionNamesKeepTheirSourceSpelling:
+    """A section's name is the spelling the source uses, not marko's flattening of it.
+
+    The deleted line scanner took names from the source line. Taking them from the AST
+    instead changed what callers match against: the registry, compact indexes and
+    ``section=`` filters all compare against the spelling a caller reads in the body.
+    """
+
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            ("## **Impact Radius**\nx", "**Impact Radius**"),
+            ("## `Fact-Check`\nx", "`Fact-Check`"),
+            ("## [Link](http://example.com)\nx", "[Link](http://example.com)"),
+            ("## Plain\nx", "Plain"),
+            ("##   Spaced   \nx", "Spaced"),
+        ],
+    )
+    def test_inline_markup_round_trips(self, body: str, expected: str) -> None:
+        """A heading carrying inline markup keeps that markup in its section name.
+
+        Why: ``_extract_heading_text`` stringified the intermediate inline node rather
+             than recursing into it, so ``## **Impact Radius**`` produced the literal
+             name ``"[<RawText children='Impact Radius'>]"`` — marko internals leaking
+             into the section index, and a previously working
+             ``section="**Impact Radius**"`` filter no longer resolving.
+        """
+        assert [s.name for s in split_body_sections(body)] == [expected]
+
+    def test_nested_inline_markup_does_not_leak_marko_internals(self) -> None:
+        """No section name may contain a marko node repr, however deeply nested."""
+        body = "## **Bold with `code` inside**\nx"
+
+        name = split_body_sections(body)[0].name
+
+        assert "RawText" not in name
+        assert name == "**Bold with `code` inside**"
+
+
+class TestUnterminatedWrapperWithoutABlankLine:
+    """An unterminated wrapper must not swallow later sections, blank line or not.
+
+    Refusing the match and deferring to marko is not sufficient recovery: a CommonMark
+    type-6 HTML block runs to the next blank line, so a malformed body with no blank line
+    before the next heading still loses every section after the wrapper.
+    """
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\ntext\n\n## B\nbbody",
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\ntext\n## B\nbbody",
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n## B\nbbody",
+        ],
+    )
+    def test_later_sections_survive_an_unterminated_wrapper(self, body: str) -> None:
+        """Sections after a truncated wrapper stay addressable in every spacing variant."""
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n## notaheading\n\n</div>\n\n## B\nb",
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n## notaheading\n</div>\n## B\nb",
+        ],
+    )
+    def test_closed_wrapper_stays_opaque_without_a_blank_line(self, body: str) -> None:
+        """Bounding an unterminated wrapper must not weaken a closed one's opacity.
+
+        Why: The recovery stops at the next heading. Applying that to a wrapper that does
+             close would re-expose heading-shaped lines inside real entry content as
+             sections, which is the defect #2956 fixed.
+        """
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
