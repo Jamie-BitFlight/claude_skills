@@ -6,10 +6,12 @@ user-invocable: false
 
 # Subagent Contract
 
-Report state as `STATUS: DONE` or `STATUS: BLOCKED`.
+Begin your response with `STATUS: DONE` or `STATUS: BLOCKED` as its own first line. Consumers
+branch on that line in that position.
 
 DONE carries what was accomplished, the deliverables in the form your dispatch named, and any risk
-you observed.
+you observed. Send it once the acceptance criteria are met as written and every stated constraint
+is respected.
 
 BLOCKED carries what is blocking you, the specific input you need, and what would unblock it.
 Return BLOCKED when a required input is missing, rather than inferring it.
