@@ -478,6 +478,26 @@ gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {path
 
 Address all inline comments before declaring the PR review complete.
 
+### Where the response goes
+
+Reply on the thread that raised the finding. A conclusion reported only to the
+dispatching agent reaches one context and dies there — the reviewer, the repo owner, and
+whoever reads the PR next all see an unanswered thread.
+
+```bash
+# 3. Reply to one inline comment (comment_id comes from the query above)
+gh api -X POST repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments/<comment_id>/replies -f body='...'
+```
+
+Every finding gets a reply, including one already fixed by a later commit and one that needs
+no change. State what was concluded, the evidence it was concluded from, and the commit SHA
+that addresses it — or why no change was warranted. "Fixed" alone tells the next reader
+nothing.
+
+A decision that spans threads rather than answering one — a sequencing choice between PRs, a
+rebase disposition plan — goes on the PR itself via `gh pr comment <N>`, before the work it
+governs.
+
 ## GitHub CLI Conventions
 
 - This checkout's git remote points to a local proxy (`127.0.0.1`), not `github.com` — `gh` cannot
