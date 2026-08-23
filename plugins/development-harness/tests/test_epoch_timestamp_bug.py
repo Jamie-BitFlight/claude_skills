@@ -23,8 +23,9 @@ from __future__ import annotations
 
 import re
 
+import pytest
 from backlog_core.entry_blocks import parse_entries, wrap_entry_with_timestamp
-from backlog_core.models import Entry, Section
+from backlog_core.models import Entry, EntryNotFoundError, Section
 from backlog_core.operations import _apply_groomed_entries
 from backlog_core.timestamps import now_iso
 
@@ -304,6 +305,78 @@ def test_apply_groomed_entries_empty_content_on_empty_section_adds_no_entries() 
     assert len(section.entries) == 0, (
         f"Empty groomed_content on an empty section must not add any entry. Got {len(section.entries)} entries."
     )
+
+
+# ---------------------------------------------------------------------------
+# Finding 7a — an entry_id matching no entry must raise, not silently append (P1, #3183)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_groomed_entries_unknown_entry_id_raises_instead_of_appending() -> None:
+    """entry_id matching no stored entry must raise EntryNotFoundError, not append.
+
+    backlog_update and backlog_groom both delegate to this function. Their
+    server.py tool descriptions document that "An id matching no entry is an
+    error naming the available ids, never a silent no-op" -- but the pre-fix
+    entry_id branch fell through to ``section.entries.append(Entry(id=entry_id,
+    ...))`` on a miss, silently creating an extra entry and reporting success.
+    An agent that supplies a stale or mistyped id (e.g. one it read from an
+    earlier backlog_view call against a since-changed section) gets a
+    duplicated entry instead of the update it asked for, with no error at all.
+    """
+    section = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="original")])
+
+    with pytest.raises(EntryNotFoundError):
+        _apply_groomed_entries(
+            section,
+            "new content",
+            append=False,
+            replace_section=False,
+            reason=None,
+            entry_id="2026-01-01T00:00:00Z-1",  # matches nothing in this section
+            added_date="0000-00-00",
+        )
+
+    assert len(section.entries) == 1, (
+        f"A miss must not mutate the section. Expected 1 entry, got {len(section.entries)}."
+    )
+    assert section.entries[0].content == "original"
+
+
+# ---------------------------------------------------------------------------
+# Finding 7b — a collision-suffixed entry_id must resolve positionally, matching
+# the same resolution backlog_view applies (P1, #3183)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_groomed_entries_collision_suffixed_id_updates_correct_entry() -> None:
+    """A '-N'-suffixed entry_id must target the correct colliding entry in place.
+
+    When two entries in one section share a stored id, backlog_view resolves
+    them positionally with entry_blocks._resolve_duplicate_ids and returns the
+    second one suffixed as f"{id}-1". Passing that exact id back must update
+    the second entry in place -- not compare literally against the still-raw,
+    still-colliding stored ids (which matches neither) and append a third,
+    unrelated entry.
+    """
+    shared_id = "2026-01-01T00:00:00Z"
+    section = Section(entries=[Entry(id=shared_id, content="first"), Entry(id=shared_id, content="second")])
+
+    _apply_groomed_entries(
+        section,
+        "updated second",
+        append=False,
+        replace_section=False,
+        reason=None,
+        entry_id=f"{shared_id}-1",
+        added_date="0000-00-00",
+    )
+
+    assert len(section.entries) == 2, (
+        f"A collision-suffixed id must update in place, not append. Expected 2 entries, got {len(section.entries)}."
+    )
+    assert section.entries[0].content == "first", "the first colliding entry must be untouched"
+    assert section.entries[1].content == "updated second", "the second colliding entry (id-1) must be updated"
 
 
 # ---------------------------------------------------------------------------

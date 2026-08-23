@@ -2584,8 +2584,14 @@ class TestStrikeEntryOperation:
         assert "based on training data" in body
 
     def test_strike_entry_not_found_raises(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """strike_entry raises ValueError when entry_id doesn't exist."""
-        from backlog_core.models import Output
+        """strike_entry raises EntryNotFoundError, naming available ids, when entry_id doesn't exist.
+
+        backlog_strike_entry's server.py tool description documents that "An id
+        matching no entry is an error naming the available ids, never a silent
+        no-op" -- EntryNotFoundError.__str__ is the mechanism that names them
+        (see backlog_core.models.EntryNotFoundError).
+        """
+        from backlog_core.models import EntryNotFoundError, Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
@@ -2595,8 +2601,46 @@ class TestStrikeEntryOperation:
         _write_item(backlog_dir, title="No Entry", priority="P1", topic="no-entry")
 
         out = Output()
-        with pytest.raises(ValueError, match=r"Entry.*not found"):
+        with pytest.raises(EntryNotFoundError, match=r"No entry with id"):
             ops.strike_entry(selector="No Entry", entry_id="2099-01-01T00:00:00Z", reason="test", output=out)
+
+    def test_strike_entry_resolves_collision_suffixed_id(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A '-N'-suffixed entry_id must strike the correct colliding entry.
+
+        When two entries in one section share a stored id, backlog_view resolves
+        them positionally (entry_blocks._resolve_duplicate_ids) and returns the
+        second one suffixed as f"{id}-1". strike_entry compared entry_id against
+        each raw, still-colliding entry.id directly, so the suffixed id it
+        advertised as the way to target a collision matched neither entry and
+        struck nothing.
+        """
+        from backlog_core.backend_protocol import get_config
+        from backlog_core.models import Output
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        import backlog_core.models as _m
+
+        backlog_dir = _m.get_backlog_dir()
+        filepath = _write_item_yaml(backlog_dir, title="Collision Test", priority="P1", topic="collision-test")
+
+        shared_id = "2026-01-01T00:00:00Z"
+        item = _stored_item(filepath)
+        item.sections["log"] = Section(
+            entries=[Entry(id=shared_id, content="first"), Entry(id=shared_id, content="second")]
+        )
+        get_config().backend.put_work_item(item)
+
+        out = Output()
+        result = ops.strike_entry(
+            selector="Collision Test", entry_id=f"{shared_id}-1", reason="test reason", output=out
+        )
+        assert "error" not in result
+        assert result["struck"] is True
+
+        updated_section = cast("Section", _stored_item(filepath).sections["log"])
+        assert updated_section.entries[0].struck is False, "the first colliding entry must remain unstruck"
+        assert updated_section.entries[1].struck is True, "the second colliding entry (id-1) must be struck"
 
 
 # ---------------------------------------------------------------------------
