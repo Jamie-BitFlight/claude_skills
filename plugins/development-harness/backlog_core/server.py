@@ -3444,16 +3444,28 @@ async def artifact_get(
         ),
     ],
     artifact_type: Annotated[str, Field(description="Artifact type to retrieve")],
+    artifact_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Logical identifier of the specific artifact to return. Omit to return every "
+                "artifact registered under this type."
+            )
+        ),
+    ] = None,
 ) -> dict:
-    """Return metadata for a specific artifact type registered on a backlog item.
+    """Return metadata for artifacts registered on a backlog item under one type.
 
-    If multiple artifacts of the same type exist (e.g. multiple
-    codebase-analysis files), all are returned.
+    Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
+    codebase-analysis files). Supplying it returns the single addressed entry, matching
+    ``dh_core.operations.artifact_get`` and the ``artifact get --artifact-id`` CLI option,
+    so both surfaces can address an artifact the same way.
 
     Returns:
         Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings. Returns error key when type is not found — an absent
-        artifact is data, not a failed call.
+        messages/warnings. Returns error key when the type is not found, or when a supplied
+        ``artifact_id`` matches no entry of that type — an absent artifact is data, not a
+        failed call.
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
@@ -3467,11 +3479,15 @@ async def artifact_get(
         def _run() -> list[dict]:
             manifest = _load_manifest(provider, item_id)
             entries = _artifact_registry.get_by_type(manifest, type_enum)
+            _require_artifact_entries(entries, f"No artifacts of type '{artifact_type}' found for item #{item_id}")
+            if artifact_id is not None:
+                entries = [entry for entry in entries if entry.artifact_id == artifact_id]
+                _require_artifact_entries(
+                    entries, f"No artifact with id '{artifact_id}' of type '{artifact_type}' found for item #{item_id}"
+                )
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        if not artifacts:
-            return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
         return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
     except BacklogError as e:
         return {"error": str(e), **out.to_dict()}

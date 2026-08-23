@@ -815,17 +815,89 @@ async def test_artifact_read_reports_an_unmatched_artifact_id() -> None:
     assert "plan/absent.md" in result["error"]
 
 
-async def test_artifact_read_mcp_surface_matches_the_operations_signature() -> None:
-    """The MCP tool must accept the same addressing parameters as its operations counterpart.
+async def test_artifact_get_by_artifact_id_returns_only_the_addressed_entry() -> None:
+    """artifact_id narrows the metadata read to one entry instead of the whole type.
+
+    Tests: artifact_get MCP tool — addressing by logical identifier.
+    How: Two research entries; get the older one by id and assert it is the only result.
+    Why: An identifier assigned on registration that no MCP metadata read accepts makes every
+    such read a category read, so a caller holding an id cannot ask which row it names.
+    """
+    older_entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-old.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-01-01T10:00:00Z",
+    )
+    newer_entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-new.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-06-01T10:00:00Z",
+    )
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[older_entry, newer_entry])
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
+
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
+        patch("backlog_core.server._artifact_registry") as mock_registry,
+    ):
+        mock_registry.get_by_type.return_value = [older_entry, newer_entry]
+        # Act
+        result = await _call(
+            "artifact_get", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r-old.md"}
+        )
+
+    # Assert: the addressed entry is the only one returned
+    assert result.get("error") is None
+    assert result["count"] == 1
+    assert result["artifacts"][0]["artifact_id"] == "plan/r-old.md"
+
+
+async def test_artifact_get_reports_an_unmatched_artifact_id() -> None:
+    """An artifact_id matching no entry names the id rather than the type.
+
+    Reporting "no artifacts of type research" while research entries do exist points the
+    caller at the wrong correction.
+    """
+    entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-new.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-06-01T10:00:00Z",
+    )
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[entry])
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
+
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
+        patch("backlog_core.server._artifact_registry") as mock_registry,
+    ):
+        mock_registry.get_by_type.return_value = [entry]
+        # Act
+        result = await _call(
+            "artifact_get", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/absent.md"}
+        )
+
+    # Assert
+    assert "plan/absent.md" in result["error"]
+
+
+@pytest.mark.parametrize("tool_name", ["artifact_register", "artifact_list", "artifact_get", "artifact_read"])
+async def test_artifact_mcp_surface_matches_the_operations_signature(tool_name: str) -> None:
+    """Each MCP tool must accept the same parameters as its operations counterpart.
 
     Two surfaces over one operation that disagree on which parameters exist force callers
-    onto the richer surface for no functional reason.
+    onto the richer surface for no functional reason. Parametrised over every artifact tool
+    because the divergence this pins was introduced one tool at a time.
     """
     tools = await mcp.list_tools()
-    parameters = next(tool.parameters for tool in tools if tool.name == "artifact_read")
-    operations_parameters = set(inspect.signature(dh_operations.artifact_read).parameters)
+    parameters = next(tool.parameters for tool in tools if tool.name == tool_name)
+    operations_parameters = set(inspect.signature(getattr(dh_operations, tool_name)).parameters)
 
     assert set(parameters["properties"]) == operations_parameters, (
-        "artifact_read's MCP parameters diverge from dh_core.operations.artifact_read: "
+        f"{tool_name}'s MCP parameters diverge from dh_core.operations.{tool_name}: "
         f"MCP has {sorted(parameters['properties'])}, operations has {sorted(operations_parameters)}"
     )

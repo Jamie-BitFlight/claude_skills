@@ -310,3 +310,33 @@ def test_local_content_backends_have_no_yaml_or_file_cache_import_boundary() -> 
     } | {node.module for tree in trees for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
 
     assert not {name for name in imports if "file_cache" in name.casefold() or "yaml_io" in name.casefold()}
+
+
+@pytest.mark.unit
+def test_artifact_get_addresses_one_entry_and_names_an_unmatched_id(
+    local_provider: InMemoryBackend | SQLiteBackend | BeadsBackend,
+) -> None:
+    """The CLI-facing operation narrows to one entry by id and reports a miss by that id.
+
+    An identifier assigned at registration is only useful if a read accepts it; reporting a
+    miss as "no artifacts of type research" while research entries exist names the wrong
+    correction.
+    """
+    set_config(BacklogConfig(backend=local_provider))
+    try:
+        # Given: two artifacts of one type on one item.
+        operations.artifact_register("item-2", "research", "report-old", "body-old")
+        operations.artifact_register("item-2", "research", "report-new", "body-new")
+
+        # When: one is addressed by id.
+        addressed = operations.artifact_get("item-2", "research", "report-old")
+
+        # Then: only that entry comes back.
+        assert addressed.get("error") is None
+        assert addressed["count"] == 1
+        assert addressed["artifacts"][0]["artifact_id"] == "report-old"
+
+        # And: an id matching no entry is reported by id, not by type.
+        assert "absent" in operations.artifact_get("item-2", "research", "absent")["error"]
+    finally:
+        reset_config()
