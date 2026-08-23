@@ -36,10 +36,16 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
-The STATUS block is a notification, never the record. Anything a later step reads goes to a
-named destination that step can read back — a task section, an artifact, a review thread.
-A result that exists only as a report is lost when the session ends, and unreachable from
-any other session, machine, or harness.
+When operating as a **teammate** (spawned via `TeamCreate`), also send:
+
+```
+SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
+```
+
+That send is a notification, never the record. Anything a later step reads goes to a named
+destination that step can read back — a task section, an artifact, a review thread. A result
+that exists only as a message is lost when the session ends and unreachable from any other
+session or machine.
 
 ## The "Write to File" Anti-Pattern
 
@@ -81,3 +87,7 @@ When writing or reviewing agent files:
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
 4. Check that any result a later step reads is written to a named destination, not only messaged
+5. Check the authored file names no harness-specific channel. This rule's own guidance above is
+   for you, a Claude Code agent. Plugin agent files ship to Codex and OpenCode, where
+   `SendMessage` and `TeamCreate` do not exist — an agent file instructing that call sends its
+   result nowhere there. Write the obligation into it, never the mechanism.
