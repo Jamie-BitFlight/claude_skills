@@ -27,7 +27,7 @@ import pytest
 
 from backlog_core.entry_blocks import parse_entries
 from backlog_core.models import SectionEntryMetadata
-from backlog_core.operations import _build_sections_metadata
+from backlog_core.operations import _build_sections_metadata, _entry_owning_headers
 from backlog_core.parsing import split_body_sections
 
 
@@ -534,3 +534,45 @@ class TestReaderAndSplitterShareOneEntryExtent:
 
         assert names == ["Real", "Next"], "entry content must not fragment the section"
         assert "Fake Heading" in entry_text, "the reader must return what the splitter hid"
+
+    def test_entry_pagination_owners_come_from_the_same_extent_rule(self) -> None:
+        """Owning headers are derived from the same entry list parse_entries returns.
+
+        Tests: _entry_owning_headers excludes what find_entry_spans excludes
+        How: An entry-wrapper example inside an inline code span in an earlier section,
+             then one real entry in a later section
+        Why: _entry_owning_headers built its list from ENTRY_RE while parse_entries used
+             find_entry_spans, so the example counted for one and not the other. The two
+             lists pair positionally, so the real entry was reported under "## First"
+             instead of "## Second" — content returned under the wrong header, with no
+             error to show for it.
+        """
+        body = (
+            "## First\n\nexample: `<div><sub>2026-01-01T00:00:00Z</sub>fake</div>`\n\n"
+            "## Second\n\n<div><sub>2026-02-02T00:00:00Z</sub>\n\nreal entry\n</div>\n"
+        )
+
+        owners = _entry_owning_headers(body)
+        entries = parse_entries(body)
+
+        assert owners == ["## Second"]
+        assert len(owners) == len(entries), "owners pair positionally with parsed entries"
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            # Outer </div> immediately followed by a real heading, no blank line.
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n## Fake\n</div>\n## B\nbbody",
+            # Same, with a blank line before the real heading.
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n## Fake\n</div>\n\n## B\nbbody",
+        ],
+    )
+    def test_debris_after_a_truncated_wrapper_never_hides_a_real_section(self, body: str) -> None:
+        """A stray </div> left by a truncated wrapper must not swallow the next heading.
+
+        Why: The truncated-wrapper bound stops at a heading precisely to keep the sections
+             after it reachable. Leaving the wrapper's orphaned </div> unmasked defeated
+             that: bare, it opens a CommonMark type-6 HTML block, which runs to the next
+             blank line and consumed the very heading the bound had preserved.
+        """
+        assert "B" in [s.name for s in split_body_sections(body)]

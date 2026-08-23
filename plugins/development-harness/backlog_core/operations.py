@@ -27,7 +27,7 @@ from typing_extensions import TypedDict
 from . import models as _models
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
-from .entry_blocks import ENTRY_RE, _render_entry_raw, parse_entries
+from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -2270,14 +2270,14 @@ def _build_sections_compact(body: str) -> list[dict[str, str | int]]:
 def _entry_owning_headers(body: str) -> list[str | None]:
     """Map each entry block in *body* to the ``## ``/``### `` header that owns it.
 
-    Returns one element per :data:`ENTRY_RE` match in document order; the value is
+    Returns one element per entry block in document order; the value is
     the full source header LINE (e.g. ``## Log`` or ``### Detail``) of the nearest
     preceding section header, or ``None`` when an entry precedes the first header
     (a headerless preamble entry).  The full line (not just the name) is kept so the
     paged body reproduces the original header level.
 
     The result aligns positionally with :func:`parse_entries` (which iterates the
-    same ``ENTRY_RE`` matches in the same order), so the i-th owning header
+    same ``find_entry_spans`` result in the same order), so the i-th owning header
     describes the i-th parsed entry.  Used by :func:`_paginate_body_result` to
     re-attach the owning header to each paged entry, keeping the paginated body
     self-describing so the section-metadata rebuild stays in sync with the page
@@ -2290,7 +2290,10 @@ def _entry_owning_headers(body: str) -> list[str | None]:
         List of owning header lines (or ``None``) aligned with the entry order
         produced by :func:`parse_entries`.
     """
-    entry_spans = [(m.start(), m.end()) for m in ENTRY_RE.finditer(body)]
+    # Must come from find_entry_spans, not a second extent rule: parse_entries pairs
+    # positionally with this list, so any entry either of them sees and the other does
+    # not shifts every later pairing and reports content under the wrong header.
+    entry_spans = [(span.start, span.end) for span in find_entry_spans(body)]
     # A ``## ``/``### `` line INSIDE an entry block's content is part of that
     # entry's text, not a real section boundary. ``split_body_sections`` is
     # already entry-block aware (#3157), so no separate exclusion filter is
@@ -2360,7 +2363,7 @@ def _paginate_body_result(result: ViewItemResult, body: str, offset: int, limit:
         offset: Number of leading entry blocks (or lines) to skip.
         limit: Maximum entry blocks (or lines) to keep (0 = unlimited).
     """
-    has_entry_blocks = bool(ENTRY_RE.search(body))
+    has_entry_blocks = bool(find_entry_spans(body))
     if has_entry_blocks:
         # Entry-block aware pagination.  Owners are captured from the ORIGINAL body
         # (before the slice) so each paged entry can be rendered under the header it
@@ -2670,7 +2673,7 @@ def _sections_from_body_or_yaml(
     Returns:
         Section metadata mapping.  Empty dict when neither source is available.
     """
-    if ENTRY_RE.search(body):
+    if find_entry_spans(body):
         return _build_sections_metadata(body, show, since, section=None)
     # Plain-text body with section headers but no entry blocks.
     body_spans = split_body_sections(body)

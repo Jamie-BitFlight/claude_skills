@@ -889,6 +889,7 @@ _ENTRY_DIV_OPEN_LINE_RE = re.compile(r"(?m)^ {0,3}" + re.escape(_ENTRY_DIV_OPEN)
 # Any ATX heading line. Used only to bound a truncated wrapper; real heading detection is
 # the parser's job.
 _ATX_ANY_RE = re.compile(r"(?m)^ {0,3}#{1,6}\s")
+_DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>")
 # Captures the text of an ATX heading line, so a section name keeps the exact inline
 # spelling callers filter and index against.
 _ATX_SOURCE_RE = re.compile(r" {0,3}#{1,6}\s+(.*)$")
@@ -932,6 +933,13 @@ def _mask_entry_blocks(body: str) -> str:
             continue
         heading = _ATX_ANY_RE.search(body, match.end())
         ranges.append((match.start(), heading.start() if heading is not None else len(body)))
+    # A </div> left outside every entry range is debris from a truncated wrapper. Left
+    # bare it opens an HTML block, and a CommonMark type-6 block runs to the next blank
+    # line — so it swallows the very heading the bound above stopped at in order to
+    # preserve. It is not markdown structure in its own right, so mask it too.
+    for match in _DIV_CLOSE_TAG_RE.finditer(body):
+        if not any(start <= match.start() < end for start, end in ranges):
+            ranges.append((match.start(), match.end()))
 
     out = list(body)
     for start, end in ranges:
