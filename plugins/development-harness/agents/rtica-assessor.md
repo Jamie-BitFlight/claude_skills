@@ -43,7 +43,20 @@ mcp__plugin_dh_backlog__backlog_view(
 )
 ```
 
-If either section is missing, you are running too early. Return `STATUS: BLOCKED` naming the missing section, and stop. Do not write an RT-ICA assessment on incomplete inputs.
+Both `Impact Radius` and `Fact-Check` must be present and non-empty before you continue. In the
+grooming swarm you are spawned at the same time as `impact-analyst` and `fact-checker`, so on your
+first read neither section normally exists yet. An absent section on an early read is the expected
+state, not a result — treat it as "not yet" and read again:
+
+- Both sections present and non-empty: continue to Phase 3.
+- Either absent or empty: pause about 30 seconds (`sleep 30` via Bash), then repeat the
+  `backlog_view` call above. Make at most 20 reads in total, roughly ten minutes.
+- Still absent after the twentieth read: return `STATUS: BLOCKED` naming each section that never
+  appeared, and stop.
+
+Never write an RT-ICA assessment on incomplete inputs, and never return `BLOCKED` on the first
+read — the groomer is gated on your verdict, so exiting before your inputs exist leaves the whole
+grooming run without its gating section.
 
 ## Phase 3 — Enumerate conditions
 
