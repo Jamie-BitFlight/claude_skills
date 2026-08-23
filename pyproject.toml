@@ -183,6 +183,24 @@ too-many-positional-arguments = "warn" # runtime-injected modules (e.g. backlog 
 unresolved-import = "warn"             # TDD red-state: test files import classes not yet implemented
 
 [[tool.ty.overrides]]
+# TDD RED-phase temporary exception (#3187 struck-progressive-disclosure): these three
+# files intentionally assert on fields (struck, entry_id, struck_ordinals) not yet added
+# to OrdinalEntry / ResolvedUnit / MapResponse / NavigateResponse / BoundedResponse — the
+# same "TDD red-state" category as the unresolved-import warn above, but "warn" alone does
+# not suppress ty's non-zero exit for warning-level diagnostics, so these specific files
+# need "ignore" instead. Remove this override once the GREEN-phase implementation pass
+# (backlog_core/ordinal_mapper.py, disclosure_types.py, disclosure_handler.py) adds the
+# fields — at that point the diagnostics disappear and the override becomes a no-op.
+include = [
+    "plugins/development-harness/backlog_core/tests/unit/test_ordinal_mapper.py",
+    "plugins/development-harness/backlog_core/tests/unit/test_disclosure_handler.py",
+    "plugins/development-harness/backlog_core/tests/unit/test_struck_progressive_disclosure.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
+[[tool.ty.overrides]]
 # pytest.skip is decorated with @_with_exception which ty 0.0.17 miscounts as a bound
 # method expecting 0 positional args (counting self). Both positional and keyword forms
 # trigger false positives. Suppress for the three reader test files that use this pattern.
