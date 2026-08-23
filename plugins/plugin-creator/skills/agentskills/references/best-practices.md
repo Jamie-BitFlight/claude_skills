@@ -139,7 +139,7 @@ description: Generate descriptive commit messages by analyzing git diffs. Use wh
 
 ### Progressive Disclosure Patterns
 
-Keep SKILL.md body lean. Split content into separate files when the validator warns. Run `uvx skilllint@latest check <skill-path>` after writing and follow its guidance on token-based sizing.
+Keep SKILL.md body lean — aim for under 500 lines, in addition to the token-based limit. Split content into separate files when the validator warns. Run `uvx skilllint@latest check <skill-path>` after writing and follow its guidance on token-based sizing.
 
 **Pattern 1 — High-level guide with references:**
 
@@ -279,7 +279,7 @@ description: >-
 
 Apply this check before sharing or publishing a skill that targets multiple clients.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-04-23)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
 
 ---
 

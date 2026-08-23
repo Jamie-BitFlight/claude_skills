@@ -59,7 +59,7 @@ Filesystem-based discovery assumes the agent has access to the local filesystem.
 - **User-level skills need external provision** — Skills stored at the user level (e.g., `~/.claude/skills/`) are not present in a fresh sandbox. Provision them by cloning a config repository into the sandbox before agent startup, providing skill URLs the agent can fetch, or offering a web UI where users upload skills before starting a session.
 - **Built-in skills as static deployment artifacts** — Skills that the product ships as part of its deployment image are always available in any sandbox. Package commonly needed skills as static assets in the deployment.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-04-23)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
 
 ---
 
@@ -118,7 +118,8 @@ When using a dedicated tool (rather than filesystem commands) to activate a skil
 
 ```xml
 <skill_content name="pdf-processing">
-  /path/to/skills/pdf-processing/
+  Skill directory: /path/to/skills/pdf-processing/
+  Relative paths in this skill are relative to the skill directory.
 
   <skill_resources>
     references/forms.md
@@ -129,7 +130,7 @@ When using a dedicated tool (rather than filesystem commands) to activate a skil
 </skill_content>
 ```
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-04-23)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
 
 ---
 
@@ -150,7 +151,7 @@ Project-level skills (committed to a repository) can come from untrusted sources
 
 **Recommended approach:** Gate project-level skill loading on an explicit trust signal — for example, requiring the user to mark a directory as trusted before its skills are loaded into context. This prevents untrusted repositories from injecting instructions automatically.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-04-23)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
 
 ---
 
@@ -160,7 +161,7 @@ When an agent uses a permission system that prompts the user before file reads, 
 
 **Recommended approach:** When a skill is loaded, add its directory to the agent's read-permission allowlist so the model can access bundled resources without interrupting the user for each file. Without allowlisting, every reference file access produces a confirmation prompt that breaks the user experience.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-04-23)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
 
 ---
 
@@ -174,7 +175,7 @@ Some agent implementations support running a skill in a separate subagent sessio
 
 This is useful for complex skill workflows that benefit from an isolated context window. Support for subagent delegation is optional and varies between agent implementations.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-04-23)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
 
 ---
 
@@ -200,6 +201,4 @@ Use the library source code as a reference implementation for building your own 
 
 ## Adoption
 
-Agent Skills are supported by 25+ products including:
-
-Claude Code, Cursor, VS Code, Gemini CLI, OpenAI Codex, GitHub, Roo Code, Amp, Goose, Factory, Databricks, Spring AI, Letta, Firebender, OpenCode, Autohand, Mux, Piebald, TRAE, Qodo, Agentman, Mistral Vibe, Command Code, Ona, VT Code.
+Agent Skills has been adopted by a growing number of agent products, including Claude Code, Cursor, VS Code, Gemini CLI, OpenAI Codex & Copilot, Roo Code, Amp, Goose, Factory, and Databricks. See the live client showcase at <https://agentskills.io> for the current full list.
