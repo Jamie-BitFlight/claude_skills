@@ -62,9 +62,9 @@ where it happens to work.
 
 **Why dispatch stays inside dh** (gotcha):
 dh governs only what it wraps: an agent dispatched by its own name carries hooks, permissions and
-tools dh neither controls nor can verify against the task. This, not tool reach, is why an outside
-skill or agent is loaded as a `dh:task-worker` profile rather than dispatched directly, and why
-`general-purpose` is never a target. The runtime rule is in `skills/dispatch-contract/`.
+tools dh neither controls nor can verify against the task. This, not tool reach, is why outside
+capability enters through `dh:task-worker`, and why `dh:task-worker` serves as this plugin's own
+general-purpose worker. The runtime rule is in `skills/dispatch-contract/`.
 
 ## Language
 
