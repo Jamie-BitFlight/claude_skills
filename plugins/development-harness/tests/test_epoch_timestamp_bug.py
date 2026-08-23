@@ -308,7 +308,7 @@ def test_apply_groomed_entries_empty_content_on_empty_section_adds_no_entries() 
 
 
 # ---------------------------------------------------------------------------
-# Finding 7a — an entry_id matching no entry must raise, not silently append (P1, #3183)
+# Finding 7a — an entry_id matching no entry must raise, not silently append (P1)
 # ---------------------------------------------------------------------------
 
 
@@ -345,7 +345,7 @@ def test_apply_groomed_entries_unknown_entry_id_raises_instead_of_appending() ->
 
 # ---------------------------------------------------------------------------
 # Finding 7b — a collision-suffixed entry_id must resolve positionally, matching
-# the same resolution backlog_view applies (P1, #3183)
+# the same resolution backlog_view applies (P1)
 # ---------------------------------------------------------------------------
 
 
@@ -382,7 +382,7 @@ def test_apply_groomed_entries_collision_suffixed_id_updates_correct_entry() -> 
 # ---------------------------------------------------------------------------
 # Finding 7c — the entry_blocks.rewrite_section path and the
 # operations._apply_groomed_entries path must resolve an identical
-# stored-id collision to the identical target entry (#3183 consolidation)
+# stored-id collision to the identical target entry
 # ---------------------------------------------------------------------------
 
 
