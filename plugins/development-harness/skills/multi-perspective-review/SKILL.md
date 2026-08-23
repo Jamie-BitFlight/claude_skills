@@ -2,7 +2,7 @@
 name: multi-perspective-review
 argument-hint: "--diff <git-range> [--issue <N>]"
 user-invocable: true
-description: "Use when a diff needs four parallel perspective reviewers (Security, Performance, Quality, Accessibility). Creates an ephemeral SAM plan, collects structured verdicts, prints one summary line per perspective, and exits non-zero if any perspective returns REJECT. SKIP is a passing outcome."
+description: "Use when a diff needs four parallel perspective reviewers (Security, Performance, Quality, Accessibility). Creates an ephemeral SAM plan, collects structured verdicts, synthesizes them into one deduplicated cross-referenced punch list, prints one summary line per perspective, and exits non-zero if any perspective returns REJECT. SKIP is a passing outcome."
 ---
 
 # Multi-Perspective Review
@@ -12,8 +12,9 @@ description: "Use when a diff needs four parallel perspective reviewers (Securit
 Orchestrates four independent perspective reviewers in parallel against a diff. Each reviewer
 specialises in a single dimension: Security, Performance, Quality, or Accessibility. The skill
 creates an ephemeral SAM plan, dispatches four `dh:task-worker` teammates via `TeamCreate`,
-reads each perspective's structured verdict block back from its task, applies the gate logic, and
-prints one canonical summary line per perspective.
+dispatches a fifth worker that reads the four verdict blocks back and synthesizes them into one
+deduplicated punch list, applies the gate logic to that punch list, and prints one canonical
+summary line per perspective.
 
 This skill does NOT replace language-scoped code review (`dh:forensic-review`). It runs
 alongside it as an orthogonal quality signal. It is an upstream dependency of #1430
@@ -83,11 +84,11 @@ Inspect the returned `items` array. If any item has `feature` equal to `{review_
 
 - Store its non-empty `plan_ref` as `{PA}` (e.g., `#2181,P8a3f1b29`)
 - Skip step 3b — do not create a new plan
-- Reset every task the reused plan already ran. For each of `T1`..`T4` whose status is terminal,
+- Reset every task the reused plan already ran. For each of `T1`..`T5` whose status is terminal,
   call `mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "state", "status": "not-started"})`.
-  A terminal task cannot be claimed, so a reviewer dispatched against it stops without writing a
-  verdict — and Step 5 would then read the previous run's `Review Results` block as if it applied
-  to this diff.
+  A terminal task cannot be claimed, so a worker dispatched against it stops without writing —
+  and the run would then read the previous run's `Review Results` and `Punch List` blocks as if
+  they applied to this diff.
 
 If no matching plan is found, proceed to step 3b.
 
@@ -152,13 +153,25 @@ mcp__plugin_dh_sam__sam_plan(
                 "signals, and keyboard parity. Return structured verdict per verdict-schema.md."
                 "\n\n{changed_files_block}",
             },
+            {
+                "id": "T5",
+                "title": "Review Synthesis",
+                "agent": "dh:review-synthesizer",
+                "priority": 1,
+                "complexity": "medium",
+                "dependencies": ["T1", "T2", "T3", "T4"],
+                "body": "Read the Review Results section of T1..T4 on this plan and synthesize "
+                "them into one deduplicated, cross-referenced punch list.\n"
+                "Write the punch-list block per verdict-schema.md §2.6 into this task's "
+                "Punch List section.",
+            },
         ],
     }
 )
 ```
 
 Store the returned `plan_ref` as `{PA}`. Completion criterion: `plan_ref` is non-empty and the
-result has `task_count=4`.
+result has `task_count=5`.
 
 ---
 
@@ -178,7 +191,8 @@ SAM task tells `dh:task-worker` which specialist profile to load via `profile_lo
 Dispatch `dh:task-worker` for all four tasks: the four perspective reviewer agents declare
 `sam_task` to write their verdict but not the rest of the SAM task lifecycle, so under
 `dh:dispatch-contract` they cannot be the dispatch target and their behavior reaches the work as a
-loaded profile instead.
+loaded profile instead. `dh:review-synthesizer` reaches the same one operation, so Step 6
+dispatches it the same way.
 
 Every prompt names the same output destination: the `Review Results` section of the worker's own
 task. That section is the only channel the gate reads in Step 5 — a reviewer that does not write it
@@ -216,61 +230,72 @@ Agent(
 
 ---
 
-## Step 5: Read Verdicts Back From the Plan
+## Step 5: Wait for the Four Reviews to Finish
 
-Wait until every task in the ephemeral plan has reached a terminal status. Poll:
+Wait until `T1`..`T4` have all reached a terminal status. Poll:
 
 ```python
 mcp__plugin_dh_sam__sam_plan(plan="{PA}", config={"action": "status"})
 ```
 
-A task is terminal at `complete`, `blocked`, `failed`, `skipped`, or `deferred`. Do not read
-verdicts while any task is still `not-started` or `in-progress`.
-
-Then read each task and take its `Review Results` section:
-
-```python
-mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})
-```
-
-Take the last `Review Results` section on the task — a reused plan carries one per run, appended
-in order. Its content is the raw JSON verdict block — parse it directly:
-
-```python
-verdict_block = json.loads(review_results_section)
-```
-
-The verdict block schema is defined in
-[./references/verdict-schema.md](./references/verdict-schema.md) §2.1. Do not duplicate the
-schema here.
-
-**Missing verdict handling:** A task that is terminal but carries no `Review Results` section, or
-whose section does not parse as a verdict block per §2.1, is a missing verdict — never an
-approval. Treat it as a `FAIL` condition:
-
-```text
-Perspective {X} did not return a verdict
-```
-
-Read all four tasks before proceeding to Step 6.
+A task is terminal at `complete`, `blocked`, `failed`, `skipped`, or `deferred`. `T5` stays
+`not-started` throughout this step — it is dispatched in Step 6, and its dependencies keep
+`sam_plan(action="ready")` from offering it before all four reviews land.
 
 ---
 
-## Step 6: Apply Gate and Print Summary
+## Step 6: Synthesize the Punch List
+
+Dispatch one more worker against `T5`. It reads the four `Review Results` sections, merges
+findings that name the same defect across perspectives into single entries, and writes the
+punch-list block into `T5`'s own `Punch List` section.
+
+```text
+Agent(
+  team_name="multi-{review_slug}",
+  name="synthesis-worker",
+  subagent_type="dh:task-worker",
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are synthesizing the four perspective verdicts on plan {PA} into one punch list. Your task: {PA}/T5.\n\nWrite your punch-list block as the content of the Punch List section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T5\", config={\"action\": \"update\", \"append_section\": \"Punch List\", \"section_content\": <raw JSON punch-list block>}). That section is where the gate reads your output.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T5\")"
+)
+```
+
+Wait for `T5` to reach a terminal status, then read it and take the last `Punch List` section:
+
+```python
+mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T5", config={"action": "read"})
+punch_list = json.loads(punch_list_section)
+```
+
+The punch-list block schema is defined in
+[./references/verdict-schema.md](./references/verdict-schema.md) §2.6. It carries each
+perspective's §2.1 verdict block verbatim in `verdicts`, the perspectives that returned nothing in
+`missing`, and the deduplicated findings in `entries`. Reading it gives the gate everything it
+needs, so Step 7 does not read the four `Review Results` sections. Read them when you want to
+check the punch list against its sources — the sections stay on `T1`..`T4` for exactly that.
+
+**Missing punch list:** a terminal `T5` carrying no parsable `Punch List` section is synthesis
+that did not happen. FAIL with `Punch list not produced`, and report which perspectives did write
+a `Review Results` section so the run is diagnosable.
+
+---
+
+## Step 7: Apply Gate and Print Summary
 
 ### Gate Logic
 
 The gate logic is the pre-#1430 stub. The full gate logic including the all-SKIP edge case is
-defined in [./references/verdict-schema.md](./references/verdict-schema.md) §2.4.
+defined in [./references/verdict-schema.md](./references/verdict-schema.md) §2.4. Both inputs come
+from the punch list read in Step 6: `punch_list["verdicts"]` and `punch_list["missing"]`.
 
 Apply gate in this order:
 
-1. **Check for missing verdicts.** If any perspective's task carries no parsable `Review Results`
-   verdict block, FAIL immediately with message
-   `"Perspective {X} did not return a verdict"`.
+1. **Check for missing verdicts.** For each perspective named in `punch_list["missing"]`, FAIL
+   immediately with message `"Perspective {X} did not return a verdict"`. A missing verdict is
+   never an approval.
 
 2. **Check for REJECT.** If any verdict has `verdict == "REJECT"`, the gate FAILS. Collect all
-   REJECT verdicts and their blocking findings for the summary.
+   REJECT verdicts and their blocking findings for the summary. Report the blocking findings from
+   `punch_list["entries"]`, where a defect two perspectives raised appears once and names both.
 
 3. **Check for all-SKIP edge case.** If all four verdicts are `SKIP`, the gate PASSES but the
    summary MUST include this exact warning line:
@@ -345,11 +370,14 @@ flowchart TD
     Parallel --> W2["Agent(name='performance-worker', subagent_type='dh:task-worker')"]
     Parallel --> W3["Agent(name='quality-worker', subagent_type='dh:task-worker')"]
     Parallel --> W4["Agent(name='accessibility-worker', subagent_type='dh:task-worker')"]
-    W1 --> Collect["Wait for T1..T4 terminal via sam_plan status<br>Read each task's Review Results section"]
+    W1 --> Collect["Wait for T1..T4 terminal via sam_plan status"]
     W2 --> Collect
     W3 --> Collect
     W4 --> Collect
-    Collect --> Gate{Any REJECT?}
+    Collect --> Synth["Dispatch synthesis worker on T5<br>Wait for T5 terminal<br>Read its Punch List section"]
+    Synth --> NoList{Punch List parsable?}
+    NoList -->|No| FailSynth[FAIL — Punch list not produced]
+    NoList -->|Yes| Gate{Any REJECT?}
     Gate -->|Missing verdict| Fail[FAIL — Perspective X did not return a verdict]
     Gate -->|Any REJECT| Fail2[Print summary. TeamDelete. Exit non-zero.]
     Gate -->|All SKIP| Warn[Print summary. Print all-SKIP warning. TeamDelete. Exit 0.]
@@ -360,7 +388,7 @@ flowchart TD
 
 ## Ephemeral Plan Task Structure
 
-The ephemeral plan always has exactly four tasks:
+The ephemeral plan always has exactly five tasks:
 
 | Task | Perspective | Agent field | dependencies |
 |------|-------------|-------------|--------------|
@@ -368,8 +396,11 @@ The ephemeral plan always has exactly four tasks:
 | T2 | Performance | `dh:reviewer-performance` | `[]` |
 | T3 | Quality | `dh:reviewer-quality` | `[]` |
 | T4 | Accessibility | `dh:reviewer-accessibility` | `[]` |
+| T5 | Synthesis | `dh:review-synthesizer` | `[T1, T2, T3, T4]` |
 
-All four tasks have `dependencies: []` — they are independent and run in parallel. The
+The four review tasks have `dependencies: []` — they are independent and run in parallel. T5
+depends on all four, so `sam_plan(action="ready")` offers it only once every perspective has
+finished. The
 `agent:` field is read internally by `dh:task-worker` via
 `mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})` and passed
 to `profile_load` to load the specialist reviewer behavior. The orchestrator always passes only
@@ -379,12 +410,16 @@ the task reference `{PA}/T{N}` to the worker prompt.
 
 ## Behavioral Rules
 
-- **SKIP is a passing outcome.** A perspective that SKIPs is not a blocker.
+- **SKIP is a passing outcome.** A perspective that SKIPs is not a blocker. The punch list records
+  it as coverage that was declined, with the reviewer's `skip_reason`.
 - **All four verdicts must arrive before the gate runs.** Do not apply the gate on partial results.
 - **Check-or-create prevents plan accumulation.** Always list by search before creating.
 - Dispatch uses `dh:task-worker` because the perspective reviewer agents cannot claim or close a SAM task. Specialist behavior is selected through the task profile. See `dh:dispatch-contract`.
-- **Do not embed the verdict schema or UI pattern list.** Reference
+- **Do not embed the verdict or punch-list schema, or the UI pattern list.** Reference
   [./references/verdict-schema.md](./references/verdict-schema.md) for all schema definitions.
-- **Each ephemeral task body must embed the newline-separated changed-files list.** Workers read
-  their task body to obtain the scan target; they do not receive it via the prompt.
+- **Each reviewer task body must embed the newline-separated changed-files list.** Reviewers read
+  their task body to obtain the scan target; they do not receive it via the prompt. T5 reads the
+  four verdict sections instead, so its body names those and carries no file list.
+- **The punch list is the gate's input.** One defect two perspectives raised is one entry naming
+  both, so a REJECT summary counts distinct defects rather than repeating one across lenses.
 - **All-SKIP warning is mandatory** when all four perspectives return SKIP.

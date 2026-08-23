@@ -140,11 +140,16 @@ GateResult:
   blocking_findings: list[Finding]   — empty when passed
 ```
 
+**Gate input:** `verdicts` and `missing` both come from the punch-list block (§2.6) that the
+synthesis task writes — `punch_list["verdicts"]` carries each §2.1 block verbatim, so the gate
+input is byte-identical to reading the four `Review Results` sections directly. The orchestrator
+may read those sections to check the punch list against them; the gate does not require it.
+
 **Pre-#1430 stub logic:**
 
 ```text
-verdicts = [parse_verdict(task.review_results) for task in plan_tasks]
-missing = [p for p in PERSPECTIVES if p's task has no parsable Review Results block]
+verdicts = punch_list["verdicts"]
+missing = punch_list["missing"]
 if missing:
     FAIL — "Perspective {X} did not return a verdict"
 rejecting = [v for v in verdicts if v.verdict == "REJECT"]
@@ -246,3 +251,65 @@ When any Tier 3 file is in the changed-files list, the quality reviewer checks:
 
 These are prompt engineering bugs. Each confirmed issue is a finding (BLOCKER if it causes
 incorrect behavior in a documented scenario; MINOR otherwise).
+
+---
+
+## §2.6 Punch-List Block
+
+The synthesis task (T5, profile `dh:review-synthesizer`) reads the four `Review Results` sections
+and writes exactly one punch-list block as the content of its own `Punch List` section. The
+orchestrator reads that section, and reads the raw verdict sections only when it chooses to check
+the punch list against them.
+
+```json
+{
+  "schema_version": "1.0",
+  "verdicts": [
+    {
+      "schema_version": "1.0",
+      "perspective": "security",
+      "verdict": "REJECT",
+      "findings": [],
+      "skip_reason": "present only when verdict == SKIP"
+    }
+  ],
+  "missing": ["performance"],
+  "entries": [
+    {
+      "severity": "BLOCKER",
+      "file": "relative/path/to/file.py",
+      "line": 42,
+      "perspectives": ["security", "quality"],
+      "descriptions": [
+        "security reviewer's wording",
+        "quality reviewer's wording"
+      ],
+      "rules": ["no-hardcoded-secrets"]
+    }
+  ]
+}
+```
+
+**Field constraints:**
+
+- `verdicts`: each §2.1 block copied verbatim from a `Review Results` section, one per perspective
+  that returned a parsable one. This is the gate input defined in §2.4.
+- `missing`: perspectives whose task is terminal with no parsable `Review Results` block. A
+  perspective appears in `verdicts` or in `missing`, never both and never neither.
+- `entries`: deduplicated findings. One entry per distinct defect, whatever number of perspectives
+  raised it.
+- `entries[].perspectives`: every perspective that raised this defect, in T1..T4 order (security,
+  performance, quality, accessibility).
+- `entries[].descriptions`: each raising reviewer's own wording, index-aligned with `perspectives`.
+- `entries[].severity`: the highest severity among the merged findings.
+- `entries[].rules`: union of the `rule` values on the merged findings; `[]` when none carried one.
+- Ordering: `BLOCKER`, `MINOR`, `INFO`; within a severity, more perspectives first, then file path,
+  then line.
+
+**Conservation invariant:** the total number of findings across `verdicts` equals the sum of
+`len(perspectives)` across `entries`. Every reviewer finding reaches exactly one entry, and no
+entry exists without a reviewer finding behind it.
+
+**Merge rule:** two findings become one entry when they name the same file, the same line, and the
+same defect. A finding with `line: null` merges with a line-specific finding in the same file only
+when both descriptions name the same defect. Two different defects on one line stay two entries.

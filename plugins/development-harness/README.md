@@ -437,6 +437,7 @@ The harness ships 27 specialist agents invoked automatically during pipeline sta
 
 - `code-reviewer` — Independent code review against acceptance criteria (S6 Forensic Review)
 - `reviewer-accessibility`, `reviewer-performance`, `reviewer-quality`, `reviewer-security` — Specialist review agents for the multi-perspective review phase
+- `review-synthesizer` — Merges the four perspective verdicts into one deduplicated, cross-referenced punch list
 
 **Grooming:**
 
