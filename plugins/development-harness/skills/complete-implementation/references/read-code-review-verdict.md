@@ -10,11 +10,19 @@ verdict. Address the entry by its identifier.
 
 ## Step A — Read by identifier
 
-`{review_artifact_id}` is `code-review-T1-qg-{slug}`. `code-reviewer` derives the `{slug}` half of
-its `artifact_id` from the plan it was dispatched under, and T1 is dispatched under the quality-gate
-plan whose slug is `qg-{slug}` — not the feature plan's `{slug}`. Use the identifier T1's STATUS
-ARTIFACTS section reports when it names one; otherwise use the derived value. Do not shorten either
-to a substring.
+Use the identifier T1's STATUS ARTIFACTS section reports when it names one. Otherwise derive it.
+
+`code-reviewer` builds its `artifact_id` as `code-review-{task_id}-{plan_slug}` from the plan it was
+dispatched under, and T1 is dispatched under the quality-gate plan, not the feature plan. Read that
+plan's slug from SAM rather than parsing it out of `{qg_plan_address}` — the address is an opaque
+logical identifier such as `Pdec8934d` and has no slug in it:
+
+```text
+mcp__plugin_dh_sam__sam_plan(plan="{qg_plan_address}", config={"action": "read"})
+```
+
+Take the response's `feature` field as `{qg_slug}`. `{review_artifact_id}` is
+`code-review-T1-{qg_slug}`. Do not shorten it to a substring.
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "code-review" --artifact-id "{review_artifact_id}"
@@ -30,11 +38,11 @@ Confirm what the type does hold before concluding anything:
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type code-review
 ```
 
-Match `artifact_id` exactly against `code-review-T1-qg-{slug}`. Never select by substring and never
-fall back to the latest `created_at`. One work item holds the verdicts of every task ever reviewed
-against it: the feature plan's own forensic review registers `code-review-{task_id}-{slug}` under
-the same type, and both that and the quality-gate verdict contain `T1`. A substring or recency match
-can hand this gate the feature plan's earlier `PASS` in place of the quality gate's `FAIL`.
+Match `artifact_id` exactly against `{review_artifact_id}`. Never select by substring and never fall
+back to the latest `created_at`. One work item holds the verdicts of every task ever reviewed
+against it: the feature plan's own forensic review registers `code-review-{task_id}-{feature_slug}`
+under the same type, and both that and the quality-gate verdict contain `T1`. A substring or recency
+match can hand this gate the feature plan's earlier `PASS` in place of the quality gate's `FAIL`.
 
 If an entry matches exactly, read it through Step A. If none does, go to Step C — no `code-review`
 entry for this quality-gate plan exists, whatever else the type holds.
@@ -52,15 +60,19 @@ The plan may predate that artifact type: a verdict recorded by an earlier run is
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type codebase-analysis
 ```
 
-Keep only entries whose `agent` field is `code-reviewer`. Prefer the one whose `artifact_id` ends in
-`-qg-{slug}`; a legacy verdict registered under a plan that predates the quality-gate split may not
-carry that suffix, in which case take the latest `created_at` among the `code-reviewer` entries and
-record in the completion report that the verdict was matched by recency. Call the selection
-`{legacy_artifact_id}` and read it by its own identifier — a read by `codebase-analysis` alone
-returns whichever analysis document was registered last, which is not a verdict:
+Match `artifact_id` exactly against the same `{review_artifact_id}` derived in Step A. The type
+migration moved the verdict's `artifact_type`; it did not change how `code-reviewer` builds its
+`artifact_id`, so this quality-gate plan's legacy verdict carries exactly the identifier Step A
+derived. Select on nothing else — not on recency, not on `agent` alone, not on any other
+`code-reviewer` entry the item happens to hold. An older `codebase-analysis` verdict belonging to a
+different plan is not this plan's verdict, and accepting one would let a stale `PASS` stand in for a
+current run that failed to register at all. If no entry matches exactly, go to Step D.
+
+Read the match by its own identifier — a read by `codebase-analysis` alone returns whichever
+analysis document was registered last, which is not a verdict:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{legacy_artifact_id}"
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{review_artifact_id}"
 ```
 
 That content is `{review_report}` — return to the caller.

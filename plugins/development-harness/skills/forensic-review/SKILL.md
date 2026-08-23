@@ -104,17 +104,25 @@ Address the entry by its `artifact_id`. One `code-review` entry exists per revie
 two tasks of this work item have been reviewed, omitting `artifact_id` returns whichever review
 registered last — which may be another task's.
 
-If the STATUS output named no `artifact_id`, derive it — `code-reviewer` registers
-`code-review-{task_id}-{slug}`, where `{slug}` is the slug half of this plan's address — and confirm
-it exists:
+If the STATUS output named no `artifact_id`, derive it. `code-reviewer` builds
+`code-review-{task_id}-{plan_slug}` from the plan it was dispatched under. Read that plan's slug
+from SAM — `{plan_id}` is an opaque logical identifier such as `Pdec8934d` and has no slug to parse
+out of it:
+
+```text
+sam_plan(plan="{plan_id}", config={"action": "read"})
+```
+
+Take the response's `feature` field as `{plan_slug}`, making the expected identifier
+`code-review-{task_id}-{plan_slug}`. Confirm it exists:
 
 ```text
 artifact_list(item_id={item_id}, artifact_type="code-review")
 ```
 
 Match `artifact_id` exactly. Never select by substring and never fall back to the latest
-`created_at`: this work item also holds the quality gate's `code-review-T1-qg-{slug}` verdict and
-the verdicts of every other task reviewed against it, and several of those contain this task's
+`created_at`: this work item also holds the quality gate's `code-review-T1-qg-{plan_slug}` verdict
+and the verdicts of every other task reviewed against it, and several of those contain this task's
 `{task_id}` as a substring. A loose match returns another task's review, which Step 5 would then
 append to this task's Review Results and mine for remediation findings that belong elsewhere.
 
