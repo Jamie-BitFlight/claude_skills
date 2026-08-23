@@ -12,6 +12,3 @@ specialist it loads as a profile — including any skill or agent from outside d
 
 Every artifact is consumed as an input by a later step. An artifact no step reads is a missing
 consumer, not a redundant artifact.
-
-Results go to the backend through a plan, task, or artifact operation — never a response message,
-never a repo file.
