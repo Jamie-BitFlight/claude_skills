@@ -7,11 +7,11 @@ user-invocable: false
 # Dispatch Contract
 
 Dispatch a `dh:` specialist that fits the task and whose declared tools reach every operation the
-dispatch hands over. Otherwise dispatch `dh:task-worker`, naming that specialist as the profile it
-loads. Never dispatch `general-purpose`, and never dispatch an agent from outside dh by its name.
+dispatch hands over. Otherwise dispatch `dh:task-worker` — it is this plugin's general-purpose
+worker, and it arrives carrying dh's tools and hooks.
 
-An outside agent reaches the task as that profile; an outside skill reaches it through the task's
-own `skills` list, since a profile resolves to an agent.
+Outside capability reaches the task through `dh:task-worker`: an outside agent as the profile it
+loads, an outside skill through the task's own `skills` list, since a profile resolves to an agent.
 
 Every artifact is consumed as an input by a later step. An artifact no step reads is a missing
 consumer, not a redundant artifact.
