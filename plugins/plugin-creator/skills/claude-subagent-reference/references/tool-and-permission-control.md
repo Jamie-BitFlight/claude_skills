@@ -37,8 +37,13 @@ the named server exposes, and each composes with named tools in the same list.
 
 ```yaml
 # Read plus every tool from the dh backlog server
-tools: Read, mcp__plugin_dh_backlog__*
+tools: Read, mcp__plugin_dh_backlog
 ```
+
+Author with the bare form. `skilllint`'s AS007 check rejects the `mcp__<server>__*` glob and
+passes the bare `mcp__<server>` form, even though both resolve to the identical tool set at
+runtime (confirmed: `skilllint 1.10.0` exits non-zero on the glob form and clean on the bare form
+for an otherwise-identical agent file).
 
 A plugin-bundled MCP server registers under `mcp__plugin_<plugin-name>_<server-name>`, and the
 server-level pattern composes with that prefix.

@@ -40,11 +40,17 @@ compose with named tools. A plugin-bundled server registers as
 tools: Read, mcp__Ref__ref_read_url
 
 # CORRECT — every tool from one server, plus Read
-tools: Read, mcp__plugin_dh_backlog__*
+tools: Read, mcp__plugin_dh_backlog
 
 # WRONG — wrong case matches no tool and is dropped
 tools: Read, mcp__ref__ref_read_url
 ```
+
+Author server grants with the bare form (`mcp__<server>`), not the `mcp__<server>__*` glob. Both
+resolve identically at runtime, but `skilllint`'s AS007 check rejects the glob form and passes the
+bare form (confirmed: `skilllint 1.10.0` exits non-zero on `mcp__plugin_dh_backlog__*` and clean
+on `mcp__plugin_dh_backlog` for an otherwise-identical agent file) — an agent generated with the
+glob form fails Phase 6 validation.
 
 An entry that matches no live tool is dropped and the rest of the grant still resolves. When every
 entry resolves to nothing the agent refuses to launch, reporting that it "would be spawned with
