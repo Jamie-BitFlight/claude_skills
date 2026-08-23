@@ -53,7 +53,9 @@ sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
 
 Extract:
 
-- `task_file_path` — the plan address (full stem, e.g. `P{id}-{slug}`); resolved by MCP tools, not filesystem paths
+- `task_file_path` — the plan address, an opaque logical identifier such as `Pdec8934d`; resolved
+  by MCP tools, not filesystem paths. Never parse it for a plan number or slug — read those
+  from `sam_plan(config={"action": "read"})`
 - `item_id` — required for artifact registration; if absent, BLOCK immediately
 - `expected_outputs` — the implementation files produced by Stage 5 (listed in the task's
   "Files Changed" or "Expected Outputs" section)
