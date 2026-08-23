@@ -1,10 +1,16 @@
 """Guards the artifact-type owner map declared in the plugin's AGENTS.md.
 
-``artifact_read`` resolves a manifest entry by ``(item_id, artifact_type)`` only — it sorts all
-matching entries by ``created_at`` descending and returns the newest one. A type whose read decides
-a workflow branch can therefore address exactly one document, and must have exactly one registering
-agent. Types that are intentionally multi-entry, or whose producers all re-register a single shared
-``artifact_id``, are safe with several registering agents and are marked as not gate-read.
+``artifact_read`` called without an ``artifact_id`` resolves a manifest entry by
+``(item_id, artifact_type)`` alone — it sorts all matching entries by ``created_at`` descending and
+returns the newest one. A type whose read decides a workflow branch can therefore address exactly
+one document that way, and must have exactly one registering agent. Types that are intentionally
+multi-entry, or whose producers all re-register a single shared ``artifact_id``, are safe with
+several registering agents and are marked as not gate-read.
+
+One registering agent is not one entry, and this guard does not claim otherwise. A single producer
+that registers one entry per unit reviewed leaves several under its own type; its consumers pass an
+``artifact_id`` instead of reading by type. The owner map's ``Gate-read`` column bounds who may
+write a type, not how many entries one writer leaves.
 
 AGENTS.md's "Artifact types and registering agents" table is the declared map. These tests hold the
 shipped markdown and that map in agreement:
