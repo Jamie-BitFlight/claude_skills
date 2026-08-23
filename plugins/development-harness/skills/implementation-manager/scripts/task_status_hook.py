@@ -214,6 +214,23 @@ def _plan_arg_to_path(plan_arg: str) -> Path | None:
         return None
 
 
+def _resolve_matched_task(match: re.Match[str]) -> tuple[Path | None, str | None]:
+    """Resolve a plan/task regex match's groups to (task_file, task_id).
+
+    Shared by every pattern in ``extract_task_info_from_prompt`` — each pattern differs
+    only in how it locates the plan-arg/task-id groups in the prompt, not in what happens
+    once they're found.
+
+    Returns:
+        ``(task_file, task_id)``, or ``(None, None)`` when the plan arg cannot be resolved
+        to a filesystem path (plan not found in the DH state directory).
+    """
+    task_file = _plan_arg_to_path(match.group("plan"))
+    if task_file is None:
+        return None, None
+    return task_file, match.group("task_id")
+
+
 def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]:
     """Extract task file path and task ID from sub-agent prompt.
 
@@ -239,10 +256,7 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
         rf"/start-task\s+{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt, re.IGNORECASE
     )
     if match:
-        task_file = _plan_arg_to_path(match.group("plan"))
-        if task_file is None:
-            return None, None
-        return task_file, match.group("task_id")
+        return _resolve_matched_task(match)
 
     # Pattern 2: Skill(skill="start-task", args="<plan-arg> --task <id>")
     # The orchestrator invokes start-task via the Skill tool, not as a literal command.
@@ -255,10 +269,16 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
         re.IGNORECASE,
     )
     if skill_match:
-        task_file = _plan_arg_to_path(skill_match.group("plan"))
-        if task_file is None:
-            return None, None
-        return task_file, skill_match.group("task_id")
+        return _resolve_matched_task(skill_match)
+
+    # Pattern 3: bare "<plan-arg>/<task-id>" address, with no /start-task prefix and no
+    # Skill() wrapper. implement-feature/SKILL.md dispatches dh:task-worker with the task
+    # reference as the sub-agent's ENTIRE prompt in this form, so it is matched as a full-string
+    # match (not a substring search like Patterns 1 and 2) to avoid false-positiving on an
+    # address mentioned in passing within a longer, unrelated prompt.
+    bare_match = re.fullmatch(rf"{_PLAN_ARG_RE}/(?P<task_id>{_TASK_ID_RE})", prompt.strip(), re.IGNORECASE)
+    if bare_match:
+        return _resolve_matched_task(bare_match)
 
     return None, None
 
