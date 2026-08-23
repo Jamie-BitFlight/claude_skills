@@ -1,6 +1,6 @@
 ---
 name: dispatch-contract
-description: Which agent a dh workflow dispatches for a task, and where a dispatched agent's result goes. Use when planning or decomposing tasks and selecting the agent for one, when dispatching an agent for dh work, or when deciding where a result belongs.
+description: Which agent a dh workflow dispatches, and the artifact consumer invariant.
 user-invocable: false
 ---
 
