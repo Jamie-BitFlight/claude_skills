@@ -1032,15 +1032,19 @@ class _EntryDivBlock(_MarkoBlockElement):
         return bool(source.expect_re(_ENTRY_DIV_OPEN_RE))
 
     @classmethod
-    def _wrapper_closes(cls, source: _MarkoSource) -> bool:
-        """Return whether the wrapper opening at the current position closes before EOF.
+    def _scan_close(cls, source: _MarkoSource, *, fence_aware: bool) -> bool:
+        """Scan ahead for the wrapper's close, then rewind to where the scan started.
 
-        Scans ahead from the current position and rewinds to it, using ``Source.anchor``
-        and ``Source.reset`` so the scan leaves no trace for the real parse below.
+        Uses ``Source.anchor``/``Source.reset`` so the scan leaves no trace for the real
+        parse.
+
+        Args:
+            source: The parser source, positioned at the wrapper's opening line.
+            fence_aware: When true, tags inside a fenced code block do not count toward
+                nesting depth.
 
         Returns:
-            ``True`` when ``<div>``/``</div>`` nesting returns to zero before the end of
-            the document.
+            ``True`` when ``<div>``/``</div>`` nesting returns to zero before EOF.
         """
         source.anchor()
         fence = _FenceState()
@@ -1052,7 +1056,7 @@ class _EntryDivBlock(_MarkoBlockElement):
                 if line is None:
                     break
                 source.consume()
-                if fence.opaque(line):
+                if fence_aware and fence.opaque(line):
                     continue
                 depth += _div_depth_delta(line)
                 if depth <= 0:
@@ -1061,6 +1065,30 @@ class _EntryDivBlock(_MarkoBlockElement):
         finally:
             source.reset()
         return closed
+
+    @classmethod
+    def _close_mode(cls, source: _MarkoSource) -> bool | None:
+        """Return the fence mode under which the wrapper closes, or ``None`` if it never does.
+
+        Fence-aware scanning is tried first, because the common real case is a valid entry
+        quoting an HTML example whose ``<div>`` must not count as wrapper structure. It is
+        not sufficient alone: an entry holding a fence that is itself never closed makes
+        every later line look fenced, including the wrapper's own ``</div>``, so a closed
+        wrapper is judged unterminated and everything after it is consumed. Falling back to
+        a fence-blind scan recovers that case, and the mode is returned rather than
+        discarded so the parse below counts depth the same way this decision did.
+
+        Args:
+            source: The parser source, positioned at the wrapper's opening line.
+
+        Returns:
+            ``True`` or ``False`` naming the mode that found the close, or ``None`` when
+            neither mode finds one.
+        """
+        for fence_aware in (True, False):
+            if cls._scan_close(source, fence_aware=fence_aware):
+                return fence_aware
+        return None
 
     @classmethod
     def parse(cls, source: _MarkoSource) -> str:
@@ -1076,7 +1104,15 @@ class _EntryDivBlock(_MarkoBlockElement):
         Returns:
             The raw, verbatim source text of the entry block.
         """
-        closes = cls._wrapper_closes(source)
+        mode = cls._close_mode(source)
+        closes = mode is not None
+        # When nothing closes the wrapper, scan the bound fence-blind. An unclosed fence
+        # inside the entry would otherwise make every later line — the next heading
+        # included — look like fenced content, and the recovery that exists to preserve
+        # later sections would consume them instead. Exposing a quoted heading from a
+        # doubly-malformed entry is the lesser failure; losing real sections is the one
+        # this whole path exists to prevent.
+        fence_aware = mode if mode is not None else False
         fence = _FenceState()
         lines: list[str] = []
         depth = 0
@@ -1084,7 +1120,7 @@ class _EntryDivBlock(_MarkoBlockElement):
             line = source.next_line()
             if line is None:
                 break
-            in_fence = fence.opaque(line)
+            in_fence = fence_aware and fence.opaque(line)
             if not closes and not in_fence and lines and _ATX_ANY_RE.match(line):
                 break
             lines.append(line)

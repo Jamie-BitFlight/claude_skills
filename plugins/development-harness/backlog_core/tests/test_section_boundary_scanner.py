@@ -420,3 +420,25 @@ class TestWrapperCloseDetectionIgnoresFencedContent:
              section while the following real section was lost.
         """
         assert [s.name for s in split_body_sections(body)] == expected
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n\n</div>\n\n## B\nbbody",
+            "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\nx\n\n</div>\n\n## B\nbbody",
+        ],
+    )
+    def test_unclosed_fence_does_not_hide_the_wrapper_close(self, body: str) -> None:
+        """A fence the entry never closes must not swallow the sections after the entry.
+
+        Tests: wrapper-close detection survives an unterminated fence inside the entry
+        How: Put an opening fence with no closing delimiter inside an otherwise closed
+             wrapper, then assert the section after the wrapper is still found
+        Why: Fence tracking made every line after an unclosed fence look like fenced
+             content — the entry's own closing </div> included — so a closed wrapper was
+             judged unterminated and the recovery consumed to EOF, losing "## B". Neither
+             a fence-aware nor a fence-blind depth scan finds the close on its own here,
+             because the quoted <div> unbalances the blind pass, so the bound itself has
+             to be scanned fence-blind when nothing closes.
+        """
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
