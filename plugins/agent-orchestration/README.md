@@ -67,7 +67,7 @@ When a task decomposes into independent subtasks, Claude dispatches agents in pa
 |---|---|
 | `agent-orchestration` | Full scientific delegation framework — verification checklist, delegation template, anti-patterns, parallel dispatch patterns |
 | `how-to-delegate` | 10-step preparation worksheet — guides through observations, success criteria, world-building context, agent selection, and pre-flight verification before constructing a delegation prompt |
-| `delegate` | Quick delegation template for single-agent prompts — the WHERE/WHAT/WHY format with a checklist |
+| `delegate` | Decomposes a request into phases, dispatches each phase to its own sub-agent, and adjudicates the results — the WHERE/WHAT/WHY dispatch template with a phase-scoped task table and pre-send checklist |
 | `orchestrating-swarms` | Patterns for large-scale parallel agent coordination — swarm spawning, task decomposition, agent pool management |
 
 ## Installation
@@ -94,7 +94,7 @@ Invoke manually when you want Claude to use the full 10-step preparation workshe
 /agent-orchestration:how-to-delegate
 ```
 
-Or use the quick delegation template before a specific Agent tool call:
+Or decompose, dispatch, and adjudicate a request before delegating it:
 
 ```text
 /agent-orchestration:delegate
