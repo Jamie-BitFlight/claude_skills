@@ -10,11 +10,33 @@ every other area of the plugin as it gets resolved.
 
 ## Dispatch Roles
 
-These terms name the scope an agent's assignment covers — not a capability it holds or is denied.
+Load, Dispatch, and Delegate name actions. Dispatcher, Orchestrator, Manager, and Worker name
+the scope an agent's assignment covers — not a capability it holds or is denied.
 Every agent may decompose its own assignment however the work requires, including by dispatching
 further agents; the scope of the assignment is what differs. See
 [ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
 incident that required stating this precisely.
+
+**Load**:
+Reading a skill's instructions into the current agent's own context. The agent that loads a skill
+performs the work itself — loading adds instructions to who you already are, and adds no worker.
+_Avoid_: "delegate" or "hand off" for loading a skill. Both name an agent-to-agent transfer, so
+"delegate to the start-task skill" reads as an instruction to spawn a subagent for work the reader
+is meant to perform itself.
+
+**Dispatch**:
+Invoking a separate agent, which starts with its own empty context and inherits nothing the
+dispatcher loaded. Dispatching adds a worker.
+_Avoid_: using it for loading a skill (see Load above).
+
+**Delegate**:
+Dispatching an agent and handing over the brief it needs to work without guessing — the
+observations already known, what success is, and the boundaries. `.claude/skills/delegate/` is that
+template, and `.claude/CLAUDE.md` requires it whenever an agent is dispatched. Every delegation is
+a dispatch; a dispatch carrying no brief is one the receiving agent has to fill in from
+assumptions, which is what SAM exists to prevent.
+_Avoid_: "delegate" for any transfer that is not agent-to-agent — a skill load, a tool call, or
+writing a result to a destination another step reads.
 
 **Dispatcher**:
 The agent that invoked another agent with its prompt. A relation, not a role — an Orchestrator, a
@@ -44,7 +66,7 @@ over, and it reports to that dispatcher rather than to the human (see Orchestrat
 
 **Worker**:
 An agent whose assignment covers one unit of work. Two forms, both executed directly:
-a SAM task reference with a task ID to delegate to `start-task`, or a direct prompt carrying its
+a SAM task reference with a task ID, which it runs by loading `start-task`, or a direct prompt carrying its
 own explicit instructions and no such task ID (it may still carry a plan address for read-only
 reference — e.g. a verification task that reads the plan to check criteria against it).
 `dh:task-worker` is dispatched both ways throughout the plugin; see the Dispatch Pattern section

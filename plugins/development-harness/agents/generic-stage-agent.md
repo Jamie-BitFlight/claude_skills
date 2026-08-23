@@ -5,7 +5,6 @@ tools: Read, Write, Edit, Bash, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_s
 model: sonnet
 skills:
   - dh:subagent-contract
-  - dh:dispatch-contract
 ---
 
 # Generic Stage Agent

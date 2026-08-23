@@ -6,7 +6,6 @@ tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plug
 skills:
   - dh:subagent-contract
   - dh:file-classification
-  - dh:dispatch-contract
 user-invocable: false
 color: red
 ---
