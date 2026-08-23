@@ -1,6 +1,6 @@
 ---
 name: t0-baseline-capture
-description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan via the plan read operation, runs each check_command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
+description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan via the plan read operation, runs each check-command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
 tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 model: haiku
 skills:
@@ -35,23 +35,30 @@ plan component is `P{N}`). Read the plan through it:
 mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
 ```
 
-Extract from the response:
+The response is an envelope: `plan`, `gaps`, `warnings`, `source_format`, `source_path`. Every plan
+field sits inside `plan`, never at the top level. Extract:
 
-- `feature` — the slug, used in the artifact ID
-- `acceptance-criteria-structured` — the list of criteria to execute
+- `plan.feature` — the slug, used in the artifact ID
+- `plan.acceptance-criteria-structured` — the list of criteria to execute
+
+Each criterion in that list carries `criterion-id`, `description`, `check-command`,
+`expected-baseline`, and `expected-final`.
 
 Never read a plan by filesystem path. The plan lives in the configured backend, which may be
 remote, and a path read returns nothing in a worktree-isolated dispatch.
 
-If `acceptance-criteria-structured` is absent or empty, assemble a T0 baseline with
-`criteria_count: 0` and an empty `results: []`, register it, then exit with STATUS: DONE.
+If `plan.acceptance-criteria-structured` is absent or empty, assemble a T0 baseline with
+`criteria_count: 0` and an empty `results: []`, register it, then exit with STATUS: DONE. Reaching
+that branch because the criteria were looked for at the top level of the response instead of inside
+`plan` disables regression coverage for the whole feature — confirm `plan` is empty of them before
+recording a zero-criterion baseline.
 
 ## Step 2: Run Each Check Command
 
-For each entry in `acceptance-criteria-structured`:
+For each entry in `plan.acceptance-criteria-structured`:
 
 1. Note the start timestamp (ISO 8601, UTC)
-2. Run the `check_command` via Bash
+2. Run its `check-command` via Bash
 3. Record: exit code, stdout (full), stderr (full), end timestamp, duration in seconds
 4. Continue to the next criterion regardless of exit code
 
@@ -99,7 +106,7 @@ results:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `feature` | str | The plan's `feature` field (the slug) |
+| `feature` | str | The plan's `plan.feature` value (the slug) |
 | `captured_at` | str (ISO 8601 UTC) | Timestamp when T0 agent ran |
 | `criteria_count` | int | Number of criteria executed |
 | `results` | list | One entry per AcceptanceCriterion |
@@ -164,7 +171,7 @@ NOTES:
 Return STATUS: BLOCKED if:
 - `item_id` is not provided in the task delegation prompt
 - The plan read returns an error or no plan address was provided
-- `feature` is absent from the plan
+- `plan.feature` is absent from the plan read response
 - In-memory YAML structure verification fails (criteria_count mismatch or missing fields)
 - `artifact_register` returns an error
 

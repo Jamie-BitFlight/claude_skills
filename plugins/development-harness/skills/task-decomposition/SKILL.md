@@ -29,7 +29,7 @@ flowchart TD
     A4 -->|Yes| CoVe[4a. Add CoVe checks]
     A4 -->|No| A5[4b. Skip CoVe]
     CoVe --> A5[5. Map dependencies]
-    A5 --> A6[6. Assign roles]
+    A5 --> A6[6. Assign agents]
     A6 --> Gate{Evaluate complexity}
     Gate -->|Manageable| Done([Tasks registered in the plan])
     Gate -->|High complexity or novel architecture| Escalate([Human touchpoint — confirm decomposition])
@@ -94,17 +94,28 @@ Build the dependency graph:
 - Identify which tasks can run in parallel (no shared file conflicts)
 - Document WHY parallelization is safe for each parallel group
 
-### Step 6 — Assign Roles
+### Step 6 — Assign Agents
 
-Assign abstract roles, NOT specific agents:
+Classify each task by the role that does its work, then resolve that role to a real agent name
+before writing it into the task's `agent` field:
 
 - `architect` — design decisions, structural changes
-- `implementer` — write production code
+- `design-spec` — interfaces, data models, module boundaries
 - `test-designer` — write tests and fixtures
 - `code-reviewer` — review and quality assessment
-- `docs-writer` — documentation and comments
 
-Role-to-agent resolution happens at execution time via the language manifest.
+Resolve a role through the project's language manifest: detect the language from the project-root
+markers, read the manifest's `Role Fulfillment` section, and take the agent it maps that role to.
+Manifest entries carry a leading `@` — `@python3-development:code-reviewer` — and `agent` stores
+the same name without it. The stored value stays plugin-qualified.
+
+Write no `agent` value at all when the manifest omits that role, no manifest matches the project,
+or the work is production code, documentation, or anything else no role above covers. The
+executing worker then runs the task with no specialist profile, which is the documented fallback.
+
+`agent` is passed verbatim to `profile_load` at execution time. An abstract role name matches no
+agent, and a bare name that two plugins both ship resolves ambiguously; either one ends the task
+blocked before any work starts.
 
 ## Input
 
@@ -177,7 +188,7 @@ rejected — do not invent fields:
 task: T1
 title: <descriptive imperative title>
 status: not-started
-agent: <architect / implementer / test-designer / code-reviewer / docs-writer>
+agent: <plugin-qualified agent resolved from the language manifest — omit when no role applies>
 dependencies: []
 priority: <1-5 based on dependency depth>
 complexity: <low / medium / high>
@@ -266,7 +277,8 @@ flowchart TD
 - Every task must be self-contained — an agent given ONLY that task can execute it
 - Never point at an upstream artifact by "see X" — inline the content the task needs. The
   executing agent has no guaranteed access to the discovery or plan artifact you read
-- Never assign specific agent names — use roles
+- Never write an abstract role name into `agent` — write the plugin-qualified agent the language
+  manifest maps that role to, or omit the field
 - Tasks must not have circular dependencies
 - Each acceptance criterion must be verifiable by the executing agent alone
 
@@ -276,5 +288,5 @@ flowchart TD
 - Every plan component maps to at least one task
 - Dependency graph has no cycles
 - Parallel groups have no shared file conflicts
-- Roles assigned (not agents) for every task
+- Every `agent` value present is plugin-qualified and resolvable by `profile_load`
 - CoVe checks present on medium/high accuracy-risk tasks only
