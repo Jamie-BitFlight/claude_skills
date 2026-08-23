@@ -82,12 +82,12 @@ Never write these as agent output instructions:
 
 ## Enforcement
 
-When writing or reviewing agent files:
+When writing or reviewing an agent file, and when launching one:
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
-4. Check that any result a later step reads is written to a named destination, not only messaged
-5. Check the authored file names no harness-specific channel. This rule's own guidance above is
-   for you, a Claude Code agent. Plugin agent files ship to Codex and OpenCode, where
-   `SendMessage` and `TeamCreate` do not exist — an agent file instructing that call sends its
-   result nowhere there. Write the obligation into it, never the mechanism.
+4. Check the agent's `tools:` grant includes `SendMessage` before launching it as a teammate.
+   Without the grant the agent cannot see or call the tool, so it has no way to reach the lead
+   and its completion is silent. This is a grant check, not a prose check — the agent needs the
+   capability, not an explanation of the tool.
+5. Check that any result a later step reads is written to a named destination, not only messaged
