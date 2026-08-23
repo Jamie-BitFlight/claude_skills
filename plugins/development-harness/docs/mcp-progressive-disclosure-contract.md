@@ -95,6 +95,8 @@ Navigate to the ordinal in each token to retrieve the raw fence body.
 | `truncated`    | `bool`        | Always `False` for navigate-without-head responses.                                     |
 | `child_map`    | `str \| None` | Formatted listing of direct sub-heading children. `None` for leaves and code blocks.    |
 | `has_children` | `bool`        | `True` iff the node has sub-heading children (ADR-4). `False` for code-only nodes.      |
+| `struck`       | `bool`        | `True` iff the ordinal addresses a struck (retracted) entry, or a descendant of one.    |
+| `entry_id`     | `str`         | Stable identifier of the owning entry. `""` for level-1 section ordinals (no dot).      |
 
 ---
 
@@ -118,6 +120,8 @@ NavigateResponse:
   truncated:     false
   has_children:  true
   child_map:     "4.0.0 | Overview | ~45 tokens\n4.0.1 | Steps | ~120 tokens\n..."
+  struck:        false
+  entry_id:      "2026-08-23T11:49:14.766159Z"
 ```
 
 Read `child_map` to discover child ordinals, then navigate to a specific child.
@@ -142,6 +146,8 @@ NavigateResponse:
   truncated:     <true if child_map exceeds head= budget>
   has_children:  true
   child_map:     "4.0.0 | Overview | ~45 tokens\n4.0.1 | Steps | ~120 tokens\n..."
+  struck:        false
+  entry_id:      "2026-08-23T11:49:14.766159Z"
 ```
 
 ### Leaf node (`has_children=False`, not a code block)
@@ -159,6 +165,8 @@ NavigateResponse:
   truncated:     false
   has_children:  false
   child_map:     null
+  struck:        false
+  entry_id:      "2026-08-23T11:49:14.766159Z"
 ```
 
 ### Code-block node (`has_children=False`, code fence body)
@@ -176,7 +184,63 @@ NavigateResponse:
   truncated:     false
   has_children:  false
   child_map:     null
+  struck:        false
+  entry_id:      "2026-08-23T11:49:14.766159Z"
 ```
+
+---
+
+## Struck Entries
+
+A struck (retracted) entry is never omitted from progressive disclosure and never presented as
+indistinguishable from live content. Every response carries an explicit, out-of-band flag, and
+aggregate content that merges multiple entries into one string carries an additional in-band
+marker so the flag is never lost when entry boundaries collapse.
+
+### Out-of-band fields
+
+| Response        | Fields                              | Meaning                                                              |
+|------------------|--------------------------------------|------------------------------------------------------------------------|
+| `MapResponse`    | `struck_ordinals: list[str]`        | Every ordinal (level-2 entry or deeper) whose node is struck.        |
+| `NavigateResponse` | `struck: bool`, `entry_id: str`   | Whether the resolved node is struck, and its owning entry's id.      |
+| `BoundedResponse`  | `struck: bool`, `entry_id: str`   | Same, surviving `head=`/`skip_tokens=` token-window truncation — struck state is metadata, not content, so it is never truncated away. |
+
+`struck`/`entry_id` are `False`/`""` for level-1 section ordinals (no dot) — a section
+aggregate has no single-entry identity. A sub-heading or code fence nested inside a struck
+entry inherits that entry's `struck`/`entry_id`.
+
+### In-band markers
+
+Two response bodies merge multiple entries' text into one string with no per-entry field to
+attach to — a map line's title, and a level-1 section's aggregate `content` (all entry bodies
+joined). Both carry a literal marker so the merged text itself remains unambiguous:
+
+| Context                                   | Marker                    | Position                                            |
+|--------------------------------------------|----------------------------|------------------------------------------------------|
+| Formatted map line (`format_map_line()`)   | `"[struck] "`              | Immediately before the title, outside the 50-char truncation window — a long struck title's ellipsis can never eat the marker. |
+| Level-1 aggregate content (`build_map()`'s section-content join) | `"[struck:{entry_id}]"` | Immediately before the struck entry's own text, inside the joined aggregate. |
+
+Example — `map=true` on an item whose section `16` has a struck entry `16.0` and a live
+entry `16.1`:
+
+```text
+16 RT-ICA (1003t) — "..."
+16.0 [struck] RT-ICA Snapshot: ... (357t) — "..."
+16.1 RT-ICA Final: ... (645t) — "..."
+```
+
+```text
+MapResponse.struck_ordinals == ["16.0"]
+```
+
+`navigate="16"` (the level-1 aggregate spanning both entries):
+
+```text
+content: "[struck:2026-08-23T11:49:14.766159Z]\nRT-ICA Snapshot: ...\n\nRT-ICA Final: ..."
+```
+
+The marker precedes only the struck entry's own text — the live entry's text carries no marker
+anywhere.
 
 ---
 

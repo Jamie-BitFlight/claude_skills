@@ -103,9 +103,10 @@ Returns `{title, priority, issue, plan, file_path, body, groomed, messages, warn
 `{title, priority, issue, plan, file_path, groomed, sections_metadata, messages, warnings}` where
 `sections_metadata` is a list of `{name, num_entries, num_struck}` dicts — no `body` or `sections` keys.
 
-With `map=True`, returns `{selector, total_sections, total_est_tokens, map_text, over_budget}`.
-With `navigate` alone, returns `{ordinal, title, content, total_tokens, truncated, child_map, has_children}`.
-With `navigate` plus `head`, returns `{ordinal, title, content, total_tokens, returned_tokens, truncated, next_call}`.
+With `map=True`, returns `{selector, total_sections, total_est_tokens, map_text, over_budget, struck_ordinals}`.
+With `navigate` alone, returns `{ordinal, title, content, total_tokens, truncated, child_map, has_children, struck, entry_id}`.
+With `navigate` plus `head`, returns `{ordinal, title, content, total_tokens, returned_tokens, truncated, next_call, struck, entry_id}`.
+`struck`/`entry_id` reflect the addressed entry (or its descendant); `""`/`False` for level-1 section ordinals, which have no single-entry identity. `struck_ordinals` lists every struck ordinal in the map.
 
 Before fetching a large item to read one part of it — one acceptance-criteria block, one code
 fence, one sub-heading — read
