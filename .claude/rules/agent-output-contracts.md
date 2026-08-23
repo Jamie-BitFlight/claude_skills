@@ -36,6 +36,17 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
+When operating as a teammate, also send the STATUS block to your lead:
+
+```
+SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
+```
+
+The message is a notification, never the record. Anything a later step reads goes to a
+named destination that step can read back — a task section, an artifact, a review thread.
+A result that exists only as a message is lost when the session ends, and cannot be read
+at all by a harness without this tool.
+
 ## The "Write to File" Anti-Pattern
 
 "Write all output to files — never return large analysis as message text" means write a file
@@ -75,3 +86,4 @@ When writing or reviewing agent files:
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
+4. Check that any result a later step reads is written to a named destination, not only messaged
