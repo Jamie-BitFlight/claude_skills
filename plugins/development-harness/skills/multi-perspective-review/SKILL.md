@@ -55,43 +55,45 @@ Do not create a team or a plan when `changed_files` is empty.
 
 ## Step 2: Derive Review Slug
 
-Derive `review_slug` exactly once using the first matching rule:
+Derive `review_base` exactly once using the first matching rule:
 
 1. `--slug` argument is provided → use its value directly
 2. `--issue <N>` argument is provided → `review-{N}` (e.g., `review-2181`)
 3. Neither provided → read current git branch name via `git rev-parse --abbrev-ref HEAD` and
    use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
 
+Then stamp the run so this invocation gets its own address. Capture this command's stdout as
+`run_stamp`:
+
+```bash
+date -u +%Y%m%dT%H%M%SZ
+```
+
+`review_slug` is `{review_base}-{run_stamp}`, for example `review-2181-20260824T014233Z`.
+
+The stamp is what makes the plan ephemeral in fact and not just in name. `review_base` identifies
+the review subject and repeats across runs; `review_slug` identifies one run of it and never
+repeats. A verdict, and the changed-file set it was produced against, belong to a single run —
+addressing them by a slug that a later run resolves to as well is what lets one run read another
+run's results.
+
 Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the team name.
 
 ---
 
-## Step 3: Create Ephemeral Review Plan (check-or-create)
+## Step 3: Create the Ephemeral Review Plan
 
-**CRITICAL: check-or-create semantics are mandatory.** List matching plans before creating one so
-repeated runs reuse the existing address.
+**Create a new plan on every run.** Never search for and reuse an existing plan. `review_slug`
+carries this run's stamp, so no earlier plan can match it and every run starts with tasks that are
+`not-started`, bodies that describe this run's `changed_files`, and no `Review Results` section.
 
-### 3a: Check for Existing Plan
+Reuse cannot be made safe by resetting task status alone. Resetting status makes a task claimable
+again, but the task body still names the previous run's changed files, so workers would review the
+wrong file set; and `Review Results` already exists on the task, so the next append lands inside
+that heading rather than creating a second one, leaving Step 5 a section holding two concatenated
+JSON documents that no longer parse.
 
-Call:
-
-```python
-mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "{review_slug}"})
-```
-
-Inspect the returned `items` array. If any item has `feature` equal to `{review_slug}`:
-
-- Store its non-empty `plan_ref` as `{PA}` (e.g., `#2181,P8a3f1b29`)
-- Skip step 3b — do not create a new plan
-- Reset every task the reused plan already ran. For each of `T1`..`T4` whose status is terminal,
-  call `mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "state", "status": "not-started"})`.
-  A terminal task cannot be claimed, so a reviewer dispatched against it stops without writing a
-  verdict — and Step 5 would then read the previous run's `Review Results` block as if it applied
-  to this diff.
-
-If no matching plan is found, proceed to step 3b.
-
-### 3b: Create the Ephemeral Plan
+### Create the Ephemeral Plan
 
 Build the changed-files body block:
 
@@ -233,8 +235,8 @@ Then read each task and take its `Review Results` section:
 mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})
 ```
 
-Take the last `Review Results` section on the task — a reused plan carries one per run, appended
-in order. Its content is the raw JSON verdict block — parse it directly:
+The plan was created for this run, so the task carries exactly one `Review Results` section and
+its content is one raw JSON verdict block. Parse it directly:
 
 ```python
 verdict_block = json.loads(review_results_section)
@@ -333,12 +335,9 @@ flowchart TD
     Parse --> Files["git diff --name-only range → changed_files list"]
     Files --> Empty{changed_files empty?}
     Empty -->|Yes| Abort[ABORT — no changed files to review]
-    Empty -->|No| Slug[Derive review_slug once]
-    Slug --> CheckPlan["sam_plan(config: list + search)"]
-    CheckPlan --> PlanExists{Plan with slug exists?}
-    PlanExists -->|Yes — reuse| PlanAddr["Store existing plan address as {PA}"]
-    PlanExists -->|No — create| CreatePlan["sam_plan(config: create + T1..T4)"]
-    CreatePlan --> PlanAddr
+    Empty -->|No| Slug["Derive review_base, then<br>review_slug = review_base + run stamp"]
+    Slug --> CreatePlan["sam_plan(config: create + T1..T4)<br>always a new plan — never reused"]
+    CreatePlan --> PlanAddr["Store new plan address as {PA}"]
     PlanAddr --> Team["TeamCreate(team_name='multi-{review_slug}')"]
     Team --> Parallel[Dispatch 4 workers in parallel — no wait between spawns]
     Parallel --> W1["Agent(name='security-worker', subagent_type='dh:task-worker')"]
