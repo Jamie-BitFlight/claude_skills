@@ -31,7 +31,7 @@ Before delegating, read the corresponding reference file to understand exact inp
 
 | Agent | subagent_type | Use When |
 |-------|--------------|----------|
-| doc-drift-auditor | development-harness:doc-drift-auditor | Evidence-based audit: docs vs code comparison, file:line citations, severity categorization. Writes .claude/reports/DOCUMENTATION_DRIFT_AUDIT.md |
+| doc-drift-auditor | development-harness:doc-drift-auditor | Evidence-based audit: docs vs code comparison, file:line citations, severity categorization. Registers its report as an artifact and returns the reference — it writes no file into the repository |
 | service-docs-maintainer | development-harness:service-docs-maintainer | Post-implementation sync: reads git diff, finds all related docs, applies surgical edits, reports what changed |
 | doc-freshness-guardian | doc-freshness-guardian (personal agent — source: ~/.claude/agents/) | Freshness headers, staleness alerts (green <30d, yellow 30-90d, red >90d), bidirectional sync governance |
 

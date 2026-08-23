@@ -64,7 +64,8 @@ When invoked, follow these steps:
    - Collect evidence for each finding (file:line, commit SHA, quotes)
 
 6. **Report Generation**
-   - Write `DOCUMENTATION_DRIFT_AUDIT.md` in repository root
+   - Write the report to `.tmp/scratch/reports/doc-drift-audit-{slug}-YYYYMMDD.md`, where `{slug}` names the audited package or component and `YYYYMMDD` is today's date in UTC. Create `.tmp/scratch/reports/` if it does not exist.
+   - Never write the report to the repository root, to a tracked directory, or anywhere under `.claude/`. The report is a point-in-time artifact of one run, not committed content.
    - Include executive summary with drift metrics
    - Provide timeline visualization
    - List categorized findings with evidence
@@ -102,7 +103,7 @@ When invoked, follow these steps:
 
 ## Output Format
 
-Generate `DOCUMENTATION_DRIFT_AUDIT.md` with this structure:
+Give the report this structure:
 
 ```markdown
 # Documentation Drift Audit Report
@@ -145,6 +146,14 @@ Generate `DOCUMENTATION_DRIFT_AUDIT.md` with this structure:
 ## Recommendations
 
 [Prioritized action items to resolve drift]
+```
+
+Return only the report path and a one-paragraph summary — never the report body, and never a commit:
+
+```text
+STATUS: DONE
+REPORT: .tmp/scratch/reports/doc-drift-audit-{slug}-YYYYMMDD.md
+SUMMARY: {one_paragraph_summary_of_findings}
 ```
 
 Each finding must include:
