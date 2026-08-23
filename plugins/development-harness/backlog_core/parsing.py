@@ -863,7 +863,7 @@ def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
 # ---------------------------------------------------------------------------
 
 import marko
-from marko.block import BlockElement as _MarkoBlockElement, Heading as _MarkoHeading
+from marko.block import Heading as _MarkoHeading
 from marko.helpers import MarkoExtension as _MarkoExtension
 
 if TYPE_CHECKING:
@@ -882,115 +882,71 @@ _GROOMED_DATE_RE = re.compile(r"^Groomed(?:\s*\((\d{4}-\d{2}-\d{2})\))?$", re.IG
 _ENTRY_DIV_OPEN = "<div><sub>"
 _ENTRY_DIV_OPEN_RE = re.compile(r" {0,3}" + re.escape(_ENTRY_DIV_OPEN))
 
-# Tag-boundary matchers for div-nesting depth tracking. A literal-substring count
-# (``line.count("<div>")``) misses an attributed opening tag like
-# ``<div class="note">`` while ``line.count("</div>")`` still matches its close
-# unconditionally — that asymmetry drives depth negative and ends entry-block
-# opacity early, letting a heading-lookalike line further down escape as a
-# spurious section (#2964 follow-up). Matching tag boundaries via regex keeps
-# opens and closes counted symmetrically regardless of attributes.
-_DIV_OPEN_TAG_RE = re.compile(r"<div\b")
-_DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>")
-
-
-def _div_depth_delta(line: str) -> int:
-    """Return the net change in ``<div>``/``</div>`` nesting depth for one line.
-
-    Args:
-        line: Source line to scan.
-
-    Returns:
-        Count of opening ``<div`` tags minus closing ``</div>`` tags on this line.
-    """
-    return len(_DIV_OPEN_TAG_RE.findall(line)) - len(_DIV_CLOSE_TAG_RE.findall(line))
-
-
-# A fence opener or closer: three or more backticks or tildes, at the up-to-three-spaces
-# indent CommonMark permits. The delimiter run is captured because a fence closes only on a
-# run of the same character at least as long as the one that opened it — the assumption a
-# boolean toggle got wrong, which is why a nested ``` inside a ```` block used to end it.
-_FENCE_RE = re.compile(r" {0,3}(`{3,}|~{3,})")
-
-
-# How a scan treats <div>/</div> tags that sit inside a fenced code block.
-# STRICT ignores them entirely — correct for a valid entry quoting an HTML example.
-# LENIENT ignores opening tags but still counts closing ones, which recovers the real
-# wrapper close when the entry holds a fence that is itself never closed, without giving
-# up fence opacity for the heading-shaped lines inside it.
-_SCAN_STRICT = 0
-_SCAN_LENIENT = 1
-
-
-def _wrapper_depth_delta(line: str, *, in_fence: bool, mode: int) -> int:
-    """Return one line's contribution to ``<div>``/``</div>`` nesting depth.
-
-    Args:
-        line: Source line to scan.
-        in_fence: Whether the line is a fence delimiter or fenced content.
-        mode: ``_SCAN_STRICT`` or ``_SCAN_LENIENT``.
-
-    Returns:
-        The net depth change this line contributes under *mode*.
-    """
-    if not in_fence:
-        return _div_depth_delta(line)
-    if mode == _SCAN_LENIENT:
-        return -len(_DIV_CLOSE_TAG_RE.findall(line))
-    return 0
-
-
-class _FenceState:
-    """Tracks whether a line-by-line scan is currently inside a fenced code block.
-
-    ``_EntryDivBlock`` is handed raw lines by marko and has to scan them itself, so it
-    cannot ask the parser what is inside a fence. Without this, a fenced HTML example
-    containing an unmatched ``<div>`` counts as wrapper structure: a properly closed
-    wrapper is judged unterminated, and the recovery path then exposes heading-shaped
-    lines from inside the entry as sections.
-    """
-
-    def __init__(self) -> None:
-        """Start outside any fence."""
-        self._delimiter = ""
-
-    def opaque(self, line: str) -> bool:
-        """Consume one line and report whether it is fence delimiter or fenced content.
-
-        Args:
-            line: The source line to classify.
-
-        Returns:
-            ``True`` when the line is a fence delimiter or sits inside a fence, and so
-            must not contribute tags or headings to the surrounding scan.
-        """
-        match = _FENCE_RE.match(line)
-        if self._delimiter:
-            if match is not None:
-                run = match.group(1)
-                closes = run[0] == self._delimiter[0] and len(run) >= len(self._delimiter)
-                if closes and not line.strip()[len(run) :].strip():
-                    self._delimiter = ""
-            return True
-        if match is not None:
-            self._delimiter = match.group(1)
-            return True
-        return False
-
-
-# Any ATX heading line, at the up-to-three-spaces indent CommonMark permits. Used only to
-# bound an unterminated entry wrapper; real heading detection is the parser's job.
-_ATX_ANY_RE = re.compile(r" {0,3}#{1,6}\s")
+# An entry-block opening marker at the start of a line, at the up-to-three-spaces indent
+# CommonMark permits. Used only to find a truncated wrapper, which is not an entry and so
+# is not returned by find_entry_spans.
+_ENTRY_DIV_OPEN_LINE_RE = re.compile(r"(?m)^ {0,3}" + re.escape(_ENTRY_DIV_OPEN))
+# Any ATX heading line. Used only to bound a truncated wrapper; real heading detection is
+# the parser's job.
+_ATX_ANY_RE = re.compile(r"(?m)^ {0,3}#{1,6}\s")
 # Captures the text of an ATX heading line, so a section name keeps the exact inline
 # spelling callers filter and index against.
 _ATX_SOURCE_RE = re.compile(r" {0,3}#{1,6}\s+(.*)$")
 
 
+def _mask_entry_blocks(body: str) -> str:
+    """Blank out every entry block so the parser sees no markdown structure inside one.
+
+    Entry extent comes from ``entry_blocks.find_entry_spans`` — the same function
+    ``parse_entries`` reads content through. That shared definition is the point: this
+    module used to track ``<div>`` nesting itself while the reader stopped at the first
+    ``</div>``, so an entry containing further HTML was opaque to one and truncated by the
+    other, and the content past that inner tag was dropped from the entry silently. One
+    function means a heading-shaped line is either inside an entry for both of them or
+    outside for both.
+
+    Masking also removes the reason this module needed to know anything about markdown
+    context. A literal ``<div>`` in a fence, an inline code span, or an HTML comment is
+    handled once, inside that shared function, rather than being re-discovered here.
+
+    A ``<div><sub>`` that never closes is a truncated wrapper, so no span covers it. It is
+    masked only as far as the next heading: masking to end of document would erase every
+    following section from the AST, and leaving it bare lets marko's HTML-block rule
+    consume to the next blank line, which a malformed body need not have.
+
+    Masking preserves length and every line ending, so an offset into the result is also
+    an offset into *body*.
+
+    Args:
+        body: Full body text.
+
+    Returns:
+        *body* with entry-block content replaced by filler of the same length.
+    """
+    # Imported here, not at module scope: entry_blocks imports now_iso from this module.
+    from .entry_blocks import find_entry_spans  # ruff: ignore[import-outside-top-level]
+
+    ranges = [(span.start, span.end) for span in find_entry_spans(body)]
+    for match in _ENTRY_DIV_OPEN_LINE_RE.finditer(body):
+        if any(start <= match.start() < end for start, end in ranges):
+            continue
+        heading = _ATX_ANY_RE.search(body, match.end())
+        ranges.append((match.start(), heading.start() if heading is not None else len(body)))
+
+    out = list(body)
+    for start, end in ranges:
+        for i in range(start, end):
+            if out[i] not in "\r\n":
+                out[i] = "x"
+    return "".join(out)
+
+
 def _original_offsets(body: str) -> list[int] | None:
     r"""Map each offset of marko's normalized buffer back to an offset in *body*.
 
-    ``marko.source.Source`` stores ``text.replace("\r\n", "\n")`` and reports every
+    ``marko.source.Source`` stores ``text.replace("\\r\\n", "\\n")`` and reports every
     position against that buffer, so a ``Source.pos`` taken from a CRLF document is short
-    by one character for each ``\r\n`` preceding it. Callers slice the original body with
+    by one character for each ``\\r\\n`` preceding it. Callers slice the original body with
     these offsets, so the positions have to be translated back rather than used raw.
 
     Args:
@@ -998,7 +954,7 @@ def _original_offsets(body: str) -> list[int] | None:
 
     Returns:
         A list indexed by normalized offset holding the matching original offset, or
-        ``None`` when the body contains no ``\r\n`` and the two spaces are identical.
+        ``None`` when the body contains no ``\\r\\n`` and the two spaces are identical.
     """
     if "\r\n" not in body:
         return None
@@ -1012,143 +968,6 @@ def _original_offsets(body: str) -> list[int] | None:
         i += 1
     mapping.append(n)
     return mapping
-
-
-class _EntryDivBlock(_MarkoBlockElement):
-    """Marko block element matching this codebase's ``<div><sub>...</sub>...</div>`` entry wrapper.
-
-    CommonMark's HTML-block rules end a generic ``<div>`` block at the first
-    blank line. ``entry_blocks.wrap_entry()`` always emits a blank line right
-    after the opening ``<div><sub>{ts}</sub>`` tag (to separate the timestamp
-    from multi-paragraph content), so marko's built-in ``HTMLBlock`` element
-    would otherwise stop treating the entry as opaque at that first blank line
-    and reparse everything after it as ordinary markdown — including any
-    ``## ``/``### ``-looking line inside the entry's own content (e.g. a
-    fact-checker verdict quoting one claim per heading) as a real section
-    boundary (#2956).
-
-    This element is registered with higher priority than ``Heading``,
-    ``HTMLBlock``, and ``Paragraph`` (see :data:`_ENTRY_AWARE_MARKDOWN`), so
-    once a line opens an entry block the parser hands the *entire* block —
-    every line up to the point ``<div>``/``</div>`` nesting returns to zero,
-    regardless of blank lines, code fences, or heading-shaped text inside — to
-    this element instead of descending into it looking for block-level
-    structure. Depth is tracked (not "stop at the first ``</div>``") because
-    entry content may itself contain further, unrelated ``<div>``/``</div>``
-    text; a first-match stop would end the opaque region early and let a
-    heading-lookalike line *after* that inner close fragment the section
-    again. That makes "a heading-lookalike line inside entry content is
-    mistaken for a section boundary" structurally impossible rather than
-    special-cased: no line inside an entry block is ever offered to the
-    block-level parser as a heading candidate in the first place, at any
-    nesting depth.
-    """
-
-    priority = 9  # Above ThematicBreak(8)/FencedCode(7)/Heading(6)/HTMLBlock(5)/Paragraph(1).
-
-    def __init__(self, lines: str) -> None:
-        self.body = lines
-
-    @classmethod
-    def match(cls, source: _MarkoSource) -> bool:
-        """Return whether the current line opens an entry block.
-
-        Returns:
-            ``True`` when the line matches the entry-block open marker.
-        """
-        return bool(source.expect_re(_ENTRY_DIV_OPEN_RE))
-
-    @classmethod
-    def _scan_close(cls, source: _MarkoSource, mode: int) -> bool:
-        """Scan ahead for the wrapper's close under *mode*, then rewind to the start.
-
-        Uses ``Source.anchor``/``Source.reset`` so the scan leaves no trace for the real
-        parse.
-
-        Args:
-            source: The parser source, positioned at the wrapper's opening line.
-            mode: ``_SCAN_STRICT`` or ``_SCAN_LENIENT``.
-
-        Returns:
-            ``True`` when nesting returns to zero before the end of the document.
-        """
-        source.anchor()
-        fence = _FenceState()
-        depth = 0
-        closed = False
-        try:
-            while not source.exhausted:
-                line = source.next_line()
-                if line is None:
-                    break
-                source.consume()
-                depth += _wrapper_depth_delta(line, in_fence=fence.opaque(line), mode=mode)
-                if depth <= 0:
-                    closed = True
-                    break
-        finally:
-            source.reset()
-        return closed
-
-    @classmethod
-    def _close_mode(cls, source: _MarkoSource) -> int | None:
-        """Return the scan mode under which the wrapper closes, or ``None`` if it never does.
-
-        ``_SCAN_STRICT`` is tried first: the common real case is a valid entry quoting an
-        HTML example, whose tags must not count as wrapper structure at all.
-        ``_SCAN_LENIENT`` then recovers an entry holding a fence that is itself never
-        closed — without it, every later line looks fenced, the entry's own ``</div>``
-        included, and a closed wrapper is judged unterminated. The mode is returned rather
-        than discarded so the parse counts depth exactly as this decision did.
-
-        Args:
-            source: The parser source, positioned at the wrapper's opening line.
-
-        Returns:
-            The mode that found the close, or ``None`` when neither does.
-        """
-        for mode in (_SCAN_STRICT, _SCAN_LENIENT):
-            if cls._scan_close(source, mode):
-                return mode
-        return None
-
-    @classmethod
-    def parse(cls, source: _MarkoSource) -> str:
-        """Consume the entry block, bounding it at the next heading when it never closes.
-
-        A wrapper whose ``</div>`` never arrives is malformed input, and consuming to EOF
-        erases every heading after it from the AST and from every consumer built on it.
-        Handing the text back to marko instead does not help: a CommonMark type-6 HTML
-        block runs to the next blank line, and a malformed body need not contain one, so
-        the later headings are lost either way. Treating the next heading as the wrapper's
-        end keeps its own text opaque and keeps every following section addressable.
-
-        Returns:
-            The raw, verbatim source text of the entry block.
-        """
-        mode = cls._close_mode(source)
-        closes = mode is not None
-        scan = mode if mode is not None else _SCAN_LENIENT
-        fence = _FenceState()
-        lines: list[str] = []
-        depth = 0
-        while not source.exhausted:
-            line = source.next_line()
-            if line is None:
-                break
-            in_fence = fence.opaque(line)
-            if not closes and lines and _ATX_ANY_RE.match(line):
-                # Nothing closes this wrapper, so bound it at the next heading without
-                # regard to fence state. A fence the entry never closed would otherwise
-                # hide that heading too, and the recovery that exists to preserve later
-                # sections would consume them instead.
-                break
-            lines.append(line)
-            source.consume()
-            depth += _wrapper_depth_delta(line, in_fence=in_fence, mode=scan)
-            if closes and depth <= 0:
-                break
-        return "".join(lines)
 
 
 class _PositionedHeading(_MarkoHeading):
@@ -1190,7 +1009,7 @@ class _PositionedHeading(_MarkoHeading):
 # Single shared marko instance used by every AST-based split in this module so
 # entry-block opacity is enforced identically everywhere, rather than each
 # caller independently re-deciding what counts as a section boundary.
-_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[_MarkoExtension(elements=[_EntryDivBlock, _PositionedHeading])])
+_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[_MarkoExtension(elements=[_PositionedHeading])])
 
 
 def _heading_line_start(normalized: str, pos: int) -> int:
@@ -1221,9 +1040,10 @@ def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str
     Returns:
         Ordered list of ``(start_offset, heading_text)`` tuples.
     """
-    doc = _ENTRY_AWARE_MARKDOWN.parse(body)
-    normalized = body.replace("\r\n", "\n")
-    mapping = _original_offsets(body)
+    masked = _mask_entry_blocks(body)
+    doc = _ENTRY_AWARE_MARKDOWN.parse(masked)
+    normalized = masked.replace("\r\n", "\n")
+    mapping = _original_offsets(masked)
 
     spans: list[tuple[int, str]] = []
     for child in doc.children:
@@ -1412,24 +1232,22 @@ def _parse_section_entries(content: str, added_date: str) -> Section:
         ``Section`` with one or more ``Entry`` objects.
     """
     # Import here to avoid circular dependency: entry_blocks → parsing (now_iso).
-    from .entry_blocks import ENTRY_RE  # ruff: ignore[import-outside-top-level]
+    from .entry_blocks import (  # ruff: ignore[import-outside-top-level]
+        _deduplicate_timestamps,
+        _entry_from_span,
+        find_entry_spans,
+    )
 
     if not content:
         return Section(entries=[])
 
-    matches = list(ENTRY_RE.finditer(content))
-    if matches:
-        from .entry_blocks import (  # ruff: ignore[import-outside-top-level]
-            _deduplicate_timestamps,
-            _parse_match_to_entry,
-        )
-
-        entries = [_parse_match_to_entry(m) for m in matches]
+    spans = find_entry_spans(content)
+    if spans:
+        entries = [_entry_from_span(content, s) for s in spans]
         _deduplicate_timestamps(entries)
 
-        # Edge case 3: capture any text that appears after the last </div>.
-        last_match_end = matches[-1].end()
-        trailing = content[last_match_end:].strip()
+        # Edge case 3: capture any text that appears after the last entry block.
+        trailing = content[spans[-1].end :].strip()
         if trailing:
             entries.append(Entry(id="", content=trailing))
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import NamedTuple
 
 from .models import Entry, EntryNotFoundError
 from .parsing import now_iso
@@ -21,6 +22,162 @@ _ZERO_DATE_PREFIX = "0000-00-00"
 # ``_resolve_duplicate_ids`` appends. The zero-date fallback ID matches this shape too.
 _ENTRY_ID_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(?:-\d+)?"
 _ENTRY_ID_RE = re.compile(rf"\A{_ENTRY_ID_PATTERN}\Z")
+
+
+_ENTRY_OPEN_RE = re.compile(r"<div><sub>([^<]+)</sub>")
+_DIV_OPEN_TAG_RE = re.compile(r"<div\b")
+_DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>")
+_FENCE_LINE_RE = re.compile(r" {0,3}(`{3,}|~{3,})")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"(`+)[^\n]*?\1")
+
+
+class EntrySpan(NamedTuple):
+    """Where one entry block sits in a section body.
+
+    Attributes:
+        start: Offset of the opening ``<div><sub>``.
+        end: Offset one past the closing ``</div>``.
+        entry_id: The text between ``<sub>`` and ``</sub>``.
+        content_start: Offset of the first character of the entry's content.
+        content_end: Offset one past the entry's content.
+    """
+
+    start: int
+    end: int
+    entry_id: str
+    content_start: int
+    content_end: int
+
+
+def _opaque_mask(text: str) -> list[bool]:
+    """Mark every character markdown treats as literal rather than as structure.
+
+    A ``<div>`` inside a fenced block, an inline code span, or an HTML comment is an
+    example of a tag, not a tag. Counting one as nesting made a properly closed entry look
+    truncated; ignoring a real one had the opposite effect. Deciding the three contexts
+    once, here, means every caller inherits the same answer instead of each rediscovering
+    which contexts to skip.
+
+    Args:
+        text: Section body text.
+
+    Returns:
+        A list parallel to *text*, true where that character sits in an opaque context.
+    """
+    mask = [False] * len(text)
+
+    def cover(start: int, end: int) -> None:
+        for i in range(start, end):
+            mask[i] = True
+
+    fence = ""
+    for line_match in re.finditer(r"[^\n]*\n?", text):
+        line = line_match.group()
+        if not line:
+            break
+        delimiter = _FENCE_LINE_RE.match(line)
+        if not fence:
+            if delimiter is not None:
+                fence = delimiter.group(1)
+                cover(line_match.start(), line_match.end())
+            continue
+        cover(line_match.start(), line_match.end())
+        if delimiter is not None:
+            run = delimiter.group(1)
+            # A fence closes only on the same character, in a run at least as long as the
+            # one that opened it, with nothing but whitespace after it.
+            if run[0] == fence[0] and len(run) >= len(fence) and not line.strip()[len(run) :].strip():
+                fence = ""
+
+    for pattern in (_HTML_COMMENT_RE, _INLINE_CODE_RE):
+        for match in pattern.finditer(text):
+            if not mask[match.start()]:
+                cover(match.start(), match.end())
+
+    return mask
+
+
+def _find_wrapper_close(text: str, from_offset: int, mask: list[bool]) -> tuple[int, int] | None:
+    """Find the ``</div>`` closing a wrapper whose opener ended at *from_offset*.
+
+    Args:
+        text: Section body text.
+        from_offset: Offset just past the opening ``<div><sub>...</sub>``.
+        mask: Opaque-context mask from :func:`_opaque_mask`.
+
+    Returns:
+        ``(close_start, close_end)`` for the closing tag, or ``None`` when nesting never
+        returns to zero.
+    """
+    events = sorted(
+        [(m.start(), m.end(), 1) for m in _DIV_OPEN_TAG_RE.finditer(text, from_offset)]
+        + [(m.start(), m.end(), -1) for m in _DIV_CLOSE_TAG_RE.finditer(text, from_offset)]
+    )
+    depth = 1
+    for start, end, delta in events:
+        if mask[start]:
+            continue
+        depth += delta
+        if depth == 0:
+            return start, end
+    return None
+
+
+def find_entry_spans(text: str) -> list[EntrySpan]:
+    """Locate every complete entry block in *text*.
+
+    This is the single definition of where an entry begins and ends. ``parse_entries``
+    reads content through it, and the section splitter treats exactly these ranges as
+    opaque, so the two cannot disagree about whether a heading-shaped line is an entry's
+    own content or a real section boundary. They previously did: the splitter tracked
+    balanced nesting while the reader stopped at the first ``</div>``, so an entry holding
+    any further HTML was shown intact by one and truncated by the other, and the content
+    past that inner tag was dropped from the entry without a word.
+
+    Extent is balanced ``<div>``/``</div>`` nesting, and tags inside an opaque context do
+    not count (see :func:`_opaque_mask`). An opening marker whose nesting never returns to
+    zero is a truncated wrapper, not an entry; it is skipped, so whatever follows stays
+    reachable rather than being swallowed to the end of the document.
+
+    Args:
+        text: Section body text.
+
+    Returns:
+        Ordered list of :class:`EntrySpan`, one per complete entry block.
+    """
+    mask = _opaque_mask(text)
+    spans: list[EntrySpan] = []
+    search_from = 0
+    while True:
+        opener = _ENTRY_OPEN_RE.search(text, search_from)
+        if opener is None:
+            return spans
+        if mask[opener.start()]:
+            search_from = opener.end()
+            continue
+        close = _find_wrapper_close(text, opener.end(), mask)
+        if close is None:
+            # A fence the entry never closed marks the rest of the text opaque, the
+            # wrapper's own </div> included, so a closed entry reads as truncated. Retry
+            # counting every tag: an entry is far more likely to hold an unclosed fence
+            # than to be genuinely unterminated, and mistaking the former for the latter
+            # drops real content.
+            close = _find_wrapper_close(text, opener.end(), [False] * len(text))
+        if close is None:
+            search_from = opener.end()
+            continue
+        close_start, close_end = close
+        spans.append(
+            EntrySpan(
+                start=opener.start(),
+                end=close_end,
+                entry_id=opener.group(1),
+                content_start=opener.end(),
+                content_end=close_start,
+            )
+        )
+        search_from = close_end
 
 
 def _parse_entry_timestamp(entry_id: str) -> datetime | None:
@@ -138,14 +295,18 @@ def wrap_entry_with_timestamp(content: str, timestamp: str) -> str:
     return f"<div><sub>{timestamp}</sub>\n\n{content}\n</div>"
 
 
-def _parse_match_to_entry(m: re.Match[str]) -> Entry:
-    """Convert a regex match into an Entry object.
+def _entry_from_span(text: str, span: EntrySpan) -> Entry:
+    """Convert one located entry block into an Entry object.
+
+    Args:
+        text: The section body the span was located in.
+        span: The entry's extent, from :func:`find_entry_spans`.
 
     Returns:
-        Entry parsed from the match groups.
+        Entry carrying the span's id and its full inner content.
     """
-    ts = m.group(1)
-    inner = m.group(2).strip()
+    ts = span.entry_id
+    inner = text[span.content_start : span.content_end].strip()
     struck_match = STRUCK_RE.search(inner)
     if struck_match:
         return Entry(
@@ -229,9 +390,9 @@ def parse_entries(
     Returns:
         List of Entry objects, in chronological order.
     """
-    matches = list(ENTRY_RE.finditer(section_body))
+    spans = find_entry_spans(section_body)
 
-    if not matches:
+    if not spans:
         content = section_body.strip()
         if not content:
             return []
@@ -242,7 +403,7 @@ def parse_entries(
         entry_id = ts_match.group(1) if ts_match else f"{added_date}T00:00:00Z"
         raw_entries = [Entry(id=entry_id, content=content)]
     else:
-        raw_entries = [_parse_match_to_entry(m) for m in matches]
+        raw_entries = [_entry_from_span(section_body, s) for s in spans]
         _deduplicate_timestamps(raw_entries)
 
     if since:

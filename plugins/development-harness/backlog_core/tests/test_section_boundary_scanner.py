@@ -25,6 +25,7 @@ from typing import cast
 
 import pytest
 
+from backlog_core.entry_blocks import parse_entries
 from backlog_core.models import SectionEntryMetadata
 from backlog_core.operations import _build_sections_metadata
 from backlog_core.parsing import split_body_sections
@@ -443,20 +444,93 @@ class TestWrapperCloseDetectionIgnoresFencedContent:
         """
         assert [s.name for s in split_body_sections(body)] == ["A", "B"]
 
-    def test_unclosed_fence_keeps_its_heading_opaque_and_still_closes(self) -> None:
-        """An unclosed fence holding a heading keeps it opaque without losing the close.
+    def test_unclosed_fence_with_unbalanced_tag_never_loses_a_real_section(self) -> None:
+        """The one ambiguous shape resolves toward keeping content, not hiding it.
 
-        Tests: both invariants hold together — no phantom section, no lost section
-        How: An entry whose unclosed fence contains an unmatched <div> AND a
-             heading-shaped example, followed by the entry's real closing </div>
-        Why: Recovering the wrapper close by ignoring fences entirely surfaced the fenced
-             "## Fake" as a real section, corrupting section indexes and filtered reads.
-             Keeping fence opacity but still counting closing tags inside a fence
-             satisfies both: the close is found, and the example heading stays content.
+        Tests: an unclosed fence holding an unbalanced <div> before the wrapper close
+        How: Assert the section after the entry survives; do not assert the fenced
+             heading stays opaque, because in this shape it cannot
+        Why: No single rule satisfies this input and the balanced-example input at once.
+             Counting a fenced closing tag as the wrapper close fixes this case but ends
+             the entry early in the balanced case, losing the real section after it.
+             Ignoring fenced tags fixes that case and surfaces this one's fenced heading.
+             Both were measured. The tie is broken toward never losing a real section: a
+             phantom section is visible and recoverable, a dropped one is neither.
         """
         body = "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n## Fake\n</div>\n\n## B\nbbody"
 
         names = [s.name for s in split_body_sections(body)]
 
+        assert "B" in names, "a real section must never be lost to a malformed entry"
+        assert names[0] == "A"
+
+    def test_unclosed_fence_with_balanced_example_keeps_its_heading_opaque(self) -> None:
+        """A balanced HTML example in an unclosed fence stays inside the entry.
+
+        Why: This is the counterpart of the case above and the reason its heading cannot
+             also be kept opaque. Here the wrapper close is found, so the fenced heading
+             is entry content and the section after the entry is still reached.
+        """
+        body = "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n</div>\n## Fake\n</div>\n## B\nb"
+
+        names = [s.name for s in split_body_sections(body)]
+
         assert names == ["A", "B"]
         assert "Fake" not in names
+
+
+class TestReaderAndSplitterShareOneEntryExtent:
+    """The section splitter and parse_entries must agree on where an entry ends.
+
+    They previously did not. The splitter tracked balanced <div>/</div> nesting while
+    parse_entries stopped at the first </div>, so an entry holding any further HTML was
+    opaque to one and truncated by the other — and everything past that inner tag was
+    dropped from the entry without any signal. Both now resolve extent through
+    entry_blocks.find_entry_spans.
+    """
+
+    def test_content_after_a_nested_div_is_not_dropped_from_the_entry(self) -> None:
+        """Entry content following an inner </div> survives the read.
+
+        Tests: parse_entries returns the whole entry, not the part before the inner tag
+        How: An entry whose content contains an unrelated <div>...</div> and then text
+        Why: parse_entries returned only 'before\\n<div>\\nnested' for this input — the
+             VERDICT line was silently absent from the entry the agent receives, while
+             the splitter simultaneously treated it as part of the section.
+        """
+        section_body = (
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\nbefore\n<div>\nnested\n</div>\n\nVERDICT: VERIFIED\n</div>\n"
+        )
+
+        entries = parse_entries(section_body)
+
+        assert len(entries) == 1
+        assert "VERDICT: VERIFIED" in entries[0].content
+        assert "nested" in entries[0].content
+
+    @pytest.mark.parametrize(
+        "section_body",
+        [
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\nplain\n\nafter\n</div>\n",
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\nbefore\n<div>\nnested\n</div>\n\nafter\n</div>\n",
+            '<div><sub>2026-01-01T00:00:00Z</sub>\n\n<div class="n">note</div>\n\nafter\n</div>\n',
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\nuse `<div>` inline\n\nafter\n</div>\n",
+            "<div><sub>2026-01-01T00:00:00Z</sub>\n\n<!-- <div> -->\n\nafter\n</div>\n",
+        ],
+    )
+    def test_a_heading_in_entry_content_is_never_a_section(self, section_body: str) -> None:
+        """Whatever the reader calls entry content, the splitter treats as opaque.
+
+        Why: This is the invariant the shared extent function exists to guarantee. If the
+             two ever diverge again, a heading-shaped line lands inside an entry for one
+             and outside for the other, which is how both #2956 and the dropped-content
+             defect above happened.
+        """
+        with_heading = section_body.replace("after\n", "## Fake Heading\n\nafter\n")
+        body = f"## Real\n\n{with_heading}\n## Next\nx"
+
+        names = [s.name for s in split_body_sections(body)]
+        entry_text = " ".join(e.content for e in parse_entries(with_heading))
+
+        assert names == ["Real", "Next"], "entry content must not fragment the section"
+        assert "Fake Heading" in entry_text, "the reader must return what the splitter hid"
