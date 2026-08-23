@@ -41,15 +41,11 @@ committing.
   not just for genuinely long-running or parallel-batch work. This eliminates race condition 1
   entirely: the agent's working tree is physically separate, so no shared-tree stash collision is
   possible regardless of what else is being edited concurrently.
-- **A worktree only sees committed state.** `git worktree add` checks out a ref (a commit), not
-  the current working tree's uncommitted changes — those are invisible to a new worktree. Before
-  spawning a worktree-isolated agent, commit (not necessarily push) whatever the agent needs to
-  build on.
-- **Worktree base is local HEAD, not `origin/main`.** This repo sets `worktree.baseRef: "head"` in
-  `.claude/settings.json` — new worktrees, including subagent isolation, branch from current local
-  HEAD. Without this, Claude Code's default (`worktree.baseRef: "fresh"`) branches from the
-  repository's remote default branch instead, so a worktree-isolated agent on an unmerged feature
-  branch would start without that branch's commits no matter how recently the repo was fetched.
+- **A worktree only sees committed state.** Commit (not necessarily push) whatever a
+  worktree-isolated agent needs to build on before spawning it.
+- **This repo sets `worktree.baseRef: "head"`** in `.claude/settings.json` — new worktrees,
+  including subagent isolation, branch from current local HEAD, not the tool's own `"fresh"`
+  default.
 - Still tell a worktree-isolated agent to verify its HEAD (`git merge-base --is-ancestor <recent
   commit> HEAD`) before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not
   a guarantee for every session (e.g. a session launched with `--settings` overriding it, or a
