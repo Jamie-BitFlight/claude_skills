@@ -7,14 +7,15 @@ entry IDs instead of the zero-timestamp fallback ``0000-00-00T00:00:00Z``.
 
 ``_insert_named_section`` is the write path tested here.  After Fix B it
 wraps every content write via ``wrap_entry``.  ``parse_entries`` (the read
-path) then finds the ``ENTRY_RE`` match and extracts the real timestamp from
-the ``<sub>`` tag rather than falling back to the zero-ID default.
+path) then finds the entry via ``find_entry_spans`` and extracts the real
+timestamp from the ``<sub>`` tag rather than falling back to the zero-ID
+default.
 
 Two tests:
 
 1. ``TestInsertNamedSectionEntryBlockRoundtrip.test_insert_named_section_wraps_content``
    — asserts that the string returned by ``_insert_named_section`` contains
-   text that ``ENTRY_RE`` can match.
+   a block ``find_entry_spans`` can locate.
 
 2. ``TestInsertNamedSectionEntryBlockRoundtrip.test_github_only_item_roundtrip_preserves_entry_ids``
    — writes content via ``_insert_named_section``, extracts the section body,
@@ -24,7 +25,7 @@ Two tests:
 
 from __future__ import annotations
 
-from backlog_core.entry_blocks import ENTRY_RE, parse_entries
+from backlog_core.entry_blocks import find_entry_spans, parse_entries
 from backlog_core.gh_client import _insert_named_section
 from backlog_core.parsing import today
 
@@ -33,21 +34,21 @@ _ZERO_ID_PREFIX = "0000-00-00"
 
 
 class TestInsertNamedSectionEntryBlockRoundtrip:
-    """_insert_named_section must wrap content so the GitHub body is ENTRY_RE-parseable."""
+    """_insert_named_section must wrap content so the GitHub body is find_entry_spans-parseable."""
 
     def test_insert_named_section_wraps_content(self) -> None:
-        """Content written by _insert_named_section must match ENTRY_RE.
+        """Content written by _insert_named_section must be a locatable entry block.
 
         Arrange: empty body, generic subsection name, non-empty content.
 
         Act: call _insert_named_section to produce an updated body.
 
-        Assert: ENTRY_RE.search(result) is truthy — the written content is
+        Assert: find_entry_spans(result) is non-empty — the written content is
         wrapped in a ``<div><sub>timestamp</sub>…</div>`` entry block.
 
         RED (pre-fix): ``_insert_named_section`` wrote raw ``content`` without
-        wrapping, so ``ENTRY_RE`` found no match and ``parse_entries`` fell back
-        to the zero-timestamp default for every entry.
+        wrapping, so ``find_entry_spans`` found no entry and ``parse_entries``
+        fell back to the zero-timestamp default for every entry.
         """
         body = ""
         section_name = "Concerns"
@@ -56,8 +57,8 @@ class TestInsertNamedSectionEntryBlockRoundtrip:
 
         result = _insert_named_section(body, section_name, content, today_str)
 
-        assert ENTRY_RE.search(result), (
-            f"_insert_named_section must wrap content in an entry block so ENTRY_RE can match. "
+        assert find_entry_spans(result), (
+            f"_insert_named_section must wrap content in an entry block find_entry_spans can locate. "
             f"Got result:\n{result!r}\n"
             "Expected a <div><sub>timestamp</sub>…</div> wrapper around the content."
         )
@@ -78,7 +79,7 @@ class TestInsertNamedSectionEntryBlockRoundtrip:
         through the round-trip.
 
         RED (pre-fix): raw content written without entry-block wrappers meant
-        parse_entries found no ENTRY_RE match and emitted
+        parse_entries found no entry span and emitted
         ``"0000-00-00T00:00:00Z"`` as the entry ID for every section.
         """
         body = ""
@@ -109,5 +110,5 @@ class TestInsertNamedSectionEntryBlockRoundtrip:
                 f"Entry id={entry.id!r} is the zero-timestamp fallback. "
                 "The entry ID must be a real ISO timestamp written by wrap_entry. "
                 "Root cause if failing: _insert_named_section did not wrap content "
-                "so ENTRY_RE found no match and parse_entries fell back to the zero-ID default."
+                "so find_entry_spans found no entry and parse_entries fell back to the zero-ID default."
             )

@@ -27,7 +27,8 @@ import pytest
 from backlog_core import rendering, yaml_io
 from backlog_core.models import BacklogItem, BacklogItemMetadata, Entry, GroomedData, Output, Section
 from backlog_core.operations import view_item
-from backlog_core.parsing import find_item, now_iso
+from backlog_core.parsing import find_item
+from backlog_core.timestamps import now_iso
 
 if TYPE_CHECKING:
     from pathlib import Path

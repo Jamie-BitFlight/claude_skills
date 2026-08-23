@@ -65,9 +65,10 @@ conversion, serialisation, and round-trip verification to `FileCache`. The scrip
 ```text
 section_registry.py   ← standalone, no imports from other mcp modules; canonical section/subsection name registry
 models.py             ← standalone, no imports from other mcp modules
+timestamps.py         ← standalone, no imports from other mcp modules; shared now_iso() UTC timestamp helper
 backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
-parsing.py            ← imports from models, section_registry; pure parsing, selection, and transformation helpers
-entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, parsing
+entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, timestamps
+parsing.py            ← imports from models, section_registry, entry_blocks; pure parsing, selection, and transformation helpers
 yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
@@ -322,6 +323,25 @@ collision genuinely is two versions of one string value under two spellings, the
 
 ---
 
+## Module: timestamps.py
+
+**Responsibility**: The single shared `now_iso()` UTC timestamp helper. Extracted from `parsing.py`
+so `parsing.py` and `entry_blocks.py` can import from each other at module scope: `entry_blocks.py`
+needs `now_iso()` to stamp new entries, and `parsing.py` needs `entry_blocks.find_entry_spans` (plus
+two private helpers) to compute entry extents — two modules importing each other at module scope is
+a cycle regardless of which pair of symbols crosses the boundary, so the one symbol both directions
+would otherwise fight over lives in its own leaf module instead.
+
+**Public functions**: `now_iso()` — current UTC time as an ISO 8601 string with microsecond
+precision (microseconds prevent entry id collisions across rapid successive calls, e.g. batch groom
+operations).
+
+**Exports** (`__all__`): `now_iso`.
+
+**Imports from other modules**: None — a leaf module, like `models.py` and `section_registry.py`.
+
+---
+
 ## Module: parsing.py
 
 **Responsibility**: Pure item parsing and transformation, item search, slug generation, body section
@@ -330,7 +350,7 @@ utilities, view helpers, and normalize helpers. Runtime backlog-directory traver
 
 **Current active functions** (post-YAML migration):
 
-- Date helpers: `today()`, `now_iso()`
+- Date helper: `today()` (see `timestamps.py` for the sibling `now_iso()`)
 - Slug/title: `title_to_slug()`, `normalize_issue_title()`, `infer_type()`
 - Selector: `parse_issue_selector()`
 - Item parsing: `parse_item_file()` (legacy `.md` path — deprecated and restricted to migration
@@ -347,7 +367,9 @@ utilities, view helpers, and normalize helpers. Runtime backlog-directory traver
 
 **Exports**: All functions above (without leading underscores).
 
-**Imports from other modules**: `from .models import ...`, `from ruamel.yaml import YAML, YAMLError`.
+**Imports from other modules**: `from .models import ...`, `from .entry_blocks import
+find_entry_spans, _entry_from_span, _deduplicate_timestamps` (entry extent — see `entry_blocks.py`
+below), `from ruamel.yaml import YAML, YAMLError`.
 
 ---
 
@@ -365,7 +387,7 @@ GitHub issue section bodies. Each entry is identified by an ISO timestamp used a
 - Rewrite: `rewrite_section(existing_body, new_content, entry_id, replace, reason, added_date)` — orchestrates append, targeted-entry replace, or full-replace-and-strike operations
 - Diff: `generate_diff(local, remote)` — git-diff-style comparison of entry blocks between two section bodies
 
-**Imports from other modules**: `from .models import Entry`, `from .parsing import now_iso`
+**Imports from other modules**: `from .models import Entry`, `from .timestamps import now_iso`
 
 ---
 

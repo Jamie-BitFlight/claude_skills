@@ -67,7 +67,6 @@ from .parsing import (
     items_needing_issues,
     items_with_issues,
     normalize_issue_title,
-    now_iso,
     parse_issue_selector,
     parse_sam_task_metadata,
     split_body_sections,
@@ -77,6 +76,7 @@ from .parsing import (
 )
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .section_registry import SectionKey, resolve_section_name
+from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100

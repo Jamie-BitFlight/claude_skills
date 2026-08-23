@@ -16,19 +16,25 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from marko.source import Source
+
     from .backend_types import IssueNode
 
 log = logging.getLogger(__name__)
 
+import marko
+from marko.block import Heading
+from marko.helpers import MarkoExtension
 from pydantic import BaseModel
 from ruamel.yaml import YAML, YAMLError
 
 # ---------------------------------------------------------------------------
 # Imports from sibling models module
 # ---------------------------------------------------------------------------
-from . import models as _models
+from . import models
+from .entry_blocks import _deduplicate_timestamps, _entry_from_span, find_entry_spans
 from .models import (
-    COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
+    COMMIT_PREFIX_RE,
     FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
@@ -69,7 +75,6 @@ __all__ = [
     "loads_frontmatter",
     "merge_sections",
     "normalize_issue_title",
-    "now_iso",
     "parse_backlog",
     "parse_backlog_from_directory",
     "parse_issue_selector",
@@ -215,15 +220,6 @@ def today() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def now_iso() -> str:
-    """Return current UTC time as ISO 8601 string with microsecond precision.
-
-    Microsecond precision ensures uniqueness across rapid successive calls,
-    preventing entry id collisions in batch groom operations.
-    """
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
 # ---------------------------------------------------------------------------
 # Slug / title helpers
 # ---------------------------------------------------------------------------
@@ -257,7 +253,7 @@ def normalize_issue_title(title: str) -> str:
         >>> normalize_issue_title("SAM: Error Recovery")
         'sam: error recovery'
     """
-    return _COMMIT_PREFIX_RE.sub("", title).strip().lower()
+    return COMMIT_PREFIX_RE.sub("", title).strip().lower()
 
 
 def infer_type(description: str, title: str) -> str:
@@ -406,7 +402,7 @@ def _parse_yaml_item_file(path: Path) -> BacklogItem:
     yaml = YAML(typ="safe")
     with path.open(encoding="utf-8") as fh:
         data = yaml.load(fh)
-    item = _models.BacklogItem.model_validate(data)
+    item = models.BacklogItem.model_validate(data)
     item.file_path = str(path.resolve())
     return item
 
@@ -421,7 +417,7 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
     Returns:
         List of BacklogItem instances with section, title, and parsed fields.
     """
-    if not _models.get_backlog_dir().exists():
+    if not models.get_backlog_dir().exists():
         return []
     prefix_to_section = {
         "p0-": "P0",
@@ -434,8 +430,8 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
     }
     # Collect .yaml files first (new format), then .md files (legacy).
     # When a stem has both .yaml and .md, .yaml takes precedence.
-    yaml_files = list(_models.get_backlog_dir().glob("*.yaml"))
-    md_files = list(_models.get_backlog_dir().glob("*.md"))
+    yaml_files = list(models.get_backlog_dir().glob("*.yaml"))
+    md_files = list(models.get_backlog_dir().glob("*.md"))
     yaml_stems = {f.stem for f in yaml_files}
     all_files = sorted(yaml_files + [f for f in md_files if f.stem not in yaml_stems])
 
@@ -746,8 +742,8 @@ def extract_sections(text: str) -> dict[str, str]:
     path (see the "Legacy .md body section parsing" section of this module).
     Both callers now share one structural section boundary decision instead
     of independently maintaining their own hand-rolled line scanners that can
-    silently disagree — see :class:`_EntryDivBlock` for why a naive line-based
-    ``## `` scan (this function's previous implementation) misidentifies a
+    silently disagree — see :func:`~.entry_blocks.find_entry_spans` for why a naive
+    line-based ``## `` scan (this function's previous implementation) misidentifies a
     heading-shaped line inside entry-block content as a real section boundary.
 
     Args:
@@ -767,7 +763,7 @@ class SectionSpan(BaseModel):
     Produced by :func:`split_body_sections`, the single structural boundary
     detector shared by every ``operations.py`` consumer that used to
     re-implement section-boundary detection with its own naive line regex
-    (see :class:`_EntryDivBlock` for why that was wrong).
+    (see :func:`~.entry_blocks.find_entry_spans` for why that was wrong).
 
     Attributes:
         name: Heading text with the ``#`` marker stripped and whitespace trimmed.
@@ -794,8 +790,9 @@ def split_body_sections(body: str) -> list[SectionSpan]:
     ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``) used to provide —
     but routed through the marko-AST heading positions shared with
     :func:`_split_body_h2`, so a heading-shaped line inside a
-    ``<div><sub>...</sub>...</div>`` entry block (see :class:`_EntryDivBlock`)
-    is never misidentified as a section boundary. This is the same guard
+    ``<div><sub>...</sub>...</div>`` entry block (see
+    :func:`~.entry_blocks.find_entry_spans`) is never misidentified as a section
+    boundary. This is the same guard
     :func:`extract_sections` already applies for ``## ``-only splitting,
     generalized to also match ``### `` and to carry char offsets so callers
     that slice the raw body (rather than only reading section content) have
@@ -862,13 +859,6 @@ def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
 # Legacy .md body section parsing — converts markdown body into typed sections
 # ---------------------------------------------------------------------------
 
-import marko
-from marko.block import Heading as _MarkoHeading
-from marko.helpers import MarkoExtension as _MarkoExtension
-
-if TYPE_CHECKING:
-    from marko.source import Source as _MarkoSource
-
 # Heading levels used for body section splitting.
 _H2_LEVEL = 2
 _H3_LEVEL = 3
@@ -877,8 +867,8 @@ _H3_LEVEL = 3
 _GROOMED_DATE_RE = re.compile(r"^Groomed(?:\s*\((\d{4}-\d{2}-\d{2})\))?$", re.IGNORECASE)
 
 # Entry-block wrapper markers. Must match entry_blocks.wrap_entry()'s
-# "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see ENTRY_RE in
-# entry_blocks.py for the canonical parse-side pattern this mirrors).
+# "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see find_entry_spans in
+# entry_blocks.py for the canonical parse-side extent this mirrors).
 _ENTRY_DIV_OPEN = "<div><sub>"
 _ENTRY_DIV_OPEN_RE = re.compile(r" {0,3}" + re.escape(_ENTRY_DIV_OPEN))
 
@@ -924,9 +914,6 @@ def _mask_entry_blocks(body: str) -> str:
     Returns:
         *body* with entry-block content replaced by filler of the same length.
     """
-    # Imported here, not at module scope: entry_blocks imports now_iso from this module.
-    from .entry_blocks import find_entry_spans  # ruff: ignore[import-outside-top-level]
-
     ranges = [(span.start, span.end) for span in find_entry_spans(body)]
     for match in _ENTRY_DIV_OPEN_LINE_RE.finditer(body):
         if any(start <= match.start() < end for start, end in ranges):
@@ -978,7 +965,7 @@ def _original_offsets(body: str) -> list[int] | None:
     return mapping
 
 
-class _PositionedHeading(_MarkoHeading):
+class _PositionedHeading(Heading):
     """A ``Heading`` that records where its own source line begins.
 
     marko 2.2.2 exposes no source position on ``Heading``, which is why this module
@@ -999,7 +986,7 @@ class _PositionedHeading(_MarkoHeading):
     _pending_start = 0
 
     @classmethod
-    def parse(cls, source: _MarkoSource) -> re.Match[str] | None:
+    def parse(cls, source: Source) -> re.Match[str] | None:
         """Record the source position, then parse the heading normally.
 
         Returns:
@@ -1017,7 +1004,7 @@ class _PositionedHeading(_MarkoHeading):
 # Single shared marko instance used by every AST-based split in this module so
 # entry-block opacity is enforced identically everywhere, rather than each
 # caller independently re-deciding what counts as a section boundary.
-_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[_MarkoExtension(elements=[_PositionedHeading])])
+_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[MarkoExtension(elements=[_PositionedHeading])])
 
 
 def _heading_line_start(normalized: str, pos: int) -> int:
@@ -1055,7 +1042,7 @@ def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str
 
     spans: list[tuple[int, str]] = []
     for child in doc.children:
-        if not isinstance(child, _MarkoHeading) or child.level not in levels:
+        if not isinstance(child, Heading) or child.level not in levels:
             continue
         norm_start = _heading_line_start(normalized, getattr(child, "raw_start", 0))
         start = mapping[norm_start] if mapping is not None else norm_start
@@ -1087,7 +1074,7 @@ def _section_spans(body: str, levels: frozenset[int]) -> list[SectionSpan]:
     return spans
 
 
-def _extract_heading_text(node: _MarkoHeading) -> str:
+def _extract_heading_text(node: Heading) -> str:
     """Reconstruct heading text from all inline descendants of a marko Heading node.
 
     Recurses. A heading containing emphasis, strong text, code or a link nests its
@@ -1159,7 +1146,7 @@ def _split_body_h2(body: str, levels: frozenset[int] = frozenset({_H2_LEVEL})) -
 
     marko correctly identifies ATX headings while ignoring ``#``-prefixed
     lines inside fenced code blocks or entry-block content (see
-    :class:`_EntryDivBlock`).  Heading positions are then mapped back to
+    :func:`~.entry_blocks.find_entry_spans`).  Heading positions are then mapped back to
     source lines so that raw content (including HTML entry blocks) is
     extracted verbatim.
 
@@ -1239,13 +1226,6 @@ def _parse_section_entries(content: str, added_date: str) -> Section:
     Returns:
         ``Section`` with one or more ``Entry`` objects.
     """
-    # Import here to avoid circular dependency: entry_blocks → parsing (now_iso).
-    from .entry_blocks import (  # ruff: ignore[import-outside-top-level]
-        _deduplicate_timestamps,
-        _entry_from_span,
-        find_entry_spans,
-    )
-
     if not content:
         return Section(entries=[])
 

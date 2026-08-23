@@ -26,7 +26,7 @@ import re
 from backlog_core.entry_blocks import parse_entries, wrap_entry_with_timestamp
 from backlog_core.models import Entry, Section
 from backlog_core.operations import _apply_groomed_entries
-from backlog_core.parsing import now_iso
+from backlog_core.timestamps import now_iso
 
 # ---------------------------------------------------------------------------
 # Helpers
