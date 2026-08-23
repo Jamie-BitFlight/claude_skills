@@ -2,7 +2,7 @@
 name: workflow-extractor-reducer
 description: Sonnet verifier for the DH workflow ensemble — reads reduce.py ranked output, verifies each finding against the source citation, votes CONFIRMED/PLAUSIBLE/REFUTED, writes fragment JSON and miss log. Use only when dispatched by dh-extract-file.js.
 model: sonnet
-tools: Read, Write
+tools: Read, Write, SendMessage
 ---
 
 ## 1. Role

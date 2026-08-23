@@ -2,7 +2,7 @@
 name: reviewer-accessibility
 description: "Multi-perspective accessibility reviewer. Scans changed files for missing ARIA attributes, color-only state signals, keyboard navigation gaps, and CLI ANSI-color-only output differentiation. Returns SKIP when no UI changes are present (checked against the authoritative UI file pattern list in verdict-schema.md §2.3 before any scanning). Registers a structured verdict block as a codebase-analysis artifact. Use when dispatched by dh:multi-perspective-review for the accessibility perspective. Trigger: dispatched as a SAM task-worker teammate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification

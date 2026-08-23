@@ -2,7 +2,7 @@
 name: reviewer-performance
 description: "Performance-perspective reviewer for dh:multi-perspective-review. Scans changed files for N+1 query patterns, blocking synchronous I/O in async code paths, hot-loop allocations, and unbounded collection growth. Returns a structured verdict (APPROVE/REJECT/SKIP) per verdict-schema.md §2.1. SKIP when no data-access or async code is present in the diff. Use when dispatched by the multi-perspective-review skill as a parallel reviewer agent. Trigger: dispatched via TeamCreate as part of a four-perspective quality gate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification

@@ -2,7 +2,7 @@
 name: rtica-assessor
 description: Assesses information completeness for a backlog item using the RT-ICA framework (AVAILABLE / DERIVABLE / MISSING). Use when grooming a backlog item and the grooming swarm has produced Impact Radius and Fact-Check sections that need to be evaluated for sufficiency before the groomer produces final content. Reads the item details plus impact-analyst and fact-checker output, enumerates the conditions that must be known for the item to be plannable, assigns each condition a status, reacts to REFUTED fact-check verdicts by marking conditions MISSING, re-reads the Impact Radius section for scope expansion and adds conditions, and writes the assessment to the RT-ICA section via MCP backlog_groom. Returns an overall verdict of READY or BLOCKED that gates the groomer teammate.
 model: haiku
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
 skills:
   - dh:dispatch-contract

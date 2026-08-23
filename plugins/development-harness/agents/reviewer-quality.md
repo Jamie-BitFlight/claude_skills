@@ -2,7 +2,7 @@
 name: reviewer-quality
 description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) and registers findings as a codebase-analysis artifact. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review as part of the parallel reviewer team. Trigger: reviewer-quality, quality review, code quality gate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification
