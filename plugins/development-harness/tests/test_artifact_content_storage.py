@@ -16,6 +16,7 @@ All GitHub API calls are mocked at the ``_graphql_request`` boundary
 from __future__ import annotations
 
 import hashlib
+import inspect
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -47,6 +48,7 @@ from backlog_core.models import (
     ContentUnavailableError,
 )
 from backlog_core.server import mcp
+from dh_core import operations as dh_operations
 from fastmcp.exceptions import ToolError
 from graphql_factories import (
     make_issue_by_number_response,
@@ -590,21 +592,19 @@ async def test_artifact_register_rejects_empty_content_before_provider_mutation(
     mock_provider.put_content.assert_not_called()
 
 
-async def test_artifact_register_with_invalid_type_returns_error() -> None:
-    """Verify artifact_register returns an error for unknown artifact types.
+async def test_artifact_register_with_invalid_type_raises() -> None:
+    """Verify artifact_register fails the call for unknown artifact types.
 
     Tests: artifact_register MCP tool — invalid type validation.
-    How: Pass artifact_type not in ArtifactType enum, verify error key present.
-    Why: Input validation must reject garbage types before touching GitHub.
+    How: Pass artifact_type not in ArtifactType enum, verify the call errors.
+    Why: An invalid type returned inside a successful response let a caller that does not
+    inspect the payload continue as though the artifact was stored (#3162).
     """
-    # Arrange / Act
-    result = await _call(
-        "artifact_register",
-        {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md", "content": "# Content"},
-    )
-
-    # Assert
-    assert "error" in result
+    with pytest.raises(ToolError):
+        await _call(
+            "artifact_register",
+            {"item_id": 42, "artifact_type": "not-a-real-type", "artifact_id": "plan/foo.md", "content": "# Content"},
+        )
 
 
 async def test_artifact_read_returns_configured_provider_content() -> None:
@@ -665,8 +665,8 @@ async def test_artifact_read_returns_error_when_type_not_found() -> None:
     """
     # Arrange
     mock_manifest = ArtifactManifest(issue_number=42, artifacts=[])
-    mock_provider = MagicMock()
-    mock_provider.get_manifest.return_value = mock_manifest
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
 
     with (
         patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
@@ -680,18 +680,16 @@ async def test_artifact_read_returns_error_when_type_not_found() -> None:
     assert "error" in result
 
 
-async def test_artifact_read_returns_error_for_invalid_type() -> None:
-    """Verify artifact_read returns an error for unknown artifact types.
+async def test_artifact_read_raises_for_invalid_type() -> None:
+    """Verify artifact_read fails the call for unknown artifact types.
 
     Tests: artifact_read MCP tool — invalid type validation.
     How: Pass artifact_type not in ArtifactType enum.
-    Why: Input validation must reject invalid types before touching GitHub.
+    Why: An invalid type is a caller error, not an absent artifact, and must not be
+    reported through the same channel as a legitimate absence (#3162).
     """
-    # Arrange / Act
-    result = await _call("artifact_read", {"item_id": 42, "artifact_type": "not-real"})
-
-    # Assert
-    assert "error" in result
+    with pytest.raises(ToolError):
+        await _call("artifact_read", {"item_id": 42, "artifact_type": "not-real"})
 
 
 async def test_artifact_read_multi_entry_returns_most_recent_and_warns() -> None:
@@ -739,3 +737,95 @@ async def test_artifact_read_multi_entry_returns_most_recent_and_warns() -> None
     assert len(warnings) == 1
     assert "plan/r-old.md" in warnings[0]
     assert "2" in warnings[0]  # "Multiple … found (2)"
+
+
+async def test_artifact_read_by_artifact_id_returns_the_addressed_entry_not_the_newest() -> None:
+    """artifact_id addresses one entry, overriding the newest-wins default.
+
+    Tests: artifact_read MCP tool — addressing by logical identifier.
+    How: Two research entries; read the older one by id and assert its content is returned.
+    Why: The MCP tool previously exposed no artifact_id while dh_core.operations.artifact_read
+    and ``artifact read --artifact-id`` both did, so an agent on MCP could not address a
+    specific artifact and recovery work had to be written in CLI form.
+    """
+    # Arrange: two research entries — the wanted one is NOT the most recent
+    older_entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-old.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-01-01T10:00:00Z",
+    )
+    newer_entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-new.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-06-01T10:00:00Z",
+    )
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[older_entry, newer_entry])
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.side_effect = [
+        _manifest_record(mock_manifest),
+        _artifact_record(42, "research", "plan/r-old.md", "# Older content"),
+    ]
+
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
+        patch("backlog_core.server._artifact_registry") as mock_registry,
+    ):
+        mock_registry.get_by_type.return_value = [older_entry, newer_entry]
+        # Act
+        result = await _call(
+            "artifact_read", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/r-old.md"}
+        )
+
+    # Assert: the addressed entry wins, and no ambiguity warning is emitted
+    assert result.get("error") is None
+    assert result["path"] == "plan/r-old.md"
+    assert result["content"] == "# Older content"
+    assert result.get("warnings", []) == []
+
+
+async def test_artifact_read_reports_an_unmatched_artifact_id() -> None:
+    """An artifact_id matching no entry of the type is reported, not silently ignored.
+
+    Falling back to the newest entry would hand the caller a different artifact than the
+    one it addressed — the ambiguity this parameter exists to remove.
+    """
+    entry = ArtifactEntry(
+        artifact_type=ArtifactType.RESEARCH,
+        artifact_id="plan/r-new.md",
+        status=ArtifactStatus.CURRENT,
+        created_at="2026-06-01T10:00:00Z",
+    )
+    mock_manifest = ArtifactManifest(issue_number=42, artifacts=[entry])
+    mock_provider = MagicMock(spec=ContentProvider)
+    mock_provider.get_content.return_value = _manifest_record(mock_manifest)
+
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=mock_provider),
+        patch("backlog_core.server._artifact_registry") as mock_registry,
+    ):
+        mock_registry.get_by_type.return_value = [entry]
+        # Act
+        result = await _call(
+            "artifact_read", {"item_id": 42, "artifact_type": "research", "artifact_id": "plan/absent.md"}
+        )
+
+    # Assert
+    assert "plan/absent.md" in result["error"]
+
+
+async def test_artifact_read_mcp_surface_matches_the_operations_signature() -> None:
+    """The MCP tool must accept the same addressing parameters as its operations counterpart.
+
+    Two surfaces over one operation that disagree on which parameters exist force callers
+    onto the richer surface for no functional reason.
+    """
+    tools = await mcp.list_tools()
+    parameters = next(tool.parameters for tool in tools if tool.name == "artifact_read")
+    operations_parameters = set(inspect.signature(dh_operations.artifact_read).parameters)
+
+    assert set(parameters["properties"]) == operations_parameters, (
+        "artifact_read's MCP parameters diverge from dh_core.operations.artifact_read: "
+        f"MCP has {sorted(parameters['properties'])}, operations has {sorted(operations_parameters)}"
+    )

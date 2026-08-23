@@ -902,54 +902,53 @@ class TestMCPToolArtifactRegister:
         assert data["action"] == "updated"
         assert data["artifact_count"] == 1  # Still one entry
 
-    async def test_artifact_register_invalid_type_returns_error(self, patched_mcp_server: Any) -> None:
-        """artifact_register returns error dict for an unknown artifact_type value.
+    async def test_artifact_register_invalid_type_fails_the_call(self, patched_mcp_server: Any) -> None:
+        """artifact_register fails the call for an unknown artifact_type value.
 
         Tests: Input validation error handling in artifact_register
-        How: Pass an unknown artifact type string; assert 'error' key in response.
-        Why: Callers must receive an informative error, not an unhandled exception.
+        How: Pass an unknown artifact type string; assert the call errors.
+        Why: An error returned inside a successful response reads as success to a caller
+        that does not inspect the payload, so nothing was stored and nothing said so
+        (#3162).
         """
         from fastmcp.client import Client
+        from fastmcp.exceptions import ToolError
 
-        # Arrange / Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool(
-                "artifact_register",
-                {
-                    "item_id": 100,
-                    "artifact_type": "not-a-real-type",
-                    "artifact_id": "plan/something.md",
-                    "content": "irrelevant — invalid type is rejected before content is used",
-                },
-            )
+            with pytest.raises(ToolError):
+                await client.call_tool(
+                    "artifact_register",
+                    {
+                        "item_id": 100,
+                        "artifact_type": "not-a-real-type",
+                        "artifact_id": "plan/something.md",
+                        "content": "irrelevant — invalid type is rejected before content is used",
+                    },
+                )
 
-        # Assert
-        assert "error" in result.data
-
-    async def test_artifact_register_invalid_status_returns_error(self, patched_mcp_server: Any) -> None:
-        """artifact_register returns error dict for an unknown status value.
+    async def test_artifact_register_invalid_status_fails_the_call(self, patched_mcp_server: Any) -> None:
+        """artifact_register fails the call for an unknown status value.
 
         Tests: Status value validation in artifact_register
-        How: Pass an unknown status string; assert 'error' key in response.
-        Why: Invalid status values must produce an error, not silently default.
+        How: Pass an unknown status string; assert the call errors.
+        Why: ``status="complete"`` was instructed across shipped agent files and each such
+        registration reported success while storing nothing (#3162).
         """
         from fastmcp.client import Client
+        from fastmcp.exceptions import ToolError
 
-        # Arrange / Act
         async with Client(patched_mcp_server) as client:
-            result = await client.call_tool(
-                "artifact_register",
-                {
-                    "item_id": 100,
-                    "artifact_type": "architect",
-                    "artifact_id": "plan/architect-foo.md",
-                    "content": "irrelevant — invalid status is rejected before content is used",
-                    "status": "not-a-real-status",
-                },
-            )
-
-        # Assert
-        assert "error" in result.data
+            with pytest.raises(ToolError):
+                await client.call_tool(
+                    "artifact_register",
+                    {
+                        "item_id": 100,
+                        "artifact_type": "architect",
+                        "artifact_id": "plan/architect-foo.md",
+                        "content": "irrelevant — invalid status is rejected before content is used",
+                        "status": "not-a-real-status",
+                    },
+                )
 
 
 class TestMCPToolArtifactList:
