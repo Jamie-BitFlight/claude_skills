@@ -7,7 +7,6 @@ skills:
   - dh:subagent-contract
   - dh:validation-protocol
   - ccc
-  - dh:dispatch-contract
 color: blue
 ---
 

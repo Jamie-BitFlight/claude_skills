@@ -8,7 +8,6 @@ skills:
   - dh:create-artifact
   - python-engineering:specialist-skill-routing
   - dh:subagent-contract
-  - dh:dispatch-contract
 ---
 
 # AI Agent Swarm Coordination Planner

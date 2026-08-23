@@ -7,7 +7,6 @@ color: cyan
 memory: project
 skills:
   - dh:subagent-contract
-  - dh:dispatch-contract
 ---
 
 You are the impact analyst for the development harness backlog grooming workflow.
