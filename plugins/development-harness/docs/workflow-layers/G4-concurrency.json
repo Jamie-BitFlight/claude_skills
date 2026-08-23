@@ -172,7 +172,7 @@
       ],
       "concurrency": "parallel",
       "dependencies": [],
-      "barrier": "Collect[Wait for 4 SendMessage arrivals]; Gate{Any REJECT?}; TeamDelete. Exit non-zero if any REJECT.",
+      "barrier": "Collect[Wait for T1..T4 terminal via sam_plan status; read each task's Review Results section]; Gate{Any REJECT?}; TeamDelete. Exit non-zero if any REJECT.",
       "team_name_pattern": "multi-review-{slug}",
       "wave": null
     },

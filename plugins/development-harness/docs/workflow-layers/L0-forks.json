@@ -1388,7 +1388,7 @@
         },
         {
           "condition": "Idle — no tool calls for 5+ min<br>agent appears stuck mid-task",
-          "target_label": "TeamCheck",
+          "target_label": "Read the task via sam_task read; note its last-activity timestamp; wait 2 minutes and read it again",
           "target_is_file_ref": false,
           "target_file": null
         },
@@ -1401,43 +1401,21 @@
       ]
     },
     {
-      "fork_id": "implement-feature.teamcheck",
+      "fork_id": "implement-feature.actcheck",
       "skill": "implement-feature",
       "source_file": "skills/implement-feature/SKILL.md",
       "source_block": "### Agent Health Check (While Waiting)",
-      "decision_question": "Agent is a teammate\nin an active team?",
+      "decision_question": "last-activity advanced?",
       "evaluated_by": "orchestrator",
       "branches": [
         {
-          "condition": "Yes",
-          "target_label": "SendMessage to teammate 'Are you blocked? What is your current status?' Wait 2 minutes for response",
-          "target_is_file_ref": false,
-          "target_file": null
-        },
-        {
-          "condition": "No — spawned via single Agent call",
-          "target_label": "Re-spawn agent with the same opaque plan_ref and task_id; SubagentStop hook updates status on completion",
-          "target_is_file_ref": false,
-          "target_file": null
-        }
-      ]
-    },
-    {
-      "fork_id": "implement-feature.msgcheck",
-      "skill": "implement-feature",
-      "source_file": "skills/implement-feature/SKILL.md",
-      "source_block": "### Agent Health Check (While Waiting)",
-      "decision_question": "Response received\nwithin 2 min?",
-      "evaluated_by": "orchestrator",
-      "branches": [
-        {
-          "condition": "Yes — agent responds",
+          "condition": "Yes — the agent is still writing task state",
           "target_label": "Continue waiting",
           "target_is_file_ref": false,
           "target_file": null
         },
         {
-          "condition": "No — still silent",
+          "condition": "No — task state is frozen",
           "target_label": "Re-spawn agent with the same opaque plan_ref and task_id; SubagentStop hook updates status on completion",
           "target_is_file_ref": false,
           "target_file": null

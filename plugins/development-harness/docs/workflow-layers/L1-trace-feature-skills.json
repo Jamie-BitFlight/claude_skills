@@ -307,8 +307,8 @@
         "If 1 task → single Agent call acceptable",
         "Step 4: Monitor all batch agents for completion",
         "Step 4a: contract-verification per completed task",
-        "Step 4b: SendMessage shutdown per teammate",
         "Step 5: the sam_plan status result shows all batch tasks complete",
+        "Commit the batch, then step 4b: release the team via TeamDelete(team_name='impl-{slug}')",
         "If checkpoint → Wave-Completion Confirmation Gate (user yes/no before next batch)",
         "If full_auto → skip gate, proceed immediately",
         "If tasks remain → loop back to step 2",
@@ -338,10 +338,14 @@
     {
       "from_fork": "implement-feature.verdict",
       "branch_condition": "Idle — no tool calls for 5+ min<br>agent appears stuck mid-task",
-      "path": ["Analyst verdict: Idle", "→ implement-feature.teamcheck"],
+      "path": [
+        "Analyst verdict: Idle",
+        "Read the task via sam_task read; note last-activity; wait 2 minutes; read again",
+        "→ implement-feature.actcheck"
+      ],
       "crosses_into_files": [],
       "terminal_type": "loops_back",
-      "terminal_target": "implement-feature.teamcheck",
+      "terminal_target": "implement-feature.actcheck",
       "source_file": "skills/implement-feature/SKILL.md"
     },
     {
@@ -354,46 +358,19 @@
       "source_file": "skills/implement-feature/SKILL.md"
     },
     {
-      "from_fork": "implement-feature.teamcheck",
-      "branch_condition": "Yes",
-      "path": [
-        "Agent is a teammate in active team",
-        "SendMessage to teammate 'Are you blocked? What is your current status?'",
-        "Wait 2 minutes for response",
-        "→ implement-feature.msgcheck"
-      ],
-      "crosses_into_files": [],
-      "terminal_type": "loops_back",
-      "terminal_target": "implement-feature.msgcheck",
-      "source_file": "skills/implement-feature/SKILL.md"
-    },
-    {
-      "from_fork": "implement-feature.teamcheck",
-      "branch_condition": "No — spawned via single Agent call",
-      "path": [
-        "Agent is not a teammate",
-        "Re-spawn agent with the same opaque plan_ref and task_id",
-        "SubagentStop hook updates status on completion"
-      ],
-      "crosses_into_files": ["skills/start-task/SKILL.md"],
-      "terminal_type": "completes_workflow",
-      "terminal_target": "Task re-dispatched; Progress Loop resumes monitoring",
-      "source_file": "skills/implement-feature/SKILL.md"
-    },
-    {
-      "from_fork": "implement-feature.msgcheck",
-      "branch_condition": "Yes — agent responds",
-      "path": ["Response received within 2 min", "Continue waiting"],
+      "from_fork": "implement-feature.actcheck",
+      "branch_condition": "Yes — the agent is still writing task state",
+      "path": ["last-activity advanced between the two reads", "Continue waiting"],
       "crosses_into_files": [],
       "terminal_type": "loops_back",
       "terminal_target": "Agent Health Check polling loop",
       "source_file": "skills/implement-feature/SKILL.md"
     },
     {
-      "from_fork": "implement-feature.msgcheck",
-      "branch_condition": "No — still silent",
+      "from_fork": "implement-feature.actcheck",
+      "branch_condition": "No — task state is frozen",
       "path": [
-        "No response within 2 min",
+        "last-activity unchanged between the two reads",
         "Re-spawn agent with the same opaque plan_ref and task_id",
         "SubagentStop hook updates status on completion"
       ],

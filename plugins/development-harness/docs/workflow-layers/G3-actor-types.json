@@ -67,9 +67,9 @@
       "id": "G3.implement-feature.shutdown-teammate",
       "skill": "implement-feature",
       "source_file": "implement-feature/SKILL.md:Progress Loop",
-      "action_label": "Send shutdown request to completed teammate (step 4b)",
+      "action_label": "Release the team after the batch commit (step 4b)",
       "actor_type": "orchestrator-raw",
-      "evidence": "SendMessage(to=\"{teammate_name}\", message={\"type\": \"shutdown_request\"})",
+      "evidence": "TeamDelete(team_name=\"{team_name}\") ... Releasing the team happens once per team, and it happens after the batch commit in step 5",
       "agent_name": null
     },
     {
@@ -283,9 +283,9 @@
       "id": "G3.complete-implementation.team-shutdown",
       "skill": "complete-implementation",
       "source_file": "complete-implementation/SKILL.md:Team Shutdown",
-      "action_label": "Shut down all team members via SendMessage(shutdown_request)",
+      "action_label": "Release the implementation team via TeamDelete",
       "actor_type": "orchestrator-raw",
-      "evidence": "read team config and shut down ALL members immediately ... SendMessage(to=..., message={type: shutdown_request})",
+      "evidence": "After commit+push, release the implementation team ... TeamDelete(team_name=\"{team_name}\")",
       "agent_name": null
     },
     {
