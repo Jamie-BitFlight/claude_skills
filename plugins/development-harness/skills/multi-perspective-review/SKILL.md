@@ -83,6 +83,11 @@ Inspect the returned `items` array. If any item has `feature` equal to `{review_
 
 - Store its non-empty `plan_ref` as `{PA}` (e.g., `#2181,P8a3f1b29`)
 - Skip step 3b — do not create a new plan
+- Reset every task the reused plan already ran. For each of `T1`..`T4` whose status is terminal,
+  call `mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "state", "status": "not-started"})`.
+  A terminal task cannot be claimed, so a reviewer dispatched against it stops without writing a
+  verdict — and Step 5 would then read the previous run's `Review Results` block as if it applied
+  to this diff.
 
 If no matching plan is found, proceed to step 3b.
 
@@ -228,7 +233,8 @@ Then read each task and take its `Review Results` section:
 mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})
 ```
 
-The section content is the raw JSON verdict block — parse it directly:
+Take the last `Review Results` section on the task — a reused plan carries one per run, appended
+in order. Its content is the raw JSON verdict block — parse it directly:
 
 ```python
 verdict_block = json.loads(review_results_section)
