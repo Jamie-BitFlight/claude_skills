@@ -1776,7 +1776,7 @@
         },
         {
           "condition": "T1 Code Review",
-          "target_label": "Read codebase-analysis artifact. Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing).",
+          "target_label": "Read code-review artifact. Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing).",
           "target_is_file_ref": false,
           "target_file": null
         },

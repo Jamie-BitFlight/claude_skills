@@ -278,7 +278,7 @@
       "detected_at": "SAM Dispatch Loop — T1 post-dispatch",
       "response": "bounce",
       "bounce_target": "Recursive Follow-up Handling — Step 1: fix loop or backlog routing",
-      "bounce_source": "Read codebase-analysis artifact. Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing)."
+      "bounce_source": "Read code-review artifact. Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing)."
     },
     {
       "id": "G1.complete-implementation.qg-task-unauthorized-skip",
