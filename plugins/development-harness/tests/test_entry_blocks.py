@@ -542,6 +542,105 @@ def test_rewrite_by_entry_id_uses_same_dedup_logic_as_parse():
 
 
 # ---------------------------------------------------------------------------
+# resolve_all_entry_ids() / resolve_entry_id() — global collision resolution
+#
+# A suffix generated for a raw duplicate ("T", "T" -> "T-0", "T-1") must not
+# collide with any id already present verbatim elsewhere in the same list —
+# not just with other members of the same duplicate group. Pre-#3183 code
+# could persist exactly this shape: an unknown entry_id silently appended a
+# new entry carrying that literal id, so a stored section can hold two
+# entries sharing a base id (needing suffixing) plus a third, unrelated
+# entry whose stored id equals what the suffix algorithm would generate.
+# ---------------------------------------------------------------------------
+from backlog_core.entry_blocks import resolve_all_entry_ids, resolve_entry_id
+from backlog_core.models import EntryNotFoundError
+
+
+def test_resolve_all_entry_ids_suffix_does_not_collide_with_pre_existing_id():
+    """A generated ``-N`` suffix must not collide with a raw id that already
+    exists verbatim elsewhere in the list, even though that id was never
+    itself duplicated."""
+    raw_ids = ["T", "T", "T-0"]
+    resolved = resolve_all_entry_ids(raw_ids)
+    assert len(resolved) == len(set(resolved)), f"collision in {resolved!r}"
+    # The pre-existing "T-0" entry keeps its literal id; both duplicates of
+    # "T" must be suffixed to something else entirely.
+    assert resolved[2] == "T-0"
+    assert resolved[0] != "T-0"
+    assert resolved[1] != "T-0"
+
+
+def test_resolve_entry_id_targets_the_pre_existing_entry_not_the_first_duplicate():
+    """``resolve_entry_id`` must resolve "T-0" to the entry that was
+    genuinely stored under that literal id (index 2), not silently return
+    the first duplicate of "T" that happens to generate the same suffix."""
+    raw_ids = ["T", "T", "T-0"]
+    assert resolve_entry_id(raw_ids, "T-0") == 2
+
+
+@pytest.mark.parametrize(
+    "raw_ids",
+    [
+        pytest.param(["T", "T", "T-0"], id="reproduction-two-dupes-one-pre-existing-suffix"),
+        pytest.param(["T-0", "T", "T"], id="pre-existing-suffix-appears-before-its-duplicates"),
+        pytest.param(["A", "A", "A-1"], id="pre-existing-suffix-matches-the-second-duplicate-not-the-first"),
+        pytest.param(["T", "T"], id="plain-duplicate-no-pre-existing-collision"),
+        pytest.param(["S", "S", "S", "S-0", "S-2"], id="three-way-dupe-two-pre-existing-suffixes"),
+        pytest.param(["T", "T", "T", "T", "T-0", "T-1", "T-2"], id="cascading-collision-skips-multiple-candidates"),
+        pytest.param(["A", "A", "B", "B", "A-0", "B-1"], id="two-separate-duplicate-groups-each-colliding"),
+    ],
+)
+def test_resolve_all_entry_ids_never_produces_duplicate_ids(raw_ids: list[str]) -> None:
+    """For any input list of raw ids, every resolved id must be pairwise
+    distinct -- the invariant the collision bug violated."""
+    resolved = resolve_all_entry_ids(raw_ids)
+    assert len(resolved) == len(set(resolved)), f"collision in {resolved!r}"
+
+
+def test_resolve_entry_id_raises_for_id_matching_no_resolved_entry():
+    """An id that matches neither a raw nor a resolved id must still raise,
+    not silently resolve to an unrelated entry."""
+    with pytest.raises(EntryNotFoundError):
+        resolve_entry_id(["T", "T", "T-0"], "does-not-exist")
+
+
+def test_parse_entries_body_parsed_path_shares_the_same_collision_fix():
+    """``parse_entries`` -> ``_deduplicate_timestamps`` -> ``_resolve_duplicate_ids``
+    is a second, independent caller of the shared collision-resolution
+    function -- reachable from a raw section body rather than a stored id
+    list, and unrelated to the structured-read caller. It must not collide
+    either, since both callers route through the same implementation."""
+    body = (
+        "<div><sub>T</sub>\n\nFirst.\n</div>\n\n"
+        "<div><sub>T</sub>\n\nSecond.\n</div>\n\n"
+        "<div><sub>T-0</sub>\n\nThird.\n</div>"
+    )
+    ids = [e.id for e in parse_entries(body)]
+    assert len(ids) == len(set(ids)), f"collision in {ids!r}"
+    assert ids[2] == "T-0"
+
+
+# hypothesis is a repository dev dependency (see pyproject.toml); a small,
+# bounded alphabet of ids that includes both bases and their own suffixed
+# forms is what actually stresses the collision path -- purely random
+# strings would almost never generate an id that looks like another id's
+# suffix.
+from hypothesis import given, strategies as st
+
+_COLLISION_PRONE_IDS = st.sampled_from(["T", "T-0", "T-1", "T-2", "A", "A-0", "A-1", "S", "S-0", "S-1", "S-2"])
+
+
+@given(st.lists(_COLLISION_PRONE_IDS, min_size=0, max_size=8))
+def test_resolve_all_entry_ids_property_ids_are_always_pairwise_distinct(raw_ids: list[str]) -> None:
+    """Property: for any input list drawn from an alphabet designed to
+    provoke base/suffix collisions, resolve_all_entry_ids must never return
+    two equal ids."""
+    resolved = resolve_all_entry_ids(raw_ids)
+    assert len(resolved) == len(raw_ids)
+    assert len(resolved) == len(set(resolved)), f"collision in {resolved!r} from input {raw_ids!r}"
+
+
+# ---------------------------------------------------------------------------
 # Residual extent-rule divergence — wrap_entry/strike_entry off ENTRY_RE onto
 # find_entry_spans, the STRUCK_RE defect, the <div/> and case-insensitive tag
 # grammar gaps. See .tmp/scratch/reports/20260823-entry-extent-residual.md.
