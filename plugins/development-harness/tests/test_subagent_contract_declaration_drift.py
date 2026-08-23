@@ -1,14 +1,17 @@
 """Guards the destination rule the subagent contract states for dispatched agents.
 
-`skills/subagent-contract/SKILL.md` is where a dispatched agent is told what its output
-goes into: repository files for source, tests, and documentation; `artifact_register`
-with content for every other document; the SAM plan and task operations for plans and
-task state. A dispatched agent starts with an empty conversation and inherits nothing its
-dispatcher loaded, so that rule reaches it only through its own `skills:` frontmatter.
+A single-purpose agent's own file names where its result goes, and a dispatch naming a
+different form overrides that when the agent is put to work beyond its one task. Most of
+this roster is the first case. `skills/subagent-contract/SKILL.md` supplies the fallback
+for when neither names one: repository files for source, tests, and documentation;
+`artifact_register` with content for every other document; the SAM plan and task
+operations for plans and task state.
 
-An agent holding those operations and not that rule can still write its result somewhere
-the next step cannot read it, and the miss is silent — the next step reads empty rather
-than failing. Item grooming operations (`backlog_view`, `backlog_groom`) address no
+The fallback is what this guards, and it is narrow — it matters for an agent whose own
+file names no destination. Such an agent holding those operations without the fallback
+can write its result somewhere the next step cannot read it, and the miss is silent: the
+next step reads empty rather than failing. A dispatched agent starts with an empty
+conversation, so its `skills:` frontmatter is what carries the fallback in. Item grooming operations (`backlog_view`, `backlog_groom`) address no
 artifact, so an agent declaring only those is out of scope and is derived as such from
 its tool list rather than exempted by name.
 """
