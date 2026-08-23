@@ -905,6 +905,51 @@ def _div_depth_delta(line: str) -> int:
     return len(_DIV_OPEN_TAG_RE.findall(line)) - len(_DIV_CLOSE_TAG_RE.findall(line))
 
 
+# A fence opener or closer: three or more backticks or tildes, at the up-to-three-spaces
+# indent CommonMark permits. The delimiter run is captured because a fence closes only on a
+# run of the same character at least as long as the one that opened it — the assumption a
+# boolean toggle got wrong, which is why a nested ``` inside a ```` block used to end it.
+_FENCE_RE = re.compile(r" {0,3}(`{3,}|~{3,})")
+
+
+class _FenceState:
+    """Tracks whether a line-by-line scan is currently inside a fenced code block.
+
+    ``_EntryDivBlock`` is handed raw lines by marko and has to scan them itself, so it
+    cannot ask the parser what is inside a fence. Without this, a fenced HTML example
+    containing an unmatched ``<div>`` counts as wrapper structure: a properly closed
+    wrapper is judged unterminated, and the recovery path then exposes heading-shaped
+    lines from inside the entry as sections.
+    """
+
+    def __init__(self) -> None:
+        """Start outside any fence."""
+        self._delimiter = ""
+
+    def opaque(self, line: str) -> bool:
+        """Consume one line and report whether it is fence delimiter or fenced content.
+
+        Args:
+            line: The source line to classify.
+
+        Returns:
+            ``True`` when the line is a fence delimiter or sits inside a fence, and so
+            must not contribute tags or headings to the surrounding scan.
+        """
+        match = _FENCE_RE.match(line)
+        if self._delimiter:
+            if match is not None:
+                run = match.group(1)
+                closes = run[0] == self._delimiter[0] and len(run) >= len(self._delimiter)
+                if closes and not line.strip()[len(run) :].strip():
+                    self._delimiter = ""
+            return True
+        if match is not None:
+            self._delimiter = match.group(1)
+            return True
+        return False
+
+
 # Any ATX heading line, at the up-to-three-spaces indent CommonMark permits. Used only to
 # bound an unterminated entry wrapper; real heading detection is the parser's job.
 _ATX_ANY_RE = re.compile(r" {0,3}#{1,6}\s")
@@ -998,6 +1043,7 @@ class _EntryDivBlock(_MarkoBlockElement):
             the document.
         """
         source.anchor()
+        fence = _FenceState()
         depth = 0
         closed = False
         try:
@@ -1006,6 +1052,8 @@ class _EntryDivBlock(_MarkoBlockElement):
                 if line is None:
                     break
                 source.consume()
+                if fence.opaque(line):
+                    continue
                 depth += _div_depth_delta(line)
                 if depth <= 0:
                     closed = True
@@ -1029,16 +1077,20 @@ class _EntryDivBlock(_MarkoBlockElement):
             The raw, verbatim source text of the entry block.
         """
         closes = cls._wrapper_closes(source)
+        fence = _FenceState()
         lines: list[str] = []
         depth = 0
         while not source.exhausted:
             line = source.next_line()
             if line is None:
                 break
-            if not closes and lines and _ATX_ANY_RE.match(line):
+            in_fence = fence.opaque(line)
+            if not closes and not in_fence and lines and _ATX_ANY_RE.match(line):
                 break
             lines.append(line)
             source.consume()
+            if in_fence:
+                continue
             depth += _div_depth_delta(line)
             if closes and depth <= 0:
                 break

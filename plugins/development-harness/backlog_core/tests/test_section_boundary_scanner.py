@@ -369,3 +369,54 @@ class TestUnterminatedWrapperWithoutABlankLine:
              sections, which is the defect #2956 fixed.
         """
         assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+
+class TestWrapperCloseDetectionIgnoresFencedContent:
+    """A fenced HTML example inside an entry must not be read as wrapper structure.
+
+    _EntryDivBlock is handed raw lines by marko and scans them itself, so it cannot ask
+    the parser what is inside a fence. Counting a fenced ``<div>`` as wrapper structure
+    makes a properly closed wrapper look unterminated, and the unterminated-recovery path
+    then exposes heading-shaped lines from inside the entry as real sections.
+    """
+
+    def test_fenced_div_in_a_closed_wrapper_creates_no_phantom_section(self) -> None:
+        """An unmatched ``<div>`` in a fenced example does not unbalance the wrapper.
+
+        Why: Without fence tracking this returned ``['A', 'quoted heading', 'B']`` — a
+             phantom section invented from the entry's own quoted content, which is the
+             defect #2956 fixed, reintroduced through the recovery path.
+        """
+        body = (
+            "## A\n"
+            "<div><sub>2026-08-22T10:00:00Z</sub>\n\n"
+            "```html\n<div>\n```\n\n"
+            "## quoted heading\n\n"
+            "</div>\n\n"
+            "## B\nbbody"
+        )
+
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    def test_fenced_div_in_a_genuinely_unterminated_wrapper_still_recovers(self) -> None:
+        """Fence tracking must not cost the unterminated-wrapper recovery."""
+        body = "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n```html\n<div>\n```\n\ntext\n\n## B\nbbody"
+
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            ("## R1\n~~~\n## Fake\n~~~\n## R2\nx", ["R1", "R2"]),
+            ("## R1\n````\n```\n## Fake\n````\n## R2\nx", ["R1", "R2"]),
+            ("## R1\n~~~~\n~~~\n## Fake\n~~~~\n## R2\nx", ["R1", "R2"]),
+        ],
+    )
+    def test_fence_delimiter_length_and_character_are_respected(self, body: str, expected: list[str]) -> None:
+        """A fence closes only on the same character, at least as long as its opener.
+
+        Why: A boolean toggle treated any fence-shaped line as a delimiter, so a shorter
+             nested run ended the block early and the heading inside it escaped as a
+             section while the following real section was lost.
+        """
+        assert [s.name for s in split_body_sections(body)] == expected
