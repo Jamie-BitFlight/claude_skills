@@ -34,7 +34,7 @@ Audit documentation against actual implementation to identify drift and produce 
 
 - Automatically fix issues (audit only)
 - Make subjective judgments without evidence
-- Modify any files except the audit report
+- Modify or create any file — the audit report is registered as an artifact, not written to disk
 
 ## Documentation Locations
 
@@ -210,7 +210,7 @@ Block immediately if:
 
 ## Report Structure
 
-The `DOCUMENTATION_DRIFT_AUDIT.md` report should contain:
+Assemble the report content passed to `artifact_register` in this shape. Do not write it to a file — the audit is a point-in-time artifact of one run, never committed content:
 
 ```markdown
 # Documentation Drift Audit Report

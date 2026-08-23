@@ -100,7 +100,6 @@ exclusions:
   - {path: plugins/development-harness/docs/assemble_graph.py, source_category: generated, reason: "Generator implementation, not a work-management contract."}
   - {path: plugins/development-harness/docs/plans/**, source_category: historical, reason: "Historical or project-specific planning artifacts, not target-contract sources."}
   - {path: plugins/development-harness/.claude/sam/**, source_category: historical, reason: "State snapshots, not target-contract sources."}
-  - {path: plugins/development-harness/backlog_core/DOCUMENTATION_DRIFT_AUDIT.md, source_category: historical, reason: "Preliminary audit output; source discovery only and not eligible as fresh-audit evidence."}
   - {path: plugins/development-harness/docs/process-audit-*, source_category: historical, reason: "Preliminary or historical audit output, not target-contract evidence."}
   - {path: plugins/development-harness/docs/complexity-fit-*, source_category: historical, reason: "Supporting research with no direct PURPOSE clause contract claim."}
   - {path: plugins/development-harness/docs/poc-validation-guide.md, source_category: historical, reason: "Specialized supporting research with no direct PURPOSE clause contract claim."}
