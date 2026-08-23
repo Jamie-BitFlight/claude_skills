@@ -2642,6 +2642,58 @@ class TestStrikeEntryOperation:
         assert updated_section.entries[0].struck is False, "the first colliding entry must remain unstruck"
         assert updated_section.entries[1].struck is True, "the second colliding entry (id-1) must be struck"
 
+    def test_view_item_duplicate_stored_ids_are_addressable_by_strike_entry(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """An id view_item returns for a backend-owned structured item must be writable.
+
+        Regression (post-#3183): the write path (_resolve_section_entry ->
+        entry_blocks.resolve_entry_id) always re-suffixes a section's raw stored ids
+        before matching an entry_id, matching what the body-parsed read path
+        (entry_blocks.parse_entries -> _deduplicate_timestamps) already returns for a
+        GitHub-body item. But operations._build_sections_from_yaml_item -- the read
+        path for a backend-owned structured item with no raw body -- copied each
+        Entry.id straight into SectionEntryDict with no collision suffixing. For a
+        Section holding two entries stored under the same id, view_item returned that
+        id twice, unsuffixed; using either id view_item handed back to strike an entry
+        raised EntryNotFoundError, because resolve_entry_id(["X", "X"], "X") suffixes
+        the stored ids to ["X-0", "X-1"] before comparing, and "X" matches neither.
+        """
+        from backlog_core.backend_protocol import get_config
+        from backlog_core.models import Output
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        import backlog_core.models as _m
+
+        backlog_dir = _m.get_backlog_dir()
+        filepath = _write_item_yaml(backlog_dir, title="Dup View Test", priority="P1", topic="dup-view-test")
+
+        shared_id = "2026-01-01T00:00:00Z"
+        item = _stored_item(filepath)
+        item.sections["log"] = Section(
+            entries=[Entry(id=shared_id, content="first"), Entry(id=shared_id, content="second")]
+        )
+        get_config().backend.put_work_item(item)
+
+        # Consumer surface: read the item the way an MCP caller does.
+        viewed = view_item("Dup View Test")
+        log_section = cast("SectionEntryMetadata", next(iter(viewed.sections.values())))
+        returned_ids = [e["id"] for e in log_section["entries"]]
+        assert returned_ids[0] != returned_ids[1], (
+            f"view_item must not hand back the same id for two distinct entries -- got {returned_ids!r}"
+        )
+
+        # Consumer surface: write back using the id view_item just returned.
+        out = Output()
+        result = ops.strike_entry(selector="Dup View Test", entry_id=returned_ids[1], reason="test reason", output=out)
+        assert "error" not in result
+        assert result["struck"] is True
+
+        updated_section = cast("Section", _stored_item(filepath).sections["log"])
+        assert updated_section.entries[0].struck is False, "the first colliding entry must remain unstruck"
+        assert updated_section.entries[1].struck is True, "the entry addressed by view_item's id must be struck"
+
 
 # ---------------------------------------------------------------------------
 # pull_items — entry-aware merge
@@ -3381,6 +3433,117 @@ class TestViewItemUnknownSections:
             f"Second section's content lost to overwrite, got: {contents}"
         )
         assert merged["num_entries"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Read/write id invariant — every id backlog_view publishes must resolve back
+# to the entry that produced it, for both id-publishing read paths and every
+# id-consuming write operation. See #3157 and #3183 for the two prior
+# instances of this same read/write contract drifting apart.
+# ---------------------------------------------------------------------------
+
+
+class TestEntryIdReadWriteInvariant:
+    """Pin the id contract so the body-parsed and structured read paths cannot drift again.
+
+    Two read paths publish entry ids: entry_blocks.parse_entries (body-parsed items,
+    via operations._build_sections_metadata) and
+    operations._build_sections_from_yaml_item (backend-owned structured items with no
+    raw body). Both must suffix a section's colliding stored ids identically, and every
+    id either one publishes must be accepted back by the single write-side resolver,
+    operations._resolve_section_entry -> entry_blocks.resolve_entry_id.
+    """
+
+    def test_body_parsed_and_structured_paths_publish_identical_collision_ids(self) -> None:
+        """The two read paths must suffix the same duplicate stored ids the same way.
+
+        Regression: _build_sections_from_yaml_item copied Section entry ids verbatim
+        with no suffixing, while parse_entries (the body-parsed path) always suffixes
+        via entry_blocks._deduplicate_timestamps. A caller reading the same collision
+        shape through either path must see the same ids, or the two paths silently
+        disagree about "what id does this entry have."
+        """
+        from backlog_core.entry_blocks import parse_entries, wrap_entry_with_timestamp
+
+        shared_id = "2026-01-01T00:00:00Z"
+        entries = [Entry(id=shared_id, content="first"), Entry(id=shared_id, content="second")]
+
+        body = "\n\n".join(wrap_entry_with_timestamp(e.content, e.id) for e in entries)
+        body_parsed_ids = [e.id for e in parse_entries(body)]
+
+        item = BacklogItem(
+            title="Invariant Item",
+            metadata=BacklogItemMetadata(
+                source="test", added="2026-01-01", priority="P1", status="open", topic="invariant"
+            ),
+            sections={"concerns": Section(entries=[e.model_copy() for e in entries])},
+        )
+        structured = ops._build_sections_from_yaml_item(item)
+        structured_section = cast("SectionEntryMetadata", next(iter(structured.values())))
+        structured_ids = [e["id"] for e in structured_section["entries"]]
+
+        assert body_parsed_ids == structured_ids == [f"{shared_id}-0", f"{shared_id}-1"]
+
+    def test_view_item_duplicate_stored_ids_are_addressable_by_groom_item(self, mocker: MockerFixture) -> None:
+        """An id view_item returns for a duplicate-id structured section must update via groom_item.
+
+        Mirrors TestStrikeEntryOperation's collision regression test for the other write
+        bottleneck: _apply_groomed_entries (reached through groom_item/update_item's
+        entry_id branch) also calls _resolve_section_entry -> entry_blocks.resolve_entry_id,
+        so it shares the same read/write contract -- every id view_item hands out for a
+        section must resolve back to the entry that produced it, even when two entries
+        share a stored id.
+        """
+        import backlog_core.models as _m
+        from backlog_core.models import Entry, Output, Section
+
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+        mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+
+        backlog_dir = _m.get_backlog_dir()
+        filepath = backlog_dir / "p1-dup-groom-item.yaml"
+        metadata = _m.BacklogItemMetadata(
+            source="test", added="2026-01-01", priority="P1", status="open", topic="dup-groom-item"
+        )
+        shared_id = "2026-01-01T00:00:00Z"
+        item = _m.BacklogItem(
+            title="Dup Groom Item",
+            description="Test duplicate stored ids via groom_item",
+            metadata=metadata,
+            reference=str(filepath),
+            file_path=str(filepath),
+            sections={
+                "concerns": Section(
+                    entries=[Entry(id=shared_id, content="first"), Entry(id=shared_id, content="second")]
+                )
+            },
+        )
+        _seed_items([item])
+
+        # Consumer surface: read the id the way an MCP caller does.
+        viewed = view_item("Dup Groom Item")
+        concerns = cast("SectionEntryMetadata", next(iter(viewed.sections.values())))
+        returned_ids = [e["id"] for e in concerns["entries"]]
+        assert returned_ids[0] != returned_ids[1], (
+            f"view_item must not hand back the same id for two distinct entries -- got {returned_ids!r}"
+        )
+
+        # Consumer surface: write back using the id view_item just returned.
+        out = Output()
+        result = ops.groom_item(
+            selector="Dup Groom Item",
+            section="Concerns",
+            content="updated second",
+            output=out,
+            entry_id=returned_ids[1],
+        )
+        assert "error" not in result
+
+        updated = cast("Section", _stored_item(filepath).sections["concerns"])
+        assert updated.entries[0].content == "first", "the first colliding entry must be untouched"
+        assert updated.entries[1].content == "updated second", (
+            "the entry addressed by view_item's id must be the one groom_item updates"
+        )
 
 
 # ---------------------------------------------------------------------------

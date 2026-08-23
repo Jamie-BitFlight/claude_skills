@@ -27,7 +27,7 @@ from typing_extensions import TypedDict
 from . import models as _models
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
-from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_entry_id
+from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -2175,8 +2175,17 @@ def _build_sections_from_yaml_item(item: BacklogItem) -> dict[str, SectionEntryM
             result[title] = GroomedSectionMetadata(type="groomed", date=sec_data.date, subsections=sec_data.subsections)
         elif isinstance(sec_data, Section):
             entries = sec_data.entries
+            # Suffix duplicate stored ids the same way the body-parsed read path
+            # (parse_entries -> _deduplicate_timestamps) already does, so an id this
+            # function publishes is always the id the write path
+            # (_resolve_section_entry -> entry_blocks.resolve_entry_id) will accept
+            # back. Without this, two entries stored under the same id are handed
+            # out unsuffixed and identical, and neither is addressable afterward --
+            # resolve_entry_id always re-suffixes stored ids before matching.
+            resolved_ids = resolve_all_entry_ids([e.id for e in entries])
             entry_dicts: list[SectionEntryDict] = [
-                SectionEntryDict(id=e.id, struck=e.struck, content=e.content) for e in entries
+                SectionEntryDict(id=resolved_id, struck=e.struck, content=e.content)
+                for e, resolved_id in zip(entries, resolved_ids, strict=True)
             ]
             active_count = sum(1 for e in entries if not e.struck)
             struck_count = sum(1 for e in entries if e.struck)

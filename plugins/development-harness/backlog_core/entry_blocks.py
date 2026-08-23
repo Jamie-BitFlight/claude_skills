@@ -361,6 +361,13 @@ def _entry_from_span(text: str, span: EntrySpan) -> Entry:
 def _resolve_duplicate_ids(entries: list[Entry]) -> int:
     """Suffix duplicate IDs in-place with ``-0``, ``-1``, etc.
 
+    A generated suffix must be unique against every id in the final result,
+    not merely against other members of the same duplicate group — a raw id
+    that was never duplicated keeps its literal form and so reserves it just
+    as much as an id already assigned earlier in this pass. The counter for
+    a duplicate group keeps incrementing past any candidate that collides
+    with either.
+
     Returns:
         Count of Entry objects whose ``id`` was modified.
     """
@@ -373,12 +380,19 @@ def _resolve_duplicate_ids(entries: list[Entry]) -> int:
 
     modified = 0
     if has_dupes:
+        reserved_ids = {entry_id for entry_id, count in seen.items() if count == 1}
         counters: dict[str, int] = {}
         for e in entries:
             if e.id in has_dupes:
-                idx = counters.get(e.id, 0)
-                counters[e.id] = idx + 1
-                e.id = f"{e.id}-{idx}"
+                base = e.id
+                idx = counters.get(base, 0)
+                candidate = f"{base}-{idx}"
+                while candidate in reserved_ids:
+                    idx += 1
+                    candidate = f"{base}-{idx}"
+                counters[base] = idx + 1
+                reserved_ids.add(candidate)
+                e.id = candidate
                 modified += 1
     return modified
 
@@ -508,25 +522,40 @@ def _rewrite_replace(
     return "\n\n".join(parts)
 
 
-def resolve_entry_id(stored_ids: list[str], entry_id: str) -> int:
-    """Return the index *entry_id* targets, after positional collision resolution.
+def resolve_all_entry_ids(stored_ids: list[str]) -> list[str]:
+    """Return *stored_ids* with duplicate-id collisions suffixed the way backlog_view shows them.
 
     Applies :func:`_resolve_duplicate_ids` to a throwaway id-only copy of
-    *stored_ids*, so a caller-supplied ``-N``-suffixed id -- the form
-    backlog_view returns when two entries in one section share a stored id --
-    resolves to the correct position instead of matching nothing. This is the
-    single implementation of "which entry does this id target": both
-    :func:`_rewrite_by_entry_id` (indexing ``spans``) and
-    ``operations._resolve_section_entry`` (indexing a ``Section``'s
-    ``entries``) resolve against *this* function rather than each keeping a
-    private copy of the resolution loop.
+    *stored_ids*, so the result matches exactly what a body-parsed section
+    (via :func:`parse_entries`) already publishes for the same collision
+    shape. This is the single implementation of "what id does backlog_view
+    show for this entry" -- both :func:`resolve_entry_id` (mapping an
+    incoming id back to its index) and
+    ``operations._build_sections_from_yaml_item`` (publishing ids for a
+    backend-owned structured section, which has no body to parse) resolve
+    against *this* function rather than each keeping a private copy of the
+    suffixing loop.
 
     Because *stored_ids* is copied 1:1 into the throwaway ``Entry`` list
-    below, the returned index always aligns positionally with *stored_ids*
-    itself -- and with any other list built from the same source in the same
-    order (e.g. ``spans`` or a ``Section``'s ``entries``). No further
-    positional pairing (``zip`` or otherwise) is needed or correct at the
-    call site.
+    below, the result aligns positionally with *stored_ids* itself -- and
+    with any other list built from the same source in the same order (e.g.
+    ``spans`` or a ``Section``'s ``entries``). No further positional pairing
+    (``zip`` or otherwise) is needed beyond that alignment.
+
+    Args:
+        stored_ids: A section's entry ids, in storage order.
+
+    Returns:
+        *stored_ids*, collision-resolved: unique ids unchanged, duplicate ids
+        suffixed ``-0``, ``-1``, etc. in storage order.
+    """
+    id_entries = [Entry(id=stored_id, content="") for stored_id in stored_ids]
+    _resolve_duplicate_ids(id_entries)
+    return [e.id for e in id_entries]
+
+
+def resolve_entry_id(stored_ids: list[str], entry_id: str) -> int:
+    """Return the index *entry_id* targets, after positional collision resolution.
 
     Args:
         stored_ids: A section's entry ids, in storage order.
@@ -540,9 +569,7 @@ def resolve_entry_id(stored_ids: list[str], entry_id: str) -> int:
             collision-resolved id. Names every id backlog_view would show for
             *stored_ids*.
     """
-    id_entries = [Entry(id=stored_id, content="") for stored_id in stored_ids]
-    _resolve_duplicate_ids(id_entries)
-    resolved_ids = [e.id for e in id_entries]
+    resolved_ids = resolve_all_entry_ids(stored_ids)
     for idx, resolved_id in enumerate(resolved_ids):
         if resolved_id == entry_id:
             return idx
