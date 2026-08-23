@@ -747,6 +747,12 @@ Deleting the team releases every teammate in it. Delete it only once every task 
 terminal — read that through `sam_plan(config={"action": "status"})`, never by assuming a silent
 teammate has finished.
 
+`TeamDelete` is a release step, not a shutdown mechanism: it fails while any teammate is still
+active, and a teammate that finished its task stays alive and idle until something shuts it down.
+Shut each teammate down through the harness's teammate-shutdown mechanism first. This step runs
+after commit+push, so a failed release cannot cost committed work — treat it as a release that did
+not happen, wait for the named teammate, and retry.
+
 ---
 
 ## Resolve the Issue
