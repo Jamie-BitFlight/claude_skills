@@ -10,9 +10,6 @@ Dispatch a `dh:` specialist that fits the task; otherwise dispatch `dh:task-work
 specialist it loads as a profile — including any skill or agent from outside dh. Never dispatch
 `general-purpose`, and never dispatch an outside agent by its own name.
 
-dh governs only what it wraps: an agent dispatched by its own name carries hooks, permissions and
-tools dh neither controls nor can verify against the task.
-
 Every artifact is consumed as an input by a later step. An artifact no step reads is a missing
 consumer, not a redundant artifact.
 
