@@ -30,6 +30,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel, Field
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
@@ -43,8 +44,10 @@ _TOOL_CALL_RE = re.compile(r"artifact_register\((?P<body>.*?)\)", re.DOTALL)
 # CLI form: `... artifact register \` followed by one --flag per continuation line.
 _CLI_CALL_RE = re.compile(r"artifact\s+register\b[^\n]*\n(?:[ \t]*--[^\n]*\n?)*")
 
-_TOOL_TYPE_RE = re.compile(r"""artifact_type=["']([^"']+)["']""")
-_TOOL_AGENT_RE = re.compile(r"""agent=["']([^"']+)["']""")
+# `artifact_type = "x"` is the same call as `artifact_type="x"`; PEP 8 forbids the spaces for a
+# keyword argument but shipped markdown is prose, not linted source, so both forms occur.
+_TOOL_TYPE_RE = re.compile(r"""artifact_type\s*=\s*["']([^"']+)["']""")
+_TOOL_AGENT_RE = re.compile(r"""\bagent\s*=\s*["']([^"']+)["']""")
 # A CLI flag value may be single-quoted, double-quoted, or bare — `--artifact-type feature-context`
 # is as much a registration as `--artifact-type "feature-context"`. Requiring quotes made every bare
 # value invisible to the scan.
@@ -162,8 +165,8 @@ def parse_owner_map(text: str) -> dict[str, ArtifactTypeOwners]:
     return owners
 
 
-def scan_registrations() -> list[Registration]:
-    """Collect every attributable ``artifact_register`` call in the plugin's markdown.
+def parse_registrations(text: str, source: str) -> list[Registration]:
+    """Collect every attributable ``artifact_register`` call in one markdown document.
 
     A call is attributable when it names its artifact type as a literal. CLI flag values count
     whether quoted or bare. Calls using a substitution slot for the type or the agent
@@ -177,28 +180,38 @@ def scan_registrations() -> list[Registration]:
     declared agent owns is exactly the unattributable write this guard exists to catch. See
     ``_resolve_agent``.
 
+    Args:
+        text: The markdown to scan.
+        source: Identifier recorded on each result, normally a plugin-relative path.
+
     Returns:
         One entry per attributable call, keyed on the agent the call names or defaults to.
     """
+    chunks = [
+        (m.group("body"), _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE) for m in _TOOL_CALL_RE.finditer(text)
+    ]
+    chunks += [(m.group(0), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE) for m in _CLI_CALL_RE.finditer(text)]
+    found: list[Registration] = []
+    for chunk, type_re, agent_re, agent_present_re in chunks:
+        type_match = type_re.search(chunk)
+        if not type_match or _is_placeholder(type_match.group(1)):
+            continue
+        agent = _resolve_agent(chunk, agent_re, agent_present_re)
+        if agent is None:
+            continue
+        found.append(Registration(artifact_type=type_match.group(1), agent=agent, source=source))
+    return found
+
+
+def scan_registrations() -> list[Registration]:
+    """Collect every attributable ``artifact_register`` call across the plugin's markdown.
+
+    Returns:
+        The concatenated result of ``parse_registrations`` over every shipped ``*.md``.
+    """
     found: list[Registration] = []
     for path in sorted(_PLUGIN_ROOT.rglob("*.md")):
-        text = path.read_text(encoding="utf-8")
-        rel = str(path.relative_to(_PLUGIN_ROOT))
-        chunks = [
-            (m.group("body"), _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE)
-            for m in _TOOL_CALL_RE.finditer(text)
-        ]
-        chunks += [
-            (m.group(0), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE) for m in _CLI_CALL_RE.finditer(text)
-        ]
-        for chunk, type_re, agent_re, agent_present_re in chunks:
-            type_match = type_re.search(chunk)
-            if not type_match or _is_placeholder(type_match.group(1)):
-                continue
-            agent = _resolve_agent(chunk, agent_re, agent_present_re)
-            if agent is None:
-                continue
-            found.append(Registration(artifact_type=type_match.group(1), agent=agent, source=rel))
+        found += parse_registrations(path.read_text(encoding="utf-8"), str(path.relative_to(_PLUGIN_ROOT)))
     return found
 
 
@@ -234,3 +247,83 @@ def test_gate_read_types_have_exactly_one_registering_agent() -> None:
         "Split the second writer onto its own type. Each entry is "
         "(artifact_type, [registering_agents]): " + repr(shared)
     )
+
+
+@pytest.mark.parametrize(
+    ("call", "expected"),
+    [
+        (
+            'artifact_register(item_id=1, artifact_type="research", agent="swarm-task-planner")',
+            ("research", "swarm-task-planner"),
+        ),
+        (
+            'artifact_register(item_id=1, artifact_type = "research", agent = "swarm-task-planner")',
+            ("research", "swarm-task-planner"),
+        ),
+        (
+            "artifact_register(item_id=1, artifact_type='research', agent='swarm-task-planner')",
+            ("research", "swarm-task-planner"),
+        ),
+        (
+            "artifact register \\\n  --artifact-type research \\\n  --agent swarm-task-planner\n",
+            ("research", "swarm-task-planner"),
+        ),
+        (
+            'artifact register \\\n  --artifact-type "research" \\\n  --agent "swarm-task-planner"\n',
+            ("research", "swarm-task-planner"),
+        ),
+        (
+            "artifact register \\\n  --artifact-type=research \\\n  --agent=swarm-task-planner\n",
+            ("research", "swarm-task-planner"),
+        ),
+    ],
+    ids=["tool-tight", "tool-spaced", "tool-single-quoted", "cli-bare", "cli-quoted", "cli-equals"],
+)
+def test_parse_registrations_reads_every_literal_call_form(call: str, expected: tuple[str, str]) -> None:
+    """Every literal spelling of a registration yields the same (type, agent) pair.
+
+    Tests: parse_registrations across the MCP tool and CLI call forms
+    How: Parse one call per spelling — tight and spaced keyword assignment, single and double quotes,
+         bare and quoted and =-separated CLI flags — and compare the extracted pair.
+    Why: The guard's whole claim is that every shipped registration is held against the owner map. A
+         spelling the regexes miss is a silent hole: an undeclared type or writer written that way
+         passes while the suite stays green.
+    """
+    assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [expected]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        'artifact_register(item_id=item_id, artifact_type="architect", agent=agent)',
+        'artifact_register(item_id=item_id, artifact_type="architect", agent="{resolved_agent}")',
+        'artifact_register(item_id=item_id, artifact_type="<type>", agent="planning")',
+        "artifact register \\\n  --artifact-type architect \\\n  --agent {resolved_agent}\n",
+    ],
+    ids=["bare-identifier", "braced-agent", "angled-type", "cli-braced-agent"],
+)
+def test_parse_registrations_ignores_calls_that_claim_no_owner(call: str) -> None:
+    """A call whose type or agent is a substitution slot makes no ownership claim.
+
+    Tests: parse_registrations placeholder handling
+    How: Parse calls whose type or agent is a bare identifier or a braced/angled slot.
+    Why: These document a call's shape rather than a concrete registration. Attributing them would
+         blame a document for a write it never performs, and would put values like
+         '{resolved_agent}' in the owner map to keep the guard green.
+    """
+    assert parse_registrations(call, "doc.md") == []
+
+
+def test_parse_registrations_attributes_an_omitted_agent_to_the_default() -> None:
+    """A call that omits the agent argument registers under artifact_register's default.
+
+    Tests: _resolve_agent's absent-argument branch
+    How: Parse a call naming a type and no agent at all; assert the agent is _DEFAULT_AGENT.
+    Why: backlog_core.server.artifact_register defaults agent to "". Skipping such a call would let
+         an entry no declared agent owns pass the map — the exact unattributed write this guard
+         exists to catch. It is distinct from the placeholder case above, where the argument is
+         present but carries no claim.
+    """
+    call = 'artifact_register(item_id=1, artifact_type="architect", artifact_id="plan/a.md")'
+
+    assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [("architect", _DEFAULT_AGENT)]
