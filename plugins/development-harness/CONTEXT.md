@@ -25,6 +25,14 @@ _Avoid_: naming a dispatched agent's invoker by a role term. The invoker may be 
 roles below, so calling it "the manager" or "the orchestrator" asserts more than the dispatched
 agent can know.
 
+**Load** (a skill) vs **Dispatch** (an agent):
+Loading a skill reads its instructions into the current agent's own context; that agent then
+performs the work itself. Dispatching hands the work to a separate agent with its own empty
+context. Loading adds instructions to who you already are; dispatching adds a worker.
+_Avoid_: "delegate" for loading a skill. This repo reserves that word for handing work to another
+agent — `.claude/skills/delegate/` is the delegation template — so "delegate to the start-task
+skill" reads as an instruction to spawn a subagent for work the reader is meant to do itself.
+
 **Orchestrator**:
 The single interactive agent acting directly on behalf of the human; exactly one per session. Its
 assignment is the human's request in full, so it owns whatever workflow level that request enters
