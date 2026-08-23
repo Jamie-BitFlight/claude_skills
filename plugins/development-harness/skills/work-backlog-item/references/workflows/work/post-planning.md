@@ -10,6 +10,12 @@ Skip the interactive report. Instead, continue directly to implementation:
    Skill(skill: "dh:implement-feature", args: "{plan_address}")
    ```
 
+   Run this call inline, in the current agent's own context. `implement-feature`'s Progress Loop
+   is written for whoever runs it to dispatch `dh:task-worker` per task for the rest of the loop.
+   Never copy this invocation into a delegation prompt for a subagent. If an isolated worktree is
+   needed first, acquire one for the current agent and then make this call from there — do not
+   hand the invocation to a subagent as a workaround.
+
 2. When all tasks complete, invoke quality gates:
 
    ```text
