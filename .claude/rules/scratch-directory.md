@@ -23,6 +23,10 @@ Write findings to .tmp/scratch/reports/YYYYMMDD-<slug>.md
 Return: STATUS: DONE + path to the file
 ```
 
+The returned path is for the requesting agent to read directly. Never pass it on as the input of a
+later step, agent, or gate — anything a subsequent step reads is an inter-step handoff and goes
+through the artifact or plan operations instead.
+
 ## Hard rule
 
 Never write agent output to `.claude/` — every write to that directory triggers a security

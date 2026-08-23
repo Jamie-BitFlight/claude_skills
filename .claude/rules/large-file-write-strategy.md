@@ -67,51 +67,47 @@ Read the completed file. Confirm:
 
 **Wrong** -- assembling a 40K+ string and issuing a single `Write` call risks truncation or timeout.
 
-**Right** -- Write skeleton (~2K chars), then Edit calls filling each section (3-5K chars each):
+**Right** -- `git-history-recon` names `walkthrough/recon-report.md` as its output, so that path is a single-file contract and Strategy B applies. Write the skeleton (~2K chars), then Edit each section in (3-5K chars each):
 
 ```python
 # Step 2: Write skeleton under 5K chars
 Write(
-    file_path="plan/architect-auth-system.md",
-    content="""---
-title: Auth System Architecture
----
+    file_path="walkthrough/recon-report.md",
+    content="""# Git History Recon Report
 
-# Auth System Architecture
+## Code Hotspots
 
-## Overview
+<!-- PENDING: Files most frequently changed in the analysis window -->
 
-<!-- PENDING: System overview and goals -->
+## Bug Magnets
 
-## Data Model
+<!-- PENDING: Files most associated with fix, bug, revert commits -->
 
-<!-- PENDING: Entity definitions and relationships -->
+## High-Risk Files
 
-## API Design
+<!-- PENDING: Intersection of hotspots and bug magnets -->
 
-<!-- PENDING: Endpoint specifications -->
+## Bus Factor
 
-## Security Model
+<!-- PENDING: Contributor ranking and 80% cumulative cutoff -->
 
-<!-- PENDING: Authentication and authorization flows -->
+## Recommendations
 
-## Error Handling
-
-<!-- PENDING: Error taxonomy and recovery strategies -->
+<!-- PENDING: Prioritized actions derived from the sections above -->
 """,
 )
 
 # Step 3: Fill each section individually — one Edit per section
 Edit(
-    file_path="plan/architect-auth-system.md",
-    old_string="<!-- PENDING: System overview and goals -->",
-    new_string="The auth system provides token-based authentication...",
+    file_path="walkthrough/recon-report.md",
+    old_string="<!-- PENDING: Files most frequently changed in the analysis window -->",
+    new_string="| File | Changes |\n|---|---|\n| src/api/router.py | 84 |",
 )
 
 # ... one Edit per section ...
 
 # Step 4: Read and verify no PENDING markers remain
-Read(file_path="plan/architect-auth-system.md")
+Read(file_path="walkthrough/recon-report.md")
 ```
 
 ## Relationship to No Invented Limits
