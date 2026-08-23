@@ -364,7 +364,7 @@ mcpServers:
     cwd: path/to/server
 ```
 
-> **MCP tool name requirements** — Each MCP tool must be listed by its exact registered name with correct casing. Wildcards (e.g., `mcp__myserver__*`) do not resolve and silently fail. Case is sensitive (e.g., `mcp__Ref__` not `mcp__ref__`). Agents with unresolvable tool names receive no MCP tools and hallucinate success. Verified via controlled experiment 2026-03-22.
+> MCP tool name requirements — name each MCP tool by its exact registered name, case-sensitive (`mcp__Ref__`, not `mcp__ref__`). Grant a whole server with `mcp__<server>__*` or `mcp__<server>`; both forms grant every tool that server exposes and compose with named tools. A plugin-bundled server registers as `mcp__plugin_<plugin-name>_<server-name>`. An entry matching no live tool is dropped and the rest of the grant still resolves; an agent whose every entry resolves to nothing refuses to launch instead. A server pattern grants nothing while that server is disconnected, so an agent granted only MCP tools cannot be invoked until the server returns — give it at least one non-MCP tool unless that runtime dependency is intended.
 
 ### With MCP Server (reference to .mcp.json)
 

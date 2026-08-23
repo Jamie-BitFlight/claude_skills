@@ -27,7 +27,8 @@ For the complete field specification (all fields with descriptions, env vars, an
 
 **Creation warnings:**
 
-- **MCP tool names**: must use exact registered names, case-sensitive. Wildcards (`mcp__Ref__*`) and wrong case (`mcp__ref__`) fail silently — agents with unresolvable MCP tool names hallucinate success. Verified 2026-03-22.
+- MCP tool names: use the exact registered name, case-sensitive (`mcp__Ref__ref_read_url`, never `mcp__ref__...`). Grant a whole server with `mcp__<server>__*` or `mcp__<server>` — both forms grant every tool that server exposes and compose with named tools. A plugin-bundled server registers as `mcp__plugin_<plugin-name>_<server-name>`.
+- MCP-only tool grants: an entry matching no live tool is dropped and the rest of the grant still resolves, but an agent whose every entry resolves to nothing refuses to launch. A server pattern grants nothing while that server is disconnected, so an agent granted only MCP tools cannot be invoked at all until the server returns — give it at least one non-MCP tool unless that runtime dependency is intended.
 - **Auto-discovery**: agents in the default `agents/` directory are registered automatically — never add them to `plugin.json`. Declaring the `agents` key overrides auto-discovery entirely (see Phase 5).
 - For plugin field restrictions (`permissionMode`, `hooks`, `mcpServers` silently ignored) and `Agent()` spawn syntax, see the preloaded `/plugin-creator:claude-subagent-reference`.
 

@@ -204,7 +204,9 @@ VALIDATE NECESSITY:
 → For each tool: "Would the agent fail without this tool?" If no, remove it.
 ```
 
-**MCP tool name requirements** — When listing MCP tools in the `tools` field, each must use its exact registered name with correct casing. Wildcards (e.g., `mcp__Ref__*`) do not resolve and silently fail — the agent receives no MCP tools and hallucinate success. Case is sensitive: `mcp__Ref__ref_search_documentation` works; `mcp__ref__ref_search_documentation` fails with zero tool calls. Verify exact names from the running MCP server registration before including them. Verified via controlled experiment 2026-03-22.
+MCP tool name requirements — list each MCP tool in the `tools` field by its exact registered name, case-sensitive: `mcp__Ref__ref_search_documentation` resolves; `mcp__ref__ref_search_documentation` matches nothing and is dropped. Grant a whole server with `mcp__<server>__*` or `mcp__<server>`; both forms grant every tool that server exposes and compose with named tools. A plugin-bundled server registers as `mcp__plugin_<plugin-name>_<server-name>`. Verify exact names against the running MCP server registration before including them.
+
+An entry matching no live tool is dropped and the rest of the grant still resolves; an agent whose every entry resolves to nothing refuses to launch. A server pattern grants nothing while that server is disconnected, so an agent granted only MCP tools cannot be invoked until the server returns — leave it at least one non-MCP tool unless that runtime dependency is intended.
 
 ---
 

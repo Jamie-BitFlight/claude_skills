@@ -13,6 +13,10 @@ tools: Read, Grep, Glob, Bash
 
 The subagent cannot use Edit, Write, Agent, or any MCP tools not in the list.
 
+Write entries comma-and-space separated, matching the documented convention. A comma without a
+space, a space-separated string, and a YAML list parse to the same tool set — none of them is an
+error.
+
 ## Tool denylist (`disallowedTools`)
 
 Remove specific tools from the inherited or specified pool.
@@ -22,6 +26,57 @@ disallowedTools: Write, Edit
 ```
 
 When both `tools` and `disallowedTools` are set, `disallowedTools` is applied first, then `tools` is resolved against the remaining pool. A tool listed in both is removed.
+
+## MCP server-level patterns
+
+SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Control subagent capabilities (accessed 2026-08-22)
+
+`tools` and `disallowedTools` both accept MCP server-level patterns in addition to exact tool
+names. `mcp__<server>` and `mcp__<server>__*` are equivalent — each grants or removes every tool
+the named server exposes, and each composes with named tools in the same list.
+
+```yaml
+# Read plus every tool from the dh backlog server
+tools: Read, mcp__plugin_dh_backlog
+```
+
+Author with the bare form. `skilllint`'s AS007 check rejects the `mcp__<server>__*` glob and
+passes the bare `mcp__<server>` form, even though both resolve to the identical tool set at
+runtime (confirmed: `skilllint 1.10.0` exits non-zero on the glob form and clean on the bare form
+for an otherwise-identical agent file).
+
+A plugin-bundled MCP server registers under `mcp__plugin_<plugin-name>_<server-name>`, and the
+server-level pattern composes with that prefix.
+
+MCP tool names are case-sensitive: `mcp__Ref__ref_read_url` resolves, `mcp__ref__ref_read_url`
+matches nothing.
+
+## How entries resolve
+
+SOURCE: <https://code.claude.com/docs/en/errors.md> (accessed 2026-08-22)
+
+An entry that matches no tool is dropped and the rest of the grant still resolves — one bad name
+does not empty the list.
+
+When every entry resolves to nothing, the subagent refuses to launch. The error names the agent and
+groups the failed entries by cause: `unrecognized` for a name matching no tool, and `recognized but
+matched no tools in this session` for a valid pattern with nothing to match.
+
+```text
+Agent 'probe-p2-bad-name' would be spawned with zero tools — refusing. Its tools list resolved to nothing: unrecognized [Grpe].
+```
+
+A server-level pattern resolves only while that server is connected. A subagent whose `tools` list
+contains only MCP entries therefore cannot be invoked at all while the server is down — the same
+definition that resolves to the server's full tool set when connected refuses to launch when it is
+not:
+
+```text
+Agent 'probe-p3-mcp-wildcard' would be spawned with zero tools — refusing. Its tools list resolved to nothing: recognized but matched no tools in this session [mcp__plugin_dh_backlog__*].
+```
+
+Grant at least one non-MCP tool to any subagent that must stay invocable regardless of server
+state; accept an MCP-only grant only where that hard runtime dependency is intended.
 
 ## Restrict which subagent types can be spawned
 

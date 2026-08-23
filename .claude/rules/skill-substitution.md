@@ -38,10 +38,19 @@ as **labels naming a key in that JSON** — not variables passed into the file. 
 "the value from the `item_ref` key," never "the parser provides `item_ref`."
 
 **Agent `tools:` frontmatter** requires exact, correctly-cased tool names
-(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`) — wildcards (`*`) and short-form MCP
-aliases (`mcp__context-mode__ctx_stats` instead of the full
-`mcp__plugin_context-mode_context-mode__ctx_stats`) silently resolve to zero tools, with no error
-raised.
+(`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`). Separator format is free — comma,
+comma-without-space, space, and a YAML list all parse identically; write comma-and-space. Verify
+every MCP name against the running server, not against another agent file.
+
+An entry that matches no live tool is dropped and the rest of the grant still resolves. When every
+entry resolves to nothing the subagent refuses to launch, reporting that it "would be spawned with
+zero tools" and naming the unresolved entries.
+
+Grant a whole MCP server with `mcp__<server>__*` or `mcp__<server>` — both forms grant every tool
+that server exposes and compose with named tools. A plugin-bundled server registers as
+`mcp__plugin_<plugin-name>_<server-name>`. Either form grants nothing while that server is
+disconnected, so an agent whose `tools:` list is MCP-only cannot be invoked at all until the server
+returns. Give such an agent at least one non-MCP tool unless that runtime dependency is intended.
 
 After editing any SKILL.md, invoke the skill and confirm it still renders correctly with no
 unexpected prompts or extra steps.

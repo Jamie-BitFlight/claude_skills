@@ -28,23 +28,37 @@ description: >-
 description: 'This agent reviews code for quality issues.'
 ```
 
-### MCP tool name casing
+### MCP tool names and server patterns
 
-MCP tools must be listed by their exact registered name, case-sensitive. Wildcards and wrong
-case fail silently — the agent receives no MCP tools and hallucination ensues.
+Name each MCP tool by its exact registered name, case-sensitive. Grant a whole server with
+`mcp__<server>__*` or `mcp__<server>` — both forms grant every tool that server exposes and
+compose with named tools. A plugin-bundled server registers as
+`mcp__plugin_<plugin-name>_<server-name>`.
 
 ```yaml
-# CORRECT
+# CORRECT — named tool
 tools: Read, mcp__Ref__ref_read_url
 
-# WRONG — wildcard fails silently
-tools: Read, mcp__Ref__*
+# CORRECT — every tool from one server, plus Read
+tools: Read, mcp__plugin_dh_backlog
 
-# WRONG — wrong case fails silently
+# WRONG — wrong case matches no tool and is dropped
 tools: Read, mcp__ref__ref_read_url
 ```
 
-Verified via controlled experiment 2026-03-22.
+Author server grants with the bare form (`mcp__<server>`), not the `mcp__<server>__*` glob. Both
+resolve identically at runtime, but `skilllint`'s AS007 check rejects the glob form and passes the
+bare form (confirmed: `skilllint 1.10.0` exits non-zero on `mcp__plugin_dh_backlog__*` and clean
+on `mcp__plugin_dh_backlog` for an otherwise-identical agent file) — an agent generated with the
+glob form fails Phase 6 validation.
+
+An entry that matches no live tool is dropped and the rest of the grant still resolves. When every
+entry resolves to nothing the agent refuses to launch, reporting that it "would be spawned with
+zero tools" and naming the unresolved entries.
+
+A server pattern grants nothing while that server is disconnected. An agent whose `tools:` list
+contains only MCP entries therefore cannot be invoked at all until the server returns — give it at
+least one non-MCP tool unless that runtime dependency is intended.
 
 ---
 
