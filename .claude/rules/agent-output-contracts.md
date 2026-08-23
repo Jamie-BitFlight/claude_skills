@@ -36,10 +36,7 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
-When operating as a teammate, also report the STATUS block to whoever dispatched you,
-through whatever channel your harness provides.
-
-That report is a notification, never the record. Anything a later step reads goes to a
+The STATUS block is a notification, never the record. Anything a later step reads goes to a
 named destination that step can read back — a task section, an artifact, a review thread.
 A result that exists only as a report is lost when the session ends, and unreachable from
 any other session, machine, or harness.
