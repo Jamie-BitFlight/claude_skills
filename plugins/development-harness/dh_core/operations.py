@@ -1955,8 +1955,12 @@ def artifact_list(item_id: int | str, artifact_type: str | None = None) -> dict[
 def artifact_get(item_id: int | str, artifact_type: str, artifact_id: str | None = None) -> dict[str, Any]:
     """Return metadata for artifacts of a specific type on a backlog item.
 
+    Omitting ``artifact_id`` returns every entry of the type; supplying it returns the single
+    addressed entry.
+
     Returns:
-        Dict with ``artifacts`` (list of dicts), ``count``, or ``error``.
+        Dict with ``artifacts`` (list of dicts), ``count``, or ``error`` when the type has no
+        entries or a supplied ``artifact_id`` matches none of them.
     """
     out = Output()
     try:
@@ -1964,11 +1968,16 @@ def artifact_get(item_id: int | str, artifact_type: str, artifact_id: str | None
         type_enum = ArtifactType(artifact_type)
         manifest = _load_manifest(provider, item_id)
         entries = _artifact_registry.get_by_type(manifest, type_enum)
+        if not entries:
+            return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
         if artifact_id is not None:
             entries = [entry for entry in entries if entry.artifact_id == artifact_id]
+            if not entries:
+                return {
+                    "error": f"No artifact with id '{artifact_id}' of type '{artifact_type}' found for item #{item_id}",
+                    **out.to_dict(),
+                }
         artifacts = [e.model_dump(mode="json") for e in entries]
-        if not artifacts:
-            return {"error": f"No artifacts of type '{artifact_type}' found for item #{item_id}", **out.to_dict()}
         return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
     except (ValueError, KeyError) as exc:
         return {"error": f"Invalid parameter: {exc}", **out.to_dict()}

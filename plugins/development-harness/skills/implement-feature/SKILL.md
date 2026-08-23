@@ -102,14 +102,11 @@ For each task being dispatched:
 {plan_ref}/{task_id}
 ```
 
-- Do not name a skill in the delegation prompt. A dispatch carries a task reference; the receiver
-  resolves what to load from it. `dh:task-worker` reads the task record, loads the profile named
-  in its `agent` field, and the task-execution skill it delegates to loads the task's own
-  `skills` list; a specialist dispatched directly already carries its own behavior. A skill name
-  written into a dispatch prompt is an instruction whose scope the receiver cannot check against
-  its own — that is the route by which a plan-level workflow reaches a task-level agent.
-- Do not restate the task's `skills` list in the prompt. The receiver reads it from the task
-  record, and task-level skills stay additive to whatever the agent profile declares.
+- The dispatch carries a task reference and the receiver resolves what to load from it.
+  `dh:task-worker` reads the task record, loads the profile named in its `agent` field, and the
+  task-execution skill it delegates to loads the task's own `skills` list; a specialist dispatched
+  directly already carries its own behavior. Task-level skills stay additive to whatever the agent
+  profile declares.
 
 ### Agent Health Check (While Waiting)
 
@@ -359,4 +356,4 @@ If the issue number is not known, skip registration.
 ## Completion Gate
 
 When all tasks show `COMPLETE`, load the `dh:complete-implementation` skill with `{plan_ref}` as
-its argument, in this workflow's own context. Never pass that skill name to a dispatched agent.
+its argument, in this workflow's own context.
