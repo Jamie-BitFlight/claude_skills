@@ -1,6 +1,6 @@
 ---
 name: subagent-contract
-description: How a dispatched agent signals its state and reports observations upstream, and the minimum standards its work meets. Use when executing any step dispatched in a development-harness workflow.
+description: How a dispatched step signals state and reports observations upstream.
 user-invocable: false
 ---
 
