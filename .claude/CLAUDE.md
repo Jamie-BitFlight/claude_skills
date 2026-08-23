@@ -137,10 +137,14 @@ flowchart TD
 
 Load `agent-orchestration:agent-orchestration` for the dispatch decision (single `Agent()` vs `TeamCreate`, shared-file-mutation serialization) — see its "Parallel Dispatch — Teams as Standard Mechanism" section.
 
-**Close out idle completed agents.** A teammate that reports `idleReason: "available"` after
-finishing and being merged/reconciled is done — send it a `shutdown_request` rather than leaving
-it resident. An idle agent still holds terminal space and system resources on the user's machine.
-Do not wait for the user to ask for cleanup after every batch.
+Close out agents you have finished with. When a teammate's work is done and you are no longer
+using it, send it a `shutdown_request` rather than leaving it resident. Subagents dispatched
+through a single `Agent()` call terminate on their own — do not send those one. Do not wait for
+the user to ask for cleanup after every batch.
+
+Treat an agent as finished only on an explicit completion report from the agent itself, or on a
+task state you have read that means the work terminated. A non-terminal state such as `CLAIMED`
+is evidence it is still working. An idle notification carries no completion information at all.
 
 ## Autonomous Action Boundary
 
