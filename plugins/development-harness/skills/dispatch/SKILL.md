@@ -77,11 +77,21 @@ When a worker sends a blocker message:
 ```mermaid
 flowchart TD
     Blocker(["Worker reports BLOCKED — status written<br>through sam_task, blocker recorded in the task"]) --> Classify{"What is blocking them?"}
-    Classify -->|"Missing information the orchestrator has"| Relay["sam_task update — append the missing context<br>under 'Orchestrator Response'<br>Re-dispatch the task; the worker reads it on claim"]
-    Classify -->|"Conflict with another worker's changes"| Resolve["Read both tasks via sam_task read<br>Decide which approach wins<br>Append the decision under 'Orchestrator Response'<br>on each affected task, then re-dispatch"]
+    Classify -->|"Missing information the orchestrator has"| Relay["sam_task update — append the missing context<br>under 'Orchestrator Response'"]
+    Classify -->|"Conflict with another worker's changes"| Resolve["Read both tasks via sam_task read<br>Decide which approach wins<br>Append the decision under 'Orchestrator Response'<br>on each affected task"]
     Classify -->|"Scope question — out of task boundaries"| Bound["Confirm scope in the task via sam_task read<br>Append the ruling under 'Orchestrator Response':<br>stay within T{M} boundaries or<br>create a new task for the discovered work"]
+    Relay --> Reopen
+    Resolve --> Reopen
+    Bound --> Reopen
+    Reopen["sam_task state — set the task back to not-started"] --> Redispatch(["Re-dispatch the task<br>the worker reads 'Orchestrator Response' on claim"])
     Classify -->|"Hard blocker — cannot proceed"| Escalate["Leave the task blocked<br>Capture blocker as backlog item<br>Adjust wave plan"]
 ```
+
+Reset the task to `not-started` before re-dispatching it. Appending the response leaves the task
+`blocked`, and the dispatched worker runs `start-task`, whose claim step accepts only a
+`not-started` task and stops on `claimed: false`. A worker that cannot claim never reads the
+`Orchestrator Response` the orchestrator just wrote, so the blocker is answered and the answer
+never reaches anyone.
 
 ### 5 — Synthesize Results
 
