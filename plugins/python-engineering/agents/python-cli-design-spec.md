@@ -45,10 +45,14 @@ mcp__plugin_dh_backlog__artifact_register(
 ```
 
 Making this call is your responsibility — the dispatching orchestrator does not make it for you and
-checks afterwards that the artifact exists. Pass the whole document in `content`. Do not write the
-spec to a file, do not resolve a storage path, and do not paste the document into your completion
-message. Downstream agents retrieve it with
+checks afterwards that the artifact exists. Pass the whole document in `content`. Do not paste the
+document into your completion message. Downstream agents retrieve it with
 `artifact_read(item_id=<same item id>, artifact_type="architect")`.
+
+**No backlog `item_id` in your dispatch prompt** (a direct, ad-hoc invocation with no SAM item
+behind it): `artifact_register` has no owner to attach to. Write the spec to
+`plan/architect-{slug}.md` instead and report that path in your completion message — do not call
+`artifact_register` without an `item_id`.
 
 Read any prior artifacts named in your dispatch prompt through the same boundary — for example
 `artifact_read(item_id=<same item id>, artifact_type="feature-context")`.
@@ -85,13 +89,15 @@ an over-large spec fails loudly instead of arriving cut.
 
 Keep the `architect` artifact to the interfaces, contracts, data models, and decisions. Register
 supporting depth — extended testing strategy, integration pattern catalogues, migration notes — as
-separate `research` artifacts with distinct `artifact_id` values, and name each one from the spec so
-consumers can find it.
+at most one companion `research` artifact. `artifact_read(item_id, artifact_type)` returns only the
+most recently registered entry for a given type and silently skips the rest, so a second companion
+is unreachable by downstream agents — fold further material into that one `research` artifact
+instead of registering more.
 
 After registering, read the artifact back with
 `artifact_read(item_id=<same item id>, artifact_type="architect")` and confirm the stored document
 ends with its final section. A stored document that ends mid-section was cut by the provider — move
-material into a `research` artifact and register the spec again.
+material into the `research` artifact and register the spec again.
 
 ## Working Process
 
@@ -104,16 +110,17 @@ material into a `research` artifact and register the spec again.
 
 ## Stopping Condition
 
-Stop when `artifact_register` has returned and the read-back confirms the stored spec is complete and
-contains every section listed above. Report:
+Stop when the spec is stored — `artifact_register` has returned and the read-back confirms the
+stored spec is complete and contains every section listed above, or, in the no-`item_id` case, the
+file write has completed. Report:
 
 ```text
 STATUS: DONE
 ARTIFACT: type=architect, action={action}, content_stored={content_stored}, chars={len(content)}
 ```
 
-Report each companion `research` artifact you registered on its own `ARTIFACT:` line in the same
-form. Never paste the spec itself into the report.
+Report a registered companion `research` artifact on its own `ARTIFACT:` line in the same form.
+Never paste the spec itself into the report.
 
 If requirements are ambiguous or contradictory, report: `STATUS: BLOCKED — {specific question}`.
 
