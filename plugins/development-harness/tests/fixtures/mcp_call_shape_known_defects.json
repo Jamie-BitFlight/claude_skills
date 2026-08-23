@@ -1,0 +1,93 @@
+{
+  "_purpose": "Known-defect specimens for the #3162 MCP call-shape guards. Each must_flag entry is one live defect class frozen from the shipped file named in frozen_from; each must_not_flag entry is a shape that resembles a defect and is correct. Mutation tests copy frozen_from into tmp_path, append markdown, and assert the guard's verdict, so a guard that cannot fail is itself a test failure.",
+  "must_flag": [
+    {
+      "id": "grant-nonexistent-backlog-tool",
+      "guard": "tool_grant",
+      "frozen_from": "plugins/development-harness/agents/t0-baseline-capture.md",
+      "markdown": "tools: mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_migrate\n",
+      "expect_contains": "mcp__plugin_dh_backlog__artifact_migrate"
+    },
+    {
+      "id": "grant-nonexistent-sam-tool",
+      "guard": "tool_grant",
+      "frozen_from": "plugins/development-harness/agents/swarm-task-planner.md",
+      "markdown": "tools: mcp__plugin_dh_sam__sam_create, mcp__plugin_dh_sam__sam_update\n",
+      "expect_contains": "mcp__plugin_dh_sam__sam_create"
+    },
+    {
+      "id": "grant-tool-under-wrong-server-prefix",
+      "guard": "tool_grant",
+      "frozen_from": "plugins/development-harness/agents/swarm-task-planner.md",
+      "markdown": "tools: mcp__plugin_dh_sam__backlog_add\n",
+      "expect_contains": "granted under the sam prefix"
+    },
+    {
+      "id": "call-nonexistent-tool-bare-name",
+      "guard": "tool_call",
+      "frozen_from": "plugins/development-harness/docs/TASK_FILE_FORMAT.md",
+      "markdown": "Register the plan with `sam_create(slug='x', goal='y')`.\n",
+      "expect_contains": "sam_create("
+    },
+    {
+      "id": "call-nonexistent-tool-in-mermaid-node",
+      "guard": "tool_call",
+      "frozen_from": "plugins/development-harness/skills/complete-implementation/references/final-handoff.md",
+      "markdown": "```mermaid\nflowchart TD\n    A --> B[\"sam_list(search='{slug}')\"]\n```\n",
+      "expect_contains": "sam_list("
+    },
+    {
+      "id": "call-nonexistent-tool-with-server-prefix",
+      "guard": "tool_call",
+      "frozen_from": "plugins/development-harness/agents/contract-verification.md",
+      "markdown": "Call `mcp__plugin_dh_backlog__artifact_migrate(item_id=1)` to move it.\n",
+      "expect_contains": "artifact_migrate("
+    },
+    {
+      "id": "enum-invalid-artifact-status",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/agents/t0-baseline-capture.md",
+      "markdown": "```python\nartifact_register(\n    item_id=1,\n    artifact_type=\"T0-baseline\",\n    artifact_id=\"T0-baseline-x\",\n    content=\"y\",\n    status=\"complete\",\n)\n```\n",
+      "expect_contains": "status=\"complete\""
+    },
+    {
+      "id": "enum-invalid-artifact-type",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/agents/tn-verification-gate.md",
+      "markdown": "Read it with `artifact_read(item_id=1, artifact_type=\"task-plan-v2\")`.\n",
+      "expect_contains": "artifact_type=\"task-plan-v2\""
+    }
+  ],
+  "must_not_flag": [
+    {
+      "id": "python-attribute-call-is-not-a-tool-call",
+      "frozen_from": "plugins/development-harness/docs/TASK_FILE_FORMAT.md",
+      "markdown": "The path is resolved via `dh_paths.backlog_dir()` at import time.\n"
+    },
+    {
+      "id": "wildcard-grant-names-no-specific-tool",
+      "frozen_from": "plugins/development-harness/agents/t0-baseline-capture.md",
+      "markdown": "tools: mcp__plugin_dh_backlog__*, mcp__plugin_dh_sam__*\n"
+    },
+    {
+      "id": "status-outside-an-artifact-call-has-its-own-value-domain",
+      "frozen_from": "plugins/development-harness/agents/swarm-task-planner.md",
+      "markdown": "Call `backlog_update(selector='x', status=\"in-progress\")` and `sam_task(plan='P1', task='T1', config={\"action\":\"state\",\"status\":\"complete\"})`.\n"
+    },
+    {
+      "id": "task-plan-is-a-registered-artifact-type",
+      "frozen_from": "plugins/development-harness/agents/tn-verification-gate.md",
+      "markdown": "Read it with `artifact_read(item_id=1, artifact_type=\"task-plan\")`.\n"
+    },
+    {
+      "id": "placeholder-literals-are-not-values",
+      "frozen_from": "plugins/development-harness/agents/t0-baseline-capture.md",
+      "markdown": "Call `artifact_register(item_id={id}, artifact_type=\"<type>\", artifact_id='x', content='y', status=\"{status}\")`.\n"
+    },
+    {
+      "id": "live-tool-names-and-enum-values-are-accepted",
+      "frozen_from": "plugins/development-harness/agents/contract-verification.md",
+      "markdown": "Call `mcp__plugin_dh_backlog__artifact_register(item_id=1, artifact_type=\"T0-baseline\", artifact_id='t0-x', content='y', status=\"current\")` then `sam_plan(config={\"action\":\"list\"})`.\n"
+    }
+  ]
+}
