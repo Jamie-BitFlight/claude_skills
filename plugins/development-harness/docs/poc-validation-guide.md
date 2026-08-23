@@ -125,8 +125,11 @@ The five inputs are:
 1. **Stage workflow skill** — the dh skill that owns this stage's process steps
 2. **Cross-cutting stage skill** — optional dh skill applying SDLC-level guidance
 3. **Domain skills** — from `manifest.stage_skills[stage]`
-4. **Task/artifact file path** — the file the agent reads for task context
+4. **Task address** — the plan address and task ID the agent reads through the task operations
 5. **Quality gate commands** — from `manifest.quality_gates`
+
+No stage hands data to a later stage through a file. Inputs are addresses resolved by read
+operations; outputs are registered through the artifact operations.
 
 Run the following from the `plugins/development-harness/scripts/` directory:
 
@@ -143,10 +146,13 @@ manifest = load_manifest(
 prompt = build_dispatch_prompt(
     stage="planning-context-integration",
     manifest=manifest,
-    task_file=".planning/harness/plan-my-feature.md",
+    plan="P1-my-feature",
+    task="T1",
     stage_workflow_skill="dh:context-integration",
     cross_cutting_skill="dh:planning",
-    output_artifact_path=Path(".planning/harness/context-my-feature.md"),
+    item_id=1770,
+    artifact_type="architect",
+    artifact_id="context-my-feature",
 )
 print(prompt)
 EOF
@@ -169,8 +175,11 @@ This provides SDLC-stage-level guidance applicable across all languages.
 ## Input 3: Domain Skills
 - Load: `Skill(skill="python3-implementation")`
 
-## Input 4: Task/Artifact File
-Read this file for your task context: `.planning/harness/plan-my-feature.md`
+## Input 4: Task Address
+Read your task context through the task operations:
+`sam_task(plan="P1-my-feature", task="T1", config={"action": "read"})`
+Plan-level context and every task field arrive in that response. The address is a
+logical identifier — do not treat it as a filesystem path.
 
 ## Input 5: Quality Gates
 Run ALL of these before declaring completion:
@@ -185,41 +194,40 @@ use Python `str.format()` syntax. Substitute `{files}` with the actual
 space-separated file paths you are checking before running the command.
 
 ## Output Artifact
-Write your output artifact to: `.planning/harness/context-my-feature.md`
+Register your output through the artifact operations:
+`artifact_register(item_id=1770, artifact_type="architect", artifact_id="context-my-feature", content=<full document>)`
+Report only the artifact type and identifier. Do not write the document to a file.
 ```
 
 **What to verify:**
 
 - Input 3 lists `python3-implementation` — the domain skill mapped to
   `planning-context-integration` in the manifest
-- Input 5 lists all five quality gates
-- The output artifact path matches what you passed as `output_artifact_path`
+- Input 5 lists every quality gate configured in the manifest
+- The artifact registration call carries the `item_id`, `artifact_type`, and `artifact_id`
+  you passed, and no filesystem path appears anywhere in the prompt
 
 ---
 
 ## Expected Output
 
-The planning stage (S2/S3 in the SAM pipeline) produces a **PLAN artifact** or **CONTEXT
-artifact** written to `.planning/harness/` in the project root.
+The planning stage (S2/S3 in the SAM pipeline) produces a PLAN artifact or CONTEXT artifact,
+registered through the artifact operations. Nothing is written to the filesystem.
 
 Per [artifact-conventions.md](../skills/development-harness/references/artifact-conventions.md):
 
-- **S2 Planning artifact** — `plan-{feature-slug}.md`
+- S2 Planning artifact — `artifact_id="plan-{feature-slug}"`
   - Token: `ARTIFACT:PLAN({feature-slug})`
   - Contains: RT-ICA gap analysis, task graph with dependencies, task skeletons with
     acceptance criteria, quality gate schedule
 
-- **S3 Context Integration artifact** — `context-{feature-slug}.md`
+- S3 Context Integration artifact — `artifact_id="context-{feature-slug}"`
   - Token: `ARTIFACT:CONTEXT({feature-slug})`
   - Amends S2 — contains validation results, codebase discrepancies, plan amendments,
     confirmed integration points
 
-**Example paths for a feature slug `my-feature`:**
-
-```text
-.planning/harness/plan-my-feature.md
-.planning/harness/context-my-feature.md
-```
+Retrieve either with `artifact_read(item_id={item_id}, artifact_type={type})`. The identifiers
+above are logical, not filesystem paths.
 
 Each artifact includes a YAML frontmatter header linking it to predecessor and successor
 artifacts:

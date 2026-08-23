@@ -1,7 +1,7 @@
 ---
 name: ecosystem-researcher
 description: Researches domain ecosystems and technology landscapes before roadmap creation. Supports three modes - Ecosystem discovery, Feasibility assessment, and Comparison analysis. Use when exploring new domains, evaluating technology choices, or comparing implementation approaches. Requires MCP research servers (Ref, exa, context7, or firecrawl) - BLOCKs if none available.
-tools: Read, Grep, Glob, Write, Skill, SendMessage, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_dh_sam
+tools: Read, Grep, Glob, Write, Skill, SendMessage, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:dispatch-contract
@@ -233,6 +233,12 @@ Before ANY research, verify at least one MCP research server is available. See `
 
 ## Step 1: Detect Research Mode
 
+If the caller's dispatch prompt names a backlog `item_id` (GitHub issue number, or bead ID when
+using beads backend), record it — Step 5 registers the finished document against it. Direct Agent
+tool invocation with no backlog item behind it is an explicitly supported entry point (see `You
+are spawned by` above); when no `item_id` is given, proceed without one and use the Step 5
+no-`item_id` fallback.
+
 Read the input prompt and determine the research mode:
 
 | Input Pattern | Research Mode |
@@ -284,25 +290,34 @@ def generate_slug(topic: str, mode: str) -> str:
 
 ## Step 5: Write Output Document
 
-Create the research document using the SAM MCP tool:
+**With an `item_id`** (from Step 1): register the research document through the artifact
+operations.
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "create", "slug": "research-{mode}-{slug}", "goal": "{mode} research for {topic}", "tasks": []})
+mcp__plugin_dh_backlog__artifact_register(
+    item_id={item_id},
+    artifact_type="research",
+    artifact_id="research-{mode}-{slug}",
+    content="{document body}",
+    status="current",
+    agent="ecosystem-researcher",
+)
 ```
 
-Then append the document content as a markdown section using:
+Pass the full document as `content=`. Do not resolve or pass a file path.
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "plan_slug": "research-{mode}-{slug}", "task_id": null, "section": "{MODE}", "content": "{document body}"})
-```
-
-Pass the config dict to `sam_plan(action='create')` and receive the plan address back. Do not resolve or pass a file path.
+**Without an `item_id`** (a direct, ad-hoc invocation with no backlog item behind it):
+`artifact_register` has no owner to attach to. Write the document to
+`plan/research/research-{mode}-{slug}.md` instead and report that path in your completion message
+— do not call `artifact_register` without an `item_id`.
 
 Use the appropriate output template for the research mode.
 
 ## Step 6: Return Structured Result
 
-Return DONE or BLOCKED status to orchestrator with document path.
+Return DONE or BLOCKED status to the orchestrator with the artifact type and identifier — never
+the document body. Report a path only in the no-`item_id` fallback from Step 5, where the file
+path is the sole way the orchestrator can locate the document.
 
 </process>
 

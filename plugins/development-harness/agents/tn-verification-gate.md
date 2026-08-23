@@ -1,7 +1,7 @@
 ---
 name: tn-verification-gate
 description: Verification gate that runs after all implementation tasks complete. Re-runs acceptance-criteria-structured check commands, compares results against T0 baseline, computes CriterionStatus per criterion, and registers a TN-verification artifact via MCP with a verdict of PASS or FAIL. FAIL blocks /complete-implementation if any criterion regressed.
-tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_migrate, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
+tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 model: haiku
 skills:
   - dh:subagent-contract
@@ -30,11 +30,11 @@ You are the TN verification gate agent. You run after all implementation tasks a
 
 ## Step 1: Retrieve Both Inputs
 
-You need two inputs:
+You need two inputs, each from the operation that owns it:
 
-1. T0 baseline — an artifact registered by the T0 agent, retrieved by owner and type
-2. The plan's `acceptance-criteria-structured` — read from the plan itself, the same way the
-   T0 agent read it
+1. T0 baseline — an artifact registered by the T0 agent, retrieved through the artifact operations
+2. Plan record — SAM-owned state, retrieved through the plan operations to re-read
+   `acceptance-criteria-structured`, the same way the T0 agent read it
 
 Your delegation prompt carries `item_id` and a plan address (`P{N}`, or the task address
 `P{N}/T{M}` whose plan component is `P{N}`).
@@ -43,6 +43,9 @@ Your delegation prompt carries `item_id` and a plan address (`P{N}`, or the task
 mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="T0-baseline")
 mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
 ```
+
+Task plans are SAM records, never artifact-registry content. Do not attempt
+`artifact_read(item_id, "task-plan")` — nothing registers that type, and the call returns no content.
 
 Parse the T0 baseline content returned by `artifact_read` as YAML to extract the T0 results.
 
@@ -153,7 +156,7 @@ mcp__plugin_dh_backlog__artifact_register(
     artifact_type="TN-verification",
     artifact_id="TN-verification-{slug}",
     content={yaml_string},
-    status="complete",
+    status="current",
     agent="tn-verification-gate"
 )
 ```

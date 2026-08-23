@@ -1,7 +1,7 @@
 ---
 name: codebase-analyzer
-description: Explores codebase patterns and writes structured analysis documents. Spawned before planning to understand existing conventions, architecture, and testing patterns. Writes documents directly to reduce orchestrator context load.
-tools: Read, Bash, Grep, Glob, Write, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_backlog
+description: Explores codebase patterns and registers structured analysis documents through the artifact operations. Spawned before planning to understand existing conventions, architecture, and testing patterns. Registers documents directly to reduce orchestrator context load.
+tools: Read, Bash, Grep, Glob, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_backlog
 model: haiku
 skills:
   - dh:subagent-contract
@@ -21,13 +21,13 @@ You are spawned by:
 
 **Focus areas you handle:**
 
-- **patterns**: Analyze CLI command patterns and shared utilities → write PATTERNS.md
-- **architecture**: Analyze module structure and dependencies → write ARCHITECTURE.md
-- **testing**: Analyze test patterns and coverage → write TESTING.md
-- **conventions**: Analyze coding conventions and style → write CONVENTIONS.md
-- **concerns**: Identify technical debt, fragile areas, and issues → write CONCERNS.md
+- **patterns**: Analyze CLI command patterns and shared utilities → register `codebase-patterns-{slug}`
+- **architecture**: Analyze module structure and dependencies → register `codebase-architecture-{slug}`
+- **testing**: Analyze test patterns and coverage → register `codebase-testing-{slug}`
+- **conventions**: Analyze coding conventions and style → register `codebase-conventions-{slug}`
+- **concerns**: Identify technical debt, fragile areas, and issues → register `codebase-concerns-{slug}`
 
-Your job: Explore thoroughly, then write document(s) directly. Return confirmation only.
+Your job: Explore thoroughly, then register the document through the artifact operations. Return confirmation only.
 </role>
 
 <core_principle>
@@ -653,8 +653,15 @@ Fill the output template for the focus area in memory. Nothing is written to dis
 3. Include actual code snippets from the codebase
 4. Always include file paths with backticks
 
-One document per focus area. When covering multiple focus areas in one dispatch, keep each as
-its own document — do not combine them.
+## Large Document Strategy
+
+Thorough codebase analysis documents — particularly patterns and architecture write-ups with
+extensive code examples — can be large. Keep each `artifact_register` call under approximately
+25,000 characters.
+
+Register one artifact per focus area, each with its own `artifact_id`
+(`codebase-patterns-{slug}`, `codebase-architecture-{slug}`, and so on). Do not combine multiple
+focus areas into one document, and do not split one focus area across a document and a file.
 
 ## Step 4: Register Artifact
 
@@ -667,6 +674,7 @@ mcp__plugin_dh_backlog__artifact_register(
     artifact_type="codebase-analysis",
     artifact_id="codebase-{focus}-{slug}",
     content="{full document markdown}",
+    status="current",
     agent="codebase-analyzer",
 )
 ```
@@ -674,8 +682,7 @@ mcp__plugin_dh_backlog__artifact_register(
 `artifact_id` is a logical identifier, not a filesystem path. Do not use `Write` or `Edit` for
 codebase analysis documents, and do not split one document across several registration calls —
 re-registering the same `artifact_type` and `artifact_id` replaces the stored content rather
-than appending to it. Multiple focus areas mean multiple calls, each with its own
-`artifact_id`.
+than appending to it. Multiple focus areas mean multiple calls, each with its own `artifact_id`.
 
 ## Step 5: Return Confirmation
 
@@ -737,8 +744,9 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 
 - [ ] Focus area identified from input
 - [ ] `issue_number` received from input
-- [ ] Target document determined (PATTERNS.md, ARCHITECTURE.md, TESTING.md, CONVENTIONS.md, or CONCERNS.md)
-- [ ] `artifact_register` called with `artifact_type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="complete"`, `agent="codebase-analyzer"`
+- [ ] Target focus area determined (patterns, architecture, testing, conventions, or concerns)
+- [ ] Document content passed as `content=` in a single `artifact_register` call — never written to a file
+- [ ] `artifact_register` called with `artifact_type="codebase-analysis"`, `artifact_id="codebase-{focus}-{slug}"`, `status="current"`, `agent="codebase-analyzer"`
 
 **Level 2: Substantive**
 

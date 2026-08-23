@@ -426,13 +426,16 @@ mcp__plugin_dh_sam__sam_plan(
             "tasks": [
                 {"id": "T0", "title": "Multi-Perspective Review", "agent": "task-worker",     "dependencies": [],           "priority": 1, "complexity": "high"},
                 {"id": "T1", "title": "Code Review",              "agent": "code-reviewer",   "dependencies": [],           "priority": 1, "complexity": "medium"},
-                {"id": "T2", "title": "Feature Verification",     "agent": "feature-verifier","dependencies": ["T1"],       "priority": 1, "complexity": "medium"},
-                {"id": "T3", "title": "Integration Check",        "agent": "integration-checker","dependencies": ["T2"],   "priority": 1, "complexity": "medium"},
+                {"id": "T2", "title": "Feature Verification",     "agent": "feature-verifier","dependencies": ["T1"],       "priority": 1, "complexity": "medium",
+                 "body": "Verify goal achievement for {slug} (work item {item_ref}). plan_address={plan_address} (REQUIRED — this is the original feature plan to read for goals, tasks, and artifacts; the address used to dispatch this task is a separate quality-gate plan used only to claim and complete your own task). item_id={item_ref} (needed to read the architect artifact)."},
+                {"id": "T3", "title": "Integration Check",        "agent": "integration-checker","dependencies": ["T2"],   "priority": 1, "complexity": "medium",
+                 "body": "Verify cross-module integration for {slug} (work item {item_ref}). plan_address={plan_address} (REQUIRED — this is the original feature plan to read for exports, imports, and data flows; the address used to dispatch this task is a separate quality-gate plan used only to claim and complete your own task). item_id={item_ref}."},
                 {"id": "T4", "title": "Documentation Drift Audit","agent": "doc-drift-auditor","dependencies": ["T3"],     "priority": 1, "complexity": "low",
                  "body": "Audit documentation for drift in {slug} (work item {item_ref}). item_id={item_ref} (REQUIRED — register the audit-report artifact against it; block if absent). project_root is the repository root (your current working directory)."},
                 {"id": "T5", "title": "Documentation Update",     "agent": "service-docs-maintainer","dependencies": ["T4"],"priority": 1, "complexity": "low",
                  "body": "Update documentation to resolve the drift found in T4 for {slug} (work item {item_ref}). item_id={item_ref} (read the audit-report artifact registered against it). project_root is the repository root (your current working directory)."},
-                {"id": "T6", "title": "Context Refinement",       "agent": "context-refinement","dependencies": ["T5"],    "priority": 1, "complexity": "medium"}
+                {"id": "T6", "title": "Context Refinement",       "agent": "context-refinement","dependencies": ["T5"],    "priority": 1, "complexity": "medium",
+                 "body": "Refine context and audit plan artifacts for {slug} (work item {item_ref}). plan_address={plan_address} (REQUIRED — this is the original feature plan to analyze; the address used to dispatch this task is a separate quality-gate plan used only to claim and complete your own task). item_id={item_ref} (needed only to read and annotate the architect and feature-context artifacts — if empty, skip that part and report it as a gap)."}
             ]}
 )
 ```
@@ -590,7 +593,7 @@ If the T6 (Context Refinement) sub-agent output contained a `DIVERGENCE_REQUIRIN
 
 ```text
 Plan artifacts have intent divergences requiring your review.
-See: [annotated artifact paths from agent output]
+See: [annotated artifact types and identifiers from agent output]
 Divergences:
   [list from DIVERGENCE_REQUIRING_REVIEW block]
 ```

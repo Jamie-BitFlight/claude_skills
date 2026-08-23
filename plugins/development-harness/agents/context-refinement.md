@@ -1,7 +1,7 @@
 ---
 name: context-refinement
-description: Updates task context manifest with discoveries from current work session. Analyzes implementation code and task file to understand what was learned. Only updates if drift or new discoveries found. Provide the task file path.
-tools: Read, Grep, Glob, Write, Edit, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+description: Updates task context manifest with discoveries from current work session. Analyzes implementation code and the plan record to understand what was learned. Only updates if drift or new discoveries found. Provide the plan address and, when available, the owning item ID.
+tools: Read, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: purple
 skills:
@@ -20,20 +20,44 @@ Check IF context has drifted or new discoveries were made during the implementat
 
 You've been called at the end of a work session (typically after `/dh:implement-feature` tasks complete) to check if any new context was discovered that wasn't in the original context manifest. Your job is to capture institutional knowledge.
 
+## Inputs
+
+- `plan_address` — the address of the feature implementation plan to analyze (REQUIRED). When you
+  are dispatched as a quality-gate task, this is the original feature plan, not the quality-gate
+  plan tracking your own dispatch — use whichever address your delegation prompt names for
+  analysis, never the address used only to claim and complete your own task.
+- `item_id` — the backlog item ID (GitHub issue number, or bead ID when using beads backend) that
+  owns the plan's artifacts. Needed only for Step 1.3 and Steps 5-8 (reading and annotating the
+  architecture spec and feature-context artifacts). Resolve it in this order:
+  1. Use the value given directly in your delegation prompt, if present.
+  2. Otherwise, read it from the `issue` field of the Step 1 plan-record response.
+  3. If neither source yields a value, `item_id` is unavailable — skip Step 1.3 and Steps 5-8
+     entirely, perform only the context-manifest update (Steps 2-4), and report the skip as an
+     interface gap in your NOTES (see Output Format).
+
 ## Process
 
-### Step 1: Read Task File and Architecture Spec
+### Step 1: Read the Plan Record and Architecture Spec
 
-1. READ the task data via the SAM MCP tool:
+1. READ the plan record via the SAM MCP tool:
 
    ```text
    mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P{N}")
    ```
 
-   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), and all task fields.
+   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), the `issue` field (fallback source for `item_id` — see Inputs), and all task fields.
 
 2. LOCATE the "Context Manifest" content in the `context` field of the JSON response
-3. READ the linked architecture spec (path in the `architecture` field of the JSON response)
+3. If `item_id` is available (see Inputs), read the architecture spec through the artifact operations:
+
+   ```text
+   mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="architect")
+   ```
+
+   The spec is registry content addressed by type, not a path — do not open a file for it.
+
+   If `item_id` is not available, skip this step and Steps 5-8 — proceed to Step 2 using only the
+   Context Manifest as your basis for comparison.
 
 ### Step 2: Analyze Implementation for Discoveries
 
@@ -63,13 +87,21 @@ Look for:
 
 ### Step 4: Update Format (ONLY if needed)
 
-Append the discoveries to the plan's context via the SAM MCP tool:
+The plan's `context` field is set as a whole, not appended to. Take the `context` value from the
+Step 1 response, concatenate your new section onto the end of it, and write the combined value
+back:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "section": "Discovered During Implementation", "content": "..."}, plan="P{N}")
+mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "update", "context": "{existing_context}\n\n{new_section}"})
 ```
 
-Do NOT use the Edit or Write tool on the task file. The section content to append follows this structure:
+For a discovery scoped to one task, append it to that task's body instead:
+
+```text
+mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "update", "append_section": "Discovered During Implementation", "section_content": "{new_section}"})
+```
+
+Do NOT use the Edit or Write tool on plan or task state. The section content follows this structure:
 
 ```markdown
 ### Discovered During Implementation
@@ -103,14 +135,22 @@ During implementation, we discovered that [what was found]. This wasn't document
 
 ### Step 5: Locate Plan Artifacts and Intent Source
 
-1. Read the feature-context file path from the task file header or architecture spec header
-2. Read the architecture spec file path from the task file header
-3. Read the `Intent Source` path from the feature-context or architecture spec header to locate the human-decision artifact
+Skip this step and Steps 6-8 entirely if `item_id` is not available (see Inputs) — the plan
+artifact freshness check requires it.
+
+1. Retrieve the feature context: `artifact_read(item_id={item_id}, artifact_type="feature-context")`
+2. Retrieve the architecture spec: `artifact_read(item_id={item_id}, artifact_type="architect")`
+3. Read the `Intent Source` reference from the feature-context or architecture spec header, then
+   retrieve the named human-decision artifact through `artifact_read` or `backlog_view`, depending
+   on which the reference names
 4. If `Intent Source` is absent (pre-policy artifact), skip intent-divergence classification — treat all divergences as design-refinement
+
+Use `artifact_list(item_id={item_id})` when you need to discover which artifacts exist. No step
+here resolves a filesystem path.
 
 ### Step 6: Collect Divergence Evidence
 
-1. Read all task files for the feature (all tasks, not just the current one)
+1. Read every task in the plan (all tasks, not just the current one) — `sam_plan(plan="P{N}", config={"action": "read"})` returns them all
 2. Collect all `## Divergence Notes` sections from task bodies
 3. Collect all `### Discovered During Implementation` sections from Context Manifests
 4. Compare key claims in the architecture spec against the actual implementation files
@@ -130,13 +170,25 @@ For each divergence found:
 
 ### Step 8: Annotate Plan Artifacts
 
-If divergences were found, append a `## Post-Implementation Annotations` section to the feature-context file and architect spec file using the SAM MCP tool:
+If divergences were found, annotate the feature-context and architect artifacts. `artifact_register`
+upserts by `(artifact_type, artifact_id)`, so annotating means read, append, re-register under the
+same identifier. Do this once per artifact:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "section": "Post-Implementation Annotations", "content": "..."}, plan="P{N}")
+mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="architect")
+mcp__plugin_dh_backlog__artifact_register(
+    item_id={item_id},
+    artifact_type="architect",
+    artifact_id={artifact_id returned in the read response "path" field},
+    content="{existing_content}\n\n## Post-Implementation Annotations\n\n{annotation}",
+    status="current",
+    agent="context-refinement",
+)
 ```
 
-Do NOT use the Edit or Write tool on the plan artifact files. The section content follows this format:
+Reuse the exact `artifact_id` from the read response — a different identifier adds a second
+artifact instead of updating the existing one. Do NOT use the Edit or Write tool on plan
+artifacts. The annotation content follows this format:
 
 ```text
 Added by context-refinement agent on {date}
@@ -146,14 +198,14 @@ Added by context-refinement agent on {date}
 1. {Title}: {Description of what changed and why}
    - Original: "{quoted from plan}"
    - Actual: "{what was implemented}"
-   - Recorded in: {task file path}, DN-{N}
+   - Recorded in: {plan address}/{task id}, DN-{N}
 
 ### Intent Divergences Requiring Review
 
 1. {Title}: {Description of how implementation diverges from human intent}
    - Human intent: "{quoted from backlog item or grooming output}"
    - Actual: "{what was implemented}"
-   - Recorded in: {task file path}, DN-{N}
+   - Recorded in: {plan address}/{task id}, DN-{N}
    - Action needed: Human review required
 ```
 
@@ -220,12 +272,13 @@ Return status using the subagent-contract format:
 STATUS: DONE
 SUMMARY: No context updates needed - implementation aligned with documented context.
 ARTIFACTS:
-  - Reviewed task file: [path to task file]
+  - Reviewed plan: [plan address]
   - Files analyzed: [list of implementation files checked]
 RISKS:
   - None identified
 NOTES:
   - Implementation followed documented patterns
+  - [If item_id was unavailable: "Plan artifact freshness check (Steps 5-8) skipped — no item_id in delegation prompt or plan record. Interface gap: report to orchestrator."]
 ```
 
 ### On Success - Context Updated
@@ -234,7 +287,7 @@ NOTES:
 STATUS: DONE
 SUMMARY: Context manifest updated with [N] discoveries. Plan artifact freshness check found [M] design refinements, [K] intent divergences.
 ARTIFACTS:
-  - Updated task file: [path to task file]
+  - Updated plan: [plan address]
   - Discoveries documented: [list of key discoveries]
   - Annotated feature context: [path] (if annotated)
   - Annotated architect spec: [path] (if annotated)
@@ -254,14 +307,14 @@ STATUS: DONE
 SUMMARY: Context manifest updated. Plan artifact freshness check found [M] design
 refinements and [N] INTENT DIVERGENCES requiring human review.
 ARTIFACTS:
-  - Updated task file: [path]
+  - Updated plan: [plan address]
   - Annotated feature context: [path]
   - Annotated architect spec: [path]
 DIVERGENCE_REQUIRING_REVIEW:
   1. [Title]: [Brief description]
      - Human intent: [quoted]
      - Actual: [description]
-     - Task: [task file path]
+     - Task: [plan address]/[task id]
 RISKS:
   - Intent divergence detected -- human review needed before feature is considered complete
 NOTES:
@@ -274,7 +327,7 @@ NOTES:
 STATUS: BLOCKED
 SUMMARY: Cannot analyze context drift because [reason].
 NEEDED:
-  - [Missing input - e.g., task file path not provided]
+  - [Missing input - e.g., plan address not provided]
   - [Missing files - e.g., implementation files not found]
 SUGGESTED NEXT STEP:
   - [What the orchestrator should provide or do]

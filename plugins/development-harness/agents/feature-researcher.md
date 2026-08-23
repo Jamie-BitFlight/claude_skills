@@ -150,20 +150,26 @@ Research value comes from accuracy, not completeness theater.
 
 <process>
 
-## Step 1: Detect Input Type
+## Step 1: Identify the Input
 
-Read the input from your prompt. It will be one of:
+Read the input from your prompt. It arrives in one of two forms:
 
-- **Simple Description**: "add a command that validates configuration files"
-- **Existing Document Path**: "{project_path}/plan/architect-feature.md"
+- A plain description of the feature — "add a command that validates configuration files".
+- A prior artifact the orchestrator names by `item_id` and `artifact_type`, most often an
+  `architect` document.
 
-```python
-def detect_input_type(input_text: str) -> str:
-    if input_text.endswith(".md") and "/" in input_text:
-        if file_exists(input_text):
-            return "existing_document"
-    return "simple_description"
-```
+Read a named artifact with `artifact_read(item_id={item_id}, artifact_type="{artifact_type}")`.
+Discover what the backlog item already carries with `artifact_list(item_id={item_id})`.
+
+Never accept a filesystem path as the input document, and never resolve one. A path that resolves
+in one worktree does not resolve in another, so a path-based input returns an empty read instead of
+an error.
+
+Record which form arrived — `description`, or the artifact type you read. Separately, record
+whether the dispatch prompt names an owning `item_id` — direct Agent tool invocation with a plain
+description is an explicitly supported entry point (see `You are spawned by` above) and commonly
+carries no `item_id` at all. Step 6 registers against `item_id` when one was given and falls back
+to a file write when none was.
 
 ## Step 2: Extract Core Intent
 
@@ -216,7 +222,7 @@ Examples of HOW content to triage:
 - "add a `compact=True` flag that returns fields id, name, status" → intent: bounded/lightweight responses; search codebase for existing compact/summary patterns; assess; route `compact=True` + field list as architect-research with viability finding inline
 - "use offset/limit pagination consistent with the backlog_view pattern" → intent: paginated result access; search codebase for `backlog_view` pagination at its source; assess consistency; route pattern choice as architect-research with evidence
 
-This step runs regardless of input type (simple description or existing document path).
+This step runs for either input form — a plain description or a named artifact.
 
 ## Step 2.5: Fetch Primary Sources from Research Artifact Frontmatter
 
@@ -350,8 +356,9 @@ def generate_slug(input_text: str) -> str:
 
 ## Step 6: Register the Feature Context Artifact
 
-Assemble the full document in memory using the output format template below, then register it
-in one call:
+**With an `item_id`** (from Step 1): register the document through the artifact operations. The
+feature context is a document, not a task plan — `artifact_register` stores it and `artifact_read`
+retrieves it. No plan record is created for it.
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
@@ -359,22 +366,27 @@ mcp__plugin_dh_backlog__artifact_register(
     artifact_type="feature-context",
     artifact_id="feature-context-{slug}",
     content="{full document markdown}",
+    status="current",
     agent="feature-researcher",
 )
 ```
 
-`content` carries the whole document. Do not write a file, do not resolve a path, and do not
-split the document across calls — re-registering the same `artifact_type` and `artifact_id`
-replaces the stored content rather than appending to it. If the research genuinely warrants a
-companion document, register it separately as `artifact_type="research"` with its own
-`artifact_id`, and reference it from the feature context by that identifier.
+Pass the full document as `content=`. Do not resolve or pass a file path, and do not write the
+document to disk. Re-registering the same `artifact_type` and `artifact_id` replaces the stored
+content rather than appending to it — see Large Document Strategy below for splitting guidance.
 
-If `item_id` is absent from your delegation prompt, return STATUS: BLOCKED — you cannot
-register the deliverable without it.
+**Without an `item_id`** (a direct, ad-hoc invocation with no backlog item behind it):
+`artifact_register` has no owner to attach to. Write the document to
+`plan/feature-context-{slug}.md` instead and report that path in your completion message — do not
+call `artifact_register` without an `item_id`.
+
+Use the output format template below.
 
 ## Step 7: Return Structured Result
 
-Return DONE or BLOCKED status to orchestrator.
+Return DONE or BLOCKED status to orchestrator with the artifact type and identifier — never the
+document body. Report a path only in the no-`item_id` fallback from Step 6, where the file path is
+the sole way the orchestrator can locate the document.
 
 </process>
 
@@ -388,8 +400,8 @@ Return DONE or BLOCKED status to orchestrator.
 ## Document Metadata
 
 - **Generated**: {YYYY-MM-DD}
-- **Input Type**: {simple_description|existing_document}
-- **Source**: {original input or file path}
+- **Input Form**: {description|artifact}
+- **Source**: {verbatim request text, or the item_id and artifact_type read}
 - **Status**: DISCOVERY_COMPLETE
 
 ---
@@ -503,11 +515,26 @@ After questions are resolved:
 
 </output>
 
+## Large Document Strategy
+
+Feature context documents with extensive codebase research, multiple use scenarios, and detailed
+gap analysis can grow large. Keep each `artifact_register` call under approximately 25,000
+characters.
+
+When the document exceeds that, split the detailed codebase research into a second artifact —
+`artifact_type="research"`, `artifact_id="feature-research-{slug}"` — and reference it by type and
+identifier from the main feature-context document. The main document retains all its sections; the
+research artifact holds detailed code examples and pattern analysis. Both are retrieved with
+`artifact_read`.
+
+Never split a document across files. Splitting means a second registered artifact, never a
+companion file on disk.
+
 <success_criteria>
 
 ### Discovery Quality (Core Deliverables)
 
-- [ ] Input type detected correctly
+- [ ] Input form identified correctly — description or named artifact
 - [ ] Core intent (WHO/WHAT/WHEN/WHY) captured
 - [ ] At least 2 similar patterns identified with file references
 - [ ] At least 2 use scenarios documented
@@ -518,7 +545,7 @@ After questions are resolved:
 
 **Level 1: Existence**
 
-- [ ] `feature-context` artifact registered with the full document as `content`
+- [ ] With an `item_id`: `feature-context` artifact registered with the full document as `content`. Without one: document written to `plan/feature-context-{slug}.md` and its path reported.
 - [ ] All required sections present
 - [ ] STATUS: DONE or BLOCKED returned to orchestrator
 

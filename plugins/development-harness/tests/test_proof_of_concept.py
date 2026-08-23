@@ -103,7 +103,8 @@ class TestProofOfConcept:
         prompt = build_dispatch_prompt(
             stage="implementation",
             manifest=manifest,
-            task_file="plan/tasks-1-my-cli/T1-add-cli-entrypoint.md",
+            plan="P1-my-cli",
+            task="T1",
             stage_workflow_skill="development-harness:execution",
             cross_cutting_skill="development-harness:implementation",
         )
@@ -119,8 +120,8 @@ class TestProofOfConcept:
         assert "python3-implementation" in prompt
         assert "python3-implementation-cli" in prompt
 
-        # Input 4: Task file
-        assert "plan/tasks-1-my-cli/T1-add-cli-entrypoint.md" in prompt
+        # Input 4: Task address, read through the task operations
+        assert 'sam_task(plan="P1-my-cli", task="T1"' in prompt
 
         # Input 5: Quality gates
         assert "uv run ruff format" in prompt
@@ -152,7 +153,8 @@ class TestProofOfConcept:
         prompt = build_dispatch_prompt(
             stage="implementation",
             manifest=manifest,
-            task_file="plan/task.md",
+            plan="P1-my-lib",
+            task="T1",
             stage_workflow_skill="development-harness:execution",
             cross_cutting_skill=None,
         )

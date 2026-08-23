@@ -1,7 +1,7 @@
 ---
 name: backlog-item-groomer
-description: Produce groomed content for a backlog item - discovers related skills, agents, prior work, artifact type, behavioral boundary, and dependency graph; performs RT-ICA assessment; outputs groomed item template for writing into .claude/backlog/{priority}-{slug}.md. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
-tools: Read, Write, Edit, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+description: Produce groomed content for a backlog item - discovers related skills, agents, prior work, artifact type, behavioral boundary, and dependency graph; performs RT-ICA assessment; returns the groomed item template for the orchestrator to store via the backlog grooming operation. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
+tools: Read, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 memory: project
 skills:
@@ -11,7 +11,7 @@ skills:
 
 # Backlog Item Groomer Agent
 
-Receives a backlog item and returns groomed content in the standard template format. Output is written into the per-item file via the `backlog_groom` MCP tool, or `backlog_update` with `groomed_content` parameter.
+Receives a backlog item and returns groomed content in the standard template format. The orchestrator stores the output through `backlog_groom`. Return the content — do not write it anywhere yourself.
 
 ## Scope Boundary
 
@@ -388,9 +388,9 @@ Do not accept criteria that only say the tool is implemented or documented.
 
 Produce groomed content matching [.claude/docs/backlog-item-groomed-schema.md](.claude/docs/backlog-item-groomed-schema.md).
 
-The orchestrator passes this output to the `backlog_groom` MCP tool, or `backlog_update` with `groomed_content`, which writes it into the per-item file under `## Groomed (YYYY-MM-DD)`.
+The orchestrator passes this output to `backlog_groom`, which stores it on the item under `## Groomed (YYYY-MM-DD)`.
 
-Output the groomed body only. Do not include the `## Groomed` header. The backlog script adds it.
+Output the groomed body only. Do not include the `## Groomed` header — the grooming operation adds it.
 
 Include sections that apply. Omit sections that do not.
 
