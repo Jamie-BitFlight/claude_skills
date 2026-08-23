@@ -51,8 +51,19 @@ _TOOL_AGENT_RE = re.compile(r"""agent=["']([^"']+)["']""")
 _CLI_TYPE_RE = re.compile(r"""--artifact-type[=\s]+["']?([^\s"'\\]+)["']?""")
 _CLI_AGENT_RE = re.compile(r"""--agent[=\s]+["']?([^\s"'\\]+)["']?""")
 
+# Whether the call supplies the argument at all, independent of whether its value is a literal.
+_TOOL_AGENT_PRESENT_RE = re.compile(r"\bagent\s*=")
+_CLI_AGENT_PRESENT_RE = re.compile(r"--agent\b")
+
 _PLACEHOLDER_CHARS = frozenset("{}<>$")
 """Characters that mark a value as a substitution slot rather than a literal registration."""
+
+_DEFAULT_AGENT = ""
+"""``artifact_register``'s default ``agent`` — what a call that omits the argument registers under.
+
+Mirrors ``backlog_core.server.artifact_register``'s signature. Resolving an omitted agent to this
+value rather than skipping the call is what stops an unattributed write passing the owner map.
+"""
 
 
 def _is_placeholder(value: str) -> bool:
@@ -89,6 +100,28 @@ class Registration(BaseModel):
 
 _UNDECLARED = ArtifactTypeOwners(artifact_type="")
 """Stand-in for a type absent from the map: it owns no agent, so every writer of it is undeclared."""
+
+
+def _resolve_agent(chunk: str, agent_re: re.Pattern[str], present_re: re.Pattern[str]) -> str | None:
+    """Resolve the agent a scanned ``artifact_register`` call registers under.
+
+    Three cases, and they are not the same. A literal value is the writer. An argument supplied with
+    a non-literal value (``agent=agent``, ``--agent {resolved_agent}``) documents the call's shape,
+    so the call makes no ownership claim. An argument omitted altogether is a concrete registration
+    under ``artifact_register``'s ``agent`` default.
+
+    Args:
+        chunk: The text of one ``artifact_register`` call.
+        agent_re: Pattern capturing the agent value when it is a literal.
+        present_re: Pattern matching the agent argument whatever its value.
+
+    Returns:
+        The agent name, or None when the call carries no ownership claim.
+    """
+    match = agent_re.search(chunk)
+    if match is not None:
+        return None if _is_placeholder(match.group(1)) else match.group(1)
+    return None if present_re.search(chunk) else _DEFAULT_AGENT
 
 
 def _strip_cell(cell: str) -> str:
@@ -132,29 +165,40 @@ def parse_owner_map(text: str) -> dict[str, ArtifactTypeOwners]:
 def scan_registrations() -> list[Registration]:
     """Collect every attributable ``artifact_register`` call in the plugin's markdown.
 
-    A call is attributable when it names both its artifact type and its registering agent as
-    literals. CLI flag values count whether quoted or bare. Calls using a substitution slot for
-    either (``artifact_type=<type>``, ``--agent {resolved_agent}``) show the call shape rather than
-    a concrete registration and carry no ownership claim.
+    A call is attributable when it names its artifact type as a literal. CLI flag values count
+    whether quoted or bare. Calls using a substitution slot for the type or the agent
+    (``artifact_type=<type>``, ``--agent {resolved_agent}``) show the call shape rather than a
+    concrete registration and carry no ownership claim.
+
+    Omitting the agent argument is not the same as supplying it with a placeholder.
+    ``artifact_register``'s ``agent`` parameter defaults to ``""``, so a call that names a type and
+    omits the argument registers a concrete entry under the empty producer. Those resolve to
+    ``_DEFAULT_AGENT`` and are held against the owner map like any other writer, because an entry no
+    declared agent owns is exactly the unattributable write this guard exists to catch. See
+    ``_resolve_agent``.
 
     Returns:
-        One entry per attributable call, keyed on the agent the call itself names.
+        One entry per attributable call, keyed on the agent the call names or defaults to.
     """
     found: list[Registration] = []
     for path in sorted(_PLUGIN_ROOT.rglob("*.md")):
         text = path.read_text(encoding="utf-8")
         rel = str(path.relative_to(_PLUGIN_ROOT))
-        chunks = [(m.group("body"), _TOOL_TYPE_RE, _TOOL_AGENT_RE) for m in _TOOL_CALL_RE.finditer(text)]
-        chunks += [(m.group(0), _CLI_TYPE_RE, _CLI_AGENT_RE) for m in _CLI_CALL_RE.finditer(text)]
-        for chunk, type_re, agent_re in chunks:
+        chunks = [
+            (m.group("body"), _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE)
+            for m in _TOOL_CALL_RE.finditer(text)
+        ]
+        chunks += [
+            (m.group(0), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE) for m in _CLI_CALL_RE.finditer(text)
+        ]
+        for chunk, type_re, agent_re, agent_present_re in chunks:
             type_match = type_re.search(chunk)
-            agent_match = agent_re.search(chunk)
-            if not type_match or not agent_match:
+            if not type_match or _is_placeholder(type_match.group(1)):
                 continue
-            artifact_type, agent = type_match.group(1), agent_match.group(1)
-            if _is_placeholder(artifact_type) or _is_placeholder(agent):
+            agent = _resolve_agent(chunk, agent_re, agent_present_re)
+            if agent is None:
                 continue
-            found.append(Registration(artifact_type=artifact_type, agent=agent, source=rel))
+            found.append(Registration(artifact_type=type_match.group(1), agent=agent, source=rel))
     return found
 
 

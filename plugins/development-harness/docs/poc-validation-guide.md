@@ -195,7 +195,7 @@ space-separated file paths you are checking before running the command.
 
 ## Output Artifact
 Register your output through the artifact operations:
-`artifact_register(item_id=1770, artifact_type="architect", artifact_id="context-my-feature", content=<full document>)`
+`artifact_register(item_id=1770, artifact_type="architect", artifact_id="context-my-feature", content=<full document>, agent="context-integration")`
 Report only the artifact type and identifier. Do not write the document to a file.
 ```
 
