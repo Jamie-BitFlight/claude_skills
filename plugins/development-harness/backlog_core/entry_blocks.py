@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from .models import Entry
+from .models import Entry, EntryNotFoundError
 from .parsing import now_iso
 
 ENTRY_RE = re.compile(r"<div><sub>([^<]+)</sub>\s*(.*?)</div>", re.DOTALL)
@@ -14,17 +14,36 @@ STRUCK_RE = re.compile(r"<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summar
 # Used in two places: detecting unwrapped seeds in the legacy entry path, and filtering
 # entries by the ``since`` parameter (entry IDs may carry a dedup suffix like ``-0``, ``-1``).
 _ISO_TIMESTAMP_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)")
+# Prefix of the fallback entry ID assigned to unwrapped (legacy) content when no real
+# ``added`` date is available. It is not a representable date, so it can never be parsed.
+_ZERO_DATE_PREFIX = "0000-00-00"
+# An entry ID: an ISO timestamp, optionally carrying the ``-N`` dedup suffix
+# ``_resolve_duplicate_ids`` appends. The zero-date fallback ID matches this shape too.
+_ENTRY_ID_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(?:-\d+)?"
+_ENTRY_ID_RE = re.compile(rf"\A{_ENTRY_ID_PATTERN}\Z")
 
 
-def _parse_entry_timestamp(entry_id: str) -> datetime:
+def _parse_entry_timestamp(entry_id: str) -> datetime | None:
     """Extract the ISO timestamp prefix from an entry ID and return a UTC-aware datetime.
 
     Returns:
-        UTC-aware datetime parsed from the ISO timestamp prefix of ``entry_id``.
+        UTC-aware datetime parsed from the ISO timestamp prefix of ``entry_id``, or ``None``
+        when ``entry_id`` carries the zero-date fallback prefix, which encodes an unknown
+        timestamp rather than a real one.
 
     Raises:
-        ValueError: If ``entry_id`` does not start with a valid ISO timestamp.
+        ValueError: If ``entry_id`` neither starts with the zero-date fallback prefix nor
+            with a valid, calendar-real ISO timestamp.
     """
+    if entry_id.startswith(_ZERO_DATE_PREFIX):
+        # The zero-date fallback means "this entry's timestamp is unknown", not "year zero"
+        # and not "older than everything". docs/unified-section-layer-brief.md forbids
+        # substituting an epoch sentinel for a missing timestamp, and mapping it to
+        # datetime.min did exactly that: every ``since=`` read then silently dropped the
+        # entry, leaving the caller unable to distinguish "nothing changed" from "content
+        # exists whose age I cannot determine". ``None`` states the unavailable outcome the
+        # brief requires and leaves the include/exclude decision to the caller.
+        return None
     m = _ISO_TIMESTAMP_RE.match(entry_id)
     if not m:
         msg = f"Entry ID does not contain a valid ISO timestamp prefix: {entry_id!r}"
@@ -36,13 +55,78 @@ def _parse_entry_timestamp(entry_id: str) -> datetime:
     return dt
 
 
-def wrap_entry(content: str) -> str:
-    """Wrap content in a timestamped entry block.
+def _is_entry_id(entry_id: str) -> bool:
+    """Return whether ``entry_id`` is a well-formed, calendar-real entry ID.
+
+    Shape alone is not enough: ``2026-13-01T00:00:00Z`` matches the ID pattern but is not a
+    date any calendar has, and adopting it persists an ID that makes every later ``since=``
+    read raise. The zero-date fallback is accepted — it is the codebase's own encoding for an
+    unknown timestamp, not a malformed one.
 
     Returns:
-        HTML div string with ``<sub>`` timestamp and content.
+        ``True`` when the ID matches the entry-ID shape and parses as a real timestamp.
+    """
+    if not _ENTRY_ID_RE.match(entry_id):
+        return False
+    try:
+        _parse_entry_timestamp(entry_id)
+    except ValueError:
+        return False
+    return True
+
+
+def _new_entry_block(content: str) -> str:
+    """Wrap ``content`` in a freshly timestamped entry block.
+
+    Returns:
+        HTML div string with a ``now_iso()`` ``<sub>`` timestamp and ``content``.
     """
     return f"<div><sub>{now_iso()}</sub>\n\n{content}\n</div>"
+
+
+def wrap_entry(content: str) -> str:
+    """Normalize content into a sequence of complete, well-formed entry blocks.
+
+    ``backlog_view`` renders entries with their ``<div><sub>...</sub>`` wrapper visible, so a
+    caller that echoes back what it read submits content that is already wrapped — sometimes
+    wholly, sometimes with its own additions around or between the blocks it read. All three
+    shapes are normalized the same way: every complete block whose ID is a real entry ID is
+    kept verbatim with its original timestamp, and every run of anything else — leading text,
+    text between two blocks, trailing text — becomes its own freshly timestamped block.
+
+    Wrapping such content as one unit instead is lossy in both directions. Blindly re-wrapping
+    a pre-wrapped submission nests the blocks, and the nested form does not survive a body
+    round-trip: the wrapper leaks into the entry's own content and the section splitter emits
+    a stray ``</div>`` entry carrying an empty ID. Adopting it whole is equally lossy the other
+    way — ``parse_entries`` extracts only ``ENTRY_RE`` matches, so anything sitting between or
+    around the blocks reaches the provider body, is absent from the parsed entries, and is
+    gone after the next render.
+
+    Returns:
+        One or more ``<div><sub>...</sub>...</div>`` blocks, separated by a blank line.
+        Content that contains no complete entry block becomes a single new block.
+    """
+    text = content.strip()
+    blocks: list[str] = []
+    pos = 0
+    for m in ENTRY_RE.finditer(text):
+        if not _is_entry_id(m.group(1)):
+            # An entry-shaped block whose ID is not a real timestamp is not an entry — an
+            # HTML example documenting the format, say. Leave it in the surrounding prose
+            # run rather than adopting it: adopting persists the label as an entry ID, and
+            # the next ``since=`` read then raises on it.
+            continue
+        gap = text[pos : m.start()].strip()
+        if gap:
+            blocks.append(_new_entry_block(gap))
+        blocks.append(m.group(0))
+        pos = m.end()
+    tail = text[pos:].strip()
+    if tail:
+        blocks.append(_new_entry_block(tail))
+    if not blocks:
+        return _new_entry_block(text)
+    return "\n\n".join(blocks)
 
 
 def wrap_entry_with_timestamp(content: str, timestamp: str) -> str:
@@ -166,7 +250,13 @@ def parse_entries(
         if since_dt.tzinfo is None:
             since_dt = since_dt.replace(tzinfo=UTC)
 
-        raw_entries = [e for e in raw_entries if _parse_entry_timestamp(e.id) >= since_dt]
+        # An entry whose timestamp is unknown (the zero-date fallback ID) is kept, not
+        # dropped. Excluding it makes "no entry is newer than the cutoff" indistinguishable
+        # from "entries exist whose age cannot be determined", and the caller — a stateless
+        # agent asking what changed since it last looked — then proceeds having never seen
+        # that content. The unknown-ness is visible in the returned entry's own ``0000-00-00``
+        # ID, so the caller can act on it; silently withholding the entry gives it nothing.
+        raw_entries = [e for e in raw_entries if (ts := _parse_entry_timestamp(e.id)) is None or ts >= since_dt]
 
     return _apply_show_filter(raw_entries, show)
 
@@ -238,15 +328,15 @@ def _rewrite_by_entry_id(
     result_parts: list[str] = []
     if is_legacy:
         legacy_ts = f"{added_date}T00:00:00Z"
-        if entry_id == legacy_ts:
-            result_parts.append(wrap_entry(new_content) if new_content else "")
-        else:
-            result_parts.append(wrap_entry_with_timestamp(existing_body.strip(), legacy_ts))
-            if new_content:
-                result_parts.append(wrap_entry(new_content))
+        if entry_id != legacy_ts:
+            raise EntryNotFoundError(entry_id, [legacy_ts])
+        result_parts.append(wrap_entry(new_content) if new_content else "")
     else:
         id_entries = [Entry(id=m.group(1), content="") for m in entries_raw]
         _resolve_duplicate_ids(id_entries)
+        available = [e.id for e in id_entries]
+        if entry_id not in available:
+            raise EntryNotFoundError(entry_id, available)
 
         for m, id_entry in zip(entries_raw, id_entries, strict=False):
             if id_entry.id == entry_id:
@@ -272,6 +362,7 @@ def rewrite_section(
 
     Raises:
         ValueError: If ``replace=True`` but ``reason`` is not provided.
+        EntryNotFoundError: If ``entry_id`` matches no entry in ``existing_body``.
     """
     entries_raw = list(ENTRY_RE.finditer(existing_body))
     is_legacy = not entries_raw and bool(existing_body.strip())

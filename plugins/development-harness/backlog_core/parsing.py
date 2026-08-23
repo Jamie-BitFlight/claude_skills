@@ -27,12 +27,10 @@ from ruamel.yaml import YAML, YAMLError
 # ---------------------------------------------------------------------------
 from . import models as _models
 from .models import (
-    BENEFIT_MAP,
     COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
     FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
-    ROLE_MAP,
     SKIP_STATUS,
     AmbiguousSelectorError,
     BacklogItem,
@@ -637,27 +635,25 @@ def build_issue_body_from_file(item: BacklogItem) -> str | None:
 def build_issue_body(item: BacklogItem) -> str:
     """Build GitHub issue body from backlog item fields.
 
+    Emits only sections whose content the caller actually supplied. A Story and
+    an Acceptance Criteria section are deliberately not generated here: both are
+    grooming outputs, established during refinement from information that does
+    not exist at intake. ``groom/finalize.md`` requires a non-empty Acceptance
+    Criteria section before an item is marked groomed, and a template-filled
+    section emitted at creation satisfies that check without anyone having
+    written a criterion.
+
     Returns:
         Markdown-formatted issue body string.
     """
-    title = item.title
     desc = item.description
     source = item.source or "Not specified"
     added = item.added
     priority = item.priority
-    item_type = item.item_type
     research = item.research_first
     files = item.files
     suggested_location = item.suggested_location
-    role = ROLE_MAP.get(item_type, "developer using Claude Code skills")
-    benefit = BENEFIT_MAP.get(item_type, "the product improves")
-    goal = title.rstrip(".")
-
-    sections = [
-        f"## Story\n\nAs a **{role}**, I want to **{goal.lower()}** so that **{benefit}**.",
-        f"## Description\n\n{desc}",
-        "## Acceptance Criteria\n\n- [ ] Work matches description\n- [ ] Plan or implementation complete",
-    ]
+    sections = [f"## Description\n\n{desc}"]
 
     if files:
         sections.append(f"## Files\n\n{files}")

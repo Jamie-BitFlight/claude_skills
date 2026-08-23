@@ -20,19 +20,20 @@ metadata:
 
 **Research first**: <!-- optional: questions to answer before grooming can proceed -->
 
-**Acceptance Criteria**:
-<!-- Required for P0. Recommended for P1. Each criterion must be a specific, verifiable condition. -->
-<!-- Examples:
+---
+
+<!-- The following sections are written by downstream skills. Do not fill them at creation time. -->
+
+## Acceptance Criteria
+
+<!-- Written by: groom-backlog-item (see finalize.md). Not authored at creation — an item is
+     created with a Description and nothing else, and grooming has the research needed to state
+     a criterion an item's author does not yet have. -->
+<!-- Each criterion must be a specific, verifiable condition. Examples:
   - Running `uv run backlog.py list --format json` outputs valid JSON
   - File `~/.dh/projects/{slug}/backlog/p1-{slug}.md` exists with correct frontmatter
   - `backlog_view(selector="#N")` returns `state: "open"` in the dict
 -->
-- <!-- criterion 1 -->
-- <!-- criterion 2 -->
-
----
-
-<!-- The following sections are written by downstream skills. Do not fill them at creation time. -->
 
 ## Fact-Check
 
