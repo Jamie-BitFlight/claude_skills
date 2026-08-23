@@ -8,9 +8,15 @@ user-invocable: true
 
 **Workflow Reference**: See [Multi-Agent Orchestration](./../../knowledge/workflow-diagrams/multi-agent-orchestration.md) for complete delegation flow with DONE/BLOCKED signaling.
 
-**Step 1:** Analyze the task. Do you have the "WHERE, WHAT, WHY"?
+**Step 1:** Load `mattpocock-skills:writing-for-agents`. The prompt you are about to write is a
+document an agent consumes, and its levers — duplication, no-ops, negation, completion criteria —
+govern it.
 
-**Step 2:** Construct the prompt using the template below.
+**Step 2:** Analyze the task. Do you have the "WHERE, WHAT, WHY"?
+
+**Step 3:** Construct the prompt using the template below. Keep it DRY against the repository: the
+agent loads `AGENTS.md` and `CLAUDE.md` itself, so a prompt restating what they already say is a
+second copy of one meaning that goes stale silently while the file moves on.
 
 ---
 
@@ -57,6 +63,7 @@ YOUR TASK:
 - **DEFINITION OF SUCCESS**: The "WHAT". Measurable outcomes the agent can verify. When the agent will produce more than ~1 line of output, instruct it to write results to a file and return only the path — this keeps orchestrator context lean. Example: `Write findings to .claude/reports/NAME-YYYYMMDD.md. Return: STATUS: DONE + file path.`
 - **DELIVERY**: State the delivery channel explicitly. The channel that carries an agent's final response back to its dispatcher differs between harnesses. Name the channel this dispatch expects, and name the artifact fallback: the full result written to a file whose path the agent returns. A result that exists only in the agent's final response text may never be read. Do not assume the dispatcher receives anything the prompt did not ask the agent to send.
 - **CONTEXT**: The "WHERE" and "WHY". Location narrows scope; constraints bound the solution space.
+- **ECOSYSTEM CONTEXT**: Only what exists because of this session and cannot be found by reading the repo — which branch a PR merged into, that another agent is live on the same files, a change made an hour ago that is not in `main` yet. Repo conventions belong to `AGENTS.md`; restating them here is duplication, and restating them as prohibitions is worse, since a banned behaviour named in a prompt is more available to the model, not less.
 
 ---
 
@@ -82,4 +89,5 @@ Check before sending:
 - [ ] No assumptions stated as facts
 - [ ] Defines WHAT and WHY, not HOW
 - [ ] Lists resources without prescribing tools
+- [ ] Says nothing `AGENTS.md` or `CLAUDE.md` already says
 - [ ] Names the delivery channel and where any longer artifact is written
