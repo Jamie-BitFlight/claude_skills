@@ -45,8 +45,30 @@ _CLI_CALL_RE = re.compile(r"artifact\s+register\b[^\n]*\n(?:[ \t]*--[^\n]*\n?)*"
 
 _TOOL_TYPE_RE = re.compile(r"""artifact_type=["']([^"']+)["']""")
 _TOOL_AGENT_RE = re.compile(r"""agent=["']([^"']+)["']""")
-_CLI_TYPE_RE = re.compile(r"""--artifact-type\s+["']([^"']+)["']""")
-_CLI_AGENT_RE = re.compile(r"""--agent\s+["']([^"']+)["']""")
+# A CLI flag value may be single-quoted, double-quoted, or bare — `--artifact-type feature-context`
+# is as much a registration as `--artifact-type "feature-context"`. Requiring quotes made every bare
+# value invisible to the scan.
+_CLI_TYPE_RE = re.compile(r"""--artifact-type[=\s]+["']?([^\s"'\\]+)["']?""")
+_CLI_AGENT_RE = re.compile(r"""--agent[=\s]+["']?([^\s"'\\]+)["']?""")
+
+_PLACEHOLDER_CHARS = frozenset("{}<>$")
+"""Characters that mark a value as a substitution slot rather than a literal registration."""
+
+
+def _is_placeholder(value: str) -> bool:
+    """Report whether a scanned flag or keyword value is a substitution slot.
+
+    A call written with ``artifact_type=<type>``, ``--agent {resolved_agent}``, or
+    ``--item-id "$task_a"`` documents the call shape rather than a concrete registration, so it
+    carries no ownership claim and must not be matched against the owner map.
+
+    Args:
+        value: The literal captured from the call.
+
+    Returns:
+        True when the value contains a substitution marker.
+    """
+    return bool(_PLACEHOLDER_CHARS & set(value))
 
 
 class ArtifactTypeOwners(BaseModel):
@@ -110,9 +132,10 @@ def parse_owner_map(text: str) -> dict[str, ArtifactTypeOwners]:
 def scan_registrations() -> list[Registration]:
     """Collect every attributable ``artifact_register`` call in the plugin's markdown.
 
-    A call is attributable when it names both its artifact type and its registering agent as quoted
-    literals. Calls using placeholders for either (``artifact_type=<type>``, ``agent=agent``) show
-    the call shape rather than a concrete registration and carry no ownership claim.
+    A call is attributable when it names both its artifact type and its registering agent as
+    literals. CLI flag values count whether quoted or bare. Calls using a substitution slot for
+    either (``artifact_type=<type>``, ``--agent {resolved_agent}``) show the call shape rather than
+    a concrete registration and carry no ownership claim.
 
     Returns:
         One entry per attributable call, keyed on the agent the call itself names.
@@ -128,7 +151,10 @@ def scan_registrations() -> list[Registration]:
             agent_match = agent_re.search(chunk)
             if not type_match or not agent_match:
                 continue
-            found.append(Registration(artifact_type=type_match.group(1), agent=agent_match.group(1), source=rel))
+            artifact_type, agent = type_match.group(1), agent_match.group(1)
+            if _is_placeholder(artifact_type) or _is_placeholder(agent):
+                continue
+            found.append(Registration(artifact_type=artifact_type, agent=agent, source=rel))
     return found
 
 
