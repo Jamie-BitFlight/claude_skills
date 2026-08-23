@@ -375,9 +375,6 @@ Pass the full document as `content=`. Do not resolve or pass a file path, and do
 document to disk. Re-registering the same `artifact_type` and `artifact_id` replaces the stored
 content rather than appending to it — see Large Document Strategy below for splitting guidance.
 
-If `item_id` is absent from your delegation prompt, return STATUS: BLOCKED — you cannot
-register the deliverable without it.
-
 **Without an `item_id`** (a direct, ad-hoc invocation with no backlog item behind it):
 `artifact_register` has no owner to attach to. Write the document to
 `plan/feature-context-{slug}.md` instead and report that path in your completion message — do not
@@ -548,7 +545,7 @@ companion file on disk.
 
 **Level 1: Existence**
 
-- [ ] `feature-context` artifact registered with the full document as `content`
+- [ ] With an `item_id`: `feature-context` artifact registered with the full document as `content`. Without one: document written to `plan/feature-context-{slug}.md` and its path reported.
 - [ ] All required sections present
 - [ ] STATUS: DONE or BLOCKED returned to orchestrator
 
