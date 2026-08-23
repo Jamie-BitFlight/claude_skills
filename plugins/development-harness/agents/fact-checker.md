@@ -6,7 +6,6 @@ model: haiku
 memory: project
 skills:
   - dh:subagent-contract
-  - dh:dispatch-contract
 ---
 
 # Fact Checker Agent

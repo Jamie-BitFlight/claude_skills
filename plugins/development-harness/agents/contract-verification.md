@@ -6,7 +6,6 @@ tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plug
 skills:
   - subagent-contract
   - dh:subagent-contract
-  - dh:dispatch-contract
 color: yellow
 ---
 

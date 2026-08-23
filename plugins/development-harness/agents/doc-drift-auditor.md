@@ -7,7 +7,6 @@ tools: Read, Grep, Glob, Bash, Write, Skill, SendMessage, mcp__plugin_dh_sam, mc
 skills:
   - dh:subagent-contract
   - ccc
-  - dh:dispatch-contract
 ---
 
 # Documentation Drift Auditor
