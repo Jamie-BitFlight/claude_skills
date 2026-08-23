@@ -1,8 +1,8 @@
 ---
 name: reviewer-security
-description: "Security-perspective reviewer for dh:multi-perspective-review. Scans changed files for hardcoded secrets, injection vectors, authn/authz gaps, insecure deserialization, and dependency CVEs. Returns a structured JSON verdict block (APPROVE/REJECT/SKIP) per verdict-schema.md §2.1 via SendMessage to team-lead. Spawned by dh:multi-perspective-review via TeamCreate. Trigger phrases: 'security review', 'check for secrets', 'scan for vulnerabilities', 'security perspective'."
+description: "Security-perspective reviewer for dh:multi-perspective-review. Scans changed files for hardcoded secrets, injection vectors, authn/authz gaps, insecure deserialization, and dependency CVEs. Writes a structured JSON verdict block (APPROVE/REJECT/SKIP) per verdict-schema.md §2.1 into its task's Review Results section. Spawned by dh:multi-perspective-review via TeamCreate. Trigger phrases: 'security review', 'check for secrets', 'scan for vulnerabilities', 'security perspective'."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
+tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification
@@ -146,8 +146,8 @@ Do NOT embed the schema in this file. Reference it only.
 
 ### 1. Structured Verdict Block (JSON)
 
-Emit exactly one verdict block in your `SendMessage` to the team lead. The `message` field
-must contain the raw JSON string so the orchestrator can `json.loads()` it:
+Assemble exactly one verdict block. It is stored as a raw JSON string so the orchestrator can
+`json.loads()` it:
 
 ```json
 {
@@ -171,7 +171,7 @@ Empty findings array is valid for `APPROVE` with no findings.
 
 ### 2. STATUS Block
 
-After emitting `SendMessage`, output your STATUS block:
+After writing the verdict block, output your STATUS block:
 
 ```text
 STATUS: DONE
@@ -189,19 +189,25 @@ Reason: {what prevented the review}
 Needed: {what the orchestrator must supply to unblock}
 ```
 
-### 3. SendMessage (MANDATORY)
+### 3. Verdict Delivery (MANDATORY)
 
-You MUST send your verdict to the team lead. Text output alone is not delivered — use
-`SendMessage` or the orchestrator will not receive your verdict and will treat this as a
-missing verdict (FAIL gate).
+Your verdict reaches the orchestrator through the task you are executing, not through your
+response text. Write the verdict block into the task's `Review Results` section — that section is
+what the orchestrator reads back to apply the review gate.
 
 ```text
-SendMessage(
-  to="team-lead",
-  summary="Security: {verdict} — {N} findings ({BLOCKER_COUNT} blockers)",
-  message=<raw JSON verdict block string>
+mcp__plugin_dh_sam__sam_task(
+  plan="{plan_address}",
+  task="{task_id}",
+  config={
+    "action": "update",
+    "append_section": "Review Results",
+    "section_content": "{the raw JSON verdict block, nothing else}"
+  }
 )
 ```
 
-The `message` value must be the JSON verdict block as a string (not a nested object) so the
-orchestrator can `json.loads(msg.message)` to parse it.
+`{plan_address}` and `{task_id}` are the task reference you were dispatched with. The section
+content must be the JSON verdict block on its own so the orchestrator can parse it directly. A
+task that reaches a terminal status with no `Review Results` section is read as a missing verdict
+and fails the gate.

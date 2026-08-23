@@ -12,8 +12,8 @@ description: "Use when a diff needs four parallel perspective reviewers (Securit
 Orchestrates four independent perspective reviewers in parallel against a diff. Each reviewer
 specialises in a single dimension: Security, Performance, Quality, or Accessibility. The skill
 creates an ephemeral SAM plan, dispatches four `dh:task-worker` teammates via `TeamCreate`,
-collects structured verdict blocks via `SendMessage`, applies the gate logic, and prints one
-canonical summary line per perspective.
+reads each perspective's structured verdict block back from its task, applies the gate logic, and
+prints one canonical summary line per perspective.
 
 This skill does NOT replace language-scoped code review (`dh:forensic-review`). It runs
 alongside it as an orthogonal quality signal. It is an upstream dependency of #1430
@@ -170,72 +170,83 @@ and must run in parallel. Each worker receives a minimal prompt that invokes `st
 `start-task` owns claim, active-task registration, and execution. The `agent:` field in each
 SAM task tells `dh:task-worker` which specialist profile to load via `profile_load` internally.
 
-Dispatch `dh:task-worker` for all four tasks: the four perspective reviewer agents do not declare
-the SAM task operations, so under `dh:dispatch-contract` they cannot be the dispatch target and
-their behavior reaches the work as a loaded profile instead.
+Dispatch `dh:task-worker` for all four tasks: the four perspective reviewer agents declare
+`sam_task` to write their verdict but not the rest of the SAM task lifecycle, so under
+`dh:dispatch-contract` they cannot be the dispatch target and their behavior reaches the work as a
+loaded profile instead.
+
+Every prompt names the same output destination: the `Review Results` section of the worker's own
+task. That section is the only channel the gate reads in Step 5 — a reviewer that does not write it
+is a missing verdict.
 
 ```text
 Agent(
   team_name="multi-{review_slug}",
   name="security-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on security review. Your task: {PA}/T1.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T1\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on security review. Your task: {PA}/T1.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T1\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T1\")"
 )
 
 Agent(
   team_name="multi-{review_slug}",
   name="performance-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on performance review. Your task: {PA}/T2.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T2\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on performance review. Your task: {PA}/T2.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T2\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T2\")"
 )
 
 Agent(
   team_name="multi-{review_slug}",
   name="quality-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on quality review. Your task: {PA}/T3.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T3\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on quality review. Your task: {PA}/T3.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T3\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T3\")"
 )
 
 Agent(
   team_name="multi-{review_slug}",
   name="accessibility-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on accessibility review. Your task: {PA}/T4.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T4\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on accessibility review. Your task: {PA}/T4.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T4\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T4\")"
 )
 ```
 
 ---
 
-## Step 5: Collect Verdicts
+## Step 5: Read Verdicts Back From the Plan
 
-Wait for four `SendMessage` arrivals from teammates. Each reviewer agent sends:
-
-```text
-SendMessage(
-  to="team-lead",
-  summary="{perspective}: {verdict} — {N} findings ({blocker_count} blockers)",
-  message="<raw JSON verdict block per verdict-schema.md §2.1>"
-)
-```
-
-For each received message, parse the `message` field as JSON:
+Wait until every task in the ephemeral plan has reached a terminal status. Poll:
 
 ```python
-verdict_block = json.loads(msg.message)
+mcp__plugin_dh_sam__sam_plan(plan="{PA}", config={"action": "status"})
+```
+
+A task is terminal at `complete`, `blocked`, `failed`, `skipped`, or `deferred`. Do not read
+verdicts while any task is still `not-started` or `in-progress`.
+
+Then read each task and take its `Review Results` section:
+
+```python
+mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})
+```
+
+The section content is the raw JSON verdict block — parse it directly:
+
+```python
+verdict_block = json.loads(review_results_section)
 ```
 
 The verdict block schema is defined in
 [./references/verdict-schema.md](./references/verdict-schema.md) §2.1. Do not duplicate the
 schema here.
 
-**Missing verdict handling:** If any perspective does not send a `SendMessage` after all workers
-complete, treat it as a `FAIL` condition:
+**Missing verdict handling:** A task that is terminal but carries no `Review Results` section, or
+whose section does not parse as a verdict block per §2.1, is a missing verdict — never an
+approval. Treat it as a `FAIL` condition:
 
 ```text
 Perspective {X} did not return a verdict
 ```
 
-Collect all four verdict blocks before proceeding to Step 6.
+Read all four tasks before proceeding to Step 6.
 
 ---
 
@@ -248,8 +259,9 @@ defined in [./references/verdict-schema.md](./references/verdict-schema.md) §2.
 
 Apply gate in this order:
 
-1. **Check for missing verdicts.** If any perspective did not return a verdict, FAIL immediately
-   with message `"Perspective {X} did not return a verdict"`.
+1. **Check for missing verdicts.** If any perspective's task carries no parsable `Review Results`
+   verdict block, FAIL immediately with message
+   `"Perspective {X} did not return a verdict"`.
 
 2. **Check for REJECT.** If any verdict has `verdict == "REJECT"`, the gate FAILS. Collect all
    REJECT verdicts and their blocking findings for the summary.
@@ -327,7 +339,7 @@ flowchart TD
     Parallel --> W2["Agent(name='performance-worker', subagent_type='dh:task-worker')"]
     Parallel --> W3["Agent(name='quality-worker', subagent_type='dh:task-worker')"]
     Parallel --> W4["Agent(name='accessibility-worker', subagent_type='dh:task-worker')"]
-    W1 --> Collect[Wait for 4 SendMessage arrivals]
+    W1 --> Collect["Wait for T1..T4 terminal via sam_plan status<br>Read each task's Review Results section"]
     W2 --> Collect
     W3 --> Collect
     W4 --> Collect

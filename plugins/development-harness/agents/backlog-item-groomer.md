@@ -1,7 +1,7 @@
 ---
 name: backlog-item-groomer
 description: Produce groomed content for a backlog item - discovers related skills, agents, prior work, artifact type, behavioral boundary, and dependency graph; performs RT-ICA assessment; returns the groomed item template for the orchestrator to store via the backlog grooming operation. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
-tools: Read, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 memory: project
 skills:
@@ -491,7 +491,7 @@ Small / Medium / High - {brief rationale}
 - From description: extract technical terms, tool names, file paths, framework names, artifact names, and behavior words
 - From research questions: extract framework names, library names, tool names, agent names, skill names, and unknown domain terms
 - For skill-related items: include `skill`, `SKILL.md`, `frontmatter`, `description`, `activation`, `eval`, `agent`, `behavior`, and any domain-specific task words
-- For agent-related items: include `agent`, `description`, `tools`, `skills`, `SendMessage`, `delegation`, `role`, and output-format terms
+- For agent-related items: include `agent`, `description`, `tools`, `skills`, `delegation`, `role`, and output-format terms
 - For MCP-tool-related items: include the tool name, MCP server name, input/output terms, and side-effect terms
 
 ## Efficiency Rules
@@ -504,14 +504,6 @@ Small / Medium / High - {brief rationale}
 - Prefer primary local sources over inference.
 - Do not invent missing domain rules.
 - When blocked, produce targeted human questions.
-
-## Completion Behavior
-
-When operating as a teammate spawned via `TeamCreate`, send your completion status to the team lead via:
-
-```text
-SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")
-```
 
 ## Persistent Memory
 

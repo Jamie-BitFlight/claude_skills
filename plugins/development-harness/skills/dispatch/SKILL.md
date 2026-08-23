@@ -76,11 +76,11 @@ When a worker sends a blocker message:
 
 ```mermaid
 flowchart TD
-    Blocker(["Worker sends blocker"]) --> Classify{"What is blocking them?"}
-    Classify -->|"Missing information the orchestrator has"| Relay["SendMessage with the missing context<br>Worker resumes"]
-    Classify -->|"Conflict with another worker's changes"| Resolve["Read both workers' summaries<br>Decide which approach wins<br>SendMessage resolution to affected workers"]
-    Classify -->|"Scope question — out of task boundaries"| Bound["Confirm scope in task file via sam_task<br>SendMessage: stay within T{M} boundaries or<br>create a new task for the discovered work"]
-    Classify -->|"Hard blocker — cannot proceed"| Escalate["SendMessage shutdown<br>Capture blocker as backlog item<br>Adjust wave plan"]
+    Blocker(["Worker reports BLOCKED — status written<br>through sam_task, blocker recorded in the task"]) --> Classify{"What is blocking them?"}
+    Classify -->|"Missing information the orchestrator has"| Relay["sam_task update — append the missing context<br>under 'Orchestrator Response'<br>Re-dispatch the task; the worker reads it on claim"]
+    Classify -->|"Conflict with another worker's changes"| Resolve["Read both tasks via sam_task read<br>Decide which approach wins<br>Append the decision under 'Orchestrator Response'<br>on each affected task, then re-dispatch"]
+    Classify -->|"Scope question — out of task boundaries"| Bound["Confirm scope in the task via sam_task read<br>Append the ruling under 'Orchestrator Response':<br>stay within T{M} boundaries or<br>create a new task for the discovered work"]
+    Classify -->|"Hard blocker — cannot proceed"| Escalate["Leave the task blocked<br>Capture blocker as backlog item<br>Adjust wave plan"]
 ```
 
 ### 5 — Synthesize Results
@@ -103,7 +103,9 @@ writing a file for another step to read.
 TeamDelete()
 ```
 
-Shut workers down via SendMessage before deleting the team.
+Deleting the team releases every worker in it. Delete it once all tasks in the wave have reached a
+terminal status — read that through `sam_plan(config={"action": "status"})`, never by assuming a
+silent worker has finished.
 
 ## When to Dispatch
 

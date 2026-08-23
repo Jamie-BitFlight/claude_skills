@@ -1,7 +1,7 @@
 ---
 name: generic-stage-agent
 description: Generic SDLC stage agent that executes workflow steps using loaded domain skills and quality gates
-tools: Read, Write, Edit, Bash, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Write, Edit, Bash, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 skills:
   - dh:dispatch-contract
@@ -38,5 +38,3 @@ You receive 5 inputs in your dispatch prompt:
 - Quality gates are mandatory — never skip them
 - If a step is unclear, read the loaded skill documentation before proceeding
 - Pass no data to a later stage through a file. Every input arrives from a read operation and every output leaves through a register or update operation. The `Write` tool is for source, tests, and documentation that land in the repository — nothing else
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

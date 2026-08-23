@@ -1,7 +1,7 @@
 ---
 name: service-docs-maintainer
 description: Synchronizes documentation with code changes — use after implementing features, refactoring code, deleting files, changing APIs, or modifying configurations. Launch this agent whenever code changes could render existing documentation inaccurate or incomplete. Triggers include new endpoints added, modules refactored, files deleted, configuration formats changed, or at session end to sweep all affected documentation.
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: yellow
 memory: project
@@ -162,8 +162,6 @@ Examples of what to record:
 - Common documentation gaps or drift patterns you observe
 - Cross-reference relationships between documentation files
 - Which documentation files are AI-facing vs human-facing
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
 
 # Persistent Agent Memory
 

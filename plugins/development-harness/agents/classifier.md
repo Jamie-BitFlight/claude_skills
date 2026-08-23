@@ -2,7 +2,7 @@
 name: classifier
 description: Classifies a backlog item into one of five issue types (procedural, recurring-pattern, defect, missing-guardrail, unbounded-design) and conditionally runs root-cause analysis. Use when grooming a backlog item that requires issue type classification. Reads the item description, walks the classification decision tree, writes an Issue Classification section with type, rationale, analysis method, and scenario target. For defect items, invokes the find-cause skill to build an evidence chain. For recurring-pattern items, searches resolved backlog history for keyword matches to measure frequency. Writes findings to the item via MCP backlog_groom. Runs as teammate #4 in the parallel grooming swarm with no blocking dependencies.
 model: haiku
-tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
 skills:
   - dh:dispatch-contract
@@ -121,21 +121,11 @@ mcp__plugin_dh_backlog__backlog_groom(
 
 The scenario target is a short narrative of the form `<observed bad outcome> → <desired outcome after the fix>`. It tells downstream consumers (planner, groomer) what "done" should look like.
 
-## Phase 5 — Broadcast findings
+## Phase 5 — Confirm the classification is readable
 
-If running in team mode, broadcast the classification to the team so other teammates can react:
+Your classification reaches the rest of the swarm through the sections you wrote, not through your response text. Re-read the item with `backlog_view` and confirm the Issue Classification section carries the type and rationale — and, for a `defect` or `recurring-pattern` item, that the Root-Cause Analysis section carries the evidence chain.
 
-```text
-SendMessage(team=<team_name>, from=<self>, to=*, content="CLASSIFIED: <item_ref> → <type>")
-```
-
-The rtica-assessor teammate may use your classification to adjust RT-ICA scope sizing. The groomer teammate reads your output after Wave 2 completes and uses it to shape the groomed Description and Acceptance Criteria subsections.
-
-If you classified as `defect` or `recurring-pattern`, also broadcast:
-
-```text
-SendMessage(team=<team_name>, from=<self>, to=*, content="ROOT_CAUSE_PRODUCED: <item_ref> — see Root-Cause Analysis section")
-```
+The rtica-assessor teammate reads the Issue Classification section to adjust RT-ICA scope sizing. The groomer teammate reads both sections after Wave 2 completes and uses them to shape the groomed Description and Acceptance Criteria subsections. A section that is absent leaves both of them working from the ungroomed description.
 
 ## Behavioral Constraints
 
@@ -154,5 +144,3 @@ Your `memory: project` frontmatter field gives you a persistent, cross-session m
 - A classification you made that a human later corrected (e.g. called `defect` when it was actually `missing-guardrail`) — what observable signal you missed
 - A decision-tree branch that repeatedly produces disputed classifications for a recognizable pattern of item wording
 - Do NOT record the content of any specific backlog item — only the generalizable judgment lesson
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

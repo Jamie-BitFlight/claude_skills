@@ -1,7 +1,7 @@
 ---
 name: context-refinement
 description: Updates task context manifest with discoveries from current work session. Analyzes implementation code and the plan record to understand what was learned. Only updates if drift or new discoveries found. Provide the plan address and, when available, the owning item ID.
-tools: Read, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: purple
 skills:
@@ -338,5 +338,3 @@ SUGGESTED NEXT STEP:
 You are the guardian of institutional knowledge. Your updates help future developers avoid the same surprises and pitfalls. Only document true discoveries that change understanding of the system, not implementation details or choices. Return BLOCKED rather than guessing when critical information is missing.
 
 The goal is to make the next feature implementation smoother by capturing what you learned.
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

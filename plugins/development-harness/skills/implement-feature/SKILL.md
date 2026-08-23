@@ -131,12 +131,10 @@ flowchart TD
     Verdict -->|"Crashed — session ended abruptly<br>after sam_task(action=claim) with no further turns"| Confirm
     Confirm["Confirm task state via sam_task read<br>using plan_ref + task_id<br>Verify task is still CLAIMED"] --> Respawn
     Respawn["Re-spawn agent with the same plan_ref and task ID<br>SubagentStop hook updates status on completion"]
-    Verdict -->|"Idle — no tool calls for 5+ min<br>agent appears stuck mid-task"| TeamCheck{Agent is a teammate<br>in an active team?}
-    TeamCheck -->|Yes| SendMsg["SendMessage to teammate<br>'Are you blocked? What is your current status?'<br>Wait 2 minutes for response"]
-    TeamCheck -->|"No — spawned via single Agent call"| Respawn
-    SendMsg --> MsgCheck{Response received<br>within 2 min?}
-    MsgCheck -->|Yes — agent responds| Waiting
-    MsgCheck -->|No — still silent| Respawn
+    Verdict -->|"Idle — no tool calls for 5+ min<br>agent appears stuck mid-task"| Activity["Read the task via sam_task read<br>Note its last-activity timestamp<br>Wait 2 minutes and read it again"]
+    Activity --> ActCheck{last-activity advanced?}
+    ActCheck -->|"Yes — the agent is still writing task state"| Waiting
+    ActCheck -->|"No — task state is frozen"| Respawn
     Verdict -->|"Active — tool calls within last 2–3 min"| Waiting
     Waiting[Continue waiting] --> Later["Re-check after 5–10 min<br>if completion message still absent"]
 ```
@@ -209,17 +207,19 @@ Note: same CLI `--append` gap as the concerns-groom call above — use the MCP t
 
 If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely. Proportional quality gate items without an architect spec automatically skip this step with zero overhead.
 
-4b. Shut down the completed teammate
+4b. Release the completed teammate
 
-After concerns and contract verification are handled for a task, send a shutdown request to the agent if it was dispatched as a teammate via `TeamCreate`:
+After concerns and contract verification are handled for every task in the team, delete the team:
 
 ```text
-SendMessage(to="{teammate_name}", message={"type": "shutdown_request"})
+TeamDelete(team_name="{team_name}")
 ```
 
-This terminates the teammate immediately rather than leaving it idle. Idle teammates emit periodic notifications and hold resources without contributing further work.
+Deleting the team releases its teammates rather than leaving them idle. Idle teammates emit periodic notifications and hold resources without contributing further work.
 
-**Skip when**: the agent was dispatched via a single `Agent` call (not `TeamCreate`) — subagents terminate automatically when their prompt completes.
+Delete the team only once every task it owns is terminal — read that through `sam_plan(config={"action": "status"})`, never by assuming a silent teammate has finished.
+
+**Skip when**: the agents were dispatched via single `Agent` calls (not `TeamCreate`) — subagents terminate automatically when their prompt completes.
 
 **Commit Ownership**
 

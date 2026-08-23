@@ -2,7 +2,7 @@
 name: reviewer-quality
 description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) and registers findings as a codebase-analysis artifact. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review as part of the parallel reviewer team. Trigger: reviewer-quality, quality review, code quality gate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
+tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification
@@ -157,14 +157,25 @@ STATUS: BLOCKED
 Reason: {what is missing — e.g., changed-files list not present in task body}
 ```
 
-## SendMessage (Required When Operating as a Teammate)
+## Verdict Delivery (Required)
 
-When spawned via `TeamCreate`, you MUST send your verdict to the team lead via `SendMessage`.
+Your verdict reaches the orchestrator through the task you are executing, not through your
+response text. Write the verdict block into the task's `Review Results` section — that section is
+what the orchestrator reads back to apply the review gate.
 
 ```text
-SendMessage(
-  to="team-lead",
-  summary="Quality: {APPROVE|REJECT} — {N} findings",
-  message="{full verdict block JSON}\n\nSTATUS: DONE\nPerspective: quality\nVerdict: {verdict}\nFindings: {count}"
+mcp__plugin_dh_sam__sam_task(
+  plan="{plan_address}",
+  task="{task_id}",
+  config={
+    "action": "update",
+    "append_section": "Review Results",
+    "section_content": "{the raw JSON verdict block, nothing else}"
+  }
 )
 ```
+
+`{plan_address}` and `{task_id}` are the task reference you were dispatched with. The section
+content must be the JSON verdict block on its own so the orchestrator can parse it directly. A
+task that reaches a terminal status with no `Review Results` section is read as a missing verdict
+and fails the gate.

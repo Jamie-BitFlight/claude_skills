@@ -2,7 +2,7 @@
 name: integration-checker
 description: Verifies cross-module integration and end-to-end flows. Checks that new code connects properly with existing modules - exports used, imports work, data flows complete. Existence is not integration.
 model: haiku
-tools: Read, Bash, Grep, Glob, Write, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Bash, Grep, Glob, Write, Skill, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:validation-protocol
@@ -298,5 +298,3 @@ NEXT_STEP: Fix integration gaps, then re-verify
 - [ ] Report provides actionable fixes for each gap
 
 </success_criteria>
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

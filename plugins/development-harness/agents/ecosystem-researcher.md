@@ -1,7 +1,7 @@
 ---
 name: ecosystem-researcher
 description: Researches domain ecosystems and technology landscapes before roadmap creation. Supports three modes - Ecosystem discovery, Feasibility assessment, and Comparison analysis. Use when exploring new domains, evaluating technology choices, or comparing implementation approaches. Requires MCP research servers (Ref, exa, context7, or firecrawl) - BLOCKs if none available.
-tools: Read, Grep, Glob, Write, Skill, SendMessage, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Write, Skill, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__context7__resolve-library-id, mcp__context7__query-docs, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:dispatch-contract
@@ -647,7 +647,5 @@ SUGGESTED NEXT STEP:
 ```
 
 **CRITICAL**: Return BLOCKED rather than guessing when you cannot verify claims. Unverified research is worse than no research - it creates false confidence.
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
 
 </output_format>
