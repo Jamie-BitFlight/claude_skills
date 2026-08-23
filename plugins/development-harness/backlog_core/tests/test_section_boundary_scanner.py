@@ -23,8 +23,11 @@ from __future__ import annotations
 
 from typing import cast
 
+import pytest
+
 from backlog_core.models import SectionEntryMetadata
 from backlog_core.operations import _build_sections_metadata
+from backlog_core.parsing import split_body_sections
 
 
 class TestEntryContentHeadingsAreNotSectionBoundaries:
@@ -206,3 +209,87 @@ class TestFilterSemanticsPreserved:
         sections = cast("dict[str, SectionEntryMetadata]", _build_sections_metadata(self._BODY, "B", None))
 
         assert set(sections) == {"B"}, f"show='B' must filter to only section 'B', got {sorted(sections)}"
+
+
+class TestBoundariesComeFromTheParserNotARescan:
+    """Heading positions come from marko, not from re-scanning the source lines.
+
+    The splitter used to ask marko *which* lines were headings, then re-scan the source
+    independently and bind the Nth heading-shaped line to the Nth AST heading. The join
+    never compared heading text to line text, so wherever the scanner and the parser
+    disagreed about a ``#``-prefixed line, every heading from that point on bound to the
+    wrong line — and the last real section was dropped entirely. These four inputs are
+    four symptoms of that one join, not four separate bugs.
+    """
+
+    def test_heading_inside_an_html_comment_is_not_a_boundary(self) -> None:
+        """A commented-out heading is invisible to marko and must be invisible here.
+
+        Why: The scanner tracked fences and entry divs but no HTML-block state, so it
+             bound AST heading #2 ("B") to the commented "## hidden" line and folded the
+             real B section into it.
+        """
+        body = "## A\n<!--\n## hidden\n-->\n## B\nbbody"
+
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    def test_heading_inside_a_four_backtick_fence_is_not_a_boundary(self) -> None:
+        """Fence tracking must respect CommonMark delimiter length.
+
+        Why: A boolean toggle on any ```` ``` ````-prefixed line treated the inner
+             three-backtick line as a closing delimiter, so "## Fake" escaped the fence
+             as a section and the real "## Real2" was lost.
+        """
+        body = "## Real1\n````\n```\n## Fake\n````\n## Real2\nreal2body"
+
+        assert [s.name for s in split_body_sections(body)] == ["Real1", "Real2"]
+
+    def test_unterminated_entry_wrapper_does_not_swallow_later_sections(self) -> None:
+        """A ``<div><sub>`` that never closes must not consume to end of document.
+
+        Why: _EntryDivBlock claimed the block and consumed every remaining line, so a
+             truncated wrapper erased every section after it from metadata, the compact
+             index, and section-filter results. The regex path this replaced did expose
+             those headings, so losing them was a regression, not an inherited bug.
+        """
+        body = "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\ntext\n\n## B\nbbody"
+
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    def test_terminated_entry_wrapper_stays_opaque(self) -> None:
+        """The unterminated fix must not weaken entry-block opacity.
+
+        Why: A heading-shaped line inside a properly closed entry is the entry's own
+             content and must never become a section (#2956).
+        """
+        body = "## A\n<div><sub>2026-08-22T10:00:00Z</sub>\n\n## notaheading\n\n</div>\n\n## B\nb"
+
+        assert [s.name for s in split_body_sections(body)] == ["A", "B"]
+
+    @pytest.mark.parametrize(
+        "document", ["## A\na\n## B\nb", "## A\na\nb\nc\n## B\nb", "## Sec\n\ntext\n\n## Two\n\nmore\n"]
+    )
+    def test_line_endings_do_not_change_the_result(self, document: str) -> None:
+        """The same document parsed with LF and with CRLF yields identical spans.
+
+        Tests: span names, content, and offsets are line-ending invariant
+        How: Parse the identical document twice, once with \\n and once with \\r\\n
+        Why: Offsets were computed as ``offset += len(line) + 1`` over splitlines(),
+             assuming a one-character line ending, so every span drifted one char left
+             per preceding line and start offsets landed mid-line. marko reports
+             positions against a CRLF-normalized buffer, so taking its positions
+             re-introduces the same class of error one layer down unless the offsets are
+             translated back — this asserts the translation, and keeps asserting it if a
+             future marko version moves where Source.pos lands.
+        """
+        crlf = document.replace("\n", "\r\n")
+
+        lf_spans = split_body_sections(document)
+        crlf_spans = split_body_sections(crlf)
+
+        assert [s.name for s in lf_spans] == [s.name for s in crlf_spans]
+        assert [s.content for s in lf_spans] == [s.content for s in crlf_spans]
+        for span in crlf_spans:
+            assert crlf[span.start : span.start + 2] == "##", (
+                f"start offset {span.start} for {span.name!r} does not land on the heading line"
+            )
