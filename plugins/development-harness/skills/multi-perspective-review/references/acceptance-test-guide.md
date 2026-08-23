@@ -20,9 +20,9 @@ Before running any test below:
    ```bash
    /dh:multi-perspective-review --help
    ```
-2. Confirm the four reviewer agents are registered:
+2. Confirm the four reviewer agents and the synthesizer are registered:
    ```bash
-   ls plugins/development-harness/agents/reviewer-*.md
+   ls plugins/development-harness/agents/reviewer-*.md plugins/development-harness/agents/review-synthesizer.md
    ```
 3. Apply a fixture diff to a scratch branch:
    ```bash
