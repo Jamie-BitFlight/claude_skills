@@ -9,6 +9,9 @@ user-invocable: false
 This contract governs execution. Follow it whenever you dispatch work in a dh workflow or execute
 a task you were dispatched to run.
 
+Every artifact is consumed as an input by a later step. An artifact no step reads is a missing
+consumer, not a redundant artifact.
+
 ## Dispatch role vocabulary
 
 - Orchestrator — the agent that dispatches. It chooses a dispatch target by fit and passes a task
