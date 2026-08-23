@@ -1055,11 +1055,11 @@ class TestExtractSectionsEntryBoundary:
 # Balanced, individually well-formed adversarial fragments -- deliberately including
 # heading-lookalike lines, nested <div> content, and code fences (the exact bug
 # classes #2956 fixed). Each fragment keeps its own <div>/</div> tags balanced so a
-# generated example never trips the separate, out-of-scope entry_blocks.ENTRY_RE
-# greedy-match behavior on an unmatched tag -- this property targets section-boundary
-# detection, not entry-content regex matching. A "<div><sub>...</sub>...</div>"-shaped
+# generated example never trips an unmatched tag in the separate, out-of-scope
+# entry_blocks.find_entry_spans extent logic -- this property targets section-boundary
+# detection, not entry-content extent matching. A "<div><sub>...</sub>...</div>"-shaped
 # fragment (mimicking a literal nested entry marker) is deliberately excluded: it
-# surfaced a real but distinct bug in entry_blocks.parse_entries's own ENTRY_RE
+# surfaced a real but distinct bug in entry_blocks.parse_entries's own entry-extent
 # matching (filed as #2967), not in the section-boundary logic #2956 fixed.
 _ADVERSARIAL_FRAGMENTS = st.sampled_from([
     "## Fake Heading Inside Content",

@@ -271,7 +271,7 @@ class TestSectionEntryDoesNotIncludeNextSectionHeader:
 
 
 # ---------------------------------------------------------------------------
-# Finding 1: _build_sections_compact must use _SECTION_BOUNDARY_RE (#{2,3})
+# Finding 1: _build_sections_compact must recognise both ## and ### boundaries
 # ---------------------------------------------------------------------------
 
 # Body containing a mix of ## and ### section headers — as occurs in real issue
@@ -300,6 +300,12 @@ class TestBuildSectionsCompactUsesSectionBoundaryRe:
     ``_SECTION_BOUNDARY_RE = re.compile(r"^#{2,3} (.+?)$")``.  This caused
     compact-mode (include_content=False) and content-mode (include_content=True)
     to disagree on section boundaries for the same body.
+
+    ``_SECTION_BOUNDARY_RE`` itself was later deleted (#3157): both functions
+    now share :func:`~backlog_core.parsing.split_body_sections`, the
+    entry-block-aware marko-AST splitter, so they cannot disagree on
+    boundaries for any body, including one with heading-shaped lines quoted
+    inside an entry block's own content.
     """
 
     def test_build_sections_compact_detects_double_hash_boundary(self) -> None:

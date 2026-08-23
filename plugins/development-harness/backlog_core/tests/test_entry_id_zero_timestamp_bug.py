@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING
 
 from backlog_core.models import BacklogItem, Entry, Section, ViewItemResult
 from backlog_core.operations import view_item
-from backlog_core.parsing import now_iso
+from backlog_core.timestamps import now_iso
 
 from ._view_test_helpers import _configure_memory_view
 

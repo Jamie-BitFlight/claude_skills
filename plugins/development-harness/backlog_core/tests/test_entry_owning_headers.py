@@ -1,12 +1,16 @@
 """Regression test for entry-content header mis-detection (#2495 C4).
 
-Bug: ``_entry_owning_headers`` runs ``_SECTION_BOUNDARY_RE`` over the full body
-with no exclusion for ``## ``/``### `` lines that appear INSIDE an entry block's
-content. Such a line is part of the entry's text, not a real section boundary,
-so a later entry is wrongly attributed to it (and a fictitious section can be
-re-attached to the paged body).
+Bug: ``_entry_owning_headers`` used to run the naive ``_SECTION_BOUNDARY_RE``
+line regex over the full body with a hand-rolled exclusion list for ``## ``/
+``### `` lines that appear INSIDE an entry block's content. Such a line is
+part of the entry's text, not a real section boundary, so a later entry was
+wrongly attributed to it (and a fictitious section could be re-attached to
+the paged body).
 
-Fix: exclude header matches whose position falls within an entry block's span.
+Fix (#3157): ``_entry_owning_headers`` now sources its headers from
+``parsing.split_body_sections``, the entry-block-aware marko-AST splitter —
+a heading-shaped line inside an entry never produces a span in the first
+place, so the hand-rolled exclusion list is gone.
 """
 
 from __future__ import annotations

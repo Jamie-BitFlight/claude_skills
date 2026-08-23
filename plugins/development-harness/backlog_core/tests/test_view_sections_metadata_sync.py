@@ -26,6 +26,7 @@ import pytest
 from backlog_core import operations
 from backlog_core.models import ViewItemResult
 from backlog_core.operations import _apply_body_section_filter
+from backlog_core.parsing import split_body_sections
 from backlog_core.tests._view_test_helpers import _patch_github_body, _resp_metadata
 from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
 
@@ -68,7 +69,7 @@ def _body_section_names(body: str) -> list[str]:
     Returns:
         A list of header name strings in document order.
     """
-    return [hdr.group(1).strip() for hdr in operations._SECTION_BOUNDARY_RE.finditer(body)]
+    return [span.name for span in split_body_sections(body)]
 
 
 def _view(mocker: MockerFixture, body: str, section: str) -> ViewItemResult:

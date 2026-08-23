@@ -52,7 +52,7 @@ repos:
         name: Detect destroyed symlinks
         description: fails if symlinks were converted to plain files (run after repair-symlinks)
       - id: trailing-whitespace
-        exclude: (\.lock$|.*requirements\.txt|plans?/.*|.claude/backlog/.*|.claude/reports/.*)$
+        exclude: (\.lock$|.*requirements\.txt|plans?/.*|.claude/backlog/.*|.claude/reports/.*|.*/tests/fixtures/.*)$
       - id: check-yaml
         args: [--unsafe] # Allow Python tags in mkdocs.yml
       - id: check-json

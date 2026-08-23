@@ -67,3 +67,76 @@ def test_full_entry_lifecycle(backlog_dir, mock_github):
     active = [e for e in entries3 if not e.get("struck")]
     assert len(active) == 1
     assert "Updated second decision." in active[0]["content"]
+
+
+def test_full_entry_lifecycle_with_nested_html_survives_resubmission(backlog_dir, mock_github):
+    """Real write -> render -> parse cycle through operations, not entry_blocks directly.
+
+    Regression for the residual ENTRY_RE/STRUCK_RE extent divergence
+    (.tmp/scratch/reports/20260823-entry-extent-residual.md): groom content
+    containing a nested <div> and a nested <details>, view it back, resubmit
+    exactly what view_item returned (the echo-back an agent performs), and
+    verify no entry is lost, duplicated, or has its tail truncated.
+    """
+    out = Output()
+    operations.add_item(title="Nested HTML Lifecycle Test", priority="P1", description="Test", output=out)
+
+    content = 'Finding A.\n\n<div align="center">a nested figure</div>\n\nFinding B - the important part.'
+    operations.groom_item(selector="Nested HTML Lifecycle Test", section="Fact-Check", content=content, output=out)
+
+    result = operations.view_item(selector="Nested HTML Lifecycle Test", output=out)
+    sections = result.sections
+    assert isinstance(sections, dict)
+    fact_check = cast("SectionEntryMetadata", sections["Fact-Check"])
+    assert fact_check["num_entries"] == 1
+    entries = list(fact_check["entries"])
+    assert len(entries) == 1
+    returned_content = entries[0]["content"]
+    assert "Finding B - the important part." in returned_content
+
+    # Resubmit exactly what view_item returned — the echo-back path that corrupted the
+    # wrapper before find_entry_spans replaced ENTRY_RE in wrap_entry.
+    operations.groom_item(
+        selector="Nested HTML Lifecycle Test",
+        section="Fact-Check",
+        content=returned_content,
+        entry_id=entries[0]["id"],
+        output=out,
+    )
+
+    result = operations.view_item(selector="Nested HTML Lifecycle Test", output=out)
+    sections = result.sections
+    assert isinstance(sections, dict)
+    fact_check = cast("SectionEntryMetadata", sections["Fact-Check"])
+    assert fact_check["num_entries"] == 1, (
+        f"Resubmission must not grow junk entries, got {fact_check['num_entries']}: {fact_check['entries']}"
+    )
+    entries = list(fact_check["entries"])
+    assert "Finding B - the important part." in entries[0]["content"]
+
+    # Strike the entry — its content survives a nested <details> the same way the read
+    # path (STRUCK_RE -> _match_struck) must.
+    struck_content = "Notes.\n\n<details><summary>detail</summary>\ninner\n</details>\n\nTail that matters."
+    operations.groom_item(
+        selector="Nested HTML Lifecycle Test",
+        section="Fact-Check",
+        content=struck_content,
+        entry_id=entries[0]["id"],
+        output=out,
+    )
+    result = operations.view_item(selector="Nested HTML Lifecycle Test", output=out)
+    sections = result.sections
+    assert isinstance(sections, dict)
+    fact_check = cast("SectionEntryMetadata", sections["Fact-Check"])
+    entries = list(fact_check["entries"])
+    target_id = entries[0]["id"]
+    operations.strike_entry(selector="Nested HTML Lifecycle Test", entry_id=target_id, reason="superseded", output=out)
+
+    result = operations.view_item(selector="Nested HTML Lifecycle Test", output=out)
+    sections = result.sections
+    assert isinstance(sections, dict)
+    fact_check = cast("SectionEntryMetadata", sections["Fact-Check"])
+    assert fact_check["num_struck"] == 1
+    struck_entries = [e for e in fact_check["entries"] if e.get("struck")]
+    assert len(struck_entries) == 1
+    assert "Tail that matters." in struck_entries[0]["content"]

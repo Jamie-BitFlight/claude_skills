@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_models import parse_issue
 from backlog_core.models import DispatchItemRecord, DispatchWaveRecord
-from backlog_core.parsing import now_iso as _now_iso
+from backlog_core.timestamps import now_iso as _now_iso
 
 if TYPE_CHECKING:
     from pathlib import Path

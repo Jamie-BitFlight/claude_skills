@@ -16,18 +16,25 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from marko.source import Source
+
     from .backend_types import IssueNode
 
 log = logging.getLogger(__name__)
 
+import marko
+from marko.block import Heading
+from marko.helpers import MarkoExtension
+from pydantic import BaseModel
 from ruamel.yaml import YAML, YAMLError
 
 # ---------------------------------------------------------------------------
 # Imports from sibling models module
 # ---------------------------------------------------------------------------
-from . import models as _models
+from . import models
+from .entry_blocks import _deduplicate_timestamps, _entry_from_span, find_entry_spans
 from .models import (
-    COMMIT_PREFIX_RE as _COMMIT_PREFIX_RE,
+    COMMIT_PREFIX_RE,
     FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
@@ -48,6 +55,7 @@ from .section_registry import resolve_section_name, resolve_subsection_name
 # Public API
 # ---------------------------------------------------------------------------
 __all__ = [
+    "SectionSpan",
     "build_body_extra_only",
     "build_issue_body",
     "build_issue_body_from_file",
@@ -67,13 +75,13 @@ __all__ = [
     "loads_frontmatter",
     "merge_sections",
     "normalize_issue_title",
-    "now_iso",
     "parse_backlog",
     "parse_backlog_from_directory",
     "parse_issue_selector",
     "parse_item_file",
     "parse_md_body_sections",
     "parse_sam_task_metadata",
+    "split_body_sections",
     "title_to_slug",
     "today",
     "view_result_from_local_item",
@@ -212,15 +220,6 @@ def today() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def now_iso() -> str:
-    """Return current UTC time as ISO 8601 string with microsecond precision.
-
-    Microsecond precision ensures uniqueness across rapid successive calls,
-    preventing entry id collisions in batch groom operations.
-    """
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
 # ---------------------------------------------------------------------------
 # Slug / title helpers
 # ---------------------------------------------------------------------------
@@ -254,7 +253,7 @@ def normalize_issue_title(title: str) -> str:
         >>> normalize_issue_title("SAM: Error Recovery")
         'sam: error recovery'
     """
-    return _COMMIT_PREFIX_RE.sub("", title).strip().lower()
+    return COMMIT_PREFIX_RE.sub("", title).strip().lower()
 
 
 def infer_type(description: str, title: str) -> str:
@@ -403,7 +402,7 @@ def _parse_yaml_item_file(path: Path) -> BacklogItem:
     yaml = YAML(typ="safe")
     with path.open(encoding="utf-8") as fh:
         data = yaml.load(fh)
-    item = _models.BacklogItem.model_validate(data)
+    item = models.BacklogItem.model_validate(data)
     item.file_path = str(path.resolve())
     return item
 
@@ -418,7 +417,7 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
     Returns:
         List of BacklogItem instances with section, title, and parsed fields.
     """
-    if not _models.get_backlog_dir().exists():
+    if not models.get_backlog_dir().exists():
         return []
     prefix_to_section = {
         "p0-": "P0",
@@ -431,8 +430,8 @@ def parse_backlog_from_directory() -> list[BacklogItem]:
     }
     # Collect .yaml files first (new format), then .md files (legacy).
     # When a stem has both .yaml and .md, .yaml takes precedence.
-    yaml_files = list(_models.get_backlog_dir().glob("*.yaml"))
-    md_files = list(_models.get_backlog_dir().glob("*.md"))
+    yaml_files = list(models.get_backlog_dir().glob("*.yaml"))
+    md_files = list(models.get_backlog_dir().glob("*.md"))
     yaml_stems = {f.stem for f in yaml_files}
     all_files = sorted(yaml_files + [f for f in md_files if f.stem not in yaml_stems])
 
@@ -743,8 +742,8 @@ def extract_sections(text: str) -> dict[str, str]:
     path (see the "Legacy .md body section parsing" section of this module).
     Both callers now share one structural section boundary decision instead
     of independently maintaining their own hand-rolled line scanners that can
-    silently disagree — see :class:`_EntryDivBlock` for why a naive line-based
-    ``## `` scan (this function's previous implementation) misidentifies a
+    silently disagree — see :func:`~.entry_blocks.find_entry_spans` for why a naive
+    line-based ``## `` scan (this function's previous implementation) misidentifies a
     heading-shaped line inside entry-block content as a real section boundary.
 
     Args:
@@ -756,6 +755,56 @@ def extract_sections(text: str) -> dict[str, str]:
         matching this function's pre-existing (dict-based) contract.
     """
     return {f"## {name}": content for name, content in _split_body_h2(text)}
+
+
+class SectionSpan(BaseModel):
+    """One entry-block-aware ``## ``/``### `` section boundary in a markdown body.
+
+    Produced by :func:`split_body_sections`, the single structural boundary
+    detector shared by every ``operations.py`` consumer that used to
+    re-implement section-boundary detection with its own naive line regex
+    (see :func:`~.entry_blocks.find_entry_spans` for why that was wrong).
+
+    Attributes:
+        name: Heading text with the ``#`` marker stripped and whitespace trimmed.
+        start: Char offset of the start of the heading's own source line in
+            the original ``body`` string.
+        end: Char offset of the next section's ``start`` (or ``len(body)`` for
+            the final section) — the exclusive end of the full section slice
+            (heading line plus content).
+        content: Section content with the heading line stripped and
+            leading/trailing whitespace trimmed.
+    """
+
+    name: str
+    start: int
+    end: int
+    content: str
+
+
+def split_body_sections(body: str) -> list[SectionSpan]:
+    """Split *body* into ``## ``/``### ``-delimited sections, entry-block aware.
+
+    The shared structural boundary detector for callers that need the same
+    flat, mixed-level ``## ``/``### `` contract the deleted
+    ``operations._SECTION_BOUNDARY_RE`` (``^#{2,3} (.+?)$``) used to provide —
+    but routed through the marko-AST heading positions shared with
+    :func:`_split_body_h2`, so a heading-shaped line inside a
+    ``<div><sub>...</sub>...</div>`` entry block (see
+    :func:`~.entry_blocks.find_entry_spans`) is never misidentified as a section
+    boundary. This is the same guard
+    :func:`extract_sections` already applies for ``## ``-only splitting,
+    generalized to also match ``### `` and to carry char offsets so callers
+    that slice the raw body (rather than only reading section content) have
+    a single shared boundary source too.
+
+    Args:
+        body: Full issue/item body text.
+
+    Returns:
+        List of :class:`SectionSpan` in document order.
+    """
+    return _section_spans(body, frozenset({_H2_LEVEL, _H3_LEVEL}))
 
 
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
@@ -810,13 +859,6 @@ def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
 # Legacy .md body section parsing — converts markdown body into typed sections
 # ---------------------------------------------------------------------------
 
-import marko
-from marko.block import BlockElement as _MarkoBlockElement, Heading as _MarkoHeading
-from marko.helpers import MarkoExtension as _MarkoExtension
-
-if TYPE_CHECKING:
-    from marko.source import Source as _MarkoSource
-
 # Heading levels used for body section splitting.
 _H2_LEVEL = 2
 _H3_LEVEL = 3
@@ -824,111 +866,221 @@ _H3_LEVEL = 3
 # Groomed heading: "## Groomed" with optional " (YYYY-MM-DD)" suffix.
 _GROOMED_DATE_RE = re.compile(r"^Groomed(?:\s*\((\d{4}-\d{2}-\d{2})\))?$", re.IGNORECASE)
 
-# ATX heading detector used when mapping AST positions back to source lines.
-_ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)")
-
 # Entry-block wrapper markers. Must match entry_blocks.wrap_entry()'s
-# "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see ENTRY_RE in
-# entry_blocks.py for the canonical parse-side pattern this mirrors).
+# "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see find_entry_spans in
+# entry_blocks.py for the canonical parse-side extent this mirrors).
 _ENTRY_DIV_OPEN = "<div><sub>"
 _ENTRY_DIV_OPEN_RE = re.compile(r" {0,3}" + re.escape(_ENTRY_DIV_OPEN))
 
-# Tag-boundary matchers for div-nesting depth tracking. A literal-substring count
-# (``line.count("<div>")``) misses an attributed opening tag like
-# ``<div class="note">`` while ``line.count("</div>")`` still matches its close
-# unconditionally — that asymmetry drives depth negative and ends entry-block
-# opacity early, letting a heading-lookalike line further down escape as a
-# spurious section (#2964 follow-up). Matching tag boundaries via regex keeps
-# opens and closes counted symmetrically regardless of attributes.
-_DIV_OPEN_TAG_RE = re.compile(r"<div\b")
+# An entry-block opening marker at the start of a line, at the up-to-three-spaces indent
+# CommonMark permits. Used only to find a truncated wrapper, which is not an entry and so
+# is not returned by find_entry_spans.
+_ENTRY_DIV_OPEN_LINE_RE = re.compile(r"(?m)^ {0,3}" + re.escape(_ENTRY_DIV_OPEN))
+# Any ATX heading line. Used only to bound a truncated wrapper; real heading detection is
+# the parser's job.
+_ATX_ANY_RE = re.compile(r"(?m)^ {0,3}#{1,6}\s")
 _DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>")
+# Captures the text of an ATX heading line, so a section name keeps the exact inline
+# spelling callers filter and index against.
+_ATX_SOURCE_RE = re.compile(r" {0,3}#{1,6}\s+(.*)$")
 
 
-def _div_depth_delta(line: str) -> int:
-    """Return the net change in ``<div>``/``</div>`` nesting depth for one line.
+def _mask_entry_blocks(body: str) -> str:
+    """Blank out every entry block so the parser sees no markdown structure inside one.
+
+    Entry extent comes from ``entry_blocks.find_entry_spans`` — the same function
+    ``parse_entries`` reads content through. That shared definition is the point: this
+    module used to track ``<div>`` nesting itself while the reader stopped at the first
+    ``</div>``, so an entry containing further HTML was opaque to one and truncated by the
+    other, and the content past that inner tag was dropped from the entry silently. One
+    function means a heading-shaped line is either inside an entry for both of them or
+    outside for both.
+
+    Masking also removes the reason this module needed to know anything about markdown
+    context. A literal ``<div>`` in a fence, an inline code span, or an HTML comment is
+    handled once, inside that shared function, rather than being re-discovered here.
+
+    A ``<div><sub>`` that never closes is a truncated wrapper, so no span covers it. It is
+    masked only as far as the next heading: masking to end of document would erase every
+    following section from the AST, and leaving it bare lets marko's HTML-block rule
+    consume to the next blank line, which a malformed body need not have.
+
+    Masking preserves length and every line ending, so an offset into the result is also
+    an offset into *body*.
 
     Args:
-        line: Source line to scan.
+        body: Full body text.
 
     Returns:
-        Count of opening ``<div`` tags minus closing ``</div>`` tags on this line.
+        *body* with entry-block content replaced by filler of the same length.
     """
-    return len(_DIV_OPEN_TAG_RE.findall(line)) - len(_DIV_CLOSE_TAG_RE.findall(line))
+    ranges = [(span.start, span.end) for span in find_entry_spans(body)]
+    for match in _ENTRY_DIV_OPEN_LINE_RE.finditer(body):
+        if any(start <= match.start() < end for start, end in ranges):
+            continue
+        heading = _ATX_ANY_RE.search(body, match.end())
+        ranges.append((match.start(), heading.start() if heading is not None else len(body)))
+    # A </div> left outside every entry range is debris from a truncated wrapper. Left
+    # bare it opens an HTML block, and a CommonMark type-6 block runs to the next blank
+    # line — so it swallows the very heading the bound above stopped at in order to
+    # preserve. It is not markdown structure in its own right, so mask it too.
+    for match in _DIV_CLOSE_TAG_RE.finditer(body):
+        if not any(start <= match.start() < end for start, end in ranges):
+            ranges.append((match.start(), match.end()))
+
+    out = list(body)
+    for start, end in ranges:
+        for i in range(start, end):
+            if out[i] not in "\r\n":
+                out[i] = "x"
+    return "".join(out)
 
 
-class _EntryDivBlock(_MarkoBlockElement):
-    """Marko block element matching this codebase's ``<div><sub>...</sub>...</div>`` entry wrapper.
+def _original_offsets(body: str) -> list[int] | None:
+    r"""Map each offset of marko's normalized buffer back to an offset in *body*.
 
-    CommonMark's HTML-block rules end a generic ``<div>`` block at the first
-    blank line. ``entry_blocks.wrap_entry()`` always emits a blank line right
-    after the opening ``<div><sub>{ts}</sub>`` tag (to separate the timestamp
-    from multi-paragraph content), so marko's built-in ``HTMLBlock`` element
-    would otherwise stop treating the entry as opaque at that first blank line
-    and reparse everything after it as ordinary markdown — including any
-    ``## ``/``### ``-looking line inside the entry's own content (e.g. a
-    fact-checker verdict quoting one claim per heading) as a real section
-    boundary (#2956).
+    ``marko.source.Source`` stores ``text.replace("\\r\\n", "\\n")`` and reports every
+    position against that buffer, so a ``Source.pos`` taken from a CRLF document is short
+    by one character for each ``\\r\\n`` preceding it. Callers slice the original body with
+    these offsets, so the positions have to be translated back rather than used raw.
 
-    This element is registered with higher priority than ``Heading``,
-    ``HTMLBlock``, and ``Paragraph`` (see :data:`_ENTRY_AWARE_MARKDOWN`), so
-    once a line opens an entry block the parser hands the *entire* block —
-    every line up to the point ``<div>``/``</div>`` nesting returns to zero,
-    regardless of blank lines, code fences, or heading-shaped text inside — to
-    this element instead of descending into it looking for block-level
-    structure. Depth is tracked (not "stop at the first ``</div>``") because
-    entry content may itself contain further, unrelated ``<div>``/``</div>``
-    text; a first-match stop would end the opaque region early and let a
-    heading-lookalike line *after* that inner close fragment the section
-    again. That makes "a heading-lookalike line inside entry content is
-    mistaken for a section boundary" structurally impossible rather than
-    special-cased: no line inside an entry block is ever offered to the
-    block-level parser as a heading candidate in the first place, at any
-    nesting depth.
+    Args:
+        body: The original, untransformed body text.
+
+    Returns:
+        A list indexed by normalized offset holding the matching original offset, or
+        ``None`` when the body contains no ``\\r\\n`` and the two spaces are identical.
+    """
+    if "\r\n" not in body:
+        return None
+    mapping: list[int] = []
+    i = 0
+    n = len(body)
+    while i < n:
+        if body[i] == "\r" and i + 1 < n and body[i + 1] == "\n":
+            i += 1
+        mapping.append(i)
+        i += 1
+    mapping.append(n)
+    return mapping
+
+
+class _PositionedHeading(Heading):
+    """A ``Heading`` that records where its own source line begins.
+
+    marko 2.2.2 exposes no source position on ``Heading``, which is why this module
+    previously re-scanned the source line by line and joined the Nth heading-shaped line
+    to the Nth AST heading. That join never compared heading text to line text, so any
+    ``#``-prefixed line the scanner and the parser disagreed about — inside an HTML
+    comment, inside a fence whose delimiter run the scanner mis-measured — silently bound
+    a heading to the wrong line and dropped every heading after it. Recording the parser's
+    own position removes the join, and with it that whole class of defect.
+
+    ``Source.pos`` at the time ``parse`` is entered can still sit on the blank lines or
+    the line ending preceding the heading, and it counts against marko's CRLF-normalized
+    buffer rather than the original text. :func:`_ast_heading_spans` corrects both; this
+    element only records what the parser knew.
     """
 
-    priority = 9  # Above ThematicBreak(8)/FencedCode(7)/Heading(6)/HTMLBlock(5)/Paragraph(1).
-
-    def __init__(self, lines: str) -> None:
-        self.body = lines
+    override = True
+    _pending_start = 0
 
     @classmethod
-    def match(cls, source: _MarkoSource) -> bool:
-        """Return whether the current line opens an entry block.
+    def parse(cls, source: Source) -> re.Match[str] | None:
+        """Record the source position, then parse the heading normally.
 
         Returns:
-            ``True`` when the line matches the entry-block open marker.
+            The match ``marko.block.Heading.parse`` produced for this source.
         """
-        return bool(source.expect_re(_ENTRY_DIV_OPEN_RE))
+        _PositionedHeading._pending_start = source.pos
+        return super().parse(source)
 
-    @classmethod
-    def parse(cls, source: _MarkoSource) -> str:
-        """Consume every line until ``<div>``/``</div`` nesting returns to zero.
-
-        Returns:
-            The raw, verbatim source text of the entry block.
-        """
-        lines: list[str] = []
-        depth = 0
-        while not source.exhausted:
-            line = source.next_line()
-            if line is None:
-                break
-            lines.append(line)
-            source.consume()
-            depth += _div_depth_delta(line)
-            if depth <= 0:
-                break
-        return "".join(lines)
+    def __init__(self, match: re.Match[str]) -> None:
+        """Attach the recorded source position to the parsed heading."""
+        super().__init__(match)
+        self.raw_start: int = _PositionedHeading._pending_start
 
 
 # Single shared marko instance used by every AST-based split in this module so
 # entry-block opacity is enforced identically everywhere, rather than each
 # caller independently re-deciding what counts as a section boundary.
-_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[_MarkoExtension(elements=[_EntryDivBlock])])
+_ENTRY_AWARE_MARKDOWN = marko.Markdown(extensions=[MarkoExtension(elements=[_PositionedHeading])])
 
 
-def _extract_heading_text(node: _MarkoHeading) -> str:
-    """Reconstruct heading text from all inline children of a marko Heading node.
+def _heading_line_start(normalized: str, pos: int) -> int:
+    """Advance *pos* to the first character of the heading's own line.
+
+    Args:
+        normalized: marko's CRLF-normalized view of the body.
+        pos: The ``Source.pos`` recorded when the heading was parsed.
+
+    Returns:
+        Offset, in *normalized*, of the first character of the heading line.
+    """
+    n = len(normalized)
+    while pos < n and normalized[pos] == "\n":
+        pos += 1
+    return pos
+
+
+def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str]]:
+    """Return ``(start_offset, heading_text)`` for every heading at *levels*.
+
+    Offsets index *body* itself, so a caller may slice the original text with them.
+
+    Args:
+        body: Raw markdown body text (everything after frontmatter).
+        levels: Heading depths to treat as boundaries.
+
+    Returns:
+        Ordered list of ``(start_offset, heading_text)`` tuples.
+    """
+    masked = _mask_entry_blocks(body)
+    doc = _ENTRY_AWARE_MARKDOWN.parse(masked)
+    normalized = masked.replace("\r\n", "\n")
+    mapping = _original_offsets(masked)
+
+    spans: list[tuple[int, str]] = []
+    for child in doc.children:
+        if not isinstance(child, Heading) or child.level not in levels:
+            continue
+        norm_start = _heading_line_start(normalized, getattr(child, "raw_start", 0))
+        start = mapping[norm_start] if mapping is not None else norm_start
+        spans.append((start, _heading_name_from_source(body, start) or _extract_heading_text(child)))
+    return spans
+
+
+def _section_spans(body: str, levels: frozenset[int]) -> list[SectionSpan]:
+    """Build the ordered section spans for *body* at the given heading *levels*.
+
+    The single boundary computation behind :func:`split_body_sections` and
+    :func:`_split_body_h2`, so the two cannot disagree about where a section starts.
+
+    Args:
+        body: Raw markdown body text.
+        levels: Heading depths to treat as boundaries.
+
+    Returns:
+        Ordered list of :class:`SectionSpan`.
+    """
+    heads = _ast_heading_spans(body, levels)
+    spans: list[SectionSpan] = []
+    for i, (start, name) in enumerate(heads):
+        end = heads[i + 1][0] if i + 1 < len(heads) else len(body)
+        newline = body.find("\n", start)
+        content_start = len(body) if newline == -1 else newline + 1
+        content = _slice_content(body, min(content_start, end), end)
+        spans.append(SectionSpan(name=name, start=start, end=end, content=content))
+    return spans
+
+
+def _extract_heading_text(node: Heading) -> str:
+    """Reconstruct heading text from all inline descendants of a marko Heading node.
+
+    Recurses. A heading containing emphasis, strong text, code or a link nests its
+    ``RawText`` one or more levels down, and stringifying the intermediate node instead
+    yields marko's ``repr`` — ``## **Impact Radius**`` became the literal section name
+    ``"[<RawText children='Impact Radius'>]"``.
 
     Args:
         node: Parsed marko Heading node.
@@ -937,126 +1089,86 @@ def _extract_heading_text(node: _MarkoHeading) -> str:
         Heading text as a plain string with inline formatting stripped.
     """
     parts: list[str] = []
-    for inline in node.children:
-        raw = getattr(inline, "children", "")
-        parts.append(raw if isinstance(raw, str) else str(raw))
+
+    def collect(inline: object) -> None:
+        children = getattr(inline, "children", None)
+        if isinstance(children, str):
+            parts.append(children)
+        elif isinstance(children, list):
+            for child in children:
+                collect(child)
+
+    collect(node)
     return "".join(parts).strip()
 
 
-def _ast_h2_headings(text: str) -> list[str]:
-    """Return level-2 heading texts from the marko AST in document order.
+def _heading_name_from_source(body: str, start: int) -> str:
+    """Return the heading's name exactly as the source line spells it.
 
-    Uses :data:`_ENTRY_AWARE_MARKDOWN` so ``##`` lines inside fenced code
-    blocks or entry-block content are never misidentified as headings.
-
-    Args:
-        text: Raw markdown body text.
-
-    Returns:
-        Ordered list of heading text strings (after ``## ``).
-    """
-    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
-    return [
-        _extract_heading_text(child)
-        for child in doc.children
-        if isinstance(child, _MarkoHeading) and child.level == _H2_LEVEL
-    ]
-
-
-def _ast_h3_headings(text: str) -> list[str]:
-    """Return level-3 heading texts from the marko AST in document order.
+    The name is taken from the source rather than from the AST so that inline markup
+    round-trips: the section registry, compact indexes and ``section=`` filters all match
+    against the spelling a caller sees in the body, so ``## **Impact Radius**`` must stay
+    ``**Impact Radius**`` and not collapse to ``Impact Radius``. This is what the deleted
+    line scanner produced, and callers depend on it.
 
     Args:
-        text: Raw markdown text for a single section body.
+        body: Full body text.
+        start: Char offset of the first character of the heading's own line.
 
     Returns:
-        Ordered list of heading text strings (after ``### ``).
+        The heading text with the ``#`` marker and surrounding whitespace removed, or an
+        empty string when the line is not an ATX heading (a setext heading, say).
     """
-    doc = _ENTRY_AWARE_MARKDOWN.parse(text)
-    return [
-        _extract_heading_text(child)
-        for child in doc.children
-        if isinstance(child, _MarkoHeading) and child.level == _H3_LEVEL
-    ]
+    line = body[start:].split("\n", 1)[0].rstrip("\r")
+    match = _ATX_SOURCE_RE.match(line)
+    return match.group(1).strip() if match else ""
 
 
-def _map_headings_to_lines(ast_headings: list[str], raw_lines: list[str], target_level: int) -> list[tuple[int, str]]:
-    """Map AST heading texts to their 0-indexed source line numbers.
+def _slice_content(body: str, content_start: int, content_end: int) -> str:
+    r"""Slice and trim one section's content out of *body*.
 
-    The AST decides *which* lines are real headings; this function only
-    locates *where* each one lives in the original source so its exact
-    verbatim content (including entry-block HTML) can be sliced out. Its
-    state tracking must therefore recognise the same block boundaries the
-    AST does — code fences and entry blocks — or it can misalign a heading
-    text with the wrong source line once any ``#``-prefixed text appears
-    inside one of those opaque regions.
+    Line endings are normalized to ``\n``, matching the ``splitlines()``-and-rejoin
+    behaviour every consumer of this contract already expects.
 
     Args:
-        ast_headings: Heading texts extracted from the marko AST, in order.
-        raw_lines: Source lines of the text (``text.splitlines()``).
-        target_level: Heading depth to match (2 for ``##``, 3 for ``###``).
+        body: Full body text.
+        content_start: Char offset of the first character after the heading line.
+        content_end: Char offset one past the section content's last character.
 
     Returns:
-        List of ``(line_index, heading_text_from_source)`` tuples.
+        The sliced, whitespace-trimmed content string.
     """
-    result: list[tuple[int, str]] = []
-    ast_idx = 0
-    in_fence = False
-    entry_depth = 0
-
-    for idx, line in enumerate(raw_lines):
-        if ast_idx >= len(ast_headings):
-            break
-        stripped = line.lstrip()
-        if entry_depth > 0:
-            entry_depth += _div_depth_delta(line)
-            continue
-        if _ENTRY_DIV_OPEN_RE.match(line):
-            entry_depth = _div_depth_delta(line)
-            continue
-        if stripped.startswith(("```", "~~~")):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            continue
-        m = _ATX_HEADING_RE.match(line)
-        if m and len(m.group(1)) == target_level:
-            result.append((idx, m.group(2).strip()))
-            ast_idx += 1
-
-    return result
+    return "\n".join(body[content_start:content_end].splitlines()).strip()
 
 
-def _split_body_h2(body: str) -> list[tuple[str, str]]:
-    """Split markdown body on ``## `` headings using the marko AST.
+def _split_body_h2(body: str, levels: frozenset[int] = frozenset({_H2_LEVEL})) -> list[tuple[str, str]]:
+    """Split markdown body on heading boundaries using the marko AST.
 
-    marko correctly identifies ATX headings while ignoring ``##`` lines inside
-    fenced code blocks.  Heading positions are then mapped back to source lines
-    so that raw content (including HTML entry blocks) is extracted verbatim.
+    marko correctly identifies ATX headings while ignoring ``#``-prefixed
+    lines inside fenced code blocks or entry-block content (see
+    :func:`~.entry_blocks.find_entry_spans`).  Heading positions are then mapped back to
+    source lines so that raw content (including HTML entry blocks) is
+    extracted verbatim.
+
+    Defaults to ``## `` (level 2) only, matching this function's original
+    contract used by :func:`extract_sections` and :func:`parse_md_body_sections`.
+    Pass ``levels=frozenset({2, 3})`` to treat ``## `` and ``### `` as a single
+    flat, mixed-level sequence of boundaries — the same contract
+    :func:`split_body_sections` uses, but entry-block aware so a
+    heading-shaped line inside a ``<div><sub>...</sub>...</div>`` entry is
+    never misidentified as a section boundary (see :func:`extract_sections`'s
+    docstring for why the naive regex scan this replaces was wrong).
 
     Args:
         body: Raw markdown body text (everything after frontmatter).
+        levels: Heading depths to treat as boundaries. Defaults to ``{2}``.
 
     Returns:
         List of ``(heading_name, content)`` tuples in document order.
-        The heading_name is the text after ``## `` with whitespace stripped.
+        The heading_name is the heading text with whitespace stripped.
         Content does not include the heading line itself.
     """
-    ast_headings = _ast_h2_headings(body)
-    if not ast_headings:
-        return []
-
-    raw_lines = body.splitlines()
-    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=2)
-
-    segments: list[tuple[str, str]] = []
-    for i, (line_idx, heading_name) in enumerate(positioned):
-        content_start = line_idx + 1
-        content_end = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
-        content = "\n".join(raw_lines[content_start:content_end]).strip()
-        segments.append((heading_name, content))
-
-    return segments
+    return [(span.name, span.content) for span in _section_spans(body, levels)]
 
 
 def _split_h3_subsections(content: str) -> dict[str, str]:
@@ -1081,19 +1193,10 @@ def _split_h3_subsections(content: str) -> dict[str, str]:
         Keys are the heading text after ``### ``, whitespace stripped, then
         resolved through the subsection registry.
     """
-    ast_headings = _ast_h3_headings(content)
-    if not ast_headings:
-        return {}
-
-    raw_lines = content.splitlines()
-    positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=3)
-
     subsections: dict[str, str] = {}
-    for i, (line_idx, raw_sub_name) in enumerate(positioned):
-        content_start = line_idx + 1
-        content_end = positioned[i + 1][0] if i + 1 < len(positioned) else len(raw_lines)
-        sub_content = "\n".join(raw_lines[content_start:content_end]).strip()
-        sub_name = resolve_subsection_name(raw_sub_name) or raw_sub_name
+    for span in _section_spans(content, frozenset({_H3_LEVEL})):
+        sub_content = span.content
+        sub_name = resolve_subsection_name(span.name) or span.name
         # When two headings collide onto one canonical key (e.g. "Priority"
         # and "priority" in the same body), the longer content wins — the
         # same rule github_sync._parse_groomed_section and _merge_groomed
@@ -1123,25 +1226,16 @@ def _parse_section_entries(content: str, added_date: str) -> Section:
     Returns:
         ``Section`` with one or more ``Entry`` objects.
     """
-    # Import here to avoid circular dependency: entry_blocks → parsing (now_iso).
-    from .entry_blocks import ENTRY_RE  # ruff: ignore[import-outside-top-level]
-
     if not content:
         return Section(entries=[])
 
-    matches = list(ENTRY_RE.finditer(content))
-    if matches:
-        from .entry_blocks import (  # ruff: ignore[import-outside-top-level]
-            _deduplicate_timestamps,
-            _parse_match_to_entry,
-        )
-
-        entries = [_parse_match_to_entry(m) for m in matches]
+    spans = find_entry_spans(content)
+    if spans:
+        entries = [_entry_from_span(content, s) for s in spans]
         _deduplicate_timestamps(entries)
 
-        # Edge case 3: capture any text that appears after the last </div>.
-        last_match_end = matches[-1].end()
-        trailing = content[last_match_end:].strip()
+        # Edge case 3: capture any text that appears after the last entry block.
+        trailing = content[spans[-1].end :].strip()
         if trailing:
             entries.append(Entry(id="", content=trailing))
 
@@ -1219,12 +1313,9 @@ def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> di
 
     # Edge case 1: capture body text that precedes the first ## heading as "preamble".
     if segments:
-        raw_lines = body_text.splitlines()
-        ast_headings = _ast_h2_headings(body_text)
-        positioned = _map_headings_to_lines(ast_headings, raw_lines, target_level=2)
-        if positioned:
-            first_heading_line = positioned[0][0]
-            pre_heading_text = "\n".join(raw_lines[:first_heading_line]).strip()
+        heads = _ast_heading_spans(body_text, frozenset({_H2_LEVEL}))
+        if heads:
+            pre_heading_text = _slice_content(body_text, 0, heads[0][0])
             if pre_heading_text:
                 synthetic_id = f"{added_date}T00:00:00Z"
                 result["preamble"] = Section(entries=[Entry(id=synthetic_id, content=pre_heading_text)])

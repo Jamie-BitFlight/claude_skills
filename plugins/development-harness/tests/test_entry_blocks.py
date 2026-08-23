@@ -539,3 +539,120 @@ def test_rewrite_by_entry_id_uses_same_dedup_logic_as_parse():
     assert entries[0].content == "First."
     assert entries[1].content == "Replaced second."
     assert entries[2].content == "Third."
+
+
+# ---------------------------------------------------------------------------
+# Residual extent-rule divergence — wrap_entry/strike_entry off ENTRY_RE onto
+# find_entry_spans, the STRUCK_RE defect, the <div/> and case-insensitive tag
+# grammar gaps. See .tmp/scratch/reports/20260823-entry-extent-residual.md.
+# ---------------------------------------------------------------------------
+
+
+def test_wrap_entry_nested_div_is_idempotent_across_resubmission():
+    """A nested <div> inside an entry must not make ENTRY_RE-style truncation
+    split the entry and grow a fresh junk entry on every resubmission."""
+    content = 'Finding A.\n\n<div align="center">a nested figure</div>\n\nFinding B - the important part.'
+    submit_1 = wrap_entry(content)
+    submit_2 = wrap_entry(submit_1)
+    submit_3 = wrap_entry(submit_2)
+    assert submit_2 == submit_1
+    assert submit_3 == submit_1
+    entries = parse_entries(submit_3)
+    assert len(entries) == 1
+    assert "Finding B - the important part." in entries[0].content
+
+
+def test_wrap_entry_fenced_example_preserves_fence_and_is_idempotent():
+    """A fenced markdown example of the wrapper format must not be broken open
+    by a naive ENTRY_RE scan that does not know about code fences."""
+    content = "Why it matters.\n\n```\n<div><sub>2026-01-01T00:00:00Z</sub>\n\ninner\n</div>\n```"
+    submit_1 = wrap_entry(content)
+    submit_2 = wrap_entry(submit_1)
+    submit_3 = wrap_entry(submit_2)
+    assert submit_2 == submit_1
+    assert submit_3 == submit_1
+    entries = parse_entries(submit_3)
+    assert len(entries) == 1
+    assert "Why it matters." in entries[0].content
+    assert "```\n<div><sub>2026-01-01T00:00:00Z</sub>\n\ninner\n</div>\n```" in entries[0].content
+
+
+def test_wrap_entry_inline_code_is_idempotent_across_resubmission():
+    """A literal `</div>` inside an inline code span must not be treated as
+    the wrapper's real closing tag."""
+    content = "See the closing tag `</div>` in the wrapper format.\n\nTrailing sentence."
+    submit_1 = wrap_entry(content)
+    submit_2 = wrap_entry(submit_1)
+    submit_3 = wrap_entry(submit_2)
+    assert submit_2 == submit_1
+    assert submit_3 == submit_1
+    entries = parse_entries(submit_3)
+    assert len(entries) == 1
+    assert "Trailing sentence." in entries[0].content
+
+
+def test_parse_entries_struck_entry_with_nested_details_preserves_tail():
+    """STRUCK_RE's non-greedy stop at the first </details> must not drop
+    content that follows a nested <details> inside the struck block."""
+    body = (
+        "<div><sub>2026-03-03T00:00:00Z</sub>\n"
+        "<details><summary>struck: 2026-08-23T04:00:00Z — superseded</summary>\n\n"
+        "Notes.\n\n"
+        "<details><summary>detail</summary>\ninner\n</details>\n\n"
+        "Tail that matters.\n"
+        "</details>\n"
+        "</div>"
+    )
+    entries = parse_entries(body)
+    assert len(entries) == 1
+    assert entries[0].struck is True
+    assert "Tail that matters." in entries[0].content
+
+
+def test_parse_entries_prose_mentioning_struck_format_is_not_struck():
+    """A struck marker that merely appears inside prose documenting the format
+    (not at the start of the entry's content) must not be treated as struck."""
+    body = (
+        "<div><sub>2026-03-03T00:00:00Z</sub>\n\n"
+        "A struck entry renders as:\n\n"
+        "<details><summary>struck: TS — reason</summary>\n\n"
+        "original\n"
+        "</details>\n\n"
+        "That is the format.\n"
+        "</div>"
+    )
+    entries = parse_entries(body)
+    assert len(entries) == 1
+    assert entries[0].struck is False
+    assert "A struck entry renders as:" in entries[0].content
+    assert "That is the format." in entries[0].content
+
+
+def test_find_entry_spans_self_closing_div_does_not_drop_entry():
+    """A self-closing <div/> must not count as an opener that never closes —
+    that drops the whole entry, not just its content."""
+    body = (
+        "<div><sub>2026-01-01T00:00:00Z</sub>\n\nA <div/> self-closing.\n</div>\n\n"
+        "<div><sub>2026-01-02T00:00:00Z</sub>\n\nSecond entry.\n</div>"
+    )
+    entries = parse_entries(body)
+    assert len(entries) == 2
+    assert entries[0].id == "2026-01-01T00:00:00Z"
+    assert "self-closing" in entries[0].content
+    assert entries[1].content == "Second entry."
+
+
+def test_find_entry_spans_case_differing_nested_div_does_not_drop_entry():
+    """A nested div tag whose spelling differs in case between open and close
+    (e.g. <div> ... </DIV>) must still balance and not drop the entry."""
+    body = (
+        "<div><sub>2026-01-01T00:00:00Z</sub>\n\n"
+        'Finding.\n\n<div class="note">note</DIV>\n\nTail.\n'
+        "</div>\n\n"
+        "<div><sub>2026-01-02T00:00:00Z</sub>\n\nSecond entry.\n</div>"
+    )
+    entries = parse_entries(body)
+    assert len(entries) == 2
+    assert entries[0].id == "2026-01-01T00:00:00Z"
+    assert "Tail." in entries[0].content
+    assert entries[1].content == "Second entry."

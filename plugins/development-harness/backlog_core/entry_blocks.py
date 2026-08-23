@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
+from typing import NamedTuple
 
 from .models import Entry, EntryNotFoundError
-from .parsing import now_iso
+from .timestamps import now_iso
 
-ENTRY_RE = re.compile(r"<div><sub>([^<]+)</sub>\s*(.*?)</div>", re.DOTALL)
-STRUCK_RE = re.compile(r"<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summary>\s*(.*?)</details>", re.DOTALL)
 # Matches ISO 8601 timestamps (with or without sub-second fraction) at the start of a string.
 # Used in two places: detecting unwrapped seeds in the legacy entry path, and filtering
 # entries by the ``since`` parameter (entry IDs may carry a dedup suffix like ``-0``, ``-1``).
@@ -21,6 +20,208 @@ _ZERO_DATE_PREFIX = "0000-00-00"
 # ``_resolve_duplicate_ids`` appends. The zero-date fallback ID matches this shape too.
 _ENTRY_ID_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(?:-\d+)?"
 _ENTRY_ID_RE = re.compile(rf"\A{_ENTRY_ID_PATTERN}\Z")
+
+
+_ENTRY_OPEN_RE = re.compile(r"<div><sub>([^<]+)</sub>")
+# A void/self-closing <div/> is not an opener that needs a matching close — counting it as
+# one makes the entry's nesting never return to zero, and the whole entry is skipped as
+# truncated. The negative lookahead excludes only tags that self-close before their `>`.
+_DIV_OPEN_TAG_RE = re.compile(r"<div\b(?![^>]*/>)", re.IGNORECASE)
+_DIV_CLOSE_TAG_RE = re.compile(r"</div\s*>", re.IGNORECASE)
+_DETAILS_OPEN_TAG_RE = re.compile(r"<details\b(?![^>]*/>)", re.IGNORECASE)
+_DETAILS_CLOSE_TAG_RE = re.compile(r"</details\s*>", re.IGNORECASE)
+_FENCE_LINE_RE = re.compile(r" {0,3}(`{3,}|~{3,})")
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
+_INLINE_CODE_RE = re.compile(r"(`+)[^\n]*?\1")
+# A struck-entry wrapper, anchored to the very start of the entry's (stripped) content.
+# Anchoring is what tells "this entry is struck" apart from "this entry's prose happens to
+# quote the struck format" — the latter must not be misread as an actual strike.
+_STRUCK_HEADER_RE = re.compile(r"\A<details><summary>struck:\s*(\S+)\s*—\s*(.*?)</summary>", re.DOTALL)
+
+
+class EntrySpan(NamedTuple):
+    """Where one entry block sits in a section body.
+
+    Attributes:
+        start: Offset of the opening ``<div><sub>``.
+        end: Offset one past the closing ``</div>``.
+        entry_id: The text between ``<sub>`` and ``</sub>``.
+        content_start: Offset of the first character of the entry's content.
+        content_end: Offset one past the entry's content.
+    """
+
+    start: int
+    end: int
+    entry_id: str
+    content_start: int
+    content_end: int
+
+
+def _opaque_mask(text: str) -> list[bool]:
+    """Mark every character markdown treats as literal rather than as structure.
+
+    A ``<div>`` inside a fenced block, an inline code span, or an HTML comment is an
+    example of a tag, not a tag. Counting one as nesting made a properly closed entry look
+    truncated; ignoring a real one had the opposite effect. Deciding the three contexts
+    once, here, means every caller inherits the same answer instead of each rediscovering
+    which contexts to skip.
+
+    Args:
+        text: Section body text.
+
+    Returns:
+        A list parallel to *text*, true where that character sits in an opaque context.
+    """
+    mask = [False] * len(text)
+
+    def cover(start: int, end: int) -> None:
+        for i in range(start, end):
+            mask[i] = True
+
+    fence = ""
+    for line_match in re.finditer(r"[^\n]*\n?", text):
+        line = line_match.group()
+        if not line:
+            break
+        delimiter = _FENCE_LINE_RE.match(line)
+        if not fence:
+            if delimiter is not None:
+                fence = delimiter.group(1)
+                cover(line_match.start(), line_match.end())
+            continue
+        cover(line_match.start(), line_match.end())
+        if delimiter is not None:
+            run = delimiter.group(1)
+            # A fence closes only on the same character, in a run at least as long as the
+            # one that opened it, with nothing but whitespace after it.
+            if run[0] == fence[0] and len(run) >= len(fence) and not line.strip()[len(run) :].strip():
+                fence = ""
+
+    for pattern in (_HTML_COMMENT_RE, _INLINE_CODE_RE):
+        for match in pattern.finditer(text):
+            if not mask[match.start()]:
+                cover(match.start(), match.end())
+
+    return mask
+
+
+def _find_balanced_close(
+    text: str, open_re: re.Pattern[str], close_re: re.Pattern[str], from_offset: int, mask: list[bool]
+) -> tuple[int, int] | None:
+    """Find the close tag matching an opener whose own tag ended at *from_offset*.
+
+    Shared by entry-wrapper ``<div>`` nesting and struck-block ``<details>`` nesting — both
+    are "one already-consumed opener, find where balanced depth returns to zero" problems,
+    and giving them one implementation means a grammar fix (self-closing tags, case
+    insensitivity) applies to both instead of drifting apart.
+
+    Args:
+        text: Text to search.
+        open_re: Pattern matching this tag family's opening tag.
+        close_re: Pattern matching this tag family's closing tag.
+        from_offset: Offset just past the already-consumed opening tag.
+        mask: Opaque-context mask from :func:`_opaque_mask`, parallel to *text*.
+
+    Returns:
+        ``(close_start, close_end)`` for the closing tag, or ``None`` when nesting never
+        returns to zero.
+    """
+    events = sorted(
+        [(m.start(), m.end(), 1) for m in open_re.finditer(text, from_offset)]
+        + [(m.start(), m.end(), -1) for m in close_re.finditer(text, from_offset)]
+    )
+    depth = 1
+    for start, end, delta in events:
+        if mask[start]:
+            continue
+        depth += delta
+        if depth == 0:
+            return start, end
+    return None
+
+
+def _match_struck(content: str) -> tuple[str, str, str] | None:
+    """Detect a struck-entry wrapper anchored to the start of *content*.
+
+    Requiring the marker at the very start (not merely present somewhere inside) is what
+    keeps prose that quotes the struck format — documentation, an example — from being
+    misread as an actual strike. Requiring balanced ``<details>`` nesting (not a stop at the
+    first ``</details>``) is what keeps a nested ``<details>`` inside genuinely struck
+    content from truncating everything after it.
+
+    Args:
+        content: An entry's full (stripped) content.
+
+    Returns:
+        ``(struck_at, reason, inner_content)`` when *content* opens with a struck marker
+        whose ``<details>`` balances to a matching close; ``None`` otherwise.
+    """
+    header = _STRUCK_HEADER_RE.match(content)
+    if header is None:
+        return None
+    mask = _opaque_mask(content)
+    close = _find_balanced_close(content, _DETAILS_OPEN_TAG_RE, _DETAILS_CLOSE_TAG_RE, header.end(), mask)
+    if close is None:
+        return None
+    close_start, _close_end = close
+    inner = content[header.end() : close_start].strip()
+    return header.group(1), header.group(2).strip(), inner
+
+
+def find_entry_spans(text: str) -> list[EntrySpan]:
+    """Locate every complete entry block in *text*.
+
+    This is the single definition of where an entry begins and ends. ``parse_entries``
+    reads content through it, and the section splitter treats exactly these ranges as
+    opaque, so the two cannot disagree about whether a heading-shaped line is an entry's
+    own content or a real section boundary. They previously did: the splitter tracked
+    balanced nesting while the reader stopped at the first ``</div>``, so an entry holding
+    any further HTML was shown intact by one and truncated by the other, and the content
+    past that inner tag was dropped from the entry without a word.
+
+    Extent is balanced ``<div>``/``</div>`` nesting, and tags inside an opaque context do
+    not count (see :func:`_opaque_mask`). An opening marker whose nesting never returns to
+    zero is a truncated wrapper, not an entry; it is skipped, so whatever follows stays
+    reachable rather than being swallowed to the end of the document.
+
+    Args:
+        text: Section body text.
+
+    Returns:
+        Ordered list of :class:`EntrySpan`, one per complete entry block.
+    """
+    mask = _opaque_mask(text)
+    spans: list[EntrySpan] = []
+    search_from = 0
+    while True:
+        opener = _ENTRY_OPEN_RE.search(text, search_from)
+        if opener is None:
+            return spans
+        if mask[opener.start()]:
+            search_from = opener.end()
+            continue
+        close = _find_balanced_close(text, _DIV_OPEN_TAG_RE, _DIV_CLOSE_TAG_RE, opener.end(), mask)
+        if close is None:
+            # A fence the entry never closed marks the rest of the text opaque, the
+            # wrapper's own </div> included, so a closed entry reads as truncated. Retry
+            # counting every tag: an entry is far more likely to hold an unclosed fence
+            # than to be genuinely unterminated, and mistaking the former for the latter
+            # drops real content.
+            close = _find_balanced_close(text, _DIV_OPEN_TAG_RE, _DIV_CLOSE_TAG_RE, opener.end(), [False] * len(text))
+        if close is None:
+            search_from = opener.end()
+            continue
+        close_start, close_end = close
+        spans.append(
+            EntrySpan(
+                start=opener.start(),
+                end=close_end,
+                entry_id=opener.group(1),
+                content_start=opener.end(),
+                content_end=close_start,
+            )
+        )
+        search_from = close_end
 
 
 def _parse_entry_timestamp(entry_id: str) -> datetime | None:
@@ -98,9 +299,9 @@ def wrap_entry(content: str) -> str:
     a pre-wrapped submission nests the blocks, and the nested form does not survive a body
     round-trip: the wrapper leaks into the entry's own content and the section splitter emits
     a stray ``</div>`` entry carrying an empty ID. Adopting it whole is equally lossy the other
-    way — ``parse_entries`` extracts only ``ENTRY_RE`` matches, so anything sitting between or
-    around the blocks reaches the provider body, is absent from the parsed entries, and is
-    gone after the next render.
+    way — ``parse_entries`` extracts only entries :func:`find_entry_spans` locates, so anything
+    sitting between or around the blocks reaches the provider body, is absent from the parsed
+    entries, and is gone after the next render.
 
     Returns:
         One or more ``<div><sub>...</sub>...</div>`` blocks, separated by a blank line.
@@ -109,18 +310,18 @@ def wrap_entry(content: str) -> str:
     text = content.strip()
     blocks: list[str] = []
     pos = 0
-    for m in ENTRY_RE.finditer(text):
-        if not _is_entry_id(m.group(1)):
+    for span in find_entry_spans(text):
+        if not _is_entry_id(span.entry_id):
             # An entry-shaped block whose ID is not a real timestamp is not an entry — an
             # HTML example documenting the format, say. Leave it in the surrounding prose
             # run rather than adopting it: adopting persists the label as an entry ID, and
             # the next ``since=`` read then raises on it.
             continue
-        gap = text[pos : m.start()].strip()
+        gap = text[pos : span.start].strip()
         if gap:
             blocks.append(_new_entry_block(gap))
-        blocks.append(m.group(0))
-        pos = m.end()
+        blocks.append(text[span.start : span.end])
+        pos = span.end
     tail = text[pos:].strip()
     if tail:
         blocks.append(_new_entry_block(tail))
@@ -138,23 +339,22 @@ def wrap_entry_with_timestamp(content: str, timestamp: str) -> str:
     return f"<div><sub>{timestamp}</sub>\n\n{content}\n</div>"
 
 
-def _parse_match_to_entry(m: re.Match[str]) -> Entry:
-    """Convert a regex match into an Entry object.
+def _entry_from_span(text: str, span: EntrySpan) -> Entry:
+    """Convert one located entry block into an Entry object.
+
+    Args:
+        text: The section body the span was located in.
+        span: The entry's extent, from :func:`find_entry_spans`.
 
     Returns:
-        Entry parsed from the match groups.
+        Entry carrying the span's id and its full inner content.
     """
-    ts = m.group(1)
-    inner = m.group(2).strip()
-    struck_match = STRUCK_RE.search(inner)
-    if struck_match:
-        return Entry(
-            id=ts,
-            content=struck_match.group(3).strip(),
-            struck=True,
-            struck_at=struck_match.group(1),
-            struck_reason=struck_match.group(2).strip(),
-        )
+    ts = span.entry_id
+    inner = text[span.content_start : span.content_end].strip()
+    struck = _match_struck(inner)
+    if struck:
+        struck_at, reason, struck_content = struck
+        return Entry(id=ts, content=struck_content, struck=True, struck_at=struck_at, struck_reason=reason)
     return Entry(id=ts, content=inner)
 
 
@@ -229,9 +429,9 @@ def parse_entries(
     Returns:
         List of Entry objects, in chronological order.
     """
-    matches = list(ENTRY_RE.finditer(section_body))
+    spans = find_entry_spans(section_body)
 
-    if not matches:
+    if not spans:
         content = section_body.strip()
         if not content:
             return []
@@ -242,7 +442,7 @@ def parse_entries(
         entry_id = ts_match.group(1) if ts_match else f"{added_date}T00:00:00Z"
         raw_entries = [Entry(id=entry_id, content=content)]
     else:
-        raw_entries = [_parse_match_to_entry(m) for m in matches]
+        raw_entries = [_entry_from_span(section_body, s) for s in spans]
         _deduplicate_timestamps(raw_entries)
 
     if since:
@@ -271,17 +471,18 @@ def strike_entry(entry_raw: str, reason: str) -> str:
         ValueError: If ``entry_raw`` is not a valid entry block.
     """
     now = now_iso()
-    match = ENTRY_RE.search(entry_raw)
-    if not match:
+    spans = find_entry_spans(entry_raw)
+    if not spans:
         msg = "Cannot strike: not a valid entry block"
         raise ValueError(msg)
 
-    ts = match.group(1)
-    content = match.group(2).strip()
+    span = spans[0]
+    ts = span.entry_id
+    content = entry_raw[span.content_start : span.content_end].strip()
 
-    struck_match = STRUCK_RE.search(content)
-    if struck_match:
-        content = struck_match.group(3).strip()
+    struck = _match_struck(content)
+    if struck:
+        content = struck[2]
 
     return (
         f"<div><sub>{ts}</sub>\n<details><summary>struck: {now} — {reason}</summary>\n\n{content}\n</details>\n</div>"
@@ -289,12 +490,7 @@ def strike_entry(entry_raw: str, reason: str) -> str:
 
 
 def _rewrite_replace(
-    entries_raw: list[re.Match[str]],
-    is_legacy: bool,
-    existing_body: str,
-    new_content: str | None,
-    reason: str,
-    added_date: str,
+    existing_body: str, spans: list[EntrySpan], is_legacy: bool, new_content: str | None, reason: str, added_date: str
 ) -> str:
     """Handle the ``replace=True`` branch of rewrite_section.
 
@@ -306,19 +502,14 @@ def _rewrite_replace(
         legacy_wrapped = wrap_entry_with_timestamp(existing_body.strip(), f"{added_date}T00:00:00Z")
         parts.append(strike_entry(legacy_wrapped, reason))
     else:
-        parts.extend(strike_entry(m.group(0), reason) for m in entries_raw)
+        parts.extend(strike_entry(existing_body[s.start : s.end], reason) for s in spans)
     if new_content:
         parts.append(wrap_entry(new_content))
     return "\n\n".join(parts)
 
 
 def _rewrite_by_entry_id(
-    entries_raw: list[re.Match[str]],
-    is_legacy: bool,
-    existing_body: str,
-    new_content: str | None,
-    entry_id: str,
-    added_date: str,
+    existing_body: str, spans: list[EntrySpan], is_legacy: bool, new_content: str | None, entry_id: str, added_date: str
 ) -> str:
     """Handle the ``entry_id`` branch of rewrite_section.
 
@@ -332,18 +523,18 @@ def _rewrite_by_entry_id(
             raise EntryNotFoundError(entry_id, [legacy_ts])
         result_parts.append(wrap_entry(new_content) if new_content else "")
     else:
-        id_entries = [Entry(id=m.group(1), content="") for m in entries_raw]
+        id_entries = [Entry(id=s.entry_id, content="") for s in spans]
         _resolve_duplicate_ids(id_entries)
         available = [e.id for e in id_entries]
         if entry_id not in available:
             raise EntryNotFoundError(entry_id, available)
 
-        for m, id_entry in zip(entries_raw, id_entries, strict=False):
+        for span, id_entry in zip(spans, id_entries, strict=False):
             if id_entry.id == entry_id:
                 if new_content:
-                    result_parts.append(wrap_entry_with_timestamp(new_content, m.group(1)))
+                    result_parts.append(wrap_entry_with_timestamp(new_content, span.entry_id))
             else:
-                result_parts.append(m.group(0))
+                result_parts.append(existing_body[span.start : span.end])
     return "\n\n".join(p for p in result_parts if p)
 
 
@@ -364,17 +555,17 @@ def rewrite_section(
         ValueError: If ``replace=True`` but ``reason`` is not provided.
         EntryNotFoundError: If ``entry_id`` matches no entry in ``existing_body``.
     """
-    entries_raw = list(ENTRY_RE.finditer(existing_body))
-    is_legacy = not entries_raw and bool(existing_body.strip())
+    spans = find_entry_spans(existing_body)
+    is_legacy = not spans and bool(existing_body.strip())
 
     if replace:
         if not reason:
             msg = "reason is required when replace=True"
             raise ValueError(msg)
-        return _rewrite_replace(entries_raw, is_legacy, existing_body, new_content, reason, added_date)
+        return _rewrite_replace(existing_body, spans, is_legacy, new_content, reason, added_date)
 
     if entry_id:
-        return _rewrite_by_entry_id(entries_raw, is_legacy, existing_body, new_content, entry_id, added_date)
+        return _rewrite_by_entry_id(existing_body, spans, is_legacy, new_content, entry_id, added_date)
 
     # Default: append
     parts: list[str] = []
