@@ -190,11 +190,17 @@ Registration is idempotent for the same owner, type, and logical name. A retry
 may update the existing entry; it MUST NOT create a second current entry.
 
 A type holds either several current entries per owner or exactly one.
-`artifact_read` selects by owner and type alone and returns the most recently
-registered entry, so a record read by type as a decision — a review verdict, a
-verification result — MUST have a type of its own and MUST NOT share one with a
-multi-entry class such as codebase analysis. Address one entry of a multi-entry
-type by the `artifact_id` that `artifact_list` returned for it.
+`artifact_read` called without an `artifact_id` selects by owner and type alone
+and returns the most recently registered entry, so a record read by type as a
+decision — a review verdict, a verification result — MUST have a type of its own
+and MUST NOT share one with a multi-entry class such as codebase analysis.
+
+A private type is not by itself a single entry. When the one producer of a
+decision type registers an entry per unit reviewed rather than per owner, that
+type is multi-entry too and its consumers MUST pass an `artifact_id`. The
+producer MUST report the identifier it registered so the consumer can address
+it; a consumer that must discover it instead reads `artifact_list` and selects
+on `artifact_id` and `created_at`.
 
 </manifest_policy>
 

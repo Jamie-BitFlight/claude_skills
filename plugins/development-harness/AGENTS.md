@@ -152,27 +152,34 @@ row before writing the call. The `Registering agents` column holds the value eac
 | Type | Registering agents | Gate-read | Notes |
 |---|---|---|---|
 | `feature-context` | `discovery`, `feature-researcher` | no | Discovery document. Each producer re-registers the same `artifact_id`, so the type holds one entry per item. |
-| `architect` | `planning`, `context-integration`, `python-cli-design-spec`, `{resolved_agent}` | no | Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision rather than adding a sibling. |
+| `architect` | `planning`, `context-integration`, `context-refinement`, `python-cli-design-spec`, `{resolved_agent}` | no | Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read returned, appending annotations. |
 | `codebase-analysis` | `codebase-analyzer`, `code-review-architecture` | no | Codebase pattern, architecture, testing, convention, and dependency-graph documents. Intentionally multi-entry — one per focus area or diagram. Consumers reach the full set through `artifact_list`. |
-| `code-review` | `code-reviewer` | yes | Code review verdict. `complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`. |
+| `code-review` | `code-reviewer` | yes | Code review verdict. One entry per reviewed task, so consumers read it by `artifact_id` (`code-review-{task_id}-{slug}`), reported in the reviewer's STATUS output. `complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`. |
 | `T0-baseline` | `t0-baseline-capture` | yes | Pre-implementation baseline. `tn-verification-gate` compares final state against it. |
 | `TN-verification` | `tn-verification-gate` | yes | Post-implementation verification. `complete-implementation` branches on the verdict. |
-| `research` | `swarm-task-planner` | no | Investigation findings, coverage analysis, rationale. Multi-entry. |
+| `research` | `swarm-task-planner`, `ecosystem-researcher` | no | Investigation findings, coverage analysis, rationale. Multi-entry — one document per investigation. |
 | `audit-report` | `doc-drift-auditor` | no | Documentation drift audit. Never used for a code review verdict. |
 | `dispatch-plan` | `dispatch_create_plan` | no | Milestone dispatch plan, registered by the dispatch tool rather than an agent. |
 
 Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
 associate the returned logical address with the owning work item through `backlog_update`.
 
-Ownership rule: `artifact_read(item_id, artifact_type)` accepts no `artifact_id`. It sorts every
-entry of that type by creation time and returns only the newest, so a read by type alone can address
-exactly one document. A `Gate-read` type must therefore have exactly one registering agent — a second
-writer wins the read the moment it registers later, and the gate branches on the wrong document with
-no error. Types marked `no` may have several registering agents for one of two reasons: every
-producer re-registers a single shared `artifact_id` and so replaces one entry (`feature-context`,
+Ownership rule: `artifact_read(item_id, artifact_type)` with no `artifact_id` sorts every entry of
+that type by creation time and returns only the newest, so a read by type alone can address exactly
+one document. A `Gate-read` type must therefore have exactly one registering agent — a second writer
+wins the read the moment it registers later, and the gate branches on the wrong document with no
+error. Types marked `no` may have several registering agents for one of two reasons: every producer
+re-registers a single shared `artifact_id` and so replaces one entry (`feature-context`,
 `architect`), or the type is intentionally multi-entry, so a read by type alone returns only its
 newest document and no gate branches on the result (`codebase-analysis`, `research`). Never point a
 gate at a multi-entry type, and never add a second registering agent to a `Gate-read` type.
+
+One registering agent is not one entry. `artifact_read` and `artifact_get` both accept an optional
+`artifact_id`, and a single agent that registers one entry per reviewed task leaves several under
+its own type. A `Gate-read` type whose producer emits more than one entry per work item — today,
+`code-review` — must be read by `artifact_id`; the producer names the identifier it used in its
+STATUS output so the consumer can address it. Reading such a type by type alone returns whichever
+task's document registered last.
 
 **Registration:** Producers call `artifact_register` after creating document-artifact content.
 Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores

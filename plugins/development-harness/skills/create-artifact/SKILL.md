@@ -61,7 +61,7 @@ One of the recognized type strings:
 |---|---|---|
 | `feature-context` | feature-researcher | Discovery document: WHO/WHAT/WHEN/WHY analysis |
 | `codebase-analysis` | codebase-analyzer, code-review-architecture | Codebase pattern/architecture/testing documents and dependency graphs; several per item |
-| `code-review` | code-reviewer | Code review verdict; exactly one per item, read by the quality gate |
+| `code-review` | code-reviewer | Code review verdict; one per reviewed task, read by the quality gate via `artifact_id` |
 | `architect` | python-cli-design-spec | Architecture spec with interfaces and contracts |
 | `T0-baseline` | t0-baseline-capture | Pre-implementation baseline of acceptance criteria |
 | `TN-verification` | tn-verification-gate | Post-implementation verification results |
