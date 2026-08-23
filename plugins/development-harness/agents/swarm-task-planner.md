@@ -169,16 +169,16 @@ Plans are living records that evolve with requirements. One feature has exactly 
 
 Revision Protocol:
 
-1. Revise in place: apply every change to the plan ID already returned by `sam_plan(action='create')`, using `sam_plan(action='update')` for plan-level fields and `sam_task(action='update')` for task fields. NEVER register a second plan to represent a newer revision of the same feature — downstream consumers read the plan ID recorded on the backlog item and will never see the replacement.
-2. Version bumping: set the plan's `version` field via `sam_plan(action='update')` when a revision changes task scope, dependencies, or acceptance criteria.
+1. Revise in place: apply every change to the plan ID already returned by `sam_plan`'s `create` action, using `mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "update", "set_fields_json": {...}})` for plan-level fields and `mcp__plugin_dh_sam__sam_task(plan="{plan_id}", task="{task_id}", config={"action": "update", "set_fields_json": {...}})` for task fields — `action` is a field of `config`, not a call keyword, and both tools require the target `plan` (and, for `sam_task`, `task`) as separate parameters. NEVER register a second plan to represent a newer revision of the same feature — downstream consumers read the plan ID recorded on the backlog item and will never see the replacement.
+2. Version bumping: set the plan's `version` field via `mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "update", "set_fields_json": {"version": "{new_version}"}})` when a revision changes task scope, dependencies, or acceptance criteria.
 3. Respond to feedback: incorporate user corrections into the registered plan.
 
 ## Task Structure Requirements
 
-`sam_plan(action='create')` validates all required fields at creation time and returns the plan ID.
+`sam_plan`'s `create` action validates all required fields at creation time and returns the plan ID.
 
 A plan exists only once that call returns a plan ID. The plan-validator and every downstream
-consumer read the plan through `sam_plan(action='read')`; a decomposition that was reasoned about
+consumer read the plan through `sam_plan`'s `read` action; a decomposition that was reasoned about
 but never registered is invisible to them and produces a false BLOCKED verdict. Register first,
 report the plan ID, and never treat any other representation of the decomposition as the plan.
 
@@ -238,7 +238,7 @@ Two distinct object shapes are involved and must never be merged into one mappin
 fields belong in the `config` object of the `create` call; task fields belong inside each object
 of `tasks` (Path A) or inside the single `task` object of `append_task` (Path B).
 
-Plan-level fields — the `config` object passed to `sam_plan(action='create')`:
+Plan-level fields — the `config` object passed to `sam_plan`'s `create` action:
 
 ```yaml
 action: create
@@ -307,16 +307,19 @@ CLEAR sections with no dedicated field — Inputs, and CoVe Checks when Accuracy
 high — go into `body` as markdown headings, in CLEAR order.
 
 When a task's markdown is large enough that sending all of it in one `create` or `append_task`
-call risks a timeout mid-call, submit the task with its structural fields and its `body`, then
-patch each large field afterwards — one call per field, using the kebab-case field names listed
-above as `set_fields_json` keys:
+call risks a timeout mid-call, submit the task with its structural fields (and `body`, if not
+also large), then patch each large field afterwards — one call per field, using the backend's
+snake_case field names as `set_fields_json` keys. The patch is validated against
+`TaskFieldsUpdate`, which defines only snake_case keys and has no kebab-case aliases — passing a
+kebab-case key such as `"expected-outputs"` is silently dropped rather than applied:
 
 ```text
-mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "update", "task_id": "{task_id}", "set_fields_json": {"requirements": "{markdown}"}})
+mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "update", "task_id": "{task_id}", "set_fields_json": {"expected_outputs": "{markdown}"}})
 ```
 
-`body` is the exception: it is writable only in the `create` or `append_task` payload, so carry it
-in the call that creates the task however large it is.
+`body` is not an exception — it is itself a `TaskFieldsUpdate` field and can be patched through the
+same `set_fields_json` call after task creation, so a large `body` does not need to be carried in
+the initial `create`/`append_task` payload either.
 
 Never route content that has a dedicated field through `append_section_name`. That parameter
 appends a markdown section without writing any named field, so the field it was meant to fill stays
@@ -334,6 +337,16 @@ Both bookends are ordinary task objects submitted through the same `tasks` list 
 call as every other task. Their executing agents carry their own procedures — supply the
 structural fields below and nothing else. Adding narrative fields to a bookend task duplicates
 instructions its executor already holds and can contradict them.
+
+T0 and TN executors need the plan's `item_id` (the backlog item whose artifact manifest stores the
+T0 baseline and TN verification artifacts) and the plan's `acceptance-criteria-structured` list.
+Neither is a `Task` model field, so do not add them to the task object itself — unknown task keys
+are rejected (see above). `item_id` is not carried on the task at all: whichever step dispatches T0
+and TN resolves it from the plan's `issue` (when set, a GitHub issue number) or `owner_reference`
+(when set, a provider-native string such as a beads ID) and supplies it, together with the plan
+address (`plan="{plan_id}"`), in each bookend task's delegation prompt, so the executor can read
+the plan directly via `mcp__plugin_dh_sam__sam_plan(plan="{plan_id}", config={"action": "read"})`
+rather than a filesystem plan path.
 
 ### T0 Task Fields
 
@@ -528,16 +541,11 @@ In addition to existing requirements:
 - Prefer primary sources: repo code, tests, official docs, config schemas
 - Bookend generation: after decomposing implementation tasks, check whether the plan's `acceptance-criteria-structured` field is non-empty. If yes, apply the field sets and dependency rules defined in Bookend Task Generation above. Order T0 before any implementation task and TN after all implementation tasks. Add `T0` to the `dependencies` list of every non-bookend task.
 
-### Phase 4: Plan Creation (UPDATED)
+### Phase 4: Plan Validation (UPDATED)
 
-Steps (in order):
-
-1. Register the plan: call `sam_plan(action='create')` with the task objects built in Phase 3,
-   choosing the monolithic or incremental path by task count. Record the returned plan ID.
-
-2. Sync checkpoints reference task acceptance criteria and verification outputs.
-
-### Phase 5: Plan Validation (UPDATED)
+Validate the task objects built in Phase 3 before they are registered in Phase 5 — the checks
+below (especially items 11 and 12) require correcting the in-memory task objects, which is only
+possible before `sam_plan`'s `create`/`append_task` calls submit them.
 
 1. Verify no temporal anti-patterns (existing)
 2. Check dependency completeness (existing)
@@ -602,6 +610,15 @@ Add these validations:
 - The TN task's `dependencies` list includes all non-bookend task IDs
 - Every non-bookend task includes `T0` in its `dependencies`
 - If any check fails, add or correct the bookend tasks before registering the plan
+
+### Phase 5: Plan Creation (UPDATED)
+
+Steps (in order):
+
+1. Register the plan: call `sam_plan`'s `create` action with the task objects validated in
+   Phase 4, choosing the monolithic or incremental path by task count. Record the returned plan ID.
+
+2. Sync checkpoints reference task acceptance criteria and verification outputs.
 
 ## Success Metrics (UPDATED)
 
