@@ -5,6 +5,7 @@ model: haiku
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
 skills:
+  - dh:subagent-contract
   - dh:dispatch-contract
 ---
 

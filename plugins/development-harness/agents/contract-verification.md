@@ -5,6 +5,7 @@ model: haiku
 tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
 skills:
   - subagent-contract
+  - dh:subagent-contract
   - dh:dispatch-contract
 color: yellow
 ---

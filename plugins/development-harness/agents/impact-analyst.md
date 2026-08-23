@@ -6,6 +6,7 @@ model: sonnet
 color: cyan
 memory: project
 skills:
+  - dh:subagent-contract
   - dh:dispatch-contract
 ---
 
