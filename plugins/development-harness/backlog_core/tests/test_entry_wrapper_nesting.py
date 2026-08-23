@@ -142,8 +142,8 @@ class TestPrewrappedContentSurvivesBodyRoundTrip:
         assert "evidence: repo-wide grep" in content
 
 
-class TestZeroDateSinceFilter:
-    """The zero-date fallback ID must not crash the documented ``since`` filter."""
+class TestUnknownTimestampSurvivesSinceFilter:
+    """An entry whose write time is unknown must never be silently withheld by ``since``."""
 
     def test_since_filter_does_not_raise_on_zero_date_entries(self) -> None:
         """A section of legacy unwrapped content is filterable by ``since``.
@@ -155,20 +155,49 @@ class TestZeroDateSinceFilter:
         """
         result = parse_entries("legacy unwrapped content", since="2026-01-01", added_date="0000-00-00")
 
-        assert result == []
+        assert len(result) == 1
 
-    def test_zero_date_entry_is_excluded_not_included(self) -> None:
-        """An entry with an unknown timestamp is not "at or after" a real cutoff."""
+    def test_unknown_timestamp_entry_is_returned_not_dropped(self) -> None:
+        """``since`` returns an unknown-timestamp entry rather than excluding it.
+
+        Tests: parse_entries(since=...) keeps zero-date entries
+        How: Compare an unfiltered read against a filtered read of the same content
+        Why: docs/unified-section-layer-brief.md forbids substituting an epoch sentinel for a
+             missing timestamp. Mapping it to datetime.min did that, and every ``since=`` read
+             then dropped the entry — leaving a stateless agent unable to tell "nothing
+             changed" from "content exists whose age I cannot determine". On #3152 that
+             withheld roughly 22KB across 5 of 16 entries while reporting success.
+        """
         no_filter = parse_entries("legacy unwrapped content", added_date="0000-00-00")
         filtered = parse_entries("legacy unwrapped content", since="2020-01-01", added_date="0000-00-00")
 
         assert len(no_filter) == 1
-        assert filtered == []
+        assert len(filtered) == 1
+        assert filtered[0].content == no_filter[0].content
 
-    def test_zero_date_sorts_before_every_real_timestamp(self) -> None:
-        """The unknown-timestamp sentinel maps to datetime.min, not to year zero."""
-        assert _parse_entry_timestamp("0000-00-00T00:00:00Z") == datetime.min.replace(tzinfo=UTC)
-        assert _parse_entry_timestamp("0000-00-00T00:00:00Z") < _parse_entry_timestamp("2026-08-22T00:00:00Z")
+    def test_unknown_timestamp_is_visible_to_the_caller_in_the_entry_id(self) -> None:
+        """The returned entry carries the sentinel ID, so the caller can see the age is unknown.
+
+        Why: Including the entry is only useful if the caller can tell it apart from one that
+             genuinely postdates the cutoff. The ``since`` parameter description on
+             ``backlog_view`` documents this exact ID as "may or may not be new".
+        """
+        filtered = parse_entries("legacy unwrapped content", since="2020-01-01", added_date="0000-00-00")
+
+        assert filtered[0].id.startswith("0000-00-00")
+
+    def test_real_timestamps_are_still_filtered(self) -> None:
+        """The include-unknown rule is scoped to unknown timestamps — real ones still filter."""
+        body = "<div><sub>2026-01-05T00:00:00Z</sub>old</div>\n\n<div><sub>2026-08-22T00:00:00Z</sub>new</div>"
+
+        filtered = parse_entries(body, since="2026-06-01")
+
+        assert [e.content for e in filtered] == ["new"]
+
+    def test_unknown_timestamp_reports_unavailable_not_a_sentinel_datetime(self) -> None:
+        """``_parse_entry_timestamp`` reports the timestamp as unavailable, not as year zero."""
+        assert _parse_entry_timestamp("0000-00-00T00:00:00Z") is None
+        assert _parse_entry_timestamp("2026-08-22T00:00:00Z") == datetime(2026, 8, 22, tzinfo=UTC)
 
     def test_genuinely_malformed_id_still_raises(self) -> None:
         """The fix is scoped to the zero-date sentinel — other bad IDs remain loud."""
@@ -179,3 +208,72 @@ class TestZeroDateSinceFilter:
         """The empty ID produced by the old orphan-entry corruption is not silently accepted."""
         with pytest.raises(ValueError, match="does not contain a valid ISO timestamp prefix"):
             _parse_entry_timestamp("")
+
+
+class TestAlreadyWrappedGuardRejectsPartialInput:
+    """The guard adopts input only when it is ENTIRELY complete, well-formed entry blocks.
+
+    The guard previously matched any string starting with a valid wrapper and ending in
+    ``</div>``, with a greedy ``.*`` between. ``parse_entries`` extracts only ``ENTRY_RE``
+    matches, so everything outside those blocks reached the provider body, was absent from the
+    parsed entries, and was gone after the next render (PR #3160 F4/F7, PR #3165 F7).
+    """
+
+    def test_prose_between_two_wrappers_is_not_adopted(self) -> None:
+        """Interstitial prose between two entry blocks is not silently swallowed.
+
+        Tests: wrap_entry rejects a wrapper-prose-wrapper sequence
+        How: Submit two valid blocks with a bare NOTE line between them
+        Why: Adopting it persisted NOTE into the body while parse_entries returned only the
+             two blocks, so NOTE vanished on the next render
+        """
+        mixed = "<div><sub>2026-08-22T10:00:00Z</sub>one</div>\nNOTE\n<div><sub>2026-08-22T11:00:00Z</sub>two</div>"
+
+        result = wrap_entry(mixed)
+
+        assert result != mixed
+        assert "NOTE" in result
+
+    def test_interstitial_prose_survives_a_body_round_trip(self) -> None:
+        """The rejected-and-wrapped form keeps the prose reachable through parse_entries."""
+        mixed = "<div><sub>2026-08-22T10:00:00Z</sub>one</div>\nNOTE\n<div><sub>2026-08-22T11:00:00Z</sub>two</div>"
+
+        entries = parse_entries(rewrite_section("", new_content=mixed, added_date="2026-08-22"))
+
+        assert any("NOTE" in e.content for e in entries), "interstitial prose must not be lost"
+
+    def test_trailing_non_entry_div_is_not_adopted(self) -> None:
+        """A non-entry ``<div>`` after a valid block is content, not part of the entry sequence."""
+        mixed = '<div><sub>2026-08-22T10:00:00Z</sub>one</div>\n<div class="note">keepme</div>'
+
+        result = wrap_entry(mixed)
+
+        assert result != mixed
+        assert "keepme" in result
+
+    def test_whitespace_between_wrappers_is_still_adopted(self) -> None:
+        """The guard is not over-tight — blank lines between blocks are not content."""
+        pair = "<div><sub>2026-08-22T10:00:00Z</sub>one</div>\n\n<div><sub>2026-08-22T11:00:00Z</sub>two</div>"
+
+        assert wrap_entry(pair) == pair
+
+    def test_calendar_impossible_timestamp_is_not_adopted(self) -> None:
+        """A shape-valid but calendar-impossible ID is rejected before it can be persisted.
+
+        Tests: The guard validates the ID semantically, not only structurally
+        How: Submit a block whose month is 13
+        Why: Adopting it persisted the ID, and the next ``since=`` read raised
+             "ValueError: month must be in 1..12" — the exact crash the guard exists to
+             prevent (PR #3165 F6)
+        """
+        impossible = "<div><sub>2026-13-01T00:00:00Z</sub>x</div>"
+
+        assert wrap_entry(impossible) != impossible
+
+    def test_calendar_impossible_timestamp_does_not_break_the_since_filter(self) -> None:
+        """A section seeded with a calendar-impossible wrapper stays filterable by ``since``."""
+        impossible = "<div><sub>2026-99-99T99:99:99Z</sub>x</div>"
+
+        wrapped = wrap_entry(impossible)
+
+        assert parse_entries(wrapped, since="2026-01-01") != []

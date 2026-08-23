@@ -2420,7 +2420,16 @@ async def backlog_view(
         Field(description="Entry filter: 'all', 'last', 'first', 'struck', or integer N (first N active entries)"),
     ] = None,
     since: Annotated[
-        str | None, Field(description="ISO date/datetime. Only entries at or after this timestamp are included.")
+        str | None,
+        Field(
+            description=(
+                "ISO date/datetime. Entries at or after this timestamp are included, plus any entry "
+                "whose write time is unknown. An unknown-timestamp entry carries the literal id "
+                "'0000-00-00T00:00:00Z' (legacy content stored before entries were timestamped); its "
+                "age cannot be compared to the cutoff, so it is returned rather than withheld. Treat "
+                "that id as 'may or may not be new', not as an old entry."
+            )
+        ),
     ] = None,
     section: Annotated[
         str | None,
