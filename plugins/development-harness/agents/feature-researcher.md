@@ -165,7 +165,11 @@ Never accept a filesystem path as the input document, and never resolve one. A p
 in one worktree does not resolve in another, so a path-based input returns an empty read instead of
 an error.
 
-Record which form arrived — `description`, or the artifact type you read.
+Record which form arrived — `description`, or the artifact type you read. Separately, record
+whether the dispatch prompt names an owning `item_id` — direct Agent tool invocation with a plain
+description is an explicitly supported entry point (see `You are spawned by` above) and commonly
+carries no `item_id` at all. Step 6 registers against `item_id` when one was given and falls back
+to a file write when none was.
 
 ## Step 2: Extract Core Intent
 
@@ -352,9 +356,9 @@ def generate_slug(input_text: str) -> str:
 
 ## Step 6: Register the Feature Context Artifact
 
-Register the document through the artifact operations. The feature context is a document, not a
-task plan — `artifact_register` stores it and `artifact_read` retrieves it. No plan record is
-created for it.
+**With an `item_id`** (from Step 1): register the document through the artifact operations. The
+feature context is a document, not a task plan — `artifact_register` stores it and `artifact_read`
+retrieves it. No plan record is created for it.
 
 ```text
 mcp__plugin_dh_backlog__artifact_register(
@@ -374,11 +378,18 @@ content rather than appending to it — see Large Document Strategy below for sp
 If `item_id` is absent from your delegation prompt, return STATUS: BLOCKED — you cannot
 register the deliverable without it.
 
+**Without an `item_id`** (a direct, ad-hoc invocation with no backlog item behind it):
+`artifact_register` has no owner to attach to. Write the document to
+`plan/feature-context-{slug}.md` instead and report that path in your completion message — do not
+call `artifact_register` without an `item_id`.
+
 Use the output format template below.
 
 ## Step 7: Return Structured Result
 
-Return DONE or BLOCKED status to orchestrator.
+Return DONE or BLOCKED status to orchestrator with the artifact type and identifier — never the
+document body. Report a path only in the no-`item_id` fallback from Step 6, where the file path is
+the sole way the orchestrator can locate the document.
 
 </process>
 
