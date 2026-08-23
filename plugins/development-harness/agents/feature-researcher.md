@@ -564,5 +564,3 @@ companion file on disk.
 - [ ] Document structure matches downstream consumer expectations
       </success_criteria>
 
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

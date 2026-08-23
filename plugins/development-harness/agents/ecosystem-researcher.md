@@ -648,6 +648,4 @@ SUGGESTED NEXT STEP:
 
 **CRITICAL**: Return BLOCKED rather than guessing when you cannot verify claims. Unverified research is worse than no research - it creates false confidence.
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
-
 </output_format>

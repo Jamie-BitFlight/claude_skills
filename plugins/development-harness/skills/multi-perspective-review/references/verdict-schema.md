@@ -15,8 +15,9 @@ definitions in agent instruction bodies.
 
 ## §2.1 Structured Verdict Block
 
-Each reviewer agent emits exactly one verdict block in its SendMessage to the team lead. The
-block is JSON-serializable and version-stamped for #1430 compatibility.
+Each reviewer agent writes exactly one verdict block as the content of the `Review Results`
+section on its own task, and the orchestrating skill reads that section back. The block is
+JSON-serializable and version-stamped for #1430 compatibility.
 
 ```json
 {
@@ -124,7 +125,7 @@ PASS conditions:
 
 FAIL conditions:
   - Any verdict is REJECT → FAIL immediately; list all blocking findings
-  - Missing verdict (an agent did not send a verdict) → FAIL with message:
+  - Missing verdict (a terminal task with no parsable Review Results block) → FAIL with message:
       "Perspective {X} did not return a verdict"
 ```
 
@@ -142,8 +143,8 @@ GateResult:
 **Pre-#1430 stub logic:**
 
 ```text
-verdicts = [parse_verdict(msg) for msg in collected_messages]
-missing = [p for p in PERSPECTIVES if no verdict received for p]
+verdicts = [parse_verdict(task.review_results) for task in plan_tasks]
+missing = [p for p in PERSPECTIVES if p's task has no parsable Review Results block]
 if missing:
     FAIL — "Perspective {X} did not return a verdict"
 rejecting = [v for v in verdicts if v.verdict == "REJECT"]

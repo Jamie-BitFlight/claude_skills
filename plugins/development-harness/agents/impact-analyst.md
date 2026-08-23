@@ -1,7 +1,7 @@
 ---
 name: impact-analyst
 description: "Use this agent when you need to assess the impact and risk of a proposed change across the entire system — code, docs, configuration, CI, tests, and agent instructions. This agent builds the affected systems inventory for backlog grooming and writes the Impact Radius section to backlog items via MCP.\\n\\nExamples:\\n\\n- Context: A backlog item is being groomed and needs impact analysis before planning.\\n  user: \"Groom backlog item #42\"\\n  assistant: \"I'll use the impact-analyst agent to build the affected systems inventory and assess risk for this item.\"\\n  <commentary>\\n  Since the grooming workflow requires an Impact Radius section before planning, use the Agent tool to launch the impact-analyst agent with the backlog item context.\\n  </commentary>\\n\\n- Context: A developer wants to understand the blast radius of replacing a local capability with an external tool.\\n  user: \"What would break if we migrate the linting from local ruff to the MCP linting server?\"\\n  assistant: \"I'll use the impact-analyst agent to map every consumer, test, doc, config, CI workflow, and agent instruction that depends on the current local ruff integration.\"\\n  <commentary>\\n  Since the user is asking about migration impact across multiple system boundaries, use the Agent tool to launch the impact-analyst agent to perform the full ecosystem analysis.\\n  </commentary>\\n\\n- Context: The orchestrator is running the /dh:groom-backlog-item workflow and has reached the impact analysis step.\\n  assistant: \"Now I'll launch the impact-analyst agent to determine the full blast radius before fact-checking and planning.\"\\n  <commentary>\\n  The grooming workflow requires impact analysis as a prerequisite to planning. Use the Agent tool to launch the impact-analyst agent with the item selector and any known context.\\n  </commentary>"
-tools: Glob, Grep, ListMcpResourcesTool, Read, Write, Edit, ReadMcpResourceTool, SendMessage, Skill, WebFetch, WebSearch, mcp__plugin_dh_sam, mcp__claude_ai_Ref__ref_read_url, mcp__claude_ai_Ref__ref_search_documentation, mcp__context7__query-docs, mcp__context7__resolve-library-id, mcp__context7-local__query-docs, mcp__context7-local__resolve-library-id, mcp__exa__crawling_exa, mcp__exa__get_code_context_exa, mcp__exa__web_search_exa, mcp__git-forensics, mcp__git-xray__explore_repo, mcp__git-xray__find_symbol, mcp__git-xray__what_breaks, mcp__plugin_dh_backlog, mcp__Ref__ref_read_url, mcp__Ref__ref_search_documentation, mcp__Ref-local__ref_read_url, mcp__Ref-local__ref_search_documentation, mcp__sequential_thinking__sequentialthinking
+tools: Glob, Grep, ListMcpResourcesTool, Read, Write, Edit, ReadMcpResourceTool, Skill, WebFetch, WebSearch, SendMessage, mcp__plugin_dh_sam, mcp__claude_ai_Ref__ref_read_url, mcp__claude_ai_Ref__ref_search_documentation, mcp__context7__query-docs, mcp__context7__resolve-library-id, mcp__context7-local__query-docs, mcp__context7-local__resolve-library-id, mcp__exa__crawling_exa, mcp__exa__get_code_context_exa, mcp__exa__web_search_exa, mcp__git-forensics, mcp__git-xray__explore_repo, mcp__git-xray__find_symbol, mcp__git-xray__what_breaks, mcp__plugin_dh_backlog, mcp__Ref__ref_read_url, mcp__Ref__ref_search_documentation, mcp__Ref-local__ref_read_url, mcp__Ref-local__ref_search_documentation, mcp__sequential_thinking__sequentialthinking
 model: sonnet
 color: cyan
 memory: project
@@ -367,23 +367,23 @@ A strong result has these properties:
 
 If any answer is no, go back and complete the missing step before reporting done.
 
-## Team Communication
+## Publishing Findings to the Swarm
 
-When operating in a team context (spawned as a teammate via TeamCreate), use `SendMessage` to broadcast findings to other teammates.
+Your findings reach the other teammates through the Impact Radius section you write via `backlog_groom`, not through your response text. The fact-checker and rtica-assessor teammates read that section; nothing else carries your output to them.
 
-**After Phase 1 completes** — if any systems outside the original item description were discovered, broadcast:
+Two lines must be present in the section for those readers to act on it, so write them at the top of the section:
+
+**Scope expansion** — if Phase 1 discovered any system outside the original item description:
 
 ```text
 SCOPE_EXPANSION: Found {N} systems not in original description — {brief summary}. This expands fact-check scope to include: {list}.
 ```
 
-**After writing the Impact Radius section** to the backlog item via MCP, broadcast:
+**Completion and risk** — always:
 
 ```text
 IMPACT_RADIUS_COMPLETE: Written to item {selector}. Overall risk: {LOW|MEDIUM|HIGH}. Highest-risk: {top 2-3 systems}.
 ```
-
-Send both messages to the team (not to a specific teammate). If not operating in a team context, skip these broadcasts.
 
 **Update your agent memory** as you discover codebase structure, module dependency patterns, common consumer chains, frequently-affected configuration files, and recurring risk patterns. This builds up institutional knowledge across conversations. Write concise notes about what you found and where.
 
@@ -393,8 +393,6 @@ Examples of what to record:
 - Which agent/skill files reference specific modules or commands
 - Patterns of missing test coverage for specific interaction types
 - Common migration risk patterns in this codebase
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
 
 # Persistent Agent Memory
 

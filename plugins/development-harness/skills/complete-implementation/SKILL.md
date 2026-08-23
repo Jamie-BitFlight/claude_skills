@@ -737,17 +737,21 @@ Push after committing; skip if the working tree is clean.
 
 ## Team Shutdown
 
-After commit+push, shut down all teammates in the implementation team:
-
-1. Read `~/.claude/teams/{team_name}/config.json` to get the members list.
-2. For each member name in the `members` array, send:
+After commit+push, release the implementation team:
 
 ```text
-SendMessage(to="{name}", message={"type": "shutdown_request"})
+TeamDelete(team_name="{team_name}")
 ```
 
-3. Note: broadcast to `"*"` does not support structured shutdown messages — send individually
-   to each named member.
+Deleting the team releases every teammate in it. Delete it only once every task the team owns is
+terminal — read that through `sam_plan(config={"action": "status"})`, never by assuming a silent
+teammate has finished.
+
+`TeamDelete` is a release step, not a shutdown mechanism: it fails while any teammate is still
+active, and a teammate that finished its task stays alive and idle until something shuts it down.
+Shut each teammate down through the harness's teammate-shutdown mechanism first. This step runs
+after commit+push, so a failed release cannot cost committed work — treat it as a release that did
+not happen, wait for the named teammate, and retry.
 
 ---
 

@@ -2,7 +2,7 @@
 name: contract-verification
 description: Post-task verifier that compares method signatures and type contracts from the architect spec against files modified by the just-completed task. Reads the architect spec Component Design and Type System Design sections, extracts expected signatures and contracts, then greps the modified files to find actual signatures. Reports mismatches as a concerns block with CONTRACT VIOLATION (signature mismatch) and CONTRACT GAP (spec defines contract but implementation is silent) severity levels. Outputs "No contract concerns" when all contracts in scope are satisfied.
 model: haiku
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog__artifact_get, mcp__plugin_dh_backlog__artifact_list, mcp__plugin_dh_backlog__artifact_read, mcp__plugin_dh_backlog__artifact_register
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - subagent-contract
   - dh:dispatch-contract
@@ -148,19 +148,15 @@ Each concern entry must include:
 
 Output: `No contract concerns — all contracts in scope are satisfied.`
 
-When operating as a **teammate** (spawned via `TeamCreate`), also send:
-`SendMessage(to="team-lead", summary="No contract concerns found", message="All contracts in scope verified — no violations or gaps.")`
+Your finding is your response. The dispatcher reads it there — you register no artifact and write no task state.
 
 ## Operating Rules
 
 - Extract contracts from the spec text exactly as written — do not interpret or infer
 - Report only what is observable from the spec and the code — no guesses
 - If the architect spec has no Component Design or Type System Design section, output
-  `No contract concerns — no contracts defined in spec` and, if operating as a teammate,
-  send `SendMessage(to="team-lead", summary="No contract concerns found", message="No Component Design or Type System Design section in spec — no contracts to verify.")`
+  `No contract concerns — no contracts defined in spec`
 - If a modified file does not exist or cannot be read, note it in the concerns block
   as a CONTRACT GAP with reason "file not found"
 - Do not modify any files — this is a read-only verification step
 - Do not suggest fixes — report findings only
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

@@ -270,5 +270,3 @@ SUGGESTED NEXT STEP:
 ## Important Output Note
 
 Your complete STATUS output must be returned as your final response. The caller cannot see your execution unless you return it explicitly.
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

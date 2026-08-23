@@ -2,21 +2,22 @@
 
 Parallel grooming agents sized by scope sizing from `analyze.md`.
 Each agent writes to a different `section` via MCP `backlog_groom` — no clobbering.
-Agents broadcast findings to the team so others react.
+Each agent's section is how the others reach its findings — a teammate that must react to another's output re-reads that section rather than waiting on a message.
 
 ## Teammates
 
 1. **impact-analyst** — Build affected systems inventory (Phase 1), run 5-question impact
-   checklist per system (Phase 2). Write to `section="Impact Radius"`. Broadcast scope-expanding
-   findings to the team.
+   checklist per system (Phase 2). Write to `section="Impact Radius"`, leading the section with a
+   `SCOPE_EXPANSION:` line when systems beyond the original description are found.
 
 2. **fact-checker** — Verify item claims against primary sources. Training data recall is NOT
    evidence. Valid evidence: WebFetch, WebSearch, command output, source code, MCP tool output.
-   Write to `section="Fact-Check"`. Broadcast REFUTED claims (become MISSING in RT-ICA).
+   Write to `section="Fact-Check"`, recording each `REFUTED:` claim there (they become MISSING in RT-ICA).
 
 3. **rtica-assessor** — Assess information completeness using impact-analyst and fact-checker
-   output. Write to `section="RT-ICA"`. When fact-checker broadcasts REFUTED, mark condition
-   MISSING. When impact-analyst broadcasts new scope, add conditions.
+   output. Write to `section="RT-ICA"`. Re-read Impact Radius and Fact-Check before
+   finalizing: a `REFUTED:` claim marks its condition MISSING, a `SCOPE_EXPANSION:` line adds
+   conditions.
 
 4. **classifier** — Classify issue type and run root-cause analysis if `defect` or
    `recurring-pattern`. Write to `section="Issue Classification"` and
@@ -27,8 +28,8 @@ Agents broadcast findings to the team so others react.
    other teammates complete. Write each via `section="{name}"`.
 
 6. **alignment-analyst** — Compare existing implementation against item design intent.
-   Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment".
-   Broadcast ALIGNMENT_DIVERGENCE or ALIGNMENT_CLEAN findings to team.
+   Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment",
+   leading the section with a MISSION_ALIGNED or MISSION_DIVERGENT verdict line.
 
 ## Dependencies
 
@@ -47,7 +48,7 @@ alignment-analyst → blocked by impact-analyst
 TeamCreate(team_name: "groom-{item-slug}")
 ```
 
-Teammates broadcast findings; others react. Sequence:
+Each teammate writes its section; a dependent teammate re-reads that section before finalizing. Sequence:
 
 ```mermaid
 sequenceDiagram
@@ -74,12 +75,12 @@ sequenceDiagram
     O->>CL: spawn (item description)
 
     IA->>IA: build systems inventory, expand via imports/docs/agents/config/CI
-    IA-->>FC: broadcast "SCOPE: found 12 systems, 2 CI workflows"
-    FC->>FC: adds CI claims to verification list
+    IA->>IA: write Impact Radius, leading with "SCOPE_EXPANSION: 12 systems, 2 CI workflows"
+    FC->>FC: re-read Impact Radius, add CI claims to verification list
 
     FC->>FC: verify claims against primary sources
-    FC-->>RT: broadcast "REFUTED: task_format.py multi-doc support"
-    RT->>RT: marks condition MISSING
+    FC->>FC: write Fact-Check, recording "REFUTED: task_format.py multi-doc support"
+    RT->>RT: re-read Fact-Check, mark condition MISSING
 
     IA->>IA: run 5-question checklist per system
     IA->>IA: write Impact Radius section via MCP

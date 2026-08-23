@@ -27,8 +27,8 @@ Extract: Impact Radius, Fact-Check, Issue Classification, Research (if Wave 0 ra
 2. Re-assess every condition from the initial RT-ICA snapshot:
    - Compare snapshot status to current status per condition.
    - Apply categorization rule: deliverables are not conditions (filter out any that leaked in).
-   - When fact-checker broadcast REFUTED: mark condition MISSING.
-   - When impact-analyst discovered new scope: add new conditions.
+   - When the Fact-Check section records REFUTED: mark condition MISSING.
+   - When the Impact Radius section records new scope: add new conditions.
 
 3. Self-resolution pass — for each MISSING or DERIVABLE condition:
    - Attempt tool-based resolution: Grep, Read, WebSearch, Bash.

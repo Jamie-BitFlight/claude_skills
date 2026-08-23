@@ -76,12 +76,22 @@ When a worker sends a blocker message:
 
 ```mermaid
 flowchart TD
-    Blocker(["Worker sends blocker"]) --> Classify{"What is blocking them?"}
-    Classify -->|"Missing information the orchestrator has"| Relay["SendMessage with the missing context<br>Worker resumes"]
-    Classify -->|"Conflict with another worker's changes"| Resolve["Read both workers' summaries<br>Decide which approach wins<br>SendMessage resolution to affected workers"]
-    Classify -->|"Scope question — out of task boundaries"| Bound["Confirm scope in task file via sam_task<br>SendMessage: stay within T{M} boundaries or<br>create a new task for the discovered work"]
-    Classify -->|"Hard blocker — cannot proceed"| Escalate["SendMessage shutdown<br>Capture blocker as backlog item<br>Adjust wave plan"]
+    Blocker(["Worker reports BLOCKED — status written<br>through sam_task, blocker recorded in the task"]) --> Classify{"What is blocking them?"}
+    Classify -->|"Missing information the orchestrator has"| Relay["sam_task update — append the missing context<br>under 'Orchestrator Response'"]
+    Classify -->|"Conflict with another worker's changes"| Resolve["Read both tasks via sam_task read<br>Decide which approach wins<br>Append the decision under 'Orchestrator Response'<br>on each affected task"]
+    Classify -->|"Scope question — out of task boundaries"| Bound["Confirm scope in the task via sam_task read<br>Append the ruling under 'Orchestrator Response':<br>stay within T{M} boundaries or<br>create a new task for the discovered work"]
+    Relay --> Reopen
+    Resolve --> Reopen
+    Bound --> Reopen
+    Reopen["sam_task state — set the task back to not-started"] --> Redispatch(["Re-dispatch the task<br>the worker reads 'Orchestrator Response' on claim"])
+    Classify -->|"Hard blocker — cannot proceed"| Escalate["Leave the task blocked<br>Capture blocker as backlog item<br>Adjust wave plan"]
 ```
+
+Reset the task to `not-started` before re-dispatching it. Appending the response leaves the task
+`blocked`, and the dispatched worker runs `start-task`, whose claim step accepts only a
+`not-started` task and stops on `claimed: false`. A worker that cannot claim never reads the
+`Orchestrator Response` the orchestrator just wrote, so the blocker is answered and the answer
+never reaches anyone.
 
 ### 5 — Synthesize Results
 
@@ -103,7 +113,9 @@ writing a file for another step to read.
 TeamDelete()
 ```
 
-Shut workers down via SendMessage before deleting the team.
+Deleting the team releases every worker in it. Delete it once all tasks in the wave have reached a
+terminal status — read that through `sam_plan(config={"action": "status"})`, never by assuming a
+silent worker has finished.
 
 ## When to Dispatch
 

@@ -17,7 +17,6 @@ You are the classifier teammate in the grooming swarm. Your job is to classify a
 You receive:
 
 - `item_ref` — the backlog item reference (`#N`, title substring, or URL)
-- `team_name` — the grooming swarm team name so you can broadcast findings
 
 You have no blocking dependencies — you run in parallel with `impact-analyst` and `fact-checker` in Wave 1 of the no-team fallback, or concurrently in team mode.
 
@@ -121,21 +120,11 @@ mcp__plugin_dh_backlog__backlog_groom(
 
 The scenario target is a short narrative of the form `<observed bad outcome> → <desired outcome after the fix>`. It tells downstream consumers (planner, groomer) what "done" should look like.
 
-## Phase 5 — Broadcast findings
+## Phase 5 — Confirm the classification is readable
 
-If running in team mode, broadcast the classification to the team so other teammates can react:
+Your classification reaches the rest of the swarm through the sections you wrote, not through your response text. Re-read the item with `backlog_view` and confirm the Issue Classification section carries the type and rationale — and, for a `defect` or `recurring-pattern` item, that the Root-Cause Analysis section carries the evidence chain.
 
-```text
-SendMessage(team=<team_name>, from=<self>, to=*, content="CLASSIFIED: <item_ref> → <type>")
-```
-
-The rtica-assessor teammate may use your classification to adjust RT-ICA scope sizing. The groomer teammate reads your output after Wave 2 completes and uses it to shape the groomed Description and Acceptance Criteria subsections.
-
-If you classified as `defect` or `recurring-pattern`, also broadcast:
-
-```text
-SendMessage(team=<team_name>, from=<self>, to=*, content="ROOT_CAUSE_PRODUCED: <item_ref> — see Root-Cause Analysis section")
-```
+The rtica-assessor teammate reads the Issue Classification section to adjust RT-ICA scope sizing. The groomer teammate reads both sections after Wave 2 completes and uses them to shape the groomed Description and Acceptance Criteria subsections. A section that is absent leaves both of them working from the ungroomed description.
 
 ## Behavioral Constraints
 
@@ -154,5 +143,3 @@ Your `memory: project` frontmatter field gives you a persistent, cross-session m
 - A classification you made that a human later corrected (e.g. called `defect` when it was actually `missing-guardrail`) — what observable signal you missed
 - A decision-tree branch that repeatedly produces disputed classifications for a recognizable pattern of item wording
 - Do NOT record the content of any specific backlog item — only the generalizable judgment lesson
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.

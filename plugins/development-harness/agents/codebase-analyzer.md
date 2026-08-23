@@ -708,8 +708,6 @@ Return a brief confirmation. DO NOT include document contents.
 
 </critical_rules>
 
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
-
 <structured_returns>
 
 ## Analysis Complete

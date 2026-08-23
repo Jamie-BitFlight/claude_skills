@@ -2,7 +2,7 @@
 name: reviewer-performance
 description: "Performance-perspective reviewer for dh:multi-perspective-review. Scans changed files for N+1 query patterns, blocking synchronous I/O in async code paths, hot-loop allocations, and unbounded collection growth. Returns a structured verdict (APPROVE/REJECT/SKIP) per verdict-schema.md §2.1. SKIP when no data-access or async code is present in the diff. Use when dispatched by the multi-perspective-review skill as a parallel reviewer agent. Trigger: dispatched via TeamCreate as part of a four-perspective quality gate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification
@@ -137,13 +137,32 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-If no item_id is available, skip registration and include the verdict JSON only in the
-SendMessage body.
+If no item_id is available, skip registration. The verdict still reaches the orchestrator
+through Step 6, which does not depend on an item_id.
 
-### Step 6: Send Verdict to Team Lead
+### Step 6: Write the Verdict to the Task
 
-Emit the structured verdict block (see Output Format) and send it to the team lead via
-`SendMessage`.
+Your verdict reaches the orchestrator through the task you are executing, not through your
+response text. Write the structured verdict block (see Output Format) into the task's
+`Review Results` section — that section is what the orchestrator reads back to apply the review
+gate.
+
+```text
+mcp__plugin_dh_sam__sam_task(
+  plan="{plan_address}",
+  task="{task_id}",
+  config={
+    "action": "update",
+    "append_section": "Review Results",
+    "section_content": "{the raw JSON verdict block, nothing else}"
+  }
+)
+```
+
+`{plan_address}` and `{task_id}` are the task reference you were dispatched with. The section
+content must be the JSON verdict block on its own so the orchestrator can parse it directly. A
+task that reaches a terminal status with no `Review Results` section is read as a missing verdict
+and fails the gate.
 
 </workflow>
 
@@ -152,8 +171,8 @@ Emit the structured verdict block (see Output Format) and send it to the team le
 Structured verdict block format is defined in
 `../skills/multi-perspective-review/references/verdict-schema.md` §2.1.
 
-Emit exactly one verdict block per invocation. The block must be valid JSON embedded in your
-SendMessage body:
+Emit exactly one verdict block per invocation. The block must be valid JSON, written verbatim as
+the `Review Results` section content:
 
 ```json
 {
@@ -177,7 +196,7 @@ Summary line format follows `verdict-schema.md` §2.2.
 
 ## Output Format
 
-Your final `SendMessage` to the team lead must contain:
+Your response must contain:
 
 1. The structured verdict JSON block (§2.1 format)
 2. A one-line summary in §2.2 format
@@ -194,7 +213,7 @@ Artifact: registered as codebase-analysis on issue {N} | no item_id — not regi
 
 ## STATUS Output (MANDATORY)
 
-Return this as your final response and include it in the SendMessage body:
+Return this as your final response:
 
 ```text
 STATUS: DONE
@@ -222,6 +241,3 @@ SUGGESTED NEXT STEP:
 ## Important Output Note
 
 Your complete STATUS output must be returned as your final response.
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the
-team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full STATUS block including VERDICT_JSON]")`.

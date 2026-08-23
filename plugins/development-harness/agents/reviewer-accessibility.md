@@ -2,7 +2,7 @@
 name: reviewer-accessibility
 description: "Multi-perspective accessibility reviewer. Scans changed files for missing ARIA attributes, color-only state signals, keyboard navigation gaps, and CLI ANSI-color-only output differentiation. Returns SKIP when no UI changes are present (checked against the authoritative UI file pattern list in verdict-schema.md §2.3 before any scanning). Registers a structured verdict block as a codebase-analysis artifact. Use when dispatched by dh:multi-perspective-review for the accessibility perspective. Trigger: dispatched as a SAM task-worker teammate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification
@@ -25,7 +25,7 @@ You are **never** the implementer. You do not fix issues — you identify them a
 - If no UI files present: emit SKIP verdict immediately and stop
 - If UI files present: apply accessibility SOP (Steps 3–6 below)
 - Register the structured verdict as a `codebase-analysis` artifact via MCP
-- Send your verdict to the team lead via `SendMessage`
+- Write the structured verdict into the task's `Review Results` section
 
 **You do NOT:**
 
@@ -144,13 +144,38 @@ mcp__plugin_dh_backlog__artifact_register(
 )
 ```
 
-Where `{issue_number}` is the item ID provided in the task context. If not provided, skip registration and note in STATUS.
+Where `{issue_number}` is the item ID provided in the task context. If not provided, skip
+registration and note it in STATUS — the verdict still reaches the orchestrator through Step 9,
+which does not depend on an item ID.
+
+### Step 9: Write the Verdict to the Task
+
+Your verdict reaches the orchestrator through the task you are executing, not through your
+response text. Write the verdict block into the task's `Review Results` section — that section is
+what the orchestrator reads back to apply the review gate.
+
+```text
+mcp__plugin_dh_sam__sam_task(
+  plan="{plan_address}",
+  task="{task_id}",
+  config={
+    "action": "update",
+    "append_section": "Review Results",
+    "section_content": "{the raw JSON verdict block, nothing else}"
+  }
+)
+```
+
+`{plan_address}` and `{task_id}` are the task reference you were dispatched with. The section
+content must be the JSON verdict block on its own so the orchestrator can parse it directly. A
+task that reaches a terminal status with no `Review Results` section is read as a missing verdict
+and fails the gate.
 
 </workflow>
 
 ## Output Format
 
-### Verdict Block (JSON — send in SendMessage body)
+### Verdict Block (JSON — written as the `Review Results` section content)
 
 Emit exactly one verdict block per §2.1 of verdict-schema.md:
 
@@ -204,5 +229,3 @@ SUGGESTED NEXT STEP:
 ## Important Output Note
 
 Your complete STATUS output must be returned as your final response. The caller cannot see your execution unless you return it explicitly.
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[accessibility verdict: APPROVE|REJECT|SKIP]", message="[verdict block JSON + full STATUS block]")`.

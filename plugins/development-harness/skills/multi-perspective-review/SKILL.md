@@ -12,8 +12,8 @@ description: "Use when a diff needs four parallel perspective reviewers (Securit
 Orchestrates four independent perspective reviewers in parallel against a diff. Each reviewer
 specialises in a single dimension: Security, Performance, Quality, or Accessibility. The skill
 creates an ephemeral SAM plan, dispatches four `dh:task-worker` teammates via `TeamCreate`,
-collects structured verdict blocks via `SendMessage`, applies the gate logic, and prints one
-canonical summary line per perspective.
+reads each perspective's structured verdict block back from its task, applies the gate logic, and
+prints one canonical summary line per perspective.
 
 This skill does NOT replace language-scoped code review (`dh:forensic-review`). It runs
 alongside it as an orthogonal quality signal. It is an upstream dependency of #1430
@@ -55,38 +55,45 @@ Do not create a team or a plan when `changed_files` is empty.
 
 ## Step 2: Derive Review Slug
 
-Derive `review_slug` exactly once using the first matching rule:
+Derive `review_base` exactly once using the first matching rule:
 
 1. `--slug` argument is provided → use its value directly
 2. `--issue <N>` argument is provided → `review-{N}` (e.g., `review-2181`)
 3. Neither provided → read current git branch name via `git rev-parse --abbrev-ref HEAD` and
    use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
 
+Then stamp the run so this invocation gets its own address. Capture this command's stdout as
+`run_stamp`:
+
+```bash
+date -u +%Y%m%dT%H%M%SZ
+```
+
+`review_slug` is `{review_base}-{run_stamp}`, for example `review-2181-20260824T014233Z`.
+
+The stamp is what makes the plan ephemeral in fact and not just in name. `review_base` identifies
+the review subject and repeats across runs; `review_slug` identifies one run of it and never
+repeats. A verdict, and the changed-file set it was produced against, belong to a single run —
+addressing them by a slug that a later run resolves to as well is what lets one run read another
+run's results.
+
 Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the team name.
 
 ---
 
-## Step 3: Create Ephemeral Review Plan (check-or-create)
+## Step 3: Create the Ephemeral Review Plan
 
-**CRITICAL: check-or-create semantics are mandatory.** List matching plans before creating one so
-repeated runs reuse the existing address.
+**Create a new plan on every run.** Never search for and reuse an existing plan. `review_slug`
+carries this run's stamp, so no earlier plan can match it and every run starts with tasks that are
+`not-started`, bodies that describe this run's `changed_files`, and no `Review Results` section.
 
-### 3a: Check for Existing Plan
+Reuse cannot be made safe by resetting task status alone. Resetting status makes a task claimable
+again, but the task body still names the previous run's changed files, so workers would review the
+wrong file set; and `Review Results` already exists on the task, so the next append lands inside
+that heading rather than creating a second one, leaving Step 5 a section holding two concatenated
+JSON documents that no longer parse.
 
-Call:
-
-```python
-mcp__plugin_dh_sam__sam_plan(config={"action": "list", "search": "{review_slug}"})
-```
-
-Inspect the returned `items` array. If any item has `feature` equal to `{review_slug}`:
-
-- Store its non-empty `plan_ref` as `{PA}` (e.g., `#2181,P8a3f1b29`)
-- Skip step 3b — do not create a new plan
-
-If no matching plan is found, proceed to step 3b.
-
-### 3b: Create the Ephemeral Plan
+### Create the Ephemeral Plan
 
 Build the changed-files body block:
 
@@ -170,72 +177,84 @@ and must run in parallel. Each worker receives a minimal prompt that invokes `st
 `start-task` owns claim, active-task registration, and execution. The `agent:` field in each
 SAM task tells `dh:task-worker` which specialist profile to load via `profile_load` internally.
 
-Dispatch `dh:task-worker` for all four tasks: the four perspective reviewer agents do not declare
-the SAM task operations, so under `dh:dispatch-contract` they cannot be the dispatch target and
-their behavior reaches the work as a loaded profile instead.
+Dispatch `dh:task-worker` for all four tasks: the four perspective reviewer agents declare
+`sam_task` to write their verdict but not the rest of the SAM task lifecycle, so under
+`dh:dispatch-contract` they cannot be the dispatch target and their behavior reaches the work as a
+loaded profile instead.
+
+Every prompt names the same output destination: the `Review Results` section of the worker's own
+task. That section is the only channel the gate reads in Step 5 — a reviewer that does not write it
+is a missing verdict.
 
 ```text
 Agent(
   team_name="multi-{review_slug}",
   name="security-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on security review. Your task: {PA}/T1.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T1\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on security review. Your task: {PA}/T1.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T1\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T1\")"
 )
 
 Agent(
   team_name="multi-{review_slug}",
   name="performance-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on performance review. Your task: {PA}/T2.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T2\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on performance review. Your task: {PA}/T2.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T2\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T2\")"
 )
 
 Agent(
   team_name="multi-{review_slug}",
   name="quality-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on quality review. Your task: {PA}/T3.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T3\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on quality review. Your task: {PA}/T3.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T3\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T3\")"
 )
 
 Agent(
   team_name="multi-{review_slug}",
   name="accessibility-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on accessibility review. Your task: {PA}/T4.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T4\")"
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on accessibility review. Your task: {PA}/T4.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T4\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the gate reads your verdict.\n\nSkill(skill=\"start-task\", args=\"{PA} --task T4\")"
 )
 ```
 
 ---
 
-## Step 5: Collect Verdicts
+## Step 5: Read Verdicts Back From the Plan
 
-Wait for four `SendMessage` arrivals from teammates. Each reviewer agent sends:
-
-```text
-SendMessage(
-  to="team-lead",
-  summary="{perspective}: {verdict} — {N} findings ({blocker_count} blockers)",
-  message="<raw JSON verdict block per verdict-schema.md §2.1>"
-)
-```
-
-For each received message, parse the `message` field as JSON:
+Wait until every task in the ephemeral plan has reached a terminal status. Poll:
 
 ```python
-verdict_block = json.loads(msg.message)
+mcp__plugin_dh_sam__sam_plan(plan="{PA}", config={"action": "status"})
+```
+
+A task is terminal at `complete`, `blocked`, `failed`, `skipped`, or `deferred`. Do not read
+verdicts while any task is still `not-started` or `in-progress`.
+
+Then read each task and take its `Review Results` section:
+
+```python
+mcp__plugin_dh_sam__sam_task(plan="{PA}", task="T{N}", config={"action": "read"})
+```
+
+The plan was created for this run, so the task carries exactly one `Review Results` section and
+its content is one raw JSON verdict block. Parse it directly:
+
+```python
+verdict_block = json.loads(review_results_section)
 ```
 
 The verdict block schema is defined in
 [./references/verdict-schema.md](./references/verdict-schema.md) §2.1. Do not duplicate the
 schema here.
 
-**Missing verdict handling:** If any perspective does not send a `SendMessage` after all workers
-complete, treat it as a `FAIL` condition:
+**Missing verdict handling:** A task that is terminal but carries no `Review Results` section, or
+whose section does not parse as a verdict block per §2.1, is a missing verdict — never an
+approval. Treat it as a `FAIL` condition:
 
 ```text
 Perspective {X} did not return a verdict
 ```
 
-Collect all four verdict blocks before proceeding to Step 6.
+Read all four tasks before proceeding to Step 6.
 
 ---
 
@@ -248,8 +267,9 @@ defined in [./references/verdict-schema.md](./references/verdict-schema.md) §2.
 
 Apply gate in this order:
 
-1. **Check for missing verdicts.** If any perspective did not return a verdict, FAIL immediately
-   with message `"Perspective {X} did not return a verdict"`.
+1. **Check for missing verdicts.** If any perspective's task carries no parsable `Review Results`
+   verdict block, FAIL immediately with message
+   `"Perspective {X} did not return a verdict"`.
 
 2. **Check for REJECT.** If any verdict has `verdict == "REJECT"`, the gate FAILS. Collect all
    REJECT verdicts and their blocking findings for the summary.
@@ -315,19 +335,16 @@ flowchart TD
     Parse --> Files["git diff --name-only range → changed_files list"]
     Files --> Empty{changed_files empty?}
     Empty -->|Yes| Abort[ABORT — no changed files to review]
-    Empty -->|No| Slug[Derive review_slug once]
-    Slug --> CheckPlan["sam_plan(config: list + search)"]
-    CheckPlan --> PlanExists{Plan with slug exists?}
-    PlanExists -->|Yes — reuse| PlanAddr["Store existing plan address as {PA}"]
-    PlanExists -->|No — create| CreatePlan["sam_plan(config: create + T1..T4)"]
-    CreatePlan --> PlanAddr
+    Empty -->|No| Slug["Derive review_base, then<br>review_slug = review_base + run stamp"]
+    Slug --> CreatePlan["sam_plan(config: create + T1..T4)<br>always a new plan — never reused"]
+    CreatePlan --> PlanAddr["Store new plan address as {PA}"]
     PlanAddr --> Team["TeamCreate(team_name='multi-{review_slug}')"]
     Team --> Parallel[Dispatch 4 workers in parallel — no wait between spawns]
     Parallel --> W1["Agent(name='security-worker', subagent_type='dh:task-worker')"]
     Parallel --> W2["Agent(name='performance-worker', subagent_type='dh:task-worker')"]
     Parallel --> W3["Agent(name='quality-worker', subagent_type='dh:task-worker')"]
     Parallel --> W4["Agent(name='accessibility-worker', subagent_type='dh:task-worker')"]
-    W1 --> Collect[Wait for 4 SendMessage arrivals]
+    W1 --> Collect["Wait for T1..T4 terminal via sam_plan status<br>Read each task's Review Results section"]
     W2 --> Collect
     W3 --> Collect
     W4 --> Collect

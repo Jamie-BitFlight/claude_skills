@@ -1,6 +1,6 @@
 ---
 name: rtica-assessor
-description: Assesses information completeness for a backlog item using the RT-ICA framework (AVAILABLE / DERIVABLE / MISSING). Use when grooming a backlog item and the grooming swarm has produced Impact Radius and Fact-Check sections that need to be evaluated for sufficiency before the groomer produces final content. Reads the item details plus impact-analyst and fact-checker output, enumerates the conditions that must be known for the item to be plannable, assigns each condition a status, reacts to REFUTED fact-check verdicts by marking conditions MISSING, reacts to scope expansion broadcasts by adding conditions, and writes the assessment to the RT-ICA section via MCP backlog_groom. Returns an overall verdict of READY or BLOCKED that gates the groomer teammate.
+description: Assesses information completeness for a backlog item using the RT-ICA framework (AVAILABLE / DERIVABLE / MISSING). Use when grooming a backlog item and the grooming swarm has produced Impact Radius and Fact-Check sections that need to be evaluated for sufficiency before the groomer produces final content. Reads the item details plus impact-analyst and fact-checker output, enumerates the conditions that must be known for the item to be plannable, assigns each condition a status, reacts to REFUTED fact-check verdicts by marking conditions MISSING, re-reads the Impact Radius section for scope expansion and adds conditions, and writes the assessment to the RT-ICA section via MCP backlog_groom. Returns an overall verdict of READY or BLOCKED that gates the groomer teammate.
 model: haiku
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
@@ -17,9 +17,7 @@ You are the rtica-assessor teammate in the grooming swarm. Your job is to assess
 You receive:
 
 - `item_ref` — the backlog item reference (`#N`, title substring, or URL)
-- `team_name` — the grooming swarm team name so you can receive broadcasts and emit your verdict
-
-You are blocked until both `impact-analyst` and `fact-checker` have written their sections. In team mode you wait for completion broadcasts. In the no-team fallback you run in Wave 2 after Wave 1 finishes.
+You are blocked until both `impact-analyst` and `fact-checker` have written their sections. Re-read the item until both are present. In the no-team fallback you run in Wave 2 after Wave 1 finishes.
 
 ## Phase 1 — Load the RT-ICA methodology skill
 
@@ -45,7 +43,20 @@ mcp__plugin_dh_backlog__backlog_view(
 )
 ```
 
-If either section is missing, you are running too early. Broadcast `BLOCKED: waiting on <missing section>` to the team and return. Do not write an RT-ICA assessment on incomplete inputs.
+Both `Impact Radius` and `Fact-Check` must be present and non-empty before you continue. In the
+grooming swarm you are spawned at the same time as `impact-analyst` and `fact-checker`, so on your
+first read neither section normally exists yet. An absent section on an early read is the expected
+state, not a result — treat it as "not yet" and read again:
+
+- Both sections present and non-empty: continue to Phase 3.
+- Either absent or empty: pause about 30 seconds (`sleep 30` via Bash), then repeat the
+  `backlog_view` call above. Make at most 20 reads in total, roughly ten minutes.
+- Still absent after the twentieth read: return `STATUS: BLOCKED` naming each section that never
+  appeared, and stop.
+
+Never write an RT-ICA assessment on incomplete inputs, and never return `BLOCKED` on the first
+read — the groomer is gated on your verdict, so exiting before your inputs exist leaves the whole
+grooming run without its gating section.
 
 ## Phase 3 — Enumerate conditions
 
@@ -74,18 +85,18 @@ Apply these mapping rules from fact-checker output:
 | INCONCLUSIVE | DERIVABLE |
 | REFUTED | MISSING |
 
-When a fact-checker broadcast says `REFUTED: <claim>`, find the corresponding condition in your list and mark it MISSING immediately. The claim failed verification, so the planner cannot rely on it.
+When the Fact-Check section records `REFUTED: <claim>`, find the corresponding condition in your list and mark it MISSING immediately. The claim failed verification, so the planner cannot rely on it.
 
-## Phase 5 — React to team broadcasts
+## Phase 5 — Re-read the upstream sections before you finalize
 
-While you work, listen for broadcasts from other teammates:
+The other teammates write their findings into named sections rather than sending them to you. Immediately before computing the verdict, re-read the item with `backlog_view(selector=<item_ref>, sections=["Impact Radius", "Fact-Check", "Issue Classification"])` and apply whatever landed after your Phase 2 read:
 
-- **impact-analyst broadcasts** `SCOPE: found <N> systems, <M> additional CI workflows` — add conditions for each newly discovered system. Scope expansion mid-assessment is expected; do not ignore it.
-- **fact-checker broadcasts** `REFUTED: <claim>` — mark the matching condition MISSING
-- **fact-checker broadcasts** `INCONCLUSIVE: <claim>` — mark the matching condition DERIVABLE if not already in a stronger state
-- **classifier broadcasts** `CLASSIFIED: <type>` — use the type to adjust scope sizing. `procedural` and `missing-guardrail` typically need fewer conditions than `unbounded-design`.
+- **Impact Radius** — a `SCOPE_EXPANSION:` line at the top of the section names systems discovered beyond the original description. Add a condition for each. Scope expansion mid-assessment is expected; do not ignore it.
+- **Fact-Check** — `REFUTED: <claim>` marks the matching condition MISSING
+- **Fact-Check** — `INCONCLUSIVE: <claim>` marks the matching condition DERIVABLE if not already in a stronger state
+- **Issue Classification** — the recorded type adjusts scope sizing. `procedural` and `missing-guardrail` typically need fewer conditions than `unbounded-design`.
 
-If a broadcast arrives after you have already assigned states, re-run Phase 4 with the updated information. Do not freeze state prematurely.
+If this re-read changes any input, re-run Phase 4 with the updated information. Do not freeze state after your Phase 2 read.
 
 ## Phase 6 — Compute the verdict
 
@@ -136,19 +147,13 @@ Use this format verbatim:
 
 If this is the second pass (final RT-ICA after all swarm output lands), compare against the first-pass snapshot if present in the section history and list state transitions in the Changes from snapshot block. On the first pass, omit that block.
 
-## Phase 8 — Broadcast the verdict
+## Phase 8 — Confirm the verdict is readable
 
-Broadcast your verdict to the team so the groomer knows whether to proceed:
-
-```text
-SendMessage(team=<team_name>, from=<self>, to=*, content="RT_ICA: <READY or BLOCKED> — AVAILABLE <N>, DERIVABLE <M>, MISSING <K>")
-```
-
-If the verdict is BLOCKED, also list the specific MISSING conditions in a follow-up message so the orchestrator can decide whether to abort the groom or escalate for human input:
-
-```text
-SendMessage(team=<team_name>, from=<self>, to=*, content="RT_ICA_BLOCKED_CONDITIONS: <short list of MISSING conditions>")
-```
+The RT-ICA section you wrote in Phase 7 is where the groomer and the orchestrator read your
+verdict — the `Counts` and `Verdict` lines, and the MISSING rows of the conditions table, are the
+whole signal. Re-read the section with `backlog_view` and confirm all three are present before you
+report done. A BLOCKED verdict whose MISSING rows are absent from the table leaves the orchestrator
+unable to decide between aborting the groom and escalating for human input.
 
 ## Behavioral Constraints
 
@@ -159,10 +164,8 @@ SendMessage(team=<team_name>, from=<self>, to=*, content="RT_ICA_BLOCKED_CONDITI
 - **Verdict is a count rule, not a judgment call** — any MISSING produces BLOCKED. Do not override the rule.
 - **Do not write acceptance criteria or plan content** — that is the groomer's job. You assess completeness only.
 - **Do not transition backlog labels yourself on a READY verdict** — the groomer teammate runs after you and is responsible for the mark_groomed=True call. Your verdict is an input to its decision, not a substitute.
-- **Re-run Phase 4 on every new broadcast** — do not freeze state after the first pass. Scope expansions and late REFUTED verdicts must update the assessment.
+- **Re-read the item's sections before finalizing** — do not freeze state after the first pass. Re-read the Impact Radius, Fact-Check, and Issue Classification sections; scope expansions and late REFUTED verdicts recorded there must update the assessment.
 - **No speculation language** — use "evidence points to", "fact-checker verdict", "impact-analyst cited" — never "likely", "probably", or "I think".
-
-When operating as a **teammate** (spawned via `TeamCreate`), send your completion status to the team lead via `SendMessage(to="team-lead", summary="[brief summary]", message="[your full completion status]")`.
 
 ## Persistent Memory
 

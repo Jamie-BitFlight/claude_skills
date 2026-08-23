@@ -324,11 +324,11 @@
       "id": "G5.implement-feature.teammate-shutdown-4b",
       "skill": "implement-feature",
       "source_file": "SKILL.md:Progress Loop step 4b",
-      "step_label": "Step 4b: Shut down the completed teammate (SendMessage shutdown_request)",
+      "step_label": "Step 4b: Release the team via TeamDelete, after the batch commit in step 5",
       "optionality": "conditional",
-      "skip_condition": "Skip when: the agent was dispatched via a single `Agent` call (not `TeamCreate`) — subagents terminate automatically when their prompt completes.",
-      "skip_trigger": "agent dispatched via Agent call (not TeamCreate)",
-      "what_happens_instead": "No shutdown message sent; subagent terminates automatically"
+      "skip_condition": "Skip when: the agents were dispatched via single `Agent` calls (not `TeamCreate`) — subagents terminate automatically when their prompt completes.",
+      "skip_trigger": "agents dispatched via Agent calls (not TeamCreate)",
+      "what_happens_instead": "No team release; subagents terminate automatically"
     },
     {
       "id": "G5.implement-feature.per-task-commit",
