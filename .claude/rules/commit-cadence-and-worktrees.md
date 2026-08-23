@@ -54,6 +54,11 @@ committing.
   commit> HEAD`) before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not
   a guarantee for every session (e.g. a session launched with `--settings` overriding it, or a
   reused worktree name reopening at an old tip per the docs' "Reuse a worktree name" section).
+- **Need a base ref other than `worktree.baseRef`?** `EnterWorktree({name})` always follows the
+  configured `baseRef`. To branch from something else — e.g. an up-to-date `origin/main` for a PR
+  unrelated to current HEAD's in-flight work — create the worktree yourself first, then
+  `EnterWorktree({path: "<path>"})` to switch the session into it; its own description covers
+  entering a worktree made this way.
 
 ## When NOT to use a worktree
 
