@@ -10,11 +10,33 @@ every other area of the plugin as it gets resolved.
 
 ## Dispatch Roles
 
-These terms name the scope an agent's assignment covers — not a capability it holds or is denied.
+Load, Dispatch, and Delegate name actions. Dispatcher, Orchestrator, Manager, and Worker name
+the scope an agent's assignment covers — not a capability it holds or is denied.
 Every agent may decompose its own assignment however the work requires, including by dispatching
 further agents; the scope of the assignment is what differs. See
 [ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
 incident that required stating this precisely.
+
+**Load**:
+Reading a skill's instructions into the current agent's own context. The agent that loads a skill
+performs the work itself — loading adds instructions to who you already are, and adds no worker.
+_Avoid_: "delegate" or "hand off" for loading a skill. Both name an agent-to-agent transfer, so
+"delegate to the start-task skill" reads as an instruction to spawn a subagent for work the reader
+is meant to perform itself.
+
+**Dispatch**:
+Invoking a separate agent, which starts with its own empty context and inherits nothing the
+dispatcher loaded. Dispatching adds a worker.
+_Avoid_: using it for loading a skill (see Load above).
+
+**Delegate**:
+Dispatching an agent and handing over the brief it needs to work without guessing — the
+observations already known, what success is, and the boundaries. `.claude/skills/delegate/` is that
+template, and `.claude/CLAUDE.md` requires it whenever an agent is dispatched. Every delegation is
+a dispatch; a dispatch carrying no brief is one the receiving agent has to fill in from
+assumptions, which is what SAM exists to prevent.
+_Avoid_: "delegate" for any transfer that is not agent-to-agent — a skill load, a tool call, or
+writing a result to a destination another step reads.
 
 **Dispatcher**:
 The agent that invoked another agent with its prompt. A relation, not a role — an Orchestrator, a
@@ -24,14 +46,6 @@ party that can observe what an assignment hands over, so scope enforcement belon
 _Avoid_: naming a dispatched agent's invoker by a role term. The invoker may be any of the three
 roles below, so calling it "the manager" or "the orchestrator" asserts more than the dispatched
 agent can know.
-
-**Load** (a skill) vs **Dispatch** (an agent):
-Loading a skill reads its instructions into the current agent's own context; that agent then
-performs the work itself. Dispatching hands the work to a separate agent with its own empty
-context. Loading adds instructions to who you already are; dispatching adds a worker.
-_Avoid_: "delegate" for loading a skill. This repo reserves that word for handing work to another
-agent — `.claude/skills/delegate/` is the delegation template — so "delegate to the start-task
-skill" reads as an instruction to spawn a subagent for work the reader is meant to do itself.
 
 **Orchestrator**:
 The single interactive agent acting directly on behalf of the human; exactly one per session. Its
