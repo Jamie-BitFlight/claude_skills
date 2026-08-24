@@ -103,12 +103,16 @@ between the methodology and one literal stateless agent instance).
 
 **Resolve**:
 Mark a work item DONE with an evidence trail — `resolve_item()` (ADR-9). The evidence trail
-(summary, method, notes, follow-ups, findings) is a contractual part of resolution, persisted to
-the item's own metadata on every backend, not a GitHub-only artifact. A native rendering (a
-GitHub `## Resolved` comment plus `state: CLOSED`) is generated from that persisted record for
-backends where one exists; it is never the record's only copy. The backend's own status field is
-the sole authority for whether an item is resolved — native state (GitHub `CLOSED`, a Beads
-closed status) is a projection of it, not a second source of truth.
+(summary, method, notes, follow-ups, findings) is meant as a contractual part of resolution, not a
+GitHub-only artifact — that is the design intent (see [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220)), not yet the implementation. As of this
+writing `resolve_item()` (`operations.py:3180`) persists only `status`/`priority`/`plan` to item
+metadata on every backend; the five evidence fields are forwarded exclusively to
+`resolve_github_issue()`, so SQLite and Memory backends discard them entirely and Beads keeps only
+`summary` as its native close reason. `#3220` tracks adding a `resolution` record to
+`BacklogItemMetadata` so the GitHub `## Resolved` comment becomes a rendering of a persisted
+record instead of the only copy. The backend's own status field is the sole authority for whether
+an item is resolved — native state (GitHub `CLOSED`, a Beads closed status) is a projection of it,
+not a second source of truth.
 _Avoid_: "close" for completed work — that is Resolve below with a different, incompatible
 contract (ADR-9). Avoid treating a provider's native closure as authoritative in its own right;
 verify the backend's status field before trusting a GitHub or Beads state directly.
@@ -122,8 +126,11 @@ were once conflated and callers used the wrong one for already-completed work.
 
 **Evidence trail**:
 The structured resolution record (summary, method, notes, follow-ups, findings) `resolve_item()`
-requires and persists. Contractual, not a display feature: it is part of what the resolution
-workflow itself must ensure happened, independent of which backend renders it natively.
+requires as arguments. Contractual by design — it is meant as part of what the resolution workflow
+itself must ensure happened, independent of which backend renders it natively — but as of this
+writing the requirement is enforced only for the `summary` argument, and persistence beyond the
+GitHub-rendered comment does not yet exist on any backend; see Resolve above and
+[#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
 
 **Backend**:
 The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
