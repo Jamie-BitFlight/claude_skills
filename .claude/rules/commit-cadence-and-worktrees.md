@@ -43,18 +43,15 @@ committing.
   possible regardless of what else is being edited concurrently.
 - **A worktree only sees committed state.** Commit (not necessarily push) whatever a
   worktree-isolated agent needs to build on before spawning it.
-- **This repo sets `worktree.baseRef: "head"`** in `.claude/settings.json` — new worktrees,
-  including subagent isolation, branch from current local HEAD, not the tool's own `"fresh"`
-  default.
-- Still tell a worktree-isolated agent to verify its HEAD (`git merge-base --is-ancestor <recent
-  commit> HEAD`) before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not
-  a guarantee for every session (e.g. a session launched with `--settings` overriding it, or a
-  reused worktree name reopening at an old tip per the docs' "Reuse a worktree name" section).
-- **Need a base ref other than `worktree.baseRef`?** `EnterWorktree({name})` always follows the
-  configured `baseRef`. To branch from something else — e.g. an up-to-date `origin/main` for a PR
-  unrelated to current HEAD's in-flight work — create the worktree yourself first, then
-  `EnterWorktree({path: "<path>"})` to switch the session into it; its own description covers
-  entering a worktree made this way.
+- **This repo sets `worktree.baseRef: "head"`** in `.claude/settings.json` — a newly created
+  worktree branches from current local HEAD, not the tool's own `"fresh"` default. Reusing an
+  existing worktree name reopens it at its old tip instead of re-branching from `baseRef`.
+- Verify a worktree-isolated agent's HEAD (`git merge-base --is-ancestor <recent commit> HEAD`)
+  before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not a guarantee
+  for every session (`--settings` overrides, a reused worktree name at an old tip).
+- To branch a worktree from a ref other than `baseRef` (e.g. `origin/main` for a PR unrelated to
+  current HEAD): `git worktree add -b <new-branch> <path> origin/main`, then
+  `EnterWorktree({path: "<path>"})` to switch the session into it.
 
 ## When NOT to use a worktree
 
