@@ -48,7 +48,7 @@ mex check --json --quiet
 # - Unresolved TODOs in agent instructions
 ```
 
-**Execution flow**: doc-drift-auditor invokes `mex check --json` (setup prerequisite: `npx mex-agent setup --dry-run` to verify .mex/ scaffold exists), parses the structured output, cross-references instruction file drift with code-docs drift findings, and includes both in the final DOCUMENTATION_DRIFT_AUDIT.md report.
+**Execution flow**: doc-drift-auditor invokes `mex check --json` (setup prerequisite: `npx mex-agent setup --dry-run` to verify .mex/ scaffold exists), parses the structured output, cross-references instruction file drift with code-docs drift findings, and includes both in its audit report.
 
 ---
 
