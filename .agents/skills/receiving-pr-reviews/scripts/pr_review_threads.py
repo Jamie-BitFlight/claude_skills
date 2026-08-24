@@ -49,7 +49,11 @@ query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id isResolved path
-          comments(first: 100) { totalCount pageInfo { hasNextPage } nodes { databaseId body line originalLine } }
+          comments(first: 100) {
+            totalCount
+            pageInfo { hasNextPage }
+            nodes { databaseId body line originalLine author { login } }
+          }
         }
       }
     }
@@ -64,7 +68,7 @@ query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
       reviews(first: 100, after: $endCursor) {
         totalCount
         pageInfo { hasNextPage endCursor }
-        nodes { author { login } state body }
+        nodes { id author { login } state body }
       }
     }
   }
@@ -80,19 +84,26 @@ mutation($threadId: ID!) {
 """
 
 
+class _Author(BaseModel):
+    login: str
+
+
 class CommentNode(BaseModel):
     """A single review comment, in the shape GitHub's GraphQL API returns it.
 
     Field names mirror the GraphQL schema exactly (`databaseId`, not
     `database_id`) rather than being converted to snake_case, so the JSON
     this script emits matches the shape the receiving-pr-reviews skill
-    already documents and its downstream reader already parses.
+    already documents and its downstream reader already parses. `author` is
+    `None` for a comment left by an account that has since been deleted —
+    GitHub's GraphQL schema allows a null `author` there, same as `ReviewNode`.
     """
 
     databaseId: int
     body: str
     line: int | None
     originalLine: int | None
+    author: _Author | None
 
 
 class _PageInfo(BaseModel):
@@ -126,10 +137,6 @@ class _ReviewThreadsConnection(BaseModel):
     nodes: list[_ReviewThreadNode]
 
 
-class _Author(BaseModel):
-    login: str
-
-
 class ReviewNode(BaseModel):
     """A top-level review submission, in the shape GitHub's GraphQL API returns it.
 
@@ -137,8 +144,13 @@ class ReviewNode(BaseModel):
     its `body` is the reviewer's summary text, separate from any inline comment threads
     it may or may not have attached. `author` is `None` for a review left by an account
     that has since been deleted — GitHub's GraphQL schema allows a null `author` there.
+    `id` is GitHub's own GraphQL node id for this review submission: `watch` diffs reviews by
+    this id (falling back to no field would compare full content, which two distinct reviews
+    with identical author/state/body — e.g. the same bot re-posting the same message — could
+    satisfy without being the same submission).
     """
 
+    id: str
     author: _Author | None
     state: str
     body: str
@@ -383,16 +395,24 @@ def watch(
     `new_thread_ids`, and `new_reviews_with_body`.
     """
     deadline = time.monotonic() + timeout_seconds
+    # Every iteration below ends with one full `_build_fetch_result` call (two independent `gh`
+    # invocations, each bounded by `_GH_TIMEOUT_SECONDS`) that cannot itself be skipped or cut
+    # short — it produces the `current` state the caller reads. Stop admitting new iterations
+    # this many seconds before `deadline` so that worst-case fetch lands at or before it, keeping
+    # this function's actual wall-clock bounded by `timeout_seconds` as documented, not by
+    # `timeout_seconds` plus an extra uncounted fetch.
+    poll_deadline = deadline - (2 * _GH_TIMEOUT_SECONDS)
     baseline = _build_fetch_result(owner, repo, pr)
     baseline_thread_ids = {thread.id for thread in baseline.unresolved}
+    baseline_review_ids = {review.id for review in baseline.reviews_with_body}
     current = baseline
     new_thread_ids: set[str] = set()
     new_reviews: list[ReviewNode] = []
-    while time.monotonic() < deadline:
-        time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
+    while time.monotonic() < poll_deadline:
+        time.sleep(max(0.0, min(interval_seconds, poll_deadline - time.monotonic())))
         current = _build_fetch_result(owner, repo, pr)
         new_thread_ids = {thread.id for thread in current.unresolved} - baseline_thread_ids
-        new_reviews = [review for review in current.reviews_with_body if review not in baseline.reviews_with_body]
+        new_reviews = [review for review in current.reviews_with_body if review.id not in baseline_review_ids]
         if new_thread_ids or new_reviews:
             break
     result = WatchResult(
