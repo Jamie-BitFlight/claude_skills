@@ -128,10 +128,11 @@ class ReviewNode(BaseModel):
 
     Distinct from a review *comment* (`CommentNode`): this is the review object itself —
     its `body` is the reviewer's summary text, separate from any inline comment threads
-    it may or may not have attached.
+    it may or may not have attached. `author` is `None` for a review left by an account
+    that has since been deleted — GitHub's GraphQL schema allows a null `author` there.
     """
 
-    author: _Author
+    author: _Author | None
     state: str
     body: str
 
@@ -235,24 +236,7 @@ def _gh_executable() -> str:
     return path
 
 
-def _uv_executable() -> str:
-    """Resolve the `uv` executable's absolute path.
-
-    Returns:
-        Absolute path to `uv`.
-
-    Raises:
-        RuntimeError: `uv` is not on PATH.
-    """
-    path = shutil.which("uv")
-    if path is None:
-        msg = "uv not found on PATH"
-        raise RuntimeError(msg)
-    return path
-
-
 _GH_TIMEOUT_SECONDS = 30
-_RUN_BOUNDED = "scripts/run_bounded.py"
 
 # `watch`'s defaults keep each call short enough that the turn it returns into still lands
 # within prompt-cache TTL even under a degraded (5-minute) cache window, not just under Claude
@@ -264,10 +248,13 @@ _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
 
 def _run_gh(args: list[str]) -> str:
-    """Run a `gh` command through this repo's bounded runner and return its captured stdout.
+    """Run a `gh` command and return its captured stdout.
 
-    A stalled `gh` process (GitHub or the local proxy stops responding) would otherwise hang
-    indefinitely with no timeout. `run_bounded.py` terminates the whole process group on expiry.
+    `_RUN_BOUNDED`'s previous wrapping resolved `scripts/run_bounded.py` relative to the
+    caller's cwd rather than this script's own location, so every subcommand failed unless
+    invoked from the repository root. `gh` also spawns no child processes of its own, so a
+    plain timeout is enough to bound it directly — no process-group cleanup is needed the way
+    it would be for a command that forks descendants.
 
     Args:
         args: Full `gh` argv, excluding the executable itself (e.g. `["api", "graphql", ...]`).
@@ -276,27 +263,13 @@ def _run_gh(args: list[str]) -> str:
         The command's stdout, decoded as text.
 
     Raises:
-        subprocess.CalledProcessError: `gh` exited non-zero, or the command exceeded
-            `_GH_TIMEOUT_SECONDS` and was terminated. stderr is left connected to this
+        subprocess.CalledProcessError: `gh` exited non-zero. stderr is left connected to this
             process's own stderr (not captured) so the diagnostic reaches the caller directly
             instead of being buried in an exception attribute nobody prints.
+        subprocess.TimeoutExpired: the command exceeded `_GH_TIMEOUT_SECONDS`.
     """
     result = subprocess.run(
-        [
-            _uv_executable(),
-            "run",
-            "--quiet",
-            "--script",
-            _RUN_BOUNDED,
-            "--timeout-seconds",
-            str(_GH_TIMEOUT_SECONDS),
-            "--",
-            _gh_executable(),
-            *args,
-        ],
-        stdout=subprocess.PIPE,
-        text=True,
-        check=True,
+        [_gh_executable(), *args], stdout=subprocess.PIPE, text=True, timeout=_GH_TIMEOUT_SECONDS, check=True
     )
     return result.stdout
 
