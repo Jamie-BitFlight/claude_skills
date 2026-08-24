@@ -332,6 +332,47 @@ def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None
         json.loads(result.output)
 
 
+def test_watch_polls_final_leg_instead_of_skipping_it(mocker: MockerFixture) -> None:
+    """`watch` attempts a final poll on a normal-length last leg instead of sleeping straight to
+    `deadline` and skipping it.
+
+    Regression coverage for a Codex review on the earlier fix: with `--timeout-seconds 100` and
+    `--interval-seconds 90`, after the first poll at t=90 only 10s remain — under the pre-fix
+    sleep formula (`min(interval_seconds, deadline - now)`), the second poll would sleep the full
+    10s straight to `deadline` (t=100), where the guard's `deadline - now < _MIN_POLL_BUDGET_SECONDS`
+    (100-100=0 < 5) fires and skips it entirely, leaving that whole final stretch unconfirmed even
+    on total success. The fixed formula reserves `_MIN_POLL_BUDGET_SECONDS`, sleeping only to
+    t=95 (`min(90, 100-5-90)=5`), where `100-95=5` does *not* trip the guard, so the second poll
+    is attempted and finds the new activity it otherwise would have missed for this call entirely.
+    """
+    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
+    no_change = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
+    updated = FetchResult.model_validate({
+        "reviews_count": 0,
+        "reviews_with_body": [],
+        "threads_count": 1,
+        "unresolved": [{"id": "T9", "path": "d.py", "comments": [], "comments_truncated": False}],
+        "unresolved_count": 1,
+    })
+    fetch_mock = mocker.patch.object(
+        pr_review_threads, "_build_fetch_result", side_effect=[baseline, no_change, updated]
+    )
+    mocker.patch.object(pr_review_threads.time, "sleep")
+    # 0.0 (deadline=100). Iter 1: 0.0 (loop cond), 0.0 (sleep calc: min(90,95)=90), 90.0 (guard:
+    # 100-90=10 ≥ 5) → poll succeeds, no new activity. Iter 2: 90.0 (loop cond), 90.0 (sleep calc:
+    # min(90, 100-5-90=5)=5 — the fixed reservation, not the interval), 95.0 (guard: 100-95=5, not
+    # < 5) → poll attempted (would have been skipped under the pre-fix formula) and finds T9.
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 95.0])
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "100"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["timed_out"] is False
+    assert data["new_thread_ids"] == ["T9"]
+    assert fetch_mock.call_count == 3
+
+
 def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) -> None:
     """`watch` fails loudly when the *last* poll fails, even if an earlier poll in the same
     window succeeded.

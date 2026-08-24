@@ -447,6 +447,13 @@ def watch(
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`,
     `new_thread_ids`, and `new_reviews_with_body`.
 
+    Reserves `_MIN_POLL_BUDGET_SECONDS` before `deadline` (shortening the final sleep rather than
+    sleeping all the way to `deadline`), so a normal-length last leg still gets a real final poll
+    instead of being silently skipped — under the default interval/timeout, the whole window
+    through shortly before `deadline` gets checked, not just up through the second-to-last
+    interval. Only a pathologically short `--timeout-seconds`, or a poll that overruns its own
+    interval, leaves no room for that final attempt.
+
     Exits non-zero, with nothing printed to stdout, if the *last* re-poll attempted this window
     failed (a transient `gh` failure — see the exception handling inside the loop). An earlier
     success in the same window does not offset a later failure: what matters is whether the final
@@ -473,12 +480,21 @@ def watch(
     # loop), so "no poll attempted since" is itself a confirmed state, not an unknown one.
     last_poll_ok = True
     while time.monotonic() < deadline:
-        time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
+        # Sleep only up to `deadline - _MIN_POLL_BUDGET_SECONDS`, not all the way to `deadline`
+        # itself — reserving that much time means the final poll below is attempted with a real
+        # chance to complete, rather than skipped. Sleeping the full remainder on a normal-length
+        # last leg (the un-reserved version of this line) would otherwise leave the final
+        # `interval_seconds`-ish stretch of every watch call structurally unconfirmed even when
+        # nothing ever fails — a caller that stops after one `timed_out: true` would miss activity
+        # that arrived in that stretch, not just on a transient error.
+        time.sleep(max(0.0, min(interval_seconds, deadline - _MIN_POLL_BUDGET_SECONDS - time.monotonic())))
         if deadline - time.monotonic() < _MIN_POLL_BUDGET_SECONDS:
-            # Not enough time left before `deadline` for a real `gh` call to plausibly finish —
-            # `_gh_timeout_budget` would otherwise starve it to a floor too small to succeed.
-            # Stop polling and report the last successfully-fetched state instead of attempting
-            # a call that cannot complete.
+            # Only reached when there wasn't even `_MIN_POLL_BUDGET_SECONDS` left at the start of
+            # this iteration (a pathologically short `--timeout-seconds`, or a previous poll that
+            # ran long) — the sleep above already couldn't reserve it. `_gh_timeout_budget` would
+            # otherwise starve a call here to a floor too small to succeed; stop polling and
+            # report the last successfully-fetched state instead of attempting a call that cannot
+            # complete.
             break
         # `_build_fetch_result`'s two `gh` calls are each bounded to whatever's left before
         # `deadline` (see `_gh_timeout_budget`) rather than a static reservation subtracted from
