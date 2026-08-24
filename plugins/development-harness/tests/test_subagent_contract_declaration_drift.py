@@ -29,17 +29,12 @@ _CONTRACT_SKILL = "dh:subagent-contract"
 
 # Bare operation names as exposed by the SAM server (sam_schema/server.py) and the
 # backlog server (backlog_core/server.py, which mounts agent_profile under `profile_`).
-_GOVERNED_OPERATIONS = frozenset({
-    "sam_plan",
-    "sam_task",
-    "sam_active_task",
-    "artifact_register",
-    "artifact_read",
-    "artifact_list",
-    "artifact_get",
-    "profile_load",
-    "profile_list",
-})
+# Only operations that can produce a result needing a destination decision are governed —
+# a read/list operation never does, so it is left out the same way backlog_view and
+# backlog_groom already are. sam_plan/sam_task/sam_active_task bundle read and write
+# actions behind one tool name (selected at call time via config.action), so they stay
+# governed on the conservative assumption that a declared grant may be used to write.
+_GOVERNED_OPERATIONS = frozenset({"sam_plan", "sam_task", "sam_active_task", "artifact_register"})
 
 # A whole-server grant reaches every operation that server exposes.
 _GOVERNED_SERVERS = frozenset({"mcp__plugin_dh_sam", "mcp__plugin_dh_backlog"})
