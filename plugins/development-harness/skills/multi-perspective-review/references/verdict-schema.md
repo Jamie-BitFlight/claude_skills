@@ -67,9 +67,16 @@ Mapping from verdict struct to summary token:
 | `REJECT` | 1 BLOCKER finding | `REJECT (1 finding)` |
 | `REJECT` | N BLOCKER findings | `REJECT ({N} findings)` |
 | `SKIP` | — | `SKIP ({skip_reason})` |
+| _missing_ | — | `MISSING (no verdict)` |
 
 **Note:** The singular `finding` vs plural `findings` applies to REJECT tokens only. APPROVE
 always uses `findings` (plural).
+
+**Missing-perspective token:** a perspective named in the punch list's `missing` array (§2.6) has
+no verdict struct to look up in this table — it never reached `verdicts`. Render its slot with the
+`MISSING (no verdict)` token directly, without applying any other row above. This is how Step 7's
+FAIL-on-missing-verdict path (SKILL.md "Exit and Cleanup") still prints one token per perspective
+before exiting non-zero.
 
 ---
 

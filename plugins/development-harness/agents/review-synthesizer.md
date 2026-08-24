@@ -28,8 +28,11 @@ Your task reference names the ephemeral review plan. That plan holds the four re
 | T4 | accessibility |
 
 Each reviewer wrote its verdict into the `Review Results` section of its own task. Those four
-sections are your only input. Your own task is T5, and its `Punch List` section is your only
-output.
+sections are your only source of findings — you review nothing yourself and add no defect a
+reviewer did not already raise. Step 3 permits reading a flagged source file as auxiliary evidence
+when two descriptions are close enough that merging them is a judgement call: that confirms an
+existing finding against its source, it does not add a new one. Your own task is T5, and its
+`Punch List` section is your only output.
 
 ## SOP
 
