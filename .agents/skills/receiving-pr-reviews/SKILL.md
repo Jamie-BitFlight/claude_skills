@@ -7,7 +7,7 @@ description: Work through every unresolved review thread on a PR to completion �
 
 1. `gh pr view <N> -R Jamie-BitFlight/claude_skills --json reviews,reviewDecision` and `gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {id, path, line, body}]'`. Empty `reviewDecision` + `state: COMMENTED` does not mean no findings.
 2. For each unresolved thread: read it, validate the claim locally, assess against the change goal and repository instructions.
-3. Implement and commit a fix only when it improves the product.
+3. Implement, commit, and push a fix only when it improves the product — push before replying, so the SHA named in the reply is inspectable and resolving the thread never outruns what is actually on the remote.
 4. Reply on that thread with the disposition — conclusion, evidence, commit SHA, or why no change was warranted.
 5. Resolve the thread.
 6. A decision spanning threads (PR sequencing, rebase disposition) goes on the PR itself via `gh pr comment <N> -R Jamie-BitFlight/claude_skills`, before the work it governs.
