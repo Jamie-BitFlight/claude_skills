@@ -62,11 +62,13 @@ Derive `review_base` exactly once using the first matching rule:
 3. Neither provided → read current git branch name via `git rev-parse --abbrev-ref HEAD` and
    use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
 
-Then stamp the run so this invocation gets its own address. Capture this command's stdout as
-`run_stamp`:
+Then stamp the run so this invocation gets its own address. Run this command and capture its
+stdout as `run_stamp`. It is a single `uv` invocation, not a shell pipeline — no `$(...)`
+substitution, pipes, or POSIX-only device file — so it runs unchanged whether the executing shell
+is bash, PowerShell, or cmd.exe:
 
-```bash
-echo "$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+```text
+uv run --quiet --script ${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py
 ```
 
 The UTC timestamp alone only has whole-second resolution: two invocations for the same
@@ -75,9 +77,11 @@ same `review_slug` and `multi-{review_slug}` team name, colliding at `TeamCreate
 team's namespace. Bash's builtin `${RANDOM}` cannot fix this reliably: it is a weak generator
 seeded from the shell's own PID and start time, so sibling processes launched together (the exact
 case of many reviews dispatched at once) can draw correlated or identical values instead of the
-independent 1-in-32768 samples the odds assume. `/dev/urandom` is a kernel-backed CSPRNG with no
-such correlation — 8 bytes (64 bits) of it, hex-encoded via `od` (already present, no new
-dependency), makes an accidental suffix collision across concurrent runs practically impossible.
+independent 1-in-32768 samples the odds assume. `gen_run_stamp.py` draws 8 bytes (64 bits) from
+`secrets.token_hex`, Python's cross-platform CSPRNG binding (`os.urandom` under the hood — the
+Windows CryptoAPI on Windows, `/dev/urandom` on Linux/macOS), making an accidental suffix collision
+across concurrent runs practically impossible on every platform this skill runs on, not just POSIX
+shells with a `/dev/urandom` device node.
 
 `review_slug` is `{review_base}-{run_stamp}`, for example
 `review-2181-20260824T014233Z-3f9a2c7e1b804d56`.
