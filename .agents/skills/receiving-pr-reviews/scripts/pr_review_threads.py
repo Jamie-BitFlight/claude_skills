@@ -214,6 +214,20 @@ _GH_TIMEOUT_SECONDS = 30
 _DEFAULT_WATCH_INTERVAL_SECONDS = 90
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
+# `_gh_timeout_budget` floors a near-zero remainder to 0.1s — enough to keep the return type
+# positive, not enough for a real `gh api graphql` round trip. `_DEFAULT_WATCH_TIMEOUT_SECONDS`
+# being an exact multiple of `_DEFAULT_WATCH_INTERVAL_SECONDS` (270 / 90 = 3) means the loop's
+# final sleep lands within a fraction of a second of `deadline` on essentially every run, so an
+# unguarded poll there is starved to that floor and reliably raises `TimeoutExpired` — not a
+# flaky network failure. `watch`'s loop skips a poll once the remaining budget drops below this,
+# rather than attempting one that is near-certain to fail.
+# ponytail: 5.0 is an unmeasured heuristic, not a proven-sufficient margin for two sequential `gh
+# api graphql` round trips — `_build_fetch_result` makes two such calls, and if the first eats
+# most of this budget the second can still be starved. The exception handler around the poll in
+# `watch` is the real backstop for that case, not this guard alone; raise this value if starvation
+# is observed in practice with the guard already in place.
+_MIN_POLL_BUDGET_SECONDS = 5.0
+
 
 def _run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
     """Run a `gh` command and return its captured stdout.
@@ -432,6 +446,22 @@ def watch(
 
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`,
     `new_thread_ids`, and `new_reviews_with_body`.
+
+    Reserves `_MIN_POLL_BUDGET_SECONDS` before `deadline` (shortening the final sleep rather than
+    sleeping all the way to `deadline`), so a normal-length last leg still gets a real final poll
+    instead of being silently skipped — under the default interval/timeout, the whole window
+    through shortly before `deadline` gets checked, not just up through the second-to-last
+    interval. Only a pathologically short `--timeout-seconds`, or a poll that overruns its own
+    interval, leaves no room for that final attempt.
+
+    Exits non-zero, with nothing printed to stdout, if the *last* re-poll attempted this window
+    failed (a transient `gh` failure — see the exception handling inside the loop). An earlier
+    success in the same window does not offset a later failure: what matters is whether the final
+    stretch before `deadline` was actually confirmed, not whether any check ever succeeded. A
+    `timed_out: true` result on stdout is only ever printed when the most recent check — the
+    baseline fetch, or the last re-poll if one was attempted — succeeded, including the case
+    where no re-poll was attempted at all because the window ended too soon for one, which is an
+    honest "nothing to report," not a failure.
     """
     deadline = time.monotonic() + timeout_seconds
     baseline = _build_fetch_result(owner, repo, pr, deadline=deadline)
@@ -443,12 +473,49 @@ def watch(
     current = baseline
     new_thread_ids: set[str] = set()
     new_reviews: list[ReviewNode] = []
+    poll_attempts = 0
+    # Tracks the outcome of the most recent poll attempt, not a success count — a success
+    # earlier in the window does not confirm the tail after a later failure. Starts True: the
+    # baseline fetch above already succeeded (its own errors propagate uncaught, before the
+    # loop), so "no poll attempted since" is itself a confirmed state, not an unknown one.
+    last_poll_ok = True
     while time.monotonic() < deadline:
-        time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
+        # Sleep only up to `deadline - _MIN_POLL_BUDGET_SECONDS`, not all the way to `deadline`
+        # itself — reserving that much time means the final poll below is attempted with a real
+        # chance to complete, rather than skipped. Sleeping the full remainder on a normal-length
+        # last leg (the un-reserved version of this line) would otherwise leave the final
+        # `interval_seconds`-ish stretch of every watch call structurally unconfirmed even when
+        # nothing ever fails — a caller that stops after one `timed_out: true` would miss activity
+        # that arrived in that stretch, not just on a transient error.
+        time.sleep(max(0.0, min(interval_seconds, deadline - _MIN_POLL_BUDGET_SECONDS - time.monotonic())))
+        if deadline - time.monotonic() < _MIN_POLL_BUDGET_SECONDS:
+            # Only reached when there wasn't even `_MIN_POLL_BUDGET_SECONDS` left at the start of
+            # this iteration (a pathologically short `--timeout-seconds`, or a previous poll that
+            # ran long) — the sleep above already couldn't reserve it. `_gh_timeout_budget` would
+            # otherwise starve a call here to a floor too small to succeed; stop polling and
+            # report the last successfully-fetched state instead of attempting a call that cannot
+            # complete.
+            break
         # `_build_fetch_result`'s two `gh` calls are each bounded to whatever's left before
         # `deadline` (see `_gh_timeout_budget`) rather than a static reservation subtracted from
         # every poll — a call made with time to spare still gets the full `_GH_TIMEOUT_SECONDS`.
-        current = _build_fetch_result(owner, repo, pr, deadline=deadline)
+        poll_attempts += 1
+        try:
+            current = _build_fetch_result(owner, repo, pr, deadline=deadline)
+            last_poll_ok = True
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            last_poll_ok = False
+            # Two distinct causes land here, not one: a genuine transient `gh` failure mid-window
+            # (network hiccup, momentary GitHub error), and the guard above not being a complete
+            # fix on its own — `_build_fetch_result` makes two sequential `gh` calls, each
+            # re-budgeted from whatever's left, so a slow first call can still starve the second
+            # even though the guard passed. This handler is that starved-second-call case's real
+            # backstop, not a belt-and-suspenders duplicate of the guard.
+            # `watch` is meant to run unattended, often backgrounded (see the receiving-pr-reviews
+            # skill's own gotchas on polling a backgrounded call for its own result); crashing
+            # here loses the whole call's result instead of just this one poll. Treat it as no
+            # fresh data this poll and let the loop continue toward `deadline` on its own schedule.
+            continue
         new_thread_ids = {thread.id for thread in current.unresolved} - baseline_thread_ids
         new_reviews = [
             review
@@ -457,6 +524,22 @@ def watch(
         ]
         if new_thread_ids or new_reviews:
             break
+    if poll_attempts and not last_poll_ok:
+        # The most recent poll attempted this window raised — not just "every poll failed", but
+        # specifically the *last* one, which is what actually matters: an earlier success in the
+        # window does not confirm the tail after a later failure. Reporting `timed_out: true`
+        # here would claim a confirmed check found nothing new for the whole window, when the
+        # final stretch before `deadline` was never actually observed; a caller trusting that
+        # signal would wrongly conclude the PR is clean instead of retrying or investigating why
+        # the last `gh` call failed. A guard-triggered stop with zero poll attempts is not this
+        # case — that one is an honest, intentional "no time left to check again," and a run that
+        # ends on a *successful* poll (even after earlier failures) is confirmed as of that poll.
+        typer.echo(
+            f"watch: the last of {poll_attempts} poll(s) this window failed — final state before "
+            "deadline was never confirmed",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     result = WatchResult(
         timed_out=not (new_thread_ids or new_reviews),
         new_thread_ids=sorted(new_thread_ids),

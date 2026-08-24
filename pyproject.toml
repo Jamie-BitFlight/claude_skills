@@ -162,6 +162,7 @@ extra-paths = [
     "./plugins/summarizer/scripts",
     "./.claude/skills/daily-releases/scripts/daily_releases_lib",
     "./plugins/scientific-method/mcp/experiment-registry",
+    "./.agents/skills/receiving-pr-reviews/scripts",
 ]
 root = ["./"]
 
