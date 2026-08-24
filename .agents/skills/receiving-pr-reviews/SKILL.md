@@ -11,10 +11,12 @@ description: Work through every unresolved review thread on a PR to completion �
 4. Reply on that thread with the disposition — conclusion, evidence, commit SHA, or why no change was warranted.
 5. Resolve the thread.
 6. A decision spanning threads (PR sequencing, rebase disposition) goes on the PR itself via `gh pr comment <N> -R Jamie-BitFlight/claude_skills`, before the work it governs.
-7. Once all current threads are resolved, check for additional reviews three times at 10-minute intervals via `/loop` or `/schedule`. A new review restarts this skill from step 1 and cancels the remaining checks. A Codex thumbs-up with no comment, or an explicit "no reviews"/"no changes"/"0 comments" response, is that reviewer's completion signal.
+7. Once all current threads are resolved, check for additional reviews three times at 10-minute intervals via `/loop` (`/schedule`'s Cloud Routines have a 1-hour minimum interval — too coarse for this cadence). A new review restarts this skill from step 1 and cancels the remaining checks. A Codex thumbs-up with no comment, or an explicit "no reviews"/"no changes"/"0 comments" response, is that reviewer's completion signal.
 
 ## Gotchas
 
-- Step 2's `id` field is required — the reply endpoint needs `comment_id` and there's no other way to get it.
+- Step 1's `id` field is required — the reply endpoint needs `comment_id` and there's no other way to get it.
 - Reply: `gh api -X POST repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments/<comment_id>/replies -f body='...'`
-- Resolve: `gh api graphql -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' -f threadId='<thread_id>'` — `<thread_id>` comes from a GraphQL `reviewThreads` query on the PR, not the REST comments endpoint in step 1.
+- Resolve needs a GraphQL thread ID, not the REST comment `id` from step 1. Fetch it first:
+  `gh api graphql -f query='query($o:String!,$r:String!,$pr:Int!){repository(owner:$o,name:$r){pullRequest(number:$pr){reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{body path}}}}}}}' -f o=Jamie-BitFlight -f r=claude_skills -F pr=<N>`
+  then: `gh api graphql -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' -f threadId='<thread_id>'`
