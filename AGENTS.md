@@ -476,7 +476,11 @@ gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {id, 
 
 `reviewDecision` being empty and `state: COMMENTED` does NOT mean no findings. Codex and other bots post substantive per-line feedback as inline comments, not as blocking review verdicts. Checking only the top-level state misses these entirely.
 
-Address all inline comments before declaring the PR review complete.
+Treat every unresolved review thread as actionable input, not just a checklist to clear: read
+it, validate the claim locally, and assess it against the change goal and repository
+instructions before deciding what to do. Implement and commit a fix only when it improves the
+product — a finding that's already fixed, or doesn't warrant a change, still needs a reply, not
+silence. A PR review is not complete until every thread has been through this and is resolved.
 
 ### Where the response goes
 
@@ -494,9 +498,25 @@ no change. State what was concluded, the evidence it was concluded from, and the
 that addresses it — or why no change was warranted. "Fixed" alone tells the next reader
 nothing.
 
+Then resolve the thread — a reply alone leaves it open in the GitHub UI, which still reads as
+unaddressed:
+
+```bash
+# 4. Resolve the thread (thread_id comes from a reviewThreads query, not the REST comments endpoint)
+gh api graphql -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' -f threadId='<thread_id>'
+```
+
 A decision that spans threads rather than answering one — a sequencing choice between PRs, a
 rebase disposition plan — goes on the PR itself via
 `gh pr comment <N> -R Jamie-BitFlight/claude_skills`, before the work it governs.
+
+### Checking for more reviews
+
+After all current threads are resolved, check for additional reviews three times at 10-minute
+intervals using `/loop` or `/schedule` — a slower reviewer's findings can land after the first
+pass is already done. If a new review arrives, cancel the remaining checks and restart this
+process. Treat a Codex thumbs-up reaction on the PR body, or an explicit "no reviews", "no
+changes", or "0 comments" response, as that reviewer's completion signal.
 
 ## GitHub CLI Conventions
 
