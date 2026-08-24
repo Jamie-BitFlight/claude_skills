@@ -67,9 +67,16 @@ Mapping from verdict struct to summary token:
 | `REJECT` | 1 BLOCKER finding | `REJECT (1 finding)` |
 | `REJECT` | N BLOCKER findings | `REJECT ({N} findings)` |
 | `SKIP` | — | `SKIP ({skip_reason})` |
+| _missing_ | — | `MISSING (no verdict)` |
 
 **Note:** The singular `finding` vs plural `findings` applies to REJECT tokens only. APPROVE
 always uses `findings` (plural).
+
+**Missing-perspective token:** a perspective named in the punch list's `missing` array (§2.6) has
+no verdict struct to look up in this table — it never reached `verdicts`. Render its slot with the
+`MISSING (no verdict)` token directly, without applying any other row above. This is how Step 7's
+FAIL-on-missing-verdict path (SKILL.md "Exit and Cleanup") still prints one token per perspective
+before exiting non-zero.
 
 ---
 
@@ -140,11 +147,16 @@ GateResult:
   blocking_findings: list[Finding]   — empty when passed
 ```
 
+**Gate input:** `verdicts` and `missing` both come from the punch-list block (§2.6) that the
+synthesis task writes — `punch_list["verdicts"]` carries each §2.1 block verbatim, so the gate
+input is byte-identical to reading the four `Review Results` sections directly. The orchestrator
+may read those sections to check the punch list against them; the gate does not require it.
+
 **Pre-#1430 stub logic:**
 
 ```text
-verdicts = [parse_verdict(task.review_results) for task in plan_tasks]
-missing = [p for p in PERSPECTIVES if p's task has no parsable Review Results block]
+verdicts = punch_list["verdicts"]
+missing = punch_list["missing"]
 if missing:
     FAIL — "Perspective {X} did not return a verdict"
 rejecting = [v for v in verdicts if v.verdict == "REJECT"]
@@ -246,3 +258,97 @@ When any Tier 3 file is in the changed-files list, the quality reviewer checks:
 
 These are prompt engineering bugs. Each confirmed issue is a finding (BLOCKER if it causes
 incorrect behavior in a documented scenario; MINOR otherwise).
+
+---
+
+## §2.6 Punch-List Block
+
+The synthesis task (T5, profile `dh:review-synthesizer`) reads the four `Review Results` sections
+and writes exactly one punch-list block as the content of its own `Punch List` section. The
+orchestrator always reads that section, and always reads the four raw `Review Results` sections
+too — checks 6 and 7 below require comparing them.
+
+```json
+{
+  "schema_version": "1.0",
+  "verdicts": [
+    {
+      "schema_version": "1.0",
+      "perspective": "security",
+      "verdict": "REJECT",
+      "findings": [],
+      "skip_reason": "present only when verdict == SKIP"
+    }
+  ],
+  "missing": ["performance"],
+  "entries": [
+    {
+      "severity": "BLOCKER",
+      "file": "relative/path/to/file.py",
+      "line": 42,
+      "perspectives": ["security", "quality"],
+      "descriptions": [
+        "security reviewer's wording",
+        "quality reviewer's wording"
+      ],
+      "rules": ["no-hardcoded-secrets"]
+    }
+  ]
+}
+```
+
+**Field constraints:**
+
+- `verdicts`: each §2.1 block copied verbatim from a `Review Results` section, one per perspective
+  that returned a parsable one. This is the gate input defined in §2.4.
+- `missing`: perspectives whose task is terminal with no parsable `Review Results` block. A
+  perspective appears in `verdicts` or in `missing`, never both and never neither.
+- `entries`: deduplicated findings. One entry per distinct defect, whatever number of perspectives
+  raised it.
+- `entries[].perspectives`: every perspective that raised this defect, in T1..T4 order (security,
+  performance, quality, accessibility).
+- `entries[].descriptions`: each raising reviewer's own wording, index-aligned with `perspectives`.
+- `entries[].severity`: the highest severity among the merged findings.
+- `entries[].rules`: union of the `rule` values on the merged findings; `[]` when none carried one.
+- Ordering: `BLOCKER`, `MINOR`, `INFO`; within a severity, more perspectives first, then file path,
+  then line.
+
+**Conservation invariant:** the total number of findings across `verdicts` equals the sum of
+`len(perspectives)` across `entries`. Every reviewer finding reaches exactly one entry, and no
+entry exists without a reviewer finding behind it.
+
+**Merge rule:** two findings become one entry when they name the same file, the same line, and the
+same defect. A finding with `line: null` merges with a line-specific finding in the same file only
+when both descriptions name the same defect. Two different defects on one line stay two entries.
+
+**Validity checks:** the synthesizer runs these before writing the block, and the orchestrator runs
+them on the block it reads back. A block that fails any of them is not a punch list, whatever
+`json.loads` says about it, and the orchestrator takes its `Punch list not produced` failure path
+rather than reading fields out of it.
+
+1. The block is an object carrying `verdicts`, `missing`, and `entries`, with `verdicts` and
+   `entries` arrays of objects and `missing` an array of strings.
+2. Each block in `verdicts` satisfies §2.1 — `perspective` one of `security`, `performance`,
+   `quality`, `accessibility`; `verdict` one of `APPROVE`, `REJECT`, `SKIP`; `findings` an array.
+3. Coverage partition holds: `verdicts` and `missing` together name all four perspectives exactly
+   once — none in both, none in neither, none named twice.
+4. The conservation invariant above holds.
+5. Each entry carries `severity`, `file`, `perspectives`, and `descriptions`, with `descriptions`
+   the same length as `perspectives`.
+6. Each `verdicts[i].verdict` matches the `verdict` field in that perspective's own `Review
+   Results` section on `T1`..`T4`, exactly. Checks 1-5 validate structure and counts; none of them
+   catches a `verdict` token silently changed in the copy (a source `REJECT` rewritten to
+   `APPROVE` while its finding text is carried forward still satisfies checks 1-5). This check is
+   the only one that catches that case, so it is not optional and not skipped when checks 1-5 all
+   pass.
+7. Every finding on each perspective's own raw `Review Results` section on `T1`..`T4` — not the
+   `verdicts` copy — has its `description` appearing verbatim in some `entries[].descriptions`, at
+   the index where that entry's `entries[].perspectives` names the finding's own perspective.
+   Comparing `entries` against `verdicts[i].findings` is not sufficient: both fields are the
+   synthesizer's own output, so a synthesizer that alters a finding's `file`, `severity`,
+   `description`, or `rule` identically in both places, or drops one while inventing a duplicate
+   attribution to keep the total unchanged, still satisfies checks 1-6 and an entries-vs-`verdicts`
+   comparison — none of those compares against the source the synthesizer read. Only a comparison
+   against the raw `T1`..`T4` sections, the same source check 6 reconciles against, catches that
+   case, so this check runs alongside check 6 on every synthesis, not only when a count or verdict
+   token looks wrong.
