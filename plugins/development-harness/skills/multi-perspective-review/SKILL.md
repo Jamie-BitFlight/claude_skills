@@ -75,8 +75,7 @@ as `C:\Users\Jane Doe\...`) truncates the argument and `uv` executes only the pr
 A UTC timestamp alone has only whole-second resolution, so two invocations for the same
 `review_base` starting within the same second would derive the same `run_stamp` and collide on
 `review_slug` and `multi-{review_slug}` team name. `${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py`
-appends a `secrets.token_hex` suffix to rule this out — see its docstring for why the timestamp
-alone, and bash's `${RANDOM}`, aren't sufficient.
+appends a `secrets.token_hex` suffix to rule this out.
 
 `review_slug` is `{review_base}-{run_stamp}`, for example
 `review-2181-20260824T014233Z-3f9a2c7e1b804d56`.
