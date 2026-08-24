@@ -5,7 +5,9 @@ description: Work through every unresolved review thread on a PR to completion �
 
 # Receiving PR Reviews
 
-1. `gh pr view <N> -R Jamie-BitFlight/claude_skills --json reviews,reviewDecision` and `gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {id, path, line, body}]'`. Empty `reviewDecision` + `state: COMMENTED` does not mean no findings.
+1. Fetch only unresolved threads, filtered before the result reaches context — one query, not three:
+   `gh api graphql -f query='query($o:String!,$r:String!,$pr:Int!){repository(owner:$o,name:$r){pullRequest(number:$pr){reviewThreads(first:50){nodes{id isResolved path comments(first:5){nodes{databaseId body}}}}}}}' -f o=Jamie-BitFlight -f r=claude_skills -F pr=<N> --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)]'`
+   Each returned thread carries its own `id` (for resolving, step 5) and each comment's `databaseId` (for replying, step 4) — no separate lookup needed. Empty result means no unresolved threads; stop here.
 2. For each unresolved thread: read it, validate the claim locally, assess against the change goal and repository instructions.
 3. Implement, commit, and push a fix only when it improves the product — push before replying, so the SHA named in the reply is inspectable and resolving the thread never outruns what is actually on the remote.
 4. Reply on that thread with the disposition — conclusion, evidence, commit SHA, or why no change was warranted.
@@ -15,8 +17,6 @@ description: Work through every unresolved review thread on a PR to completion �
 
 ## Gotchas
 
-- Step 1's `id` field is required — the reply endpoint needs `comment_id` and there's no other way to get it.
-- Reply: `gh api -X POST repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments/<comment_id>/replies -f body='...'`
-- Resolve needs a GraphQL thread ID, not the REST comment `id` from step 1. Fetch it first:
-  `gh api graphql -f query='query($o:String!,$r:String!,$pr:Int!){repository(owner:$o,name:$r){pullRequest(number:$pr){reviewThreads(first:50){nodes{id isResolved comments(first:1){nodes{body path}}}}}}}' -f o=Jamie-BitFlight -f r=claude_skills -F pr=<N>`
-  then: `gh api graphql -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' -f threadId='<thread_id>'`
+- Reply: `gh api -X POST repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments/<comment_id>/replies -f body='...'` — `<comment_id>` is a comment's `databaseId` from step 1 (verified identical to the REST comment `id`).
+- Resolve: `gh api graphql -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{isResolved}}}' -f threadId='<thread_id>'` — `<thread_id>` is a thread's `id` from step 1.
+- Auditing already-resolved review history (not checking for new work to address) is a different task: drop `select(.isResolved == false)` from step 1's query to see every thread.
