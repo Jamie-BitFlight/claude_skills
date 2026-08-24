@@ -110,7 +110,8 @@ _Avoid_: "close" for completed work — that is Close below, a different, incomp
 
 **Close**:
 Dismiss a work item without completion — `close_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)),
-requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, blocked). No
+requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, permanently
+blocked — not a temporary wait on a dependency or input). No
 resolution evidence trail — that is Resolve's contract above, not Close's. `close_item()` also
 takes `reference`/`comment` parameters, forwarded on a GitHub-backed item to its closing comment
 — but as of this writing `reference` is overwritten with the item's own backend reference before
