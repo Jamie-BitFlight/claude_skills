@@ -520,7 +520,7 @@ The following diagram is the authoritative procedure for SAM Dispatch Loop phase
 flowchart TD
     Done{Which task<br>just completed?}
     Done -->|T0 Multi-Perspective Review| T0Post["Any REJECT — trigger Recursive Follow-up Handling<br>(same path as T1 NEEDS_WORK)."]
-    Done -->|T1 Code Review| T1Post["Read codebase-analysis artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
+    Done -->|T1 Code Review| T1Post["Read code-review artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
     Done -->|T4 Drift Audit| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
     T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{qg_plan_address}', task='T5',<br>config={action:'state', status:'skipped'})"]
     T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
@@ -624,16 +624,11 @@ orchestrator skips recursion.
 
 ### Step 1: Detect Follow-up Plans
 
-Retrieve the review report registered by `@dh:code-reviewer` during Phase 1:
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "codebase-analysis"
-```
-
-**If `artifact_read` returns an error**, call
-`artifact_list(item_id={item_ref}, artifact_type="codebase-analysis")`. If the manifest contains
-an entry, report the provider read error and stop; registered content must remain readable through
-the same provider boundary.
+Resolve `{review_report}` by running
+[./references/read-code-review-verdict.md](./references/read-code-review-verdict.md). It derives this
+quality-gate plan's own `artifact_id` and matches it exactly, everywhere it looks — `code-review`
+holds one entry per reviewed task and this item also holds the feature plan's. When nothing matches
+it resets and re-dispatches T1, then blocks. An absent verdict is not a passing verdict.
 
 Check the `verdict` field in the report:
 
@@ -650,7 +645,8 @@ Check the `verdict` field in the report:
   or fix task `blocked`): report `COMPLETION BLOCKED — Blocking Code Review Findings Not
   Resolved`, do NOT route to backlog, stop, do not apply `status:verified`.
 
-If `artifact_list` also finds no match, fall back to the SAM MCP search:
+A `NEEDS-WORK` or `FAIL` report names the follow-up plans the reviewer created. If it names none,
+search SAM for plans the reviewer created without recording them in the report:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}-followup"
@@ -658,7 +654,9 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}-foll
 
 Use the parent plan's resolved `{slug}`.
 
-If both `artifact_read` and the SAM search return empty: skip the entire routing section (no follow-ups to route).
+If the report names no follow-up plan and the SAM search returns empty, skip the entire routing
+section — there is nothing to route. Reaching this point requires a verdict that was read; an
+unreadable verdict blocks in the procedure above and never arrives here.
 
 **Error handling**: If the SAM fallback returns plans from a different feature slug, filter results
 to the parent `{slug}`. Store each retained result's opaque `plan_ref` for follow-up operations.

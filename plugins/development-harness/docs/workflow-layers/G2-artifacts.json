@@ -84,9 +84,56 @@
       },
       "consumed_by": [
         {
-          "skill": "implement-feature",
-          "source_file": "skills/implement-feature/SKILL.md:SAM Stage 6 — Forensic Review:Step 4 — Read codebase-analysis Artifact",
-          "action": "artifact_read(item_id={item_id}, artifact_type='codebase-analysis')",
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 2: Codebase Analysis (@dh:codebase-analyzer)",
+          "action": "artifact list --item-id {issue} --artifact-type codebase-analysis — registration check after the agent returns",
+          "agent": null
+        },
+        {
+          "skill": "add-new-feature",
+          "source_file": "skills/add-new-feature/SKILL.md:## Phase 3: Architecture Spec (design-spec role)",
+          "action": "If codebase analysis exists: Read via artifact_read(item_id={issue}, artifact_type='codebase-analysis')",
+          "agent": null
+        }
+      ],
+      "storage": "provider_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.codebase-analysis-architecture",
+      "name": "codebase-analysis (architecture dependency graph)",
+      "artifact_type_key": "codebase-analysis",
+      "produced_by": {
+        "skill": "code-review-architecture",
+        "source_file": "skills/code-review-architecture/SKILL.md:## SOP (Architecture Audit)",
+        "action": "artifact register --item-id {issue_number} --artifact-type codebase-analysis --artifact-id architecture-graph-{slug} --content {report_markdown} --status complete --agent code-review-architecture",
+        "agent": "code-review-architecture"
+      },
+      "consumed_by": [],
+      "storage": "provider_artifact",
+      "persistent": true
+    },
+    {
+      "id": "G2.code-review",
+      "name": "code-review",
+      "artifact_type_key": "code-review",
+      "produced_by": {
+        "skill": "complete-implementation",
+        "source_file": "agents/code-reviewer.md:### Step 8: Assemble and Register Report",
+        "action": "artifact_register(item_id={item_id}, artifact_type='code-review', artifact_id='code-review-{task_id}-{slug}', content={report_markdown}, status='current', agent='code-reviewer')",
+        "agent": "code-reviewer"
+      },
+      "consumed_by": [
+        {
+          "skill": "complete-implementation",
+          "source_file": "skills/complete-implementation/references/read-code-review-verdict.md:## Step A — Read by identifier",
+          "action": "artifact read --item-id {item_ref} --artifact-type code-review --artifact-id {review_artifact_id} — verdict drives the fix loop and follow-up routing; falls back to artifact list on code-review, then to the same artifact_id under codebase-analysis for plans predating the type; every selection is an exact artifact_id match",
+          "agent": null
+        },
+        {
+          "skill": "forensic-review",
+          "source_file": "skills/forensic-review/SKILL.md:### Step 4 — Read code-review Artifact",
+          "action": "artifact_read(item_id={item_id}, artifact_type='code-review', artifact_id='{artifact_id}')",
           "agent": null
         }
       ],

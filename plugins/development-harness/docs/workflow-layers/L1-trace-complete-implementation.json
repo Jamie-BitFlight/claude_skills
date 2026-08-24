@@ -444,7 +444,7 @@
       "path": [
         "T1 complete",
         "done-2:T1",
-        "Read codebase-analysis artifact",
+        "Read code-review artifact by artifact_id",
         "Verdict drives Recursive Follow-up Handling (Step 1 — fix loop or backlog routing)"
       ],
       "crosses_into_files": [

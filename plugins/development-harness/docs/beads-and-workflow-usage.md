@@ -48,6 +48,7 @@ plan create \
   --item-id "$task_a" \
   --artifact-type research \
   --artifact-id findings-20260730 \
+  --agent ecosystem-researcher \
   --content "$(<findings.md)"
 
  plan validate \

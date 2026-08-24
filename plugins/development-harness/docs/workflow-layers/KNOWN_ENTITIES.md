@@ -231,11 +231,11 @@ then associate the returned logical plan address with its owner through `backlog
 | artifact_type key | Producer skill/agent | Consumer skill/agent |
 |---|---|---|
 | `feature-context` | `add-new-feature` (feature-researcher) | `add-new-feature` (architect, swarm-task-planner) |
-| `codebase-analysis` | `add-new-feature` (codebase-analyzer) | `add-new-feature`, `complete-implementation` |
+| `codebase-analysis` | `add-new-feature` (codebase-analyzer), `code-review-architecture` | `add-new-feature` |
 | `architect` | `add-new-feature` (swarm-task-planner) | `implement-feature`, `add-new-feature` |
 | `T0-baseline` | `implement-feature` (t0-baseline-capture) | `implement-feature` (TN gate comparison) |
 | `TN-verification` | `implement-feature` (tn-verification-gate) | `complete-implementation` |
-| `codebase-analysis` | `complete-implementation` (code-reviewer) | `complete-implementation` |
+| `code-review` | `complete-implementation` (code-reviewer) | `complete-implementation`, `forensic-review` |
 | `audit-report` | `complete-implementation` (doc-drift-auditor) | `complete-implementation` |
 | `research` | `add-new-feature` (ecosystem-researcher / technical-researcher) | `add-new-feature` |
 | `dispatch-plan` | `groom-milestone` (dispatch_create_plan) | `work-milestone` |

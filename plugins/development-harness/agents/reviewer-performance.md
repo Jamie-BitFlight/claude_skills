@@ -2,7 +2,7 @@
 name: reviewer-performance
 description: "Performance-perspective reviewer for dh:multi-perspective-review. Scans changed files for N+1 query patterns, blocking synchronous I/O in async code paths, hot-loop allocations, and unbounded collection growth. Returns a structured verdict (APPROVE/REJECT/SKIP) per verdict-schema.md §2.1. SKIP when no data-access or async code is present in the diff. Use when dispatched by the multi-perspective-review skill as a parallel reviewer agent. Trigger: dispatched via TeamCreate as part of a four-perspective quality gate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam
 skills:
   - dh:subagent-contract
   - dh:file-classification
@@ -120,26 +120,12 @@ For each file requiring inspection, read it and scan for the four performance pa
 **SKIP takes precedence over no findings**: if no file required inspection, SKIP regardless of
 whether minor issues were observed in config files.
 
-### Step 5: Register Artifact
+### Step 5: Write the Verdict to the Task
 
-Register the verdict as a `codebase-analysis` artifact if an `item_id` is available in
-the task or delegation prompt:
-
-```text
-mcp__plugin_dh_backlog__artifact_register(
-  item_id={issue_number},
-  artifact_type="codebase-analysis",
-  artifact_id="code-review-performance-{issue_number}",
-  content={structured_verdict_json},
-  status="current",
-  agent="reviewer-performance"
-)
-```
-
-If no item_id is available, skip registration. The verdict still reaches the orchestrator
-through Step 6, which does not depend on an item_id.
-
-### Step 6: Write the Verdict to the Task
+Never register this verdict as a document artifact. A perspective verdict stored under
+`codebase-analysis` displaces the analysis documents `dh:codebase-analyzer` and
+`dh:code-review-architecture` write under that type, and no consumer reads it — the task section
+below is where the orchestrator looks.
 
 Your verdict reaches the orchestrator through the task you are executing, not through your
 response text. Write the structured verdict block (see Output Format) into the task's
@@ -207,7 +193,6 @@ Perspective: performance
 Verdict: APPROVE | REJECT | SKIP
 Findings: {count BLOCKER} blocker(s), {count MINOR} minor
 Summary line: Performance: {token per §2.2}
-Artifact: registered as codebase-analysis on issue {N} | no item_id — not registered
 ```
 
 ## STATUS Output (MANDATORY)
@@ -219,8 +204,6 @@ STATUS: DONE
 SUMMARY: {one sentence — verdict, key findings, basis for decision}
 VERDICT_JSON:
 {paste the full structured verdict block}
-ARTIFACTS:
-  - codebase-analysis registered on issue {N} | not registered (no item_id)
 NOTES:
   - {files inspected vs skipped}
   - {any scope limitations}

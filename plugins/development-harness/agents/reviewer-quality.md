@@ -1,8 +1,8 @@
 ---
 name: reviewer-quality
-description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) and registers findings as a codebase-analysis artifact. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review as part of the parallel reviewer team. Trigger: reviewer-quality, quality review, code quality gate."
+description: "Quality-perspective reviewer for multi-perspective code review. Scans changed files for naming violations, dead code, swallowed exceptions (bare except, except Exception with pass, empty catch blocks), test coverage gaps (new public functions without tests), and SOLID violations. Emits a structured verdict block (APPROVE/REJECT) written into the task's Review Results section. SKIP is not applicable — quality perspective always runs on code changes. Use when dispatched by dh:multi-perspective-review as part of the parallel reviewer team. Trigger: reviewer-quality, quality review, code quality gate."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam
 skills:
   - dh:subagent-contract
   - dh:file-classification
@@ -117,20 +117,14 @@ Produce the structured verdict block per the schema defined in:
 
 Note: `skip_reason` is omitted — SKIP is never applicable for this perspective.
 
-### Step 8: Register Artifact
+### Step 8: Deliver Verdict
 
-Register the verdict as a `codebase-analysis` artifact via MCP. Use `issue_number` from the task context if provided; omit if not available.
+Deliver the assembled verdict block through the Verdict Delivery section below — the task's
+`Review Results` section is the only channel a consumer reads the quality verdict from.
 
-```text
-mcp__plugin_dh_backlog__artifact_register(
-  item_id={issue_number},
-  artifact_type="codebase-analysis",
-  artifact_id="code-review-quality-{issue_number}",
-  content={verdict_block_json},
-  status="current",
-  agent="reviewer-quality"
-)
-```
+Never register this verdict as a document artifact. A perspective verdict stored under
+`codebase-analysis` displaces the analysis documents `dh:codebase-analyzer` and
+`dh:code-review-architecture` write under that type, and no consumer reads it.
 
 </workflow>
 

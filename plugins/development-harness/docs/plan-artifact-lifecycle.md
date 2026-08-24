@@ -189,6 +189,19 @@ Consumer agents MUST:
 Registration is idempotent for the same owner, type, and logical name. A retry
 may update the existing entry; it MUST NOT create a second current entry.
 
+A type holds either several current entries per owner or exactly one.
+`artifact_read` called without an `artifact_id` selects by owner and type alone
+and returns the most recently registered entry, so a record read by type as a
+decision — a review verdict, a verification result — MUST have a type of its own
+and MUST NOT share one with a multi-entry class such as codebase analysis.
+
+A private type is not by itself a single entry. When the one producer of a
+decision type registers an entry per unit reviewed rather than per owner, that
+type is multi-entry too and its consumers MUST pass an `artifact_id`. The
+producer MUST report the identifier it registered so the consumer can address
+it; a consumer that must discover it instead reads `artifact_list` and selects
+on `artifact_id` and `created_at`.
+
 </manifest_policy>
 
 <migration_policy>
@@ -199,6 +212,20 @@ Apply this policy to new records. Preserve existing human intent and generated
 content while it is being read. Existing records may contain path fields or
 provider-specific references; treat those fields as migration metadata and
 rewrite them only through the configured backend's migration operation.
+
+When a class of record moves to its own artifact type, entries already
+registered under the former type stay there; nothing backfills them. A consumer
+of the new type that finds no entry MUST look under the former type before
+concluding that no record exists.
+
+Select that entry by the same `artifact_id` it would have addressed under the new
+type. A type migration moves `artifact_type`; it does not change how the producer
+builds `artifact_id`, so the record still carries the identifier the consumer
+already derived. Matching on the producing agent alone is not sufficient — one
+owner accumulates that agent's records for every unit it ever reviewed, and
+accepting the wrong one substitutes an unrelated stale record for a current one
+that was never written. When no entry matches the identifier exactly, no record
+exists; report that rather than selecting the nearest candidate.
 
 Do not make a file path the canonical artifact identity, add a second backend
 selector, or silently copy an old record into a new authority. A migration is

@@ -238,9 +238,9 @@
       "id": "G3.complete-implementation.surface-divergence",
       "skill": "complete-implementation",
       "source_file": "complete-implementation/SKILL.md:Post-Phase-6: Surface Divergence Findings",
-      "action_label": "Read codebase-analysis artifact and route divergence findings",
+      "action_label": "Surface T6 divergence findings from the agent's DIVERGENCE_REQUIRING_REVIEW block",
       "actor_type": "orchestrator-raw",
-      "evidence": "mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type=\"codebase-analysis\")",
+      "evidence": "Read the DIVERGENCE_REQUIRING_REVIEW block collected from T6's output in the dispatch loop; no artifact read occurs in this step",
       "agent_name": null
     },
     {

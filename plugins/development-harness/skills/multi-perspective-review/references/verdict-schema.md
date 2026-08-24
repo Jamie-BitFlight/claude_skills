@@ -11,6 +11,15 @@ definitions in agent instruction bodies.
 
 **Gate interface**: The `gate(verdicts) -> GateResult` interface defined in §2.4 is stable.
 
+**Verdict transport is the task's `Review Results` section.** Each reviewer writes its verdict block
+there with `sam_task(config={"action": "update", "append_section": "Review Results", ...})`; the
+orchestrator reads it back from the task to apply the gate. No reviewer in this skill registers a
+document artifact. A verdict block registered under `codebase-analysis` collides with the analysis
+documents `dh:codebase-analyzer` and `dh:code-review-architecture` write under that type, and a read
+of a type returns only its most recently registered entry — so a perspective verdict displaces
+whichever document a consumer of that type expected, and any gate reading it evaluates a schema it
+does not expect (`APPROVE`/`REJECT`/`SKIP` against branches written for `PASS`/`NEEDS-WORK`/`FAIL`).
+
 ---
 
 ## §2.1 Structured Verdict Block
