@@ -260,8 +260,8 @@ punch_list = json.loads(punch_list_section)
 
 The block carries each perspective's §2.1 verdict block verbatim in `verdicts`, the perspectives
 that returned nothing in `missing`, and the deduplicated findings in `entries`. It gives the gate
-everything it needs, so Step 7 does not read the four `Review Results` sections. Read them when you
-want to check the punch list against its sources — the sections stay on `T1`..`T4` for exactly that.
+everything it needs to render the summary and entries, but not everything it needs to trust the
+`verdict` token itself — see the reconciliation check below.
 
 `json.loads` succeeding proves the section is JSON, not that it is a punch list. Run the validity
 checks in [./references/verdict-schema.md](./references/verdict-schema.md) §2.6 against the parsed
@@ -270,10 +270,22 @@ naming the check that failed — when any of them fails. Indexing a field the ga
 unvalidated block raises on `{}` and silently under-reports coverage on a block missing a
 perspective, and a review that reports fewer perspectives than it ran is a false pass.
 
+**Reconcile against source (§2.6 check 6):** the synthesizer copies each `verdicts[i]` block from
+its perspective's own `Review Results` section, but a copy is a claim, not a guarantee — an LLM
+that alters a source `REJECT` to `APPROVE` while carrying its finding text forward still produces
+a block that passes every check above, because none of them compares `verdict` to its source. Read
+the four `Review Results` sections on `T1`..`T4` and confirm each `verdicts[i].verdict` matches its
+source perspective's `verdict` field exactly. A mismatch is check 6 failing: take the `Punch list
+not produced` failure path below and name the perspective whose verdict was altered — a punch list
+that silently drops a REJECT is a false pass, and the gate's entire correctness rests on this
+token, so this check runs on every synthesis, not only when something looks wrong.
+
 **Punch list not produced:** a terminal `T5` whose `Punch List` section is absent, does not
 parse as JSON, or fails any validation check above is synthesis that did not happen. FAIL with
-`Punch list not produced`, name the check that failed, and report which perspectives did write a
-`Review Results` section so the run is diagnosable.
+`Punch list not produced`, name the check that failed, report which perspectives did write a
+`Review Results` section so the run is diagnosable, then run `TeamDelete(team_name="multi-{review_slug}")`
+and exit non-zero — this failure happens before Step 7, so its own team cleanup and exit are the
+only ones that will run for it.
 
 ---
 
@@ -322,7 +334,8 @@ rendered example line.
 
 ### Exit and Cleanup
 
-1. If gate FAILED (any REJECT): print the summary line, then TeamDelete, then exit non-zero.
+1. If gate FAILED (missing verdict or any REJECT): print the summary line, then TeamDelete, then
+   exit non-zero.
 2. If gate PASSED (all-SKIP warning applies): print the summary line, then print the warning
    line `NOTE: No perspectives reviewed — all skipped`, then TeamDelete, then exit 0.
 3. If gate PASSED (normal): print the summary line, then TeamDelete, then exit 0.
@@ -358,9 +371,9 @@ flowchart TD
     W4 --> Collect
     Collect --> Synth["Dispatch synthesis worker on T5<br>Wait for T5 terminal<br>Read its Punch List section"]
     Synth --> NoList{"Punch List parses AND<br>validates against §2.6?"}
-    NoList -->|No| FailSynth[FAIL — Punch list not produced]
+    NoList -->|No| FailSynth[FAIL — Punch list not produced.<br>TeamDelete. Exit non-zero.]
     NoList -->|Yes| Gate{Any REJECT?}
-    Gate -->|Missing verdict| Fail[FAIL — Perspective X did not return a verdict]
+    Gate -->|Missing verdict| Fail[FAIL — Perspective X did not return a verdict.<br>Print summary. TeamDelete. Exit non-zero.]
     Gate -->|Any REJECT| Fail2[Print summary. TeamDelete. Exit non-zero.]
     Gate -->|All SKIP| Warn[Print summary. Print all-SKIP warning. TeamDelete. Exit 0.]
     Gate -->|All APPROVE or APPROVE+SKIP| Pass[Print summary. TeamDelete. Exit 0.]

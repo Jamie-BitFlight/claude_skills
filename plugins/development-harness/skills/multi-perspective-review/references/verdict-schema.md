@@ -258,8 +258,8 @@ incorrect behavior in a documented scenario; MINOR otherwise).
 
 The synthesis task (T5, profile `dh:review-synthesizer`) reads the four `Review Results` sections
 and writes exactly one punch-list block as the content of its own `Punch List` section. The
-orchestrator reads that section, and reads the raw verdict sections only when it chooses to check
-the punch list against them.
+orchestrator always reads that section, and always reads the four raw `Review Results` sections
+too — check 6 below requires comparing them.
 
 ```json
 {
@@ -328,3 +328,9 @@ rather than reading fields out of it.
 4. The conservation invariant above holds.
 5. Each entry carries `severity`, `file`, `perspectives`, and `descriptions`, with `descriptions`
    the same length as `perspectives`.
+6. Each `verdicts[i].verdict` matches the `verdict` field in that perspective's own `Review
+   Results` section on `T1`..`T4`, exactly. Checks 1-5 validate structure and counts; none of them
+   catches a `verdict` token silently changed in the copy (a source `REJECT` rewritten to
+   `APPROVE` while its finding text is carried forward still satisfies checks 1-5). This check is
+   the only one that catches that case, so it is not optional and not skipped when checks 1-5 all
+   pass.
