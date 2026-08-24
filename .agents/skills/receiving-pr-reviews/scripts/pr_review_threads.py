@@ -254,10 +254,13 @@ def _uv_executable() -> str:
 _GH_TIMEOUT_SECONDS = 30
 _RUN_BOUNDED = "scripts/run_bounded.py"
 
-# `watch`'s defaults keep one call safely under Claude Code's 600-second Bash tool-call cap —
-# see the receiving-pr-reviews SKILL.md step 7 gotcha before raising `--timeout-seconds`.
-_DEFAULT_WATCH_INTERVAL_SECONDS = 300
-_DEFAULT_WATCH_TIMEOUT_SECONDS = 540
+# `watch`'s defaults keep each call short enough that the turn it returns into still lands
+# within prompt-cache TTL even under a degraded (5-minute) cache window, not just under Claude
+# Code's 600-second Bash tool-call cap — see the receiving-pr-reviews SKILL.md step 7 gotcha
+# before raising `--timeout-seconds`; step 7 covers a longer watching window by looping short
+# calls instead. A 90s interval over a 270s timeout polls 4 times per call (t=0/90/180/270).
+_DEFAULT_WATCH_INTERVAL_SECONDS = 90
+_DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
 
 def _run_gh(args: list[str]) -> str:
@@ -450,6 +453,11 @@ def watch(
     `timeout_seconds` elapses with no new activity. The polling loop lives entirely inside this
     one process, so no separate mechanism is needed to resume checking later — everything the
     check needs happens before this command returns.
+
+    Each call covers only its own `timeout_seconds` window. To watch for longer than one call's
+    default window, issue `watch` again immediately after a `timed_out: true` result — its own
+    baseline fetch picks up exactly where the previous call's ended, so back-to-back calls never
+    miss activity between them. The receiving-pr-reviews SKILL.md documents this loop pattern.
 
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`, `polls`,
     `elapsed_seconds`, `new_thread_ids`, and `new_reviews_with_body`.
