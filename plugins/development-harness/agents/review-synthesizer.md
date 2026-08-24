@@ -106,9 +106,9 @@ as synthesis that did not happen.
 
 ### Step 6 — Verify, then report
 
-Check all three §2.6 invariants before you report. The orchestrator validates the block you write
-and takes its `Punch list not produced` failure path when any fails, so a block that breaks one
-loses the whole review, not just your entry.
+Check every §2.6 invariant before you report. The orchestrator validates the block you write and
+takes its `Punch list not produced` failure path when any fails, so a block that breaks one loses
+the whole review, not just your entry.
 
 - Conservation: the total number of findings across all parsed verdicts equals the sum of
   `len(perspectives)` across all entries. A shortfall means a finding was dropped; a surplus
@@ -119,6 +119,11 @@ loses the whole review, not just your entry.
   `verdict` field you parsed from that perspective's own `Review Results` section. Copying
   "verbatim" in Step 3 is the instruction; this is verifying you actually did — re-diff each
   `verdict` token against its source before reporting, not just the findings you derived from it.
+- Finding fidelity (check 7): every source finding's `description` you parsed in Step 1 appears
+  verbatim in the `descriptions` you wrote for some entry, at the index matching that finding's own
+  perspective in that entry's `perspectives`. Conservation proves the counts match; this proves the
+  content behind those counts wasn't altered, dropped, or covered by an invented duplicate — re-diff
+  each finding's description against what you wrote, not just its count.
 
 ```text
 STATUS: DONE
