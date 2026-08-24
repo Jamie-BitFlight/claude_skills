@@ -66,16 +66,21 @@ Then stamp the run so this invocation gets its own address. Capture this command
 `run_stamp`:
 
 ```bash
-echo "$(date -u +%Y%m%dT%H%M%SZ)-${RANDOM}"
+echo "$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
 ```
 
 The UTC timestamp alone only has whole-second resolution: two invocations for the same
 `review_base` starting within the same second would derive the same `run_stamp`, and therefore the
 same `review_slug` and `multi-{review_slug}` team name, colliding at `TeamCreate` or sharing one
-team's namespace. `${RANDOM}` is bash's builtin pseudo-random 0-32767 integer — no new dependency —
-appended for the entropy the timestamp alone lacks.
+team's namespace. Bash's builtin `${RANDOM}` cannot fix this reliably: it is a weak generator
+seeded from the shell's own PID and start time, so sibling processes launched together (the exact
+case of many reviews dispatched at once) can draw correlated or identical values instead of the
+independent 1-in-32768 samples the odds assume. `/dev/urandom` is a kernel-backed CSPRNG with no
+such correlation — 8 bytes (64 bits) of it, hex-encoded via `od` (already present, no new
+dependency), makes an accidental suffix collision across concurrent runs practically impossible.
 
-`review_slug` is `{review_base}-{run_stamp}`, for example `review-2181-20260824T014233Z-14822`.
+`review_slug` is `{review_base}-{run_stamp}`, for example
+`review-2181-20260824T014233Z-3f9a2c7e1b804d56`.
 
 The stamp is what makes the plan ephemeral in fact and not just in name. `review_base` identifies
 the review subject and repeats across runs; `review_slug` identifies one run of it and never
