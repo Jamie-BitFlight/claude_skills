@@ -63,28 +63,20 @@ Derive `review_base` exactly once using the first matching rule:
    use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
 
 Then stamp the run so this invocation gets its own address. Run this command and capture its
-stdout as `run_stamp`. It is a single `uv` invocation, not a shell pipeline — no `$(...)`
-substitution, pipes, or POSIX-only device file — so it runs unchanged whether the executing shell
-is bash, PowerShell, or cmd.exe:
+stdout as `run_stamp`:
 
 ```text
 uv run --quiet --script "${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py"
 ```
 
-Quote the path exactly as shown. An install location with a space in it (a Windows profile such as
-`C:\Users\Jane Doe\...`) splits an unquoted argument, so `uv` would try to execute only the prefix.
+Keep the path quoted exactly as shown — an unquoted path with a space (e.g. a Windows profile such
+as `C:\Users\Jane Doe\...`) truncates the argument and `uv` executes only the prefix.
 
-The UTC timestamp alone only has whole-second resolution: two invocations for the same
-`review_base` starting within the same second would derive the same `run_stamp`, and therefore the
-same `review_slug` and `multi-{review_slug}` team name, colliding at `TeamCreate` or sharing one
-team's namespace. Bash's builtin `${RANDOM}` cannot fix this reliably: it is a weak generator
-seeded from the shell's own PID and start time, so sibling processes launched together (the exact
-case of many reviews dispatched at once) can draw correlated or identical values instead of the
-independent 1-in-32768 samples the odds assume. `gen_run_stamp.py` draws 8 bytes (64 bits) from
-`secrets.token_hex`, Python's cross-platform CSPRNG binding (`os.urandom` under the hood — the
-Windows CryptoAPI on Windows, `/dev/urandom` on Linux/macOS), making an accidental suffix collision
-across concurrent runs practically impossible on every platform this skill runs on, not just POSIX
-shells with a `/dev/urandom` device node.
+A UTC timestamp alone has only whole-second resolution, so two invocations for the same
+`review_base` starting within the same second would derive the same `run_stamp` and collide on
+`review_slug` and `multi-{review_slug}` team name. `${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py`
+appends a `secrets.token_hex` suffix to rule this out — see its docstring for why the timestamp
+alone, and bash's `${RANDOM}`, aren't sufficient.
 
 `review_slug` is `{review_base}-{run_stamp}`, for example
 `review-2181-20260824T014233Z-3f9a2c7e1b804d56`.
