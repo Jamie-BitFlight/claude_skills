@@ -101,6 +101,30 @@ _Avoid_: "the SAM plugin" (there is no such thing — SAM is the methodology; `d
 is the plugin implementing it); "stateless agent" alone as a synonym for SAM itself (ambiguous
 between the methodology and one literal stateless agent instance).
 
+**Resolve**:
+Mark a work item DONE with an evidence trail — `resolve_item()` (ADR-9). The evidence trail
+(summary, method, notes, follow-ups, findings) is a contractual part of resolution, persisted to
+the item's own metadata on every backend, not a GitHub-only artifact. A native rendering (a
+GitHub `## Resolved` comment plus `state: CLOSED`) is generated from that persisted record for
+backends where one exists; it is never the record's only copy. The backend's own status field is
+the sole authority for whether an item is resolved — native state (GitHub `CLOSED`, a Beads
+closed status) is a projection of it, not a second source of truth.
+_Avoid_: "close" for completed work — that is Resolve below with a different, incompatible
+contract (ADR-9). Avoid treating a provider's native closure as authoritative in its own right;
+verify the backend's status field before trusting a GitHub or Beads state directly.
+
+**Close**:
+Dismiss a work item without completion — `close_item()` (ADR-9), requires a categorized `reason`
+(duplicate, out_of_scope, superseded, wontfix, blocked). Distinct from Resolve above: Close never
+carries an evidence trail because no work was done to document.
+_Avoid_: "resolve" for a dismissal, or "close" for completed work — ADR-9 exists because these
+were once conflated and callers used the wrong one for already-completed work.
+
+**Evidence trail**:
+The structured resolution record (summary, method, notes, follow-ups, findings) `resolve_item()`
+requires and persists. Contractual, not a display feature: it is part of what the resolution
+workflow itself must ensure happened, independent of which backend renders it natively.
+
 **Backend**:
 The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
 data-providing system, never a call to the MCP tool or CLI — those are Frontend below. Not one
