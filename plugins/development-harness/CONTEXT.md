@@ -102,35 +102,22 @@ is the plugin implementing it); "stateless agent" alone as a synonym for SAM its
 between the methodology and one literal stateless agent instance).
 
 **Resolve**:
-Mark a work item DONE with an evidence trail — `resolve_item()` (ADR-9). The evidence trail
-(summary, method, notes, follow-ups, findings) is meant as a contractual part of resolution, not a
-GitHub-only artifact — that is the design intent (see [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220)), not yet the implementation. As of this
-writing `resolve_item()` (`operations.py:3180`) persists only `status`/`priority`/`plan` to item
-metadata on every backend; the five evidence fields are forwarded exclusively to
-`resolve_github_issue()`, so SQLite and Memory backends discard them entirely and Beads keeps only
-`summary` as its native close reason. `#3220` tracks adding a `resolution` record to
-`BacklogItemMetadata` so the GitHub `## Resolved` comment becomes a rendering of a persisted
-record instead of the only copy. The backend's own status field is the sole authority for whether
-an item is resolved — native state (GitHub `CLOSED`, a Beads closed status) is a projection of it,
-not a second source of truth.
-_Avoid_: "close" for completed work — that is Resolve below with a different, incompatible
-contract (ADR-9). Avoid treating a provider's native closure as authoritative in its own right;
-verify the backend's status field before trusting a GitHub or Beads state directly.
+Mark a work item DONE with an evidence trail (summary, method, notes, follow-ups, findings) —
+`resolve_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)). The evidence trail is meant
+as contractual, not a GitHub-only artifact — persisting it on every backend, not only rendering it
+into a GitHub comment, is tracked by [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+_Avoid_: "close" for completed work — that is Close below, a different, incompatible contract.
 
 **Close**:
-Dismiss a work item without completion — `close_item()` (ADR-9), requires a categorized `reason`
-(duplicate, out_of_scope, superseded, wontfix, blocked). Distinct from Resolve above: Close never
-carries an evidence trail because no work was done to document.
-_Avoid_: "resolve" for a dismissal, or "close" for completed work — ADR-9 exists because these
-were once conflated and callers used the wrong one for already-completed work.
+Dismiss a work item without completion — `close_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)),
+requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, blocked). Close
+records only that reason — no evidence trail.
+_Avoid_: "resolve" for a dismissal — [ADR-9](./docs/adr-9-close-resolve-semantics.md) exists
+because these were once conflated and callers used the wrong one for already-completed work.
 
 **Evidence trail**:
-The structured resolution record (summary, method, notes, follow-ups, findings) `resolve_item()`
-requires as arguments. Contractual by design — it is meant as part of what the resolution workflow
-itself must ensure happened, independent of which backend renders it natively — but as of this
-writing the requirement is enforced only for the `summary` argument, and persistence beyond the
-GitHub-rendered comment does not yet exist on any backend; see Resolve above and
-[#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+The structured resolution record Resolve above requires. Only `summary` is enforced today;
+persisting the rest beyond the GitHub-rendered comment is [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
 
 **Backend**:
 The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
