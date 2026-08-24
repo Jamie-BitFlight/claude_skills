@@ -1357,7 +1357,7 @@ flowchart TD
     CLAIM["task-worker claims task\nsam_task(action='claim')"]
     READ["Reads fresh per task:\n• sam_task read → plan.context\n• architect artifact by owner + type\n• feature-context artifact by owner + type\n• Context Manifest from task record"]
     IMPL["Specialist agent implements\n(loaded via profile_load)"]
-    REVIEW["dh:code-reviewer\n→ registers codebase-analysis content\nwith a stable logical artifact ID"]
+    REVIEW["dh:code-reviewer\n→ registers code-review content\nwith a stable logical artifact ID"]
     CONTRACT["dh:contract-verification\n→ appends CONTRACT: items\nto Concerns section on issue"]
     COMPLETE["sam_task(action='state', state='complete')"]
     MORE{"More ready tasks?"}
