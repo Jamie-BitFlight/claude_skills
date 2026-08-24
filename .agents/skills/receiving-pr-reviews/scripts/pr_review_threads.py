@@ -8,13 +8,12 @@
 # ///
 """GitHub PR review-thread operations for the receiving-pr-reviews skill.
 
-Wraps the three `gh` command pipelines the skill documents: fetching every
-unresolved review thread (auto-paginated, filtered before it reaches an
-agent's context), replying to a review comment, and resolving a review
-thread. Every operation shells out to `gh` (GitHub CLI) rather than talking to
-the GitHub API directly, relying on `gh`'s own authentication. A fourth
-command, `watch`, blocks this process on an internal polling loop so a caller
-never needs a separate resumption mechanism to re-check a PR later.
+Wraps the three `gh` command pipelines the skill documents: fetching every unresolved review
+thread (auto-paginated, filtered before it reaches an agent's context), replying to a review
+comment, and resolving a review thread. Every operation shells out to `gh` (GitHub CLI) rather
+than talking to the GitHub API directly, relying on `gh`'s own authentication. A fourth command,
+`watch`, blocks this process on an internal polling loop so a caller never needs a separate
+resumption mechanism to re-check a PR later.
 
 Usage:
     uv run pr_review_threads.py fetch --pr 3208
@@ -34,6 +33,8 @@ from typing import Annotated
 import typer
 from pydantic import BaseModel
 
+# This checkout's own owner/repo — override with --owner/--repo to target any other repository;
+# every `gh` call below takes them as explicit query variables, so nothing here is repo-specific.
 DEFAULT_OWNER = "Jamie-BitFlight"
 DEFAULT_REPO = "claude_skills"
 
@@ -56,9 +57,6 @@ query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
 }
 """
 
-# A separate query+pagination from reviewThreads above: `gh api graphql --paginate` follows a
-# single `$endCursor`/`pageInfo.endCursor` pair per invocation, so one query cannot paginate two
-# independent connections (reviews and reviewThreads) at once — each needs its own `gh` call.
 _REVIEWS_QUERY = """
 query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
   repository(owner: $o, name: $r) {
@@ -115,6 +113,15 @@ class _ReviewThreadNode(BaseModel):
 
 
 class _ReviewThreadsConnection(BaseModel):
+    """One page's `reviewThreads` connection, already unwrapped from `data.repository.pullRequest`.
+
+    `_fetch_pages` pulls this dict straight out of each slurped page by subscripting the fixed
+    `data.repository.pullRequest.reviewThreads` path — a mismatch there (GitHub renaming or
+    removing a field) raises `KeyError` immediately at the point of access, which is an
+    acceptable boundary failure for a query shape this script itself controls. Everything
+    variable — the node fields — is validated here.
+    """
+
     totalCount: int
     nodes: list[_ReviewThreadNode]
 
@@ -138,64 +145,23 @@ class ReviewNode(BaseModel):
 
 
 class _ReviewsConnection(BaseModel):
+    """One page's `reviews` connection, already unwrapped — see `_ReviewThreadsConnection`."""
+
     totalCount: int
-    pageInfo: _PageInfo
     nodes: list[ReviewNode]
 
 
-class _PullRequestThreadsData(BaseModel):
-    reviewThreads: _ReviewThreadsConnection
-
-
-class _RepositoryThreadsData(BaseModel):
-    pullRequest: _PullRequestThreadsData
-
-
-class _GraphQLThreadsPageData(BaseModel):
-    repository: _RepositoryThreadsData
-
-
-class _GraphQLThreadsPage(BaseModel):
-    """One page of the reviewThreads `gh api graphql --paginate --slurp` output."""
-
-    data: _GraphQLThreadsPageData
-
-
-class _PullRequestReviewsData(BaseModel):
-    reviews: _ReviewsConnection
-
-
-class _RepositoryReviewsData(BaseModel):
-    pullRequest: _PullRequestReviewsData
-
-
-class _GraphQLReviewsPageData(BaseModel):
-    repository: _RepositoryReviewsData
-
-
-class _GraphQLReviewsPage(BaseModel):
-    """One page of the reviews `gh api graphql --paginate --slurp` output.
-
-    Fetched via a separate `gh` invocation from `_GraphQLThreadsPage`: `--paginate` follows one
-    `pageInfo.endCursor` per call, so reviews and reviewThreads — independent connections with
-    independent cursors — cannot be paginated together in a single query.
-    """
-
-    data: _GraphQLReviewsPageData
-
-
 class UnresolvedThread(BaseModel):
-    """One review thread and its full comment history, as emitted to the caller."""
+    """One unresolved review thread and its full comment history, as emitted to the caller."""
 
     id: str
     path: str
-    isResolved: bool
     comments: list[CommentNode]
     comments_truncated: bool
 
 
 class FetchResult(BaseModel):
-    """Result of `fetch`: totals plus every thread selected by `--include-resolved`."""
+    """Result of `fetch`: totals plus every currently-unresolved thread."""
 
     reviews_count: int
     reviews_with_body: list[ReviewNode]
@@ -213,36 +179,26 @@ class WatchResult(BaseModel):
     """
 
     timed_out: bool
-    polls: int
-    elapsed_seconds: float
     new_thread_ids: list[str]
     new_reviews_with_body: list[ReviewNode]
     state: FetchResult
 
 
-def _gh_executable() -> str:
-    """Resolve the `gh` executable's absolute path.
-
-    Returns:
-        Absolute path to `gh`.
-
-    Raises:
-        RuntimeError: `gh` is not on PATH.
-    """
-    path = shutil.which("gh")
-    if path is None:
-        msg = "gh (GitHub CLI) not found on PATH"
-        raise RuntimeError(msg)
-    return path
-
+# Absolute `gh` path, resolved once at import time — ruff's start-process-with-partial-path (S607)
+# requires a resolved path rather than a bare command name. Falls back to the literal "gh" when
+# `shutil.which` can't find it, so a missing binary still surfaces as a normal FileNotFoundError
+# from the exec call itself rather than a custom error path.
+_GH = shutil.which("gh") or "gh"
 
 _GH_TIMEOUT_SECONDS = 30
 
-# `watch`'s defaults keep each call short enough that the turn it returns into still lands
-# within prompt-cache TTL even under a degraded (5-minute) cache window, not just under Claude
-# Code's 600-second Bash tool-call cap — see the receiving-pr-reviews SKILL.md step 7 gotcha
-# before raising `--timeout-seconds`; step 7 covers a longer watching window by looping short
-# calls instead. A 90s interval over a 270s timeout polls 4 times per call (t=0/90/180/270).
+# Anthropic's raw prompt-cache API defaults to a 5-minute TTL in every billing mode; a 1-hour TTL
+# is opt-in only (https://platform.claude.com/docs/en/build-with-claude/prompt-caching, accessed
+# 2026-08-24). Claude Code additionally opts a Claude-subscription session into that 1-hour cache
+# on its own, dropping back to 5 minutes only during usage overage — API-key/Bedrock/Vertex
+# sessions stay on the 5-minute default throughout. Sizing `watch`'s defaults to the 5-minute
+# floor keeps one call's turn cached under every billing mode. Cover a longer watching window by
+# looping `watch` calls (receiving-pr-reviews SKILL.md step 7), not by raising `--timeout-seconds`.
 _DEFAULT_WATCH_INTERVAL_SECONDS = 90
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
@@ -250,11 +206,8 @@ _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 def _run_gh(args: list[str]) -> str:
     """Run a `gh` command and return its captured stdout.
 
-    `_RUN_BOUNDED`'s previous wrapping resolved `scripts/run_bounded.py` relative to the
-    caller's cwd rather than this script's own location, so every subcommand failed unless
-    invoked from the repository root. `gh` also spawns no child processes of its own, so a
-    plain timeout is enough to bound it directly — no process-group cleanup is needed the way
-    it would be for a command that forks descendants.
+    `gh` spawns no child processes of its own, so a plain timeout is enough to bound it — no
+    process-group cleanup is needed the way it would be for a command that forks descendants.
 
     Args:
         args: Full `gh` argv, excluding the executable itself (e.g. `["api", "graphql", ...]`).
@@ -263,18 +216,16 @@ def _run_gh(args: list[str]) -> str:
         The command's stdout, decoded as text.
 
     Raises:
+        FileNotFoundError: `gh` (GitHub CLI) is not on PATH.
         subprocess.CalledProcessError: `gh` exited non-zero. stderr is left connected to this
-            process's own stderr (not captured) so the diagnostic reaches the caller directly
-            instead of being buried in an exception attribute nobody prints.
+            process's own stderr (not captured) so the diagnostic reaches the caller directly.
         subprocess.TimeoutExpired: the command exceeded `_GH_TIMEOUT_SECONDS`.
     """
-    result = subprocess.run(
-        [_gh_executable(), *args], stdout=subprocess.PIPE, text=True, timeout=_GH_TIMEOUT_SECONDS, check=True
-    )
+    result = subprocess.run([_GH, *args], stdout=subprocess.PIPE, text=True, timeout=_GH_TIMEOUT_SECONDS, check=True)
     return result.stdout
 
 
-def _fetch_pages(owner: str, repo: str, pr: int) -> list[_GraphQLThreadsPage]:
+def _fetch_pages(owner: str, repo: str, pr: int) -> list[_ReviewThreadsConnection]:
     """Fetch and validate every paginated page of a PR's review threads.
 
     Args:
@@ -283,9 +234,7 @@ def _fetch_pages(owner: str, repo: str, pr: int) -> list[_GraphQLThreadsPage]:
         pr: Pull request number.
 
     Returns:
-        One validated page per page `gh api graphql --paginate` returned. A schema mismatch
-        (a field GitHub renamed or removed) raises `pydantic.ValidationError` immediately here
-        rather than surfacing later as a confusing `KeyError` deep in the caller.
+        One validated `reviewThreads` connection per page `gh api graphql --paginate` returned.
     """
     raw = _run_gh([
         "api",
@@ -301,10 +250,13 @@ def _fetch_pages(owner: str, repo: str, pr: int) -> list[_GraphQLThreadsPage]:
         "-F",
         f"pr={pr}",
     ])
-    return [_GraphQLThreadsPage.model_validate(page) for page in json.loads(raw)]
+    return [
+        _ReviewThreadsConnection.model_validate(page["data"]["repository"]["pullRequest"]["reviewThreads"])
+        for page in json.loads(raw)
+    ]
 
 
-def _fetch_review_pages(owner: str, repo: str, pr: int) -> list[_GraphQLReviewsPage]:
+def _fetch_review_pages(owner: str, repo: str, pr: int) -> list[_ReviewsConnection]:
     """Fetch and validate every paginated page of a PR's top-level reviews.
 
     A separate `gh` invocation from `_fetch_pages`: `gh api graphql --paginate` follows exactly
@@ -317,7 +269,7 @@ def _fetch_review_pages(owner: str, repo: str, pr: int) -> list[_GraphQLReviewsP
         pr: Pull request number.
 
     Returns:
-        One validated page per page `gh api graphql --paginate` returned.
+        One validated `reviews` connection per page `gh api graphql --paginate` returned.
     """
     raw = _run_gh([
         "api",
@@ -333,11 +285,14 @@ def _fetch_review_pages(owner: str, repo: str, pr: int) -> list[_GraphQLReviewsP
         "-F",
         f"pr={pr}",
     ])
-    return [_GraphQLReviewsPage.model_validate(page) for page in json.loads(raw)]
+    return [
+        _ReviewsConnection.model_validate(page["data"]["repository"]["pullRequest"]["reviews"])
+        for page in json.loads(raw)
+    ]
 
 
-def _build_fetch_result(owner: str, repo: str, pr: int, *, include_resolved: bool) -> FetchResult:
-    """Fetch and assemble one PR's review-thread and review state.
+def _build_fetch_result(owner: str, repo: str, pr: int) -> FetchResult:
+    """Fetch and assemble one PR's unresolved review threads and top-level review state.
 
     Shared by `fetch` (prints the result once) and `watch` (calls this repeatedly on a polling
     interval) so both subcommands assemble a `FetchResult` identically.
@@ -346,35 +301,30 @@ def _build_fetch_result(owner: str, repo: str, pr: int, *, include_resolved: boo
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        include_resolved: Include already-resolved threads in `unresolved` (auditing review
-            history) instead of only currently-unresolved ones.
 
     Returns:
-        Totals plus every thread selected by `include_resolved`.
+        Totals plus every currently-unresolved thread.
     """
-    pages = _fetch_pages(owner, repo, pr)
+    thread_pages = _fetch_pages(owner, repo, pr)
     review_pages = _fetch_review_pages(owner, repo, pr)
-    threads = pages[0].data.repository.pullRequest.reviewThreads
-    reviews = review_pages[0].data.repository.pullRequest.reviews
-    all_nodes = [node for page in pages for node in page.data.repository.pullRequest.reviewThreads.nodes]
-    all_reviews = [node for page in review_pages for node in page.data.repository.pullRequest.reviews.nodes]
-    selected = all_nodes if include_resolved else [node for node in all_nodes if not node.isResolved]
+    all_threads = [node for page in thread_pages for node in page.nodes]
+    all_reviews = [node for page in review_pages for node in page.nodes]
     unresolved = [
         UnresolvedThread(
             id=node.id,
             path=node.path,
-            isResolved=node.isResolved,
             comments=node.comments.nodes,
             comments_truncated=node.comments.pageInfo.hasNextPage,
         )
-        for node in selected
+        for node in all_threads
+        if not node.isResolved
     ]
     return FetchResult(
-        reviews_count=reviews.totalCount,
+        reviews_count=review_pages[0].totalCount,
         reviews_with_body=[review for review in all_reviews if review.body.strip()],
-        threads_count=threads.totalCount,
+        threads_count=thread_pages[0].totalCount,
         unresolved=unresolved,
-        unresolved_count=sum(1 for node in selected if not node.isResolved),
+        unresolved_count=len(unresolved),
     )
 
 
@@ -383,26 +333,25 @@ def fetch(
     pr: Annotated[int, typer.Option(help="Pull request number.")],
     owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
     repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
-    include_resolved: Annotated[
-        bool, typer.Option("--include-resolved", help="Include already-resolved threads (auditing review history).")
-    ] = False,
 ) -> None:
-    """Fetch a PR's review threads, auto-paginated so none is silently truncated.
+    """Fetch a PR's unresolved review threads, auto-paginated so none is silently truncated.
 
-    Prints compact JSON with `reviews_count`, `threads_count`, `unresolved` (every thread when
-    `--include-resolved` is set, otherwise only unresolved ones), and `unresolved_count`. A
-    `threads_count` of 0 means no reviews have landed yet — different from a nonzero
-    `threads_count` with `unresolved_count: 0`, which means everything found was already
-    resolved. Each thread's `comments_truncated: true` means that thread alone has passed 100
-    comments in its own back-and-forth and needs its `comments` connection paged directly.
+    Prints compact JSON with `reviews_count`, `threads_count`, `unresolved`, and
+    `unresolved_count`. A `threads_count` of 0 means no reviews have landed yet — different from
+    a nonzero `threads_count` with `unresolved_count: 0`, which means every thread found was
+    already resolved. Never treat an empty `unresolved` array as "nothing to do" without checking
+    these counts first. Each unresolved thread carries its own `id` (for resolving) and each
+    comment's `databaseId` (for replying) — no separate lookup needed. A thread's
+    `comments_truncated: true` means that single thread has passed 100 comments in its own
+    back-and-forth (rare, but real content is missing) — page that thread's `comments` connection
+    directly before concluding anything about it.
 
     Also includes `reviews_with_body`: reviews whose top-level summary text is non-empty (an
-    approval note, or feedback given in the review body rather than as an inline comment) —
-    these have no thread at all and would otherwise be invisible even when `unresolved_count`
-    is 0. Both `reviews` and `reviewThreads` are paginated independently and in full — neither
-    is capped at one page of 100.
+    approval note, or feedback given in the review body rather than as an inline comment) — these
+    have no thread at all and would otherwise be invisible even when `unresolved_count` is 0;
+    treat each as actionable input too.
     """
-    result = _build_fetch_result(owner, repo, pr, include_resolved=include_resolved)
+    result = _build_fetch_result(owner, repo, pr)
     typer.echo(result.model_dump_json())
 
 
@@ -420,41 +369,34 @@ def watch(
 ) -> None:
     """Poll `fetch` until new PR review activity appears, or a timeout elapses.
 
-    Blocks this process — one `uv run` invocation, one tool call — for up to `timeout_seconds`,
-    re-fetching every `interval_seconds`. Returns the moment a thread id or `reviews_with_body`
-    entry appears that the first fetch in this run did not have, or the final clean state once
-    `timeout_seconds` elapses with no new activity. The polling loop lives entirely inside this
-    one process, so no separate mechanism is needed to resume checking later — everything the
-    check needs happens before this command returns.
+    Blocks this process for up to `timeout_seconds`, re-fetching every `interval_seconds`.
+    Returns the moment a thread id or `reviews_with_body` entry appears that the first fetch in
+    this run did not have, or the final clean state once `timeout_seconds` elapses with no new
+    activity.
 
     Each call covers only its own `timeout_seconds` window. To watch for longer than one call's
     default window, issue `watch` again immediately after a `timed_out: true` result — its own
     baseline fetch picks up exactly where the previous call's ended, so back-to-back calls never
     miss activity between them. The receiving-pr-reviews SKILL.md documents this loop pattern.
 
-    Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`, `polls`,
-    `elapsed_seconds`, `new_thread_ids`, and `new_reviews_with_body`.
+    Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`,
+    `new_thread_ids`, and `new_reviews_with_body`.
     """
-    start = time.monotonic()
-    deadline = start + timeout_seconds
-    baseline = _build_fetch_result(owner, repo, pr, include_resolved=False)
+    deadline = time.monotonic() + timeout_seconds
+    baseline = _build_fetch_result(owner, repo, pr)
     baseline_thread_ids = {thread.id for thread in baseline.unresolved}
     current = baseline
     new_thread_ids: set[str] = set()
     new_reviews: list[ReviewNode] = []
-    polls = 1
     while time.monotonic() < deadline:
         time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
-        polls += 1
-        current = _build_fetch_result(owner, repo, pr, include_resolved=False)
+        current = _build_fetch_result(owner, repo, pr)
         new_thread_ids = {thread.id for thread in current.unresolved} - baseline_thread_ids
         new_reviews = [review for review in current.reviews_with_body if review not in baseline.reviews_with_body]
         if new_thread_ids or new_reviews:
             break
     result = WatchResult(
         timed_out=not (new_thread_ids or new_reviews),
-        polls=polls,
-        elapsed_seconds=time.monotonic() - start,
         new_thread_ids=sorted(new_thread_ids),
         new_reviews_with_body=new_reviews,
         state=current,
@@ -479,14 +421,14 @@ def reply(
         "-f",
         f"body={body}",
     ])
-    typer.echo(json.dumps(json.loads(raw), separators=(",", ":")))
+    typer.echo(raw.strip())
 
 
 @app.command()
 def resolve(thread_id: Annotated[str, typer.Option(help="Review thread id, from `fetch`.")]) -> None:
     """Resolve a review thread. Prints gh's mutation response as compact JSON."""
     raw = _run_gh(["api", "graphql", "-f", f"query={_RESOLVE_THREAD_MUTATION}", "-f", f"threadId={thread_id}"])
-    typer.echo(json.dumps(json.loads(raw), separators=(",", ":")))
+    typer.echo(raw.strip())
 
 
 if __name__ == "__main__":
