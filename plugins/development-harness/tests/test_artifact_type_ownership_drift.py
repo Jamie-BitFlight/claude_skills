@@ -28,6 +28,7 @@ scanned call. The scan catches undeclared writers; the map covers the producers 
 from __future__ import annotations
 
 import re
+import shlex
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
@@ -52,15 +53,9 @@ _CLI_CALL_RE = re.compile(r"artifact\s+register\b[^\n]*\n(?:[ \t]*--[^\n]*\n?)*"
 # keyword argument but shipped markdown is prose, not linted source, so both forms occur.
 _TOOL_TYPE_RE = re.compile(r"""artifact_type\s*=\s*["']([^"']+)["']""")
 _TOOL_AGENT_RE = re.compile(r"""\bagent\s*=\s*["']([^"']+)["']""")
-# A CLI flag value may be single-quoted, double-quoted, or bare — `--artifact-type feature-context`
-# is as much a registration as `--artifact-type "feature-context"`. Requiring quotes made every bare
-# value invisible to the scan.
-_CLI_TYPE_RE = re.compile(r"""--artifact-type[=\s]+["']?([^\s"'\\]+)["']?""")
-_CLI_AGENT_RE = re.compile(r"""--agent[=\s]+["']?([^\s"'\\]+)["']?""")
 
 # Whether the call supplies the argument at all, independent of whether its value is a literal.
 _TOOL_AGENT_PRESENT_RE = re.compile(r"\bagent\s*=")
-_CLI_AGENT_PRESENT_RE = re.compile(r"--agent\b")
 
 _PLACEHOLDER_CHARS = frozenset("{}<>$")
 """Characters that mark a value as a substitution slot rather than a literal registration."""
@@ -158,24 +153,78 @@ def _iter_tool_call_top_level_args(body: str) -> Iterator[str]:
     yield body[start:]
 
 
-def _iter_cli_flag_lines(text: str) -> Iterator[str]:
-    """Split one CLI ``artifact register`` invocation into its per-line flag arguments.
+def _cli_flags(text: str) -> dict[str, str | None]:
+    """Tokenize one CLI ``artifact register`` invocation into its flag/value pairs.
 
-    ``_CLI_CALL_RE`` already captures the invocation as one ``--flag value`` per continuation line,
-    so splitting on newlines and dropping blank lines is enough to isolate each flag as its own
-    segment — the same anchoring purpose ``_iter_tool_call_top_level_args`` serves for the MCP tool
-    form.
+    Uses ``shlex.split`` rather than a line split, so a quoted value's contents — including text
+    shaped like another ``--flag`` — are never treated as a separate token: this is what stops an
+    earlier flag's string value from being mistaken for the real ``--artifact-type``/``--agent``
+    flag, the same anchoring purpose ``_iter_tool_call_top_level_args`` serves for the MCP tool
+    form. A per-line split cannot do this job: it also mishandles this call form's other valid
+    spelling, every flag written on the invocation's own line
+    (``artifact register --artifact-type x --agent y``) rather than one flag per continuation
+    line, because that whole invocation is then a single line with no interior newline to split
+    on, and the flags inside it are silently never seen.
+
+    A flag written more than once keeps its last occurrence, matching ordinary CLI parsing (a
+    later flag overrides an earlier one of the same name).
 
     Args:
         text: The full matched CLI invocation, as yielded by ``_CLI_CALL_RE.finditer``.
 
-    Yields:
-        Each non-blank line, stripped of surrounding whitespace.
+    Returns:
+        Mapping of each ``--flag`` token to its value, or ``None`` when the flag has no following
+        value token. Invocation text ``shlex`` cannot tokenize (unbalanced quoting) yields an
+        empty mapping — there is no flag list to attribute.
     """
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            yield stripped
+    try:
+        tokens = shlex.split(text)
+    except ValueError:
+        return {}
+    flags: dict[str, str | None] = {}
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if not token.startswith("--"):
+            index += 1
+            continue
+        if "=" in token:
+            name, _, value = token.partition("=")
+            flags[name] = value
+            index += 1
+            continue
+        if index + 1 < len(tokens) and not tokens[index + 1].startswith("--"):
+            flags[token] = tokens[index + 1]
+            index += 2
+            continue
+        flags[token] = None
+        index += 1
+    return flags
+
+
+def _cli_registration(flags: dict[str, str | None]) -> tuple[str, str] | None:
+    """Resolve one CLI invocation's tokenized flags into an attributable (type, agent) pair.
+
+    Mirrors ``_resolve_agent``'s three agent cases against ``--agent``'s presence in ``flags``: a
+    literal value is the writer; a placeholder value or a flag with no value documents the call's
+    shape and makes no ownership claim; an absent flag is a concrete registration under
+    ``artifact_register``'s default agent.
+
+    Args:
+        flags: This invocation's flag/value pairs, from ``_cli_flags``.
+
+    Returns:
+        The ``(artifact_type, agent)`` pair, or None when the call carries no ownership claim.
+    """
+    type_value = flags.get("--artifact-type")
+    if type_value is None or _is_placeholder(type_value):
+        return None
+    if "--agent" not in flags:
+        return type_value, _DEFAULT_AGENT
+    agent_value = flags["--agent"]
+    if agent_value is None or _is_placeholder(agent_value):
+        return None
+    return type_value, agent_value
 
 
 def _is_placeholder(value: str) -> bool:
@@ -222,13 +271,14 @@ def _resolve_agent(args: Iterable[str], agent_re: re.Pattern[str], present_re: r
     so the call makes no ownership claim. An argument omitted altogether is a concrete registration
     under ``artifact_register``'s ``agent`` default.
 
-    Each candidate in ``args`` is one top-level argument (or CLI flag line), matched from its own
-    start rather than searched for anywhere in the full call body — so an earlier argument's string
-    value that merely contains ``agent=...``-shaped text is never mistaken for the real keyword
-    argument.
+    Each candidate in ``args`` is one top-level argument of the MCP tool-call form, matched from
+    its own start rather than searched for anywhere in the full call body — so an earlier
+    argument's string value that merely contains ``agent=...``-shaped text is never mistaken for
+    the real keyword argument. The CLI form uses ``_cli_registration`` instead, since its
+    flag/value structure carries no equivalent of a non-literal Python expression argument.
 
     Args:
-        args: The call's top-level arguments (or CLI flag lines), one segment per candidate.
+        args: The call's top-level arguments, one segment per candidate.
         agent_re: Pattern capturing the agent value when it is a literal, anchored to match from the
             start of a stripped segment.
         present_re: Pattern matching the agent argument whatever its value, anchored the same way.
@@ -252,10 +302,10 @@ def _find_type_match(args: Iterable[str], type_re: re.Pattern[str]) -> re.Match[
 
     Matches from the start of each stripped segment rather than searching the full call body, so an
     earlier argument's string value that merely contains ``artifact_type=...``-shaped text is never
-    mistaken for the real keyword argument.
+    mistaken for the real keyword argument. The CLI form uses ``_cli_registration`` instead.
 
     Args:
-        args: The call's top-level arguments (or CLI flag lines), one segment per candidate.
+        args: The call's top-level arguments, one segment per candidate.
         type_re: Pattern capturing the type value, anchored to match from the start of a stripped
             segment.
 
@@ -329,23 +379,22 @@ def parse_registrations(text: str, source: str) -> list[Registration]:
     Returns:
         One entry per attributable call, keyed on the agent the call names or defaults to.
     """
-    call_groups = [
-        (list(_iter_tool_call_top_level_args(body)), _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE)
-        for body in _iter_tool_call_bodies(text)
-    ]
-    call_groups += [
-        (list(_iter_cli_flag_lines(m.group(0))), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE)
-        for m in _CLI_CALL_RE.finditer(text)
-    ]
     found: list[Registration] = []
-    for args, type_re, agent_re, agent_present_re in call_groups:
-        type_match = _find_type_match(args, type_re)
+    for body in _iter_tool_call_bodies(text):
+        args = list(_iter_tool_call_top_level_args(body))
+        type_match = _find_type_match(args, _TOOL_TYPE_RE)
         if not type_match or _is_placeholder(type_match.group(1)):
             continue
-        agent = _resolve_agent(args, agent_re, agent_present_re)
+        agent = _resolve_agent(args, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE)
         if agent is None:
             continue
         found.append(Registration(artifact_type=type_match.group(1), agent=agent, source=source))
+    for cli_match in _CLI_CALL_RE.finditer(text):
+        registration = _cli_registration(_cli_flags(cli_match.group(0)))
+        if registration is None:
+            continue
+        artifact_type, agent = registration
+        found.append(Registration(artifact_type=artifact_type, agent=agent, source=source))
     return found
 
 
@@ -426,6 +475,13 @@ def test_gate_read_types_have_exactly_one_registering_agent() -> None:
             "artifact register \\\n  --artifact-type=research \\\n  --agent=swarm-task-planner\n",
             ("research", "swarm-task-planner"),
         ),
+        (
+            (
+                "artifact register --item-id 1 --artifact-type research --artifact-id x "
+                "--content y --agent swarm-task-planner\n"
+            ),
+            ("research", "swarm-task-planner"),
+        ),
     ],
     ids=[
         "tool-tight",
@@ -435,6 +491,7 @@ def test_gate_read_types_have_exactly_one_registering_agent() -> None:
         "cli-bare",
         "cli-quoted",
         "cli-equals",
+        "cli-single-line",
     ],
 )
 def test_parse_registrations_reads_every_literal_call_form(call: str, expected: tuple[str, str]) -> None:
@@ -532,6 +589,42 @@ def test_parse_registrations_ignores_ownership_text_inside_an_earlier_argument_v
     assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [
         ("new-type", "swarm-task-planner")
     ]
+
+
+def test_parse_registrations_reads_a_single_line_cli_call() -> None:
+    """Every flag on the invocation's own line, not one per continuation line, still registers.
+
+    Tests: parse_registrations CLI-form flag tokenization (_cli_flags, _cli_registration)
+    How: Parse a valid single-line ``artifact register --flag value --flag value ...`` invocation
+         with no ``\\``-continued lines at all.
+    Why: A line-based split treats the whole invocation as one line beginning with ``artifact
+         register``, so an anchored match for ``--artifact-type``/``--agent`` at that line's start
+         never finds either flag and the registration is silently skipped — an undeclared type or
+         writer spelled this way would pass a green guard. ``artifact register --help`` documents
+         ``--artifact-type`` and ``--agent`` as ordinary options with no requirement that each
+         start its own line.
+    """
+    call = "artifact register --item-id 1 --artifact-type new-type --artifact-id x --content y --agent new-writer\n"
+
+    assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [("new-type", "new-writer")]
+
+
+def test_parse_registrations_ignores_ownership_text_inside_an_earlier_cli_flag_value() -> None:
+    """An earlier flag's quoted value shaped like ``--artifact-type x`` is not mistaken for one.
+
+    Tests: parse_registrations CLI-form flag tokenization (_cli_flags)
+    How: Parse a CLI invocation whose ``--content`` flag's quoted value contains literal
+         ``--artifact-type research`` text, followed by the invocation's real, distinct
+         ``--artifact-type`` and ``--agent`` flags. ``shlex``-based tokenization keeps a quoted
+         flag value as one token, so the decoy text never becomes a standalone ``--artifact-type``
+         token the way a text scan over the raw invocation would treat it.
+    Why: The same class of bug the tool-form decoy-value test above guards against, in the CLI
+         form: an undeclared type could slip past the owner-map guard under cover of a declared
+         type named only in a decoy string.
+    """
+    call = 'artifact register --content "--artifact-type research" --artifact-type new-type --agent new-writer\n'
+
+    assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [("new-type", "new-writer")]
 
 
 def test_iter_tool_call_bodies_ignores_an_unclosed_call() -> None:
