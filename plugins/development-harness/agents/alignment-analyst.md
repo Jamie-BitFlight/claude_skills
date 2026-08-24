@@ -36,9 +36,10 @@ Read `plugins/development-harness/CLAUDE.md`. Extract:
 - The Composition Model section
 
 When the proposed change touches which agent a workflow dispatches or how a task's `agent:` field
-is used, judge it against `dh:dispatch-contract`. When it touches how plans, tasks, or artifacts
-are addressed, judge it against `dh:subagent-contract`. Those two skills carry the authoritative
-rules; do not judge such a change against a rule recalled from training or from an older document.
+is used, load `dh:dispatch-contract` and judge the change against it. When it touches how plans,
+tasks, or artifacts are addressed, judge it against `dh:subagent-contract` (already loaded via
+this agent's `skills:` frontmatter). Do not judge either kind of change against a rule recalled
+from training or from an older document.
 
 **1b. Architectural documentation**
 
