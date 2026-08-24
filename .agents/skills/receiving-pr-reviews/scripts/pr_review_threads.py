@@ -446,6 +446,13 @@ def watch(
 
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`,
     `new_thread_ids`, and `new_reviews_with_body`.
+
+    Exits non-zero, with nothing printed to stdout, if every re-poll attempted this window
+    failed (a transient `gh` failure on each one — see the exception handling inside the loop).
+    A `timed_out: true` result on stdout is only ever printed when at least one check since the
+    baseline fetch actually succeeded — including the case where no re-poll was attempted at all
+    because the window ended too soon for one, which is an honest "nothing to report," not a
+    failure.
     """
     deadline = time.monotonic() + timeout_seconds
     baseline = _build_fetch_result(owner, repo, pr, deadline=deadline)
@@ -457,6 +464,8 @@ def watch(
     current = baseline
     new_thread_ids: set[str] = set()
     new_reviews: list[ReviewNode] = []
+    poll_attempts = 0
+    poll_successes = 0
     while time.monotonic() < deadline:
         time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
         if deadline - time.monotonic() < _MIN_POLL_BUDGET_SECONDS:
@@ -468,8 +477,10 @@ def watch(
         # `_build_fetch_result`'s two `gh` calls are each bounded to whatever's left before
         # `deadline` (see `_gh_timeout_budget`) rather than a static reservation subtracted from
         # every poll — a call made with time to spare still gets the full `_GH_TIMEOUT_SECONDS`.
+        poll_attempts += 1
         try:
             current = _build_fetch_result(owner, repo, pr, deadline=deadline)
+            poll_successes += 1
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
             # Two distinct causes land here, not one: a genuine transient `gh` failure mid-window
             # (network hiccup, momentary GitHub error), and the guard above not being a complete
@@ -490,6 +501,18 @@ def watch(
         ]
         if new_thread_ids or new_reviews:
             break
+    if poll_attempts and not poll_successes:
+        # Every re-poll this window attempted raised — `current` never advanced past the
+        # baseline fetch. Reporting `timed_out: true` here would claim a confirmed check found
+        # nothing new, when no check after the baseline actually succeeded; a caller trusting
+        # that signal would wrongly conclude the PR is clean instead of retrying or investigating
+        # why every `gh` call failed. A guard-triggered stop with zero poll attempts is not this
+        # case — that one is an honest, intentional "no time left to check again."
+        typer.echo(
+            f"watch: all {poll_attempts} poll(s) this window failed — no confirmed state beyond the baseline fetch",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     result = WatchResult(
         timed_out=not (new_thread_ids or new_reviews),
         new_thread_ids=sorted(new_thread_ids),

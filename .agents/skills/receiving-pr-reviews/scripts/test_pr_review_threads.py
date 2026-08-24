@@ -23,6 +23,7 @@ import json
 import subprocess
 from typing import TYPE_CHECKING
 
+import pytest
 from typer.testing import CliRunner
 
 import pr_review_threads
@@ -292,3 +293,40 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     data = json.loads(result.output)
     assert data["timed_out"] is False
     assert data["new_thread_ids"] == ["T9"]
+
+
+def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None:
+    """`watch` exits non-zero, printing nothing to stdout, when every re-poll attempted this
+    window fails.
+
+    Regression coverage for a Codex review on the fix that introduced the try/except around each
+    poll: silently returning `timed_out: true` here would claim a confirmed check found nothing
+    new, when no check after the baseline ever succeeded — a caller trusting that signal would
+    wrongly conclude the PR is clean instead of retrying. Mocks `time.monotonic` to a fixed
+    sequence for exactly two failed poll attempts (each iteration: loop condition, sleep-duration
+    calc, guard check) followed by the window naturally expiring, matching the real function's
+    call order the same way `test_watch_skips_final_poll_when_budget_too_low` does.
+    """
+    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
+    mocker.patch.object(
+        pr_review_threads,
+        "_build_fetch_result",
+        side_effect=[
+            baseline,
+            subprocess.TimeoutExpired(cmd=["gh"], timeout=30),
+            subprocess.CalledProcessError(1, ["gh"]),
+        ],
+    )
+    mocker.patch.object(pr_review_threads.time, "sleep")
+    # 0.0 (deadline = 0.0 + 100). Iter 1: 0.0 (loop cond), 0.0 (sleep calc), 10.0 (guard: 100-10=90
+    # ≥ 5.0, doesn't fire) → poll raises TimeoutExpired. Iter 2: 20.0, 20.0, 30.0 (guard: 70 ≥ 5.0)
+    # → poll raises CalledProcessError. Then 105.0 (loop cond: 105 ≥ 100 → loop ends naturally).
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 10.0, 20.0, 20.0, 30.0, 105.0])
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
+
+    assert result.exit_code != 0
+    assert "all 2 poll(s) this window failed" in result.output
+    # No `timed_out`/`state` JSON was ever printed to stdout — only the failure message above.
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.output)
