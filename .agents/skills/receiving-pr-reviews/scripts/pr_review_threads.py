@@ -214,6 +214,20 @@ _GH_TIMEOUT_SECONDS = 30
 _DEFAULT_WATCH_INTERVAL_SECONDS = 90
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
+# `_gh_timeout_budget` floors a near-zero remainder to 0.1s — enough to keep the return type
+# positive, not enough for a real `gh api graphql` round trip. `_DEFAULT_WATCH_TIMEOUT_SECONDS`
+# being an exact multiple of `_DEFAULT_WATCH_INTERVAL_SECONDS` (270 / 90 = 3) means the loop's
+# final sleep lands within a fraction of a second of `deadline` on essentially every run, so an
+# unguarded poll there is starved to that floor and reliably raises `TimeoutExpired` — not a
+# flaky network failure. `watch`'s loop skips a poll once the remaining budget drops below this,
+# rather than attempting one that is near-certain to fail.
+# ponytail: 5.0 is an unmeasured heuristic, not a proven-sufficient margin for two sequential `gh
+# api graphql` round trips — `_build_fetch_result` makes two such calls, and if the first eats
+# most of this budget the second can still be starved. The exception handler around the poll in
+# `watch` is the real backstop for that case, not this guard alone; raise this value if starvation
+# is observed in practice with the guard already in place.
+_MIN_POLL_BUDGET_SECONDS = 5.0
+
 
 def _run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
     """Run a `gh` command and return its captured stdout.
@@ -445,10 +459,29 @@ def watch(
     new_reviews: list[ReviewNode] = []
     while time.monotonic() < deadline:
         time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
+        if deadline - time.monotonic() < _MIN_POLL_BUDGET_SECONDS:
+            # Not enough time left before `deadline` for a real `gh` call to plausibly finish —
+            # `_gh_timeout_budget` would otherwise starve it to a floor too small to succeed.
+            # Stop polling and report the last successfully-fetched state instead of attempting
+            # a call that cannot complete.
+            break
         # `_build_fetch_result`'s two `gh` calls are each bounded to whatever's left before
         # `deadline` (see `_gh_timeout_budget`) rather than a static reservation subtracted from
         # every poll — a call made with time to spare still gets the full `_GH_TIMEOUT_SECONDS`.
-        current = _build_fetch_result(owner, repo, pr, deadline=deadline)
+        try:
+            current = _build_fetch_result(owner, repo, pr, deadline=deadline)
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            # Two distinct causes land here, not one: a genuine transient `gh` failure mid-window
+            # (network hiccup, momentary GitHub error), and the guard above not being a complete
+            # fix on its own — `_build_fetch_result` makes two sequential `gh` calls, each
+            # re-budgeted from whatever's left, so a slow first call can still starve the second
+            # even though the guard passed. This handler is that starved-second-call case's real
+            # backstop, not a belt-and-suspenders duplicate of the guard.
+            # `watch` is meant to run unattended, often backgrounded (see the receiving-pr-reviews
+            # skill's own gotchas on polling a backgrounded call for its own result); crashing
+            # here loses the whole call's result instead of just this one poll. Treat it as no
+            # fresh data this poll and let the loop continue toward `deadline` on its own schedule.
+            continue
         new_thread_ids = {thread.id for thread in current.unresolved} - baseline_thread_ids
         new_reviews = [
             review
