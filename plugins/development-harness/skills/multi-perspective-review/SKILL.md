@@ -68,8 +68,11 @@ substitution, pipes, or POSIX-only device file — so it runs unchanged whether 
 is bash, PowerShell, or cmd.exe:
 
 ```text
-uv run --quiet --script ${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py
+uv run --quiet --script "${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py"
 ```
+
+Quote the path exactly as shown. An install location with a space in it (a Windows profile such as
+`C:\Users\Jane Doe\...`) splits an unquoted argument, so `uv` would try to execute only the prefix.
 
 The UTC timestamp alone only has whole-second resolution: two invocations for the same
 `review_base` starting within the same second would derive the same `run_stamp`, and therefore the
