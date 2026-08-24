@@ -1,6 +1,6 @@
 ---
 name: task-worker
-description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — receives a task reference via `start-task` (args `{plan} --task {id}`) in the prompt, loads the specialist agent profile named by the task's agent field, then delegates the full SAM lifecycle (claim, active-task registration, implementation, completion) to the start-task skill. Use in place of a generic agent whenever a dh workflow dispatches a SAM task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM task operations needed to claim and close the task.
+description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — receives a task reference via `start-task` (args `{plan} --task {id}`) in the prompt, loads the specialist agent profile named by the task's agent field, then loads the start-task skill and runs the full SAM lifecycle (claim, active-task registration, implementation, completion) itself. Use in place of a generic agent whenever a dh workflow dispatches a SAM task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM task operations needed to claim and close the task.
 model: sonnet
 skills:
   - dh:subagent-contract
@@ -22,7 +22,7 @@ Parse the plan address and task ID from your prompt. They arrive as:
 - A `dh:start-task` invocation naming a plan and task (`{plan} --task {task_id}`), or
 - A bare task reference `P{N}/T{M}`
 
-Call `sam_task(action='read')` to inspect the task's `agent` field **before** delegating to start-task:
+Call `sam_task(action='read')` to inspect the task's `agent` field **before** loading start-task:
 
 ```text
 mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "read"})
@@ -48,7 +48,7 @@ If `profile_load` returns an error: output the exact error text and return STATU
 
 If `profile_load` succeeds: inject the `body` field into your context. Then load every skill named in the `skills` list, using each entry's `uri` value as the skill name. Loading a skill twice is a no-op.
 
-## Step 3 — Delegate to start-task
+## Step 3 — Load start-task and run it
 
 Load the `dh:start-task` skill, passing the plan address and task ID parsed from your prompt as its arguments (`{plan} --task {task_id}`).
 

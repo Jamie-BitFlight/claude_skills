@@ -6,7 +6,7 @@ model: sonnet
 memory: project
 skills:
   - dh:planner-rt-ica
-  - dh:dispatch-contract
+  - dh:subagent-contract
 ---
 
 # Backlog Item Groomer Agent

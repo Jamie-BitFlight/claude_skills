@@ -1,17 +1,19 @@
-"""Guards the roster invariant the dispatch contract skill states as fact.
+"""Guards the destination rule the subagent contract states for dispatched agents.
 
-`skills/dispatch-contract/SKILL.md` tells a dispatcher that a `dh:` agent passing the
-tool-reach check is already executing under the dispatch contract, so no per-candidate
-check of the candidate's `skills:` frontmatter is needed. A dispatcher cannot verify
-that claim: the listing it picks a target from carries name, description, and tool list
-only. The claim is therefore load-bearing prose backed by nothing unless every dh agent
-that declares a governed operation also declares `dh:dispatch-contract`.
+A single-purpose agent's own file names where its result goes, and a dispatch naming a
+different form overrides that when the agent is put to work beyond its one task. Most of
+this roster is the first case. `skills/subagent-contract/SKILL.md` supplies the fallback
+for when neither names one: repository files for source, tests, and documentation;
+`artifact_register` with content for every other document; the SAM plan and task
+operations for plans and task state.
 
-The governed operations are the ones the skill's own decision list enumerates — the SAM
-plan/task/active-task operations, the artifact operations, and `profile_load`. Item
-grooming operations (`backlog_view`, `backlog_groom`) are not governed by this contract,
-so an agent declaring only those is out of scope and is derived as such from its tool
-list rather than exempted by name.
+The fallback is what this guards, and it is narrow — it matters for an agent whose own
+file names no destination. Such an agent holding those operations without the fallback
+can write its result somewhere the next step cannot read it, and the miss is silent: the
+next step reads empty rather than failing. A dispatched agent starts with an empty
+conversation, so its `skills:` frontmatter is what carries the fallback in. Item grooming operations (`backlog_view`, `backlog_groom`) address no
+artifact, so an agent declaring only those is out of scope and is derived as such from
+its tool list rather than exempted by name.
 """
 
 from __future__ import annotations
@@ -23,21 +25,16 @@ from agent_profile.parser import _load_frontmatter_from_path, _normalize_skills
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _AGENTS_ROOT = _PLUGIN_ROOT / "agents"
 
-_CONTRACT_SKILL = "dh:dispatch-contract"
+_CONTRACT_SKILL = "dh:subagent-contract"
 
 # Bare operation names as exposed by the SAM server (sam_schema/server.py) and the
 # backlog server (backlog_core/server.py, which mounts agent_profile under `profile_`).
-_GOVERNED_OPERATIONS = frozenset({
-    "sam_plan",
-    "sam_task",
-    "sam_active_task",
-    "artifact_register",
-    "artifact_read",
-    "artifact_list",
-    "artifact_get",
-    "profile_load",
-    "profile_list",
-})
+# Only operations that can produce a result needing a destination decision are governed —
+# a read/list operation never does, so it is left out the same way backlog_view and
+# backlog_groom already are. sam_plan/sam_task/sam_active_task bundle read and write
+# actions behind one tool name (selected at call time via config.action), so they stay
+# governed on the conservative assumption that a declared grant may be used to write.
+_GOVERNED_OPERATIONS = frozenset({"sam_plan", "sam_task", "sam_active_task", "artifact_register"})
 
 # A whole-server grant reaches every operation that server exposes.
 _GOVERNED_SERVERS = frozenset({"mcp__plugin_dh_sam", "mcp__plugin_dh_backlog"})
@@ -62,7 +59,7 @@ def _reaches_governed_operation(tools: list[str]) -> bool:
 
 
 def _agents_missing_contract(agents_root: Path) -> list[str]:
-    """Return the names of in-scope agents that omit the dispatch contract skill.
+    """Return the names of in-scope agents that omit the subagent contract skill.
 
     An agent is in scope when its `tools:` key is absent (it inherits every tool, so it
     reaches the governed operations) or when the declared list reaches one of them.
@@ -72,7 +69,7 @@ def _agents_missing_contract(agents_root: Path) -> list[str]:
 
     Returns:
         Sorted paths, relative to *agents_root*, of in-scope agents whose `skills:`
-        frontmatter does not declare `dh:dispatch-contract`.
+        frontmatter does not declare `dh:subagent-contract`.
     """
     missing: list[str] = []
     for path in sorted(agents_root.rglob("*.md")):
@@ -86,16 +83,15 @@ def _agents_missing_contract(agents_root: Path) -> list[str]:
 
 
 def test_every_dh_agent_reaching_governed_operations_declares_the_contract() -> None:
-    """The invariant the skill asserts to dispatchers holds across the whole roster."""
+    """Every agent that can address an artifact, plan, or task carries the rule for it."""
     missing = _agents_missing_contract(_AGENTS_ROOT)
 
     assert not missing, (
-        "The dispatch-contract skill tells a dispatcher that a dh: agent passing the tool-reach "
-        f"check is already executing under {_CONTRACT_SKILL}, and a dispatcher cannot verify that "
-        "per candidate — the agent listing exposes name, description, and tools only. These agents "
-        "declare a governed operation without declaring the contract, so a dispatcher following "
-        f"the skill would dispatch them expecting behaviour they do not load: {missing!r}. Add "
-        f"'{_CONTRACT_SKILL}' to each agent's skills: frontmatter, or remove the governed "
+        "An agent reaching the SAM or artifact operations decides where its output lands, and "
+        f"{_CONTRACT_SKILL} is where that decision is stated. A dispatched agent loads it through "
+        "its own skills: frontmatter or not at all. These agents reach those operations without "
+        f"declaring it, so each can persist a result the next step reads back empty: {missing!r}. "
+        f"Add '{_CONTRACT_SKILL}' to each agent's skills: frontmatter, or remove the governed "
         "operations from its tools: frontmatter."
     )
 

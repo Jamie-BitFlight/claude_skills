@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, Skill, WebFetch, WebSearch, SendMess
 model: haiku
 memory: project
 skills:
-  - dh:dispatch-contract
+  - dh:subagent-contract
 ---
 
 # Fact Checker Agent
@@ -103,7 +103,8 @@ Before finalizing, challenge your initial verdict:
 
 ### Step 4: Return Verdict
 
-Assemble the verdict in this exact shape. You will use it both as the return payload AND as the `content` argument in Step 5 when writing to the backlog item.
+Assemble the verdict in this exact shape. It is your deliverable: in your response it follows the
+`STATUS: DONE` line, and in Step 5 it is the `content` argument on its own, with no status line.
 
 ```text
 CLAIM: {exact claim text}

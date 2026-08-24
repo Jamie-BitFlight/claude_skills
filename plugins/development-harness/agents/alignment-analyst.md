@@ -5,7 +5,7 @@ model: haiku
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
 skills:
-  - dh:dispatch-contract
+  - dh:subagent-contract
 ---
 
 # Alignment Analyst
@@ -35,10 +35,11 @@ Read `plugins/development-harness/CLAUDE.md`. Extract:
 - Any explicit "Do NOT use when" guidance
 - The Composition Model section
 
-When the proposed change touches dispatch — which agent a workflow dispatches, how a task's
-`agent:` field is used, how plans, tasks, or artifacts are addressed — load `dh:dispatch-contract`
-and judge the change against it. That skill is the authoritative dispatch rule; do not judge a
-dispatch change against a rule recalled from training or from an older document.
+When the proposed change touches which agent a workflow dispatches or how a task's `agent:` field
+is used, load `dh:dispatch-contract` and judge the change against it. When it touches how plans,
+tasks, or artifacts are addressed, judge it against `dh:subagent-contract` (already loaded via
+this agent's `skills:` frontmatter). Do not judge either kind of change against a rule recalled
+from training or from an older document.
 
 **1b. Architectural documentation**
 
