@@ -470,19 +470,8 @@ this file) was removed to avoid two files drifting out of sync.
 
 ## PR Review Protocol
 
-When asked to check or address PR reviews, always fetch BOTH levels of feedback:
-
-```bash
-# 1. Top-level review state (APPROVED / CHANGES_REQUESTED / COMMENTED)
-gh pr view <N> -R Jamie-BitFlight/claude_skills --json reviews,reviewDecision
-
-# 2. Inline comments on specific lines — this is where substantive findings live
-gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {path, line, body}]'
-```
-
-`reviewDecision` being empty and `state: COMMENTED` does NOT mean no findings. Codex and other bots post substantive per-line feedback as inline comments, not as blocking review verdicts. Checking only the top-level state misses these entirely.
-
-Address all inline comments before declaring the PR review complete.
+After pushing a commit to a PR, or when asked to check or address PR reviews, load the
+`receiving-pr-reviews` skill.
 
 ## GitHub CLI Conventions
 

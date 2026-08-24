@@ -94,6 +94,7 @@ pythonpath = [
     "./plugins/summarizer/scripts",
     "./plugins/frustration-analyzer/tests",
     "./examples/solid-review-ab",
+    "./.agents/skills/receiving-pr-reviews/scripts",
 ]
 testpaths = [
     "plugins/agentskill-kaizen/tests",
@@ -107,6 +108,7 @@ testpaths = [
     "tests",
     "examples/solid-review-ab/tests",
     "plugins/plugin-creator/skills/ensemble-rule-review/scripts",
+    ".agents/skills/receiving-pr-reviews/scripts",
 ]
 
 [tool.coverage.report]
