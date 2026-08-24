@@ -2,6 +2,12 @@
 
 This document covers everything an AI agent needs to work effectively in this repository.
 
+## Evidence Proportionality
+
+Before using tools, running tests, searching history, or gathering evidence, ask: Could the result
+materially change the decision, recommendation, or action? If not, skip that work; if uncertain,
+prefer the cheapest evidence that can resolve the uncertainty rather than maximizing information.
+
 ## Repository Overview
 
 **Project**: Claude Code Marketplace Plugin Collection (see `plugins/` for the full roster)
