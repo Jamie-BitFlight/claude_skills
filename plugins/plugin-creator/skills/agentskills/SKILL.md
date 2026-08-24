@@ -184,7 +184,7 @@ Place user-facing docs (README, CHANGELOG, INSTALLATION_GUIDE), setup procedures
 
 ## Validation
 
-For skill-complexity and frontmatter checks in this repository, run `uvx skilllint@latest check <skill-path>` first — it is bundled, requires no install, and is this repo's standard validator (see AGENTS.md).
+For quick complexity and frontmatter checks, `uvx skilllint@latest check <skill-path>` is available via `uvx` (resolves the package from PyPI on first run — needs network access, is not bundled with this skill) and is faster than installing `skills-ref`.
 
 For deeper agentskills.io open-standard compliance checks not covered by `skilllint` (e.g. cross-client portability rules), use the `skills-ref` reference library:
 

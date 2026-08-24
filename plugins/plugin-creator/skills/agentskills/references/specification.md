@@ -278,7 +278,7 @@ skills-ref validate ./my-skill
 
 **Why validate:** Validation catches frontmatter and naming errors before distribution and prevents agents from loading malformed skills. Run it before publishing or sharing skills.
 
-> **Note:** The live agentskills.io/specification page now documents only this single `skills-ref validate` command. The additional CLI subcommands, Python API, and XML output format below are confirmed directly against the [skills-ref repository](https://github.com/agentskills/agentskills/tree/main/skills-ref) — not the specification page. The skills-ref README also states it is **intended for demonstration purposes only** and is not meant to be used in production; treat it as a reference implementation, not a hardened validation gate.
+> **Note:** `skills-ref` is intended for demonstration purposes only and is not meant to be used in production — treat it as a reference implementation, not a hardened validation gate.
 
 **CLI commands:**
 
