@@ -28,7 +28,7 @@ scanned call. The scan catches undeclared writers; the map covers the producers 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import pytest
@@ -115,6 +115,69 @@ def _iter_tool_call_bodies(text: str) -> Iterator[str]:
             index += 1
 
 
+def _iter_tool_call_top_level_args(body: str) -> Iterator[str]:
+    """Split one ``artifact_register(...)`` call's body into its top-level arguments.
+
+    Tracks bracket depth (parens, brackets, braces) and quoted-string state the same way
+    ``_iter_tool_call_bodies`` tracks parenthesis depth, so a comma inside a nested call's argument
+    list (``content=build_report(a, b)``) or inside a quoted string does not split an argument
+    early. This is what lets the field patterns match only a call's real, top-level keyword
+    arguments: an earlier argument's string value that happens to contain text shaped like
+    ``artifact_type="x"`` lives inside that argument's own segment, never at the start of one, so it
+    cannot be mistaken for the real keyword argument the way an unanchored scan over the whole call
+    body would.
+
+    Args:
+        body: One call's argument-list text, as yielded by ``_iter_tool_call_bodies``.
+
+    Yields:
+        Each top-level argument's raw text (whitespace included; callers strip before matching).
+    """
+    depth = 0
+    quote: str | None = None
+    start = 0
+    index = 0
+    while index < len(body):
+        char = body[index]
+        if quote is not None:
+            if char == "\\":
+                index += 2
+                continue
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "([{":
+            depth += 1
+        elif char in ")]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            yield body[start:index]
+            start = index + 1
+        index += 1
+    yield body[start:]
+
+
+def _iter_cli_flag_lines(text: str) -> Iterator[str]:
+    """Split one CLI ``artifact register`` invocation into its per-line flag arguments.
+
+    ``_CLI_CALL_RE`` already captures the invocation as one ``--flag value`` per continuation line,
+    so splitting on newlines and dropping blank lines is enough to isolate each flag as its own
+    segment — the same anchoring purpose ``_iter_tool_call_top_level_args`` serves for the MCP tool
+    form.
+
+    Args:
+        text: The full matched CLI invocation, as yielded by ``_CLI_CALL_RE.finditer``.
+
+    Yields:
+        Each non-blank line, stripped of surrounding whitespace.
+    """
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            yield stripped
+
+
 def _is_placeholder(value: str) -> bool:
     """Report whether a scanned flag or keyword value is a substitution slot.
 
@@ -151,7 +214,7 @@ _UNDECLARED = ArtifactTypeOwners(artifact_type="")
 """Stand-in for a type absent from the map: it owns no agent, so every writer of it is undeclared."""
 
 
-def _resolve_agent(chunk: str, agent_re: re.Pattern[str], present_re: re.Pattern[str]) -> str | None:
+def _resolve_agent(args: Iterable[str], agent_re: re.Pattern[str], present_re: re.Pattern[str]) -> str | None:
     """Resolve the agent a scanned ``artifact_register`` call registers under.
 
     Three cases, and they are not the same. A literal value is the writer. An argument supplied with
@@ -159,18 +222,51 @@ def _resolve_agent(chunk: str, agent_re: re.Pattern[str], present_re: re.Pattern
     so the call makes no ownership claim. An argument omitted altogether is a concrete registration
     under ``artifact_register``'s ``agent`` default.
 
+    Each candidate in ``args`` is one top-level argument (or CLI flag line), matched from its own
+    start rather than searched for anywhere in the full call body — so an earlier argument's string
+    value that merely contains ``agent=...``-shaped text is never mistaken for the real keyword
+    argument.
+
     Args:
-        chunk: The text of one ``artifact_register`` call.
-        agent_re: Pattern capturing the agent value when it is a literal.
-        present_re: Pattern matching the agent argument whatever its value.
+        args: The call's top-level arguments (or CLI flag lines), one segment per candidate.
+        agent_re: Pattern capturing the agent value when it is a literal, anchored to match from the
+            start of a stripped segment.
+        present_re: Pattern matching the agent argument whatever its value, anchored the same way.
 
     Returns:
         The agent name, or None when the call carries no ownership claim.
     """
-    match = agent_re.search(chunk)
-    if match is not None:
+    for raw_arg in args:
+        arg = raw_arg.strip()
+        if not present_re.match(arg):
+            continue
+        match = agent_re.match(arg)
+        if match is None:
+            return None
         return None if _is_placeholder(match.group(1)) else match.group(1)
-    return None if present_re.search(chunk) else _DEFAULT_AGENT
+    return _DEFAULT_AGENT
+
+
+def _find_type_match(args: Iterable[str], type_re: re.Pattern[str]) -> re.Match[str] | None:
+    """Find the artifact-type keyword argument among a call's top-level arguments.
+
+    Matches from the start of each stripped segment rather than searching the full call body, so an
+    earlier argument's string value that merely contains ``artifact_type=...``-shaped text is never
+    mistaken for the real keyword argument.
+
+    Args:
+        args: The call's top-level arguments (or CLI flag lines), one segment per candidate.
+        type_re: Pattern capturing the type value, anchored to match from the start of a stripped
+            segment.
+
+    Returns:
+        The match against the first segment naming the type argument, or None if no segment does.
+    """
+    for raw_arg in args:
+        match = type_re.match(raw_arg.strip())
+        if match is not None:
+            return match
+    return None
 
 
 def _strip_cell(cell: str) -> str:
@@ -233,14 +329,20 @@ def parse_registrations(text: str, source: str) -> list[Registration]:
     Returns:
         One entry per attributable call, keyed on the agent the call names or defaults to.
     """
-    chunks = [(body, _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE) for body in _iter_tool_call_bodies(text)]
-    chunks += [(m.group(0), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE) for m in _CLI_CALL_RE.finditer(text)]
+    call_groups = [
+        (list(_iter_tool_call_top_level_args(body)), _TOOL_TYPE_RE, _TOOL_AGENT_RE, _TOOL_AGENT_PRESENT_RE)
+        for body in _iter_tool_call_bodies(text)
+    ]
+    call_groups += [
+        (list(_iter_cli_flag_lines(m.group(0))), _CLI_TYPE_RE, _CLI_AGENT_RE, _CLI_AGENT_PRESENT_RE)
+        for m in _CLI_CALL_RE.finditer(text)
+    ]
     found: list[Registration] = []
-    for chunk, type_re, agent_re, agent_present_re in chunks:
-        type_match = type_re.search(chunk)
+    for args, type_re, agent_re, agent_present_re in call_groups:
+        type_match = _find_type_match(args, type_re)
         if not type_match or _is_placeholder(type_match.group(1)):
             continue
-        agent = _resolve_agent(chunk, agent_re, agent_present_re)
+        agent = _resolve_agent(args, agent_re, agent_present_re)
         if agent is None:
             continue
         found.append(Registration(artifact_type=type_match.group(1), agent=agent, source=source))
@@ -407,6 +509,28 @@ def test_parse_registrations_reads_past_nested_expressions(call: str) -> None:
     """
     assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [
         ("research", "swarm-task-planner")
+    ]
+
+
+def test_parse_registrations_ignores_ownership_text_inside_an_earlier_argument_value() -> None:
+    """An earlier argument's string value shaped like ``artifact_type="x"`` is not mistaken for one.
+
+    Tests: parse_registrations top-level argument anchoring (_find_type_match, _resolve_agent)
+    How: Parse a call whose ``content`` argument's string value contains literal
+         ``artifact_type="research"`` text, followed by the call's real, distinct top-level
+         ``artifact_type`` and ``agent`` keyword arguments.
+    Why: A scan that searches the whole call body for ``artifact_type=...``/``agent=...`` text
+         matches the first occurrence anywhere, including inside another argument's string value.
+         That lets an undeclared type slip past the owner-map guard under cover of a declared type
+         named only in a decoy string, while the real (and possibly undeclared) type and agent the
+         call actually registers go unchecked.
+    """
+    call = (
+        'artifact_register(content=\'artifact_type="research"\', artifact_type="new-type", agent="swarm-task-planner")'
+    )
+
+    assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [
+        ("new-type", "swarm-task-planner")
     ]
 
 
