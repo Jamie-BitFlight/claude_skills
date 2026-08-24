@@ -482,7 +482,14 @@ gh api repos/Jamie-BitFlight/claude_skills/pulls/<N>/comments --jq '[.[] | {path
 
 `reviewDecision` being empty and `state: COMMENTED` does NOT mean no findings. Codex and other bots post substantive per-line feedback as inline comments, not as blocking review verdicts. Checking only the top-level state misses these entirely.
 
-Address all inline comments before declaring the PR review complete.
+Address all inline comments before declaring the PR review complete: when a PR is ready for
+review, treat every unresolved review thread as actionable input. Read it, validate the claim
+locally, assess it against the change goal and repository instructions, implement and commit it
+only when it improves the product, then reply with the disposition and resolve the thread. After
+all current threads are resolved, check for additional reviews three times at 10-minute intervals
+using `/loop` or `/schedule`; if any new review arrives, cancel the remaining checks and restart
+this process. Treat a Codex thumbs-up reaction on the PR body, or an explicit "no reviews", "no
+changes", or "0 comments" response, as that reviewer's completion signal.
 
 ## GitHub CLI Conventions
 
