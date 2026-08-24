@@ -42,8 +42,9 @@ _OWNER_TABLE_HEADING = "| Type | Registering agents | Gate-read | Notes |"
 # MCP tool form: artifact_register(item_id=..., artifact_type="x", ..., agent="y"). Only the opening
 # delimiter is matched here — the closing one is found by _iter_tool_call_bodies, because a regex
 # cannot balance nested parentheses and a non-greedy match to the first ")" would end a call early
-# at any nested expression, hiding every argument written after it.
-_TOOL_CALL_OPEN_RE = re.compile(r"artifact_register\(")
+# at any nested expression, hiding every argument written after it. Optional whitespace before "("
+# covers `artifact_register (...)`, which is as much a call as the tight spelling.
+_TOOL_CALL_OPEN_RE = re.compile(r"artifact_register\s*\(")
 # CLI form: `... artifact register \` followed by one --flag per continuation line.
 _CLI_CALL_RE = re.compile(r"artifact\s+register\b[^\n]*\n(?:[ \t]*--[^\n]*\n?)*")
 
@@ -308,6 +309,10 @@ def test_gate_read_types_have_exactly_one_registering_agent() -> None:
             ("research", "swarm-task-planner"),
         ),
         (
+            'artifact_register (item_id=1, artifact_type="research", agent="swarm-task-planner")',
+            ("research", "swarm-task-planner"),
+        ),
+        (
             "artifact register \\\n  --artifact-type research \\\n  --agent swarm-task-planner\n",
             ("research", "swarm-task-planner"),
         ),
@@ -320,7 +325,15 @@ def test_gate_read_types_have_exactly_one_registering_agent() -> None:
             ("research", "swarm-task-planner"),
         ),
     ],
-    ids=["tool-tight", "tool-spaced", "tool-single-quoted", "cli-bare", "cli-quoted", "cli-equals"],
+    ids=[
+        "tool-tight",
+        "tool-spaced",
+        "tool-single-quoted",
+        "tool-space-before-paren",
+        "cli-bare",
+        "cli-quoted",
+        "cli-equals",
+    ],
 )
 def test_parse_registrations_reads_every_literal_call_form(call: str, expected: tuple[str, str]) -> None:
     """Every literal spelling of a registration yields the same (type, agent) pair.
