@@ -326,7 +326,37 @@ def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
 
     assert result.exit_code != 0
-    assert "all 2 poll(s) this window failed" in result.output
+    assert "the last of 2 poll(s) this window failed" in result.output
     # No `timed_out`/`state` JSON was ever printed to stdout — only the failure message above.
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.output)
+
+
+def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) -> None:
+    """`watch` fails loudly when the *last* poll fails, even if an earlier poll in the same
+    window succeeded.
+
+    Regression coverage for a second Codex review, on the fix above: tracking whether *any* poll
+    succeeded is not enough — an early success does not confirm the tail of the window after a
+    later failure. If poll 1 succeeds (finding nothing new) and poll 2 then fails as the window
+    ends, `current` is stale (still poll 1's data) and the final stretch before `deadline` was
+    never actually observed; `watch` must still fail rather than report a `timed_out: true` built
+    from that stale state.
+    """
+    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
+    mocker.patch.object(
+        pr_review_threads,
+        "_build_fetch_result",
+        side_effect=[baseline, baseline, subprocess.TimeoutExpired(cmd=["gh"], timeout=30)],
+    )
+    mocker.patch.object(pr_review_threads.time, "sleep")
+    # Same 8-call shape as the all-fail test above, but iter 1's poll succeeds this time (finding
+    # nothing new, so the loop does not break) before iter 2's poll fails as the window ends.
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 10.0, 20.0, 20.0, 30.0, 105.0])
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
+
+    assert result.exit_code != 0
+    assert "the last of 2 poll(s) this window failed" in result.output
     with pytest.raises(json.JSONDecodeError):
         json.loads(result.output)

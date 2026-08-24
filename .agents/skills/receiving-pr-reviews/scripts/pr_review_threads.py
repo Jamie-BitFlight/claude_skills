@@ -447,12 +447,14 @@ def watch(
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`,
     `new_thread_ids`, and `new_reviews_with_body`.
 
-    Exits non-zero, with nothing printed to stdout, if every re-poll attempted this window
-    failed (a transient `gh` failure on each one — see the exception handling inside the loop).
-    A `timed_out: true` result on stdout is only ever printed when at least one check since the
-    baseline fetch actually succeeded — including the case where no re-poll was attempted at all
-    because the window ended too soon for one, which is an honest "nothing to report," not a
-    failure.
+    Exits non-zero, with nothing printed to stdout, if the *last* re-poll attempted this window
+    failed (a transient `gh` failure — see the exception handling inside the loop). An earlier
+    success in the same window does not offset a later failure: what matters is whether the final
+    stretch before `deadline` was actually confirmed, not whether any check ever succeeded. A
+    `timed_out: true` result on stdout is only ever printed when the most recent check — the
+    baseline fetch, or the last re-poll if one was attempted — succeeded, including the case
+    where no re-poll was attempted at all because the window ended too soon for one, which is an
+    honest "nothing to report," not a failure.
     """
     deadline = time.monotonic() + timeout_seconds
     baseline = _build_fetch_result(owner, repo, pr, deadline=deadline)
@@ -465,7 +467,11 @@ def watch(
     new_thread_ids: set[str] = set()
     new_reviews: list[ReviewNode] = []
     poll_attempts = 0
-    poll_successes = 0
+    # Tracks the outcome of the most recent poll attempt, not a success count — a success
+    # earlier in the window does not confirm the tail after a later failure. Starts True: the
+    # baseline fetch above already succeeded (its own errors propagate uncaught, before the
+    # loop), so "no poll attempted since" is itself a confirmed state, not an unknown one.
+    last_poll_ok = True
     while time.monotonic() < deadline:
         time.sleep(max(0.0, min(interval_seconds, deadline - time.monotonic())))
         if deadline - time.monotonic() < _MIN_POLL_BUDGET_SECONDS:
@@ -480,8 +486,9 @@ def watch(
         poll_attempts += 1
         try:
             current = _build_fetch_result(owner, repo, pr, deadline=deadline)
-            poll_successes += 1
+            last_poll_ok = True
         except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            last_poll_ok = False
             # Two distinct causes land here, not one: a genuine transient `gh` failure mid-window
             # (network hiccup, momentary GitHub error), and the guard above not being a complete
             # fix on its own — `_build_fetch_result` makes two sequential `gh` calls, each
@@ -501,15 +508,19 @@ def watch(
         ]
         if new_thread_ids or new_reviews:
             break
-    if poll_attempts and not poll_successes:
-        # Every re-poll this window attempted raised — `current` never advanced past the
-        # baseline fetch. Reporting `timed_out: true` here would claim a confirmed check found
-        # nothing new, when no check after the baseline actually succeeded; a caller trusting
-        # that signal would wrongly conclude the PR is clean instead of retrying or investigating
-        # why every `gh` call failed. A guard-triggered stop with zero poll attempts is not this
-        # case — that one is an honest, intentional "no time left to check again."
+    if poll_attempts and not last_poll_ok:
+        # The most recent poll attempted this window raised — not just "every poll failed", but
+        # specifically the *last* one, which is what actually matters: an earlier success in the
+        # window does not confirm the tail after a later failure. Reporting `timed_out: true`
+        # here would claim a confirmed check found nothing new for the whole window, when the
+        # final stretch before `deadline` was never actually observed; a caller trusting that
+        # signal would wrongly conclude the PR is clean instead of retrying or investigating why
+        # the last `gh` call failed. A guard-triggered stop with zero poll attempts is not this
+        # case — that one is an honest, intentional "no time left to check again," and a run that
+        # ends on a *successful* poll (even after earlier failures) is confirmed as of that poll.
         typer.echo(
-            f"watch: all {poll_attempts} poll(s) this window failed — no confirmed state beyond the baseline fetch",
+            f"watch: the last of {poll_attempts} poll(s) this window failed — final state before "
+            "deadline was never confirmed",
             err=True,
         )
         raise typer.Exit(code=1)
