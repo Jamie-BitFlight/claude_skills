@@ -39,12 +39,16 @@ _UNRESOLVED_THREADS_QUERY = """
 query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
   repository(owner: $o, name: $r) {
     pullRequest(number: $pr) {
-      reviews(first: 0) { totalCount }
+      reviews(first: 100) {
+        totalCount
+        pageInfo { hasNextPage }
+        nodes { author { login } state body }
+      }
       reviewThreads(first: 100, after: $endCursor) {
         totalCount
         nodes {
           id isResolved path
-          comments(first: 100) { totalCount pageInfo { hasNextPage } nodes { databaseId body } }
+          comments(first: 100) { totalCount pageInfo { hasNextPage } nodes { databaseId body line originalLine } }
         }
       }
     }
@@ -72,6 +76,8 @@ class CommentNode(BaseModel):
 
     databaseId: int
     body: str
+    line: int | None
+    originalLine: int
 
 
 class _PageInfo(BaseModel):
@@ -96,12 +102,31 @@ class _ReviewThreadsConnection(BaseModel):
     nodes: list[_ReviewThreadNode]
 
 
-class _Reviews(BaseModel):
+class _Author(BaseModel):
+    login: str
+
+
+class ReviewNode(BaseModel):
+    """A top-level review submission, in the shape GitHub's GraphQL API returns it.
+
+    Distinct from a review *comment* (`CommentNode`): this is the review object itself —
+    its `body` is the reviewer's summary text, separate from any inline comment threads
+    it may or may not have attached.
+    """
+
+    author: _Author
+    state: str
+    body: str
+
+
+class _ReviewsConnection(BaseModel):
     totalCount: int
+    pageInfo: _PageInfo
+    nodes: list[ReviewNode]
 
 
 class _PullRequestData(BaseModel):
-    reviews: _Reviews
+    reviews: _ReviewsConnection
     reviewThreads: _ReviewThreadsConnection
 
 
@@ -124,6 +149,7 @@ class UnresolvedThread(BaseModel):
 
     id: str
     path: str
+    isResolved: bool
     comments: list[CommentNode]
     comments_truncated: bool
 
@@ -132,6 +158,8 @@ class FetchResult(BaseModel):
     """Result of `fetch`: totals plus every thread selected by `--include-resolved`."""
 
     reviews_count: int
+    reviews_with_body: list[ReviewNode]
+    reviews_truncated: bool
     threads_count: int
     unresolved: list[UnresolvedThread]
     unresolved_count: int
@@ -153,8 +181,31 @@ def _gh_executable() -> str:
     return path
 
 
+def _uv_executable() -> str:
+    """Resolve the `uv` executable's absolute path.
+
+    Returns:
+        Absolute path to `uv`.
+
+    Raises:
+        RuntimeError: `uv` is not on PATH.
+    """
+    path = shutil.which("uv")
+    if path is None:
+        msg = "uv not found on PATH"
+        raise RuntimeError(msg)
+    return path
+
+
+_GH_TIMEOUT_SECONDS = 30
+_RUN_BOUNDED = "scripts/run_bounded.py"
+
+
 def _run_gh(args: list[str]) -> str:
-    """Run a `gh` command and return its captured stdout.
+    """Run a `gh` command through this repo's bounded runner and return its captured stdout.
+
+    A stalled `gh` process (GitHub or the local proxy stops responding) would otherwise hang
+    indefinitely with no timeout. `run_bounded.py` terminates the whole process group on expiry.
 
     Args:
         args: Full `gh` argv, excluding the executable itself (e.g. `["api", "graphql", ...]`).
@@ -163,11 +214,28 @@ def _run_gh(args: list[str]) -> str:
         The command's stdout, decoded as text.
 
     Raises:
-        subprocess.CalledProcessError: `gh` exited non-zero. stderr is left connected to this
-            process's own stderr (not captured) so `gh`'s diagnostic reaches the caller directly
+        subprocess.CalledProcessError: `gh` exited non-zero, or the command exceeded
+            `_GH_TIMEOUT_SECONDS` and was terminated. stderr is left connected to this
+            process's own stderr (not captured) so the diagnostic reaches the caller directly
             instead of being buried in an exception attribute nobody prints.
     """
-    result = subprocess.run([_gh_executable(), *args], stdout=subprocess.PIPE, text=True, check=True)
+    result = subprocess.run(
+        [
+            _uv_executable(),
+            "run",
+            "--quiet",
+            "--script",
+            _RUN_BOUNDED,
+            "--timeout-seconds",
+            str(_GH_TIMEOUT_SECONDS),
+            "--",
+            _gh_executable(),
+            *args,
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+        check=True,
+    )
     return result.stdout
 
 
@@ -218,6 +286,11 @@ def fetch(
     `threads_count` with `unresolved_count: 0`, which means everything found was already
     resolved. Each thread's `comments_truncated: true` means that thread alone has passed 100
     comments in its own back-and-forth and needs its `comments` connection paged directly.
+
+    Also includes `reviews_with_body`: reviews whose top-level summary text is non-empty (an
+    approval note, or feedback given in the review body rather than as an inline comment) —
+    these have no thread at all and would otherwise be invisible even when `unresolved_count`
+    is 0. `reviews_truncated: true` means more than 100 reviews exist and some may be unseen.
     """
     pages = _fetch_pages(owner, repo, pr)
     pull_request = pages[0].data.repository.pullRequest
@@ -227,6 +300,7 @@ def fetch(
         UnresolvedThread(
             id=node.id,
             path=node.path,
+            isResolved=node.isResolved,
             comments=node.comments.nodes,
             comments_truncated=node.comments.pageInfo.hasNextPage,
         )
@@ -234,9 +308,11 @@ def fetch(
     ]
     result = FetchResult(
         reviews_count=pull_request.reviews.totalCount,
+        reviews_with_body=[review for review in pull_request.reviews.nodes if review.body.strip()],
+        reviews_truncated=pull_request.reviews.pageInfo.hasNextPage,
         threads_count=pull_request.reviewThreads.totalCount,
         unresolved=unresolved,
-        unresolved_count=len(unresolved),
+        unresolved_count=sum(1 for node in selected if not node.isResolved),
     )
     typer.echo(result.model_dump_json())
 
