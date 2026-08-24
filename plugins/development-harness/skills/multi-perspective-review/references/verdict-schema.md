@@ -266,7 +266,7 @@ incorrect behavior in a documented scenario; MINOR otherwise).
 The synthesis task (T5, profile `dh:review-synthesizer`) reads the four `Review Results` sections
 and writes exactly one punch-list block as the content of its own `Punch List` section. The
 orchestrator always reads that section, and always reads the four raw `Review Results` sections
-too — check 6 below requires comparing them.
+too — checks 6 and 7 below require comparing them.
 
 ```json
 {
@@ -341,10 +341,14 @@ rather than reading fields out of it.
    `APPROVE` while its finding text is carried forward still satisfies checks 1-5). This check is
    the only one that catches that case, so it is not optional and not skipped when checks 1-5 all
    pass.
-7. Every finding's `description` in every `verdicts[i].findings` appears verbatim in some
-   `entries[].descriptions`, at the index where that entry's `entries[].perspectives` names the
-   finding's own perspective. The conservation invariant (check 4) proves only that the *counts*
-   match — a finding whose `file`, `severity`, or `description` was altered in the copy, or one
-   dropped while a duplicate attribution was invented to keep the total unchanged, still satisfies
-   checks 1-6. This check is the only one that catches that case, so it runs alongside check 6 on
-   every synthesis, not only when a count or verdict token looks wrong.
+7. Every finding on each perspective's own raw `Review Results` section on `T1`..`T4` — not the
+   `verdicts` copy — has its `description` appearing verbatim in some `entries[].descriptions`, at
+   the index where that entry's `entries[].perspectives` names the finding's own perspective.
+   Comparing `entries` against `verdicts[i].findings` is not sufficient: both fields are the
+   synthesizer's own output, so a synthesizer that alters a finding's `file`, `severity`,
+   `description`, or `rule` identically in both places, or drops one while inventing a duplicate
+   attribution to keep the total unchanged, still satisfies checks 1-6 and an entries-vs-`verdicts`
+   comparison — none of those compares against the source the synthesizer read. Only a comparison
+   against the raw `T1`..`T4` sections, the same source check 6 reconciles against, catches that
+   case, so this check runs alongside check 6 on every synthesis, not only when a count or verdict
+   token looks wrong.

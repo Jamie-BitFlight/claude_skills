@@ -261,7 +261,7 @@ punch_list = json.loads(punch_list_section)
 The block carries each perspective's §2.1 verdict block verbatim in `verdicts`, the perspectives
 that returned nothing in `missing`, and the deduplicated findings in `entries`. It gives the gate
 everything it needs to render the summary and entries, but not everything it needs to trust the
-`verdict` token itself — see the reconciliation check below.
+`verdict` token or the findings behind `entries` — see the reconciliation checks below.
 
 `json.loads` succeeding proves the section is JSON, not that it is a punch list. Run the validity
 checks in [./references/verdict-schema.md](./references/verdict-schema.md) §2.6 against the parsed
@@ -270,15 +270,28 @@ naming the check that failed — when any of them fails. Indexing a field the ga
 unvalidated block raises on `{}` and silently under-reports coverage on a block missing a
 perspective, and a review that reports fewer perspectives than it ran is a false pass.
 
-**Reconcile against source (§2.6 check 6):** the synthesizer copies each `verdicts[i]` block from
-its perspective's own `Review Results` section, but a copy is a claim, not a guarantee — an LLM
-that alters a source `REJECT` to `APPROVE` while carrying its finding text forward still produces
-a block that passes every check above, because none of them compares `verdict` to its source. Read
-the four `Review Results` sections on `T1`..`T4` and confirm each `verdicts[i].verdict` matches its
-source perspective's `verdict` field exactly. A mismatch is check 6 failing: take the `Punch list
-not produced` failure path below and name the perspective whose verdict was altered — a punch list
-that silently drops a REJECT is a false pass, and the gate's entire correctness rests on this
-token, so this check runs on every synthesis, not only when something looks wrong.
+**Reconcile against source (§2.6 checks 6 and 7):** the synthesizer copies each `verdicts[i]` block
+from its perspective's own `Review Results` section, but a copy is a claim, not a guarantee. Read
+the four raw `Review Results` sections on `T1`..`T4` — comparing the punch list's own `verdicts`
+and `entries` fields against each other is not enough, since both are the synthesizer's own output
+and an internally-consistent alteration to both still passes. Confirm two things against those raw
+sections directly:
+
+- Check 6: each `verdicts[i].verdict` matches its source perspective's `verdict` field exactly. An
+  LLM that alters a source `REJECT` to `APPROVE` while carrying its finding text forward still
+  produces a block that passes every other check, because none of them compares `verdict` to its
+  source.
+- Check 7: each raw finding's `description` on `T1`..`T4` appears verbatim in some
+  `entries[].descriptions`, at the index where that entry's `entries[].perspectives` names the
+  finding's own perspective. An LLM that alters a finding's `file`, `severity`, `description`, or
+  `rule` identically in both `verdicts[i].findings` and `entries`, or drops one while inventing a
+  duplicate attribution to keep the total unchanged, still passes every check that compares the
+  punch list only against itself.
+
+A mismatch on either check is that check failing: take the `Punch list not produced` failure path
+below and name the check and the perspective or finding it failed on — a punch list that silently
+drops a REJECT, or silently misstates a finding, is a false pass, and the gate's entire correctness
+rests on these two checks, so both run on every synthesis, not only when something looks wrong.
 
 **Punch list not produced:** a terminal `T5` whose `Punch List` section is absent, does not
 parse as JSON, or fails any validation check above is synthesis that did not happen. FAIL with
