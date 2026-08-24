@@ -39,17 +39,30 @@ _UNRESOLVED_THREADS_QUERY = """
 query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
   repository(owner: $o, name: $r) {
     pullRequest(number: $pr) {
-      reviews(first: 100) {
-        totalCount
-        pageInfo { hasNextPage }
-        nodes { author { login } state body }
-      }
       reviewThreads(first: 100, after: $endCursor) {
         totalCount
+        pageInfo { hasNextPage endCursor }
         nodes {
           id isResolved path
           comments(first: 100) { totalCount pageInfo { hasNextPage } nodes { databaseId body line originalLine } }
         }
+      }
+    }
+  }
+}
+"""
+
+# A separate query+pagination from reviewThreads above: `gh api graphql --paginate` follows a
+# single `$endCursor`/`pageInfo.endCursor` pair per invocation, so one query cannot paginate two
+# independent connections (reviews and reviewThreads) at once — each needs its own `gh` call.
+_REVIEWS_QUERY = """
+query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
+  repository(owner: $o, name: $r) {
+    pullRequest(number: $pr) {
+      reviews(first: 100, after: $endCursor) {
+        totalCount
+        pageInfo { hasNextPage endCursor }
+        nodes { author { login } state body }
       }
     }
   }
@@ -77,7 +90,7 @@ class CommentNode(BaseModel):
     databaseId: int
     body: str
     line: int | None
-    originalLine: int
+    originalLine: int | None
 
 
 class _PageInfo(BaseModel):
@@ -125,23 +138,45 @@ class _ReviewsConnection(BaseModel):
     nodes: list[ReviewNode]
 
 
-class _PullRequestData(BaseModel):
-    reviews: _ReviewsConnection
+class _PullRequestThreadsData(BaseModel):
     reviewThreads: _ReviewThreadsConnection
 
 
-class _RepositoryData(BaseModel):
-    pullRequest: _PullRequestData
+class _RepositoryThreadsData(BaseModel):
+    pullRequest: _PullRequestThreadsData
 
 
-class _GraphQLPageData(BaseModel):
-    repository: _RepositoryData
+class _GraphQLThreadsPageData(BaseModel):
+    repository: _RepositoryThreadsData
 
 
-class _GraphQLPage(BaseModel):
-    """One page of `gh api graphql --paginate --slurp` output."""
+class _GraphQLThreadsPage(BaseModel):
+    """One page of the reviewThreads `gh api graphql --paginate --slurp` output."""
 
-    data: _GraphQLPageData
+    data: _GraphQLThreadsPageData
+
+
+class _PullRequestReviewsData(BaseModel):
+    reviews: _ReviewsConnection
+
+
+class _RepositoryReviewsData(BaseModel):
+    pullRequest: _PullRequestReviewsData
+
+
+class _GraphQLReviewsPageData(BaseModel):
+    repository: _RepositoryReviewsData
+
+
+class _GraphQLReviewsPage(BaseModel):
+    """One page of the reviews `gh api graphql --paginate --slurp` output.
+
+    Fetched via a separate `gh` invocation from `_GraphQLThreadsPage`: `--paginate` follows one
+    `pageInfo.endCursor` per call, so reviews and reviewThreads — independent connections with
+    independent cursors — cannot be paginated together in a single query.
+    """
+
+    data: _GraphQLReviewsPageData
 
 
 class UnresolvedThread(BaseModel):
@@ -159,7 +194,6 @@ class FetchResult(BaseModel):
 
     reviews_count: int
     reviews_with_body: list[ReviewNode]
-    reviews_truncated: bool
     threads_count: int
     unresolved: list[UnresolvedThread]
     unresolved_count: int
@@ -239,7 +273,7 @@ def _run_gh(args: list[str]) -> str:
     return result.stdout
 
 
-def _fetch_pages(owner: str, repo: str, pr: int) -> list[_GraphQLPage]:
+def _fetch_pages(owner: str, repo: str, pr: int) -> list[_GraphQLThreadsPage]:
     """Fetch and validate every paginated page of a PR's review threads.
 
     Args:
@@ -266,7 +300,39 @@ def _fetch_pages(owner: str, repo: str, pr: int) -> list[_GraphQLPage]:
         "-F",
         f"pr={pr}",
     ])
-    return [_GraphQLPage.model_validate(page) for page in json.loads(raw)]
+    return [_GraphQLThreadsPage.model_validate(page) for page in json.loads(raw)]
+
+
+def _fetch_review_pages(owner: str, repo: str, pr: int) -> list[_GraphQLReviewsPage]:
+    """Fetch and validate every paginated page of a PR's top-level reviews.
+
+    A separate `gh` invocation from `_fetch_pages`: `gh api graphql --paginate` follows exactly
+    one `pageInfo.endCursor` per call, so reviews and reviewThreads — independent connections —
+    each need their own query and their own paginated `gh` call.
+
+    Args:
+        owner: Repository owner login.
+        repo: Repository name.
+        pr: Pull request number.
+
+    Returns:
+        One validated page per page `gh api graphql --paginate` returned.
+    """
+    raw = _run_gh([
+        "api",
+        "graphql",
+        "--paginate",
+        "--slurp",
+        "-f",
+        f"query={_REVIEWS_QUERY}",
+        "-f",
+        f"o={owner}",
+        "-f",
+        f"r={repo}",
+        "-F",
+        f"pr={pr}",
+    ])
+    return [_GraphQLReviewsPage.model_validate(page) for page in json.loads(raw)]
 
 
 @app.command()
@@ -290,11 +356,15 @@ def fetch(
     Also includes `reviews_with_body`: reviews whose top-level summary text is non-empty (an
     approval note, or feedback given in the review body rather than as an inline comment) —
     these have no thread at all and would otherwise be invisible even when `unresolved_count`
-    is 0. `reviews_truncated: true` means more than 100 reviews exist and some may be unseen.
+    is 0. Both `reviews` and `reviewThreads` are paginated independently and in full — neither
+    is capped at one page of 100.
     """
     pages = _fetch_pages(owner, repo, pr)
-    pull_request = pages[0].data.repository.pullRequest
+    review_pages = _fetch_review_pages(owner, repo, pr)
+    threads = pages[0].data.repository.pullRequest.reviewThreads
+    reviews = review_pages[0].data.repository.pullRequest.reviews
     all_nodes = [node for page in pages for node in page.data.repository.pullRequest.reviewThreads.nodes]
+    all_reviews = [node for page in review_pages for node in page.data.repository.pullRequest.reviews.nodes]
     selected = all_nodes if include_resolved else [node for node in all_nodes if not node.isResolved]
     unresolved = [
         UnresolvedThread(
@@ -307,10 +377,9 @@ def fetch(
         for node in selected
     ]
     result = FetchResult(
-        reviews_count=pull_request.reviews.totalCount,
-        reviews_with_body=[review for review in pull_request.reviews.nodes if review.body.strip()],
-        reviews_truncated=pull_request.reviews.pageInfo.hasNextPage,
-        threads_count=pull_request.reviewThreads.totalCount,
+        reviews_count=reviews.totalCount,
+        reviews_with_body=[review for review in all_reviews if review.body.strip()],
+        threads_count=threads.totalCount,
         unresolved=unresolved,
         unresolved_count=sum(1 for node in selected if not node.isResolved),
     )
