@@ -101,6 +101,30 @@ _Avoid_: "the SAM plugin" (there is no such thing — SAM is the methodology; `d
 is the plugin implementing it); "stateless agent" alone as a synonym for SAM itself (ambiguous
 between the methodology and one literal stateless agent instance).
 
+**Resolve**:
+Mark a work item DONE with an evidence trail (summary, method, notes, follow-ups, findings) —
+`resolve_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)). The evidence trail is meant
+as contractual, not a GitHub-only artifact — persisting it on every backend, not only rendering it
+into a GitHub comment, is tracked by [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+_Avoid_: "close" for completed work — that is Close below, a different, incompatible contract.
+
+**Close**:
+Dismiss a work item without completion — `close_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)),
+requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, permanently
+blocked — not a temporary wait on a dependency or input). No
+resolution evidence trail — that is Resolve's contract above, not Close's. `close_item()` also
+takes `reference`/`comment` parameters, forwarded on a GitHub-backed item to its closing comment
+— but as of this writing `reference` is overwritten with the item's own backend reference before
+that forwarding, so it never carries the caller's intended cross-reference, and neither parameter
+is persisted to any backend's local metadata (so a Beads, SQLite, or Memory item retains neither) —
+see [#3230](https://github.com/Jamie-BitFlight/claude_skills/issues/3230).
+_Avoid_: "resolve" for a dismissal — [ADR-9](./docs/adr-9-close-resolve-semantics.md) exists
+because these were once conflated and callers used the wrong one for already-completed work.
+
+**Evidence trail**:
+The structured resolution record Resolve above requires. Only `summary` is enforced today;
+persisting the rest beyond the GitHub-rendered comment is [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+
 **Backend**:
 The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
 data-providing system, never a call to the MCP tool or CLI — those are Frontend below. Not one
