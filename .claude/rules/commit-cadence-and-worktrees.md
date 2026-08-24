@@ -41,19 +41,17 @@ committing.
   not just for genuinely long-running or parallel-batch work. This eliminates race condition 1
   entirely: the agent's working tree is physically separate, so no shared-tree stash collision is
   possible regardless of what else is being edited concurrently.
-- **A worktree only sees committed state.** `git worktree add` checks out a ref (a commit), not
-  the current working tree's uncommitted changes — those are invisible to a new worktree. Before
-  spawning a worktree-isolated agent, commit (not necessarily push) whatever the agent needs to
-  build on.
-- **Worktree base is local HEAD, not `origin/main`.** This repo sets `worktree.baseRef: "head"` in
-  `.claude/settings.json` — new worktrees, including subagent isolation, branch from current local
-  HEAD. Without this, Claude Code's default (`worktree.baseRef: "fresh"`) branches from the
-  repository's remote default branch instead, so a worktree-isolated agent on an unmerged feature
-  branch would start without that branch's commits no matter how recently the repo was fetched.
-- Still tell a worktree-isolated agent to verify its HEAD (`git merge-base --is-ancestor <recent
-  commit> HEAD`) before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not
-  a guarantee for every session (e.g. a session launched with `--settings` overriding it, or a
-  reused worktree name reopening at an old tip per the docs' "Reuse a worktree name" section).
+- **A worktree only sees committed state.** Commit (not necessarily push) whatever a
+  worktree-isolated agent needs to build on before spawning it.
+- **This repo sets `worktree.baseRef: "head"`** in `.claude/settings.json` — a newly created
+  worktree branches from current local HEAD, not the tool's own `"fresh"` default. Reusing an
+  existing worktree name reopens it at its old tip instead of re-branching from `baseRef`.
+- Verify a worktree-isolated agent's HEAD (`git merge-base --is-ancestor <recent commit> HEAD`)
+  before starting, as defense-in-depth — `baseRef: "head"` is the repo default, not a guarantee
+  for every session (`--settings` overrides, a reused worktree name at an old tip).
+- To branch a worktree from a ref other than `baseRef` (e.g. `origin/main` for a PR unrelated to
+  current HEAD): `git worktree add -b <new-branch> <path> origin/main`, then
+  `EnterWorktree({path: "<path>"})` to switch the session into it.
 
 ## When NOT to use a worktree
 
