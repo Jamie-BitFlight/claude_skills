@@ -160,11 +160,7 @@ def test_fetch_flattens_pages_filters_resolved_and_handles_null_author(mocker: M
 
 
 def test_watch_reports_new_thread_when_activity_appears(mocker: MockerFixture) -> None:
-    """`watch` returns `timed_out: False` and the new thread id as soon as a poll finds one.
-
-    `--timeout-seconds` must clear `2 * _GH_TIMEOUT_SECONDS` (the budget `watch` reserves for its
-    own final, unavoidable fetch) or the poll loop never admits a single iteration.
-    """
+    """`watch` returns `timed_out: False` and the new thread id as soon as a poll finds one."""
     baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
     updated = FetchResult.model_validate({
         "reviews_count": 0,
@@ -176,13 +172,48 @@ def test_watch_reports_new_thread_when_activity_appears(mocker: MockerFixture) -
     mocker.patch.object(pr_review_threads, "_build_fetch_result", side_effect=[baseline, updated])
     mocker.patch.object(pr_review_threads.time, "sleep")
 
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "65"])
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "5"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
     assert data["new_thread_ids"] == ["T9"]
     assert data["new_reviews_with_body"] == []
+
+
+def test_watch_reports_edited_review_with_unchanged_id(mocker: MockerFixture) -> None:
+    """`watch` treats a baseline review whose body/state changed as new activity, same id or not.
+
+    Regression coverage for comparing reviews by id alone: a reviewer editing an existing review
+    (GitHub keeps its GraphQL id stable across edits) must still be detected — SKILL.md documents
+    this as counting as new activity.
+    """
+    review_v1 = {"id": "R1", "author": {"login": "codex"}, "state": "COMMENTED", "body": "first pass"}
+    review_v2 = {"id": "R1", "author": {"login": "codex"}, "state": "COMMENTED", "body": "edited after more thought"}
+    baseline = FetchResult.model_validate({
+        "reviews_count": 1,
+        "reviews_with_body": [review_v1],
+        "threads_count": 0,
+        "unresolved": [],
+        "unresolved_count": 0,
+    })
+    edited = FetchResult.model_validate({
+        "reviews_count": 1,
+        "reviews_with_body": [review_v2],
+        "threads_count": 0,
+        "unresolved": [],
+        "unresolved_count": 0,
+    })
+    mocker.patch.object(pr_review_threads, "_build_fetch_result", side_effect=[baseline, edited])
+    mocker.patch.object(pr_review_threads.time, "sleep")
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "5"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["timed_out"] is False
+    assert len(data["new_reviews_with_body"]) == 1
+    assert data["new_reviews_with_body"][0]["body"] == "edited after more thought"
 
 
 def test_watch_times_out_when_no_new_activity(mocker: MockerFixture) -> None:
