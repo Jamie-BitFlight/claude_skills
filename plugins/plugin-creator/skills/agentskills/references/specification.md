@@ -161,6 +161,7 @@ The optional `compatibility` field:
 ```yaml
 compatibility: Designed for Claude Code (or similar products)
 compatibility: Requires git, docker, jq, and access to the internet
+compatibility: Requires Python 3.14+ and uv
 ```
 
 Most skills do not need this field.
@@ -245,7 +246,7 @@ Contains static resources:
 Skills should be structured for efficient use of context:
 
 1. **Metadata** (~100 tokens): The `name` and `description` fields are loaded at startup for all skills
-2. **Instructions** (<5000 tokens recommended): The full SKILL.md body is loaded when the skill is activated
+2. **Instructions** (<5000 tokens recommended, and ideally under 500 lines): The full SKILL.md body is loaded when the skill is activated
 3. **Resources** (as needed): Files in `scripts/`, `references/`, `assets/` are loaded only when required
 
 **Keep your main SKILL.md lean.** Move detailed reference material to separate files. Run `uvx skilllint@latest check <skill-path>` after writing and follow its guidance on token-based sizing.
@@ -276,6 +277,8 @@ skills-ref validate ./my-skill
 ```
 
 **Why validate:** Validation catches frontmatter and naming errors before distribution and prevents agents from loading malformed skills. Run it before publishing or sharing skills.
+
+> **Note:** `skills-ref` is intended for demonstration purposes only and is not meant to be used in production — treat it as a reference implementation, not a hardened validation gate.
 
 **CLI commands:**
 

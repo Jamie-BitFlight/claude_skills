@@ -6,11 +6,11 @@ user-invocable: true
 
 # Agent Skills Open Standard
 
-The Agent Skills format is an open standard for extending AI agent capabilities with specialized knowledge and workflows. Originally developed by Anthropic, adopted by 25+ agent products.
+The Agent Skills format is an open standard for extending AI agent capabilities with specialized knowledge and workflows. Originally developed by Anthropic, released as an open standard, and adopted by a growing number of agent products.
 
 **Source:** <https://agentskills.io>
 
-**When to use this skill:** Before creating any skill that should be portable across multiple agent products. For Claude Code-specific features (hooks, context fork, model selection, invocation control), see `../claude-skills-overview-2026/SKILL.md` instead.
+**When to use this skill:** Before creating any skill that should be portable across multiple agent products. For Claude Code-specific features (hooks, context fork, model selection, invocation control), use the `plugin-creator:claude-skills-overview-2026` skill instead.
 
 ---
 
@@ -93,7 +93,7 @@ description: Helps with PDFs.
 Skills use three-level loading to manage context efficiently:
 
 1. **Metadata** (~100 tokens): `name` + `description` loaded at startup for all skills
-2. **Instructions** (<5000 tokens recommended): Full SKILL.md body loaded on activation
+2. **Instructions** (<5000 tokens recommended, and ideally under 500 lines): Full SKILL.md body loaded on activation
 3. **Resources** (as needed): Files in `scripts/`, `references/`, `assets/` loaded on demand
 
 **Keep SKILL.md body lean.** Move detailed reference material to separate files. Run `uvx skilllint@latest check <skill-path>` after writing and follow its guidance on token-based sizing.
@@ -159,7 +159,7 @@ Static resources used in output (templates, images, data files). Not loaded into
 
 ## Authoring Best Practices
 
-For the complete Anthropic authoring guide, see `references/best-practices.md`.
+For the complete Anthropic authoring guide, see [references/best-practices.md](./references/best-practices.md).
 
 Key principles:
 
@@ -184,7 +184,9 @@ Place user-facing docs (README, CHANGELOG, INSTALLATION_GUIDE), setup procedures
 
 ## Validation
 
-Use the `skills-ref` reference library to validate:
+For quick complexity and frontmatter checks, `uvx skilllint@latest check <skill-path>` is available via `uvx` (resolves the package from PyPI on first run — needs network access, is not bundled with this skill) and is faster than installing `skills-ref`.
+
+For deeper agentskills.io open-standard compliance checks not covered by `skilllint` (e.g. cross-client portability rules), use the `skills-ref` reference library:
 
 ```bash
 # Validate a skill directory
@@ -210,6 +212,8 @@ prompt = to_prompt([Path("skill-a"), Path("skill-b")])
 
 Install: `pip install -e .` from the [skills-ref](https://github.com/agentskills/agentskills/tree/main/skills-ref) directory.
 
+> **Note:** `skills-ref` is intended for demonstration purposes only and is not meant to be used in production — treat it as a reference implementation, not a hardened validation gate.
+
 ---
 
 ## Portable vs Claude Code-Specific
@@ -234,20 +238,22 @@ The open standard defines a **portable subset**. Claude Code extends it with add
 
 **For portable skills:** Use only the open standard fields. Other agents will ignore unknown fields, but keeping frontmatter clean improves compatibility.
 
-**For Claude Code skills:** See `../claude-skills-overview-2026/SKILL.md` for the full extended schema.
+**Claude Code-specific validation:** Claude Code additionally rejects `name` or `description` values containing XML tags, and rejects `name` values containing the reserved words `anthropic` or `claude` — a stricter check than the open standard's own name/description rules above. This constraint is Claude Code-specific and not part of the agentskills.io specification.
+
+**For Claude Code skills:** Use the `plugin-creator:claude-skills-overview-2026` skill for the full extended schema.
 
 ---
 
 ## Detailed References
 
-- **Full specification details**: See `references/specification.md`
-- **Authoring best practices**: See `references/best-practices.md`
-- **Agent integration guide**: See `references/integration.md`
+- **Full specification details**: See [references/specification.md](./references/specification.md)
+- **Authoring best practices**: See [references/best-practices.md](./references/best-practices.md)
+- **Agent integration guide**: See [references/integration.md](./references/integration.md)
 
 ## External Links
 
-- Specification: <https://agentskills.io/specification>
-- Best practices: <https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices>
-- Example skills: <https://github.com/anthropics/skills>
-- Reference library: <https://github.com/agentskills/agentskills/tree/main/skills-ref>
-- GitHub org: <https://github.com/agentskills/agentskills>
+- Specification: <https://agentskills.io/specification> (accessed 2026-08-24)
+- Best practices: <https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices> (accessed 2026-08-24)
+- Example skills: <https://github.com/anthropics/skills> (accessed 2026-08-24)
+- Reference library: <https://github.com/agentskills/agentskills/tree/main/skills-ref> (accessed 2026-08-24)
+- GitHub org: <https://github.com/agentskills/agentskills> (accessed 2026-08-24) — Apache-2.0 (code) + CC-BY-4.0 (spec text)
