@@ -110,8 +110,9 @@ _Avoid_: "close" for completed work — that is Close below, a different, incomp
 
 **Close**:
 Dismiss a work item without completion — `close_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)),
-requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, blocked). Close
-records only that reason — no evidence trail.
+requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, blocked), with
+optional `reference` and `comment` for dismissal context. No resolution evidence trail — that is
+Resolve's contract above, not Close's.
 _Avoid_: "resolve" for a dismissal — [ADR-9](./docs/adr-9-close-resolve-semantics.md) exists
 because these were once conflated and callers used the wrong one for already-completed work.
 
