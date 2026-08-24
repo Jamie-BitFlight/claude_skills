@@ -51,7 +51,7 @@ Document-level artifacts (discovery, plan, context integration) are managed by t
 - **Read:** `artifact_read(item_id=item_id, artifact_type=artifact_type, artifact_id=None)` — returns `{artifact_type, path, content, status}` from the configured provider. The `path` response field carries the registered logical `artifact_id`. Supplying `artifact_id` returns that one entry. Omitting it selects by owner and type alone: when several entries share one type, the most recently registered entry is returned and the others are reported as skipped in the response warnings.
 - **List:** `artifact_list(item_id=item_id, artifact_type=None)` — enumerates registered artifacts for an issue, each with its `artifact_id`, `agent`, `status`, and `created_at`.
 
-Each artifact type, the agent that produces it, and when to use it are listed in the type table in [create-artifact](../../create-artifact/SKILL.md). `ArtifactType` in `backlog_core/models.py` defines the accepted strings.
+Load the `dh:create-artifact` skill before registering or reading an artifact — it defines the accepted `artifact_type` strings, the producing agent for each, and when to use them.
 
 A type is either multi-entry — several current documents per owner, such as one codebase analysis per focus area — or single-entry, one document per owner. Any document a gate reads by type alone requires its own single-entry type. Sharing a type with a multi-entry class hands the gate whichever document was registered last. To read one specific entry of a multi-entry type, discover it with `artifact_list` and pass its `artifact_id` to `artifact_read` or to the provider-neutral CLI's `artifact read --artifact-id`.
 
