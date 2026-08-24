@@ -66,16 +66,22 @@ Then stamp the run so this invocation gets its own address. Capture this command
 `run_stamp`:
 
 ```bash
-date -u +%Y%m%dT%H%M%SZ
+echo "$(date -u +%Y%m%dT%H%M%SZ)-${RANDOM}"
 ```
 
-`review_slug` is `{review_base}-{run_stamp}`, for example `review-2181-20260824T014233Z`.
+The UTC timestamp alone only has whole-second resolution: two invocations for the same
+`review_base` starting within the same second would derive the same `run_stamp`, and therefore the
+same `review_slug` and `multi-{review_slug}` team name, colliding at `TeamCreate` or sharing one
+team's namespace. `${RANDOM}` is bash's builtin pseudo-random 0-32767 integer — no new dependency —
+appended for the entropy the timestamp alone lacks.
+
+`review_slug` is `{review_base}-{run_stamp}`, for example `review-2181-20260824T014233Z-14822`.
 
 The stamp is what makes the plan ephemeral in fact and not just in name. `review_base` identifies
 the review subject and repeats across runs; `review_slug` identifies one run of it and never
-repeats. A verdict, and the changed-file set it was produced against, belong to a single run —
-addressing them by a slug that a later run resolves to as well is what lets one run read another
-run's results.
+repeats, including two runs launched concurrently for the same subject. A verdict, and the
+changed-file set it was produced against, belong to a single run — addressing them by a slug that
+a later run resolves to as well is what lets one run read another run's results.
 
 Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the team name.
 
@@ -200,14 +206,19 @@ dispatches it the same way.
 
 Every prompt names the same output destination: the `Review Results` section of the worker's own
 task. That section is the only channel the synthesizer reads in Step 6 — a reviewer that does not
-write it is a missing verdict, and the punch list records it as one.
+write it is a missing verdict, and the punch list records it as one. The loaded profile — not the
+dispatch prompt — performs that write: each reviewer agent's own SOP ends with a mandatory write
+to `Review Results` as part of what `dh:start-task` executes. Do not instruct the worker to write
+the section itself before running `dh:start-task`; a prompt that does both produces two
+`append_section` calls against the same heading, and the second leaves the section holding two
+concatenated JSON documents that no longer parse.
 
 ```text
 Agent(
   team_name="multi-{review_slug}",
   name="{worker}",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on {lens} review. Your task: {PA}/{task}.\n\nWrite your structured verdict block as the content of the Review Results section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"{task}\", config={\"action\": \"update\", \"append_section\": \"Review Results\", \"section_content\": <raw JSON verdict block>}). That section is where the punch list reads your verdict.\n\nThen run the dh:start-task skill against {PA} --task {task}."
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on {lens} review. Your task: {PA}/{task}.\n\nRun the dh:start-task skill against {PA} --task {task}. The loaded profile writes your structured verdict block into the task's Review Results section — that is where the punch list reads your verdict. Do not write that section yourself first; the profile's own SOP performs the single write."
 )
 ```
 
@@ -240,14 +251,17 @@ A task is terminal at `complete`, `blocked`, `failed`, `skipped`, or `deferred`.
 
 Dispatch one more worker against `T5`. It reads the four `Review Results` sections, merges
 findings that name the same defect across perspectives into single entries, and writes the
-punch-list block into `T5`'s own `Punch List` section.
+punch-list block into `T5`'s own `Punch List` section. As with the four reviewer workers, the
+`dh:review-synthesizer` profile — loaded by `dh:start-task` — performs that write as its own Step
+5; the dispatch prompt only tells the worker where to look and where its output is read, not to
+write the section itself.
 
 ```text
 Agent(
   team_name="multi-{review_slug}",
   name="synthesis-worker",
   subagent_type="dh:task-worker",
-  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are synthesizing the four perspective verdicts on plan {PA} into one punch list. Your task: {PA}/T5.\n\nWrite your punch-list block as the content of the Punch List section on that task, via mcp__plugin_dh_sam__sam_task(plan=\"{PA}\", task=\"T5\", config={\"action\": \"update\", \"append_section\": \"Punch List\", \"section_content\": <raw JSON punch-list block>}). That section is where the gate reads your output.\n\nThen run the dh:start-task skill against {PA} --task T5."
+  prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are synthesizing the four perspective verdicts on plan {PA} into one punch list. Your task: {PA}/T5.\n\nRun the dh:start-task skill against {PA} --task T5. The loaded profile writes your punch-list block into the task's Punch List section — that is where the gate reads your output. Do not write that section yourself first; the profile's own SOP performs the single write."
 )
 ```
 
