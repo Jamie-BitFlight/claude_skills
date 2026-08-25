@@ -380,7 +380,7 @@ Load [references/example.md](./references/example.md) for a worked classificatio
 
 After applying the accepted deletions, reread the complete tightened skill against the behavioral contract.
 
-Read the repository's `skill-substitution.md` rule, invoke the tightened skill through its supported harness, and compare the rendered prompt and behavior with the contract. Do not declare preservation from source rereading alone.
+Load [skill-substitution.md](./references/skill-substitution.md), invoke the tightened skill through its supported harness, and compare the rendered prompt and behavior with the contract. Do not declare preservation from source rereading alone.
 
 Local equivalence is insufficient if several individually safe deletions combine to remove a required behavior.
 
