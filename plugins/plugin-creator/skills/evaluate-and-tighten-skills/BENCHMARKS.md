@@ -195,15 +195,15 @@ All 6 runs independently verified the target's `SKILL-GOALS.md` and read `script
 `references/*.md` in full before disposing of any material; word counts above are each run's own
 self-reported `wc -w` figure, not independently re-measured except where noted.
 
-## Results — `research-curator` (6/6 runs; baseline-2 read in full, candidate-1's word delta
-independently re-measured via `wc -w`, the rest relayed via the dispatched agent's own summary)
+## Results — `research-curator` (6/6 runs; baseline-2 and candidate-1 read in full, the rest
+relayed via the dispatched agent's own summary)
 
 | Run | Words before→after (SKILL.md only unless noted) | Reduction | MAINTENANCE.md | Notes |
 |---|---|---|---|---|
-| baseline-1 | 3473→2964 (SKILL.md **+** `references/batch-mode.md` combined) | 14.7% (combined denominator, not comparable to the other rows) | not reported | Deleted a `--layer 0\|1\|2` mechanism as foreign to all 6 goals — no other run touched it |
+| baseline-1 | 3473→2964 (SKILL.md **+** `references/batch-mode.md` combined) | 14.7% (combined denominator, not comparable to the other rows) | not reported | Deleted a `--layer 0\|1\|2` mechanism as foreign to all 6 goals, without diagnosing *why* it was wrong — no other run touched it |
 | baseline-2 | ~2719→2535 | 6.8% | not needed | Flagged (not fixed) two orphaned reference files and a mermaid/prose validation-gate gap |
-| baseline-3 | 2718→2503 | 7.9% | created | Also tightened `references/validation-rules.md` (406→296); surfaced a real `header_fields` severity contradiction between that file and the actual script; found 2 orphaned scripts + 2 orphaned reference files |
-| candidate-1 | 2718→2522 (independently verified via `wc -w`) | 7.2% | unknown — this run's own `run-report.md` left its `## Completion report` and `## Files touched` sections as unfilled `<!-- PENDING -->` placeholders | Report artifact incomplete; only the tightened `SKILL.md`'s word delta could be independently confirmed |
+| baseline-3 | 2718→2503 | 7.9% | created | Also tightened `references/validation-rules.md` (406→296); surfaced a real `header_fields` severity contradiction between that file and the actual script — reported, not fixed; found 2 orphaned scripts + 2 orphaned reference files |
+| candidate-1 | 2718→2522 (independently verified via `wc -w`) | 7.2% | created (1 entry) | Found **and fixed** 4 genuine pre-existing runtime defects (see Key finding 6) — one of which would have broken the script invocation as originally written. Its `run-report.md` was still mid-write (Completion/Files-touched sections showed `<!-- PENDING -->`) when first checked; it completed shortly after |
 | candidate-2 | 2718→2481 | 8.7% | created (1 entry) | Flagged (not fixed) the same Rerun Mode mermaid/prose gate gap baseline-2 found, plus a Goal-5 scope gap (cross-reference graph only realized in Batch Mode) |
 | candidate-3 | 2718→2283 | 16.0% | not created | Found the same `--layer` mechanism baseline-1 deleted, but **checked for external dependents first** (found real callers in `knowledge-explorer`/`refresh-research`) and correctly kept it as `Uncertain` instead of deleting it |
 
@@ -228,39 +228,68 @@ independently re-measured via `wc -w`, the rest relayed via the dispatched agent
    baseline-1 deleted it as foreign without checking for external callers; candidate-3 checked,
    found real dependents, and correctly kept it as `Uncertain`. This cuts against a simple
    "section loop always causes premature closure" reading.
-5. **`research-curator candidate-1`'s own run-report left its Completion/Files-touched sections
-   unfilled** (`<!-- PENDING -->`), despite the tightened `SKILL.md` itself being complete and
-   independently measurable. Worth treating as a possible failure mode of the section-loop's own
-   output-contract discipline under this run's prompt, not evidence about pruning quality itself.
+5. **`research-curator candidate-1` found and fixed 4 genuine pre-existing runtime defects that
+   no baseline run caught or corrected**, including one script invocation missing a required Typer
+   subcommand ("this was Validate Mode's primary script call and would have failed at runtime as
+   originally written"), a diagram missing a validation-gate branch that its own adjacent prose
+   required, a prose/diagram timing contradiction, and — most notably — root-caused the same
+   `--layer` claim `baseline-1` had blindly deleted: candidate-1 identified it as copy-paste
+   leakage from an unrelated skill (verified by grepping for the leaked skill names) and corrected
+   it to the true dependency, rather than removing it outright. `baseline-3` found a comparable
+   real defect (`header_fields` severity contradiction) but only reported it, per every baseline
+   run's consistent stance that fixing factual/logic defects is outside a pruning pass's scope.
+6. **Fixing defects (as opposed to reporting them) is out of scope for *both* variants' written
+   procedure** — nothing in either Step 2's wording licenses adding new correct content (a missing
+   subcommand, a missing diagram branch). `candidate-1` invented an unauthorized "Corrected"
+   section in its Completion report to hold these fixes, a template deviation from the sanctioned
+   Removed/Uncertain/Goal-deviations/Relocated/Maintenance-file shape every other run of 12 used.
+   Valuable work, but not evidence specifically attributable to the section-loop hypothesis being
+   tested — nothing in the candidate's Step 2 text instructs fixing anything, so this looks like
+   this one run's own initiative rather than a systematic effect of the process change.
 
 ## Hypothesis analysis
 
 Two hypotheses, not one:
 
-- **H1 — sequential section processing improves consideration.** Evidence: weak/mixed. Candidate
-  runs found one factual defect no baseline run caught (`gh candidate-3`'s `gh project` finding)
-  and did deeper dependent-checking in one case (`rc candidate-3`'s `--layer` check), but also
-  produced the single worst fidelity miss across all 12 runs (`gh candidate-2`).
+- **H1 — sequential section processing improves consideration.** Evidence: genuinely mixed, and
+  target-dependent. On `gh`, candidate found one extra defect (`candidate-3`) but also produced
+  the worst miss of all 12 runs (`candidate-2`). On `research-curator`, candidate's edge is
+  clearer: `candidate-1` diagnosed and corrected a defect `baseline-1` had blindly deleted, and
+  `candidate-3` did dependent-checking `baseline-1` skipped on the identical material. Averaged
+  across both targets this looks like "candidate finds more, baseline is more consistently
+  reliable" rather than a clean win or loss for either.
 - **H2 — closing each section before moving on causes local optimization or premature
-  completion.** Evidence: plausible. `gh candidate-2`'s reversal from a correct `EXPLAINS` read to
-  `KEEP-RUNTIME` happened without inspecting the script source it was reasoning about — consistent
-  with a completion-boundary effect (reach a locally coherent classification, stop investigating)
-  rather than a random miss. Not conclusively separable from ordinary run-to-run variance on a
-  6-run sample per variant.
+  completion.** Evidence: plausible but not confirmed. `gh candidate-2`'s reversal from a correct
+  `EXPLAINS` read to `KEEP-RUNTIME` without inspecting the script source is consistent with a
+  completion-boundary effect. But the same variant's `candidate-1`/`candidate-3` runs on
+  `research-curator` show the opposite pattern (more dependency-following, not less) on similarly
+  structured material. If premature closure were a systematic property of the section loop, it
+  should show up more than once in 6 candidate runs; on the current evidence it looks like a
+  per-run failure mode, not a designed-in one.
 
 ## Verdict
 
-**DO NOT PROMOTE** the section-loop variant on this evidence.
+**NO MATERIAL DIFFERENCE, leaning DO NOT PROMOTE** on the current evidence.
 
-- Fidelity: baseline > candidate (candidate produced the one clear miss across all 12 runs).
-- Discovery breadth: candidate possibly > baseline (2 novel findings vs. 0).
-- Disposition consistency: baseline > candidate (candidate's two runs that found similar factual
-  defects disagreed on whether correction is in scope; baseline's inconsistency was reporting-only,
-  not a disposition disagreement).
-- Overall: the added process structure does not reliably produce deeper consideration — it can
-  sharpen local attention within a section while simultaneously licensing the agent to stop
-  investigating once that section looks locally coherent. Sample size is 3 runs per variant per
-  target (12 runs total); this is directional evidence, not a large-sample result.
+- Fidelity: baseline > candidate on `gh` (candidate produced the one clear miss across all 12
+  runs); candidate ≥ baseline on `research-curator` (candidate-1's defect diagnosis-and-fix beat
+  baseline-1's blind deletion of the same material; candidate-3's dependent-check beat
+  baseline-1's on the same finding). These point in opposite directions across the two targets.
+- Discovery breadth: candidate > baseline overall (3 novel findings — `gh candidate-3`'s second
+  inaccuracy, `rc candidate-1`'s 4 fixed defects, `rc candidate-3`'s dependent-check — vs. 1 for
+  baseline, `rc baseline-3`'s severity contradiction).
+- Disposition consistency: baseline > candidate (candidate's `gh` runs disagreed with each other
+  on whether correcting a factual claim is in scope; baseline's `gh` inconsistency was
+  reporting-only, not a disposition disagreement — though `rc candidate-1`'s unauthorized
+  "Corrected" section shows the scope-creep risk isn't unique to disposition labeling).
+- Overall: this evidence does not support a confident promote or reject. The single worst outcome
+  in the whole experiment (`gh candidate-2`) happened under the candidate variant, but so did the
+  single best outcome (`rc candidate-1`'s defect fixes). The variance within the candidate variant
+  is at least as large as the variance between variants — which is itself evidence that a 3-run
+  sample per variant per target is too small to attribute outcomes to the process change rather
+  than to individual-run luck. A proper follow-up (larger sample, blind scoring, isolated
+  environment — see Limitations) is needed before either promoting or permanently rejecting this
+  change.
 
 ## Evidence
 
