@@ -21,6 +21,11 @@ Use the first available source:
 
 Treat these goals as the purpose of the skill, not its current implementation. Instructions are allowed to disappear even when deliberately written if they do not contribute to those goals.
 
+Goals must be resolved before pruning because they serve two purposes:
+
+* define the behavior that must survive tightening;
+* expose instructions or entire branches that are coherent in isolation but have drifted away from what the skill exists to achieve.
+
 ## Step 1: Generate the behavioral contract
 
 Create a small set of evals describing the behavior that must survive pruning.
@@ -64,17 +69,52 @@ The contract is complete when:
 * every check protects behavior contributing to an explicit goal;
 * no check exists solely to preserve current implementation detail.
 
-## Step 2: Counterfactual deletion pass
+## Step 2: Section-level goal alignment
+
+Before sentence-level pruning, classify each section against the goals resolved above.
+
+For each section, ask:
+
+> Which explicit skill goal does this section or instruction help the executing agent achieve, and how?
+
+Classify:
+
+* **DIRECT** - directly causes behavior required by a goal.
+* **SUPPORTING** - provides a decision principle, constraint, domain fact, or capability needed to achieve a goal across variable situations.
+* **UNALIGNED** - does not materially contribute to any explicit goal.
+
+Flag `UNALIGNED` sections for removal or relocation before tightening individual sentences. The skill should not preserve behavior merely because it already exists in the current implementation.
+
+## Step 3: Counterfactual deletion pass
 
 Read the complete skill section by section, including frontmatter and referenced instructional material.
 
 For each sentence or independently removable instruction, first classify its function:
 
-* **DOES** - changes an action, decision, branch, validation, completion condition, output, or required lookup.
-* **RESOLVES** - makes an instruction executable or unambiguous: paths, substitutions, quoting, references, scope.
-* **EXPLAINS** - describes why something works, how it was designed, what was previously tried, or why an already-fixed choice was made.
+* **DOES** - specifies an action, decision, branch, validation, completion condition, output, or required lookup.
+* **RESOLVES** - makes execution unambiguous: paths, substitutions, quoting, references, scope, or dependencies.
+* **REASONS** - supplies a principle the agent needs to make a good decision where the correct action cannot be fully specified in advance.
+* **EXPLAINS** - describes why an already-bounded instruction works, how it was implemented, its history, or why a choice already made for the agent was made.
 
-`DOES` and `RESOLVES` material may be necessary. `EXPLAINS` material is presumed removable unless its absence changes behavior under the behavioral contract.
+`DOES`, `RESOLVES`, and `REASONS` may earn their load. `EXPLAINS` should be presumed removable unless its deletion changes expected behavior under the behavioral contract.
+
+When prose gives a reason for an instruction, ask:
+
+> Is the agent expected to reason from this information to choose an action in situations the skill cannot enumerate, or has the action already been fully chosen for it?
+
+If the agent must choose among context-dependent paths, preserve the minimum reasoning principle needed to make that choice well. If the instruction is bounded and already determines the action, its rationale normally does not affect execution and should be removed.
+
+```text
+Commit changes between edits.
+```
+
+This is bounded. Explanation of why incremental commits are useful normally adds no behavior.
+
+```text
+Choose the smallest validation capable of disproving the change before running broader tests.
+```
+
+This is unbounded. The principle is operational because the agent must reason about the current change, available checks, cost, and failure risk.
 
 Then ask:
 
@@ -206,7 +246,7 @@ Prefer:
 
 For every sentence ask:
 
-> Does this tell the executing agent what to do, decide, verify, or resolve - or does it only explain?
+> Does this tell the agent what to do, what outcome to reach, what it must resolve, or how to reason when the correct action depends on context - or does it only explain an action that has already been chosen?
 
 Explanation is a deletion candidate by default.
 
@@ -220,7 +260,7 @@ If **no**, remove it.
 
 Load [references/example.md](./references/example.md) for a worked classification and reduction example.
 
-## Step 3: Whole-skill preservation pass
+## Step 4: Whole-skill preservation pass
 
 After applying the accepted deletions, reread the **complete tightened skill** against the behavioral contract.
 
@@ -258,7 +298,12 @@ Removed:
 
 Uncertain:
 - <only items whose behavioral effect requires empirical evaluation>
+
+Goal deviations found:
+- <behavior, section, or instruction that does not advance any explicit skill goal>
 ```
+
+Report `Goal deviations found: none` when none are found.
 
 `Uncertain` items become candidates for the subsequent full skill eval.
 
