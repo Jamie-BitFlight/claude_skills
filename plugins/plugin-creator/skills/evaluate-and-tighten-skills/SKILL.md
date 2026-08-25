@@ -380,8 +380,6 @@ Load [references/example.md](./references/example.md) for a worked classificatio
 
 After applying the accepted deletions, reread the complete tightened skill against the behavioral contract.
 
-Load [skill-substitution.md](./references/skill-substitution.md), invoke the tightened skill through its supported harness, and compare the rendered prompt and behavior with the contract. Do not declare preservation from source rereading alone.
-
 Local equivalence is insufficient if several individually safe deletions combine to remove a required behavior.
 
 For every contract eval, identify where the tightened skill still supplies any behavior that the base agent cannot be expected to provide reliably.
