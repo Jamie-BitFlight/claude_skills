@@ -1,24 +1,17 @@
 # Verdict Schema — Multi-Perspective Review
 
-Reference file for the structured verdict block schema, summary line format, SKIP detection
-rule, and gate logic used by the `dh:multi-perspective-review` skill and all four reviewer
-agents.
+Use this file as the runtime source for the verdict schema, summary tokens, SKIP rules, and gate
+logic. Write each verdict as raw JSON in its task's `Review Results` section. The orchestrator reads
+that section to gate the review. Do not register a verdict as a document artifact.
 
-**Authoritative source**: All four reviewer agents (`reviewer-security.md`,
-`reviewer-performance.md`, `reviewer-quality.md`, `reviewer-accessibility.md`) reference this
-file for schema version, summary tokens, and SKIP patterns. Do NOT duplicate or embed these
-definitions in agent instruction bodies.
+## Contents
 
-**Gate interface**: The `gate(verdicts) -> GateResult` interface defined in §2.4 is stable.
-
-**Verdict transport is the task's `Review Results` section.** Each reviewer writes its verdict block
-there with `sam_task(config={"action": "update", "append_section": "Review Results", ...})`; the
-orchestrator reads it back from the task to apply the gate. No reviewer in this skill registers a
-document artifact. A verdict block registered under `codebase-analysis` collides with the analysis
-documents `dh:codebase-analyzer` and `dh:code-review-architecture` write under that type, and a read
-of a type returns only its most recently registered entry — so a perspective verdict displaces
-whichever document a consumer of that type expected, and any gate reading it evaluates a schema it
-does not expect (`APPROVE`/`REJECT`/`SKIP` against branches written for `PASS`/`NEEDS-WORK`/`FAIL`).
+- §2.1 Structured Verdict Block
+- §2.2 Summary Line Format
+- §2.3 SKIP Detection Rule
+- §2.4 Gate Logic
+- §2.5 Prose File Classification
+- §2.6 Punch-List Block
 
 ---
 
@@ -60,8 +53,7 @@ JSON-serializable and version-stamped for #1430 compatibility.
 
 ## §2.2 Summary Line Format
 
-The orchestrating skill (`multi-perspective-review/SKILL.md`) prints one summary line per
-perspective in canonical format. AC6 defines the expected shape:
+The orchestrating skill (`multi-perspective-review/SKILL.md`) prints one canonical summary line:
 
 ```text
 Security: APPROVE (0 findings) | Performance: REJECT (1 finding) | Quality: APPROVE (2 minor) | Accessibility: SKIP (no UI changes)
@@ -285,8 +277,7 @@ too — checks 6 and 7 below require comparing them.
       "schema_version": "1.0",
       "perspective": "security",
       "verdict": "REJECT",
-      "findings": [],
-      "skip_reason": "present only when verdict == SKIP"
+      "findings": []
     }
   ],
   "missing": ["performance"],

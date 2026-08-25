@@ -46,7 +46,7 @@ mcp__plugin_dh_sam__sam_task(plan="{plan_address}", task="T{N}", config={"action
 
 The plan was created for this run, so the task carries exactly one `Review Results` section.
 Parse its content as JSON per verdict schema §2.1. Activate the
-`/dh:multi-perspective-review` skill to load that schema — it owns `verdict-schema.md`.
+`/dh:review-verdict-contract` skill to load that schema.
 
 A task carrying no `Review Results` section, or a section that does not parse as a §2.1 block,
 contributes no verdict. Record that perspective in the `missing` list and carry it forward. A
