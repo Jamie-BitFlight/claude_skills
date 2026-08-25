@@ -62,29 +62,14 @@ Derive `review_base` exactly once using the first matching rule:
 3. Neither provided → read current git branch name via `git rev-parse --abbrev-ref HEAD` and
    use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
 
-Then stamp the run so this invocation gets its own address. Run this command and capture its
-stdout as `run_stamp`:
+Run this command and capture its stdout as `run_stamp`:
 
 ```text
 uv run --quiet --script "${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py"
 ```
 
-Keep the path quoted exactly as shown — an unquoted path with a space (e.g. a Windows profile such
-as `C:\Users\Jane Doe\...`) truncates the argument and `uv` executes only the prefix.
-
-A UTC timestamp alone has only whole-second resolution, so two invocations for the same
-`review_base` starting within the same second would derive the same `run_stamp` and collide on
-`review_slug` and `multi-{review_slug}` team name. `${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py`
-appends a `secrets.token_hex` suffix to rule this out.
-
 `review_slug` is `{review_base}-{run_stamp}`, for example
 `review-2181-20260824T014233Z-3f9a2c7e1b804d56`.
-
-The stamp is what makes the plan ephemeral in fact and not just in name. `review_base` identifies
-the review subject and repeats across runs; `review_slug` identifies one run of it and never
-repeats, including two runs launched concurrently for the same subject. A verdict, and the
-changed-file set it was produced against, belong to a single run — addressing them by a slug that
-a later run resolves to as well is what lets one run read another run's results.
 
 Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the team name.
 
