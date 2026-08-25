@@ -464,7 +464,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}" \
   --content "{report_markdown}" \
-  --status "complete" \
+  --status "current" \
   --agent "code-review-architecture"
 ```
 
@@ -479,7 +479,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}" \
   --content "{parent_report_markdown}" \
-  --status "complete" \
+  --status "current" \
   --agent "code-review-architecture"
 
 # Each child cluster
@@ -488,7 +488,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}-{cluster-name}" \
   --content "{child_report_markdown}" \
-  --status "complete" \
+  --status "current" \
   --agent "code-review-architecture"
 ```
 

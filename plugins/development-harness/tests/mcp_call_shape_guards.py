@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import shlex
 from typing import TYPE_CHECKING, Final, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,7 +67,6 @@ _ARTIFACT_CALL_RE: Final = re.compile(
 
 _ARTIFACT_TYPE_KWARG_RE: Final = re.compile(r"""artifact_type\s*=\s*["']([^"']*)["']""")
 _STATUS_KWARG_RE: Final = re.compile(r"""status\s*=\s*["']([^"']*)["']""")
-
 # Characters that mark a literal as an authoring placeholder rather than a real value.
 _PLACEHOLDER_CHARS: Final = frozenset("{}<>$|")
 
@@ -225,15 +225,202 @@ def _artifact_call_spans(text: str) -> Iterator[str]:
         yield _call_span(text, match.end() - 1)
 
 
+def _is_shell_comment_start(text: str, index: int) -> bool:
+    return index == 0 or text[index - 1].isspace()
+
+
+def _skip_whitespace(text: str, start: int) -> int:
+    while start < len(text) and text[start].isspace():
+        start += 1
+    return start
+
+
+def _matches_artifact_register(text: str, start: int) -> bool:
+    if not text.startswith("artifact", start):
+        return False
+    cursor = start + len("artifact")
+    if cursor == len(text) or not text[cursor].isspace():
+        return False
+    cursor = _skip_whitespace(text, cursor)
+    if not text.startswith("register", cursor):
+        return False
+    cursor += len("register")
+    if cursor == len(text) or not text[cursor].isspace():
+        return False
+    cursor = _skip_whitespace(text, cursor)
+    return text.startswith("--", cursor) or (cursor < len(text) and text[cursor] == "\\")
+
+
+def _uv_run_arguments_start(text: str, start: int) -> int | None:
+    if not text.startswith("uv", start):
+        return None
+    cursor = start + len("uv")
+    if cursor == len(text) or not text[cursor].isspace():
+        return None
+    cursor = _skip_whitespace(text, cursor)
+    if not text.startswith("run", cursor):
+        return None
+    cursor += len("run")
+    if cursor == len(text) or not text[cursor].isspace():
+        return None
+    return cursor
+
+
+def _matches_uv_artifact_register(text: str, start: int) -> bool:
+    cursor = _uv_run_arguments_start(text, start)
+    if cursor is None:
+        return False
+
+    quote = ""
+    escaped = False
+    while cursor < len(text):
+        char = text[cursor]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif quote:
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char in ";&|#\n`":
+            return False
+        elif (cursor == start or text[cursor - 1].isspace()) and _matches_artifact_register(text, cursor):
+            return True
+        cursor += 1
+    return False
+
+
+def _cli_scan_character(char: str, quote: str, escaped: bool, artifact_command: bool) -> tuple[str, str, bool]:
+    if not artifact_command:
+        return char, quote, escaped
+    if escaped:
+        return " ", quote, False
+    if char == "\\":
+        return " ", quote, True
+    if quote:
+        return " ", "" if char == quote else quote, False
+    if char in "\"'":
+        return " ", char, False
+    return char, quote, escaped
+
+
+def _artifact_register_cli_starts(text: str) -> Iterator[tuple[int, bool]]:
+    index = 0
+    command_start = True
+    quote = ""
+    escaped = False
+    artifact_command = False
+    while index < len(text):
+        char, quote, escaped = _cli_scan_character(text[index], quote, escaped, artifact_command)
+        if command_start:
+            index = _skip_whitespace(text, index)
+            if index == len(text):
+                return
+            char = text[index]
+            if text[index] == "`":
+                index += 1
+                continue
+            if text[index] == "#":
+                index = text.find("\n", index)
+                if index == -1:
+                    return
+                command_start = True
+                index += 1
+                continue
+            if _matches_artifact_register(text, index) or _matches_uv_artifact_register(text, index):
+                inline = index > 0 and text[index - 1] == "`"
+                yield index, inline
+                artifact_command = True
+            command_start = False
+
+        if char == "`":
+            command_start = True
+            artifact_command = False
+        elif char == "#" and _is_shell_comment_start(text, index):
+            newline = text.find("\n", index)
+            if newline == -1:
+                return
+            command_start = True
+            artifact_command = False
+            index = newline
+        elif char in ";&|" or (char == "\n" and not text[:index].rstrip().endswith("\\")):
+            command_start = True
+            artifact_command = False
+        index += 1
+
+
+def _cli_command_span(text: str, start: int, inline: bool) -> tuple[str, str]:
+    quote = ""
+    escaped = False
+    end = start
+    while end < len(text):
+        char = text[end]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == "\n":
+            if not text[start:end].rstrip().endswith("\\"):
+                break
+        elif quote:
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char in ";&|" or (char == "#" and _is_shell_comment_start(text, end)) or (inline and char == "`"):
+            break
+        end += 1
+    return text[start:end], quote
+
+
+def _artifact_register_cli_defects(text: str, artifact_statuses: frozenset[str]) -> Iterator[Defect]:
+    for start, inline in _artifact_register_cli_starts(text):
+        span, quote = _cli_command_span(text, start, inline)
+        if quote:
+            yield Defect(
+                kind="artifact_enum",
+                found="artifact register",
+                detail=f"has malformed artifact register CLI tokenization: unterminated {quote!r} quote",
+            )
+            continue
+
+        try:
+            tokens = shlex.split(span, posix=False)
+        except ValueError as exc:
+            yield Defect(
+                kind="artifact_enum",
+                found="artifact register",
+                detail=f"has malformed artifact register CLI tokenization: {exc}",
+            )
+            continue
+
+        for index, token in enumerate(tokens):
+            if token == "--status" and index + 1 < len(tokens) and not tokens[index + 1].startswith("--"):
+                raw_value = tokens[index + 1]
+                found, value = f"--status {raw_value}", raw_value.strip("\"'")
+            elif token.startswith("--status="):
+                found, value = token, token.partition("=")[2].strip("\"'")
+            else:
+                continue
+            if not _is_placeholder(value) and value not in artifact_statuses:
+                yield Defect(
+                    kind="artifact_enum",
+                    found=found,
+                    detail=f"is not an ArtifactStatus; valid values are {sorted(artifact_statuses)}",
+                )
+
+
 def find_artifact_enum_defects(
     text: str, artifact_types: frozenset[str], artifact_statuses: frozenset[str]
 ) -> list[Defect]:
     """Flag ``artifact_type=`` and ``status=`` literals that are not enum members.
 
     ``artifact_type=`` is checked wherever it appears — that keyword is unique to the
-    artifact tools. ``status=`` is checked only inside an ``artifact_*`` call span,
-    because the same keyword carries an unrelated value domain on the backlog and task
-    tools.
+    artifact tools. ``status=`` is checked only inside an ``artifact_*`` call span, and
+    ``--status`` only inside an ``artifact register`` CLI command, because the same
+    values carry unrelated domains on the backlog and task tools.
 
     Args:
         text: Full markdown text of one shipped file.
@@ -262,4 +449,5 @@ def find_artifact_enum_defects(
         for value in _STATUS_KWARG_RE.findall(span)
         if not _is_placeholder(value) and value not in artifact_statuses
     )
+    defects.extend(_artifact_register_cli_defects(text, artifact_statuses))
     return defects
