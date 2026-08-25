@@ -214,7 +214,7 @@ Report only the artifact type and identifier. Do not write the document to a fil
 The planning stage (S2/S3 in the SAM pipeline) produces a PLAN artifact or CONTEXT artifact,
 registered through the artifact operations. Nothing is written to the filesystem.
 
-Per [artifact-conventions.md](../skills/development-harness/references/artifact-conventions.md):
+Per [artifact-conventions.md](../skills/dh-meta-docs/references/artifact-conventions.md):
 
 - S2 Planning artifact — `artifact_id="plan-{feature-slug}"`
   - Token: `ARTIFACT:PLAN({feature-slug})`

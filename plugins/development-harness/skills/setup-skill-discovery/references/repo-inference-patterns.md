@@ -5,8 +5,8 @@ Used by `setup-skill-discovery/SKILL.md` to determine candidate skill categories
 building the `.dh/skill_discovery.yaml` draft.
 
 This file documents file presence → stack → skill category mappings. For the canonical
-language manifest schema (role fulfillment, quality gates, project detection rules), see
-`development-harness/references/language-manifest-schema.md` — do not duplicate that content here.
+language manifest schema (role fulfillment, quality gates, project detection rules), load
+`dh:dh-meta-docs` — do not duplicate that content here.
 
 ---
 

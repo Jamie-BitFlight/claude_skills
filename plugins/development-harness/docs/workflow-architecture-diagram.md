@@ -495,8 +495,8 @@ sequence or filesystem path from the address.
 
 Read these together to get the full system picture:
 
-- [Default Development Flow](../skills/development-harness/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
-- [Artifact Conventions](../skills/development-harness/references/artifact-conventions.md) — naming, file layout, cross-referencing
+- [Default Development Flow](../skills/dh-meta-docs/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
+- [Artifact Conventions](../skills/dh-meta-docs/references/artifact-conventions.md) — naming, file layout, cross-referencing
 - [Plan Artifact Lifecycle](./plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
 - [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
 - [Task File Format](./TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)

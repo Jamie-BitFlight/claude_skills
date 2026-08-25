@@ -215,9 +215,7 @@ Then read:
 | Component | Path | Purpose |
 |-----------|------|---------|
 | **Development harness** | `plugins/development-harness/` | SAM 7-stage pipeline, artifact conventions |
-| **Default flow** | `plugins/development-harness/skills/development-harness/references/default-development-flow.md` | Default development flow |
-| **Artifact conventions** | `plugins/development-harness/skills/development-harness/references/artifact-conventions.md` | Artifact naming and structure |
-| **Human touchpoint model** | `plugins/development-harness/skills/development-harness/references/human-touchpoint-model.md` | Escalation and human gates |
+| **Shared references** | `dh:dh-meta-docs` | Routes the default flow, artifact conventions, and human touchpoint model |
 | **Work-backlog-item bridge** | `.claude/skills/work-backlog-item/SKILL.md` | Bridges backlog items into SAM planning |
 
 ---

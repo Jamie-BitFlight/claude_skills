@@ -569,8 +569,8 @@ creating their content. Plan ownership or a backlog update does not imply artifa
 
 Read these together to get the full system picture:
 
-- [Default Development Flow](../skills/development-harness/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
-- [Artifact Conventions](../skills/development-harness/references/artifact-conventions.md) — naming, file layout, cross-referencing
+- [Default Development Flow](../skills/dh-meta-docs/references/default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
+- [Artifact Conventions](../skills/dh-meta-docs/references/artifact-conventions.md) — naming, file layout, cross-referencing
 - [Workflow Architecture Diagram](./workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
 - [Plan Artifact Lifecycle](./plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
 - [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
