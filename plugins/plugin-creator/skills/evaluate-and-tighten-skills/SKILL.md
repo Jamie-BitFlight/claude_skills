@@ -308,11 +308,15 @@ Prefer:
 
 ## Gotchas
 
-* An inline `## Sources` section inside `SKILL.md` is not "a dedicated maintenance source file."
-  Only a genuinely separate file (e.g. an existing `MAINTENANCE.md`) qualifies for
-  `references/maintenance-placement.md`'s "preserve existing convention" exception. An inline
-  section is ordinary runtime material — run it through the normal `MOVE-MAINTENANCE`/
-  `MOVE-LOCAL`/`DELETE` test like everything else.
+* An inline `## Sources` section is not automatically maintainer-only, and the section as a whole
+  does not qualify for `references/maintenance-placement.md`'s "preserve existing convention"
+  exception either (that exception is for a genuinely separate file, e.g. an existing
+  `MAINTENANCE.md`). Evaluate each entry individually with the runtime test: an entry the
+  executing agent is instructed to actually consult or verify against — check current values,
+  cross-reference for drift — is `KEEP-RUNTIME`/`KEEP-REASONING`; a bare citation or provenance
+  note with no agent-facing instruction (e.g. `See #12345`) has none of that and goes through the
+  normal `MOVE-MAINTENANCE`/`DELETE` test instead. Do not classify the whole section by its
+  heading.
 * An unconditional instruction does not automatically make its attached rationale removable. Even
   when the instruction itself has no branch ("always do X"), its rationale can still pass the
   runtime test if the agent needs it to recognize or diagnose the underlying condition independent
