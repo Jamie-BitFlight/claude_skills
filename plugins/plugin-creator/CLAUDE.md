@@ -67,6 +67,7 @@ flowchart TD
 | `/plugin-creator` | Yes | New-plugin creation workflow — complements `/plugin-lifecycle` for existing plugins |
 | `/agent-creator` | Yes | Create agents from scratch or templates; handles scope (project/user/plugin) |
 | `/skill-creator` | Yes | Create skills from scratch or templates; handles scope and validation |
+| `/skill-goal-extractor` | Yes | Extract a skill's small set of explicit goals by reading it in full — for characterizing a skill's purpose before refactoring or reviewing it |
 | `/skill-sync` | Yes | Sync skill content against upstream documentation — update STALE SOURCE: URLs, add NEW upstream claims, enforce progressive-disclosure structure via /refactor-skill |
 | `/claude-skills-overview-2026` | Yes | Complete reference for Claude Code skills system (January 2026) |
 | `/claude-plugins-reference-2026` | Yes | Complete reference for Claude Code plugins system (January 2026) |
