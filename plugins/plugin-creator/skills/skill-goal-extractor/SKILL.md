@@ -20,6 +20,8 @@ The purpose and explicit goals of the skill <skill_name>:
 3. <clear outcome or capability>
 ```
 
+5. If the user approves these goals, offer to write them to `SKILL-GOALS.md` in the target skill's own directory, creating or overwriting it.
+
 ## When Used as a Review Step
 
 When this skill runs to characterize a skill for a review or quality-gate decision, prefer running it from an agent that did not author or edit the skill being read — a fresh read catches drift between stated goals and actual content that the editor's own re-read tends to miss.
