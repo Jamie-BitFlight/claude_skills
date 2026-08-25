@@ -75,10 +75,10 @@ Additionally, run the **Rules Extraction Phase** for CLAUDE.md targets:
 
 If analysis finds content that does not serve any resolved goal — exposition explaining an
 already-bounded instruction, duplication of what a script or reference already owns, historical
-narrative, maintainer-facing notes — that is a tightening finding, not an optimization one. Stop
-and report it: recommend a `/plugin-creator:evaluate-and-tighten-skills` pass before continuing,
-rather than rewriting the material into better prose. Rewriting content that should be deleted
-entrenches it.
+narrative, maintainer-facing notes — that is a tightening finding, not an optimization one. Record
+it under `Tightening Candidates`, leave that material unchanged, and continue optimizing the rest.
+Recommend a `/plugin-creator:evaluate-and-tighten-skills` pass rather than rewriting the candidate
+into better prose. Rewriting content that should be deleted entrenches it.
 
 **Agent definition:** Verify required frontmatter (name, description); check description contains trigger keywords; verify skills field references exist; ensure model selection appropriate for task complexity; check for behavioral instructions that could be structural.
 
