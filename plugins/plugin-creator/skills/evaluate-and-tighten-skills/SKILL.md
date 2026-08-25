@@ -306,6 +306,23 @@ Prefer:
 * observable completion criteria;
 * positive executable instructions.
 
+## Gotchas
+
+* An inline `## Sources` section inside `SKILL.md` is not "a dedicated maintenance source file."
+  Only a genuinely separate file (e.g. an existing `MAINTENANCE.md`) qualifies for
+  `references/maintenance-placement.md`'s "preserve existing convention" exception. An inline
+  section is ordinary runtime material — run it through the normal `MOVE-MAINTENANCE`/
+  `MOVE-LOCAL`/`DELETE` test like everything else.
+* An unconditional instruction does not automatically make its attached rationale removable. Even
+  when the instruction itself has no branch ("always do X"), its rationale can still pass the
+  runtime test if the agent needs it to recognize or diagnose the underlying condition independent
+  of ever reading the instruction — e.g. matching a raw error message to its cause. Do not delete
+  a rationale solely because the instruction above it is bounded.
+* Finding a sentence is factually wrong is not the same as finding it's a no-op. Do not correct
+  the wording in place. Delete or relocate it per the normal disposition and report it under
+  `Goal deviations found` (or `Uncertain` if the fix isn't obvious) — correcting the underlying
+  claim is feature work outside a pruning pass's scope.
+
 ## Fastest filter
 
 For every sentence ask:
