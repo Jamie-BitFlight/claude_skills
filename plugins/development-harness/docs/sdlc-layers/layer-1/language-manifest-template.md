@@ -49,5 +49,5 @@ Canonical starting point for language manifests. All Layer 1 plugins produce a m
 
 ## Quick Reference
 
-- **Template file**: [plugins/development-harness/templates/language-manifest-template.md](../../../../plugins/development-harness/templates/language-manifest-template.md)
+- **Template file**: [plugins/development-harness/templates/language-manifest-template.md](../../../templates/language-manifest-template.md)
 - **Schema**: [language-manifest-schema.md](../../../skills/dh-meta-docs/references/language-manifest-schema.md)
