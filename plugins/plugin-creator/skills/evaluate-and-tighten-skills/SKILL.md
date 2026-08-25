@@ -297,6 +297,7 @@ Check:
 
 * every required file pointer can be resolved from the agent's actual environment;
 * commands containing substituted paths remain valid for supported installation paths;
+* existing load-time substitution expressions remain unchanged and in the target `SKILL.md`;
 * variables, aliases, helper names, and references used by an instruction have an available definition;
 * moving reference behind progressive disclosure does not remove the pointer needed to find it.
 
