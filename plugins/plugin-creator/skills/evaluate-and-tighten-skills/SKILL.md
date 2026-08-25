@@ -311,11 +311,14 @@ Prefer:
 * An inline `## Sources` section is not automatically maintainer-only, and the section as a whole
   does not qualify for `references/maintenance-placement.md`'s "preserve existing convention"
   exception either (that exception is for a genuinely separate file, e.g. an existing
-  `MAINTENANCE.md`). Evaluate each entry individually with the runtime test: an entry the
-  executing agent is instructed to actually consult or verify against — check current values,
-  cross-reference for drift — is `KEEP-RUNTIME`/`KEEP-REASONING`; a bare citation or provenance
-  note with no agent-facing instruction (e.g. `See #12345`) has none of that and goes through the
-  normal `MOVE-MAINTENANCE`/`DELETE` test instead. Do not classify the whole section by its
+  `MAINTENANCE.md`). The skill is the agent's prompt — evaluate each entry by asking who it is
+  for. An entry the executing agent is meant to consult or verify against at runtime (check
+  current values, cross-reference for drift) is runtime material: keep it inline
+  (`KEEP-RUNTIME`/`KEEP-REASONING`), or move it into a `references/*.md` file linked from the
+  skill if it is too heavy for every load — either way it stays reachable by the agent, not the
+  maintenance sink. An entry meant only for whoever edits this skill later — provenance, a bare
+  `See #12345` — has no agent-facing use and goes through the normal
+  `MOVE-LOCAL`/`MOVE-MAINTENANCE`/`DELETE` test instead. Do not classify the whole section by its
   heading.
 * An unconditional instruction does not automatically make its attached rationale removable. Even
   when the instruction itself has no branch ("always do X"), its rationale can still pass the
