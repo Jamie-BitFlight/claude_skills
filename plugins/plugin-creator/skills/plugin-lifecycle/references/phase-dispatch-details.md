@@ -73,7 +73,7 @@ Routing by concern (use when editing files in `plugins/`, `.claude/`, `AGENTS.md
 
 - Establish what a skill exists to achieve, before judging any of its content → `Skill(skill="plugin-creator:skill-goal-extractor")`
 - Remove content that serves no goal (decides whether text exists) → `Skill(skill="plugin-creator:evaluate-and-tighten-skills")`
-- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → `subagent_type="plugin-creator:ai-doc-optimizer"`
+- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → `Skill(skill="plugin-creator:optimize-claude-md")`, which measures, delegates to `ai-doc-optimizer`, verifies, and reports
 - Audit quality (read-only, no writes, score against completeness categories) → `subagent_type="plugin-creator:skill-auditor"`
 - Sync content against upstream docs (add NEW/fix STALE from live sources) → `subagent_type="plugin-creator:skill-content-updater"`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
@@ -96,12 +96,18 @@ optimization from polishing prose that should have been deleted.
    - Context to include in the prompt: plugin path, `assessment-REPORT.md` (if available from Phase 1)
    - Output: improved plugin structure, updated SKILL.md files, better progressive disclosure
 
-4. Task is content quality optimization with `subagent_type="plugin-creator:ai-doc-optimizer"`
+4. Task is content quality optimization with `Skill(skill="plugin-creator:optimize-claude-md")`
    - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1
-   - For CLAUDE.md or AGENTS.md targets, also pass absolute paths to `index-discipline.md` and `claude-rules-extraction.md`, both under the plugin-creator plugin's own `skills/optimize-claude-md/references/` directory. Resolve them to absolute paths before dispatching — the agent treats these specs as unavailable and skips the rules-extraction phase when no path is supplied, rather than guessing one.
-   - Output: optimized documentation with better Claude comprehension
+   - Output: optimized documentation with better Claude comprehension, plus that skill's before/after metrics report
+
+   Enter through the skill, not by dispatching `ai-doc-optimizer` directly. The skill owns the
+   surrounding process — baseline token/completeness/index measurement, goal resolution, the
+   reference paths the agent needs, an independent second-agent verification pass, and the
+   before/after report. A direct agent dispatch skips all of it and produces an unverified,
+   unmeasured rewrite.
 
 5. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`
+   - Load `Skill(skill="plugin-creator:subagent-refactoring-methodology")` first — that skill carries the analysis criteria, transformation patterns, output format, and validation checklist this agent is written to apply, and its own description requires loading it before the agent runs. It is reference knowledge, not an orchestrator, so the agent is still dispatched directly here.
    - Context to include in the prompt: agent .md files needing improvement
    - Output: optimized agent prompts using Anthropic best practices
 

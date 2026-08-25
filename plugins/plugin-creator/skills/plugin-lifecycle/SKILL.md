@@ -11,7 +11,7 @@ user-invocable: true
 <plugin_intent>$2</plugin_intent>
 <invocation_args>$ARGUMENTS</invocation_args>
 
-> When editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md` for content optimization, route to the appropriate subagent. Full routing-by-concern table in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
+> When editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md` for content optimization, route to the owning skill where one exists, and to a subagent only when no skill owns that process. Full routing-by-concern table in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
 
 > [!IMPORTANT]
 > When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
@@ -245,7 +245,9 @@ Entry condition: Debug gate passed OR Assess gate passed with no errors.
 
 Optimize improves quality — descriptions, progressive disclosure, agent prompts, documentation. This phase is not about fixing errors (that is Debug) but about raising quality.
 
-Execute five dispatches in order: (1) skill goal resolution via `skill-goal-extractor`, (2) pre-optimization tightening via `evaluate-and-tighten-skills`, (3) structural plugin improvement via `refactor-plugin`, (4) content quality optimization via `ai-doc-optimizer`, (5) agent prompt optimization via `subagent-refactorer`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
+Execute five dispatches in order: (1) skill goal resolution via `skill-goal-extractor`, (2) pre-optimization tightening via `evaluate-and-tighten-skills`, (3) structural plugin improvement via `refactor-plugin`, (4) content quality optimization via `optimize-claude-md`, (5) agent prompt optimization via `subagent-refactorer`, preceded by loading `subagent-refactoring-methodology`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
+
+Enter each step through its skill where one exists. `optimize-claude-md` owns baseline measurement, goal resolution, agent delegation, independent verification, and reporting — dispatching `ai-doc-optimizer` directly skips all of it and yields an unmeasured, unverified rewrite.
 
 Order is load-bearing: goals are the standard every later dispatch judges content against, and tightening runs before structural and content work because removing dead weight can drop a skill back under the split threshold and stops later passes from polishing prose that should have been deleted.
 
