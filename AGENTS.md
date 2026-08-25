@@ -448,6 +448,7 @@ this file) was removed to avoid two files drifting out of sync.
 | Purpose | Location |
 |---------|----------|
 | AI project instructions | `.claude/CLAUDE.md` (primary context file for Claude Code) |
+| Repo terminology (skill vs. plugin vs. agent vs. command vs. hook vs. MCP server) | `.claude/rules/glossary.md` |
 | Linting config | `pyproject.toml [tool.ruff]` |
 | Type checking config | `pyproject.toml [tool.ty]` |
 | Test config | `pyproject.toml [tool.pytest.ini_options]` |
