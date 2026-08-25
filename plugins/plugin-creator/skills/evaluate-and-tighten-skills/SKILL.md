@@ -21,10 +21,22 @@ Use the first available source:
 
 Treat these goals as the purpose of the skill, not its current implementation. Instructions are allowed to disappear even when deliberately written if they do not contribute to those goals.
 
+`SKILL-GOALS.md` contains only capabilities or outcomes this skill specifically exists to add. Exclude generic competent-agent behavior such as accuracy, thoroughness, following instructions, or using tools correctly unless the skill gives those concepts a domain-specific meaning.
+
+Goals describe what must remain true. They do not document how the current skill achieves it.
+
 Goals must be resolved before pruning because they serve two purposes:
 
 * define the behavior that must survive tightening;
 * expose instructions or entire branches that are coherent in isolation but have drifted away from what the skill exists to achieve.
+
+### Existing maintenance context
+
+If `<target-skill>/MAINTENANCE.md` exists, read it before pruning.
+
+Treat it as maintainer-facing context, not as another source of skill goals or runtime instructions. It may identify current invariants, regression provenance, authoritative sources, or evaluation uncertainties that matter when changing the skill.
+
+An entry in `MAINTENANCE.md` does not by itself justify keeping prose in `SKILL.md`. Runtime prose still has to earn its place through the goals and behavioral contract.
 
 ## Step 1: Generate the behavioral contract
 
@@ -83,7 +95,9 @@ Classify:
 * **SUPPORTING** - provides a decision principle, constraint, domain fact, or capability needed to achieve a goal across variable situations.
 * **UNALIGNED** - does not materially contribute to any explicit goal.
 
-Flag `UNALIGNED` sections for removal or relocation before tightening individual sentences. The skill should not preserve behavior merely because it already exists in the current implementation.
+Flag `UNALIGNED` sections before tightening individual sentences. They cannot remain runtime behavior merely because they already exist in the current implementation.
+
+Do not immediately discard them. During the counterfactual deletion pass, determine whether they contain a durable goal, maintenance fact, local implementation invariant, or architectural decision that belongs somewhere else. Otherwise delete them.
 
 ## Step 3: Counterfactual deletion pass
 
@@ -153,6 +167,20 @@ NO
 
 No justification is required unless the dependency is non-obvious.
 
+### Disposition
+
+After determining what runtime text is necessary, assign removed or retained material one disposition:
+
+* **KEEP-RUNTIME** - required execution instruction, resolution detail, constraint, or validation.
+* **KEEP-REASONING** - reasoning principle required for context-dependent judgment.
+* **MOVE-GOALS** - expresses a capability or outcome the skill exists to provide and belongs in `SKILL-GOALS.md`.
+* **MOVE-LOCAL** - useful maintenance knowledge whose natural scope is one script, config, template, reference, or other artifact.
+* **MOVE-MAINTENANCE** - non-obvious whole-skill maintenance context that still constrains present changes.
+* **MOVE-ADR** - a significant durable decision that passes the ADR threshold below.
+* **DELETE** - has no continuing execution, goal, or maintenance value.
+
+`MOVE-*` never means copy the original prose wholesale. Extract only the smallest durable fact that deserves to survive.
+
 ## What earns its place
 
 Keep material when removing it could change:
@@ -211,20 +239,146 @@ Check:
 
 Do not delete text carrying a dependency merely because that dependency looked obvious while reviewing it.
 
-### Wrong home
+### Wrong home and maintenance value
 
-Remove material whose audience or lifecycle belongs elsewhere:
+Runtime irrelevance does not automatically mean information is worthless. Some prose is useless to the executing agent but valuable to a future maintainer.
 
-* design history;
-* alternatives considered;
-* explanations of rejected approaches;
-* maintenance commentary to future editors;
-* anti-reversion notes whose relevant edit occurs in another file;
-* human onboarding or explanatory prose that does not alter agent execution.
+For material leaving runtime context, ask:
 
-Move genuinely important architectural decisions to an existing appropriate source of truth such as an ADR, commit, PR, or maintainership documentation. Do not create new documentation merely to preserve trivia removed from a skill.
+> Would a future maintainer be materially more likely to make an incorrect change without knowing this?
 
-Explanatory material stays only when an agent that actually loads the document uses it to make a materially different decision.
+If no, delete it.
+
+If yes, determine its narrowest correct home.
+
+#### Scope follows ownership
+
+Put maintenance knowledge where the maintainer naturally encounters the thing it constrains.
+
+Use **MOVE-LOCAL** when the fact applies to one artifact and can live with it:
+
+* script-specific invariants -> script docstring or local documentation;
+* configuration-specific constraints -> configuration-adjacent documentation;
+* reference-specific maintenance facts -> that reference;
+* template-specific constraints -> template-adjacent documentation.
+
+Do not put a local fact into whole-skill maintenance context merely because `MAINTENANCE.md` exists.
+
+Use **MOVE-MAINTENANCE** only when all three are true:
+
+1. **Still constrains the present** - it affects how this skill can safely be changed now.
+2. **Non-obvious** - a maintainer cannot reliably recover it by inspecting the artifact they would naturally edit.
+3. **Cross-cutting or displaced** - no narrower artifact is the natural place to encounter it.
+
+If any condition fails, do not put it in `MAINTENANCE.md`.
+
+#### MAINTENANCE.md
+
+`MAINTENANCE.md` is optional whole-skill maintenance context. Create it lazily only when at least one fact passes the `MOVE-MAINTENANCE` test.
+
+It is not a scratch pad, author journal, changelog, source dump, or destination for everything removed from `SKILL.md`.
+
+When created, include only sections that have content:
+
+```markdown
+# Skill maintenance
+
+## Invariants
+
+- `<non-obvious property that must survive changes>`
+  - Owned by: `<file/script/instruction or cross-cutting>`
+  - Protected by: `<eval if available>`
+  - Origin: `<issue/PR/commit only when useful>`
+
+## Sources of truth
+
+- `<source name>`
+  - Source: `<URL, repository path, specification, vendor documentation>`
+  - Governs: `<specific current behavior>`
+  - Version/ref: `<version, tag, commit, or live documentation>`
+  - Refresh when: `<condition that should cause revalidation>`
+
+## Regression provenance
+
+- `<failure that caused durable behavior>`
+  - Observed in: `<issue/PR/incident>`
+  - Required behavior: `<what must continue to be true>`
+  - Protected by: `<instruction/script/eval>`
+
+## Evaluation uncertainties
+
+- `<behavior intentionally retained pending empirical evaluation>`
+  - Question: `<what needs to be established>`
+  - Relevant goal: `<goal>`
+```
+
+Do not create empty sections.
+
+Do not add a runtime pointer from the target `SKILL.md` to `MAINTENANCE.md`. The executing agent does not need maintainer context.
+
+#### Sources
+
+Record an external source only when it governs current skill behavior that a future maintainer may need to revalidate.
+
+Do not preserve a source merely because it was consulted while authoring the skill.
+
+For every preserved source record:
+
+* what source is authoritative;
+* exactly what behavior it governs;
+* the relevant version/ref when applicable;
+* what future change should cause it to be checked again.
+
+General documentation that does not govern a current skill-specific behavior should not be retained.
+
+Keep sources in `MAINTENANCE.md` by default. If the target skill already has a dedicated maintenance source file, preserve that convention rather than creating a competing one. Do not create a separate source file merely to hold a few links.
+
+#### Regression and issue provenance
+
+Preserve an issue, PR, commit, or incident reference only when it explains a behavior or invariant that still constrains the present.
+
+Reduce history to the current durable fact.
+
+Prefer:
+
+```markdown
+- Parallel invocations must not share a run address.
+  - Origin: #142
+  - Protected by: concurrent-run eval
+```
+
+over narrative history of approaches that were tried and rejected.
+
+Git history remains the source of historical detail.
+
+#### ADR threshold
+
+Use **MOVE-ADR** only when all three are true:
+
+1. **Hard to reverse** - changing the decision later has meaningful cost.
+2. **Surprising without context** - a reasonable future maintainer would question or "fix" it without knowing why.
+3. **Real trade-off** - genuine alternatives existed and the choice was made for specific reasons.
+
+If any condition fails, do not create an ADR.
+
+Follow the repository's existing ADR convention when one exists.
+
+If no ADR convention exists, do not create one merely to preserve minor skill history. A standalone skill may create `maintenance/adr/` lazily when the first decision actually passes all three conditions.
+
+An ADR should record the decision and the minimum reason needed to prevent an incorrect reversal. Do not copy the original explanatory prose into it.
+
+#### Delete history that no longer constrains anything
+
+Delete rather than relocate:
+
+* abandoned alternatives with no present consequence;
+* authoring narrative;
+* implementation trivia;
+* explanations recoverable from the artifact itself;
+* maintenance reminders aimed at an audience that will already see the relevant source;
+* links to issues, PRs, commits, vendor docs, or research that do not govern current behavior;
+* speculative future improvements that belong in an issue or backlog;
+* human onboarding or promotional prose that does not affect execution.
 
 ### Structural load
 
@@ -254,7 +408,9 @@ Then run the counterfactual:
 
 > If this text disappears, can any behavioral-contract eval reasonably produce a different result?
 
-If **no**, remove it.
+If the answer is no, runtime deletion is correct. Then decide whether the smallest durable fact deserves `MOVE-GOALS`, `MOVE-LOCAL`, `MOVE-MAINTENANCE`, `MOVE-ADR`, or `DELETE`.
+
+Do not use maintenance value as a reason to retain text in runtime context.
 
 ## Example
 
@@ -272,15 +428,30 @@ If a requirement no longer has adequate support, restore the smallest instructio
 
 Do not restore explanatory material merely because the original version contained it.
 
+Then inspect all `MOVE-*` results:
+
+* `MOVE-GOALS` entries express genuine skill-specific goals and are not generic agent expectations.
+* `MOVE-LOCAL` entries are stored beside the artifact whose maintenance they constrain.
+* `MOVE-MAINTENANCE` entries pass all three maintenance admission criteria.
+* `MOVE-ADR` entries pass all three ADR criteria and follow the repository's existing convention.
+* no runtime instruction now depends on maintainer-only material to execute correctly;
+* no information was moved merely to avoid deleting it.
+
+If relocation produced a longer explanation than the durable fact requires, tighten the relocated text too.
+
 ## Completion
 
 Finish when:
 
 1. every behavioral-contract requirement remains supported where explicit support is necessary;
-2. no remaining sentence contains a removable part whose deletion is expected to preserve behavior;
-3. pointers still expose every required branch without redundant trigger language;
-4. scripts and references remain resolvable exactly where their behavior is needed;
-5. no explanation remains solely to document how or why an already-unambiguous instruction works.
+2. no remaining runtime sentence contains a removable part whose deletion is expected to preserve behavior;
+3. pointers still expose every required execution branch without redundant trigger language;
+4. scripts and references remain resolvable exactly where their runtime behavior is needed;
+5. no explanation remains solely to document how or why an already-unambiguous instruction works;
+6. every retained maintenance fact still constrains present maintenance and lives at its narrowest useful scope;
+7. `MAINTENANCE.md` exists only if at least one cross-cutting or displaced maintenance fact earns it;
+8. every ADR created by this pass satisfies the hard-to-reverse, surprising, and real-trade-off tests;
+9. historical detail with no current execution or maintenance consequence has been deleted rather than relocated.
 
 Return:
 
@@ -301,7 +472,18 @@ Uncertain:
 
 Goal deviations found:
 - <behavior, section, or instruction that does not advance any explicit skill goal>
+
+Relocated:
+- GOALS: <items or none>
+- LOCAL: <items or none>
+- MAINTENANCE: <items or none>
+- ADR: <items or none>
+
+Maintenance file:
+- unchanged | created | tightened | not needed
 ```
+
+Do not report every sentence. Summarize material changes.
 
 Report `Goal deviations found: none` when none are found.
 
