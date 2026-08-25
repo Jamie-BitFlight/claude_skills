@@ -5,6 +5,13 @@ description: Generate a focused behavioral contract for an existing skill, then 
 
 # Evaluate and Tighten Skills
 
+A skill is its directory, not `SKILL.md` alone — `SKILL.md` plus every `references/`, `scripts/`,
+`assets/`, and other bundled file it contains (see the `plugin-creator:agentskills` skill's
+"SKILL.md Format" section for the full spec). Everywhere below that names "the skill" or "the
+target skill" means that whole directory. A section, sentence, or instruction under evaluation can
+live in `SKILL.md` or in any bundled file it materially references — both are in scope for every
+step of this procedure, not `SKILL.md`'s own prose only.
+
 Make an existing skill as light as possible without removing behavior that contributes to its purpose.
 
 This is a **pre-eval pruning pass**. Do not run the skill's full benchmark or optimization loop here.
