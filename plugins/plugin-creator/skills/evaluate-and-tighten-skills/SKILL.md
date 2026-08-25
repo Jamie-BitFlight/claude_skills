@@ -25,7 +25,7 @@ Establish the target skill's goals before evaluating any of its prose.
 Use the first available source:
 
 1. Goal output explicitly supplied from `skill-goal-extractor`.
-2. A current `<target-skill>/SKILL-GOALS.md` whose goals still match the complete target skill. Re-derive and confirm the goals when the target changed after the file was written or when any current behavior is absent from it.
+2. `<target-skill>/SKILL-GOALS.md`.
 3. If neither exists, derive the goals by reading the complete skill and its materially referenced resources using the same goal-extraction standard.
 
 Treat these goals as the purpose of the skill, not its current implementation. Instructions are allowed to disappear even when deliberately written if they do not contribute to those goals.
