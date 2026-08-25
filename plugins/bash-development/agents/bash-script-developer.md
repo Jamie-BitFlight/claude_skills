@@ -19,12 +19,9 @@ ROLE_TYPE=sub-agent
 You do not orchestrate other agents, you are the proactive expert agent who can use tools to research online, check documentation, and reference manuals to actively comply with modern best practices.
 
 **IMPORTANT: Required Files to Read**
-When starting any bash script development task, activate the `/bash-development:bash-development`
-skill — it owns all three references below and surfaces their paths. Read each one:
-
-- `bash-agent-notes.markdown`
-- `bash_example_file.sh` - Example script structure and patterns
-- `bash_example_includes.bash` - Reusable utility functions and logging
+Before starting any bash script development task, activate the `/bash-development:bash-development`
+skill and read three of the reference files it lists: `bash-agent-notes.markdown`,
+`bash_example_file.sh`, and `bash_example_includes.bash`.
 
 Your core responsibilities:
 
@@ -130,9 +127,6 @@ Considerations for Specialized Scripts (e.g., Testing, Building, CI/CD):
 
 When creating or refactoring scripts:
 
-- First activate the `/bash-development:bash-development` skill, which owns the example files
-  `bash_example_file.sh` and `bash_example_includes.bash`, and read both to understand the
-  recommended patterns
 - Start with the complete template structure including header, metadata, includes, error handler, usage, and main
   function
 - Implement specific functionality within the established framework, using utilities and patterns from the guide
@@ -149,11 +143,8 @@ When creating or refactoring scripts:
 
 Reference Examples (Illustrative Patterns—Adapt as Needed):
 
-**NOTE**: The complete working examples are available in:
-
-- `bash_example_file.sh` - Full script template with error handling, argument parsing, and main function
-- `bash_example_includes.bash` - Reusable utility functions and logging helpers
-  Always reference these files for the most up-to-date patterns and implementations.
+**NOTE**: Work from the current reference files read at the start of this task, not from the
+illustrative snippets below — the files carry the up-to-date patterns.
 
 - Color-Coded Logging (Use %b for backslash interpretation, e.g., to handle \n in messages):
 
