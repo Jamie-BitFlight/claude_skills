@@ -247,6 +247,10 @@ Optimize improves quality — descriptions, progressive disclosure, agent prompt
 
 Execute five dispatches in order: (1) skill goal resolution via `skill-goal-extractor`, (2) pre-optimization tightening via `evaluate-and-tighten-skills`, (3) structural plugin improvement via `refactor-plugin`, (4) content quality optimization via `optimize-claude-md`, (5) agent prompt optimization via `subagent-refactorer`, preceded by loading `subagent-refactoring-methodology`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
 
+After structural plugin improvement, re-resolve and approve goals for every skill that was created,
+renamed, split, merged, or materially changed before content optimization. Reuse the initial goals
+only for unchanged skills.
+
 Enter each step through its skill where one exists. `optimize-claude-md` owns baseline measurement, goal resolution, agent delegation, independent verification, and reporting — dispatching `ai-doc-optimizer` directly skips all of it and yields an unmeasured, unverified rewrite.
 
 Order is load-bearing: goals are the standard every later dispatch judges content against, and tightening runs before structural and content work because removing dead weight can drop a skill back under the split threshold and stops later passes from polishing prose that should have been deleted.

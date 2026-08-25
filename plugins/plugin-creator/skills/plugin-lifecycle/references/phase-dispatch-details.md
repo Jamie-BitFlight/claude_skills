@@ -96,8 +96,14 @@ optimization from polishing prose that should have been deleted.
    - Context to include in the prompt: plugin path, `assessment-REPORT.md` (if available from Phase 1)
    - Output: improved plugin structure, updated SKILL.md files, better progressive disclosure
 
+   After structural work, compare the resulting skill directories with the pre-refactor set. For
+   every skill that was created, renamed, split, merged, or materially changed, separately activate
+   `plugin-creator:skill-goal-extractor` and obtain approval for the resulting goals before dispatch
+   4. Reuse dispatch 1 goals only for unchanged skills. Never pass a pre-refactor goal set to a skill
+   whose behavior or ownership changed.
+
 4. Task is content quality optimization with `plugin-creator:optimize-claude-md`
-   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1
+   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1 or the post-refactor refresh
    - Output: optimized documentation with better Claude comprehension, plus that skill's before/after metrics report
 
    Enter through the skill, not by dispatching `ai-doc-optimizer` directly. The skill owns the

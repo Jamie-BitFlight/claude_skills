@@ -16,8 +16,8 @@ Lookup reference: which skill or agent handles each phase, and the exact invocat
 | 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint")` |
 | 5: Debug | `/plugin-creator:refactor-skill` | `Skill(skill="plugin-creator:refactor-skill")` |
 | 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint", args="--fix PATH")` |
-| 6: Optimize | `/plugin-creator:skill-goal-extractor` | `Skill(skill="plugin-creator:skill-goal-extractor")` |
-| 6: Optimize | `/plugin-creator:evaluate-and-tighten-skills` | `Skill(skill="plugin-creator:evaluate-and-tighten-skills")` |
+| 6: Optimize | `/plugin-creator:skill-goal-extractor` | Activate `plugin-creator:skill-goal-extractor` |
+| 6: Optimize | `/plugin-creator:evaluate-and-tighten-skills` | Activate `plugin-creator:evaluate-and-tighten-skills` |
 | 6: Optimize | `/plugin-creator:refactor-plugin` | `Skill(skill="plugin-creator:refactor-plugin")` |
 | 6: Optimize | `/plugin-creator:optimize-claude-md` | `Skill(skill="plugin-creator:optimize-claude-md")` — entry point; dispatches `@ai-doc-optimizer` itself |
 | 6: Optimize | `@skill-auditor` | subagent_type="plugin-creator:skill-auditor" |
