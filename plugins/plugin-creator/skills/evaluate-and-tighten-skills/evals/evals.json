@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/existing-maintenance/skill-under-test.md as the target skill's SKILL.md; it already has a MAINTENANCE.md alongside it.",
+      "prompt": "Copy evals/files/existing-maintenance/ to a temporary standalone skill directory outside plugins/*/skills/, then run the evaluate-and-tighten-skills procedure against the copied skill-under-test.md as that skill's SKILL.md; it already has a MAINTENANCE.md alongside it.",
       "expected_output": "Existing MAINTENANCE.md branch: the current cross-cutting invariant survives, the stale historical note is deleted, the runtime duplicate of an already-maintained fact is removed from the target's SKILL.md, and the tightened SKILL.md still executes correctly without reading MAINTENANCE.md.",
       "files": [
         "evals/files/existing-maintenance/skill-under-test.md",
@@ -19,7 +19,7 @@
     },
     {
       "id": 2,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/maintenance-creation/skill-under-test.md as the target skill's SKILL.md; it has no MAINTENANCE.md.",
+      "prompt": "Copy evals/files/maintenance-creation/ to a temporary standalone skill directory outside plugins/*/skills/, then run the evaluate-and-tighten-skills procedure against the copied skill-under-test.md as that skill's SKILL.md; it has no MAINTENANCE.md.",
       "expected_output": "MAINTENANCE.md creation branch: the runtime explanation is stripped down to the bare instruction, and a new MAINTENANCE.md is created lazily containing only the smallest durable cross-cutting invariant.",
       "files": ["evals/files/maintenance-creation/skill-under-test.md"],
       "expectations": [
