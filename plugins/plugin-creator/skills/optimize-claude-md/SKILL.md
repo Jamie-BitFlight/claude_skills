@@ -49,7 +49,7 @@ Recognize these file types: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, agent definiti
 
 - Run completeness score evaluation (8-category assessment from /plugin-creator:audit-skill-completeness)
 - Record baseline completeness score (format: X/24)
-- Resolve the skill's goals — use `<target-skill>/SKILL-GOALS.md` only when its goals still match the complete target skill. Re-derive and confirm the goals when the target changed after the file was written or when any current behavior is absent from it. Otherwise activate the `/plugin-creator:skill-goal-extractor` skill against the skill directory. Record the goals; they are passed into delegation and are the standard every later phase judges changes against.
+- Resolve the skill's goals — use `<target-skill>/SKILL-GOALS.md` if present, otherwise activate the `/plugin-creator:skill-goal-extractor` skill against the skill directory. Record the goals; they are passed into delegation and are the standard every later phase judges changes against.
 - Offer a `/plugin-creator:evaluate-and-tighten-skills` pass before optimizing. Tightening decides what content earns its place; optimization decides how the survivors read. Running them in that order avoids polishing prose that a tightening pass would delete. Skip the offer only when the skill was tightened against these same goals already.
 
 **For CLAUDE.md and AGENTS.md files** — run index discipline audit (6 binary checks):
