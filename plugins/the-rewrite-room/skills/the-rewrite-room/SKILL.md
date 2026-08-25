@@ -8,7 +8,7 @@ allowed-tools: Read, Grep, Glob, Bash, Task, Write, Edit
 
 Routes documentation, authoring, and optimization tasks to the correct specialist agents. Does not rewrite source agents or skills — orchestrates them. Governs authoring, docs, prompts, and summaries — not product code.
 
-Before producing a rewrite-room `STATUS` block, read `${CLAUDE_PLUGIN_ROOT}/the-rewrite-room/references/status-block-contract.md`.
+Before producing a rewrite-room `STATUS` block, read `${CLAUDE_SKILL_DIR}/references/status-block-contract.md`.
 
 ## Non-Negotiable Writing Standard
 

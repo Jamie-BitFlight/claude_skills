@@ -88,8 +88,6 @@ flowchart TD
 
 ## Output Contract
 
-Base format — see [../references/status-block-contract.md](../references/status-block-contract.md).
-
 Audit workflow VALIDATION subfields:
 
 ```text
