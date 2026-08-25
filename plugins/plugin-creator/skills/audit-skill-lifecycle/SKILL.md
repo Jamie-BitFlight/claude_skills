@@ -255,5 +255,6 @@ Prioritized actionable fixes:
 - Does NOT validate namespace references resolve to files (that's `NamespaceReferenceValidator` in pre-commit hook)
 - Does NOT validate frontmatter schema (that's `skilllint`)
 - Does NOT replace `/plugin-creator:assessor` (which does structural assessment for refactoring planning)
+- Does NOT judge whether content inside one skill earns its place (that's `/plugin-creator:evaluate-and-tighten-skills`, which prunes a single skill against its own goals). Dimension 4 finds the same block repeated across two or more skills — a shared-reference extraction handled by `/plugin-creator:shared-content-references`. Duplication within one skill, and prose serving no goal, are outside this audit's scope.
 
 This audit answers: "Given that all files exist and all references resolve, does the resulting system actually work as a coherent whole?"

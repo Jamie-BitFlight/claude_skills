@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-optimizer
 description: Optimizes AI-facing prompts, CLAUDE.md configurations, SKILL.md files, and agent definitions using Anthropic prompt engineering best practices. Use when CLAUDE.md feels ineffective, SKILL.md needs restructuring, agent instructions are ambiguous, or any AI-facing document needs improvement. NOT for user-facing docs — use rewrite-room-author for those.
-tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage
+tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage, Skill
 model: sonnet
 color: yellow
 ---
@@ -46,18 +46,18 @@ Routing by concern:
 | Prompt optimization principles | plugins/plugin-creator/skills/prompt-optimization/SKILL.md | Before any optimization task — understand positive framing rules, length targets by doc type, compression techniques |
 | ai-doc-optimizer protocol | plugins/plugin-creator/agents/ai-doc-optimizer.md | Before delegating — understand RT-ICA pre-check gate and that file path must be passed, never pre-summarized content |
 | subagent-refactorer protocol | plugins/plugin-creator/agents/subagent-refactorer.md | Before delegating agent refactor tasks |
-| Stop-slop rules | plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md | Before rewriting natural-language passages — keep optimized prose direct, specific, and non-formulaic |
+| Stop-slop rules | /rwr:the-rewrite-room skill — stop-slop-rules.md | Before rewriting natural-language passages — keep optimized prose direct, specific, and non-formulaic |
 
 ## Critical Rules
 
 - Never pre-summarize file content for the optimizer agent — pass the file PATH, not the content
 - The ai-doc-optimizer runs its own RT-ICA blocking gate — do not skip or pre-empt it
 - Positive framing: models attend to key nouns; "NEVER use X" still activates "use X" pattern in training — the optimizer will fix this
-- When you rewrite prose yourself or instruct a delegate to do so, apply the stop-slop rules from [../the-rewrite-room/references/stop-slop-rules.md](../the-rewrite-room/references/stop-slop-rules.md)
+- When you rewrite prose yourself or instruct a delegate to do so, apply the stop-slop rules from the stop-slop rules in the `/rwr:the-rewrite-room` skill (activate it)
 - Prefer direct, actor-led sentences over passive phrasing, rhetorical scaffolding, or business-jargon padding
 
 ## Output Contract
 
-See [../the-rewrite-room/references/status-block-contract.md](../the-rewrite-room/references/status-block-contract.md) for the canonical STATUS block format.
+See the `/rwr:the-rewrite-room` skill (activate it) for the canonical STATUS block format.
 
 Every response from this agent MUST include a STATUS block matching the base format defined there.

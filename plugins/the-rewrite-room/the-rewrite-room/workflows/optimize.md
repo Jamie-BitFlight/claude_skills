@@ -112,8 +112,6 @@ Revision context prompt template:
 
 ## Output Contract
 
-Base format — see [../references/status-block-contract.md](../references/status-block-contract.md).
-
 Optimize workflow VALIDATION subfields:
 
 ```text

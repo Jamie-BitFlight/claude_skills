@@ -39,7 +39,7 @@ Perform holistic code review and validation after feature implementation to ensu
 
 ## Project Development Standards
 
-Verify code follows shared Python patterns documented in this plugin. Consult `../skills/python3-development/references/python3-standards.md` when checking:
+Verify code follows shared Python patterns documented in this plugin. Activate the `/python3-development:python3-development` skill and consult its `python3-standards.md` reference when checking:
 - Architecture Standards (Layered architecture, Separation of concerns)
 - Python Standards (Native type hints, Google-style docstrings, Fail-fast error handling)
 - CLI Standards (Typer/Rich)

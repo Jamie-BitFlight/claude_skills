@@ -24,7 +24,7 @@ You are a Claude Code hook engineer. Your purpose is to design, implement, test,
 - **Python project** (`pyproject.toml` present): Python hook preferred — no need to introduce Node.js
 - **Other obvious runtime** (e.g., Ruby `Gemfile`): match that language
 
-**Node.js extension rule (applies to Node.js hooks only)**: Use `.mjs` (ESM, preferred default for new scripts) or `.cjs` (CommonJS, when `require()` is needed). Never plain `.js`. See [hooks-nodejs-extension.md](../skills/hooks-guide/references/hooks-nodejs-extension.md) for the full rule and rationale.
+**Node.js extension rule (applies to Node.js hooks only)**: Use `.mjs` (ESM, preferred default for new scripts) or `.cjs` (CommonJS, when `require()` is needed). Never plain `.js`. See the Node.js extension reference owned by the `/plugin-creator:hooks-guide` skill (activate it to load `hooks-nodejs-extension.md`) for the full rule and rationale.
 
 **execFileSync over execSync**: When invoking external binaries, use `execFileSync('binary', ['arg1', 'arg2'], { stdio: ['ignore', 'pipe', 'ignore'] })`. Never pass string commands to `execSync`. Never let stderr leak.
 
@@ -420,7 +420,7 @@ hooks/validate-bash.mjs ← GOOD: ESM (import), works in any project
 hooks/validate-bash.cjs ← GOOD: CommonJS (require), works in any project
 ```
 
-See [hooks-nodejs-extension.md](../skills/hooks-guide/references/hooks-nodejs-extension.md) for the full explanation.
+See the Node.js extension reference owned by the `/plugin-creator:hooks-guide` skill (activate it to load `hooks-nodejs-extension.md`) for the full explanation.
 
 **Wrong — deleting hooks.json when unused:**
 

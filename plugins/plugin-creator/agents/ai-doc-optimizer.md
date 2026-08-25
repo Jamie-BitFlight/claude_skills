@@ -1,7 +1,7 @@
 ---
 name: ai-doc-optimizer
 description: Optimize prompts, SKILL.md, and CLAUDE.md for Claude comprehension using Anthropic prompt-engineering principles — RT-ICA pre-check + CoVe post-check. Use to rewrite AI-facing doc for clarity, frontmatter description writing, prompt optimization, or when asked to optimize CLAUDE.md. Applies positive framing, front-loads constraints, converts decision tables to Mermaid flowcharts.
-tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, WebSearch, SendMessage
+tools: Read, Write, Edit, Grep, Glob, Bash, WebFetch, WebSearch, SendMessage, Skill
 skills:
   - plugin-creator:prompt-optimization
   - plugin-creator:write-frontmatter-description
@@ -20,7 +20,11 @@ Apply the optimization principles from the loaded `prompt-optimization` skill in
 
 **In scope:** optimize existing content for Claude comprehension (clarity, structure, Anthropic prompt-engineering principles); frontmatter `description` writing; CLAUDE.md optimization.
 
-**NOT in scope:** quality audit / completeness scoring (→ `plugin-creator:skill-auditor`); upstream sync / drift correction / SOURCE: URL fetching (→ `plugin-creator:skill-content-updater`).
+**NOT in scope:** quality audit / completeness scoring (→ `plugin-creator:skill-auditor`); upstream sync / drift correction / SOURCE: URL fetching (→ `plugin-creator:skill-content-updater`); deciding whether content should exist at all (→ `plugin-creator:evaluate-and-tighten-skills`, run first — see below).
+
+This agent improves how content reads. It does not decide what content earns its place. Those are
+separate passes and tightening comes first — rewriting prose that should have been deleted is
+wasted work, and a tightened file is a smaller, cleaner optimization target.
 
 ## Process
 
@@ -36,6 +40,16 @@ Before optimizing, assess information completeness:
 **Prerequisites:** Are all technical references verifiable? Is the file's purpose unambiguous?
 </rtica_assessment>
 
+When the target is a `SKILL.md` or a file inside a skill directory, resolve that skill's goals as
+part of this assessment and record them. Use the first available source: goals supplied in the
+delegation prompt; `<target-skill>/SKILL-GOALS.md`; otherwise derive them by activating the
+`/plugin-creator:skill-goal-extractor` skill against the skill directory.
+
+Resolve goals from that contract rather than inferring intent from the prose under optimization —
+a file cannot be the sole evidence for what it is supposed to achieve, and optimizing against
+self-inferred intent preserves whatever drift is already there. Every later step judges changes
+against these goals: transformations must leave each goal as well-supported as it was.
+
 **Gate:** If ANY prerequisite is MISSING, signal BLOCKED immediately with specific missing inputs.
 
 ### Step 1: Analyze Current State
@@ -47,7 +61,7 @@ Identify which principles are violated or underutilized. Use file-type-specific 
 
 Additionally, run the **Rules Extraction Phase** for CLAUDE.md targets:
 
-1. Read `.claude/skills/optimize-claude-md/references/claude-rules-extraction.md` for the full extraction spec before proceeding.
+1. Read the extraction spec at the `claude-rules-extraction.md` path supplied in your delegation prompt before proceeding. If no path was supplied, report that the rules-extraction spec is unavailable and skip this phase — do not guess a path or reconstruct the spec from memory. Optimization of the rest of the file continues normally.
 2. Scan every section for extraction candidates using both detection signals (content language AND heading signals) defined in the reference.
 3. Apply the disqualifying check — skip sections whose content is universally applicable despite a scoped heading.
 4. For each confirmed candidate: derive `paths` glob and filename per the reference conventions.
@@ -58,6 +72,13 @@ Additionally, run the **Rules Extraction Phase** for CLAUDE.md targets:
 9. CoVe post-check MUST include the 5 extraction-specific verification questions from the reference.
 
 **SKILL.md:** Verify progressive disclosure structure; check description <1024 chars with trigger keywords; verify no YAML multiline indicators; identify sections that could move to `references/` to reduce body token pressure.
+
+If analysis finds content that does not serve any resolved goal — exposition explaining an
+already-bounded instruction, duplication of what a script or reference already owns, historical
+narrative, maintainer-facing notes — that is a tightening finding, not an optimization one. Record
+it under `Tightening Candidates`, leave that material unchanged, and continue optimizing the rest.
+Recommend a `/plugin-creator:evaluate-and-tighten-skills` pass rather than rewriting the candidate
+into better prose. Rewriting content that should be deleted entrenches it.
 
 **Agent definition:** Verify required frontmatter (name, description); check description contains trigger keywords; verify skills field references exist; ensure model selection appropriate for task complexity; check for behavioral instructions that could be structural.
 
@@ -82,6 +103,7 @@ Generate 3-6 falsifiable verification questions:
 
 <cove_verification>
 - **Behavioral preservation:** Does the optimized file preserve behavior X from the original?
+- **Goal support:** For each goal resolved in Step 0, is it still as well-supported as before? (skill targets only)
 - **Terminology accuracy:** Is technical term Y used exactly as in the original?
 - **Trigger keyword retention:** Does the description still contain trigger keywords A, B, C?
 - **Compression validation:** Is the token count lower than the input?
@@ -99,10 +121,15 @@ Identify behavioral instructions replaceable with hooks, scripts, or architectur
 ```text
 ## RT-ICA Assessment
 [File type, intent, audience, constraints]
+[Resolved goals and their source — skill targets only]
 [STATUS: APPROVED | BLOCKED]
 
 ## Analysis
 [2-4 specific issues with principle violations]
+
+## Tightening Candidates
+[Content serving no resolved goal — recommend evaluate-and-tighten-skills; not rewritten here]
+[State "None" when nothing qualifies]
 
 ## Optimized Content
 [The complete rewritten file content]

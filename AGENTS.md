@@ -255,11 +255,14 @@ flat directives, not `Edit`-trimming words from its existing structure.
 ### Markdown (Skills/Commands/Agents)
 
 - Skills are AI-facing documentation, NOT user documentation
-- Shipped skill/agent/reference content has exactly one reader: the agent executing it at runtime,
-  in whatever install it ends up in — never the plugin's own maintainer. Never write a maintenance
-  aside ("don't restate this here", "keep this in sync with X", "note for future editors") into
-  that content; the maintainer editing this repo is not that content's audience and never reads it
-  as instructions. Put maintenance notes in a commit message, PR description, or ADR instead.
+- Runtime skill/agent/reference content has exactly one reader: the agent executing it. Never write
+  a maintenance aside ("don't restate this here", "keep this in sync with X", "note for future
+  editors") into runtime content.
+- Design-time artifacts such as `SKILL-GOALS.md`, `BENCHMARKS.md`, `MAINTENANCE.md`,
+  `maintenance/*.md`, and `evals/**` travel inside the skill package but do not load with
+  `SKILL.md`. Do not link to them from runtime skill content. Maintenance, review, and evaluation
+  workflows may read them explicitly when making decisions about the skill. Put transient
+  provenance in a commit or PR and durable architectural decisions in an ADR.
 - Use imperative language ("The model MUST...")
 - No decorative `**bold**` — a model reads it as no stronger a signal than plain text. Use
   imperative wording for emphasis, backtick code-spans for literal identifiers (tool names, config
@@ -448,6 +451,7 @@ this file) was removed to avoid two files drifting out of sync.
 | Purpose | Location |
 |---------|----------|
 | AI project instructions | `.claude/CLAUDE.md` (primary context file for Claude Code) |
+| Repo terminology (skill vs. plugin vs. agent vs. command vs. hook vs. MCP server) | `docs/terminology-glossary.md` |
 | Linting config | `pyproject.toml [tool.ruff]` |
 | Type checking config | `pyproject.toml [tool.ty]` |
 | Test config | `pyproject.toml [tool.pytest.ini_options]` |

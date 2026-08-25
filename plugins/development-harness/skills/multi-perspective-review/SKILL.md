@@ -20,6 +20,8 @@ This skill does NOT replace language-scoped code review (`dh:forensic-review`). 
 alongside it as an orthogonal quality signal. #1430 replaces the stub gate logic in Step 7 without
 changing the caller interface.
 
+Activate `dh:review-verdict-contract` before the first verdict-schema operation.
+
 ## Argument Parsing
 
 | Argument | Type | Description |
@@ -265,8 +267,8 @@ that returned nothing in `missing`, and the deduplicated findings in `entries`. 
 everything it needs to render the summary and entries, but not everything it needs to trust the
 `verdict` token or the findings behind `entries` — see the reconciliation checks below.
 
-`json.loads` succeeding proves the section is JSON, not that it is a punch list. Run the validity
-checks in [./references/verdict-schema.md](./references/verdict-schema.md) §2.6 against the parsed
+`json.loads` succeeding proves the section is JSON, not that it is a punch list. Run the
+`review-verdict-contract` §2.6 validity checks against the parsed
 block before Step 7 reads any field, and take the `Punch list not produced` failure path below —
 naming the check that failed — when any of them fails. Indexing a field the gate needs out of an
 unvalidated block raises on `{}` and silently under-reports coverage on a block missing a
@@ -309,7 +311,7 @@ only ones that will run for it.
 ### Gate Logic
 
 The gate logic is the pre-#1430 stub. The full gate logic including the all-SKIP edge case is
-defined in [./references/verdict-schema.md](./references/verdict-schema.md) §2.4. Both inputs come
+defined in `review-verdict-contract` §2.4. Both inputs come
 from the punch list read in Step 6: `punch_list["verdicts"]` and `punch_list["missing"]`.
 
 Apply gate in this order:
@@ -344,7 +346,7 @@ Security: {token} | Performance: {token} | Quality: {token} | Accessibility: {to
 ```
 
 Take each `{token}` from the verdict-to-token mapping in
-[./references/verdict-schema.md](./references/verdict-schema.md) §2.2, which also shows a fully
+`review-verdict-contract` §2.2, which also shows a fully
 rendered example line.
 
 ### Exit and Cleanup
@@ -416,8 +418,8 @@ orchestrator passes only the task reference `{PA}/T{N}` to the worker prompt.
 - **Every run creates its own plan.** `review_slug` carries this run's stamp, so no earlier
   plan can match it and no run reads another run's results.
 - Dispatch uses `dh:task-worker` because the perspective reviewer agents cannot claim or close a SAM task. Specialist behavior is selected through the task profile. See `dh:dispatch-contract`.
-- **Do not embed the verdict or punch-list schema, or the UI pattern list.** Reference
-  [./references/verdict-schema.md](./references/verdict-schema.md) for all schema definitions.
+- **Do not embed the verdict or punch-list schema, or the UI pattern list.** Activate
+  `dh:review-verdict-contract` for all schema definitions.
 - **Each reviewer task body must embed the newline-separated changed-files list.** Reviewers read
   their task body to obtain the scan target; they do not receive it via the prompt. T5 reads the
   four verdict sections instead, so its body names those and carries no file list.

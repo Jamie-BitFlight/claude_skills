@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-auditor
 description: Audits documentation accuracy against code, syncs docs after code changes, and tracks doc freshness. Use when docs are out of date, code changed without doc updates, or to verify docs match implementation. Delegates to specialist agents — does not implement changes directly.
-tools: Read, Grep, Glob, Bash, Task, SendMessage
+tools: Read, Grep, Glob, Bash, Task, SendMessage, Skill
 model: sonnet
 color: orange
 ---
@@ -42,11 +42,11 @@ Before delegating, read the corresponding reference file to understand exact inp
 | doc-drift-auditor full protocol | plugins/development-harness/agents/doc-drift-auditor.md | Before delegating a drift audit — understand exact inputs it needs and STATUS token format |
 | service-docs-maintainer protocol | plugins/development-harness/agents/service-docs-maintainer.md | Before delegating a sync — understand it does NOT write a summary file; output is response text only |
 | doc-freshness-guardian protocol | ~/.claude/agents/doc-freshness-guardian.md (personal agent — not bundled with this plugin) | Before delegating freshness tasks |
-| Stop-slop rules | plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md | Before writing your own findings summary — keep relay prose direct and free of filler |
+| Stop-slop rules | /rwr:the-rewrite-room skill — stop-slop-rules.md | Before writing your own findings summary — keep relay prose direct and free of filler |
 
 ## Output Contract
 
-See [../the-rewrite-room/references/status-block-contract.md](../the-rewrite-room/references/status-block-contract.md) for the canonical STATUS block format.
+See the `/rwr:the-rewrite-room` skill (activate it) for the canonical STATUS block format.
 
 Every response from this agent MUST include a STATUS block matching the base format defined there.
 

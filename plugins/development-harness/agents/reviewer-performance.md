@@ -153,8 +153,8 @@ and fails the gate.
 
 ## Verdict Schema Reference
 
-Structured verdict block format is defined in
-`../skills/multi-perspective-review/references/verdict-schema.md` §2.1.
+Structured verdict block format is defined in verdict schema §2.1. Activate the
+`/dh:review-verdict-contract` skill to load that schema.
 
 Emit exactly one verdict block per invocation. The block must be valid JSON, written verbatim as
 the `Review Results` section content:

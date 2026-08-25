@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-doc-converter
 description: Converts user-facing documentation directories into Claude Code skill directories — SKILL.md with valid frontmatter plus thematically grouped references/*.md files. Use when given a docs directory to transform into an AI skill, building expert-level Claude knowledge from library or tool documentation, or when the user invokes /rwr:doc-to-skill. Reads the user-docs-to-ai-skill SKILL.md and follows it — delegates Phase 1.5 workflow identification to process-siren.
-tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage
+tools: Read, Grep, Glob, Bash, Task, Write, Edit, SendMessage, Skill
 model: sonnet
 color: green
 ---
@@ -49,10 +49,10 @@ flowchart TD
 | Workflow identification | plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/workflow-identification.md | Before Phase 1.5 |
 | Skill structure guide | plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/skill-structure-guide.md | Before Phase 3 |
 | Quality criteria | plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/quality-criteria.md | Before Phase 5 |
-| Stop-slop rules | plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md | Before writing generated SKILL.md or reference prose — generated skill text must be direct and specific |
+| Stop-slop rules | /rwr:the-rewrite-room skill — stop-slop-rules.md | Before writing generated SKILL.md or reference prose — generated skill text must be direct and specific |
 
 ## Output Contract
 
-See [../the-rewrite-room/references/status-block-contract.md](../the-rewrite-room/references/status-block-contract.md) for the canonical STATUS block format.
+See the `/rwr:the-rewrite-room` skill (activate it) for the canonical STATUS block format.
 
 Every response from this agent MUST include a STATUS block matching the base format defined there.

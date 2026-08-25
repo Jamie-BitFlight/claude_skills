@@ -33,6 +33,13 @@ Before analyzing for a split, determine whether skill splitting is the appropria
    `uvx skilllint@latest check <skill-path>`
 2. Read the complete SKILL.md — every line, every section.
 
+If the skill is over threshold mainly because it carries content serving no stated goal — exposition
+around already-bounded instructions, duplication of what a script or reference already owns,
+historical narrative — run `/plugin-creator:evaluate-and-tighten-skills` first and re-measure.
+Splitting or extracting distributes that content across more files instead of removing it, and a
+skill that comes back under threshold needs no structural change at all. Proceed with the
+assessment below when the skill is over threshold on content that genuinely earns its place.
+
 **Step 2 — Determine the correct path:**
 
 ```mermaid

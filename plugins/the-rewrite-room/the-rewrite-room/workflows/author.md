@@ -117,7 +117,6 @@ Agent(
 Target: <file path>
 Audience: <who will read this>
 
-Content preservation rules: see [../references/status-block-contract.md](../references/status-block-contract.md) — No-Loss Rewrite Rule section.
 Style rules: Apply plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md to all newly written prose. Preserve direct quotes verbatim."
 )
 ```
@@ -143,8 +142,6 @@ flowchart TD
 Note: validate_glfm.py calls GitLab API — requires network and GITLAB_TOKEN.
 
 ## Output Contract
-
-Base format — see [../references/status-block-contract.md](../references/status-block-contract.md).
 
 Author workflow VALIDATION subfields:
 

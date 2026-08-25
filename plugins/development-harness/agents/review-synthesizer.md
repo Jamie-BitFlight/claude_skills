@@ -2,7 +2,7 @@
 name: review-synthesizer
 description: "Synthesizes the four multi-perspective reviewer verdicts into one deduplicated, cross-referenced punch list. Loaded as the T5 profile by dh:multi-perspective-review."
 model: opus
-tools: Read, Grep, mcp__plugin_dh_sam__sam_task
+tools: Read, Grep, mcp__plugin_dh_sam__sam_task, Skill
 skills:
   - dh:subagent-contract
   - dh:dispatch-contract
@@ -45,8 +45,8 @@ mcp__plugin_dh_sam__sam_task(plan="{plan_address}", task="T{N}", config={"action
 ```
 
 The plan was created for this run, so the task carries exactly one `Review Results` section.
-Parse its content as JSON per
-`../skills/multi-perspective-review/references/verdict-schema.md` §2.1.
+Parse its content as JSON per verdict schema §2.1. Activate the
+`/dh:review-verdict-contract` skill to load that schema.
 
 A task carrying no `Review Results` section, or a section that does not parse as a §2.1 block,
 contributes no verdict. Record that perspective in the `missing` list and carry it forward. A

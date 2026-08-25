@@ -112,8 +112,8 @@ For each confirmed finding (not a false positive):
 
 ### Step 4: Determine Verdict
 
-Apply the verdict rule from
-`../skills/multi-perspective-review/references/verdict-schema.md` §2.1:
+Apply the verdict rule from verdict schema §2.1 — activate the
+`/dh:review-verdict-contract` skill to load that schema:
 
 - `REJECT` — any finding with `severity: BLOCKER`
 - `APPROVE` — no BLOCKER findings (MINOR or INFO findings may exist)
@@ -133,11 +133,7 @@ credential files in changeset").
 ## Verdict Rules
 
 For the full structured verdict block schema (field constraints, `findings[]` structure,
-`severity` values, `skip_reason` rules), see:
-
-```text
-../skills/multi-perspective-review/references/verdict-schema.md §2.1
-```
+`severity` values, `skip_reason` rules), activate `/dh:review-verdict-contract` and use §2.1.
 
 Do NOT embed the schema in this file. Reference it only.
 

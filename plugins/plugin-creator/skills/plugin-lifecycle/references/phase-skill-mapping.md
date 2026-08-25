@@ -16,14 +16,19 @@ Lookup reference: which skill or agent handles each phase, and the exact invocat
 | 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint")` |
 | 5: Debug | `/plugin-creator:refactor-skill` | `Skill(skill="plugin-creator:refactor-skill")` |
 | 5: Debug | `/plugin-creator:lint` | `Skill(skill="plugin-creator:lint", args="--fix PATH")` |
+| 6: Optimize | `/plugin-creator:skill-goal-extractor` | Activate `plugin-creator:skill-goal-extractor` |
+| 6: Optimize | `/plugin-creator:evaluate-and-tighten-skills` | Activate `plugin-creator:evaluate-and-tighten-skills` |
 | 6: Optimize | `/plugin-creator:refactor-plugin` | `Skill(skill="plugin-creator:refactor-plugin")` |
-| 6: Optimize | `@ai-doc-optimizer` | subagent_type="plugin-creator:ai-doc-optimizer" |
+| 6: Optimize | `/plugin-creator:optimize-claude-md` | `Skill(skill="plugin-creator:optimize-claude-md")` — entry point; dispatches `@ai-doc-optimizer` itself |
 | 6: Optimize | `@skill-auditor` | subagent_type="plugin-creator:skill-auditor" |
 | 6: Optimize | `@skill-content-updater` | subagent_type="plugin-creator:skill-content-updater" |
+| 6: Optimize | `/plugin-creator:subagent-refactoring-methodology` | `Skill(skill="plugin-creator:subagent-refactoring-methodology")` — load before the agent below |
 | 6: Optimize | `@subagent-refactorer` | subagent_type="plugin-creator:subagent-refactorer" |
 
 Routing by concern:
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `ai-doc-optimizer` agent (subagent_type="plugin-creator:ai-doc-optimizer")
+- Establish what a skill exists to achieve, before judging any of its content → `/plugin-creator:skill-goal-extractor` skill
+- Remove content that serves no goal (decides whether text exists) → `/plugin-creator:evaluate-and-tighten-skills` skill, run before optimizing
+- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → `/plugin-creator:optimize-claude-md` skill, which measures baselines, dispatches the `ai-doc-optimizer` agent, runs independent verification, and reports. Do not dispatch that agent directly — a bare dispatch skips measurement, goal resolution, verification, and reporting.
 - Audit quality (read-only, no writes, score against completeness categories) → `skill-auditor` agent (uses `/plugin-creator:audit-skill-completeness`)
 - Sync content against upstream docs (add NEW/fix STALE from live sources) → `skill-content-updater` agent (subagent_type="plugin-creator:skill-content-updater")
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly

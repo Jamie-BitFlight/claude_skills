@@ -71,23 +71,49 @@ For agent-frontmatter decisions during agent creation, also load `/plugin-creato
 
 Routing by concern (use when editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md`):
 
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `subagent_type="plugin-creator:ai-doc-optimizer"`
+- Establish what a skill exists to achieve, before judging any of its content → activate `plugin-creator:skill-goal-extractor`
+- Remove content that serves no goal (decides whether text exists) → activate `plugin-creator:evaluate-and-tighten-skills`
+- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → activate `plugin-creator:optimize-claude-md`, which measures, delegates to `ai-doc-optimizer`, verifies, and reports
 - Audit quality (read-only, no writes, score against completeness categories) → `subagent_type="plugin-creator:skill-auditor"`
 - Sync content against upstream docs (add NEW/fix STALE from live sources) → `subagent_type="plugin-creator:skill-content-updater"`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
-- Resolve prose duplicated across 2+ skills or agent files (shared reference material, not one skill's own bloat) → `Skill(skill="plugin-creator:shared-content-references")`
+- Resolve prose duplicated across 2+ skills or agent files (shared reference material, not one skill's own bloat) → activate `plugin-creator:shared-content-references`
 
-Dispatches:
+Dispatches run in this order. Goals are resolved first because every later step judges content
+against them, and tightening precedes both structural and content work: removing dead weight can
+drop a skill back under the split threshold, making structural work unnecessary, and stops content
+optimization from polishing prose that should have been deleted.
 
-1. Task is structural plugin improvement with `Skill(skill="plugin-creator:refactor-plugin")`
+1. For each skill directory lacking approved goals, separately activate `plugin-creator:skill-goal-extractor`.
+   - Context to include in each prompt: one skill directory
+   - Output: one approved goal block; write `SKILL-GOALS.md` only when the user requests persistence
+
+2. Task is pre-optimization tightening with `plugin-creator:evaluate-and-tighten-skills`
+   - Context to include in the prompt: skill directory path, its resolved goals from dispatch 1
+   - Output: tightened skill with dead weight removed, plus its Tightening-complete report listing removals, relocations, and `Uncertain` items
+
+3. Task is structural plugin improvement with `plugin-creator:refactor-plugin`
    - Context to include in the prompt: plugin path, `assessment-REPORT.md` (if available from Phase 1)
    - Output: improved plugin structure, updated SKILL.md files, better progressive disclosure
 
-2. Task is content quality optimization with `subagent_type="plugin-creator:ai-doc-optimizer"`
-   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings
-   - Output: optimized documentation with better Claude comprehension
+   After structural work, compare the resulting skill directories with the pre-refactor set. For
+   every skill that was created, renamed, split, merged, or materially changed, separately activate
+   `plugin-creator:skill-goal-extractor` and obtain approval for the resulting goals before dispatch
+   4. Reuse dispatch 1 goals only for unchanged skills. Never pass a pre-refactor goal set to a skill
+   whose behavior or ownership changed.
 
-3. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`
+4. Task is content quality optimization with `plugin-creator:optimize-claude-md`
+   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1 or the post-refactor refresh
+   - Output: optimized documentation with better Claude comprehension, plus that skill's before/after metrics report
+
+   Enter through the skill, not by dispatching `ai-doc-optimizer` directly. The skill owns the
+   surrounding process — baseline token/completeness/index measurement, goal resolution, the
+   reference paths the agent needs, an independent second-agent verification pass, and the
+   before/after report. A direct agent dispatch skips all of it and produces an unverified,
+   unmeasured rewrite.
+
+5. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`
+   - Activate `plugin-creator:subagent-refactoring-methodology` first — that skill carries the analysis criteria, transformation patterns, output format, and validation checklist this agent is written to apply, and its own description requires loading it before the agent runs. It is reference knowledge, not an orchestrator, so the agent is still dispatched directly here.
    - Context to include in the prompt: agent .md files needing improvement
    - Output: optimized agent prompts using Anthropic best practices
 

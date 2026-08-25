@@ -90,7 +90,7 @@ Why top: biggest replication; the reviewer-* agents above already prove the spli
 ### C2 Plugin-Creator Audit/Assessor Family — tier-partitioned, convert-once cascades
 
 - `skills/audit-skill-completeness` — 20+ (5 agentskills checks + 8 scored categories) — fit5
-- `skills/assessor` + `references/scoring-criteria.md` — 4 tiers, 15-20 — fit5
+- `skills/assessment-reporting` + `references/scoring-criteria.md` — 4 tiers, 15-20 — fit5
 - `agents/skill-auditor` — 12-15 — fit5
 - `agents/plugin-assessor` — 4 assessment tiers — fit5
 - `skills/audit-agent-lifecycle` — 8 dimensions — fit4

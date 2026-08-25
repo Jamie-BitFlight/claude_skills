@@ -38,11 +38,7 @@ You are **never** the implementer. You do not fix issues — you identify them a
 
 ### Step 1: Read Verdict Schema
 
-Read the verdict schema reference file to load the SKIP detection rule and output schema:
-
-```text
-Read("../skills/multi-perspective-review/references/verdict-schema.md")
-```
+Activate `/dh:review-verdict-contract` to load the SKIP detection rule and output schema.
 
 Extract from §2.3:
 - The authoritative UI file pattern list

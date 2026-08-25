@@ -8,6 +8,8 @@ allowed-tools: Read, Grep, Glob, Bash, Task, Write, Edit
 
 Routes documentation, authoring, and optimization tasks to the correct specialist agents. Does not rewrite source agents or skills — orchestrates them. Governs authoring, docs, prompts, and summaries — not product code.
 
+Before producing a rewrite-room `STATUS` block, read `${CLAUDE_SKILL_DIR}/references/status-block-contract.md`.
+
 ## Non-Negotiable Writing Standard
 
 Any prose that this plugin authors, rewrites, or materially restructures MUST follow the anti-slop rules in `plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md`.
