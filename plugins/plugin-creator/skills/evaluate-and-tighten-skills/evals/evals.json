@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/existing-maintenance/skill-under-test.md as the target skill's SKILL.md; it already has a MAINTENANCE.md alongside it.",
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/existing-maintenance/skill-under-test.md as the target skill's SKILL.md; it already has a MAINTENANCE.md alongside it. Resolved goals supplied from skill-goal-extractor: obtain a run address with the bundled stamp script and configure retries to 3.",
       "expected_output": "Existing MAINTENANCE.md branch: the current cross-cutting invariant survives, the stale historical note is deleted, the runtime duplicate of an already-maintained fact is removed from the target's SKILL.md, and the tightened SKILL.md still executes correctly without reading MAINTENANCE.md.",
       "files": [
         "evals/files/existing-maintenance/skill-under-test.md",
@@ -19,7 +19,7 @@
     },
     {
       "id": 2,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/maintenance-creation/skill-under-test.md as the target skill's SKILL.md; it has no MAINTENANCE.md.",
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/maintenance-creation/skill-under-test.md as the target skill's SKILL.md; it has no MAINTENANCE.md. Resolved goal supplied from skill-goal-extractor: prevent concurrent run-directory corruption by acquiring the shared run lock before writing.",
       "expected_output": "MAINTENANCE.md creation branch: the runtime explanation is stripped down to the bare instruction, and a new MAINTENANCE.md is created lazily containing only the smallest durable cross-cutting invariant.",
       "files": ["evals/files/maintenance-creation/skill-under-test.md"],
       "expectations": [
@@ -31,7 +31,7 @@
     },
     {
       "id": 3,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/local-ownership/skill-under-test.md as the target skill's SKILL.md; its maintenance reasoning concerns only scripts/rebuild_cache.py.",
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/local-ownership/skill-under-test.md as the target skill's SKILL.md; its maintenance reasoning concerns only scripts/rebuild_cache.py. Resolved goal supplied from skill-goal-extractor: regenerate the cache with the bundled rebuild script.",
       "expected_output": "MOVE-LOCAL branch: the seed-reproducibility fact is classified MOVE-LOCAL and relocated to the script itself, not to a new whole-skill MAINTENANCE.md.",
       "files": [
         "evals/files/local-ownership/skill-under-test.md",
@@ -46,7 +46,7 @@
     },
     {
       "id": 4,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/adr-worthy/component/skills/eval4-target/skill-under-test.md as the target skill's SKILL.md. Its containing component has its own ADR convention at evals/files/adr-worthy/component/docs/adrs/.",
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/adr-worthy/component/skills/eval4-target/skill-under-test.md as the target skill's SKILL.md. Its containing component has its own ADR convention at evals/files/adr-worthy/component/docs/adrs/. Resolved goal supplied from skill-goal-extractor: detect completion reliably by polling the status endpoint every 30 seconds.",
       "expected_output": "MOVE-ADR branch: the polling-vs-webhook decision passes all three ADR criteria (hard to reverse, surprising without context, genuine trade-off) and is placed in the narrower component-scoped ADR convention rather than any broader one.",
       "files": [
         "evals/files/adr-worthy/component/skills/eval4-target/skill-under-test.md",
@@ -61,7 +61,7 @@
     },
     {
       "id": 5,
-      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/non-adr-history/skill-under-test.md as the target skill's SKILL.md.",
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/non-adr-history/skill-under-test.md as the target skill's SKILL.md. Resolved goal supplied from skill-goal-extractor: emit the result as machine-readable JSON.",
       "expected_output": "Non-ADR history branch: the rejected CSV/key=value history fails the ADR threshold (easily reversible, single caller) and is deleted outright rather than relocated anywhere.",
       "files": ["evals/files/non-adr-history/skill-under-test.md"],
       "expectations": [
