@@ -71,23 +71,36 @@ For agent-frontmatter decisions during agent creation, also load `/plugin-creato
 
 Routing by concern (use when editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md`):
 
-- Optimize existing content (improve clarity, fix structure, apply Anthropic prompt engineering principles) → `subagent_type="plugin-creator:ai-doc-optimizer"`
+- Establish what a skill exists to achieve, before judging any of its content → `Skill(skill="plugin-creator:skill-goal-extractor")`
+- Remove content that serves no goal (decides whether text exists) → `Skill(skill="plugin-creator:evaluate-and-tighten-skills")`
+- Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → `subagent_type="plugin-creator:ai-doc-optimizer"`
 - Audit quality (read-only, no writes, score against completeness categories) → `subagent_type="plugin-creator:skill-auditor"`
 - Sync content against upstream docs (add NEW/fix STALE from live sources) → `subagent_type="plugin-creator:skill-content-updater"`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 - Resolve prose duplicated across 2+ skills or agent files (shared reference material, not one skill's own bloat) → `Skill(skill="plugin-creator:shared-content-references")`
 
-Dispatches:
+Dispatches run in this order. Goals are resolved first because every later step judges content
+against them, and tightening precedes both structural and content work: removing dead weight can
+drop a skill back under the split threshold, making structural work unnecessary, and stops content
+optimization from polishing prose that should have been deleted.
 
-1. Task is structural plugin improvement with `Skill(skill="plugin-creator:refactor-plugin")`
+1. Task is skill goal resolution with `Skill(skill="plugin-creator:skill-goal-extractor")`
+   - Context to include in the prompt: each skill directory in the plugin lacking a `SKILL-GOALS.md`
+   - Output: `SKILL-GOALS.md` written into each skill directory, on user approval of the extracted goals
+
+2. Task is pre-optimization tightening with `Skill(skill="plugin-creator:evaluate-and-tighten-skills")`
+   - Context to include in the prompt: skill directory path, its resolved goals from dispatch 1
+   - Output: tightened skill with dead weight removed, plus its Tightening-complete report listing removals, relocations, and `Uncertain` items
+
+3. Task is structural plugin improvement with `Skill(skill="plugin-creator:refactor-plugin")`
    - Context to include in the prompt: plugin path, `assessment-REPORT.md` (if available from Phase 1)
    - Output: improved plugin structure, updated SKILL.md files, better progressive disclosure
 
-2. Task is content quality optimization with `subagent_type="plugin-creator:ai-doc-optimizer"`
-   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings
+4. Task is content quality optimization with `subagent_type="plugin-creator:ai-doc-optimizer"`
+   - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1
    - Output: optimized documentation with better Claude comprehension
 
-3. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`
+5. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`
    - Context to include in the prompt: agent .md files needing improvement
    - Output: optimized agent prompts using Anthropic best practices
 

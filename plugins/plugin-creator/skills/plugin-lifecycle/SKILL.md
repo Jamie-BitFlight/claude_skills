@@ -245,7 +245,9 @@ Entry condition: Debug gate passed OR Assess gate passed with no errors.
 
 Optimize improves quality — descriptions, progressive disclosure, agent prompts, documentation. This phase is not about fixing errors (that is Debug) but about raising quality.
 
-Execute three dispatches: (1) structural plugin improvement via `refactor-plugin`, (2) content quality optimization via `ai-doc-optimizer`, (3) agent prompt optimization via `subagent-refactorer`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
+Execute five dispatches in order: (1) skill goal resolution via `skill-goal-extractor`, (2) pre-optimization tightening via `evaluate-and-tighten-skills`, (3) structural plugin improvement via `refactor-plugin`, (4) content quality optimization via `ai-doc-optimizer`, (5) agent prompt optimization via `subagent-refactorer`. Full task specs in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
+
+Order is load-bearing: goals are the standard every later dispatch judges content against, and tightening runs before structural and content work because removing dead weight can drop a skill back under the split threshold and stops later passes from polishing prose that should have been deleted.
 
 The following diagram is the authoritative procedure for Phase 6 Optimize completion gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
