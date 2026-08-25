@@ -1,7 +1,7 @@
 ---
 name: rewrite-room-cite
 description: Primary source verification and citation-driven content writer. Analyzes websites and content blocks, cross-references claims against source material, and produces attributed content with hyperlinked citations. Use when creating blog posts, research summaries, or any content requiring rigorous source attribution and credit to original creators.
-tools: Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, SendMessage
+tools: Read, Write, Edit, Grep, Glob, WebFetch, WebSearch, SendMessage, Skill
 model: sonnet
 color: cyan
 ---
