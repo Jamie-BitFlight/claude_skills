@@ -75,7 +75,7 @@ WRITE using Source-First logic:
 - Embed hyperlinked citations using markdown: `[keyword or phrase](URL)`
 - Direct quotes are verbatim with blockquote formatting
 - Adapt tone and depth to the content context (blog = accessible, research = rigorous, social = concise)
-- Read and apply [../the-rewrite-room/references/stop-slop-rules.md](../the-rewrite-room/references/stop-slop-rules.md) to all non-quoted prose
+- Read and apply the stop-slop rules in the `/rwr:the-rewrite-room` skill (activate it) to all non-quoted prose
 
 ### Step 5: Assemble Output
 
@@ -119,7 +119,7 @@ PRODUCE the content with these sections:
 
 ## Output Contract
 
-See [../the-rewrite-room/references/status-block-contract.md](../the-rewrite-room/references/status-block-contract.md) for the canonical STATUS block format.
+See the `/rwr:the-rewrite-room` skill (activate it) for the canonical STATUS block format.
 
 Every response from this agent MUST include a STATUS block matching the base format defined there.
 Use the cite workflow VALIDATION subfields from the canonical contract.

@@ -62,13 +62,13 @@ The architecture spec document contains:
 
 1. **Executive Summary** — architectural approach in plain language
 2. **Architecture Overview** — C4 context + container Mermaid diagrams
-3. **Technology Stack** — choices from `./references/architecture-spec-patterns.md` with project-specific justification
+3. **Technology Stack** — choices from `architecture-spec-patterns.md` with project-specific justification
 4. **Component Design** — cli/, core/, services/, utils/ with purpose, interfaces, dependencies
 5. **Data Architecture** — configuration schema and data models (type hints, fields, validation)
 6. **Type System Design** — domain identifier inventory (all custom types needed: enums, NewTypes, Annotated validators); boundary validation map (which boundaries get runtime validation, what mechanism); type contract for each domain identifier (creation → validation → consumption → serialization); weak type audit (flag Any, cast(), bare str for constrained domains)
 7. **Security Architecture** — credential management, security checklist
-8. **Testing Architecture** — strategy and coverage requirements from `./references/testing-spec-guidance.md`
-9. **Distribution Architecture** — PEP 723 vs package, from `./references/architecture-spec-patterns.md`
+8. **Testing Architecture** — strategy and coverage requirements from `testing-spec-guidance.md`
+9. **Distribution Architecture** — PEP 723 vs package, from `architecture-spec-patterns.md`
 10. **Architectural Decisions (ADRs)** — one per non-obvious technology choice
 11. **Scalability Strategy** — async patterns, resource management
 
@@ -76,11 +76,11 @@ The architecture spec document contains:
 
 Load these before writing the spec:
 
-- `./references/architecture-spec-patterns.md` — standard technology stack, component templates, security, integration patterns, ADRs
-- `./references/testing-spec-guidance.md` — testing stack, coverage requirements, pytest config block
-- `./references/type-system-design-patterns.md` — type system audit, domain identifier patterns, boundary validation, anti-patterns, type contract template
-- Load `Skill(skill="python-engineering:python3-cli")` — Typer and Rich reference including table width measurement pattern (include in spec when tables are needed)
-- Review compliance: `./references/architecture-spec-patterns.md` § "Review Compliance Requirements" — the architecture spec MUST prescribe patterns that pass `modernpython`, `shebangpython`, and `code-reviewer` assessments on first attempt
+- Activate the `/python-engineering:python3-cli` skill first — it owns the three references below, plus the Typer and Rich reference including the table width measurement pattern (include in spec when tables are needed)
+- `architecture-spec-patterns.md` — standard technology stack, component templates, security, integration patterns, ADRs
+- `testing-spec-guidance.md` — testing stack, coverage requirements, pytest config block
+- `type-system-design-patterns.md` — type system audit, domain identifier patterns, boundary validation, anti-patterns, type contract template
+- Review compliance: `architecture-spec-patterns.md` § "Review Compliance Requirements" — the architecture spec MUST prescribe patterns that pass `modernpython`, `shebangpython`, and `code-reviewer` assessments on first attempt
 
 ## Document Size
 
@@ -107,7 +107,7 @@ material into the `research` artifact and register the spec again.
 3. **Type System Analysis** — identify domain identifiers, map validation boundaries, design type contracts for each identifier flowing through the system
 4. **Detailed Design** — select libraries, design command interfaces with Typer/Annotated syntax, data models
 5. **Document** — write architecture diagrams, ADRs, command specs, testing and packaging guidance
-6. **Review Compliance Verification** — verify the spec prescribes patterns that satisfy all three review stages (modernpython, shebangpython, code-reviewer) from `./references/architecture-spec-patterns.md` § "Review Compliance Requirements"
+6. **Review Compliance Verification** — verify the spec prescribes patterns that satisfy all three review stages (modernpython, shebangpython, code-reviewer) from `architecture-spec-patterns.md` § "Review Compliance Requirements"
 
 ## Stopping Condition
 

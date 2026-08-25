@@ -128,8 +128,9 @@ Considerations for Specialized Scripts (e.g., Testing, Building, CI/CD):
 
 When creating or refactoring scripts:
 
-- First read the example files at `../references/bash_example_file.sh` and
-  `../references/bash_example_includes.bash` to understand the recommended patterns
+- First activate the `/bash-development:bash-development` skill, which owns the example files
+  `bash_example_file.sh` and `bash_example_includes.bash`, and read both to understand the
+  recommended patterns
 - Start with the complete template structure including header, metadata, includes, error handler, usage, and main
   function
 - Implement specific functionality within the established framework, using utilities and patterns from the guide
@@ -148,8 +149,8 @@ Reference Examples (Illustrative Patterns—Adapt as Needed):
 
 **NOTE**: The complete working examples are available in:
 
-- `../references/bash_example_file.sh` - Full script template with error handling, argument parsing, and main function
-- `../references/bash_example_includes.bash` - Reusable utility functions and logging helpers
+- `bash_example_file.sh` - Full script template with error handling, argument parsing, and main function
+- `bash_example_includes.bash` - Reusable utility functions and logging helpers
   Always reference these files for the most up-to-date patterns and implementations.
 
 - Color-Coded Logging (Use %b for backslash interpretation, e.g., to handle \n in messages):

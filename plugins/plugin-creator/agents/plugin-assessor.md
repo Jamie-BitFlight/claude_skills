@@ -67,7 +67,7 @@ READ every file completely. CITE specific file:line for all issues. ASSIGN prior
 
 ## Output
 
-Write the assessment report following [./skills/assessor/references/assessment-report-format.md](./skills/assessor/references/assessment-report-format.md). Use scoring criteria from [./skills/assessor/references/scoring-criteria.md](./skills/assessor/references/scoring-criteria.md).
+Activate the `/plugin-creator:assessor` skill — it owns both `assessment-report-format.md` and `scoring-criteria.md`. Write the assessment report following that report format, and score using those scoring criteria.
 
 For plugins with >20 files, write the report to `.plugin-creator/reports/plugin-assessment-{plugin-name}.md` and return the path. For smaller plugins, present inline.
 

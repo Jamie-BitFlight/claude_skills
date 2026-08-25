@@ -49,10 +49,10 @@ flowchart TD
 | Workflow identification | plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/workflow-identification.md | Before Phase 1.5 |
 | Skill structure guide | plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/skill-structure-guide.md | Before Phase 3 |
 | Quality criteria | plugins/the-rewrite-room/skills/user-docs-to-ai-skill/references/quality-criteria.md | Before Phase 5 |
-| Stop-slop rules | plugins/the-rewrite-room/the-rewrite-room/references/stop-slop-rules.md | Before writing generated SKILL.md or reference prose — generated skill text must be direct and specific |
+| Stop-slop rules | /rwr:the-rewrite-room skill — stop-slop-rules.md | Before writing generated SKILL.md or reference prose — generated skill text must be direct and specific |
 
 ## Output Contract
 
-See [../the-rewrite-room/references/status-block-contract.md](../the-rewrite-room/references/status-block-contract.md) for the canonical STATUS block format.
+See the `/rwr:the-rewrite-room` skill (activate it) for the canonical STATUS block format.
 
 Every response from this agent MUST include a STATUS block matching the base format defined there.

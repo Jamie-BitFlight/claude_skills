@@ -95,8 +95,8 @@ SKIP is never a valid verdict for the quality perspective.
 
 ### Step 7: Assemble Verdict Block
 
-Produce the structured verdict block per the schema defined in:
-`../skills/multi-perspective-review/references/verdict-schema.md` §2.1
+Produce the structured verdict block per verdict schema §2.1. Activate the
+`/dh:multi-perspective-review` skill to load that schema — it owns `verdict-schema.md`.
 
 ```json
 {

@@ -112,8 +112,8 @@ For each confirmed finding (not a false positive):
 
 ### Step 4: Determine Verdict
 
-Apply the verdict rule from
-`../skills/multi-perspective-review/references/verdict-schema.md` §2.1:
+Apply the verdict rule from verdict schema §2.1 — activate the
+`/dh:multi-perspective-review` skill to load that schema, which owns `verdict-schema.md`:
 
 - `REJECT` — any finding with `severity: BLOCKER`
 - `APPROVE` — no BLOCKER findings (MINOR or INFO findings may exist)
