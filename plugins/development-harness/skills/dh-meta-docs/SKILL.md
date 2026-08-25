@@ -10,6 +10,18 @@ user-invocable: false
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
 </sam_cli>
 
+<shared_reference_routing>
+Load the smallest reference matching the task. This skill routes shared documentation; it does not
+own or run the development-harness lifecycle.
+
+- [Artifact Conventions](./references/artifact-conventions.md) — artifact naming, logical storage, and cross-reference tokens.
+- [Default Development Flow](./references/default-development-flow.md) — S1–S7 sequencing, stage handoffs, and ARL gates.
+- [Human Touchpoint Model](./references/human-touchpoint-model.md) — whether a constraint requires human escalation.
+- [Language Manifest Schema](./references/language-manifest-schema.md) — create or validate a language-plugin manifest.
+- [Role Resolution Protocol](./references/role-resolution-protocol.md) — resolve abstract harness roles to language-plugin agents.
+- [SDLC Stage Taxonomy](./references/sdlc-stage-taxonomy.md) — choose canonical stage names and `{domain}-{sdlc-stage}` identifiers.
+</shared_reference_routing>
+
 Available documentation:
 
 !`find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' -type f | sort`

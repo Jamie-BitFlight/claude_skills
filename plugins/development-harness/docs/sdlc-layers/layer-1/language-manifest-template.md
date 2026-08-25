@@ -2,7 +2,7 @@
 
 Canonical starting point for language manifests. All Layer 1 plugins produce a manifest conforming to this structure before composing with the harness.
 
-**Schema**: [language-manifest-schema.md](../../../../plugins/development-harness/skills/development-harness/references/language-manifest-schema.md)
+**Schema**: [language-manifest-schema.md](../../../skills/dh-meta-docs/references/language-manifest-schema.md)
 
 ---
 
@@ -50,4 +50,4 @@ Canonical starting point for language manifests. All Layer 1 plugins produce a m
 ## Quick Reference
 
 - **Template file**: [plugins/development-harness/templates/language-manifest-template.md](../../../../plugins/development-harness/templates/language-manifest-template.md)
-- **Schema**: [language-manifest-schema.md](../../../../plugins/development-harness/skills/development-harness/references/language-manifest-schema.md)
+- **Schema**: [language-manifest-schema.md](../../../skills/dh-meta-docs/references/language-manifest-schema.md)

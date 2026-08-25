@@ -37,13 +37,13 @@ registered through the configured backend. Stages gate on artifact completion, n
 6. **S6 Forensic Review** - Verify each task against its acceptance criteria
 7. **S7 Final Verification** - Certify the feature meets original requirements
 
-The default flow with ARL touchpoint gates is defined in [./skills/development-harness/references/default-development-flow.md](./skills/development-harness/references/default-development-flow.md).
+The `dh:dh-meta-docs` skill routes the default flow with ARL touchpoint gates.
 
 ### ARL Human Touchpoints
 
 Not every stage requires human review. The harness uses ARL-derived constraint analysis to decide when to escalate. Escalation triggers include unbound constraints, domain knowledge gaps, high-risk irreversible changes, and novel architecture decisions. Routine changes with existing patterns proceed autonomously.
 
-Details in [./skills/development-harness/references/human-touchpoint-model.md](./skills/development-harness/references/human-touchpoint-model.md).
+Load `dh:dh-meta-docs` for the human touchpoint model.
 
 ### Voltron-Style Composition
 
@@ -73,7 +73,7 @@ flowchart TD
     Configure --> Run([Begin S1 Discovery])
 ```
 
-The full resolution protocol is documented in [./skills/development-harness/references/role-resolution-protocol.md](./skills/development-harness/references/role-resolution-protocol.md).
+Load `dh:dh-meta-docs` for the role-resolution protocol.
 
 ---
 
@@ -93,7 +93,7 @@ Agents address plans and tasks logically (`P{id}/T{M}`) through `sam_plan`, `sam
 grouped DH CLI adapter. Physical paths, cache records, provider IDs, and wire formats are backend
 internals. Use `sam_active_task` for session-scoped execution context.
 
-Full conventions in [./skills/development-harness/references/artifact-conventions.md](./skills/development-harness/references/artifact-conventions.md).
+Load `dh:dh-meta-docs` for the artifact conventions.
 
 **Gotcha — Large plans must use the incremental append workflow:**
 
@@ -257,7 +257,7 @@ flowchart TD
 
 Language plugin authors should use the template at [./templates/language-manifest-template.md](./templates/language-manifest-template.md).
 
-The manifest schema is documented in [./skills/development-harness/references/language-manifest-schema.md](./skills/development-harness/references/language-manifest-schema.md).
+Load `dh:dh-meta-docs` for the language-manifest schema.
 
 ---
 
@@ -401,8 +401,7 @@ Load these documents based on what you are doing. They contain the system design
 
 **Modifying the pipeline process, stage sequencing, or touchpoint gates:**
 
-- Load [Default Development Flow](./skills/development-harness/references/default-development-flow.md) — defines the S1-S7 pipeline, ARL gates, and stage handoffs
-- Load [Artifact Conventions](./skills/development-harness/references/artifact-conventions.md) — artifact naming, required sections per type, cross-referencing tokens
+- Load `dh:dh-meta-docs` — routes the S1-S7 pipeline, ARL gates, stage handoffs, artifact naming, and cross-reference tokens
 
 **Modifying data structures, domain models, or task/plan schemas:**
 
@@ -430,7 +429,7 @@ Load these documents based on what you are doing. They contain the system design
 **Modifying artifact handling, divergence detection, or plan management:**
 
 - Load [Plan Artifact Lifecycle](./docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence classification, annotation rules
-- Load [Artifact Conventions](./skills/development-harness/references/artifact-conventions.md) — storage model, file naming, cross-reference tokens
+- Load `dh:dh-meta-docs` — routes the artifact storage model, file naming, and cross-reference tokens
 
 **Modifying or extending the SDLC layer architecture (Layer 0/1/2 design):**
 
@@ -607,11 +606,7 @@ storage.
 ## References
 
 - [Backend Providers](./docs/backend-providers.md)
-- [Default Development Flow](./skills/development-harness/references/default-development-flow.md)
-- [Role Resolution Protocol](./skills/development-harness/references/role-resolution-protocol.md)
-- [Language Manifest Schema](./skills/development-harness/references/language-manifest-schema.md)
-- [Human Touchpoint Model](./skills/development-harness/references/human-touchpoint-model.md)
-- [Artifact Conventions](./skills/development-harness/references/artifact-conventions.md)
+- `dh:dh-meta-docs`
 - [Language Manifest Template](./templates/language-manifest-template.md)
 
 ---
