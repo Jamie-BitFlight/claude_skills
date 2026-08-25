@@ -98,6 +98,7 @@ optimization from polishing prose that should have been deleted.
 
 4. Task is content quality optimization with `subagent_type="plugin-creator:ai-doc-optimizer"`
    - Context to include in the prompt: SKILL.md or CLAUDE.md files needing improvement, assessment findings, resolved goals from dispatch 1
+   - For CLAUDE.md or AGENTS.md targets, also pass absolute paths to `index-discipline.md` and `claude-rules-extraction.md`, both under the plugin-creator plugin's own `skills/optimize-claude-md/references/` directory. Resolve them to absolute paths before dispatching — the agent treats these specs as unavailable and skips the rules-extraction phase when no path is supplied, rather than guessing one.
    - Output: optimized documentation with better Claude comprehension
 
 5. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`

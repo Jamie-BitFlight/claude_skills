@@ -61,7 +61,7 @@ Identify which principles are violated or underutilized. Use file-type-specific 
 
 Additionally, run the **Rules Extraction Phase** for CLAUDE.md targets:
 
-1. Read `.claude/skills/optimize-claude-md/references/claude-rules-extraction.md` for the full extraction spec before proceeding.
+1. Read the extraction spec at the `claude-rules-extraction.md` path supplied in your delegation prompt before proceeding. If no path was supplied, report that the rules-extraction spec is unavailable and skip this phase — do not guess a path or reconstruct the spec from memory. Optimization of the rest of the file continues normally.
 2. Scan every section for extraction candidates using both detection signals (content language AND heading signals) defined in the reference.
 3. Apply the disqualifying check — skip sections whose content is universally applicable despite a scoped heading.
 4. For each confirmed candidate: derive `paths` glob and filename per the reference conventions.
