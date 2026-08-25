@@ -41,11 +41,11 @@ Goals must be resolved before pruning because they serve two purposes:
 
 ### Existing maintenance context
 
-For a standalone skill outside packaged `plugins/*/skills/` content, read an existing `<target-skill>/MAINTENANCE.md` before pruning. Do not treat a packaged skill directory as a home for maintainer-only files.
+Read `<target-skill>/MAINTENANCE.md` and `<target-skill>/maintenance/*.md` when they exist before pruning.
 
-Treat it as maintainer-facing context, not as another source of skill goals or runtime instructions. It may identify current invariants, regression provenance, authoritative sources, or evaluation uncertainties that matter when changing the skill.
+Treat them as design-time context that travels with the skill package, not as another source of skill goals or runtime instructions. They may identify current invariants, regression provenance, authoritative sources, or evaluation uncertainties that matter when changing the skill.
 
-An entry in `MAINTENANCE.md` does not by itself justify keeping prose in `SKILL.md`. Runtime prose still has to earn its place through the goals and behavioral contract.
+An entry in `MAINTENANCE.md` or `maintenance/*.md` does not by itself justify keeping prose in `SKILL.md`. Runtime prose still has to earn its place through the goals and behavioral contract.
 
 </goal_resolution>
 
@@ -413,7 +413,7 @@ Finish when:
 4. scripts and references remain resolvable exactly where their runtime behavior is needed;
 5. no explanation remains solely to document how or why an already-unambiguous instruction works;
 6. every retained maintenance fact still constrains present maintenance and lives at its narrowest useful scope;
-7. `MAINTENANCE.md` exists only for a standalone skill when at least one cross-cutting or displaced maintenance fact earns it;
+7. every `MAINTENANCE.md` or `maintenance/*.md` file contains at least one cross-cutting or displaced maintenance fact that earns its place;
 8. every ADR created by this pass satisfies the hard-to-reverse, surprising, and real-trade-off tests;
 9. historical detail with no current execution or maintenance consequence has been deleted rather than relocated.
 

@@ -66,9 +66,17 @@ When created, include only sections that have content:
 
 Do not create empty sections.
 
-Do not add a runtime pointer from the target `SKILL.md` to `MAINTENANCE.md`. The executing agent does not need maintainer context.
+Do not add a runtime pointer from the target `SKILL.md` to `MAINTENANCE.md` or `maintenance/*.md`. The executing agent does not need maintainer context.
 
-Do not create `MAINTENANCE.md` inside a packaged `plugins/*/skills/` directory. Put non-architectural maintainer context in the current commit message or PR description; use an ADR only when the ADR threshold below is met. Existing `MAINTENANCE.md` handling applies only to standalone skills or repositories whose instructions explicitly establish that file outside shipped skill content.
+## `maintenance/*.md`
+
+Use a skill-local `maintenance/` directory when design-time context has distinct topics that are
+clearer as separately named Markdown files, or when the target skill already follows that
+convention. These files travel with the skill package but do not load with `SKILL.md`.
+
+Keep each file scoped to one maintenance concern. Do not use `maintenance/` as a general archive,
+and do not link its files from runtime skill content. Maintenance, review, and evaluation workflows
+may read them explicitly when making decisions about the skill.
 
 ## Sources
 
