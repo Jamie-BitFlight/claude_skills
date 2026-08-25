@@ -16,12 +16,12 @@ gen_run_stamp.py draws 8 bytes (64 bits) from secrets.token_hex...
 
 Classification:
 
-* "run this command" -> **DOES**
-* "capture its stdout as `run_stamp`" -> **DOES**
-* resolvable script path -> **RESOLVES**
-* shell-portability explanation -> **EXPLAINS**
-* timestamp-resolution discussion -> **EXPLAINS**
-* CSPRNG implementation discussion -> **EXPLAINS**
+* "run this command" -> DOES
+* "capture its stdout as `run_stamp`" -> DOES
+* resolvable script path -> RESOLVES
+* shell-portability explanation -> EXPLAINS
+* timestamp-resolution discussion -> EXPLAINS
+* CSPRNG implementation discussion -> EXPLAINS
 
 If the contract requires the agent to obtain a suitable run address through the supplied script, you would reduce it to:
 
@@ -32,7 +32,7 @@ stdout as `run_stamp`:
 ```
 
 ```text
-${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py
+uv run --quiet --script "${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py"
 ```
 ````
 
@@ -56,10 +56,10 @@ concurrency lock and the archival cleanup job.
 
 Disposition:
 
-* "Run the stamp script." -> **DOES** -> **KEEP-RUNTIME**.
-* "We originally used `date +%s%N`... so we switched..." plus "(see #142)" -> **EXPLAINS**, a rejected approach with no present consequence -> **DELETE**. The issue link provided provenance for history that no longer matters, not for a current invariant, so it is deleted along with the narrative rather than kept.
-* "The script must be invoked exactly once per run... silently produces two different stamps" -> non-obvious invariant scoped to this one script -> **MOVE-LOCAL**: add to `gen_run_stamp.py`'s own docstring — "Idempotency: call once per run; repeated calls return different values with no error."
-* "...this same fixed-length hex format is also assumed by the concurrency lock and the archival cleanup job" -> non-obvious, cross-cutting, still constrains present changes -> **MOVE-MAINTENANCE** entry in `MAINTENANCE.md`:
+* "Run the stamp script." -> DOES -> KEEP-RUNTIME.
+* "We originally used `date +%s%N`... so we switched..." plus "(see #142)" -> EXPLAINS, a rejected approach with no present consequence -> DELETE. The issue link provided provenance for history that no longer matters, not for a current invariant, so it is deleted along with the narrative rather than kept.
+* "The script must be invoked exactly once per run... silently produces two different stamps" -> non-obvious invariant scoped to this one script -> MOVE-LOCAL: add to `gen_run_stamp.py`'s own docstring — "Idempotency: call once per run; repeated calls return different values with no error."
+* "...this same fixed-length hex format is also assumed by the concurrency lock and the archival cleanup job" -> non-obvious, cross-cutting, still constrains present changes -> MOVE-MAINTENANCE entry in `MAINTENANCE.md`:
 
   ```markdown
   ## Invariants

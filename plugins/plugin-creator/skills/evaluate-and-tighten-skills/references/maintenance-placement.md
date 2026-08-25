@@ -6,7 +6,7 @@ Admission tests and templates for material that failed the runtime test and is b
 
 Put maintenance knowledge where the maintainer naturally encounters the thing it constrains.
 
-Use **MOVE-LOCAL** when the fact applies to one artifact and can live with it:
+Use MOVE-LOCAL when the fact applies to one artifact and can live with it:
 
 * script-specific invariants -> script docstring or local documentation;
 * configuration-specific constraints -> configuration-adjacent documentation;
@@ -15,11 +15,11 @@ Use **MOVE-LOCAL** when the fact applies to one artifact and can live with it:
 
 Do not put a local fact into whole-skill maintenance context merely because `MAINTENANCE.md` exists.
 
-Use **MOVE-MAINTENANCE** only when all three are true:
+Use MOVE-MAINTENANCE only when all three are true:
 
-1. **Still constrains the present** - it affects how this skill can safely be changed now.
-2. **Non-obvious** - a maintainer cannot reliably recover it by inspecting the artifact they would naturally edit.
-3. **Cross-cutting or displaced** - no narrower artifact is the natural place to encounter it.
+1. Still constrains the present - it affects how this skill can safely be changed now.
+2. Non-obvious - a maintainer cannot reliably recover it by inspecting the artifact they would naturally edit.
+3. Cross-cutting or displaced - no narrower artifact is the natural place to encounter it.
 
 If any condition fails, do not put it in `MAINTENANCE.md`.
 
@@ -47,6 +47,7 @@ When created, include only sections that have content:
   - Source: `<URL, repository path, specification, vendor documentation>`
   - Governs: `<specific current behavior>`
   - Version/ref: `<version, tag, commit, or live documentation>`
+  - Accessed: `<YYYY-MM-DD>`
   - Refresh when: `<condition that should cause revalidation>`
 
 ## Regression provenance
@@ -67,6 +68,8 @@ Do not create empty sections.
 
 Do not add a runtime pointer from the target `SKILL.md` to `MAINTENANCE.md`. The executing agent does not need maintainer context.
 
+Do not create `MAINTENANCE.md` inside a packaged `plugins/*/skills/` directory. Put non-architectural maintainer context in the current commit message or PR description; use an ADR only when the ADR threshold below is met. Existing `MAINTENANCE.md` handling applies only to standalone skills or repositories whose instructions explicitly establish that file outside shipped skill content.
+
 ## Sources
 
 Record an external source only when it governs current skill behavior that a future maintainer may need to revalidate.
@@ -78,6 +81,7 @@ For every preserved source record:
 * what source is authoritative;
 * exactly what behavior it governs;
 * the relevant version/ref when applicable;
+* the access date;
 * what future change should cause it to be checked again.
 
 General documentation that does not govern a current skill-specific behavior should not be retained.
@@ -104,11 +108,11 @@ Git history remains the source of historical detail.
 
 ## ADR threshold
 
-Use **MOVE-ADR** only when all three are true:
+Use MOVE-ADR only when all three are true:
 
-1. **Hard to reverse** - changing the decision later has meaningful cost.
-2. **Surprising without context** - a reasonable future maintainer would question or "fix" it without knowing why.
-3. **Real trade-off** - genuine alternatives existed and the choice was made for specific reasons.
+1. Hard to reverse - changing the decision later has meaningful cost.
+2. Surprising without context - a reasonable future maintainer would question or "fix" it without knowing why.
+3. Real trade-off - genuine alternatives existed and the choice was made for specific reasons.
 
 If any condition fails, do not create an ADR.
 
