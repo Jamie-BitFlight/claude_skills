@@ -139,7 +139,9 @@ This is unbounded. The principle is operational because the agent must reason ab
 
 #### Evaluation order
 
-Evaluate material in this order. Do not combine these questions.
+The skill is the executing agent's prompt. Ask who each piece of text is for: the agent running
+the skill, or whoever maintains the skill later. The two tests below answer that in order. Do not
+combine them.
 
 **1. Runtime test**
 
@@ -311,8 +313,8 @@ Prefer:
 * An inline `## Sources` section is not automatically maintainer-only, and the section as a whole
   does not qualify for `references/maintenance-placement.md`'s "preserve existing convention"
   exception either (that exception is for a genuinely separate file, e.g. an existing
-  `MAINTENANCE.md`). The skill is the agent's prompt — evaluate each entry by asking who it is
-  for. An entry the executing agent is meant to consult or verify against at runtime (check
+  `MAINTENANCE.md`). Apply the audience question per entry, not to the section. An entry the
+  executing agent is meant to consult or verify against at runtime (check
   current values, cross-reference for drift) is runtime material: keep it inline
   (`KEEP-RUNTIME`/`KEEP-REASONING`), or move it into a `references/*.md` file linked from the
   skill if it is too heavy for every load — either way it stays reachable by the agent, not the
