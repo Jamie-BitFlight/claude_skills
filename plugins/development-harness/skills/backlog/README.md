@@ -354,6 +354,10 @@ backlog sync
 ### `backlog_close` — Dismiss an item
 
 Use for duplicates, out-of-scope items, superseded items, wontfix, or permanently blocked items. For completed work, use `backlog_resolve`.
+Close persists `close_reason`, `close_reference`, and `close_comment` in neutral metadata on every
+backend. The caller-provided `reference` is the related item, distinct from `BacklogItem.reference`,
+the storage identity; GitHub's closing comment uses the same caller-provided `reference` and
+`comment`.
 
 ```python
 mcp__plugin_dh_backlog__backlog_close(

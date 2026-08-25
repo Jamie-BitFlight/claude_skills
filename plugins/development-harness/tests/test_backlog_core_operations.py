@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import backlog_core.models as _bc_models
 import backlog_core.operations as ops
@@ -1451,6 +1451,41 @@ class TestCloseItem:
         result = close_item(selector="Closeable Item", reason="superseded")
 
         assert result["closed"] is True
+
+    @pytest.mark.parametrize(
+        ("related_reference", "close_comment"),
+        [("#related-item", "Superseded by the tracked item."), ("", "")],
+        ids=["context", "empty-optional-context"],
+    )
+    def test_close_item_persists_caller_context_and_forwards_it_to_github(
+        self, mocker: MockerFixture, related_reference: str, close_comment: str
+    ) -> None:
+        from backlog_core.backend_protocol import get_config
+
+        storage_reference = "storage://opaque-close-record"
+        item = BacklogItem(
+            title="Close Context Item",
+            description="A close-context regression fixture.",
+            reference=storage_reference,
+            metadata=BacklogItemMetadata(
+                source="test", added="2026-01-01", priority="P1", status="open", issue="#3230"
+            ),
+        )
+        get_config().backend.put_work_item(item)
+        mock_close_github_issue = mocker.patch("backlog_core.operations.close_github_issue")
+        mocker.patch("backlog_core.operations.check_open_prs_for_issue", return_value=[])
+
+        close_item(
+            selector="Close Context Item", reason="superseded", reference=related_reference, comment=close_comment
+        )
+
+        stored = get_config().backend.get_work_item(storage_reference)
+        assert stored.metadata.close_reason == "superseded"
+        assert stored.metadata.close_reference == related_reference
+        assert stored.metadata.close_comment == close_comment
+        mock_close_github_issue.assert_called_once_with(
+            "#3230", "superseded", reference=related_reference, comment=close_comment, repo="", output=ANY
+        )
 
     def test_close_item_with_open_pr_raises_backlog_error(self, mocker: MockerFixture) -> None:
         """Verify close_item raises BacklogError when open PRs reference the issue.

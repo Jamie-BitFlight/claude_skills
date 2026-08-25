@@ -779,6 +779,8 @@ class BacklogItemMetadata(BaseModel):
     files: str = ""
     suggested_location: str = ""
     close_reason: str = ""
+    close_reference: str = ""
+    close_comment: str = ""
     assignees: list[str] = Field(default_factory=list)
     labels: list[str] = Field(default_factory=list)
     milestone: str = ""

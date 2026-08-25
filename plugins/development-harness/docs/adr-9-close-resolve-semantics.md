@@ -47,8 +47,9 @@ Terminal state for items that will NOT be worked. Requires a categorized reason.
 | `wontfix` | Deliberate decision not to do this |
 | `blocked` | Permanently blocked, cannot proceed |
 
-**Metadata**: `{"status": "closed", "close_reason": "{reason}"}`
-**GitHub comment**: `Closed ({reason}). Reference: {reference}. {comment}`
+**Metadata**: `{"status": "closed", "close_reason": "{reason}", "close_reference": "{reference}", "close_comment": "{comment}"}` on every backend.
+The caller-provided `reference` is the related item and remains distinct from `BacklogItem.reference`, the storage identity.
+**GitHub comment**: `Closed ({reason}). Reference: {reference}. {comment}` using the same caller-provided `reference` and `comment`.
 **GitHub issue state**: `closed`
 
 ### `resolve` — Completed with evidence
