@@ -13,11 +13,11 @@ description: Extract the small set of explicit goals a skill is designed to achi
 4. Return only the format below.
 
 ```text
-The purpose and explicit goals of the skill `<skill_name>`:
+The purpose and explicit goals of the skill <skill_name>:
 
-1. `<clear outcome or capability>`
-2. `<clear outcome or capability>`
-3. `<clear outcome or capability>`
+1. <clear outcome or capability>
+2. <clear outcome or capability>
+3. <clear outcome or capability>
 ```
 
 ## When Used as a Review Step
