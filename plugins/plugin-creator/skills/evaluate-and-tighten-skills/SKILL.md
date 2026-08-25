@@ -130,6 +130,38 @@ Choose the smallest validation capable of disproving the change before running b
 
 This is unbounded. The principle is operational because the agent must reason about the current change, available checks, cost, and failure risk.
 
+#### Evaluation order
+
+Evaluate material in this order. Do not combine these questions.
+
+**1. Runtime test**
+
+First determine whether the material changes execution under the behavioral contract.
+
+For reasoning attached to an instruction, ask:
+
+> Is the agent expected to reason from this information to choose an action in situations the skill cannot enumerate, or has the action already been chosen for it?
+
+Then apply the counterfactual:
+
+> If this text disappears from runtime context, can any behavioral-contract eval reasonably produce a different result?
+
+If yes, classify the minimum necessary material as `KEEP-RUNTIME` or `KEEP-REASONING` and stop evaluating that material for relocation.
+
+If no, remove it from runtime context and continue to the maintenance test.
+
+**2. Preservation test**
+
+Only for material already removed from runtime context, ask:
+
+> Would a future maintainer be materially more likely to make an incorrect change without knowing the smallest durable fact contained here?
+
+If no, classify it `DELETE`.
+
+If yes, classify the smallest durable fact as `MOVE-GOALS`, `MOVE-LOCAL`, `MOVE-MAINTENANCE`, or `MOVE-ADR`.
+
+Maintenance value must never be used to justify keeping material in runtime context.
+
 Then ask:
 
 > Is there anything in this sentence, in the context where it is used, that could be removed without changing the expected behavior of an agent following this skill under the behavioral contract?
@@ -183,7 +215,7 @@ After determining what runtime text is necessary, assign removed or retained mat
 
 ## What earns its place
 
-Keep material when removing it could change:
+Material earns `KEEP-RUNTIME` or `KEEP-REASONING` when removing it could change:
 
 * whether the skill is invoked on a required branch;
 * an action the agent performs;
@@ -213,7 +245,7 @@ The test is model-relative:
 
 > Does this instruction change expected behavior compared with the agent's default behavior?
 
-If not, delete it.
+If not, remove it from runtime context and run the preservation test. The final disposition may be `MOVE-*` or `DELETE`.
 
 ### Duplication
 
@@ -224,7 +256,7 @@ Look for:
 * prose in the skill re-deriving behavior already owned by a script, configuration file, or referenced resource;
 * reminders added after the underlying command or example was already corrected.
 
-Keep each meaning at one authoritative location.
+Keep each meaning at one authoritative location. Runtime duplication should be removed even when the surviving authoritative copy is maintainer-facing.
 
 ### Resolvability
 
@@ -249,136 +281,7 @@ For material leaving runtime context, ask:
 
 If no, delete it.
 
-If yes, determine its narrowest correct home.
-
-#### Scope follows ownership
-
-Put maintenance knowledge where the maintainer naturally encounters the thing it constrains.
-
-Use **MOVE-LOCAL** when the fact applies to one artifact and can live with it:
-
-* script-specific invariants -> script docstring or local documentation;
-* configuration-specific constraints -> configuration-adjacent documentation;
-* reference-specific maintenance facts -> that reference;
-* template-specific constraints -> template-adjacent documentation.
-
-Do not put a local fact into whole-skill maintenance context merely because `MAINTENANCE.md` exists.
-
-Use **MOVE-MAINTENANCE** only when all three are true:
-
-1. **Still constrains the present** - it affects how this skill can safely be changed now.
-2. **Non-obvious** - a maintainer cannot reliably recover it by inspecting the artifact they would naturally edit.
-3. **Cross-cutting or displaced** - no narrower artifact is the natural place to encounter it.
-
-If any condition fails, do not put it in `MAINTENANCE.md`.
-
-#### MAINTENANCE.md
-
-`MAINTENANCE.md` is optional whole-skill maintenance context. Create it lazily only when at least one fact passes the `MOVE-MAINTENANCE` test.
-
-It is not a scratch pad, author journal, changelog, source dump, or destination for everything removed from `SKILL.md`.
-
-When created, include only sections that have content:
-
-```markdown
-# Skill maintenance
-
-## Invariants
-
-- `<non-obvious property that must survive changes>`
-  - Owned by: `<file/script/instruction or cross-cutting>`
-  - Protected by: `<eval if available>`
-  - Origin: `<issue/PR/commit only when useful>`
-
-## Sources of truth
-
-- `<source name>`
-  - Source: `<URL, repository path, specification, vendor documentation>`
-  - Governs: `<specific current behavior>`
-  - Version/ref: `<version, tag, commit, or live documentation>`
-  - Refresh when: `<condition that should cause revalidation>`
-
-## Regression provenance
-
-- `<failure that caused durable behavior>`
-  - Observed in: `<issue/PR/incident>`
-  - Required behavior: `<what must continue to be true>`
-  - Protected by: `<instruction/script/eval>`
-
-## Evaluation uncertainties
-
-- `<behavior intentionally retained pending empirical evaluation>`
-  - Question: `<what needs to be established>`
-  - Relevant goal: `<goal>`
-```
-
-Do not create empty sections.
-
-Do not add a runtime pointer from the target `SKILL.md` to `MAINTENANCE.md`. The executing agent does not need maintainer context.
-
-#### Sources
-
-Record an external source only when it governs current skill behavior that a future maintainer may need to revalidate.
-
-Do not preserve a source merely because it was consulted while authoring the skill.
-
-For every preserved source record:
-
-* what source is authoritative;
-* exactly what behavior it governs;
-* the relevant version/ref when applicable;
-* what future change should cause it to be checked again.
-
-General documentation that does not govern a current skill-specific behavior should not be retained.
-
-Keep sources in `MAINTENANCE.md` by default. If the target skill already has a dedicated maintenance source file, preserve that convention rather than creating a competing one. Do not create a separate source file merely to hold a few links.
-
-#### Regression and issue provenance
-
-Preserve an issue, PR, commit, or incident reference only when it explains a behavior or invariant that still constrains the present.
-
-Reduce history to the current durable fact.
-
-Prefer:
-
-```markdown
-- Parallel invocations must not share a run address.
-  - Origin: #142
-  - Protected by: concurrent-run eval
-```
-
-over narrative history of approaches that were tried and rejected.
-
-Git history remains the source of historical detail.
-
-#### ADR threshold
-
-Use **MOVE-ADR** only when all three are true:
-
-1. **Hard to reverse** - changing the decision later has meaningful cost.
-2. **Surprising without context** - a reasonable future maintainer would question or "fix" it without knowing why.
-3. **Real trade-off** - genuine alternatives existed and the choice was made for specific reasons.
-
-If any condition fails, do not create an ADR.
-
-Follow the repository's existing ADR convention when one exists.
-
-If no ADR convention exists, do not create one merely to preserve minor skill history. A standalone skill may create `maintenance/adr/` lazily when the first decision actually passes all three conditions.
-
-An ADR should record the decision and the minimum reason needed to prevent an incorrect reversal. Do not copy the original explanatory prose into it.
-
-#### Delete history that no longer constrains anything
-
-Delete rather than relocate:
-
-* abandoned alternatives with no present consequence;
-* authoring narrative;
-* implementation trivia;
-* explanations recoverable from the artifact itself;
-* maintenance reminders aimed at an audience that will already see the relevant source;
-* links to issues, PRs, commits, vendor docs, or research that do not govern current behavior;
-* speculative future improvements that belong in an issue or backlog;
-* human onboarding or promotional prose that does not affect execution.
+If yes, determine its narrowest correct home. Load [references/maintenance-placement.md](./references/maintenance-placement.md) for the `MOVE-LOCAL`/`MOVE-MAINTENANCE`/`MOVE-ADR` admission tests, the `MAINTENANCE.md` template, and the source and regression-provenance retention rules.
 
 ### Structural load
 

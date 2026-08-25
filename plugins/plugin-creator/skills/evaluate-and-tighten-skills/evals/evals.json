@@ -1,0 +1,75 @@
+{
+  "skill_name": "evaluate-and-tighten-skills",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/existing-maintenance/skill-under-test.md as the target skill's SKILL.md; it already has a MAINTENANCE.md alongside it.",
+      "expected_output": "Existing MAINTENANCE.md branch: the current cross-cutting invariant survives, the stale historical note is deleted, the runtime duplicate of an already-maintained fact is removed from the target's SKILL.md, and the tightened SKILL.md still executes correctly without reading MAINTENANCE.md.",
+      "files": [
+        "evals/files/existing-maintenance/skill-under-test.md",
+        "evals/files/existing-maintenance/MAINTENANCE.md"
+      ],
+      "expectations": [
+        "MAINTENANCE.md's 'Run-stamp format is fixed-length hex' invariant is retained",
+        "MAINTENANCE.md's rate-limiting/token-bucket regression provenance note is removed as stale",
+        "The target's explanatory clause referencing MAINTENANCE.md for the run-stamp rationale is removed from runtime text (classified EXPLAINS/duplicate, not KEEP-RUNTIME)",
+        "The target's 'Set retries: 3 in config.yaml' instruction is retained as KEEP-RUNTIME with its duplicate cross-reference sentence removed",
+        "The tightened target contains no runtime pointer to MAINTENANCE.md"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/maintenance-creation/skill-under-test.md as the target skill's SKILL.md; it has no MAINTENANCE.md.",
+      "expected_output": "MAINTENANCE.md creation branch: the runtime explanation is stripped down to the bare instruction, and a new MAINTENANCE.md is created lazily containing only the smallest durable cross-cutting invariant.",
+      "files": ["evals/files/maintenance-creation/skill-under-test.md"],
+      "expectations": [
+        "The target's runtime instruction is reduced to substantially 'Acquire locks/run.lock before writing to the run directory.'",
+        "A new MAINTENANCE.md is created containing the shared-lock-path invariant (cleanup script and archival job both depend on this path)",
+        "The created MAINTENANCE.md does not include a runtime pointer added to the target",
+        "No unrelated sections (Sources of truth, ADR, etc.) are created in the new MAINTENANCE.md"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/local-ownership/skill-under-test.md as the target skill's SKILL.md; its maintenance reasoning concerns only scripts/rebuild_cache.py.",
+      "expected_output": "MOVE-LOCAL branch: the seed-reproducibility fact is classified MOVE-LOCAL and relocated to the script itself, not to a new whole-skill MAINTENANCE.md.",
+      "files": [
+        "evals/files/local-ownership/skill-under-test.md",
+        "evals/files/local-ownership/scripts/rebuild_cache.py"
+      ],
+      "expectations": [
+        "The seed-reproducibility fact is classified MOVE-LOCAL, not MOVE-MAINTENANCE",
+        "The durable fact is placed in or alongside scripts/rebuild_cache.py (e.g. its docstring), not in a new MAINTENANCE.md",
+        "No MAINTENANCE.md is created for this skill",
+        "The target's runtime instruction 'Run scripts/rebuild_cache.py' is retained"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/adr-worthy/component/skills/eval4-target/skill-under-test.md as the target skill's SKILL.md. Its containing component has its own ADR convention at evals/files/adr-worthy/component/docs/adrs/.",
+      "expected_output": "MOVE-ADR branch: the polling-vs-webhook decision passes all three ADR criteria (hard to reverse, surprising without context, genuine trade-off) and is placed in the narrower component-scoped ADR convention rather than any broader one.",
+      "files": [
+        "evals/files/adr-worthy/component/skills/eval4-target/skill-under-test.md",
+        "evals/files/adr-worthy/component/docs/adrs/ADR-0001-example.md"
+      ],
+      "expectations": [
+        "The polling-vs-webhook rationale is classified MOVE-ADR",
+        "The ADR is placed under evals/files/adr-worthy/component/docs/adrs/, not a repository-root or newly-invented location",
+        "The target's runtime instruction is reduced to substantially 'Poll the status endpoint every 30 seconds instead of registering a webhook.'",
+        "The created ADR records the decision and the minimum reason needed to prevent an incorrect reversal, not the original explanatory prose verbatim"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Run the evaluate-and-tighten-skills procedure. Treat evals/files/non-adr-history/skill-under-test.md as the target skill's SKILL.md.",
+      "expected_output": "Non-ADR history branch: the rejected CSV/key=value history fails the ADR threshold (easily reversible, single caller) and is deleted outright rather than relocated anywhere.",
+      "files": ["evals/files/non-adr-history/skill-under-test.md"],
+      "expectations": [
+        "No ADR is created for the output-format history",
+        "The CSV and key=value rejected-alternative narrative is classified DELETE, not MOVE-*",
+        "No MAINTENANCE.md is created for this skill",
+        "The target's runtime instruction is reduced to substantially 'Emit the result as JSON.'"
+      ]
+    }
+  ]
+}
