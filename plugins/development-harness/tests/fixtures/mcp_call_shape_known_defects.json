@@ -51,6 +51,62 @@
       "expect_contains": "status=\"complete\""
     },
     {
+      "id": "enum-invalid-artifact-status-cli-one-line",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "Run `uv run sam_schema/cli.py artifact register --item-id 1 --artifact-type \"codebase-analysis\" --artifact-id \"audit\" --content \"report\" --status \"complete\" --agent \"code-review-architecture\"`.\n",
+      "expect_contains": "--status \"complete\""
+    },
+    {
+      "id": "enum-invalid-artifact-status-cli-multiline",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "```bash\nuv run sam_schema/cli.py artifact register \\\n  --item-id 1 \\\n  --artifact-type \"codebase-analysis\" \\\n  --artifact-id \"audit\" \\\n  --content \"report\" \\\n  --status \"complete\" \\\n  --agent \"code-review-architecture\"\n```\n",
+      "expect_contains": "--status \"complete\""
+    },
+    {
+      "id": "enum-invalid-artifact-status-cli-indented",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/docs/beads-and-workflow-usage.md",
+      "markdown": " artifact register --item-id 1 --artifact-type research --artifact-id findings --agent ecosystem-researcher --content report --status complete\n",
+      "expect_contains": "--status complete"
+    },
+    {
+      "id": "enum-invalid-artifact-status-cli-quoted-separator",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --content \"Compare A; B\" --status complete\n",
+      "expect_contains": "--status complete"
+    },
+    {
+      "id": "enum-invalid-artifact-status-cli-after-shell-separator",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --status current; artifact register --status complete\n",
+      "expect_contains": "--status complete"
+    },
+    {
+      "id": "enum-invalid-artifact-status-cli-hash-inside-content-token",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --content ref#part --status complete\n",
+      "expect_contains": "--status complete"
+    },
+    {
+      "id": "enum-invalid-artifact-status-cli-after-non-artifact-shell-command",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "cd docs && artifact register --status complete\n",
+      "expect_contains": "--status complete"
+    },
+    {
+      "id": "enum-malformed-artifact-register-cli-tokenization",
+      "guard": "artifact_enum",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --content \"Compare A; B --status complete\n",
+      "expect_contains": "malformed artifact register CLI tokenization"
+    },
+    {
       "id": "enum-invalid-artifact-type",
       "guard": "artifact_enum",
       "frozen_from": "plugins/development-harness/agents/tn-verification-gate.md",
@@ -88,6 +144,56 @@
       "id": "live-tool-names-and-enum-values-are-accepted",
       "frozen_from": "plugins/development-harness/agents/contract-verification.md",
       "markdown": "Call `mcp__plugin_dh_backlog__artifact_register(item_id=1, artifact_type=\"T0-baseline\", artifact_id='t0-x', content='y', status=\"current\")` then `sam_plan(config={\"action\":\"list\"})`.\n"
+    },
+    {
+      "id": "current-artifact-status-cli-one-line-is-accepted",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "Run `uv run sam_schema/cli.py artifact register --item-id 1 --artifact-type \"codebase-analysis\" --artifact-id \"audit\" --content \"report\" --status \"current\" --agent \"code-review-architecture\"`.\n"
+    },
+    {
+      "id": "placeholder-artifact-status-cli-multiline-is-exempt",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "```bash\nuv run sam_schema/cli.py artifact register \\\n  --item-id {issue_number} \\\n  --artifact-type \"codebase-analysis\" \\\n  --artifact-id \"architecture-graph-{slug}\" \\\n  --content \"{report_markdown}\" \\\n  --status \"{status}\" \\\n  --agent \"code-review-architecture\"\n```\n"
+    },
+    {
+      "id": "non-artifact-cli-status-is-not-an-artifact-status",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "Run `sam task --plan P1 --task T1 --status \"complete\"`.\n"
+    },
+    {
+      "id": "prose-artifact-register-status-is-not-a-cli-command",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "Use artifact register, then set --status complete.\n"
+    },
+    {
+      "id": "status-after-shell-separator-belongs-to-next-command",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --item-id 1; sam task --status complete\n"
+    },
+    {
+      "id": "status-after-shell-comment-is-not-an-artifact-status",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --status current # --status complete\n"
+    },
+    {
+      "id": "quoted-cli-content-status-is-not-a-flag",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --content \"Explain --status complete\" --status current\n"
+    },
+    {
+      "id": "quoted-cli-content-nested-artifact-after-separator-is-not-a-command",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --content \"example; artifact register --status complete\" --status current\n"
+    },
+    {
+      "id": "quoted-cli-content-nested-artifact-after-hash-is-not-a-command",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "artifact register --content \"example # artifact register --status complete\" --status current\n"
+    },
+    {
+      "id": "inline-current-artifact-status-cli-is-accepted",
+      "frozen_from": "plugins/development-harness/skills/code-review-architecture/SKILL.md",
+      "markdown": "Run `artifact register --status current`.\n"
     }
   ]
 }
