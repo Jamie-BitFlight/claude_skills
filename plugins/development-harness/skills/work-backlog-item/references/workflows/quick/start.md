@@ -75,11 +75,13 @@ or issue reference is passed as `item_ref`.
 
 3. Find the item via the CLI: `backlog view --selector "{title or #N}"`. If not found (JSON output contains an `error` key), create a minimal item:
 
+   If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, rewrite that clause as `**Hypothesis**: {cause}` before using it as the description — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this path skips the rest of that workflow.
+
    ```bash
    backlog add \
      --title "{title}" \
      --priority P2 \
-     --description "{title}"
+     --description "{title, with any speculative cause labeled per above}"
    ```
 
    Note: When arriving via the proactive fix gate with no prior backlog item, this creation step
