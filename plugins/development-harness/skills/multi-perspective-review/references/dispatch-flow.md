@@ -12,7 +12,7 @@ flowchart TD
     DiffCheck -->|"No — required arg missing"| AbortUsage(["ABORT — print usage message<br>Stop before any plan or team is created"])
     DiffCheck -->|"Yes"| Files["Run git diff --name-only range<br>Split stdout by newline, trim empty lines<br>→ changed_files list"]
     Files --> EmptyCheck{"changed_files list empty?"}
-    EmptyCheck -->|"Yes"| AbortEmpty(["ABORT — print<br>'ERROR — No changed files found for diff range range. Nothing to review.'<br>Do not create a team or a plan"])
+    EmptyCheck -->|"Yes"| AbortEmpty(["ABORT — print<br>'ERROR: No changed files found for diff range &lt;git-range&gt;. Nothing to review.'<br>Do not create a team or a plan"])
     EmptyCheck -->|"No"| SlugArg{"--slug argument provided?"}
 
     SlugArg -->|"Yes"| SlugFromArg["review_base = --slug value"]
