@@ -48,14 +48,18 @@ Allowed content at creation time:
 - expected behavior, if stated
 - reproduction context, if stated
 - direct evidence or references supplied by the user
+- a likely cause, labeled explicitly as `**Hypothesis**: {text}`, not stated as established fact
 
 Not allowed at creation time:
 - proposed implementation
 - design decisions
 - technical solutioning
 - extra work not requested by the user
+- speculation about why the problem occurs, stated in the same declarative voice as an observed fact
 
 If the user supplies a possible fix, preserve it as user-provided context or hypothesis, not as a requirement or implementation instruction.
+
+Remove speculation from the description rather than deleting the underlying idea: a causal claim that is not a confirmed observation is a hypothesis, not a fact, and must read as one. State it as `**Hypothesis**: {text}` instead of asserting it directly. Cause verification is grooming's job (`find-cause`, `dh:fact-checker`), not creation's — an unlabeled causal claim at creation time reaches the groomed item, and eventually the live issue, indistinguishable from a verified fact.
 
 Solutions belong to later stages:
 - grooming may investigate causes, constraints, and candidate directions
