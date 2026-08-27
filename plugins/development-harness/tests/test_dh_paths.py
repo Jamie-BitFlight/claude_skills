@@ -470,10 +470,9 @@ class TestInferProjectRoot:
 
         assert git_project_root() == repo
 
-    def test_infer_uses_codex_pwd_when_plugin_cwd_is_not_a_repository(
+    def test_infer_uses_codex_pwd_when_marker_and_git_pwd_are_present(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Codex MCP uses its forwarded agent PWD instead of the plugin cache cwd."""
         project = tmp_path / "project"
         plugin_cache = tmp_path / "plugin-cache"
         _init_repo(project)
@@ -482,13 +481,52 @@ class TestInferProjectRoot:
         monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-        monkeypatch.setenv("CODEX_THREAD_ID", "codex-test-thread")
+        monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+        monkeypatch.setenv("DH_CODEX_MCP", "1")
         monkeypatch.setenv("PWD", str(project))
         monkeypatch.chdir(plugin_cache)
 
         assert infer_project_root() == project
 
-    def test_infer_ignores_codex_pwd_when_cwd_is_explicit(
+    def test_infer_ignores_pwd_with_codex_thread_id_without_codex_marker(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        project = tmp_path / "project"
+        plugin_cache = tmp_path / "plugin-cache"
+        _init_repo(project)
+        plugin_cache.mkdir()
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.setenv("CODEX_THREAD_ID", "thread-present")
+        monkeypatch.delenv("DH_CODEX_MCP", raising=False)
+        monkeypatch.setenv("PWD", str(project))
+        monkeypatch.chdir(plugin_cache)
+
+        with pytest.raises(RuntimeError, match="Could not resolve the git project root"):
+            infer_project_root()
+
+    def test_infer_ignores_marker_when_pwd_is_not_a_git_root(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        plugin_cache = tmp_path / "plugin-cache"
+        invalid_pwd = tmp_path / "not-a-repository"
+        plugin_cache.mkdir()
+        invalid_pwd.mkdir()
+        monkeypatch.delenv("DH_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
+        monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
+        monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+        monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
+        monkeypatch.setenv("DH_CODEX_MCP", "1")
+        monkeypatch.setenv("PWD", str(invalid_pwd))
+        monkeypatch.chdir(plugin_cache)
+
+        with pytest.raises(RuntimeError, match="Could not resolve the git project root"):
+            infer_project_root()
+
+    def test_infer_ignores_marker_gated_pwd_when_cwd_is_explicit(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The Codex PWD hint only applies to the no-arg (MCP) resolution path."""
@@ -500,7 +538,7 @@ class TestInferProjectRoot:
         monkeypatch.delenv("WORKSPACE_FOLDER_PATHS", raising=False)
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-        monkeypatch.setenv("CODEX_THREAD_ID", "codex-test-thread")
+        monkeypatch.setenv("DH_CODEX_MCP", "1")
         monkeypatch.setenv("PWD", str(pwd_repo))
 
         assert infer_project_root(cwd=explicit_repo) == explicit_repo

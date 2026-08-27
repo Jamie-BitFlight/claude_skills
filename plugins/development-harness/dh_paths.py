@@ -29,7 +29,6 @@ plugin cache cwd, IDEs). Checked in order by :func:`infer_project_root` when
 
     DH_PROJECT_ROOT=/path/to/repo          # explicit override (any host)
     WORKSPACE_FOLDER_PATHS=["/path"]       # VS Code / Cursor (JSON array)
-    PWD=/path/to/repo                        # Codex MCP, with CODEX_THREAD_ID
     CURSOR_PROJECT_ROOT=/path/to/repo      # when the Cursor host sets it
     CLAUDE_PROJECT_DIR=/path/to/repo       # when the Claude Code host sets it
 
@@ -228,7 +227,7 @@ def _infer_from_codex_pwd() -> Path | None:
     Returns:
         Resolved Git root from PWD, or ``None`` outside Codex or without a repo.
     """
-    if not os.environ.get("CODEX_THREAD_ID"):
+    if os.environ.get("DH_CODEX_MCP") != "1":
         return None
     raw = os.environ.get("PWD", "").strip()
     if not raw:
@@ -288,7 +287,8 @@ def infer_project_root(cwd: Path | None = None) -> Path:
        that resolves as a git worktree.
     #. ``CURSOR_PROJECT_ROOT``, then ``CLAUDE_PROJECT_DIR`` — only if the host
        sets them (Cursor before Claude when both are present).
-    #. ``PWD`` — Codex agent cwd, only when ``CODEX_THREAD_ID`` is present.
+    #. Codex's forwarded ``PWD`` — only when ``DH_CODEX_MCP=1`` and *cwd* is
+       not explicit.
     #. Walk upward from *cwd* (default ``Path.cwd()``) for a ``.git`` entry,
        then resolve its Git common directory (preserves worktree semantics).
     #. Discover a Git repository from *cwd* itself.
