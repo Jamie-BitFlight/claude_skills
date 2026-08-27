@@ -16,10 +16,6 @@ dispatches a fifth worker that reads the four verdict blocks back and synthesize
 deduplicated punch list, applies the gate logic to that punch list, and prints one canonical
 summary line per perspective.
 
-This skill does NOT replace language-scoped code review (`dh:forensic-review`). It runs
-alongside it as an orthogonal quality signal. #1430 replaces the stub gate logic in Step 7 without
-changing the caller interface.
-
 Activate `dh:review-verdict-contract` before the first verdict-schema operation.
 
 ## Argument Parsing
@@ -84,14 +80,8 @@ Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the
 ## Step 3: Create the Ephemeral Review Plan
 
 **Create a new plan on every run.** Never search for and reuse an existing plan. `review_slug`
-carries this run's stamp, so no earlier plan can match it and every run starts with tasks that are
-`not-started`, bodies that describe this run's `changed_files`, and no `Review Results` section.
-
-Reuse cannot be made safe by resetting task status alone. Resetting status makes a task claimable
-again, but the task body still names the previous run's changed files, so workers would review the
-wrong file set; and `Review Results` already exists on the task, so the next append lands inside
-that heading rather than creating a second one, leaving a section that holds two concatenated
-JSON documents and no longer parses.
+carries this run's stamp, so no earlier plan can match it and every run starts with `not-started`
+tasks, bodies naming this run's `changed_files`, and no `Review Results` section.
 
 ### Create the Ephemeral Plan
 
@@ -186,17 +176,15 @@ TeamCreate(team_name="multi-{review_slug}")
 
 Dispatch all four workers simultaneously. Do NOT wait between spawns — all four are independent
 and must run in parallel. Each worker receives a minimal prompt that tells it to run the
-`dh:start-task` skill against its own task reference. `dh:start-task` owns claim, active-task
-registration, and execution. Name the skill in prose — a harness-specific invocation form
-reaches only the harness that defines it, and a worker that never runs `dh:start-task` never
-claims its task and writes nothing. The `agent:` field in each
-SAM task tells `dh:task-worker` which specialist profile to load via `profile_load` internally.
+`dh:start-task` skill (name it in prose — a harness-specific invocation form reaches only the
+harness that defines it) against its own task reference. `dh:start-task` owns claim, active-task
+registration, and execution; a worker that never runs it claims nothing and writes nothing, which
+Step 6 records as a missing verdict. The `agent:` field in each SAM task tells `dh:task-worker`
+which specialist profile to load via `profile_load` internally.
 
-Dispatch `dh:task-worker` for all four tasks: the four perspective reviewer agents declare
-`sam_task` to write their verdict but not the rest of the SAM task lifecycle, so under
-`dh:dispatch-contract` they cannot be the dispatch target and their behavior reaches the work as a
-loaded profile instead. `dh:review-synthesizer` reaches the same one operation, so Step 6
-dispatches it the same way.
+Dispatch `dh:task-worker` for all four tasks, not the reviewer agents directly — see Behavioral
+Rules for why. `dh:review-synthesizer` reaches the plan the same way, so Step 6 dispatches it
+identically.
 
 Every prompt names the same output destination: the `Review Results` section of the worker's own
 task. That section is the only channel the synthesizer reads in Step 6 — a reviewer that does not
@@ -314,9 +302,8 @@ only ones that will run for it.
 
 ### Gate Logic
 
-The gate logic is the pre-#1430 stub. The full gate logic including the all-SKIP edge case is
-defined in `review-verdict-contract` §2.4. Both inputs come
-from the punch list read in Step 6: `punch_list["verdicts"]` and `punch_list["missing"]`.
+Both inputs come from the punch list read in Step 6: `punch_list["verdicts"]` and
+`punch_list["missing"]`.
 
 Apply gate in this order:
 
@@ -336,10 +323,6 @@ Apply gate in this order:
    ```
 
 4. **All other combinations** (any APPROVE, remaining SKIP) → gate PASSES.
-
-**Gate interface:** The gate interface is stable:
-`gate(verdicts: list[VerdictBlock]) -> GateResult` where `GateResult = {passed: bool,
-summary_line: str, blocking_findings: list[Finding]}`.
 
 ### Summary Line Format
 
@@ -402,34 +385,12 @@ flowchart TD
 
 ---
 
-## Ephemeral Plan Task Structure
-
-The ephemeral plan always has exactly the five tasks the Step 3 create call defines — `T1`
-security, `T2` performance, `T3` quality, `T4` accessibility, `T5` synthesis.
-
-The four review tasks have `dependencies: []` — they are independent and run in parallel. T5
-depends on all four, so `sam_plan(action="ready")` offers it only once every perspective has
-finished. `dh:task-worker` reads the `agent:` field itself and passes it to `profile_load`; the
-orchestrator passes only the task reference `{PA}/T{N}` to the worker prompt.
-
----
-
 ## Behavioral Rules
 
-- **SKIP is a passing outcome.** A perspective that SKIPs is not a blocker. The punch list records
-  it as coverage that was declined, with the reviewer's `skip_reason`.
-- **All four verdicts must arrive before the gate runs.** Do not apply the gate on partial results.
-- **Every run creates its own plan.** `review_slug` carries this run's stamp, so no earlier
-  plan can match it and no run reads another run's results.
 - Dispatch uses `dh:task-worker` because the perspective reviewer agents cannot claim or close a SAM task. Specialist behavior is selected through the task profile. See `dh:dispatch-contract`.
-- **Do not embed the verdict or punch-list schema, or the UI pattern list.** Activate
-  `dh:review-verdict-contract` for all schema definitions.
 - **Each reviewer task body must embed the newline-separated changed-files list.** Reviewers read
   their task body to obtain the scan target; they do not receive it via the prompt. T5 reads the
   four verdict sections instead, so its body names those and carries no file list.
-- **The punch list is the gate's input.** One defect two perspectives raised is one entry naming
-  both, so a REJECT summary counts distinct defects rather than repeating one across lenses.
-- **All-SKIP warning is mandatory** when all four perspectives return SKIP.
 
 ---
 
