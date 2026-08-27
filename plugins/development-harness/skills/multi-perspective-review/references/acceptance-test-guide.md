@@ -10,6 +10,14 @@ execution against real diff inputs. They are NOT covered by the plan's T0/TN boo
 deliberate scope decision — the bookend system verifies static artifacts; behavioral runtime
 verification is manual-only.
 
+## Contents
+
+- [Prerequisites](#prerequisites)
+- [AC4 — Security REJECT on Hardcoded Secret](#ac4--security-reject-on-hardcoded-secret)
+- [AC5 — Accessibility SKIP When No UI Changes](#ac5--accessibility-skip-when-no-ui-changes)
+- [AC6 — Canonical Summary Line Format](#ac6--canonical-summary-line-format)
+- [Cleanup](#cleanup)
+
 ---
 
 ## Prerequisites
@@ -79,9 +87,9 @@ Security: REJECT (1 finding) | Performance: APPROVE (...) | Quality: APPROVE (..
 **Fixture**: `.tmp/test-fixtures/no-ui-changes.diff`
 
 The fixture modifies only `.py` files (`backlog_core/models.py`,
-`backlog_core/backend_protocol.py`). None of these match the UI file pattern list defined in
-`references/verdict-schema.md §2.3`. The accessibility reviewer must emit `verdict: SKIP`
-without scanning file contents.
+`backlog_core/backend_protocol.py`). None of these match the UI file pattern list. Activate the
+`/dh:review-verdict-contract` skill for the UI file pattern list definition (`review-verdict-contract`
+§2.3). The accessibility reviewer must emit `verdict: SKIP` without scanning file contents.
 
 **Invocation** (from repository root, after applying the fixture):
 ```bash
@@ -110,7 +118,8 @@ git apply .tmp/test-fixtures/no-ui-changes.diff
 ## AC6 — Canonical Summary Line Format
 
 **Context**: AC6 requires the orchestrating skill to emit one summary line per perspective in
-the canonical format defined in `references/verdict-schema.md §2.2`.
+the canonical format. Activate the `/dh:review-verdict-contract` skill for the canonical format
+definition (`review-verdict-contract` §2.2).
 
 **Canonical format**:
 ```text
