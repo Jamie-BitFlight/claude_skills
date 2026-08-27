@@ -5,9 +5,8 @@ AC6 (summary format). These tests require the full `dh:multi-perspective-review`
 operational and must be run after T6 (skill implementation) completes.
 
 **Scope note**: AC4, AC5, and AC6 are behavioral acceptance criteria that require live skill
-execution against real diff inputs. They are NOT covered by the plan's T0/TN bookend checks
-(which verify only structural ACs 1–2–7: file existence and schema correctness). This is a
-deliberate scope decision — the bookend system verifies static artifacts; behavioral runtime
+execution against real diff inputs, so they are not covered by the plan's T0/TN bookend checks
+(structural ACs 1–2–7 only: file existence and schema correctness) — behavioral runtime
 verification is manual-only.
 
 ## Contents
