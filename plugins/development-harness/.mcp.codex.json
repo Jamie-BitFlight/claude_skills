@@ -13,6 +13,10 @@
       "cwd": ".",
       "env": { "DH_CODEX_MCP": "1" },
       "env_vars": ["PWD"]
+    },
+    "sequential_thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
     }
   }
 }

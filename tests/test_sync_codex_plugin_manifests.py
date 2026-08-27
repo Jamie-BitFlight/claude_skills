@@ -175,6 +175,15 @@ def test_sync_preserves_explicit_codex_mcp_target_without_rewriting_it(tmp_path:
     assert dedicated_config.read_bytes() == before
 
 
+def test_development_harness_codex_mcp_config_includes_all_servers() -> None:
+    plugin_dir = Path(__file__).parents[1] / "plugins" / "development-harness"
+    claude_config = json.loads((plugin_dir / ".mcp.json").read_text(encoding="utf-8"))
+    codex_config = json.loads((plugin_dir / ".mcp.codex.json").read_text(encoding="utf-8"))
+
+    assert set(codex_config["mcpServers"]) == {"backlog", "sam", "sequential_thinking"}
+    assert codex_config["mcpServers"]["sequential_thinking"] == claude_config["mcpServers"]["sequential_thinking"]
+
+
 def test_sync_manifest_always_resyncs_derived_description_and_developer_fields(tmp_path: Path) -> None:
     """shortDescription/longDescription/developerName are pure derivations, never preserved stale.
 
