@@ -9,7 +9,7 @@ project_detection:
 
 stage_skills:
   discovery: [python3-discovery]
-  design: [python3-design]
+  design: [python3-development:python-cli-design-spec]
   planning-context-integration: [python3-implementation]
   planning-task-decomposition: [python3-planning-task-decomposition]
   implementation: [python3-implementation]
