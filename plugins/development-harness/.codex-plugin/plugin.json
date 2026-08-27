@@ -22,5 +22,5 @@
       "Language-agnostic development process harness implementing the Stateless Agent Methodology (SAM) 7-stage pipeline with ARL human"
     ]
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.codex.json"
 }

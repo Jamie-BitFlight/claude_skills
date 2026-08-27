@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "backlog": {
+      "command": "uv",
+      "args": ["run", "--script", "scripts/run_backlog_server.py"],
+      "cwd": ".",
+      "env": { "DH_CODEX_MCP": "1" },
+      "env_vars": ["PWD"]
+    },
+    "sam": {
+      "command": "uv",
+      "args": ["run", "--script", "scripts/run_sam_server.py"],
+      "cwd": ".",
+      "env": { "DH_CODEX_MCP": "1" },
+      "env_vars": ["PWD"]
+    }
+  }
+}

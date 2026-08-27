@@ -34,15 +34,17 @@ reliable two-root pattern for local marketplace plugins:
   "command": "uv",
   "args": ["run", "--script", "scripts/run_server.py"],
   "cwd": ".",
-  "env_vars": ["PWD", "CODEX_THREAD_ID"]
+  "env": { "DH_CODEX_MCP": "1" },
+  "env_vars": ["PWD"]
 }
 ```
 
 `cwd: "."` starts the server in the installed plugin bundle. `PWD` is the
 Codex agent project working directory when forwarded through `env_vars`.
-`CODEX_THREAD_ID` is a Codex marker: use it to ensure the server interprets
-`PWD` as the project root only in Codex. Validate `PWD` with GitPython before
-using it; it can name a directory that is not a Git repository.
+`DH_CODEX_MCP: "1"` is a launch-mode hint supplied by the dedicated Codex
+configuration, not provenance or authentication. Use it only to select the
+Codex `PWD` fallback, then validate `PWD` with GitPython before using it; it
+can name a directory that is not a Git repository.
 
 Keep explicit project overrides and existing host-specific project hints ahead
 of the Codex fallback. Development Harness uses this order: explicit override,
@@ -59,6 +61,14 @@ CODEX_HOME=/tmp/codex-plugin-test codex plugin add plugin-name@marketplace-name
 CODEX_HOME=/tmp/codex-plugin-test codex exec -C /path/to/project \
   "Use the installed plugin MCP tool named tool_name."
 ```
+
+Use a fresh `CODEX_HOME` for each check. The positive control must invoke a
+named read-only DH MCP tool from a Git project with `CODEX_THREAD_ID` absent;
+the marker in the dedicated configuration and forwarded `PWD` must still let
+the tool resolve the project. The negative control must use a separate,
+disposable package copy whose `.mcp.codex.json` omits `DH_CODEX_MCP`, or launch
+against an invalid `PWD`; the same project-dependent tool must fail to resolve
+the project. Do not modify the source package for either control.
 
 For direct protocol checks, load the `fastmcp-creator:fastmcp-client-cli` skill
 first. On this macOS host the isolated CLI command is:

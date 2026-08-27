@@ -152,6 +152,29 @@ def test_sync_manifest_preserves_hand_curated_interface_fields_on_rerun(tmp_path
     assert changed is False
 
 
+def test_sync_preserves_explicit_codex_mcp_target_without_rewriting_it(tmp_path: Path) -> None:
+    plugin_dir = _build_plugin_dir(
+        tmp_path,
+        "widget-tools",
+        description="Widgets.",
+        mcp_servers={"widget-server": {"command": "uv", "args": ["run", "server.py"]}},
+    )
+    manifest_path = plugin_dir / ".codex-plugin" / "plugin.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["mcpServers"] = "./.mcp.codex.json"
+    _write_json(manifest_path, manifest)
+    dedicated_config = plugin_dir / ".mcp.codex.json"
+    dedicated_config.write_text('{"mcpServers":{"dedicated":{"command":"uv"}}}\n', encoding="utf-8")
+    before = dedicated_config.read_bytes()
+
+    sync_module.sync_mcp_file(plugin_dir)
+    sync_module.sync_manifest(plugin_dir)
+
+    reread_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert reread_manifest["mcpServers"] == "./.mcp.codex.json"
+    assert dedicated_config.read_bytes() == before
+
+
 def test_sync_manifest_always_resyncs_derived_description_and_developer_fields(tmp_path: Path) -> None:
     """shortDescription/longDescription/developerName are pure derivations, never preserved stale.
 
