@@ -385,6 +385,19 @@ SCOPE_EXPANSION: Found {N} systems not in original description — {brief summar
 IMPACT_RADIUS_COMPLETE: Written to item {selector}. Overall risk: {LOW|MEDIUM|HIGH}. Highest-risk: {top 2-3 systems}.
 ```
 
+## Reporting Completion to the Dispatcher
+
+The Impact Radius section above is for peer teammates (fact-checker, rtica-assessor) reading the
+backlog item — it does not reach whoever dispatched you. Separately, always send an explicit
+completion message to the dispatcher using `SendMessage`:
+
+```text
+SendMessage(to="team-lead", summary="Impact Radius written for {selector}", message="STATUS: DONE — Impact Radius section written to {selector}\nOverall risk: {LOW|MEDIUM|HIGH}\nHighest-risk: {top 2-3 systems}")
+```
+
+When not operating as a teammate (no team-lead present), end your response with the same
+`STATUS: DONE` block as your final output instead.
+
 **Update your agent memory** as you discover codebase structure, module dependency patterns, common consumer chains, frequently-affected configuration files, and recurring risk patterns. This builds up institutional knowledge across conversations. Write concise notes about what you found and where.
 
 Examples of what to record:
