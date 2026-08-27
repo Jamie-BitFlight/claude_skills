@@ -7,6 +7,11 @@ description: "Use when a diff needs four parallel perspective reviewers (Securit
 
 # Multi-Perspective Review
 
+> [!IMPORTANT]
+> When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+> A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
+> When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
+
 ## Role
 
 Orchestrates four independent perspective reviewers in parallel against a diff. Each reviewer
@@ -352,35 +357,96 @@ TeamDelete(team_name="multi-{review_slug}")
 
 ---
 
-## Dispatch Flow (Reference)
+## Dispatch Flow
+
+The following diagram is the authoritative procedure for `dh:multi-perspective-review` dispatch.
+Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+It supersedes the per-step prose above for sequencing and branching; the prose remains the source
+for payload shapes (task bodies, MCP call arguments) referenced from each node.
 
 ```mermaid
 flowchart TD
-    Start([dh:multi-perspective-review invoked]) --> Parse[Parse --diff and --issue args]
-    Parse --> Files["git diff --name-only range → changed_files list"]
-    Files --> Empty{changed_files empty?}
-    Empty -->|Yes| Abort[ABORT — no changed files to review]
-    Empty -->|No| Slug["Derive review_base, then<br>review_slug = review_base + run stamp"]
-    Slug --> CreatePlan["sam_plan(config: create + T1..T5)<br>always a new plan — never reused"]
-    CreatePlan --> PlanAddr["Store new plan address as {PA}"]
-    PlanAddr --> Team["TeamCreate(team_name='multi-{review_slug}')"]
-    Team --> Parallel[Dispatch 4 workers in parallel — no wait between spawns]
-    Parallel --> W1["Agent(name='security-worker', subagent_type='dh:task-worker')"]
-    Parallel --> W2["Agent(name='performance-worker', subagent_type='dh:task-worker')"]
-    Parallel --> W3["Agent(name='quality-worker', subagent_type='dh:task-worker')"]
-    Parallel --> W4["Agent(name='accessibility-worker', subagent_type='dh:task-worker')"]
-    W1 --> Collect["Wait for T1..T4 terminal via sam_plan status"]
-    W2 --> Collect
-    W3 --> Collect
-    W4 --> Collect
-    Collect --> Synth["Dispatch synthesis worker on T5<br>Wait for T5 terminal<br>Read its Punch List section"]
-    Synth --> NoList{"Punch List parses AND<br>validates against §2.6?"}
-    NoList -->|No| FailSynth[FAIL — Punch list not produced.<br>TeamDelete. Exit non-zero.]
-    NoList -->|Yes| Gate{Any REJECT?}
-    Gate -->|Missing verdict| Fail[FAIL — Perspective X did not return a verdict.<br>Print summary. TeamDelete. Exit non-zero.]
-    Gate -->|Any REJECT| Fail2[Print summary. TeamDelete. Exit non-zero.]
-    Gate -->|All SKIP| Warn[Print summary. Print all-SKIP warning. TeamDelete. Exit 0.]
-    Gate -->|All APPROVE or APPROVE+SKIP| Pass[Print summary. TeamDelete. Exit 0.]
+    Start(["Skill invoked with invocation arguments string"]) --> ParseArgs["Parse --diff, --issue, --slug from the invocation arguments string"]
+    ParseArgs --> DiffCheck{"Is --diff argument present?"}
+    DiffCheck -->|"No — required argument missing"| AbortUsage(["Abort — print usage message. Stop."])
+    DiffCheck -->|"Yes — proceed"| RunDiff["Run: git diff --name-only &lt;git-range&gt;"]
+
+    RunDiff --> SplitFiles["Split stdout by newline, trim empty lines → changed_files list"]
+    SplitFiles --> EmptyCheck{"Is changed_files empty?"}
+    EmptyCheck -->|"Yes — nothing to review"| AbortEmpty(["Print 'ERROR — No changed files found for diff range. Nothing to review.'<br>Do not create a team or plan. Stop."])
+    EmptyCheck -->|"No — files present"| SlugRule1
+
+    %% Step 2 — Derive Review Slug: three-rule priority chain, first match wins
+    SlugRule1{"Was --slug argument provided?"}
+    SlugRule1 -->|"Yes"| SlugFromArg["review_base = the --slug value"]
+    SlugRule1 -->|"No"| SlugRule2{"Was --issue &lt;N&gt; argument provided?"}
+    SlugRule2 -->|"Yes"| SlugFromIssue["review_base = 'review-{N}'"]
+    SlugRule2 -->|"No"| SlugFromBranch["Run git rev-parse --abbrev-ref HEAD<br>Sanitize branch name — replace '/' with '-'<br>review_base = 'review-{branch-name}'"]
+
+    SlugFromArg --> RunStamp
+    SlugFromIssue --> RunStamp
+    SlugFromBranch --> RunStamp
+    RunStamp["Run gen_run_stamp.py, capture stdout as run_stamp<br>review_slug = review_base + '-' + run_stamp<br>team_name = 'multi-' + review_slug"]
+
+    RunStamp --> CreatePlan["sam_plan(action='create') — always a new plan, never reused<br>Creates T1 Security, T2 Performance, T3 Quality,<br>T4 Accessibility (each dependencies = empty),<br>T5 Synthesis (dependencies = T1,T2,T3,T4)<br>Store returned plan_ref as PA"]
+    CreatePlan -.-> CreatePlanDesc["Reuse is unsafe even with status reset —<br>task bodies would still name the prior run's<br>changed files, and a second append to an<br>existing Review Results section produces<br>unparseable concatenated JSON"]
+
+    CreatePlan --> TeamCreateStep["TeamCreate(team_name = 'multi-' + review_slug)"]
+    TeamCreateStep --> DispatchParallel["Dispatch all four reviewer workers simultaneously<br>No wait between spawns — all four are independent"]
+
+    DispatchParallel --> W1["Agent(team_name, name='security-worker',<br>subagent_type='dh:task-worker')<br>Task = PA slash T1 — runs dh:start-task"]
+    DispatchParallel --> W2["Agent(team_name, name='performance-worker',<br>subagent_type='dh:task-worker')<br>Task = PA slash T2 — runs dh:start-task"]
+    DispatchParallel --> W3["Agent(team_name, name='quality-worker',<br>subagent_type='dh:task-worker')<br>Task = PA slash T3 — runs dh:start-task"]
+    DispatchParallel --> W4["Agent(team_name, name='accessibility-worker',<br>subagent_type='dh:task-worker')<br>Task = PA slash T4 — runs dh:start-task"]
+
+    W1 --> WaitReviews
+    W2 --> WaitReviews
+    W3 --> WaitReviews
+    W4 --> WaitReviews
+    WaitReviews["Poll sam_plan(action='status') until<br>T1..T4 all reach a terminal status<br>(complete, blocked, failed, skipped, or deferred)<br>T5 stays not-started — its dependencies block it"]
+
+    WaitReviews --> DispatchSynth["Agent(team_name, name='synthesis-worker',<br>subagent_type='dh:task-worker')<br>Task = PA slash T5 — runs dh:start-task<br>Profile merges same-defect findings across<br>perspectives into one Punch List entry"]
+    DispatchSynth --> WaitT5["Wait for T5 to reach a terminal status"]
+    WaitT5 --> ReadPunch["sam_task(plan=PA, task='T5', action='read')<br>Take the Punch List section"]
+    ReadPunch --> ParseJSON{"Does json.loads succeed<br>on the Punch List section?"}
+    ParseJSON -->|"No — absent or not JSON"| FailSynth
+    ParseJSON -->|"Yes"| ValidateSchema{"Does the parsed block pass every<br>review-verdict-contract section 2.6<br>validity check?"}
+    ValidateSchema -->|"No — a section 2.6 check failed"| FailSynth
+    ValidateSchema -->|"Yes"| Check6{"Check 6 — does each verdicts[i].verdict<br>match its source perspective's raw<br>Review Results verdict field exactly<br>(read T1..T4 directly, not punch_list<br>against itself)?"}
+    Check6 -->|"No — a copied verdict was altered"| FailSynth
+    Check6 -->|"Yes"| Check7{"Check 7 — does each raw finding's<br>description on T1..T4 appear verbatim<br>in entries[].descriptions at the index<br>named by entries[].perspectives?"}
+    Check7 -->|"No — a finding was altered, dropped,<br>or falsely attributed"| FailSynth
+    Check7 -->|"Yes"| GateOrder1
+
+    FailSynth(["FAIL — Punch list not produced<br>Name the check that failed<br>Report which perspectives wrote a Review Results section<br>TeamDelete(team_name)<br>Exit non-zero. Stop."])
+
+    %% Step 7 — gate logic runs as an ordered priority chain, not a parallel branch
+    GateOrder1{"1. Is punch_list['missing'] non-empty<br>for any perspective?"}
+    GateOrder1 -->|"Yes — a perspective returned nothing"| GateFailMissing["Gate FAILS — 'Perspective X did not<br>return a verdict'. A missing verdict is<br>never an approval."]
+    GateOrder1 -->|"No — all four perspectives reported"| GateOrder2{"2. Does any verdict equal REJECT?"}
+
+    GateOrder2 -->|"Yes"| GateFailReject["Gate FAILS — collect all REJECT verdicts<br>and their blocking findings from<br>punch_list['entries'] (a defect two<br>perspectives raised appears once, naming both)"]
+    GateOrder2 -->|"No"| GateOrder3{"3. Are all four verdicts SKIP?"}
+
+    GateOrder3 -->|"Yes"| GatePassAllSkip["Gate PASSES — summary MUST include<br>'NOTE — No perspectives reviewed, all skipped'"]
+    GateOrder3 -->|"No — any APPROVE, remaining SKIP"| GatePassNormal["Gate PASSES — normal combination"]
+
+    GateFailMissing --> PrintSummary
+    GateFailReject --> PrintSummary
+    GatePassAllSkip --> PrintSummary
+    GatePassNormal --> PrintSummary
+
+    PrintSummary["Print summary line —<br>'Security = token, Performance = token,<br>Quality = token, Accessibility = token'<br>tokens from review-verdict-contract section 2.2"]
+
+    PrintSummary --> ExitRoute{"Gate outcome?"}
+    ExitRoute -->|"FAILED — missing verdict or REJECT"| CleanupFail["TeamDelete(team_name)"]
+    ExitRoute -->|"PASSED — all-SKIP warning applies"| PrintWarn["Print 'NOTE — No perspectives reviewed, all skipped'"]
+    ExitRoute -->|"PASSED — normal"| CleanupPassNormal["TeamDelete(team_name)"]
+
+    CleanupFail --> ExitNonZero(["Exit non-zero. Run complete."])
+    PrintWarn --> CleanupPassWarn["TeamDelete(team_name)"]
+    CleanupPassWarn --> ExitZeroWarn(["Exit 0. Run complete."])
+    CleanupPassNormal --> ExitZeroNormal(["Exit 0. Run complete."])
 ```
 
 ---
