@@ -9,7 +9,7 @@ project_detection:
   required_dependencies: [typer]
 
 stage_skills:
-  design: [python3-design-cli]
+  design: [python3-development:python-cli-design-spec]
   implementation: [python3-implementation-cli]
 
 quality_gates:
