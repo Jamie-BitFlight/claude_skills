@@ -57,12 +57,16 @@ Do not create a team or a plan when `changed_files` is empty.
 
 ## Step 2: Derive Review Slug
 
-Derive `review_base` exactly once using the first matching rule:
+Derive `review_base` exactly once using this flowchart:
 
-1. `--slug` argument is provided → use its value directly
-2. `--issue <N>` argument is provided → `review-{N}` (e.g., `review-2181`)
-3. Neither provided → read current git branch name via `git rev-parse --abbrev-ref HEAD` and
-   use `review-{branch-name}` (sanitize branch name: replace `/` with `-`)
+```mermaid
+flowchart TD
+    Start([Derive review_base]) --> Q1{--slug argument provided?}
+    Q1 -->|Yes| A["review_base = --slug value"]
+    Q1 -->|No| Q2{--issue N argument provided?}
+    Q2 -->|Yes| B["review_base = review-{N}<br>e.g. review-2181"]
+    Q2 -->|No| C["git rev-parse --abbrev-ref HEAD<br>review_base = review-{branch-name}<br>sanitize: replace / with -"]
+```
 
 Run this command and capture its stdout as `run_stamp`:
 
@@ -426,3 +430,12 @@ orchestrator passes only the task reference `{PA}/T{N}` to the worker prompt.
 - **The punch list is the gate's input.** One defect two perspectives raised is one entry naming
   both, so a REJECT summary counts distinct defects rather than repeating one across lenses.
 - **All-SKIP warning is mandatory** when all four perspectives return SKIP.
+
+---
+
+## Manual Acceptance Testing
+
+Security REJECT, Accessibility SKIP, and summary-line-format behavior require live skill execution
+against real diff inputs and are not covered by automated structural checks. See
+[Acceptance Test Guide](./references/acceptance-test-guide.md) for fixture-based verification
+procedures.
