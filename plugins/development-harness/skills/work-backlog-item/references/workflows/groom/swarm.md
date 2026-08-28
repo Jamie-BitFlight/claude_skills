@@ -62,10 +62,10 @@ sequenceDiagram
     TR-->>O: STATUS: DONE (or BLOCKED — proceed without research context)
 
     Note over O,AA: Wave 1 — parallel (fact-checker receives Research section as prior context)
-    O->>IA: spawn (item details, Files, Evidence, suggested_location)
+    O->>IA: spawn (item_ref)
     O->>FC: spawn (item claims to verify, including any description Hypothesis line + Research section as prior context if available)
-    O->>RT: spawn (item details — waits for IA + FC)
-    O->>CL: spawn (item description)
+    O->>RT: spawn (item_ref — waits for IA + FC)
+    O->>CL: spawn (item_ref)
 
     IA->>IA: build systems inventory, expand via imports/docs/agents/config/CI
     IA->>IA: write Impact Radius, leading with "SCOPE_EXPANSION: 12 systems, 2 CI workflows"
@@ -77,7 +77,7 @@ sequenceDiagram
 
     IA->>IA: run 5-question checklist per system
     IA->>IA: write Impact Radius section via MCP
-    O->>AA: spawn (item design intent — waits for IA)
+    O->>AA: spawn (item_ref — waits for IA)
 
     FC->>FC: write Fact-Check section via MCP
 
@@ -266,10 +266,10 @@ Description is the problem statement. Acceptance Criteria are verifiable success
 
 Groomer agent: `subagent_type="dh:backlog-item-groomer"`, model=sonnet.
 
-Input to groomer: item title, description, source, priority, plan address, RT-ICA assessment,
-Fact-Check verdicts, Issue Classification, Root-Cause Analysis (or "N/A"), Impact Radius,
-Research section (from Wave 0 technical-researcher, if available — pass verbatim as prior context),
-and any discovery context.
+Input to groomer: `item_ref` only, per `dh:dispatch-contract`. The groomer fetches title,
+description, and every section prior swarm waves wrote (Impact Radius, Fact-Check, Issue
+Classification, Root-Cause Analysis, RT-ICA, Design Intent Alignment, Research) itself — see
+`backlog-item-groomer.md` Step 0.0. Do not paste any of those sections into the dispatch prompt.
 
 Orchestrator: before dispatching the groomer, verify your prompt names all required subsections: Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. A prompt that omits a subsection produces a missing section that cannot be recovered by retry alone.
 
