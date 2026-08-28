@@ -26,7 +26,7 @@ Language manifests **declare specialists and gates**. They do **not** redefine p
 | Human touchpoint model | — |
 | Artifact conventions | — |
 | RT-ICA, verification | — |
-| Task file format | — |
+| SAM task schema (`models.py`) | — |
 | Subagent contract | — |
 | — | Role Fulfillment (architect, test-designer, etc.) |
 | — | Quality Gates (format, lint, typecheck, test, standards) |

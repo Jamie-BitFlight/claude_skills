@@ -299,8 +299,7 @@ with `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"r
 or `plan read --address {plan_address}` (CLI). Discover plans with
 `sam_plan(config={"action":"list","search":"{search_term}"})` or `plan list --search
 {search_term}`. These tools resolve addresses; do not inspect or infer filesystem paths.
-(`sam_read`/`sam_list` are deprecated names; see
-[TASK_FILE_FORMAT.md](./TASK_FILE_FORMAT.md) "Deprecated Tools".)
+(`sam_read`/`sam_list` are deprecated names.)
 
 Do not select or instantiate a separate plan/task provider. The active-task context is only an
 ephemeral session pointer to the returned addresses; it is not a plan store, cache, or source of

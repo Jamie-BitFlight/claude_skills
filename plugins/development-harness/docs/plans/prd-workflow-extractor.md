@@ -109,7 +109,7 @@ sam_task(action='claim', plan=..., task=...)
 
 **CLI form** (`sam_schema/cli.py`, a Typer app — used where a workflow step documents the
 provider-neutral CLI instead of, or alongside, an MCP call; see
-[TASK_FILE_FORMAT.md](../TASK_FILE_FORMAT.md) "DH CLI Usage Guide" and
+[dh-cli-usage-guide.md](../../skills/dh-meta-docs/references/dh-cli-usage-guide.md) "DH CLI Usage Guide" and
 [backend-providers.md](../backend-providers.md) "CLI vs MCP Capability Surface" for the full
 mapping):
 ```

@@ -21,7 +21,7 @@ classification and handling instructions.
      2. 🔍 SAM: Regex False Positive Suppression           [#14  status:needs-grooming  v1.0]
 
    P1
-     3. 📋 SAM: Validate Task File Schema                  [no issue]
+     3. 📋 SAM: Validate Task Schema                       [no issue]
      4. 📋 SAM: Implement Feature Dry-Run Mode             [no issue]
 
    P2
