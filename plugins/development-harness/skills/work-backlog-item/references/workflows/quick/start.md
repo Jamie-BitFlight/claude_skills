@@ -18,12 +18,15 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
 1. From <item_ref/>, derive:
    - `{title}` — a short, title-shaped label of the symptom or request (this is what you would
      write as a backlog item title, not the raw request verbatim).
-   - `{observations}` — your own contextual restatement of what the raw request is actually about:
-     enough that a downstream reader (grooming, a task-worker, a human) understands the original
-     ask without re-reading the raw text or re-deriving context from a terse title alone. This is
-     not optional filler — a bare title frequently loses context a terser or more conversational
-     raw request carried (what triggered it, what's already been ruled out, an exact error
-     message) that this step is responsible for capturing.
+   - `{observations}` — verifiable facts about the circumstances the request arose in: what you
+     were discussing or working on when it came in, what system/file/topic was in view, an exact
+     error message, what's already been ruled out. Record what you actually observed, not what you
+     infer the request means — a short or ambiguous request read without its surrounding context
+     invites exactly the wrong guess (e.g. "which is the best beatle" asked mid-discussion of
+     African dung beetles isn't a Ringo Starr question; the observation that grounds it is *what
+     was being discussed*, not a reinterpretation of the request itself). This is not optional
+     filler — a bare title strips the surrounding context a downstream reader needs to interpret
+     the request correctly.
 
    Derive the same `{title}` for the same raw request as consistently as you can — prefer the most
    literal, shortest faithful label over creative rephrasing — since Step 3's lookup matches on
@@ -121,13 +124,17 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
      --description "{description from above}"
    ```
 
-   If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`).
+   If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`) — this is the real content to use below, not just what was in `<item_ref/>` (e.g. `--quick #42` has almost nothing in the raw request itself; the existing item is where the actual problem statement lives).
 
-4. Extract the item's description and acceptance criteria if available.
+4. Build `{task_brief}` for Step 5, same rule as Step 2a — a SAM task is an execution brief, not a
+   groomed artifact, so it never carries `{hypothesis}`, labeled or not, from any source:
+   - Item found in Step 3 (already existed): `{task_brief}` = the fetched description, with any
+     `**Hypothesis**: {text}` line removed if present (an existing item can carry one same as a
+     freshly-created one), plus acceptance criteria if available.
+   - Item not found (just created in Step 3): `{task_brief}` = `{title}` plus `{observations}` from
+     Step 1 — already excludes `{hypothesis}` by construction.
 
-5. Create the quick plan via the CLI. Same rule as Step 2a: a SAM task is an execution brief, not
-   a groomed artifact, so `--goal` and `--task-title` use `{title}` plus `{observations}` only
-   (call this `{task_brief}`) — never `{hypothesis}`, which no `--quick` path ever verifies:
+5. Create the quick plan via the CLI using `{task_brief}` for both `--goal` and `--task-title`:
 
    ```bash
    plan create \
