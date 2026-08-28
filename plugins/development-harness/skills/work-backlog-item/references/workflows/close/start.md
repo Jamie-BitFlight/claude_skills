@@ -154,7 +154,7 @@ If operation is `resolve`:
 
 ## Step 5.7: Invoke backlog resolve
 
-8. If the item has a linked GitHub Issue (`#N`), check whether an open PR already references it:
+7. If the item has a linked GitHub Issue (`#N`), check whether an open PR already references it:
 
    ```bash
    git log --oneline -20 --grep="Fixes #N\|Closes #N"
@@ -174,15 +174,15 @@ If operation is `resolve`:
 
    - **No open PR / no linked issue**: proceed to invoke backlog resolve below.
 
-9. Use `AskUserQuestion` to ask: "Summarize what was done (1-2 sentences):" (free text — this is the required `summary` field).
+8. Use `AskUserQuestion` to ask: "Summarize what was done (1-2 sentences):" (free text — this is the required `summary` field).
 
-10. Optionally gather additional evidence fields (can be skipped for trivial items):
+9. Optionally gather additional evidence fields (can be skipped for trivial items):
     - `method` — "How was the work done?"
     - `notes` — "Any problems found or surprises?"
     - `follow_ups` — "Any follow-up tickets created?" (comma-separated refs)
     - `findings` — "Any retrospective learnings?"
 
-11. Call `backlog resolve`:
+10. Call `backlog resolve`:
 
     - `--selector`: `"{title}"` or `"#{N}"`
     - `--summary`: `"{summary}"`
@@ -192,9 +192,9 @@ If operation is `resolve`:
     - `--follow-ups`: `"{follow_ups}"` (if provided)
     - `--findings`: `"{findings}"` (if provided)
 
-12. Check the returned dict for an `error` key. Report the result to the user.
+11. Check the returned dict for an `error` key. Report the result to the user.
 
-13. Before emitting Handoff E, determine whether all milestone issues are resolved:
+12. Before emitting Handoff E, determine whether all milestone issues are resolved:
 
     a. Read the `milestone` field from the `backlog_resolve` response. If the resolved item has no `milestone` field (or `milestone` is null/empty), skip Handoff E — no milestone context exists.
 
