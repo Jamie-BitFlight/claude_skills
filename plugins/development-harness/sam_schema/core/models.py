@@ -735,10 +735,13 @@ class FinalizePlanResult(BaseModel):
 
 
 class ActiveTaskContext(BaseModel):
-    """Session-to-task binding stored in context_dir() as active-task-{session_id}.json.
+    """Session-to-task binding, identified by its (plan, task) address across all backends.
 
-    The SubagentStop hook reads this file directly from the filesystem.
-    The MCP server writes it via ContextBackend.
+    Persistence as context_dir()/active-task-{session_id}.json is a local-YAML
+    ContextBackend storage detail, not a universal contract — the memory, GitHub,
+    and beads backends hold the same binding without writing that file. The
+    SubagentStop hook's primary retrieval path is the sam_active_task(action="get")
+    fastmcp call; a file read is only a local-backend fallback.
 
     Schema note: new fields (session_id, feature_slug, started_at) are additive.
     Existing files without these fields remain valid — all new fields default to None.
@@ -746,7 +749,13 @@ class ActiveTaskContext(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    task_file_path: str = Field(description="Absolute path to the plan YAML file containing this task.")
+    task_file_path: str | None = Field(
+        default=None,
+        description=(
+            "Absolute path to the plan YAML file containing this task. "
+            "Populated only by the local-YAML ContextBackend; None for memory, GitHub, and beads."
+        ),
+    )
     task_id: str = Field(description="Task identifier within the plan (e.g., 'T3').")
     plan: str | None = Field(
         default=None,
