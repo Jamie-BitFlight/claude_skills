@@ -190,29 +190,38 @@ backlog groom \
 
 ## Hypothesis Resolution
 
-Runs only when the item's `description` (read in RT-ICA Final Pass Step 1) contains a
-`**Hypothesis**: {text}` line — a creation-time speculative cause the `create/scope.md` rule
+Runs only when the item's `description` (read in RT-ICA Final Pass Step 1) contains one or more
+`**Hypothesis**: {text}` lines — a creation-time speculative cause the `create/scope.md` rule
 requires to be labeled, not stated as fact. If `description` has no such line, skip this section
-entirely.
+entirely. A description can carry more than one speculative cause; resolve every line found,
+independently — do not stop after the first.
 
 Rewrite `description` in place — not only a groomed section — so the resolution is visible even
 to an agent reading just a truncated glimpse of the item.
 
-1. Determine resolution, in this precedence order:
-   - `Root-Cause Analysis` section present and contains a `**Root cause**: {statement}` line (RCA
-     ran via the `defect` 5-whys path, see `swarm.md`'s Root-Cause Analysis step) — this is
-     authoritative regardless of whether it matches the original guess. New text:
-     `**Confirmed cause**: {statement}`.
-   - Else, `Fact-Check` section contains a claim prefixed `HYPOTHESIS:` (per `swarm.md`'s
-     fact-checker instruction) — read its `verdict`:
+1. For each `**Hypothesis**: {text}` line found, determine its resolution in this precedence
+   order:
+   - `description` contains exactly one `**Hypothesis**` line, AND `Root-Cause Analysis` section
+     is present and contains a `**Root cause**: {statement}` line (RCA ran via the `defect`
+     5-whys path, see `swarm.md`'s Root-Cause Analysis step) — this is authoritative regardless of
+     whether it matches the original guess. New text: `**Confirmed cause**: {statement}`. (RCA
+     analyzes one root cause for the item — with multiple hypothesis lines there is no reliable
+     way to attribute that single finding to one specific line over another, so this precedence
+     tier applies only when exactly one hypothesis line exists.)
+   - Else, `Fact-Check` section contains a claim prefixed `HYPOTHESIS:` whose text exactly matches
+     this line's `{text}` (per `swarm.md`'s fact-checker instruction, which prefixes every
+     hypothesis claim with `HYPOTHESIS:` using the claim's own exact text so each verdict maps
+     back to its originating line) — read its `verdict`:
      - `VERIFIED` → `**Confirmed cause**: {original hypothesis text}`
      - `REFUTED` → `**Hypothesis (refuted — see Fact-Check section)**: {original hypothesis text}`
      - `INCONCLUSIVE` → no rewrite; the marker already correctly signals "not yet confirmed"
-   - Else (RCA didn't run and no matching Fact-Check claim exists) → no rewrite.
+   - Else (RCA tier doesn't apply and no matching Fact-Check claim exists for this line) → no
+     rewrite for this line.
 
-2. When a rewrite applies, replace only the `**Hypothesis**: {text}` line within `description`
-   with the resolved text from Step 1 — leave the rest of `description` unchanged — and write it
-   back **before** the Write Groomed Content step below, in this same finalize pass:
+2. When a rewrite applies, replace that specific `**Hypothesis**: {text}` line within
+   `description` with its own resolved text from Step 1 — leave every other line unchanged,
+   including any hypothesis line that had no matching resolution — and write the result back
+   **before** the Write Groomed Content step below, in this same finalize pass:
 
 ```bash
 mcp__plugin_dh_backlog__backlog_update(selector='{item_ref}', description='{description with the Hypothesis line replaced}')

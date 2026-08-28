@@ -38,11 +38,20 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
      filler — a bare title strips the surrounding context a downstream reader needs to interpret
      the request correctly.
 
+   Separately, scan `<item_ref/>` for an explicit `#N` issue reference (the `#` prefix required —
+   a bare number is too ambiguous to treat as a reference here, since it may just be ordinary
+   request content such as a port or line number). If found anywhere in the text, record it as
+   `{explicit_ref}`, independent of whatever `{title}`/`{observations}` get derived from the same
+   raw text — this survives even when other text follows it (e.g. `#42 -- Only fails with SSO` →
+   `{explicit_ref}="#42"`), unlike SKILL.md's routing-layer `item_ref` discriminator, which only
+   fires when a `#N` consumes the *entire* remaining text.
+
    Derive the same `{title}` for the same raw request as consistently as you can — prefer the most
-   literal, shortest faithful label over creative rephrasing — since Step 3's lookup matches on
-   `{title}` to avoid creating a duplicate on a repeat invocation. This is best-effort, not
-   deterministic: `{title}` is derived, not parsed, so exact stability across separate invocations
-   isn't guaranteed the way it would be for literal substring extraction.
+   literal, shortest faithful label over creative rephrasing — since Step 3's lookup falls back to
+   matching on `{title}` (after trying `{explicit_ref}` first, when captured) to avoid creating a
+   duplicate on a repeat invocation. This is best-effort, not deterministic: `{title}` is derived,
+   not parsed, so exact stability across separate invocations isn't guaranteed the way it would be
+   for literal substring extraction — `{explicit_ref}`, when present, is the reliable match.
 
    If the title, or `{observations}`, states a cause for the problem (e.g. "X failing because Y",
    "X due to Y") that is not a confirmed observation, the persisted text must not assert it as fact
@@ -119,7 +128,12 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
 
    Stop — do not continue to step 3 or create a new backlog item.
 
-3. Find the item via the CLI: `backlog view --selector "{title or #N}"` (using the normalized `{title}` from Step 1). If not found (JSON output contains an `error` key), create a minimal item:
+3. Find the item via the CLI. If Step 1 captured `{explicit_ref}`, try
+   `backlog view --selector "{explicit_ref}"` first — this is the same item a plain `#42` lookup
+   would find, just recovered from inside a longer request. If not found, or `{explicit_ref}`
+   wasn't captured, fall back to `backlog view --selector "{title}"` (using the normalized
+   `{title}` from Step 1). If neither lookup succeeds (JSON output contains an `error` key),
+   create a minimal item:
 
    The backlog item's `description` starts as `{title}`, then appends each of `{observations}` and
    `{hypothesis}` that Step 1 recorded, each on its own paragraph, in that order
@@ -134,7 +148,9 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
      --description "{description from above}"
    ```
 
-   If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`) — this is the real content to use below, not just what was in `<item_ref/>` (e.g. `--quick #42` has almost nothing in the raw request itself; the existing item is where the actual problem statement lives).
+   Record `{item_title}` = `{title}` — the label just used to create it.
+
+   If found (by either lookup in this step), extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`) — this is the real content to use below, not just what was in `<item_ref/>` (e.g. `--quick #42` has almost nothing in the raw request itself; the existing item is where the actual problem statement lives). Record `{item_title}` = the fetched item's own `title` field — Step 5 uses this, not the derived `{title}` or `{task_brief}`, as `--task-title`.
 
 4. Build `{task_brief}` for Step 5, same rule as Step 2a — a SAM task is an execution brief, not a
    groomed artifact, so it never carries `{hypothesis}`, labeled or not, from any source:
@@ -147,14 +163,19 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    - Item not found (just created in Step 3): `{task_brief}` = `{title}` plus `{observations}` from
      Step 1 — already excludes `{hypothesis}` by construction.
 
-5. Create the quick plan via the CLI using `{task_brief}` for both `--goal` and `--task-title`:
+5. Create the quick plan via the CLI using `{task_brief}` for `--goal`, but `{item_title}` (not
+   `{task_brief}`) for `--task-title` — `Task.title` is capped at 200 characters
+   (`sam_schema/core/models.py`), and `{task_brief}` for an existing item can carry its full
+   fetched description plus acceptance criteria, which routinely exceeds that. `{item_title}` is
+   always short by construction (it's a backlog item title). If `{item_title}` still exceeds 200
+   characters, truncate to 200:
 
    ```bash
    plan create \
      --slug "quick-{slug}" \
      --goal "{goal from task_brief or acceptance_criteria}" \
      --task-id T1 \
-     --task-title "{task_brief}" \
+     --task-title "{item_title}" \
      --task-agent "task-worker" \
      --task-priority 1 \
      --task-complexity low
@@ -165,7 +186,7 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    internally — do not resolve or pass a file path. Read `plan_id` (e.g. `Pe71c7cb8-{slug}`) from the JSON
    output — that is the plan reference used in the next two steps, not the `quick-{slug}` string.
 
-6. Call the CLI to record the plan reference: `backlog update --selector "{title}" --plan "{plan_id from step 5}"`.
+6. Call the CLI to record the plan reference: `backlog update --selector "{item_title}" --plan "{plan_id from step 5}"` — use `{item_title}` here too, since that's the selector guaranteed to resolve to the item Step 3 actually found or created (an existing item's real title can differ from Step 1's re-derived `{title}` guess).
 
 7. Report the `plan_id` returned by `plan create`:
 
@@ -174,5 +195,5 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    Steps: {N} tasks
 
    To execute: /dh:implement-feature {plan_id}
-   To close:   /dh:work-backlog-item close {title}
+   To close:   /dh:work-backlog-item close {item_title}
    ```

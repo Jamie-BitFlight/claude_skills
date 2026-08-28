@@ -12,10 +12,11 @@ Each agent's section is how the others reach its findings — a teammate that mu
 
 2. **fact-checker** — Verify item claims against primary sources. Training data recall is NOT
    evidence. Valid evidence: WebFetch, WebSearch, command output, source code, MCP tool output.
-   If `description` contains a `**Hypothesis**: {text}` line, include it as one of the claims to
-   verify, prefixed `HYPOTHESIS:` so its verdict is locatable later (see Fact-Checker output
-   contract below). Write to `section="Fact-Check"`, recording each `REFUTED:` claim there (they
-   become MISSING in RT-ICA).
+   If `description` contains one or more `**Hypothesis**: {text}` lines, include each one as its
+   own separate claim to verify, every one prefixed `HYPOTHESIS:` using that claim's own exact
+   text, so `finalize.md` can match each verdict back to its originating line by exact-text
+   comparison (see Fact-Checker output contract below). Write to `section="Fact-Check"`, recording
+   each `REFUTED:` claim there (they become MISSING in RT-ICA).
 
 3. **rtica-assessor** — Assess information completeness using impact-analyst and fact-checker
    output. Write to `section="RT-ICA"`. Re-read Impact Radius and Fact-Check before
@@ -209,10 +210,11 @@ evidence: {tool result citation}
 source: {URL or file path with line numbers}
 ```
 
-When the claim is the item description's `**Hypothesis**: {text}` line, prefix `claim:` with
-`HYPOTHESIS:` (e.g. `claim: HYPOTHESIS: retries fail because the cache is stale`) so
-`finalize.md`'s Hypothesis Resolution step can locate this specific verdict deterministically
-rather than by matching claim wording.
+When the claim is one of the item description's `**Hypothesis**: {text}` lines, prefix `claim:`
+with `HYPOTHESIS:` followed by that line's exact text verbatim — do not paraphrase (e.g.
+`claim: HYPOTHESIS: retries fail because the cache is stale`). With more than one hypothesis line,
+`finalize.md`'s Hypothesis Resolution step matches each verdict back to its originating line by
+comparing this exact text, so a paraphrased claim breaks that match.
 
 Validation rules:
 
