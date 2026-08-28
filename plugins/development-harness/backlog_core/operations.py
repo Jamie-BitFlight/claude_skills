@@ -75,7 +75,7 @@ from .parsing import (
     view_result_from_local_item,
 )
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
-from .search import ContentDuplicateMatch, DuplicateCheckStatus, find_content_duplicates
+from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
 from .timestamps import now_iso
 
@@ -1820,6 +1820,7 @@ def list_items(
     repo: str = "",
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
+    search: str | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
     """List backlog items. Default reads provider-backed record only. Use from_github=True to refresh first.
 
@@ -1842,6 +1843,9 @@ def list_items(
             comparison). All pairs compose with AND logic. A key the item does
             not carry returns no match (a no-op, not an error). Existing
             type/topic/status filters are unaffected.
+        search: Full-text search query (see backlog_core.search for syntax).
+            Applied after filter_by_key, on the result item dicts. None skips
+            search filtering entirely.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -1873,6 +1877,8 @@ def list_items(
     result_items = [_build_list_entry(it, status_map) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
+    if search is not None:
+        result_items = apply_search_filter(result_items, search)
     return {"items": result_items, "count": len(result_items), **out.to_dict()}
 
 

@@ -75,7 +75,7 @@ from .search import (
     _make_snippet,
     _make_snippet_parts,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._make_snippet_parts test imports
     _parse_body_sections,
-    apply_search_filter as _apply_search_filter,
+    apply_search_filter as _apply_search_filter,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._apply_search_filter test imports
     tokenize_search as _tokenize_search,
 )
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
@@ -465,7 +465,7 @@ def _enrich_with_match_context(
     grouped display: the header appears once, then each ``text`` line follows.
 
     Args:
-        items: Items filtered by ``_apply_search_filter``.
+        items: Items already filtered by search (via ``operations.list_items``).
         search: The original search query string, or ``None``.
         snippet_context: Total character budget for pre + post context per match.
 
@@ -1247,7 +1247,7 @@ async def backlog_add(
     type_: Annotated[
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
-    force: Annotated[bool, Field(description="Skip fuzzy duplicate check")] = False,
+    force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
 ) -> dict:
     """Add a new item through the configured backend and optionally create its native issue.
 
@@ -1697,6 +1697,7 @@ async def backlog_list(
                 topic=topic,
                 include_closed=include_closed,
                 filter_by_key=filter_by_key,
+                search=search,
                 output=out,
             ),
             asyncio.to_thread(_probe_backend_status),
@@ -1708,10 +1709,6 @@ async def backlog_list(
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
     all_items: list[dict[str, str | bool]] = _extract_item_list(result)
-
-    # Apply cross-field search filter when requested.
-    if search is not None:
-        all_items = _apply_search_filter(all_items, search)
 
     # Deduplicate by issue number — the cache may contain duplicate entries for
     # the same issue (observed: #260 appeared twice when multiple match paths
