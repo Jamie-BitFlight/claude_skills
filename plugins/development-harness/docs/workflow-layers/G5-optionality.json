@@ -24,7 +24,7 @@
       "id": "G5.work-backlog-item.quick-route",
       "skill": "work-backlog-item",
       "source_file": "SKILL.md:Routing",
-      "step_label": "Load references/workflows/quick/start.md title source: item_ref joined",
+      "step_label": "Load references/workflows/quick/start.md — agent derives title and observations from raw item_ref text",
       "optionality": "skippable-by-flag",
       "skip_condition": "mode is not --quick",
       "skip_trigger": "--quick flag absent",
