@@ -129,8 +129,8 @@ def test_schema_generation():
 ```
 
 Commands:
-- `pytest --inline-snapshot=create` - populate empty snapshots
-- `pytest --inline-snapshot=fix` - update after intentional changes
+- `pytest -n 2 --inline-snapshot=create` - populate empty snapshots
+- `pytest -n 2 --inline-snapshot=fix` - update after intentional changes
 
 ## Fixtures
 
@@ -210,11 +210,11 @@ async def test_async_raises():
 ## Running Tests
 
 ```bash
-uv run pytest -n auto              # Run all tests in parallel
-uv run pytest -n auto -x           # Stop on first failure
-uv run pytest path/to/test.py      # Run specific file
-uv run pytest -k "test_name"       # Run tests matching pattern
-uv run pytest -m "not integration" # Exclude integration tests
+uv run pytest -n 2                      # Run all tests in parallel
+uv run pytest -n 2 -x                   # Stop on first failure
+uv run pytest -n 2 path/to/test.py      # Run specific file
+uv run pytest -n 2 -k "test_name"       # Run tests matching pattern
+uv run pytest -n 2 -m "not integration" # Exclude integration tests
 ```
 
 ## Checklist
