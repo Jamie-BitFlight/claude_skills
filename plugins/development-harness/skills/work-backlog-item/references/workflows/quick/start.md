@@ -15,21 +15,23 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
 (e.g. an error message, or what was already ruled out) can supply it after a `--` delimiter:
 `--quick {title} -- {additional observations}` — see Step 1 for how this splits.
 
-1. Extract title from <item_ref/>+ joined. If that text contains a `--` freetext delimiter (per
-   the argument vocabulary in `SKILL.md`), the portion before it is the title and the portion
-   after it is `{observations}` — additional detail to include in the description, not to fold
-   into the title. With no delimiter, there are no `{observations}`.
+1. Extract title from <item_ref/>. Per `SKILL.md`'s quick-mode exception to the freetext-delimiter
+   rule, this text is not yet split — if it contains a `--` delimiter, the portion before it is
+   the title and the portion after it is `{observations}`, additional detail to include in the
+   description rather than fold into the title. With no delimiter, there are no `{observations}`.
 
-   If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is
-   not a confirmed observation, the persisted title must not assert it as fact either — the
-   creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this
-   path skips the rest of that workflow. Strip the causal clause from the title (keep only the
-   symptom, e.g. "X failing") before any lookup or write, and record the full causal clause
-   separately as `{hypothesis}` (`**Hypothesis**: {cause}`) for use in the description if a new
-   item is created. Build slug from this normalized title: lowercased, spaces → hyphens. Every
-   step below — the lookup, `--slug`, selectors, reported handoffs — uses this normalized
-   `{title}`/`{slug}`, so a repeat invocation of the same command matches the item this workflow
-   already created instead of attempting to create a duplicate.
+   If the title, or `{observations}` if present, states a cause for the problem (e.g. "X failing
+   because Y", "X due to Y") that is not a confirmed observation, the persisted text must not
+   assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`)
+   applies here too, even though this path skips the rest of that workflow. Strip the causal
+   clause from wherever it appears (title, `{observations}`, or both — check each independently)
+   before any lookup or write, keeping only the symptom (e.g. "X failing"), and record every
+   causal clause found as `{hypothesis}` (`**Hypothesis**: {cause}`, one line per clause if more
+   than one) for use in the description if a new item is created. Build slug from the normalized
+   title: lowercased, spaces → hyphens. Every step below — the lookup, `--slug`, selectors,
+   reported handoffs — uses this normalized `{title}`/`{slug}`, so a repeat invocation of the same
+   command matches the item this workflow already created instead of attempting to create a
+   duplicate.
 
 2. **In-Progress Relevance Check** — Before creating a new backlog item, determine whether this fix belongs to work already in progress. If it does, add it to the active plan instead of opening a new item.
 
@@ -57,7 +59,9 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
    - Else: call `mcp__plugin_dh_backlog__backlog_view(selector="{first in_progress_items title}", summary=false)` and read the item's `plan` field as `active_plan_id`.
    - If neither yields a plan ID: fall through to step 3 (cannot integrate without a plan reference).
 
-   Append the fix as a new task on the active plan:
+   Append the fix as a new task on the active plan. Set `description` the same way Step 3 builds
+   the description for a new item — `{observations}` and `{hypothesis}` from Step 1, when present,
+   go here too; this path must not discard them just because it isn't creating a new item:
 
    ```text
    mcp__plugin_dh_sam__sam_plan(
@@ -67,6 +71,7 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
        "task": {
          "id": "T{next_available_id}",
          "title": "{title}",
+         "description": "{title, plus observations and hypothesis if Step 1 recorded them}",
          "status": "not-started",
          "agent": "task-worker",
          "dependencies": [],
