@@ -1,7 +1,7 @@
 ---
 name: clear-cove-task-design
-description: "Use when orchestration or planning agents are producing task plans, task prompts, or TASK.md instructions that must be unambiguous, verifiable, and resistant to hallucination. Applies CLEAR (Concise, Logical, Explicit, Adaptive, Reflective) to structure and write agent task files, then adds CoVe (Chain of Verification) checks where accuracy risk is meaningful. Activates on draft task prompts, swarm plans, migration tasks, and multi-step plans requiring independently executable steps."
-argument-hint: '[draft task prompt or task file content]'
+description: "Use when orchestration or planning agents are producing task plans, task prompts, or TASK.md instructions that must be unambiguous, verifiable, and resistant to hallucination. Applies CLEAR (Concise, Logical, Explicit, Adaptive, Reflective) to structure and write agent task prompts, then adds CoVe (Chain of Verification) checks where accuracy risk is meaningful. Activates on draft task prompts, swarm plans, migration tasks, and multi-step plans requiring independently executable steps."
+argument-hint: '[draft task prompt content]'
 user-invocable: true
 disable-model-invocation: false
 ---
@@ -20,13 +20,13 @@ Use two complementary systems:
 - CLEAR: a writing and requirements framework (Concise, Logical, Explicit, Adaptive, Reflective)
 - CoVe: an execution time reliability pattern (generation then verification)
 
-Treat every task file as an LLM prompt with operational consequences.
+Treat every task prompt as carrying operational consequences.
 
 ## When to Use This Skill
 
 Use this skill when producing or revising any of the following:
 
-- task files or task prompts that will be executed by worker agents
+- task prompts that will be executed by worker agents
 - multi-step plans where each task must be independently executable
 - tasks requiring factual accuracy (APIs, versions, specs, configuration)
 - tasks with acceptance criteria, quality gates, or verification commands

@@ -1,6 +1,6 @@
 ---
 name: dh-context-gathering
-description: Use when creating a new task OR when starting/switching to a task that lacks a context manifest. Provide the plan address (e.g. P{N}) so the agent can read it via sam_plan and write the context manifest back through the SAM update operation — never a task file path, and never a direct file edit. Skip if the plan's context field already contains a "Context Manifest" section.
+description: Use when creating a new task OR when starting/switching to a task that lacks a context manifest. Provide the plan address (e.g. P{N}) so the agent can read it via sam_plan and write the context manifest back through the SAM update operation — never a file path, and never a direct file edit. Skip if the plan's context field already contains a "Context Manifest" section.
 tools: Read, Grep, Glob, Bash, Write, Skill, SendMessage, mcp__plugin_dh_sam
 model: haiku
 color: cyan
@@ -21,7 +21,7 @@ You are part of the feature development workflow. A plan has just been created a
 
 ### Step 1: Understand the Task
 
-1. READ the task file data via the SAM MCP tool:
+1. READ the task data via the SAM MCP tool:
 
    ```text
    mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P{N}")
@@ -70,7 +70,7 @@ Read files completely. Trace call paths. Understand the full architecture.
 
 ### CRITICAL RESTRICTION
 
-You are FORBIDDEN from using the Edit or Write tool on any task file. Use the structured SAM update operation (`sam_task`/`sam_plan`, or the corresponding `plan update` DH CLI command) to write to task files. You are FORBIDDEN from editing any other files in the codebase. Your sole writing responsibility is updating the task file with a context manifest via the SAM interface.
+You are FORBIDDEN from using the Edit or Write tool on any task. Use the structured SAM update operation (`sam_task`/`sam_plan`, or the corresponding `plan update` DH CLI command) to write to tasks. You are FORBIDDEN from editing any other files in the codebase. Your sole writing responsibility is updating the task with a context manifest via the SAM interface.
 
 ## Requirements for Your Output
 
@@ -110,13 +110,13 @@ Include actual:
 
 ### Output Format
 
-Write the Context Manifest to the task file using the SAM MCP tool:
+Write the Context Manifest to the task using the SAM MCP tool:
 
 ```text
 mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "Context Manifest content here"}, plan="P{N}")
 ```
 
-The content passed to `context` is the full text of the Context Manifest section (everything inside the markdown block below). Do NOT use the Edit tool on the task file.
+The content passed to `context` is the full text of the Context Manifest section (everything inside the markdown block below). Do NOT use the Edit tool on the task.
 
 The Context Manifest is added as the plan-level `context` field. It should contain:
 

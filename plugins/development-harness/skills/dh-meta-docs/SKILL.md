@@ -1,6 +1,6 @@
 ---
 name: dh-meta-docs
-description: Development harness plugin documentation index. Use when looking up SAM pipeline, backlog lifecycle, SDLC layers, task file format, plan artifacts, quality gates, or dispatch schema documentation.
+description: Development harness plugin documentation index. Use when looking up SAM pipeline, backlog lifecycle, SDLC layers, task/plan schema, plan artifacts, quality gates, or dispatch schema documentation.
 user-invocable: false
 ---
 

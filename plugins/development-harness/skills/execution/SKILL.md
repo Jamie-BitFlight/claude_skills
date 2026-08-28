@@ -1,6 +1,6 @@
 ---
 name: execution
-description: Executes SAM Stage 5 — dispatches a single ARTIFACT:TASK file to a fresh stateless agent session, runs quality gates, and produces an ARTIFACT:EXECUTION with implementation results and verification output. Use when Stage 4 Task Decomposition is complete and tasks are ready for execution, when re-executing a task after Stage 6 returns NEEDS_WORK, or when dispatching a task to a language-appropriate specialist agent via the development harness pipeline.
+description: Executes SAM Stage 5 — dispatches a single ARTIFACT:TASK to a fresh stateless agent session, runs quality gates, and produces an ARTIFACT:EXECUTION with implementation results and verification output. Use when Stage 4 Task Decomposition is complete and tasks are ready for execution, when re-executing a task after Stage 6 returns NEEDS_WORK, or when dispatching a task to a language-appropriate specialist agent via the development harness pipeline.
 user-invocable: false
 ---
 
@@ -10,18 +10,18 @@ user-invocable: false
 
 You are the execution dispatcher for the SAM pipeline. You launch fresh,
 stateless agent sessions to execute individual tasks. Each agent receives
-exactly one task file as its complete context.
+exactly one task as its complete context.
 
 ## Core Principle
 
-**The task file IS the prompt.** Each executing agent gets a fresh session with
+**The task IS the prompt.** Each executing agent gets a fresh session with
 zero memory of previous stages. Everything the agent needs is embedded in the
-task file. If the task file is insufficient, that is a Stage 4 defect, not a
+task. If the task is insufficient, that is a Stage 4 defect, not a
 Stage 5 problem.
 
 ## When to Use
 
-- After Stage 4 Task Decomposition produces ARTIFACT:TASK files
+- After Stage 4 Task Decomposition produces ARTIFACT:TASK entries
 - For each task ready for execution (dependencies satisfied)
 - When re-executing a task after Stage 6 returns NEEDS_WORK
 
@@ -29,7 +29,7 @@ Stage 5 problem.
 
 ```mermaid
 flowchart TD
-    Start([ARTIFACT:TASK file]) --> R1[1. Read task file]
+    Start([ARTIFACT:TASK]) --> R1[1. Read Task]
     R1 --> R2[2. Resolve role to agent]
     R2 --> R3[3. Dispatch to agent in fresh session]
     R3 --> R4[4. Agent executes task]
@@ -42,7 +42,7 @@ flowchart TD
     Collect --> Done([ARTIFACT:EXECUTION])
 ```
 
-### Step 1 — Read Task File
+### Step 1 — Read Task (`sam_task` action=read)
 
 Read the task via `sam_task`. The returned
 `TaskAssignment` model contains both plan-level context (`plan_goal`, `plan_context`,
@@ -63,9 +63,9 @@ If no language manifest exists, dispatch dh:task-worker. No specialist profile w
 
 ### Step 3 — Dispatch to Fresh Session
 
-Launch the resolved agent in a fresh session. Pass the task file body as the
+Launch the resolved agent in a fresh session. Pass the task body as the
 complete prompt. The agent must NOT have access to other planning artifacts
-unless the task file explicitly includes relevant excerpts.
+unless the task explicitly includes relevant excerpts.
 
 ### Step 4 — Agent Executes Task
 
@@ -121,7 +121,7 @@ The execution results follow this template:
 
 ## Task
 
-<task title from TASK file>
+<task title from ARTIFACT:TASK>
 
 ## Status
 
@@ -173,7 +173,7 @@ The execution results follow this template:
 
 - **One task per agent** — never batch multiple tasks into one session
 - **Fresh session per task** — no carry-over state between executions
-- **Task file is authoritative** — if the task file contradicts the plan, follow the task file (report the discrepancy in handoff)
+- **Task is authoritative** — if the task contradicts the plan, follow the task (report the discrepancy in handoff)
 - **Quality gates are mandatory** — execution is not complete until gates pass or failures are documented
 
 ## Dependency Ordering

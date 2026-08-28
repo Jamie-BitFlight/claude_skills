@@ -53,9 +53,9 @@ sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
 
 Extract:
 
-- `task_file_path` — the plan address, an opaque logical identifier such as `Pdec8934d`; resolved
-  by MCP tools, not filesystem paths. Never parse it for a plan number or slug — read those
-  from `sam_plan(config={"action": "read"})`
+- `plan_id` and `task_id` — the plan/task address pair, opaque logical identifiers such as
+  `Pdec8934d`/`T3`; resolved by MCP tools, not filesystem paths. Never parse `plan_id` for a
+  plan number or slug — read those from `sam_plan(config={"action": "read"})`
 - `item_id` — required for artifact registration; if absent, BLOCK immediately
 - `expected_outputs` — the implementation files produced by Stage 5 (listed in the task's
   "Files Changed" or "Expected Outputs" section)
@@ -67,13 +67,13 @@ Delegate the concrete S6 review work with subagent_type="dh:code-reviewer".
 
 Context to include in the prompt:
 
-- `task_file_path` — path to the SAM task file
+- `plan_id` and `task_id` — the SAM task address
 - `implementation_files` — the files from the task's Expected Outputs
 - `item_id` — required for `artifact_register` inside the agent
 
 ```text
 Task is S6 forensic review with subagent_type="dh:code-reviewer"
-Context: task_file_path={task_file_path}, item_id={item_id},
+Context: plan_id={plan_id}, task_id={task_id}, item_id={item_id},
   implementation_files={expected_outputs}
 Output: STATUS block containing Verdict (PASS / FAIL / NEEDS-WORK) and ARTIFACTS
   section naming the code-review artifact_id registered on issue #{item_id}
@@ -161,7 +161,7 @@ When the verdict is NEEDS_WORK or FAIL, extract blocking findings from the
 ```mermaid
 flowchart TD
     NW([NEEDS_WORK verdict]) --> Extract[Extract blocking findings from code-review artifact]
-    Extract --> Create[Create remediation TASK files — one per blocking finding]
+    Extract --> Create[Create remediation tasks — one per blocking finding]
     Create --> Stage5[Stage 5 — Execute remediation tasks]
     Stage5 --> Stage6[Stage 6 — Re-review via @dh:code-reviewer]
     Stage6 --> Q{PASS?}

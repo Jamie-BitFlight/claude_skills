@@ -186,7 +186,7 @@ Feature is ready for commit/PR.
 ```mermaid
 flowchart TD
     NotCert([NOT_CERTIFIED]) --> Gaps[Document specific gaps]
-    Gaps --> NewTasks[Create new TASK files for gaps]
+    Gaps --> NewTasks[Create new tasks for gaps]
     NewTasks --> Stage4[Stage 4 — Decompose gap tasks]
     Stage4 --> Stage5[Stage 5 — Execute gap tasks]
     Stage5 --> Stage6[Stage 6 — Review gap executions]

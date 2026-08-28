@@ -271,7 +271,7 @@ NEXT_STEP: Fix integration gaps, then re-verify
 
 ### Level 1: Existence - Artifacts Present
 
-- [ ] Task file read and new code inventory built
+- [ ] Task read and new code inventory built
 - [ ] Export/import map created for all modules
 - [ ] Integration report generated
 - [ ] STATUS field present in output

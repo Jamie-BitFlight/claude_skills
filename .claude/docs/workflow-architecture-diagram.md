@@ -237,13 +237,13 @@ Written by `/start-task` skill. Read by `task_status_hook.py` PostToolUse handle
 
 ```json
 {
-  "task_file_path": "~/.dh/projects/{slug}/plan/P719-my-feature.yaml",
+  "plan": "P719-my-feature",
   "task_id": "T04",
   "parent_issue_number": 719
 }
 ```
 
-`parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
+The `ActiveTaskContext` model also carries a local-YAML-only absolute plan-file-path field, populated only by the `LocalContextBackend`; it is `None` for the memory, GitHub, and beads backends. The hook's primary retrieval path is `sam_active_task(action="get")`; a filesystem read of this JSON file is only a local-backend fallback. `parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
 
 ### 2.7 sam_claim output
 
@@ -343,7 +343,7 @@ Processing sequence:
 1. Read `agent_transcript_path` from hook input. If absent, exit 0 (cannot correlate agent to task).
 2. Call `_extract_session_id_from_transcript(transcript_path)` — reads first 10 JSONL lines, returns the `session_id` field of the first parseable record. If not found, exit 0.
 3. Construct `~/.dh/projects/{slug}/context/active-task-{sub_agent_session_id}.json` via `dh_paths.context_dir()`. If the file does not exist, exit 0 (not a `/start-task` sub-agent).
-4. Read `task_file_path`, `task_id`, and `parent_issue_number` from the context file.
+4. Read `plan`, `task_id`, and `parent_issue_number` from the context file (or via `sam_active_task(action="get")` on the primary path).
 5. If task is already `status: complete`, delete the context file and exit 0.
 6. Call `sam_update_status(full_path, task_id, COMPLETE, timestamp_field="completed")`.
 7. Delete the context file.
@@ -364,7 +364,7 @@ Processing sequence:
 
 1. Read `session_id` from hook input. If absent, exit 0.
 2. Read `~/.dh/projects/{slug}/context/active-task-{session_id}.json`. If absent, exit 0.
-3. Resolve `task_file_path` and `task_id` from context file.
+3. Resolve `plan` and `task_id` from context file.
 4. Read current task via `sam_get_task`. If `status == complete`, return without writing.
 5. Call `sam_update_plan_fields(full_path, task_id, set_fields={"last-activity": <ISO timestamp>})`.
 

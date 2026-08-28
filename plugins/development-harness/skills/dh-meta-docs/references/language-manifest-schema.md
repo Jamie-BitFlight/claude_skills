@@ -12,7 +12,7 @@ Language manifests extend Layer 0 (SDLC-agnostic). They do **not** redefine:
 - Human touchpoint model
 - Artifact conventions
 - RT-ICA, verification protocol
-- Task file format
+- Task record schema
 
 See [.claude/docs/sdlc-layers/layer-0/](../../../../.claude/docs/sdlc-layers/layer-0/). Layer 0 gates apply before role resolution.
 
