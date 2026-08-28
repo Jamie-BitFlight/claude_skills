@@ -20,6 +20,21 @@ Return BLOCKED when a required input is missing, rather than inferring it.
 
 </status>
 
+<dispatch_input>
+
+If your `tools:` list carries `mcp__plugin_dh_backlog`, fetch the backlog item yourself —
+`backlog_view(selector=<item_ref>, ...)` — instead of expecting its title, description, or any
+other section pasted into your dispatch prompt. Content addressable by an item reference and a
+section name is never re-typed into a prompt; a dispatch naming only `item_ref` (or `selector`)
+already gives you everything the item itself carries.
+
+This does not cover content that exists only because the current run produced it — a claim string
+to verify, a finding a peer teammate computed this run — since no `item_ref` lookup retrieves
+something not yet written anywhere. A dispatch carrying that kind of content is not a violation of
+this rule.
+
+</dispatch_input>
+
 <result_destination>
 
 Put your result where your own agent file says. A dispatch naming a different form overrides that
