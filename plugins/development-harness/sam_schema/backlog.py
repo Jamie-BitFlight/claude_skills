@@ -92,7 +92,7 @@ def list_items(
     """List backlog items, optionally filtered."""
     output = Output()
     result = operations.list_items(
-        from_github=refresh,
+        refresh=refresh,
         label=label,
         section=section,
         status=status,

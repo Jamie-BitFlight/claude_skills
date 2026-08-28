@@ -1933,7 +1933,9 @@ def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int
     )
 )
 async def backlog_list(
-    from_github: Annotated[bool, Field(description="Refresh local cache from GitHub Issues before listing")] = False,
+    refresh: Annotated[
+        bool, Field(description="Refresh the local cache from the configured backend before listing")
+    ] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
     section: Annotated[
         str | None, Field(description="Filter by priority section: P0, P1, P2, or Ideas (case-insensitive)")
@@ -2101,7 +2103,7 @@ async def backlog_list(
 ) -> dict:
     """List all open backlog items.
 
-    Use from_github=true to refresh the local cache from GitHub before listing.
+    Use refresh=true to refresh the local cache from the backend before listing.
     Use label to filter items by a specific GitHub label.
     Use section to filter by priority section (P0, P1, P2, Ideas).
     Use status to filter by status value (e.g. needs-grooming, status:in-progress).
@@ -2140,7 +2142,7 @@ async def backlog_list(
         result, backend_status = await asyncio.gather(
             asyncio.to_thread(
                 operations.list_items,
-                from_github=from_github,
+                refresh=refresh,
                 label=label,
                 section=section,
                 status=status,

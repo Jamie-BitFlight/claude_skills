@@ -1764,7 +1764,7 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
 
 
 def list_items(
-    from_github: bool = False,
+    refresh: bool = False,
     label: str | None = None,
     section: str | None = None,
     status: str | None = None,
@@ -1776,10 +1776,10 @@ def list_items(
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
-    """List backlog items. Default reads provider-backed record only. Use from_github=True to refresh first.
+    """List backlog items. Default reads provider-backed record only. Use refresh=True to refresh first.
 
     Args:
-        from_github: Refresh provider-backed record from GitHub Issues before listing.
+        refresh: Refresh the provider-backed record from the configured backend before listing.
         label: Filter by GitHub label (applied during refresh).
         section: Filter by priority section — P0, P1, P2, or Ideas (case-insensitive).
         status: Filter by status value e.g. 'needs-grooming', 'status:in-progress'.
@@ -1803,7 +1803,7 @@ def list_items(
         file_path, groomed, status, and milestone fields for items with a GitHub issue).
     """
     out = output or Output()
-    if from_github:
+    if refresh:
         refresh_local_cache_from_github(repo, label, output=out)
     items = get_config().backend.list_work_items()
     # Start with non-skipped items that have a section. The skip flag may be set
