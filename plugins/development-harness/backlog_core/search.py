@@ -9,7 +9,9 @@ Operates on the ``list[dict[str, str | bool]]`` shape produced by
 from __future__ import annotations
 
 import dataclasses
+import operator
 import re as _re
+from enum import StrEnum
 
 # Fields searched by default when no field-specific prefix is given.
 # ``body`` contains the full item content (description + all section entries)
@@ -474,3 +476,192 @@ def _format_match_text(
 
 
 _META_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
+
+
+# ---------------------------------------------------------------------------
+# Primitive 2: content-based duplicate detection
+# ---------------------------------------------------------------------------
+
+# Statuses that mark a candidate as no longer a live duplicate risk.
+_DUPLICATE_EXCLUDED_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed", "skip"})
+
+# Common words dropped from concept extraction — not indicative of topic.
+_CONCEPT_STOPWORDS: frozenset[str] = frozenset({
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "been",
+    "but",
+    "by",
+    "can",
+    "for",
+    "from",
+    "had",
+    "has",
+    "have",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "near",
+    "no",
+    "nor",
+    "not",
+    "of",
+    "on",
+    "or",
+    "our",
+    "that",
+    "the",
+    "their",
+    "then",
+    "there",
+    "these",
+    "this",
+    "those",
+    "to",
+    "was",
+    "were",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "will",
+    "with",
+    "without",
+    "would",
+    "you",
+    "your",
+    "both",
+})
+
+# Concept tokens shorter than this are treated as noise, not a topic word.
+_MIN_CONCEPT_TOKEN_LEN = 3
+
+_WORD_RE = _re.compile(r"[a-zA-Z0-9]+")
+
+
+class DuplicateCheckStatus(StrEnum):
+    """Outcome of a duplicate check — distinguishes a verified negative from an unverifiable one."""
+
+    DUPLICATE_FOUND = "duplicate_found"
+    NO_DUPLICATE = "no_duplicate"
+    COULD_NOT_VERIFY = "could_not_verify"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ContentDuplicateMatch:
+    """A single candidate duplicate surfaced by ``find_content_duplicates``."""
+
+    title: str
+    item_ref: str
+    matched_field: str
+    snippet: str
+    match_count: int
+
+
+def build_concept_query(title: str, description: str, *, max_concepts: int = 4) -> str:
+    """Build an OR search query from the significant words in title and description.
+
+    Mirrors the manual concept-extraction step already prescribed by
+    ``skills/work-backlog-item/references/workflows/create/start.md`` Step 3:
+    "extract 2 to 4 key concepts ... build {c1} OR {c2} OR {c3}".
+
+    Args:
+        title: New item title.
+        description: New item description.
+        max_concepts: Maximum number of concept terms to include.
+
+    Returns:
+        A ``term1 OR term2 ...`` query string, or ``""`` when no usable
+        concept word remains after filtering.
+    """
+    concepts: list[str] = []
+    seen: set[str] = set()
+    for word in _WORD_RE.findall(f"{title} {description}".casefold()):
+        if len(word) < _MIN_CONCEPT_TOKEN_LEN or word in _CONCEPT_STOPWORDS or word in seen:
+            continue
+        seen.add(word)
+        concepts.append(word)
+        if len(concepts) >= max_concepts:
+            break
+    return " OR ".join(concepts)
+
+
+def _candidate_item_ref(candidate: dict[str, str | bool]) -> str:
+    """Return the actionable reference for a candidate: issue number, else logical reference.
+
+    ``file_path`` is the key ``_build_list_entry`` uses for ``item.reference``
+    (a logical id like ``"p1-slug"`` or a beads nanoid, not a filesystem path).
+    """
+    issue_ref = str(candidate.get("issue", "") or "")
+    return issue_ref or str(candidate.get("file_path", "") or "")
+
+
+def _candidate_matched_field_and_snippet(candidate: dict[str, str | bool], concept_terms: list[str]) -> tuple[str, str]:
+    """Return the first field a concept term matched in, plus a snippet around it."""
+    for term in concept_terms:
+        for field in _SEARCH_FIELDS:
+            text = _item_field_text(candidate, field)
+            idx = text.find(term)
+            if idx >= 0:
+                return field, _make_snippet(text, idx, idx + len(term))
+    return "body", str(candidate.get("title", ""))
+
+
+def find_content_duplicates(
+    title: str, description: str, candidates: list[dict[str, str | bool]], *, max_results: int = 5
+) -> list[ContentDuplicateMatch]:
+    """Find existing backlog items whose content overlaps the given title/description.
+
+    Replaces character-sequence title matching (``difflib.SequenceMatcher``)
+    with token-overlap matching over the full item content (title, description,
+    and all section bodies), per ADR-004.
+
+    Args:
+        title: New item title.
+        description: New item description.
+        candidates: Backlog item dicts in the ``_build_list_entry`` shape.
+        max_results: Maximum number of matches to return.
+
+    Returns:
+        Up to ``max_results`` matches ordered by ``match_count`` descending.
+        Empty when the concept query is empty or nothing matches.
+    """
+    query = build_concept_query(title, description)
+    if not query:
+        return []
+
+    concept_terms = [term.casefold() for term in query.split(" OR ")]
+    live_candidates = [
+        c
+        for c in candidates
+        if str(c.get("title", "")) and str(c.get("status", "")).casefold() not in _DUPLICATE_EXCLUDED_STATUSES
+    ]
+    matched = apply_search_filter(live_candidates, query)
+    if not matched:
+        return []
+
+    scored = [(sum(1 for term in concept_terms if term in _build_haystack(c)), c) for c in matched]
+    scored.sort(key=operator.itemgetter(0), reverse=True)
+
+    results: list[ContentDuplicateMatch] = []
+    for match_count, candidate in scored[:max_results]:
+        matched_field, snippet = _candidate_matched_field_and_snippet(candidate, concept_terms)
+        results.append(
+            ContentDuplicateMatch(
+                title=str(candidate.get("title", "")),
+                item_ref=_candidate_item_ref(candidate),
+                matched_field=matched_field,
+                snippet=snippet,
+                match_count=match_count,
+            )
+        )
+    return results
