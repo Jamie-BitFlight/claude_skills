@@ -34,7 +34,7 @@ STATUS_MAP: dict[str, str] = {
     "DEFERRED": "deferred",
     "SKIPPED": "skipped",
     "WONT FIX": "wont-fix",
-    # Lowercase single-word variants (used in follow-up task files)
+    # Lowercase single-word variants (used in follow-up tasks)
     "pending": "not-started",
     "todo": "not-started",
     "done": "complete",
@@ -102,10 +102,7 @@ class AnalysisMethod(StrEnum):
 
 
 class BookendType(StrEnum):
-    """Bookend task type — constrains the two allowed values for ``Task.bookend_type``.
-
-    Values mirror the JSON schema enum defined in TASK_FILE_FORMAT.md §490.
-    """
+    """Bookend task type — constrains the two allowed values for ``Task.bookend_type``."""
 
     T0_BASELINE = "t0-baseline"
     TN_VERIFICATION = "tn-verification"

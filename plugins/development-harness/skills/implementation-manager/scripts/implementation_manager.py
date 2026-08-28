@@ -103,7 +103,7 @@ class TaskStatus(StrEnum):
 
 
 # Mapping from YAML frontmatter status values to TaskStatus enum members.
-# Source: TASK_FILE_FORMAT.md line 283 defines valid statuses as
+# Source: sam_schema/core/models.py defines valid statuses as
 # not-started, in-progress, complete, blocked.
 _YAML_STATUS_TO_ENUM: dict[str, TaskStatus] = {
     "not-started": TaskStatus.NOT_STARTED,

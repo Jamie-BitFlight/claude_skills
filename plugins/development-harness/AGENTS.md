@@ -32,7 +32,7 @@ registered through the configured backend. Stages gate on artifact completion, n
 1. **S1 Discovery** - Understand the feature, codebase, and constraints
 2. **S2 Planning + RT-ICA** - Generate a plan with information completeness analysis
 3. **S3 Context Integration** - Validate the plan against actual codebase state
-4. **S4 Task Decomposition** - Break the plan into executable task files
+4. **S4 Task Decomposition** - Break the plan into executable tasks
 5. **S5 Execution** - Implement tasks using language-appropriate specialists
 6. **S6 Forensic Review** - Verify each task against its acceptance criteria
 7. **S7 Final Verification** - Certify the feature meets original requirements
@@ -276,8 +276,8 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 **SAM workflow:**
 
 - `/dh:add-new-feature` - Plan a feature: discovery, analysis, architecture, task decomposition
-- `/dh:implement-feature` - Execute tasks from a SAM task file via agent delegation loop
-- `/dh:start-task` - Start or complete a specific task inside a SAM task file
+- `/dh:implement-feature` - Execute tasks from a SAM plan via agent delegation loop
+- `/dh:start-task` - Start or complete a specific SAM task
 - `/dh:complete-implementation` - Quality gates after all tasks are COMPLETE
 - `/dh:gate-push` - Resolve branch → backlog issue/plan, then run complete-implementation gates and push/PR
 
@@ -294,7 +294,7 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 **Planning tools:**
 
 - `/dh:clear-cove-task-design` - Task design methodology
-- `/dh:generate-task` - Generate individual task files
+- `/dh:generate-task` - Generate individual tasks
 - `/dh:planner-rt-ica` - Information completeness analysis for planning
 - `/dh:validation-protocol` - Validation patterns and checklists
 
