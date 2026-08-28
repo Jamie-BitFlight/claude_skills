@@ -21,9 +21,23 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 
+import requests
 from github import GithubException
 
 from .models import BackendUnavailableError, BacklogError
+
+# Transient-network exceptions that are also OSError subclasses, so they must be
+# checked before the generic OSError branch: asyncio.TimeoutError (Python 3.11+
+# aliases it to OSError) and the requests exceptions PyGithub's Requester can raise
+# for a dropped/failed HTTP transport (via requests.exceptions.RequestException).
+# ConnectTimeout/ReadTimeout subclass Timeout; SSLError/ProxyError subclass
+# ConnectionError -- covered without listing them.
+_RETRYABLE_TRANSIENT_EXCEPTIONS = (
+    asyncio.TimeoutError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.ChunkedEncodingError,
+)
 
 __all__ = ["SyncErrorKind", "SyncState", "SyncStatus", "classify_sync_error", "get_sync_state", "reset_sync_state"]
 
@@ -237,7 +251,12 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     - ``GithubException`` with status >= 500 — RETRYABLE.
     - ``asyncio.TimeoutError`` — RETRYABLE (transient network timeout; checked before
       OSError because Python 3.11+ aliases it to OSError).
-    - ``OSError`` — NON_RETRYABLE (filesystem failure; requires operator action).
+    - ``requests.exceptions.ConnectionError``, ``.Timeout``, ``.ChunkedEncodingError``
+      (and subclasses, e.g. ``ConnectTimeout``, ``ReadTimeout``, ``SSLError``,
+      ``ProxyError``) — RETRYABLE (dropped/failed network transport underlying a
+      PyGithub call; checked before OSError because these are OSError subclasses).
+    - ``OSError`` (any other instance, e.g. local cache-file write failure) —
+      NON_RETRYABLE (filesystem failure; requires operator action).
     - ``ValueError`` — NON_RETRYABLE (config error from ``resolve_repo``).
 
     Args:
@@ -254,7 +273,7 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         return SyncErrorKind.RETRYABLE
     if isinstance(exc, GithubException):
         return _classify_github_exception(exc)
-    if isinstance(exc, asyncio.TimeoutError):
+    if isinstance(exc, _RETRYABLE_TRANSIENT_EXCEPTIONS):
         return SyncErrorKind.RETRYABLE
     if isinstance(exc, (OSError, ValueError)):
         return SyncErrorKind.NON_RETRYABLE

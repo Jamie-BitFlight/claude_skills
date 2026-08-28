@@ -392,6 +392,11 @@ max-complexity = 12
 # SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
 # underscore prefix marks it as a background-task entry point, not a user-facing tool
 "**/backlog_core/server.py" = ["private-member-access", "unused-async"]
+# PyGithub's Requester issues HTTP calls through requests (not httpx), so classify_sync_error
+# must reference requests.exceptions types to distinguish transient network-transport OSErrors
+# (retryable) from genuine local filesystem OSErrors (non-retryable) — not a new HTTP client
+"**/backlog_core/sync_state.py" = ["banned-api"]
+"**/backlog_core/tests/test_startup_sync.py" = ["banned-api"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["start-process-with-partial-path"]
 "**/kage-bunshin/scripts/spawn.py" = ["start-process-with-partial-path"]
