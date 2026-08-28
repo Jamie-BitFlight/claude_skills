@@ -7,7 +7,10 @@ from types import ModuleType
 import backlog_core.gh_client as gh_client
 import backlog_core.operations as operations
 import backlog_core.server as server
+import pytest
 import sam_schema.server as sam_server
+from backlog_core.backends import beads_backend
+from sam_schema.core.backends import github_context_backend, memory_context_backend
 
 
 def _source(module: ModuleType) -> str:
@@ -77,3 +80,10 @@ def test_sam_server_has_no_task_backend_routing() -> None:
     source = _source(sam_server)
     assert "create_task_backend" not in source
     assert "task_file_path" not in source
+
+
+# local_context_backend.py and models.py are excluded: local-YAML file storage is the
+# genuine home for task_file_path (the field's declaration site and its only resolver).
+@pytest.mark.parametrize("module", [memory_context_backend, github_context_backend, beads_backend])
+def test_non_local_context_backend_has_no_task_file_path(module: ModuleType) -> None:
+    assert "task_file_path" not in _source(module)

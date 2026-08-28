@@ -279,7 +279,7 @@ class TestContextFileLifecycle:
         cd = context_dir(project_root)
         session_id = "test-session-abc123"
         context_file = cd / f"active-task-{session_id}.json"
-        payload = {"task_file_path": "plan/P001.yaml", "task_id": "T1", "parent_issue_number": 42}
+        payload = {"plan": "P001", "task_id": "T1", "parent_issue_number": 42}
 
         # Act
         context_file.write_text(json.dumps(payload), encoding="utf-8")
@@ -303,18 +303,14 @@ class TestContextFileLifecycle:
         cd = context_dir(project_root)
         session_id = "session-deadbeef"
         context_file = cd / f"active-task-{session_id}.json"
-        payload = {
-            "task_file_path": "plan/P981-consolidate-dh-paths.yaml",
-            "task_id": "T13",
-            "parent_issue_number": 981,
-        }
+        payload = {"plan": "P981", "task_id": "T13", "parent_issue_number": 981}
 
         # Act
         context_file.write_text(json.dumps(payload), encoding="utf-8")
         loaded = json.loads(context_file.read_text(encoding="utf-8"))
 
         # Assert
-        assert loaded["task_file_path"] == payload["task_file_path"]
+        assert loaded["plan"] == payload["plan"]
         assert loaded["task_id"] == payload["task_id"]
         assert loaded["parent_issue_number"] == payload["parent_issue_number"]
 

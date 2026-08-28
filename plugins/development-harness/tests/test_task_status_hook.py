@@ -4,7 +4,8 @@ Covers:
 - _call_sam_task_state: routes state writes through MCP subprocess
 - _call_sam_task_update: routes field writes through MCP subprocess
 - Both helpers fall back gracefully (return False) on subprocess failure
-- _extract_plan_addr_from_path: plan address extraction from filenames
+- read_task_context / _call_sam_active_task_get / _read_context_file: read the plan
+  address directly from the "plan" field (no path-parsing indirection)
 - handle_subagent_stop: calls MCP helpers instead of direct YAML writes
 - handle_activity_update: calls MCP helpers instead of direct YAML writes
 """
@@ -45,7 +46,6 @@ _spec.loader.exec_module(_hook_mod)  # type: ignore[union-attr]
 # Re-export symbols for clarity
 _call_sam_task_state = _hook_mod._call_sam_task_state
 _call_sam_task_update = _hook_mod._call_sam_task_update
-_extract_plan_addr_from_path = _hook_mod._extract_plan_addr_from_path
 extract_task_info_from_prompt = _hook_mod.extract_task_info_from_prompt
 handle_subagent_stop = _hook_mod.handle_subagent_stop
 handle_activity_update = _hook_mod.handle_activity_update
@@ -67,47 +67,6 @@ def _mcp_success_response(data: dict[str, Any]) -> CompletedProcess[str]:
 def _mcp_error_response(returncode: int = 1) -> CompletedProcess[str]:
     """Build a failed fastmcp CLI response."""
     return CompletedProcess(args=[], returncode=returncode, stdout="", stderr="error")
-
-
-# ---------------------------------------------------------------------------
-# _extract_plan_addr_from_path
-# ---------------------------------------------------------------------------
-
-
-def test_extract_plan_addr_from_path_returns_hex_address() -> None:
-    """A filename containing a hex plan token returns that token."""
-    # Arrange
-    path = Path("/home/user/.dh/projects/foo/plan/Pf4281187-my-feature.yaml")
-
-    # Act
-    result = _extract_plan_addr_from_path(path)
-
-    # Assert
-    assert result == "Pf4281187"
-
-
-def test_extract_plan_addr_from_path_returns_none_when_no_token() -> None:
-    """A filename without a plan address token returns None."""
-    # Arrange
-    path = Path("/tmp/some-plan-file.yaml")
-
-    # Act
-    result = _extract_plan_addr_from_path(path)
-
-    # Assert
-    assert result is None
-
-
-def test_extract_plan_addr_from_path_short_address() -> None:
-    """Short hex plan IDs are also matched."""
-    # Arrange
-    path = Path("P1a2b3c4-slug.yaml")
-
-    # Act
-    result = _extract_plan_addr_from_path(path)
-
-    # Assert
-    assert result == "P1a2b3c4"
 
 
 # ---------------------------------------------------------------------------
@@ -589,11 +548,7 @@ def test_call_sam_task_update_returns_false_on_malformed_json() -> None:
 
 def test_handle_activity_update_calls_mcp_update(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """handle_activity_update calls _call_sam_task_update for last-activity field."""
-    # Arrange — create a plan file with plan address in the name
-    plan_file = tmp_path / "Pf4281187-feature.yaml"
-    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
-
-    # Set up context file
+    # Arrange — context file carries the plan address directly
     monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
     import dh_paths
 
@@ -601,7 +556,7 @@ def test_handle_activity_update_calls_mcp_update(tmp_path: Path, monkeypatch: py
     context_dir.mkdir(parents=True, exist_ok=True)
     session_id = "sess-abc"
     context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "task_id": "T1"}))
+    context_file.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T1"}))
 
     hook_input = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
 
@@ -626,11 +581,8 @@ def test_handle_activity_update_calls_mcp_update(tmp_path: Path, monkeypatch: py
 
 
 def test_handle_activity_update_skips_when_no_plan_addr(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """handle_activity_update exits silently when filename has no plan address token."""
-    # Arrange — plan file with no plan address in name
-    plan_file = tmp_path / "my-plan-without-address.yaml"
-    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
-
+    """handle_activity_update exits silently when the context file has no plan address."""
+    # Arrange — context file missing the "plan" field
     monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
     import dh_paths
 
@@ -638,7 +590,7 @@ def test_handle_activity_update_skips_when_no_plan_addr(tmp_path: Path, monkeypa
     context_dir.mkdir(parents=True, exist_ok=True)
     session_id = "sess-xyz"
     context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "task_id": "T1"}))
+    context_file.write_text(json.dumps({"task_id": "T1"}))
 
     hook_input = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
 
@@ -717,49 +669,6 @@ def test_handle_subagent_stop_exits_cleanly_when_state_fails(tmp_path: Path, mon
     assert exc_info.value.code == 0
     # Update should not be called if state failed
     mock_update.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# handle_subagent_stop — file-path form regression
-# ---------------------------------------------------------------------------
-
-
-def test_handle_subagent_stop_file_path_plan_addr_extracted_and_mcp_read_called(
-    tmp_path: Path, mocker: MockerFixture
-) -> None:
-    """When plan_id is a path string containing a P-token, plan addr is extracted and _call_sam_task_read is called.
-
-    Regression test: ensures path-string plan identifiers (from context files storing
-    full YAML paths) continue to work after the refactor. The hook extracts the plan
-    address from the path filename and routes through _call_sam_task_read.
-    """
-    # Arrange — plan_id is a path string (as stored by older context files)
-    plan_file = tmp_path / "Pf4281187-feature.yaml"
-    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
-    # _resolve_active_task_context returns the path as a str (no Path wrapping)
-    plan_id_str = str(plan_file)
-
-    from sam_schema.core.models import Task, TaskStatus
-
-    mock_task = MagicMock(spec=Task)
-    mock_task.status = TaskStatus.IN_PROGRESS
-
-    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
-
-    mocker.patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id_str, "T1", None, None))
-    mock_read = mocker.patch.object(_hook_mod, "_call_sam_task_read", create=True, return_value=mock_task)
-    mocker.patch.object(_hook_mod, "_call_sam_task_state", return_value=True)
-    mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
-    mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
-
-    # Act
-    handle_subagent_stop(hook_input)
-
-    # Assert — _call_sam_task_read was called with extracted plan address
-    mock_read.assert_called_once()
-    read_args = mock_read.call_args[0]
-    assert read_args[0] == "Pf4281187"  # plan addr extracted from path filename
-    assert read_args[1] == "T1"  # task_id
 
 
 # ===========================================================================
@@ -1092,20 +1001,10 @@ def test_handle_subagent_stop_skips_state_write_when_task_already_complete(mocke
 
 
 def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: MockerFixture, tmp_path: Path) -> None:
-    """_resolve_active_task_context returns plan_id as str, not Path, when MCP primary resolves.
+    """_resolve_active_task_context returns plan_id as str, read from the "plan" field.
 
-    After refactor, the second element of the tuple is a str plan_id (e.g. 'Pf4281187').
-    Current code wraps the MCP response value in Path() inside _call_sam_active_task_get,
-    so the returned type is Path on current code.
-
-    RED on current code:
-      - _call_sam_active_task_get wraps 'task_file_path' from MCP JSON in Path() (line 378).
-      - _resolve_active_task_context propagates that Path as task_file_path.
-      - isinstance(plan_id, Path) is True on current code → assertion fails.
-
-    GREEN after refactor:
-      - _call_sam_active_task_get returns str plan_id without wrapping in Path().
-      - isinstance(plan_id, str) is True and isinstance(plan_id, Path) is False.
+    _call_sam_active_task_get reads the ActiveTaskContext.plan field directly —
+    no path parsing or extraction involved.
     """
     # Arrange — transcript with session_id so MCP primary path is taken
     transcript = tmp_path / "agent-session.jsonl"
@@ -1118,13 +1017,7 @@ def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: Mocker
     }
 
     # Build a realistic MCP response for sam_active_task(action='get')
-    active_task = {
-        "active_task": {
-            "task_file_path": "Pf4281187",  # plan_id string, not a filesystem path
-            "task_id": "T1",
-            "parent_issue_number": None,
-        }
-    }
+    active_task = {"active_task": {"plan": "Pf4281187", "task_id": "T1", "parent_issue_number": None}}
     inner_json = json.dumps(active_task)
     outer = {"content": [{"text": inner_json}]}
     mcp_response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(outer), stderr="")
@@ -1198,10 +1091,7 @@ def test_handle_activity_update_emits_stderr_when_mcp_read_returns_none(
     Verifies the silent failure case is now visible: before this fix the hook fell
     through to the activity update without any indication the read had failed.
     """
-    # Arrange — context file pointing to a plan with a valid plan address token
-    plan_file = tmp_path / "Pf4281187-feature.yaml"
-    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
-
+    # Arrange — context file carries the plan address directly
     monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
     import dh_paths
 
@@ -1209,7 +1099,7 @@ def test_handle_activity_update_emits_stderr_when_mcp_read_returns_none(
     context_dir.mkdir(parents=True, exist_ok=True)
     session_id = "sess-no-task"
     context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "task_id": "T1"}))
+    context_file.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T1"}))
 
     hook_input: dict[str, Any] = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
 
@@ -1297,7 +1187,7 @@ def test_call_sam_active_task_get_passes_sam_active_task_target(mocker: MockerFi
     making it a correctness failure invisible at the call site.
     """
     # Arrange — valid active task response so the call succeeds
-    active_task_data = {"active_task": {"task_file_path": "Pf4281187", "task_id": "T1", "parent_issue_number": None}}
+    active_task_data = {"active_task": {"plan": "Pf4281187", "task_id": "T1", "parent_issue_number": None}}
     outer = {"content": [{"text": json.dumps(active_task_data)}]}
     response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(outer), stderr="")
 
@@ -1377,6 +1267,38 @@ def test_cleanup_active_task_context_suppresses_file_not_found(mocker: MockerFix
 
     # Act — must not raise; FileNotFoundError is a legitimate concurrent-removal scenario
     _hook_mod._cleanup_active_task_context(session_id=None, fallback_context_file=fallback_file)
+
+
+# ---------------------------------------------------------------------------
+# read_task_context — local backend shape (both plan and task_file_path present)
+# ---------------------------------------------------------------------------
+
+
+def test_read_task_context_reads_plan_field_for_local_backend_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """read_task_context reads the "plan" field even when a genuine task_file_path is also present.
+
+    The local-YAML ContextBackend populates BOTH task_file_path (a real filesystem
+    path) and plan (the address) in the same context file. This proves reading
+    "plan" is correct for local sessions too, not just for memory/GitHub/beads
+    where task_file_path is None.
+    """
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    import dh_paths
+
+    context_dir = dh_paths.context_dir()
+    context_dir.mkdir(parents=True, exist_ok=True)
+    session_id = "sess-local-backend"
+    context_file = context_dir / f"active-task-{session_id}.json"
+    context_file.write_text(
+        json.dumps({"task_file_path": str(tmp_path / "plan" / "Pf4281187.yaml"), "plan": "Pf4281187", "task_id": "T1"})
+    )
+
+    plan_addr, task_id = _hook_mod.read_task_context(tmp_path, session_id)
+
+    assert plan_addr == "Pf4281187"
+    assert task_id == "T1"
 
 
 # ---------------------------------------------------------------------------
