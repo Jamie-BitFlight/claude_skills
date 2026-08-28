@@ -47,12 +47,32 @@ Skills are behavioral automation instructions for agents. Do not treat skills as
 
 ## Input
 
-- **Item title**: The backlog item title
-- **Item description**: The full description text
-- **Research questions**: Any "Research first" questions from the item
-- **RT-ICA summary** (optional): Pre-computed RT-ICA assessment from the orchestrator
+- **item_ref**: the backlog item reference (`#N`, title substring, beads nanoid, or URL)
+- **RT-ICA summary** (optional): pre-computed RT-ICA assessment from the orchestrator or the
+  `rtica-assessor` teammate — when present in the dispatch, use it directly and skip Step 0's own
+  pass; focus discovery on filling MISSING conditions and validating DERIVABLE ones instead.
 
 ## Process
+
+### Step 0.0 - Fetch the Item
+
+Call `mcp__plugin_dh_backlog__backlog_view(selector=item_ref, summary=False)` to fetch the full
+item. Do not begin grooming from memory, from assumptions, or from anything other than this
+response — always fetch the item first.
+
+Extract from the response:
+
+- `title`, `description` — the primary grooming input
+- Any `**Hypothesis**:` lines inside the description — treated as research questions
+- Whichever of these sections earlier swarm waves have already written, if present: `Impact
+  Radius`, `Fact-Check`, `Issue Classification`, `Root-Cause Analysis`, `RT-ICA`, `Design Intent
+  Alignment`, `Research`
+
+Fetch immediately before Step 0's RT-ICA pass, not earlier in the run, so the read reflects
+whatever the rest of the swarm has written by the time the groomer — which always runs last —
+actually starts. A read taken any earlier risks grooming against a stale Impact Radius or RT-ICA
+section that a peer teammate revises after your fetch (the same staleness risk `rtica-assessor.md:90-99`
+guards against with its own late re-read).
 
 ### Step 0 - RT-ICA Assessment
 
