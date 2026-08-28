@@ -16,7 +16,10 @@ import sys
 import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, assert_never
+from typing import TYPE_CHECKING, Literal, assert_never
+
+if TYPE_CHECKING:
+    from .search import ContentDuplicateMatch
 
 import git
 from pydantic import AliasChoices, BaseModel, Field, field_validator, model_validator
@@ -419,7 +422,6 @@ SKIP_STATUS = ("DONE", "RESOLVED", "COMPLETED", "CLOSED")
 VALID_CLOSE_REASONS = ("duplicate", "out_of_scope", "superseded", "wontfix", "blocked")
 GITHUB_ISSUE_TITLE_TRUNCATE = 80
 MIN_FRONTMATTER_PARTS = 3
-FUZZY_DUPLICATE_THRESHOLD = 0.80
 
 # ---------------------------------------------------------------------------
 # Dict mappings
@@ -559,12 +561,12 @@ class AmbiguousSelectorError(BacklogError):
 
 
 class DuplicateItemError(BacklogError):
-    """Raised when a fuzzy duplicate is detected during item creation."""
+    """Raised when a content-based duplicate is detected during item creation."""
 
-    def __init__(self, duplicates: list[tuple[str, float, str]]) -> None:
-        """Initialize with list of (title, similarity_ratio, file_path) tuples."""
+    def __init__(self, duplicates: list[ContentDuplicateMatch]) -> None:
+        """Initialize with the content-duplicate matches found."""
         self.duplicates = duplicates
-        titles = ", ".join(f'"{t}" ({int(r * 100)}%)' for t, r, _ in duplicates)
+        titles = ", ".join(f'"{d.title}" ({d.item_ref})' for d in duplicates)
         super().__init__(f"Similar backlog items found: {titles}")
 
 

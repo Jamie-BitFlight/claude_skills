@@ -63,7 +63,6 @@ from .models import (
 )
 from .parsing import (
     SectionSpan,
-    find_fuzzy_duplicates,
     find_item,
     items_needing_issues,
     items_with_issues,
@@ -76,6 +75,7 @@ from .parsing import (
     view_result_from_local_item,
 )
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
+from .search import ContentDuplicateMatch, DuplicateCheckStatus, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
 from .timestamps import now_iso
 
@@ -1338,23 +1338,68 @@ def _validate_add_item_type(type_: str) -> None:
     raise ValidationError(msg)
 
 
-def _check_for_duplicates(title: str, force: bool) -> None:
-    """Raise DuplicateItemError if a fuzzy duplicate exists and force is False.
+def _classify_duplicate_check(
+    title: str, description: str, repo: str, out: Output
+) -> tuple[DuplicateCheckStatus, list[ContentDuplicateMatch]]:
+    """Classify whether title/description content matches an existing backlog item.
+
+    Checks the local cache first. When nothing matches locally and the active
+    backend is a ``SyncProvider``, performs one bounded incremental refresh and
+    re-checks — absence of a local match alone does not prove no duplicate
+    exists for backends fed by an external provider. A refresh failure never
+    blocks item creation: it downgrades the result to ``COULD_NOT_VERIFY`` and
+    records a warning on *out*.
 
     Args:
         title: Title of the new item.
+        description: Description of the new item.
+        repo: Repository slug used for the optional refresh.
+        out: Output collector for a COULD_NOT_VERIFY warning.
+
+    Returns:
+        Tuple of (status, matches). *matches* is non-empty only when status is
+        ``DUPLICATE_FOUND``.
+    """
+    backend = get_config().backend
+    candidates = [_build_list_entry(item, {}) for item in backend.list_work_items()]
+    matches = find_content_duplicates(title, description, candidates)
+    if matches:
+        return DuplicateCheckStatus.DUPLICATE_FOUND, matches
+    if not isinstance(backend, SyncProvider):
+        return DuplicateCheckStatus.NO_DUPLICATE, []
+    try:
+        refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
+    except (GithubException, BacklogError) as e:
+        out.warn(f"  WARNING: Could not verify duplicate status: {e}")
+        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
+    candidates = [_build_list_entry(item, {}) for item in backend.list_work_items()]
+    matches = find_content_duplicates(title, description, candidates)
+    if matches:
+        return DuplicateCheckStatus.DUPLICATE_FOUND, matches
+    return DuplicateCheckStatus.NO_DUPLICATE, []
+
+
+def _check_for_duplicates(title: str, description: str, force: bool, repo: str, out: Output) -> None:
+    """Raise DuplicateItemError if a content duplicate is found and force is False.
+
+    Args:
+        title: Title of the new item.
+        description: Description of the new item.
         force: When True, skip the check entirely.
+        repo: Repository slug used for the optional refresh.
+        out: Output collector for a COULD_NOT_VERIFY warning.
 
     Raises:
-        DuplicateItemError: If one or more similar titles are found.
+        DuplicateItemError: If one or more content-matching items are found.
     """
     if force:
         return
-    existing_items = get_config().backend.list_work_items()
-    duplicates = find_fuzzy_duplicates(title, existing_items)
-    if not duplicates:
-        return
-    raise DuplicateItemError(duplicates)
+    status, matches = _classify_duplicate_check(title, description, repo, out)
+    match status:
+        case DuplicateCheckStatus.DUPLICATE_FOUND:
+            raise DuplicateItemError(matches)
+        case DuplicateCheckStatus.NO_DUPLICATE | DuplicateCheckStatus.COULD_NOT_VERIFY:
+            return
 
 
 def _resolve_reference(priority: str, slug: str) -> str:
@@ -1500,7 +1545,7 @@ def add_item(
 
     out = output or Output()
 
-    _check_for_duplicates(title, force)
+    _check_for_duplicates(title, description, force, repo, out)
 
     today_str = today()
     slug = title_to_slug(title)
