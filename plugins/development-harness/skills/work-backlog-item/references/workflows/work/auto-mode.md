@@ -40,4 +40,4 @@ Do not stop for user input after any announcement. Announce then immediately exe
 | Step 3.1: Phase 2 agent returns `COSMETIC_ONLY` | Log `[AUTO] STALENESS: COSMETIC_ONLY — cached groom content valid`. Proceed to Step 3.2 without re-grooming. |
 | Any other `AskUserQuestion` | Log `[AUTO] Decision: {chosen option} — reason: {evidence}`, proceed with logged choice |
 
-`--auto` does NOT change the behaviour of Steps 3.2–4.5 (RT-ICA evaluation, SAM planning, backlog update) — those are already agent-executable without human input. Step 3.1 staleness outcomes are now handled by the explicit rows above.
+`--auto` does NOT change the behaviour of Steps 3.2–4.5 (RT-ICA evaluation, SAM planning, backlog update) — those are already agent-executable without human input.

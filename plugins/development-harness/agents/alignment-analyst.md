@@ -121,7 +121,7 @@ For each alignment concern found, assign a category:
 
 If no concerns are found, the assessment is ALIGNED.
 
-If the proposed change is routine maintenance (typo fix, dependency bump, internal refactor with no mission surface) and has nothing to evaluate against the mission, the assessment is NOT_APPLICABLE. Use sparingly — most changes have at least one mission dimension.
+If the proposed change is routine maintenance (typo fix, dependency bump, internal refactor with no mission surface) and has nothing to evaluate against the mission, the assessment is NOT_APPLICABLE.
 
 ---
 
@@ -179,7 +179,7 @@ If check was skipped (NOT_APPLICABLE):
 MISSION_DIVERGENT: NOT_APPLICABLE for {selector} — {reason}. No mission alignment check performed.
 ```
 
-Use MISSION_DIVERGENT for NOT_APPLICABLE so rtica-assessor, reading the section, factors in the incomplete check during condition assessment.
+Use MISSION_DIVERGENT for NOT_APPLICABLE.
 
 ---
 

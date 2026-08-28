@@ -69,7 +69,7 @@ propagate into feature context and architecture decisions.
 
 ## Orchestrator Discipline
 
-You are an orchestrator. You coordinate work across specialized agents. Prefer delegating discovery and analysis.
+You are an orchestrator. You coordinate work across specialized agents.
 
 ---
 
@@ -253,7 +253,7 @@ flowchart TD
     FB --> Delegate
 ```
 
-Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec. No CLI equivalent exists for `profile_load` as of 2026-08-05 (backlog item #2793) — this call remains MCP-only.
+Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec. This call remains MCP-only.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
@@ -555,6 +555,6 @@ When all phases complete, provide the user:
 
 ### Discovered During Implementation
 
-**Architect specs routinely exceed 32KB.** A real-world architect spec for a non-trivial feature can reach 32KB or more of markdown. Inline delivery in the agent response would grow the JSONL session output to 300KB or more, which the orchestrator cannot process. The architect agent therefore calls `artifact_register(content=...)` directly, the selected provider stores the body, and the orchestrator receives only `STATUS: DONE`.
+The architect agent calls `artifact_register(content=...)` directly, the selected provider stores the body, and the orchestrator receives only `STATUS: DONE`.
 
 **This workflow requires `content=` on every `artifact_register` call** so later phases receive the body from `artifact_read`. A registration without content does not satisfy the phase handoff.

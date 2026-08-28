@@ -56,7 +56,7 @@ flowchart TD
 6. [ ] **Invoke implement-feature** — `Skill(skill: "dh:implement-feature", args: "{plan_address}")` — do not stop for user input
 7. [ ] **Invoke complete-implementation** — `Skill(skill: "dh:complete-implementation", args: "{plan_address}")` — do not stop for user input
 8. [ ] **Verify issue resolved** — `/dh:complete-implementation` calls `backlog_resolve` as its terminal step. Verify the issue is now closed. If it remains open (e.g., `complete-implementation` was interrupted), use `/work-backlog-item resolve` as fallback (see [post-planning.md](./post-planning.md)).
-9. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "docs(workflow): update work backlog item instructions"`)
+9. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "<type>(<scope>): <description>"`)
 
 ## Error Routing
 

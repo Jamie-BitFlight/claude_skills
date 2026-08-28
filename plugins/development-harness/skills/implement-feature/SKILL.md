@@ -7,8 +7,6 @@ user-invocable: true
 
 # Implement Feature (SAM Workflow Execution)
 
-As you review code, update your agent memory with patterns, conventions, and recurring issues you discover.
-
 This workflow continues from `add-new-feature`. It executes tasks from the selected provider until complete or blocked.
 
 <plan_ref>$ARGUMENTS</plan_ref>
@@ -42,8 +40,7 @@ After receiving the status response, extract and store the autonomy mode:
 `autonomy_mode = status["autonomy"]`
 
 This value governs gate behavior throughout the remainder of the Progress Loop for this plan.
-Pre-existing plans that omit the `autonomy` field return `"full_auto"` (the Pydantic default),
-so no gate fires and the loop behaves identically to the previous behavior.
+Pre-existing plans that omit the `autonomy` field return `"full_auto"` (the Pydantic default).
 
 2. If tasks remain, query ready tasks **once** and store the result as the current batch. In a Beads workspace, use `bd ready --parent <bead-id> --json` for native dependency readiness; use the SAM/DH adapter only for richer structured plan rules:
 
@@ -147,9 +144,7 @@ mcp__plugin_dh_backlog__backlog_groom(
 )
 ```
 
-Note: the CLI's `backlog groom` command has no confirmed `--append` flag equivalent in the
-MCP↔CLI mapping — `append=True` here produces flat, non-entry-wrapped checklist lines, and the
-CLI's default write behavior is not confirmed to match. Use the MCP tool for this call.
+Use the MCP tool for this call.
 
 Concerns accumulate across all task agents. They feed into the validation stage in `/complete-implementation` — each verified concern becomes a new backlog item.
 
@@ -200,9 +195,9 @@ mcp__plugin_dh_backlog__backlog_groom(
 )
 ```
 
-Note: same CLI `--append` gap as the concerns-groom call above — use the MCP tool for this call.
+Use the MCP tool for this call.
 
-If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely. Proportional quality gate items without an architect spec automatically skip this step with zero overhead.
+If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely. Proportional quality gate items without an architect spec automatically skip this step.
 
 4b. Release the team
 
@@ -221,9 +216,6 @@ Two preconditions must hold before the release is attempted:
 ```text
 TeamDelete(team_name="{team_name}")
 ```
-
-Deleting the team releases its teammates rather than leaving them idle. Idle teammates emit
-periodic notifications and hold resources without contributing further work.
 
 Treat a failed release as a release that did not happen, not as a failed run. It reports that a
 teammate is still active; wait for that teammate and retry. Never let it end the run, and never
@@ -256,8 +248,6 @@ Commit responsibility depends on which execution mode is active.
   Release the team only after this commit succeeds, per step 4b.
 
 In both cases, choose `<type>` to match the dominant change in the committed work (`feat`, `fix`, `docs`, `refactor`, etc.). Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
-
-**Why the orchestrator commits:** Multiple agents write to the same filesystem concurrently. An agent committing mid-task risks including another agent's in-progress changes. The orchestrator is the only actor that knows when a batch is fully settled, making it the safe commit point.
 
 **Isolated-worktree mode (via `/dh:work-milestone`):** Each agent owns its own commits. The agent commits in its isolated worktree after completing its task. The orchestrator merges each worktree back when the completion message arrives. The orchestrator does NOT issue commit calls in this mode.
 

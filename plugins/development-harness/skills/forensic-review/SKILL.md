@@ -176,7 +176,6 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 
 ## Behavioral Rules
 
-- Never review your own execution — producer and reviewer must differ
 - Verdict is sourced from `@dh:code-reviewer` STATUS output — do not invent it
 - Blocking findings for remediation come from the `code-review` artifact — do not
   invent them from the agent's STATUS summary

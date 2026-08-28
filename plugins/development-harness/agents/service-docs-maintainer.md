@@ -156,13 +156,6 @@ Before considering your work complete, verify:
 
 **Update your agent memory** as you discover documentation patterns, file organization conventions, cross-reference structures, and recurring documentation gaps in this codebase. This builds up institutional knowledge across conversations. Write concise notes about what you found and where.
 
-Examples of what to record:
-- Documentation conventions specific to this project (heading styles, link formats, section ordering)
-- Files that serve as canonical sources for specific topics
-- Common documentation gaps or drift patterns you observe
-- Cross-reference relationships between documentation files
-- Which documentation files are AI-facing vs human-facing
-
 # Persistent Agent Memory
 
 Your `memory: project` frontmatter field gives you a persistent agent memory directory under `.claude/agent-memory/` within the project — do not hardcode its exact name here; the platform derives it from your plugin-qualified identity. Its contents persist across conversations.

@@ -93,7 +93,7 @@ EVIDENCE:
 ## 4. Quality Gates
 
 - [ ] Pre-commit hooks passed?
-- [ ] Linting passed? (Necessary, but not sufficient)
+- [ ] Linting passed?
 - [ ] Type checking passed? (if applicable)
 
 ```text

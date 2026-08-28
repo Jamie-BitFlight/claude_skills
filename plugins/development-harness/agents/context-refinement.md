@@ -332,8 +332,3 @@ SUGGESTED NEXT STEP:
   - [What the orchestrator should provide or do]
 ```
 
-## Remember
-
-You are the guardian of institutional knowledge. Your updates help future developers avoid the same surprises and pitfalls. Only document true discoveries that change understanding of the system, not implementation details or choices. Return BLOCKED rather than guessing when critical information is missing.
-
-The goal is to make the next feature implementation smoother by capturing what you learned.

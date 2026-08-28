@@ -79,9 +79,7 @@ Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the
 
 ## Step 3: Create the Ephemeral Review Plan
 
-**Create a new plan on every run.** Never search for and reuse an existing plan. `review_slug`
-carries this run's stamp, so no earlier plan can match it and every run starts with `not-started`
-tasks, bodies naming this run's `changed_files`, and no `Review Results` section.
+**Create a new plan on every run.** Never search for and reuse an existing plan.
 
 ### Create the Ephemeral Plan
 
@@ -191,9 +189,7 @@ task. That section is the only channel the synthesizer reads in Step 6 — a rev
 write it is a missing verdict, and the punch list records it as one. The loaded profile — not the
 dispatch prompt — performs that write: each reviewer agent's own SOP ends with a mandatory write
 to `Review Results` as part of what `dh:start-task` executes. Do not instruct the worker to write
-the section itself before running `dh:start-task`; a prompt that does both produces two
-`append_section` calls against the same heading, and the second leaves the section holding two
-concatenated JSON documents that no longer parse.
+the section itself before running `dh:start-task`.
 
 ```text
 Agent(

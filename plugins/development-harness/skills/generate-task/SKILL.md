@@ -105,9 +105,7 @@ Before returning the task prompt, you MUST lint it using the existing rules:
 - Logical: sections in canonical order
 - Explicit: objective, outputs, acceptance criteria, verification are concrete
 - CoVe: included only when Accuracy Risk is Medium/High, and questions are falsifiable
-- Commit step: when `## Expected Outputs` lists one or more repo-relative file paths,
-  `## Verification Steps` MUST end with a `git add <files> && git commit -m "<type>(<scope>): <title>"`
-  step scoped to those exact files — scope is required (repo enforces `--force-scope`),
-  never `git add .` or `git add -A`, never a `Fixes #N` trailer
+- Commit step: when `## Expected Outputs` lists file paths, `## Verification Steps` ends
+  with the commit step per the template rule above
 
 If any lint check fails, revise the task prompt and re-lint.

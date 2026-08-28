@@ -30,8 +30,6 @@ Verify factual claims against primary sources using web lookups. Training data r
 
 <evidence_rules>
 
-Adapted from the `find-cause` evidence chain protocol.
-
 **Valid evidence** (one of these MUST support each verdict):
 
 1. **WebFetch output** — content retrieved from an official documentation URL
@@ -143,8 +141,6 @@ Each agent MUST apply CoVe before finalizing:
 3. **Independent check** — answer each verification question using a different source or method
 4. **Final verdict** — confirm or revise based on cross-checking
 
-This prevents the agent from confirming its own bias in a single lookup.
-
 ---
 
 ## Report Format
@@ -196,8 +192,4 @@ For INCONCLUSIVE claims, add a note to the backlog item describing what addition
 
 ## References
 
-- Evidence chain protocol: use the /dh:find-cause skill
-- Wave spawning pattern: use the /research-curator skill
-- Anti-hallucination checkpoint: use the /skill-research-process skill
-- Chain of Verification: use the /cove-prompt-design skill
 - Verification agent: [@dh:fact-checker](../../agents/fact-checker.md)

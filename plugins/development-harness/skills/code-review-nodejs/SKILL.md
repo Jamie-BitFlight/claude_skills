@@ -11,7 +11,6 @@ Stack-specific rules loaded by `dh:code-reviewer` when `package.json` and `*.js`
 ## Synchronous I/O in Request Path
 
 - `fs.readFileSync`, `fs.writeFileSync`, `execSync`, `spawnSync` in any function called during request handling are blocking findings
-- Synchronous I/O blocks the event loop and degrades all concurrent requests
 - All file system operations in server code must use the async variants or `fs/promises`
 
 ```javascript
@@ -60,7 +59,7 @@ execFile("convert", [userInput, "output.png"]);
 - `*` version ranges in `package.json` are a blocking finding — they produce non-reproducible installs
 - `^` ranges are acceptable; `~` is preferred for stricter patch-level pinning
 - `package-lock.json` or `yarn.lock` must be committed — without a lockfile, versions are not reproducible in CI
-- Dev-only dependencies must be in `devDependencies`, not `dependencies` — they inflate production bundle size
+- Dev-only dependencies must be in `devDependencies`, not `dependencies`
 
 ## Event Emitter Cleanup
 
@@ -73,16 +72,6 @@ execFile("convert", [userInput, "output.png"]);
 - All required environment variables must be validated at startup, before the server begins accepting requests
 - `process.env.SOME_VAR!` without validation is a blocking finding — the app will fail with a confusing error at runtime rather than a clear startup message
 - Provide a `.env.example` file listing all required variables — checked in, never containing real values
-
-## `execFile` Over `exec`
-
-```javascript
-// WRONG: shell injection risk
-exec(`git log --oneline ${branch}`);
-
-// RIGHT: explicit argument array, no shell
-execFile("git", ["log", "--oneline", branch], (err, stdout) => { ... });
-```
 
 ## Anti-Patterns
 

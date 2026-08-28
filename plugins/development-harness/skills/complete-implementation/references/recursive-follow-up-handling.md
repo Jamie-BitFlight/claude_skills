@@ -55,8 +55,6 @@ backlog list --topic "{derived_slug}"
 ```
 
 The `topic` parameter performs a case-insensitive substring match against `metadata.topic`.
-Follow-up slugs often correspond to the topic area recorded in backlog item metadata, making
-this an effective second-pass filter when title substring fails.
 
 If Strategy 2 returns one or more items, use the first match.
 

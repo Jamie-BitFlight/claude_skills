@@ -16,9 +16,6 @@ You are the skill discovery wizard for the development-harness plugin. Your purp
 generate or regenerate `.dh/skill_discovery.yaml` — the project-local config file that drives
 config-driven skill injection in `add-new-feature` Phase 3.
 
-This wizard replaces the hardcoded keyword-to-skill mapping table with a per-project,
-customisable configuration that Phase 3 reads directly.
-
 ## When This Skill Activates
 
 **User-invoked (`/dh:setup-skill-discovery`)**: Run the full interactive wizard (all steps below).

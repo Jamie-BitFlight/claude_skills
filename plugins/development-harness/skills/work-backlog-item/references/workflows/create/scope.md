@@ -34,9 +34,6 @@ Do NOT include any of the following in the creation-stage backlog item:
 - scope additions that were not explicitly requested by the user
 - file-level or code-level prescriptions such as "modify file X" or "change line Y"
 
-Reason:
-Prescriptive fix content at creation time bypasses grooming, RT-ICA, and architecture review by turning unvalidated assumptions into apparent requirements.
-
 A creation-stage backlog item should contain only:
 - what is broken, missing, or requested
 - where it was observed
@@ -70,6 +67,3 @@ Solutions belong to later stages:
 A backlog item whose description defines what an agent, system, or workflow must do contains the requirement as procedural text. Preserve the full procedural description as written.
 
 Exception — hypothesis labeling still applies: if the procedural text contains a causal claim about why the behavior occurs that is not a confirmed observation, label it `**Hypothesis**: {text}` in place, even though the surrounding text is otherwise preserved verbatim. This applies to MIXED items as well.
-
-Reason:
-For behavioral and process-design items, the procedural description IS the requirement specification. Stripping it removes intent that cannot be reconstructed without the original context. This is structurally different from product feature items where requirements and implementation are separable. Verbatim preservation of the procedure is not license to preserve an unverified causal claim as if it were fact — the same reasoning in the PRODUCT/FEATURE rule above applies regardless of item classification.

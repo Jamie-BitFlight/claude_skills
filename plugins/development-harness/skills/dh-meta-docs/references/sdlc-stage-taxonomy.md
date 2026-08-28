@@ -152,30 +152,7 @@ This list is exhaustive. Adding a new domain requires updating this document and
 
 ---
 
-## Section 3: Standard Terminology Mappings
-
-Maps the 7 bare stage names to closest equivalents in IEEE 12207, ISO 15288, and SAFe. These mappings are approximate. The SAM pipeline stages are composite activities that may span multiple processes in formal standards. The mapping establishes terminology correspondence, not process equivalence.
-
-| Stage | IEEE 12207 Process | ISO 15288 Process | SAFe Practice |
-|-------|-------------------|-------------------|---------------|
-| `discovery` | Stakeholder Needs Definition (6.4.1) | Stakeholder Needs and Requirements Definition (6.4.1) | Explore / Define |
-| `planning` | System Requirements Analysis (6.4.2) | System Requirements Definition (6.4.2) | Plan / PI Planning |
-| `context-integration` | Architecture Definition (6.4.3) | Architecture Definition (6.4.3) | Architect / Enable |
-| `task-decomposition` | Implementation Planning (7.2.1) | Project Planning (6.3.1) | Plan / Iteration Planning |
-| `execution` | Software Construction (7.1.5) | Implementation (6.4.7) | Implement / Build |
-| `forensic-review` | Software Verification (7.2.4) | Verification (6.4.6) | Inspect / Review |
-| `final-verification` | Software Validation (7.2.5) | Validation (6.4.8) | Demonstrate / Inspect & Adapt |
-
-**Match quality notes:**
-
-- `discovery` → IEEE/ISO 6.4.1 is an approximate match. IEEE 12207 defines this as a formal elicitation process; SAM discovery is lighter-weight but equivalent in purpose.
-- `context-integration` → IEEE/ISO Architecture Definition is the closest parallel. SAM context-integration does not produce a full architecture specification; it validates an existing plan against codebase reality.
-- `task-decomposition` → IEEE 7.2.1 / ISO 6.3.1 cover planning at project scope. SAM task-decomposition is narrower (feature-level), so this is an approximate match.
-- `forensic-review` → IEEE 7.2.4 / ISO 6.4.6 cover formal verification against requirements. SAM forensic-review is per-task and evidence-driven, making this a close but not exact match.
-
----
-
-## Section 4: Naming Convention Rules
+## Section 3: Naming Convention Rules
 
 Numbered rules for determining the correct form for any stage-related name.
 
@@ -233,7 +210,6 @@ stage_skills:
 
 ## Sources
 
-- Architecture spec: [plan/architect-development-harness-phase1.md](../../../../../plan/architect-development-harness-phase1.md) (Deliverable 1 section, Sections 1–4 content and exact mappings)
 - Language manifest schema: [./language-manifest-schema.md](./language-manifest-schema.md)
 - Generic stage agent: [../../agents/generic-stage-agent.md](../../agents/generic-stage-agent.md) (inputs 2 and 3 reference this taxonomy)
 - IEEE 12207:2017 — Systems and software engineering — Software life cycle processes

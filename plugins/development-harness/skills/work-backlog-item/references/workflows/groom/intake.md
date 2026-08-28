@@ -7,9 +7,6 @@ Validate the item identified by <item_ref/> is eligible for grooming, and extrac
 Verify <item_ref/> exists via `backlog view --selector "{item_ref}"`
 (the CLI has no `summary` parameter — it always returns full content). If error, report and stop.
 
-To extract the integer for tools that require `issue_number` (int):
-`issue_number = int(item_ref.lstrip('#'))`
-
 ## Validate: Pre-Groom Checks
 
 Run these checks in order per item. First failure → SKIP.

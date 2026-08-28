@@ -205,4 +205,3 @@ in parallel if their `parallelize-with` field permits it.
 - Task completed and all acceptance criteria verified
 - Quality gates pass (format, lint, typecheck, test)
 - Execution artifact documents implementation, evidence, and any remaining risks
-- Handoff section provides enough information for Stage 6 review

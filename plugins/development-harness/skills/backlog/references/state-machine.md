@@ -3,8 +3,6 @@
 Canonical state machine for backlog items. All skills that modify item state MUST
 reference this document and enforce only allowed transitions.
 
-SOURCE: Derived from GSD STATE.md patterns and comparative analysis of claude_skills backlog management (accessed 2026-02-26).
-
 ---
 
 ## State Diagram
@@ -193,7 +191,7 @@ status:closed           — terminal: milestone archived by complete-milestone
 
 `status:needs-review` exists in `labels.md` and `github_project_setup.py` but is **not** part of the 8-state lifecycle above. It has no defined entry or exit transitions in this document.
 
-**Decision**: Retained in the label taxonomy for backwards compatibility (PRs may use it for code review workflows), but backlog commands MUST NOT set it during state transitions. It is not a backlog lifecycle state. Do not add it to the state machine DAG.
+Backlog commands MUST NOT set it during state transitions. It is not a backlog lifecycle state. Do not add it to the state machine DAG.
 
 Priority labels (orthogonal to status):
 
@@ -214,5 +212,3 @@ priority:Ideas
 (defined in finalize.md; see [./item-schema.md](./item-schema.md)). Partial grooming is not groomed.
 
 **`blocked` and `in-progress` are exclusive**: An item cannot be both blocked and in-progress. If AC verification fails during close, revert to `blocked`, do not close.
-
-SOURCE: claude_skills_backlog_management_systematic_improvements_list.md, Cross-Cutting Improvement 1 and work-backlog-item improvement 3 (2026-02-26).

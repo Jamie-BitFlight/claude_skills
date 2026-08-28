@@ -113,10 +113,6 @@ Write no `agent` value at all when the manifest omits that role, no manifest mat
 or the work is production code, documentation, or anything else no role above covers. The
 executing worker then runs the task with no specialist profile, which is the documented fallback.
 
-`agent` is passed verbatim to `profile_load` at execution time. An abstract role name matches no
-agent, and a bare name that two plugins both ship resolves ambiguously; either one ends the task
-blocked before any work starts.
-
 ## Input
 
 Retrieve the contextualized plan via MCP:
@@ -272,21 +268,6 @@ flowchart TD
     Revise --> Done
 ```
 
-## Behavioral Rules
-
-- Every task must be self-contained — an agent given ONLY that task can execute it
-- Never point at an upstream artifact by "see X" — inline the content the task needs. The
-  executing agent has no guaranteed access to the discovery or plan artifact you read
-- Never write an abstract role name into `agent` — write the plugin-qualified agent the language
-  manifest maps that role to, or omit the field
-- Tasks must not have circular dependencies
-- Each acceptance criterion must be verifiable by the executing agent alone
-
 ## Success Criteria
 
-- Each task is independently executable without clarifying questions
 - Every plan component maps to at least one task
-- Dependency graph has no cycles
-- Parallel groups have no shared file conflicts
-- Every `agent` value present is plugin-qualified and resolvable by `profile_load`
-- CoVe checks present on medium/high accuracy-risk tasks only

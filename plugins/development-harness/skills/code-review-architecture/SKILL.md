@@ -367,8 +367,6 @@ Rules:
 - If a candidate cluster would contain < 5 nodes, merge it into the sibling cluster it shares the most edges with.
 - Name each cluster by its dominant responsibility (e.g., `Auth`, `DataLayer`, `NotificationPipeline`).
 
-The partitioning algorithm is **system-agnostic** — it operates on the abstract directed graph built in Steps 1–4 and does not depend on language or framework.
-
 **5c — Gateway selection and edge-cut validation (Pass 2 + Pass 3)**
 
 For each cluster boundary, identify the **gateway node**: the single node with the highest cross-boundary degree (most connections to nodes outside its own cluster). The gateway node:
@@ -398,7 +396,7 @@ ClusterName["ClusterName (→ architecture-graph-{slug}-{cluster-name}.md)"]
 click ClusterName href "architecture-graph-{slug}-{cluster-name}.md" "Open child diagram"
 ```
 
-The `click` directive makes the node navigable in Mermaid-supporting renderers (GitHub, Obsidian, etc.). The reference node inherits the shape the gateway node would have in a flat (non-partitioned) diagram.
+The reference node inherits the shape the gateway node would have in a flat (non-partitioned) diagram.
 
 **Additional rules for each child diagram** (only when partitioned):
 

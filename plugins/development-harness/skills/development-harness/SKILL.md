@@ -68,7 +68,7 @@ flowchart TD
     Work -.->|close or resolve mode| Done
 ```
 
-**Key invariants derived from the skill sources:**
+**Key invariants:**
 
 - `/dh:work-backlog-item` stops immediately when the item already has a `Plan` field — use `/dh:implement-feature` instead
 - `/dh:work-backlog-item` stops at the RT-ICA gate when MISSING conditions remain unresolved

@@ -188,9 +188,7 @@ One `code-review` entry exists per reviewed task, not per work item: reviewing t
 item registers two entries under this type. `complete-implementation` and `forensic-review`
 therefore read the verdict by `artifact_id`, not by type alone —
 `artifact_read(item_id, artifact_type="code-review", artifact_id="code-review-{task_id}-{slug}")`.
-Report the `artifact_id` you actually used verbatim in the ARTIFACTS section of your STATUS output;
-that string is how the caller addresses this verdict, and a caller that cannot read it back branches
-on another task's review.
+Report the `artifact_id` you actually used verbatim in the ARTIFACTS section of your STATUS output.
 
 </workflow>
 

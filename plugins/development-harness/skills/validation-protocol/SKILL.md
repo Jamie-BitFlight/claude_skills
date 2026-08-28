@@ -7,7 +7,7 @@ description: Scientific validation protocol for verifying fixes work through obs
 
 ## Overview
 
-Before claiming any fix works, follow this scientific validation protocol. Success means observing the intended behavior, not merely the absence of errors.
+Before claiming any fix works, follow this scientific validation protocol.
 
 ## When to Use This Skill
 
@@ -39,8 +39,6 @@ A fix that "runs without failing" is not validated. A fix that demonstrates the 
   - System state issues
 - Confirm you can observe the failure consistently
 
-**Why**: Without reproducing the failure, you cannot verify the fix addresses the actual problem. You may fix a different issue or introduce new problems.
-
 **Example**:
 
 ```bash
@@ -66,8 +64,6 @@ A fix that "runs without failing" is not validated. A fix that demonstrates the 
   - Success != Absence of warnings
   - Success != "It ran without failing"
 
-**Why**: Clear success criteria prevent false positives where code runs but doesn't actually work correctly.
-
 **Example**:
 
 ```text
@@ -88,8 +84,6 @@ Success Criteria:
 - Look for the specific success indicators defined in Step 2
 - Document what actually happened (verbatim output, return values, behavior)
 - Compare observed outcome against success criteria
-
-**Why**: The fix may run without errors but still not produce the intended behavior. Observation reveals the truth.
 
 **Example**:
 
@@ -115,8 +109,6 @@ Success Criteria:
   - Each criterion must be met with evidence
   - Partial success is not success
 - Document the verification evidence
-
-**Why**: Verification ensures the fix actually solved the problem and didn't just change the symptoms.
 
 **Example**:
 
@@ -222,52 +214,3 @@ This validation protocol complements but does not replace automated testing:
 2. Add automated test to prevent regression
 3. Run full test suite to ensure no new issues
 
-## Example: Complete Validation Workflow
-
-```text
-Bug Report: "User authentication fails with 500 error"
-
-Step 1: Reproduce Failing State
-- Attempt login with valid credentials
-- Observe: HTTP 500, server logs show "KeyError: 'user_id'"
-- Confirmed: Failure reproduces consistently
-
-Step 2: Define Success Criteria
-- Login with valid credentials returns HTTP 200
-- Response contains {"status": "authenticated", "user_id": <id>}
-- No KeyError in server logs
-- Session cookie is set
-
-Step 3: Apply Fix and Observe
-- Fixed: Added user_id field validation in auth handler
-- Tested: Login with valid credentials
-- Observed: HTTP 200 response
-- Observed: {"status": "authenticated", "user_id": 42}
-- Observed: No errors in logs
-- Observed: Session cookie present
-
-Step 4: Verify Result
-- Reproduction steps no longer trigger 500 error
-- HTTP 200 received (not 500)
-- Response contains correct user_id
-- No KeyError in logs
-- Session cookie set correctly
-
-Conclusion: Fix verified. All success criteria met with evidence.
-
-Additional Verification:
-- Added regression test for user_id validation
-- Full test suite passes (156 tests)
-- Deployed to staging, manual verification successful
-```
-
-## Summary
-
-This protocol ensures fixes are verified through observation rather than assumption:
-
-1. **Reproduce**: Establish the broken baseline
-2. **Define**: State what success looks like
-3. **Apply**: Implement the fix
-4. **Verify**: Confirm success criteria are met with evidence
-
-**Remember**: Success = Observing the intended behavior, not absence of errors.

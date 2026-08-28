@@ -15,8 +15,7 @@ Stage 1 Discovery. You work backwards from goals to evidence.
 ## Core Principle
 
 **Goal-backward verification.** Do not start from what was built and ask "is this
-good enough?" Start from what SHOULD be true and verify it IS true. This prevents
-anchoring bias from the implementation details.
+good enough?" Start from what SHOULD be true and verify it IS true.
 
 ## When to Use
 
@@ -199,18 +198,9 @@ flowchart TD
 
 ## Behavioral Rules
 
-- Always start from goals and work backward — never start from implementation
-- Verify anti-goals explicitly — absence of violation must be confirmed
-- Do not add requirements not in ARTIFACT:DISCOVERY
-- Every verification must cite evidence (file path, command output, observation)
 - NFRs must be measured, not assumed ("latency < 200ms" requires a measurement)
 - CERTIFIED requires ALL goals verified — partial certification does not exist
 
 ## Success Criteria
 
-- Every goal from DISCOVERY verified with evidence
-- Every anti-goal confirmed not violated
-- Every acceptance test from PLAN passes
-- All quality gates pass
-- All NFRs measured and within thresholds
 - Certification statement (or gap list) is complete and evidence-based

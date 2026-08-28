@@ -21,7 +21,7 @@ $ARGUMENTS
 
 ---
 
-**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. The SAM server initializes in ~1 second after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
+**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 
 ## Parse Arguments
 
@@ -79,10 +79,9 @@ $ARGUMENTS
 
 2a. **Load task-level skills** (if present):
    - Read `task.skills` from the `TaskAssignment` model (an array of skill names).
-   - If absent or empty, skip (backward compatible with tasks recorded before this field existed).
+   - If absent or empty, skip.
    - For each skill name, invoke: `Skill(skill="{skill-name}")`
    - If a skill fails to load, log a warning and continue. Do not abort task execution.
-   - **Redundancy note**: The orchestrator (`/implement-feature`) may also include skill-loading instructions in the delegation prompt. This is intentional redundancy — loading a skill twice is a no-op.
    - Task-level skills are **additive** to any skills already declared in the agent definition's frontmatter.
 
 3. Claim the task (prevents duplicate dispatch):

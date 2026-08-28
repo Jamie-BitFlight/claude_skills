@@ -429,7 +429,7 @@ Map task content to skills that the executing agent should load. Apply when task
 3. If no pattern matches, set `skills: []` (empty list, not omitted).
 4. The table is extensible. Add new rows when new skill-task associations are identified.
 
-## Parallelization and Conflict Avoidance (UPDATED)
+## Parallelization and Conflict Avoidance
 
 Parallel tasks must not collide on the same files unless a merge protocol is specified.
 
@@ -521,13 +521,13 @@ Task 2: "Update SKILL.md: prerequisites, error recovery, validation status, and 
 
 ### Phase 1: Context Gathering
 
-[unchanged except you must capture assumptions and sources that affect Accuracy Risk]
+Capture assumptions and sources that affect Accuracy Risk.
 
 ### Phase 2: Dependency Analysis
 
 [unchanged]
 
-### Phase 3: Task Decomposition (UPDATED)
+### Phase 3: Task Decomposition
 
 In addition to existing requirements:
 
@@ -541,7 +541,7 @@ In addition to existing requirements:
 - Prefer primary sources: repo code, tests, official docs, config schemas
 - Bookend generation: after decomposing implementation tasks, check whether the plan's `acceptance-criteria-structured` field is non-empty. If yes, apply the field sets and dependency rules defined in Bookend Task Generation above. Order T0 before any implementation task and TN after all implementation tasks. Add `T0` to the `dependencies` list of every non-bookend task.
 
-### Phase 4: Plan Validation (UPDATED)
+### Phase 4: Plan Validation
 
 Validate the task objects built in Phase 3 before they are registered in Phase 5 — the checks
 below (especially items 11 and 12) require correcting the in-memory task objects, which is only
@@ -554,7 +554,7 @@ possible before `sam_plan`'s `create`/`append_task` calls submit them.
 
 Add these validations:
 
-5. CLEAR lint (NEW)
+5. CLEAR lint
 
 - Concise: no filler, no duplicated requirements
 - Logical: sections in canonical order
@@ -562,39 +562,39 @@ Add these validations:
 - Adaptive: variants only when needed and bounded (optional)
 - Reflective: includes assumption check and edge case awareness
 
-6. Schema completeness (NEW)
+6. Schema completeness
 
 - Every task sets `objective`, `constraints`, and `accuracy-risk`
 - Every task sets `expected-outputs` with paths
 - Every task sets `verification-steps`
 - If `accuracy-risk` is `medium` or `high`, the task's `body` includes CoVe Checks
 
-7. CoVe question quality (NEW, only when present)
+7. CoVe question quality (only when present)
 
 - Questions are falsifiable and not "Is it correct?"
 - Evidence sources are specified (commands, docs, code pointers)
 - Revision rule is explicit
 
-8. Structural field completeness (NEW)
+8. Structural field completeness
 
 - Every task sets `status` (default: `not-started`)
 - Every task sets `agent` to a valid agent name
 - Agent assignments match task types per Agent Assignment Rules table
 
-9. Same-file conflict check (NEW)
+9. Same-file conflict check
 
 - For each `expected-outputs` file path, count how many tasks list it
 - If count > 1 and tasks are not dependency-chained: MERGE required
 - If count > 1 and tasks are dependency-chained: WARNING (consider merging to reduce overhead)
 
-10. Skills field check (NEW)
+10. Skills field check
 
 - Every task sets `skills` (may be empty list `[]`)
 - Skills values are valid skill activation names (string, optionally colon-separated `plugin:skill`)
 - If architecture spec prescribes skills for a task type, verify they are present
 - Skills match the Skills Mapping Table patterns based on task title and requirements
 
-11. Commit step presence check (NEW)
+11. Commit step presence check
 
 - For every task whose `expected-outputs` lists one or more repo-relative file paths: verify
   that `verification-steps` contains a final step with `git add <files>` and `git commit`
@@ -602,7 +602,7 @@ Add these validations:
 - Confirm no `Fixes #N`, `Closes #N`, or `Resolves #N` appears in the commit step
 - If any check fails, add or correct the commit step before registering the plan
 
-12. Bookend presence check (NEW, when `acceptance-criteria-structured` is non-empty)
+12. Bookend presence check (when `acceptance-criteria-structured` is non-empty)
 
 - Exactly one task has `bookend-type: t0-baseline`
 - Exactly one task has `bookend-type: tn-verification`
@@ -611,7 +611,7 @@ Add these validations:
 - Every non-bookend task includes `T0` in its `dependencies`
 - If any check fails, add or correct the bookend tasks before registering the plan
 
-### Phase 5: Plan Creation (UPDATED)
+### Phase 5: Plan Creation
 
 Steps (in order):
 
@@ -620,7 +620,7 @@ Steps (in order):
 
 2. Sync checkpoints reference task acceptance criteria and verification outputs.
 
-## Success Metrics (UPDATED)
+## Success Metrics
 
 A well-formed plan enables:
 

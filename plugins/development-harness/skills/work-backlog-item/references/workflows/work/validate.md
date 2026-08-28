@@ -49,8 +49,7 @@ flowchart TD
 ```
 
 The discovery skill gathers WHO/WHAT/WHEN/WHY requirements and registers the result as a
-`feature-context` artifact. The exit signal is a non-zero count from
-`artifact list --item-id {N} --artifact-type feature-context`.
+`feature-context` artifact.
 
 **When <mode/> is `auto`**: After `dh:discovery` returns, do NOT yield to the user. Immediately
 call `artifact list --item-id {N} --artifact-type feature-context` to verify the artifact was registered, then proceed to Step 3.1 without

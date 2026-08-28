@@ -129,10 +129,9 @@ mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "Context Man
 ```
 
 Note: the CLI equivalent is `plan update --plan-address P1 [...]`, but the specific flag for
-setting the plan-level `context` field is not enumerated in the current CLI-parity mapping
-(2026-08-05, backlog item #2793) — verify the exact flag via
-`uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --help` before converting
-this call site to CLI form.
+setting the plan-level `context` field is not enumerated in the current CLI-parity mapping —
+verify the exact flag via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --help`
+before converting this call site to CLI form.
 
 ## Task File Format
 
@@ -214,7 +213,7 @@ The `task_status_hook.py` script supports environment-variable-based profile con
 Controls which hook handlers run. Case-sensitive lowercase. Default when unset or empty: `standard`.
 
 - **`minimal`** — PostToolUse (LastActivity updates) is skipped entirely. SubagentStop (task completion) runs normally. Use this to reduce I/O during task execution when activity timestamps are not needed.
-- **`standard`** — All handlers run. This is the current default behavior and is backward compatible with sessions that do not set the variable.
+- **`standard`** — All handlers run.
 - **`strict`** — All handlers run. SubagentStop additionally performs pre-completion validation checks and emits warnings to stderr. Warnings are observational only — they do not prevent task completion. Strict checks verify that the task was claimed (status was `in-progress` before completion) and that acceptance criteria were defined (non-empty).
 
 Invalid values produce a warning to stderr and fall back to `standard`.

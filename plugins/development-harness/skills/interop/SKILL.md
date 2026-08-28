@@ -13,8 +13,6 @@ The plan file path is provided as `$ARGUMENTS`.
 
 Invocation: `/dh:interop <path-to-plan-file>`
 
-SOURCE: plan/architect-dh-phase2-interop-adapter.md (historical plan artifact, archived to `~/.dh/projects/{project-slug}/plan/`)
-
 ---
 
 ## Step 1 — Validate the argument
@@ -97,9 +95,9 @@ flowchart TD
     WriteRef --> UseExisting
 ```
 
-Note: the CLI's `backlog add` command has no `--plan` flag in the MCP↔CLI mapping (verified
-2026-08-05) — the `plan = $ARGUMENTS` parameter used here has no confirmed CLI equivalent. Use the
-MCP tool for this call until the gap is resolved.
+Note: the CLI's `backlog add` command has no `--plan` flag in the MCP↔CLI mapping — the
+`plan = $ARGUMENTS` parameter used here has no confirmed CLI equivalent. Use the MCP tool for
+this call until the gap is resolved.
 
 When writing the backlog item reference into the plan file, use the Edit tool to insert:
 
@@ -213,28 +211,8 @@ Use the Edit tool for each annotation. Do not rewrite the file.
 ## Idempotency rules
 
 Running `/dh:interop` on the same plan file a second time must produce identical output to the
-first run — no duplicates, no data loss.
-
-- `**SAM tasks:**` line: if it already exists, replace in-place. Never insert a second line.
-- Chunk annotations: if the comment already exists on the line immediately after a `## Chunk N:`
-  heading, replace in-place. Never insert a duplicate.
-- `**Backlog item:**` line: if it already exists, use the existing number. Never create a second
-  backlog item.
-
----
-
-## Abort conditions summary
-
-Stop immediately and make no further changes when:
-
-- `$ARGUMENTS` is empty
-- The file at `$ARGUMENTS` cannot be read
-- Title (`#` heading) is absent from the plan file
-- Goal (`**Goal:**` field) is absent from the plan file
-- `mcp__plugin_dh_backlog__backlog_add` returns an error response
-- `/work-backlog-item` completes without producing a task file
-
-All abort messages are prefixed with `ERROR:` and printed to the user before stopping.
+first run — no duplicates, no data loss. Steps 3, 6, and 7 above each already specify the
+replace-in-place vs. insert branch that guarantees this.
 
 ---
 

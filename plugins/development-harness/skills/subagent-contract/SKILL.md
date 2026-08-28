@@ -38,7 +38,6 @@ that wrote it, so that step reads it back empty instead of failing.
 
 <reporting>
 
-Report every command you ran with its outcome. Keep changes minimal and reversible, and confined
-to the task you were given.
+Report every command you ran with its outcome. Keep changes confined to the task you were given.
 
 </reporting>

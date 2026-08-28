@@ -4,7 +4,7 @@ Sub-workflow of [start.md](./start.md). Triggered when an item is already groome
 (Check E in validation). Two modes based on whether a plan file exists.
 
 **Purpose**: Detect codebase changes since grooming/planning that may invalidate cached content.
-This is an informational check — it reports findings and stops. It does NOT trigger re-grooming.
+See Terminal State below.
 
 ## Inputs
 

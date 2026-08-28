@@ -52,7 +52,6 @@ Note: the CLI's `--artifact-id` corresponds to MCP's `path` parameter — both h
 logical identifier (see development-harness AGENTS.md's Artifact Manifest System section).
 
 → Load the just-registered artifact via `artifact_read`, **CONTINUE** to RT-ICA snapshot.
-Discovery is pure overhead for well-groomed items — skip it when these sections exist.
 
 4. If `count == 0` and rich groomed sections are absent: invoke discovery skill.
 

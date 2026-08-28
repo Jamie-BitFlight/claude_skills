@@ -10,7 +10,7 @@ Establish a balanced investigative approach for all test failures encountered in
 
 ## Core Principle
 
-Tests are specifications - they define expected behavior. When they fail, it's a critical moment requiring balanced investigation, not automatic dismissal.
+Tests are specifications - they define expected behavior.
 
 ## Dual Hypothesis Approach
 
@@ -29,7 +29,7 @@ For EVERY test failure:
 ### 1. Pause and Read
 
 - Understand what the test is trying to verify
-- Read its name, comments, and assertions carefully
+- Read its name, comments, and assertions
 - Check the test's history (git blame) for context
 
 ### 2. Trace the Implementation
@@ -71,25 +71,7 @@ For EVERY test failure:
 - Treat each test failure as a potential bug discovery
 - Document analysis in comments when fixing tests
 - Write clear test names that explain intent
-- When changing a test, explain why the original was wrong
 - Consider adding more tests when finding ambiguity
-
-## Example Responses
-
-**Good**: "I see test_user_validation is failing. Let me trace through the validation logic to understand if this is catching a real bug or if the test's expectations are incorrect."
-
-**Bad**: "The test is failing so I'll update it to match what the code does."
-
-## Remember
-
-Every test failure is an opportunity to:
-
-- Discover and fix a bug before users do
-- Clarify ambiguous requirements
-- Improve system understanding
-- Strengthen the test suite
-
-**The goal is NOT to make tests pass quickly. The goal IS to ensure the system behaves correctly.**
 
 ## Related Skills
 

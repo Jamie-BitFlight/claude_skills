@@ -150,15 +150,7 @@ manifest to find the appropriate codebase-analysis role for the tech stack.
 
 - Never modify the design intent — only add concrete references
 - If a conflict is unresolvable, document it and flag for human review
-- Scope classification must cite evidence (file paths, not assumptions)
-- Resource mapping must verify resources still exist (read the files)
-- Do not fabricate file paths — verify every reference with codebase access
 
 ## Success Criteria
 
-- Every plan component has a scope classification with evidence
-- All conflicts between plan and codebase are documented with resolutions
-- Resource map covers reusable utilities, patterns, and test infrastructure
-- Integration points specify exact files and connection surfaces
-- File impact summary is complete and verified against codebase
 - Plan is ready for task decomposition without requiring further codebase exploration

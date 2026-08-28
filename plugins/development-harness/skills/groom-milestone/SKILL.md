@@ -96,7 +96,7 @@ The backlog MCP server exposes these dispatch tools used at plan-write time:
 - `dispatch_wave_start(milestone, wave_num, items)` — Step 9: registers each wave in the dispatch state database; call after dispatch_create_plan to initialise wave state
 - `dispatch_wave_status(milestone, wave_num)` — available after `/work-milestone` launches; returns item-level progress with stale PID detection
 
-The dispatch plan is persisted via the `dispatch_create_plan` MCP tool, which validates the DispatchPlan object against the schema and writes atomically. The DispatchPlan schema is defined in [./references/dispatch-plan-schema.md](./references/dispatch-plan-schema.md). The conflict analysis and wave assignment logic (Steps 5–9) runs in-session — it does not call external module functions.
+The DispatchPlan schema is defined in [./references/dispatch-plan-schema.md](./references/dispatch-plan-schema.md).
 
 ## Error Handling
 

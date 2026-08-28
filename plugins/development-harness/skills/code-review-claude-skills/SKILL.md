@@ -19,7 +19,7 @@ Stack-specific rules loaded by `dh:code-reviewer` when `SKILL.md`, agent frontma
 
 ## Description Quality
 
-- The description is the primary routing mechanism when Claude selects from 100+ available skills — it must contain specific trigger keywords
+- The description must contain specific trigger keywords
 - First 1024 characters are most important — front-load trigger conditions and activation signals
 - Preferred trigger openers: "Use when", "Activates on", "Triggers on", "Loaded automatically when"
 - Descriptions must be third-person ("Generates commit messages" not "I can help you generate")

@@ -157,8 +157,6 @@ BLOCKERS:
      Fix: Call sam_plan(action='finalize') to set state="ready", then re-validate.
 ```
 
-SOURCE: Architectural Decision 2 — Drafting State (plan-context artifact #1770, 2026-04-13)
-
 </drafting_state_handling>
 
 <validation_dimensions>
@@ -227,8 +225,6 @@ For each task T:
 - Self-reference (task depends on itself)
 - Forward reference (early task depending on later task's output)
 - Execution order impossible due to dependency conflicts
-
-SOURCE: Cycle detection algorithm adapted from gsd-plan-checker.md
 
 ## Dimension 4: Agent Capability Match
 
@@ -306,8 +302,6 @@ issue:
   fix_hint: "Add integration step in TASK-03 or create wiring task"
 ```
 
-SOURCE: Adapted from gsd-plan-checker.md (Key Links Planned dimension)
-
 ## Dimension 7: Testability
 
 **Question:** Are acceptance criteria testable?
@@ -367,8 +361,6 @@ issue:
     estimated_complexity: high
   fix_hint: "Split into foundation task + integration task"
 ```
-
-SOURCE: Adapted from gsd-plan-checker.md (Scope Sanity dimension)
 
 ## Dimension 9: Architectural Boundary Compliance
 
@@ -682,7 +674,6 @@ issues:
     fix_hint: "Merge into single task with combined requirements grouped by scope"
 ```
 
-SOURCE: Adapted from gsd-plan-checker.md (Issue Structure section)
 
 </issue_structure>
 

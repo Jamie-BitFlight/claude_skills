@@ -25,9 +25,8 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:discovery', args='#42'
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
 ```
 
-Note: the CLI's `backlog view` has no `summary`/`include_content` parameter (the MCP tool's
-progressive-disclosure compact-vs-full split) — it always returns the flat, full item content,
-which is the CLI equivalent of the MCP call's `summary=false` above.
+Note: the CLI's `backlog view` has no `summary`/`include_content` parameter — it always returns
+the flat, full item content, which is the CLI equivalent of the MCP call's `summary=false` above.
 
 2. Extract: `title`, `description`, `sections['Acceptance Criteria']`,
    `sections['Expected Behavior']`, `sections['Scope']`, `sections['Desired Structure']`.

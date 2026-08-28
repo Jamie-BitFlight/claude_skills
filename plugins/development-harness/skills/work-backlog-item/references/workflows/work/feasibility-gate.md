@@ -28,7 +28,7 @@ flowchart TD
 
     C3(["Criterion 3 — Blast radius check"]) --> PatternCheck
     PatternCheck{"Any Impact Radius row<br>contains pattern: field?"}
-    PatternCheck -->|"No pattern: fields present"| ManualCount["Use manual row count<br>(backward-compatible path)"]
+    PatternCheck -->|"No pattern: fields present"| ManualCount["Use manual row count"]
     PatternCheck -->|"Yes — pattern: field found"| RunRg["Run: rg -l '<pattern>' | wc -l<br>Capture as live_count"]
     RunRg --> Compare{"live_count > 1.5 * manual_count?"}
     Compare -->|"Yes — count diverged"| FBlock3b(["Emit STALE_GROOM warning<br>Require re-grooming before proceeding"])
