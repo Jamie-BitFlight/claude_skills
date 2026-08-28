@@ -12,7 +12,10 @@ Each agent's section is how the others reach its findings — a teammate that mu
 
 2. **fact-checker** — Verify item claims against primary sources. Training data recall is NOT
    evidence. Valid evidence: WebFetch, WebSearch, command output, source code, MCP tool output.
-   Write to `section="Fact-Check"`, recording each `REFUTED:` claim there (they become MISSING in RT-ICA).
+   If `description` contains a `**Hypothesis**: {text}` line, include it as one of the claims to
+   verify, prefixed `HYPOTHESIS:` so its verdict is locatable later (see Fact-Checker output
+   contract below). Write to `section="Fact-Check"`, recording each `REFUTED:` claim there (they
+   become MISSING in RT-ICA).
 
 3. **rtica-assessor** — Assess information completeness using impact-analyst and fact-checker
    output. Write to `section="RT-ICA"`. Re-read Impact Radius and Fact-Check before
@@ -59,7 +62,7 @@ sequenceDiagram
 
     Note over O,AA: Wave 1 — parallel (fact-checker receives Research section as prior context)
     O->>IA: spawn (item details, Files, Evidence, suggested_location)
-    O->>FC: spawn (item claims to verify + Research section as prior context if available)
+    O->>FC: spawn (item claims to verify, including any description Hypothesis line + Research section as prior context if available)
     O->>RT: spawn (item details — waits for IA + FC)
     O->>CL: spawn (item description)
 
@@ -205,6 +208,11 @@ claim: {exact claim from item}
 evidence: {tool result citation}
 source: {URL or file path with line numbers}
 ```
+
+When the claim is the item description's `**Hypothesis**: {text}` line, prefix `claim:` with
+`HYPOTHESIS:` (e.g. `claim: HYPOTHESIS: retries fail because the cache is stale`) so
+`finalize.md`'s Hypothesis Resolution step can locate this specific verdict deterministically
+rather than by matching claim wording.
 
 Validation rules:
 
