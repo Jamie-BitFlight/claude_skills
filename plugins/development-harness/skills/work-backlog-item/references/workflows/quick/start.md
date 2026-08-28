@@ -11,9 +11,25 @@ passes the descriptive title directly to `--quick`, which creates a minimal item
 of this workflow). The gate, not the user, authorizes the --quick routing decision.
 
 **Invocation form:** `flags.quick = true` (parser flag). Not a registry command. The title
-or issue reference is passed as `item_ref`.
+or issue reference is passed as `item_ref`. A caller with more detail than fits in a short title
+(e.g. an error message, or what was already ruled out) can supply it after a `--` delimiter:
+`--quick {title} -- {additional observations}` — see Step 1 for how this splits.
 
-1. Extract title from <item_ref/>+ joined. If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this path skips the rest of that workflow. Strip the causal clause from the title (keep only the symptom, e.g. "X failing") before any lookup or write, and record the full causal clause separately as `{hypothesis}` (`**Hypothesis**: {cause}`) for use in the description if a new item is created. Build slug from this normalized title: lowercased, spaces → hyphens. Every step below — the lookup, `--slug`, selectors, reported handoffs — uses this normalized `{title}`/`{slug}`, so a repeat invocation of the same command matches the item this workflow already created instead of attempting to create a duplicate.
+1. Extract title from <item_ref/>+ joined. If that text contains a `--` freetext delimiter (per
+   the argument vocabulary in `SKILL.md`), the portion before it is the title and the portion
+   after it is `{observations}` — additional detail to include in the description, not to fold
+   into the title. With no delimiter, there are no `{observations}`.
+
+   If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is
+   not a confirmed observation, the persisted title must not assert it as fact either — the
+   creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this
+   path skips the rest of that workflow. Strip the causal clause from the title (keep only the
+   symptom, e.g. "X failing") before any lookup or write, and record the full causal clause
+   separately as `{hypothesis}` (`**Hypothesis**: {cause}`) for use in the description if a new
+   item is created. Build slug from this normalized title: lowercased, spaces → hyphens. Every
+   step below — the lookup, `--slug`, selectors, reported handoffs — uses this normalized
+   `{title}`/`{slug}`, so a repeat invocation of the same command matches the item this workflow
+   already created instead of attempting to create a duplicate.
 
 2. **In-Progress Relevance Check** — Before creating a new backlog item, determine whether this fix belongs to work already in progress. If it does, add it to the active plan instead of opening a new item.
 
@@ -75,8 +91,9 @@ or issue reference is passed as `item_ref`.
 
 3. Find the item via the CLI: `backlog view --selector "{title or #N}"` (using the normalized `{title}` from Step 1). If not found (JSON output contains an `error` key), create a minimal item:
 
-   If Step 1 recorded a `{hypothesis}`, the description is `{title}\n\n{hypothesis}`; otherwise it
-   is just `{title}`.
+   The description starts as `{title}`, then appends each of `{observations}` and `{hypothesis}`
+   that Step 1 recorded, each on its own paragraph, in that order (`{title}\n\n{observations}\n\n{hypothesis}`
+   when both are present). With neither, the description matches the title exactly.
 
    ```bash
    backlog add \
