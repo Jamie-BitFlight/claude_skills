@@ -104,21 +104,16 @@ If operation is `resolve`:
 
 ## Step 5.6: Resolve path — typed acceptance-criteria verification
 
-4. Extract acceptance criteria from the `backlog_view` response. Call `backlog view --selector "{title}"`, then read `response["sections"]["Acceptance Criteria"]`. The field format is a bullet list:
-
-   Note: the CLI's `backlog view` has no `summary` toggle — it always returns the flatter,
-   full-content equivalent of `summary=false`.
-
-   ```markdown
-   **Acceptance Criteria**:
-   - {criterion 1}
-   - {criterion 2}
-   - {criterion 3}
-   ```
-
-   Parse each `-` line as a separate criterion.
-
-5. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: item title, plan address (e.g., `P{id}`), checklist status (100%), and each criterion listed individually as "Criterion N: {text}". Instruct the agent to: read the plan via `mcp__plugin_dh_sam__sam_plan(plan="{address}", config={"action": "read"})`, search `git log --oneline -20`, check relevant files for each criterion, and return per-criterion PASS/FAIL with file:line evidence. Required return format:
+4. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: `item_ref`
+   (the same selector used in Step 5.2), `section="Acceptance Criteria"`, plan address (e.g.,
+   `P{id}`), and checklist status (100%). Instruct the agent to: call
+   `mcp__plugin_dh_backlog__backlog_view(selector=item_ref, sections=["Acceptance Criteria"])` and
+   parse each `-` line as a separate criterion itself, read the plan via
+   `mcp__plugin_dh_sam__sam_plan(plan="{address}", config={"action": "read"})`, search
+   `git log --oneline -20`, check relevant files for each criterion, and return per-criterion
+   PASS/FAIL with file:line evidence. Do not parse or re-type the criteria text into the dispatch
+   prompt — the agent has backlog MCP access and fetches the item's Acceptance Criteria section
+   itself. Required return format:
 
    ```text
    [PASS] {criterion} — verified at {file}:{line} (or commit {sha})
@@ -126,9 +121,11 @@ If operation is `resolve`:
    Overall: PASS or FAIL (N/M criteria met)
    ```
 
-   **If no acceptance criteria exist**: warn "No **Acceptance Criteria**: field found — falling back to description-based verification" and spawn agent with the description as the goal instead.
+   **If no acceptance criteria exist**: the agent's own `backlog_view` call returns an empty or
+   absent `Acceptance Criteria` section — instruct it in the prompt to warn "No **Acceptance Criteria**: field found — falling back to description-based verification"
+   and verify against the item description instead.
 
-6. Parse the agent verdict:
+5. Parse the agent verdict:
 
    ```text
    Acceptance Criteria Verification:
@@ -140,7 +137,7 @@ If operation is `resolve`:
    Overall: FAIL (2/3 criteria met)
    ```
 
-7. Collect agent verdict:
+6. Collect agent verdict:
    - **Overall PASS** (all criteria met): proceed to Step 5.7
    - **Overall FAIL** (any criterion failed): report gaps, do not resolve:
 
