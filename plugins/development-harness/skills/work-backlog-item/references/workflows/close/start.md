@@ -219,12 +219,9 @@ If operation is `resolve`:
 
 ## --force flag
 
-The `--force` flag bypasses two gates in the resolve path:
-
-- **Step 5.4** (`status:verified` gate): Skips the check that `status:verified` is present on the GitHub Issue. Use when you are confident quality gates have passed but the label was not applied automatically (e.g., the `/complete-implementation` hook failed to apply it).
-- **Step 5.7** (open PR check): Bypasses the check for an open PR with `Fixes #N`. Use when you want to resolve the local cache entry immediately even though a PR is still open.
-
-In both cases `--force` prints a warning before proceeding so the bypass is visible in the session transcript.
+The `--force` flag bypasses the Step 5.4 `status:verified` gate only (see Step 5.4 above for the
+warning text and when to use it). It has no effect on Step 5.7 — the open-PR check there has no
+bypass branch; it either stops (open PR found) or proceeds (no open PR), regardless of `--force`.
 
 Usage:
 

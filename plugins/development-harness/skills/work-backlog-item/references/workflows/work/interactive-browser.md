@@ -47,8 +47,8 @@ classification and handling instructions.
 
 5. Handle the response:
    - `[number]` — use that item's title as the working title and proceed to [find-item.md](./find-item.md)
-   - `G [number]` — invoke `Skill(skill="groom-backlog-item", args="{item title}")` then re-display the list
-   - `G all` — invoke `Skill(skill="groom-backlog-item", args="all")` then re-display the list
+   - `G [number]` — invoke `Skill(skill="dh:groom-backlog-item", args="{item title}")` then re-display the list
+   - `G all` — invoke `Skill(skill="dh:groom-backlog-item", args="all")` then re-display the list
    - `D [number]` — display the full item description, research_first field, and groomed content (if present), then re-display the list
    - `C [number]` — proceed to close path with that item's title
    - `R [number]` — proceed to resolve path with that item's title

@@ -8,7 +8,6 @@
 
    ```text
    MCP: backlog_sync()
-   # backlog_sync creates missing labels as part of its sync operation.
    # To verify labels exist: MCP: backlog_list_labels()
    ```
 
@@ -38,7 +37,6 @@
    If yes:
 
    ```text
-   # OWNER/REPO is discovered dynamically via discover_repo() from backlog_core.models
    MCP: backlog_create_project(title="{REPO} Backlog")
    ```
 
@@ -52,5 +50,5 @@
 
    Next steps:
    - Add custom fields to the GitHub Project (manual step — not yet available via MCP tools)
-   - Import existing backlog: /work-backlog-item <title> for each P0/P1 item
+   - Import existing backlog: /dh:work-backlog-item <title> for each P0/P1 item
    ```

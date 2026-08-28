@@ -8,8 +8,6 @@ Runs after every groom workflow exit — whether the outcome is Groomed, Blocked
 
    > **Do NOT call `backlog_sync()` — that runs a full sweep of all issues and is expensive.**
 
-   > **Note (#2452):** The sync-state step and JSONL export claim that appeared here were removed in #2452 — both referenced a capability that was never implemented.
-
 2. **Report terminal state**: emit a one-line summary to the caller with the outcome:
 
    | Outcome | Report |

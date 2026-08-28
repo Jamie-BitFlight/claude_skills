@@ -63,14 +63,8 @@ If condition not met: continue.
 
 **Check D — Item state**:
 
-Check the item's state:
-
-```bash
-backlog view --selector "{item_ref}"
-```
-
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
+Check `state` from the Load Item response above (no checks before this one change `state`, so it
+does not need to be re-fetched):
 
 - `state: open` → continue.
 - `state: closed` → search for evidence:
@@ -98,9 +92,6 @@ If `groomed` absent, empty, or not today → **PROCEED**.
 ```bash
 backlog view --selector "{item_ref}"
 ```
-
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
 
 From the response, extract:
 

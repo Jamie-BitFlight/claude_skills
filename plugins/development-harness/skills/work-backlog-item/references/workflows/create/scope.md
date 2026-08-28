@@ -59,7 +59,7 @@ Not allowed at creation time:
 
 If the user supplies a possible fix, preserve it as user-provided context or hypothesis, not as a requirement or implementation instruction.
 
-Remove speculation from the description rather than deleting the underlying idea: a causal claim that is not a confirmed observation is a hypothesis, not a fact, and must read as one. State it as `**Hypothesis**: {text}` instead of asserting it directly. Cause verification is grooming's job (`find-cause`, `dh:fact-checker`), not creation's — an unlabeled causal claim at creation time reaches the groomed item, and eventually the live issue, indistinguishable from a verified fact.
+Cause verification is grooming's job (`find-cause`, `dh:fact-checker`), not creation's — an unlabeled causal claim at creation time reaches the groomed item, and eventually the live issue, indistinguishable from a verified fact.
 
 Solutions belong to later stages:
 - grooming may investigate causes, constraints, and candidate directions

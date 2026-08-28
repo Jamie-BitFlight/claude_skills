@@ -84,10 +84,6 @@ or issue reference is passed as `item_ref`.
      --description "{title, with any speculative cause labeled per above}"
    ```
 
-   Note: When arriving via the proactive fix gate with no prior backlog item, this creation step
-   is the correct path. The gate's complexity classification already confirmed the fix is trivial —
-   no grooming or RT-ICA is needed.
-
    If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`).
 
 4. Extract the item's description and acceptance criteria if available.
@@ -118,6 +114,6 @@ or issue reference is passed as `item_ref`.
    Quick plan created: {plan_id from step 5}
    Steps: {N} tasks
 
-   To execute: /implement-feature {plan_id}
-   To close:   /work-backlog-item close {title}
+   To execute: /dh:implement-feature {plan_id}
+   To close:   /dh:work-backlog-item close {title}
    ```

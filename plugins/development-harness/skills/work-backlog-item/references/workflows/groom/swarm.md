@@ -31,17 +31,6 @@ Each agent's section is how the others reach its findings — a teammate that mu
    Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment",
    leading the section with a MISSION_ALIGNED or MISSION_DIVERGENT verdict line.
 
-## Dependencies
-
-```text
-impact-analyst    → (none)
-fact-checker      → (none)
-classifier        → (none)
-rtica-assessor    → blocked by impact-analyst + fact-checker
-groomer           → blocked by rtica-assessor + classifier
-alignment-analyst → blocked by impact-analyst
-```
-
 ## Team mode (preferred)
 
 ```text

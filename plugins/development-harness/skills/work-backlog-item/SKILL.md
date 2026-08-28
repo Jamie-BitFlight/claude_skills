@@ -26,7 +26,7 @@ Argument vocabulary:
 - **Flags** — `--language <value>`, `--stack <value>`: both take the *next* token as their value, but only when that next token does not itself start with `-` — a next token starting with `-` (including no next token at all) means the value is missing, a stop-and-ask condition, not "consume the next flag as this flag's value" (verified: `--language --stack python-fastapi` treats `--language` as missing its value; it does not consume `--stack` as the value). `--force`, `--auto`, `--quick` (boolean, no value). `mode` is `auto` only when `--auto` is present, otherwise `interactive`.
 - `--help`/`-h` present → show usage (this vocabulary plus `argument-hint` in the frontmatter) and stop; do not route.
 
-Route → reference file: see [command-routes.json](./scripts/parser/command-routes.json) — one JSON object, `route` keyword to reference-file path, do not hand-copy it here; if it changes, this vocabulary section does not need to.
+Route → reference file: see [command-routes.json](./scripts/parser/command-routes.json) — one JSON object, `route` keyword to reference-file path, do not hand-copy it here.
 
 For every placeholder in the form <key/>, substitute the value of that key from `<input/>`.
 
@@ -41,7 +41,7 @@ The `references/workflows/*.md` files loaded by this skill are plain files, not 
 > A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
 > When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
 
-The following diagram is the authoritative procedure for coercing <provided_arguments/> into `<input/>`. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram governs argument coercion:
 
 ```mermaid
 flowchart TD
@@ -58,23 +58,9 @@ flowchart TD
     NeedRefCheck -->|"No"| Ready
 ```
 
-Input contract — keys available after coercion:
-
-- `mode`: optional; allowed values are `auto` or `interactive` (default when absent: `interactive`)
-- `route`: required; allowed values are `none`, `title_substring`, `issue` (sole discriminator is an item_ref), or a registry keyword — `create`, `groom`, `work`, `close`, `resolve`, `setup-github`, `progress`, `resume`
-- `reference`: present only when `route` is a registry keyword — the file from the route table above
-- `user_text`: optional free text supplied by the user
-- `item_ref`: optional backlog reference such as `#887`
-
 In `auto` mode, do not call `AskUserQuestion`. Log each would-be interactive decision as `[AUTO] {decision} - {evidence}`.
 
-Backlog item detection from `user_text`:
-
-- Free text describing work to be done → new inbound backlog item
-- Issue reference matching `/#\d+/` or a GitHub issue URL → existing backlog item
-- Both reference and descriptive text present → reference is existing item identifier; remaining text is additional context
-
-The following diagram is the authoritative procedure for pipeline stage execution. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram governs pipeline stage execution:
 
 ```mermaid
 flowchart TD
@@ -124,8 +110,6 @@ The configured backend is authoritative for its native work records. For Beads-b
 
 **MCP server availability**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
 
-When invoked with no arguments, shows an interactive browser. When invoked with `#N` or a title substring, proceeds directly to the planning workflow.
-
 **To capture a new backlog item**: `/dh:work-backlog-item create -- "<what and why of the problem that triggered the need for a backlog issue>"`
 
 ## Arguments
@@ -156,18 +140,16 @@ On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_te
 Loads [references/workflows/quick/start.md](./references/workflows/quick/start.md) with `flags.quick = true` (parser flag) and `item_ref` set to the supplied title or issue reference (e.g. `#N`).
 
 **Proactive fix routing**: The Proactive Fix Gate in `.claude/CLAUDE.md` (Proactive Fix Gate section) routes trivial discovered issues to this `--quick` path autonomously.
-Invocation form: `flags.quick = true` (parser flag). The gate, not the user, authorizes the
-routing decision.
 
 ### --auto mode rules
 
-All interactive `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the full substitution table.
+All interactive `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the full substitution table. BLOCKED states (RT-ICA MISSING conditions, feasibility gate BLOCKED) require human resolution regardless of mode.
 
 ## Workflow
 
 ### Routing (evaluated first, before any step)
 
-The following diagram is the authoritative procedure for route dispatch. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram governs route dispatch:
 
 ```mermaid
 flowchart TD
@@ -203,5 +185,3 @@ flowchart TD
     Q1 -->|"setup-github"| SGH["Load references/workflows/setup-github/start.md"]
     SGH --> SGHEnd(["STOP — setup-github workflow handles session"])
 ```
-
-**When <mode/> is `auto`**: all `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the substitution table. BLOCKED states (RT-ICA MISSING conditions, feasibility gate BLOCKED) require human resolution regardless of mode.

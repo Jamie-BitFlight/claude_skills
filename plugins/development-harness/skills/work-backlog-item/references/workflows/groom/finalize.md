@@ -19,9 +19,6 @@ Runs after the grooming swarm completes. The orchestrator (not a subagent) execu
 backlog view --selector "{item_ref}"
 ```
 
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
-
 Extract: Impact Radius, Fact-Check, Issue Classification, Research (if Wave 0 ran), groomed subsections.
 
 2. Re-assess every condition from the initial RT-ICA snapshot:
@@ -43,8 +40,6 @@ No section may advance without satisfying all items:
 - For each DERIVABLE condition: run the cited tool (Grep/Read/Bash/WebSearch). Paste the exact tool output as the citation. Do not cite session context or training data recall. If the tool returns no result, the condition remains DERIVABLE.
 - For each MISSING condition resolved by user: paste the exact user message as citation. Mark AVAILABLE with that citation.
 - No condition status changes from DERIVABLE or MISSING to AVAILABLE without a tool output or user message pasted as its citation.
-
-SOURCE: Session observation — #1899 groom failure diagnosis, 2026-04-23
 
 4. Build RT-ICA Final report:
 
@@ -152,8 +147,6 @@ Optional sections (not validated for presence): `Root-Cause Analysis`, `Impact`,
 
 When a required section is absent or has 0 entries, identify the cause before acting.
 
-SOURCE: Session observation — #1899 groom failure diagnosis, 2026-04-23
-
 ```mermaid
 flowchart TD
     Start([Required section absent or 0 entries]) --> Q{Observable signal?}
@@ -207,7 +200,10 @@ backlog groom \
 
 ## Write Groomed Content
 
-Final step — write groomed content via MCP and mark the item as groomed.
+Final step — write groomed content via MCP and mark the item as groomed. None of `sections=`
+(batch write), `mark_groomed=True`, or `replace_section=True` have a CLI equivalent — `backlog
+groom`'s CLI form accepts only a single `--section`/`--content` pair with no equivalent flags —
+so every call below is left as MCP.
 
 #### Preferred: batch write with atomic status transition
 
@@ -236,18 +232,11 @@ mcp__plugin_dh_backlog__backlog_groom(
 )
 ```
 
-Note: no CLI equivalent for the batch `sections=`/`mark_groomed=True` write — `backlog groom`'s
-CLI form accepts only a single `--section`/`--content` pair and has no `--mark-groomed` flag (not
-in the verified mapping table's flag list). This call is left as MCP.
-
 After the batch write, verify the RT-ICA section was persisted:
 
 ```bash
 backlog view --selector "{item_ref}"
 ```
-
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
 
 Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-DD` and
 `Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
@@ -269,9 +258,6 @@ if response.get("mark_groomed_skipped"):
     mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
 
-Note: no CLI equivalent for `mark_groomed=True` — not in `backlog groom`'s verified CLI flag
-list. This call is left as MCP.
-
 **Alternative: incremental section updates**
 
 When sections become available during the swarm (not at the end), write each immediately:
@@ -289,17 +275,11 @@ it with the final report from the RT-ICA Final Pass step above:
 mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True)
 ```
 
-Note: no CLI equivalent for `replace_section=True` — not in `backlog groom`'s verified CLI flag
-list. This call is left as MCP.
-
 Then call the final status transition:
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
-
-Note: no CLI equivalent for `mark_groomed=True` — not in `backlog groom`'s verified CLI flag
-list. This call is left as MCP.
 
 #### Handoff
 

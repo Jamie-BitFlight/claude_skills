@@ -32,9 +32,6 @@ artifact read --item-id {issue_number} --artifact-type feature-context
 backlog view --selector "{item_ref}"
 ```
 
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
-
 Inspect `response["sections"]`. If **all three** of the following are non-empty:
 - `acceptance criteria`
 - `expected behavior`

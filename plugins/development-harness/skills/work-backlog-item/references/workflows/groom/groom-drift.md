@@ -52,20 +52,7 @@ Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 backlog groom --selector "{title}" --section "Plan Drift" --content "{findings}"
 ```
 
-**`{findings}` content format**:
-
-```text
-Drift since {date}: {N} commits, {M} affecting plan/grooming scope
-
-- {sha} {subject} — {classification}
-  Files: {changed files relevant to item}
-- {sha} {subject} — {classification}
-  Files: {changed files relevant to item}
-
-Summary: {one sentence — what changed and whether it invalidates the plan/grooming}
-```
-
-Classifications: `Scope change`, `Partial fix`, `New callers`, `File moved`, `No impact`.
+See the shared `{findings}` format below.
 
 ---
 
@@ -77,7 +64,7 @@ Classifications: `Scope change`, `Partial fix`, `New callers`, `File moved`, `No
 
 Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 
-1. Call `backlog view --selector "{title}"` (the CLI has no `summary` parameter — it always returns full content).
+1. Call `backlog view --selector "{title}"`.
 2. Extract file paths from groomed sections:
    - `sections["Impact Radius"]` — file paths under Code, Documentation, Configuration/CI
    - `sections["Files"]` — explicit file paths
@@ -91,7 +78,16 @@ Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 backlog groom --selector "{title}" --section "Grooming Drift" --content "{findings}"
 ```
 
-**`{findings}` content format**:
+See the shared `{findings}` format below.
+
+---
+
+## Terminal State
+
+Both modes end with: report findings to user, stop. Do not proceed to extract, swarm, or
+any other grooming step. The drift check is informational only.
+
+**Shared `{findings}` content format** (both modes write via `backlog groom --section` as shown above):
 
 ```text
 Drift since {date}: {N} commits, {M} affecting plan/grooming scope
@@ -106,13 +102,6 @@ Summary: {one sentence — what changed and whether it invalidates the plan/groo
 
 Classifications: `Scope change`, `Partial fix`, `New callers`, `File moved`, `No impact`.
 
----
-
-## Terminal State
-
-Both modes end with: report findings to user, stop. Do not proceed to extract, swarm, or
-any other grooming step. The drift check is informational only.
-
 If the caller (work-backlog-item) needs to act on drift, it uses its own staleness taxonomy
-(FUNCTIONAL_DRIFT / SUPERSEDED / COSMETIC_ONLY) — that is a separate check in work.md,
-not in this workflow.
+(FUNCTIONAL_DRIFT / SUPERSEDED / COSMETIC_ONLY) — that is a separate check in
+[groom-check.md](../work/groom-check.md), not in this workflow.
