@@ -130,10 +130,9 @@ Dismiss a backlog item without completing it and close its GitHub issue.
 
 Use for duplicates, out-of-scope items, superseded items, wontfix, or permanently blocked.
 For completed work, use `backlog_resolve` instead.
-Close persists `close_reason`, `close_reference`, and `close_comment` in neutral metadata on every
-backend. The caller-provided `reference` is the related item, distinct from `BacklogItem.reference`,
-the storage identity; GitHub's closing comment uses the same caller-provided `reference` and
-`comment`.
+Pass `reference` and `comment` when closing — `reference` names the related item, not
+`BacklogItem.reference` (the storage identity). Both persist verbatim as `close_reference` and
+`close_comment` in metadata on every backend, and are reused as GitHub's closing comment.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
