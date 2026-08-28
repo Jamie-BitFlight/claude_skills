@@ -419,7 +419,7 @@
     {
       "id": "G8.work.backlog_update-github-sync-create-issue",
       "skill": "work",
-      "source_file": "work/github-sync.md:Step 2.3 Create Linked Issue",
+      "source_file": "work/issue-sync.md:Step 2.3 Create Linked Issue",
       "step_label": "Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\"",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
       "call_params": "selector=\"{title}\"",
@@ -435,7 +435,7 @@
     {
       "id": "G8.work.backlog_update-github-sync-set-in-progress",
       "skill": "work",
-      "source_file": "work/github-sync.md:Step 2.4 Set In-Progress",
+      "source_file": "work/issue-sync.md:Step 2.4 Set In-Progress",
       "step_label": "MCP: backlog_update(selector=\"{title}\", status=\"in-progress\")",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
       "call_params": "selector=\"{title}\", status=\"in-progress\"",
@@ -451,7 +451,7 @@
     {
       "id": "G8.work.backlog_list_issues-milestone-bulk-in-progress",
       "skill": "work",
-      "source_file": "work/github-sync.md:Step 2.4 Set In-Progress — bulk milestone",
+      "source_file": "work/issue-sync.md:Step 2.4 Set In-Progress — bulk milestone",
       "step_label": "backlog_list_issues(milestone=\"{milestone_title}\") [to enumerate milestone issues for bulk status update]",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_issues",
       "call_params": "milestone=\"{milestone_title}\"",
