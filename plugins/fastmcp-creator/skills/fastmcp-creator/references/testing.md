@@ -375,8 +375,8 @@ async def test_tool(): ...
 ## Running Tests [18]
 
 ```bash
-uv run pytest -n auto               # run all tests in parallel
-uv run pytest -n auto -x            # stop on first failure
+uv run pytest                       # run all tests with the configured two workers
+uv run pytest -x                    # stop on first failure
 uv run pytest path/to/test.py       # run specific file
 uv run pytest -k "test_name"        # run tests matching pattern
 uv run pytest -m "not integration"  # exclude integration tests

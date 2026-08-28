@@ -210,8 +210,8 @@ async def test_async_raises():
 ## Running Tests
 
 ```bash
-uv run pytest -n auto              # Run all tests in parallel
-uv run pytest -n auto -x           # Stop on first failure
+uv run pytest                      # Run all tests with the configured two workers
+uv run pytest -x                   # Stop on first failure
 uv run pytest path/to/test.py      # Run specific file
 uv run pytest -k "test_name"       # Run tests matching pattern
 uv run pytest -m "not integration" # Exclude integration tests
