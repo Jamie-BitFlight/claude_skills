@@ -15,7 +15,7 @@ disable-model-invocation: false
 | Grooming a backlog item, generating a plan, decomposing tasks under uncertainty | **`dh:planner-rt-ica`** (this skill — non-blocking) |
 | At the S2 implementation gate where missing inputs must halt the pipeline | **`dh:rt-ica`** (the blocking sister skill) |
 
-`dh:planner-rt-ica` and `dh:rt-ica` are deliberately split: same framework, different cost-of-being-wrong. During planning, a `MISSING` condition is a research task. At the implementation gate, the same `MISSING` is a halt event because the agent would otherwise guess. Do not consolidate.
+`dh:planner-rt-ica` and `dh:rt-ica` are deliberately split: same framework, different cost-of-being-wrong. During planning, a `MISSING` condition is a research task. At the implementation gate, the same `MISSING` is a halt event because the agent would otherwise guess.
 
 ## Role
 
@@ -378,12 +378,3 @@ This skill does NOT replace rt-ica.
 Any task produced under APPROVED-WITH-GAPS MUST still pass `rt-ica`
 before being executed by a specialist agent.
 
----
-
-## Success Criteria
-
-This skill is successful if:
-
-- A dependency-correct plan can be produced without invented facts.
-- Every missing input is visible, localized, and actionable.
-- No worker task can execute without required inputs being explicit.

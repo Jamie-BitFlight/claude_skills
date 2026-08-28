@@ -225,6 +225,22 @@
       "backend_agnostic": true
     },
     {
+      "id": "G8.groom.backlog_update-finalize-hypothesis-resolution",
+      "skill": "groom",
+      "source_file": "groom/finalize.md:Hypothesis Resolution — rewrite description",
+      "step_label": "mcp__plugin_dh_backlog__backlog_update(selector='{item_ref}', description='{description with the Hypothesis line replaced}')",
+      "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
+      "call_params": "selector='{item_ref}', description='{description with the Hypothesis line replaced}'",
+      "routes_to_protocol_method": "update_item (description path — local write only; carried to the remote provider by the following backlog_groom(mark_groomed=True) batch write's own reconciliation, not by this call)",
+      "per_backend": {
+        "github": "Local YAML write only — no GraphQL call here; reconciled to the issue body by the next backlog_groom write",
+        "sqlite": "UPDATE items SET description — single backend, no separate reconciliation needed",
+        "memory": "dict mutation — single backend, no separate reconciliation needed",
+        "beads": "Local YAML write only — no bd call here; reconciled by the next backlog_groom write"
+      },
+      "backend_agnostic": true
+    },
+    {
       "id": "G8.groom.backlog_groom-finalize-batch",
       "skill": "groom",
       "source_file": "groom/finalize.md:Write Groomed Content — batch write",
@@ -419,7 +435,7 @@
     {
       "id": "G8.work.backlog_update-github-sync-create-issue",
       "skill": "work",
-      "source_file": "work/github-sync.md:Step 2.3 Create Linked Issue",
+      "source_file": "work/issue-sync.md:Step 2.3 Create Linked Issue",
       "step_label": "Call the mcp__plugin_dh_backlog__backlog_update tool with selector=\"{title}\"",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
       "call_params": "selector=\"{title}\"",
@@ -435,7 +451,7 @@
     {
       "id": "G8.work.backlog_update-github-sync-set-in-progress",
       "skill": "work",
-      "source_file": "work/github-sync.md:Step 2.4 Set In-Progress",
+      "source_file": "work/issue-sync.md:Step 2.4 Set In-Progress",
       "step_label": "MCP: backlog_update(selector=\"{title}\", status=\"in-progress\")",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_update",
       "call_params": "selector=\"{title}\", status=\"in-progress\"",
@@ -451,7 +467,7 @@
     {
       "id": "G8.work.backlog_list_issues-milestone-bulk-in-progress",
       "skill": "work",
-      "source_file": "work/github-sync.md:Step 2.4 Set In-Progress — bulk milestone",
+      "source_file": "work/issue-sync.md:Step 2.4 Set In-Progress — bulk milestone",
       "step_label": "backlog_list_issues(milestone=\"{milestone_title}\") [to enumerate milestone issues for bulk status update]",
       "mcp_tool": "mcp__plugin_dh_backlog__backlog_list_issues",
       "call_params": "milestone=\"{milestone_title}\"",

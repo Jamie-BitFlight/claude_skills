@@ -8,7 +8,7 @@
       "description": "Map of exact argv tokens to their skill-relative documentation paths",
       "additionalProperties": {
         "type": "string",
-        "description": "Path relative to the skill directory (e.g., 'references/close-resolve-procedure.md')"
+        "description": "Path relative to the skill directory (e.g., 'references/workflows/close/start.md')"
       }
     }
   }

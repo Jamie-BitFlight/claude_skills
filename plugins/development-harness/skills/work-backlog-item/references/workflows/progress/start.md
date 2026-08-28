@@ -4,10 +4,9 @@
 
 1. Call `backlog_list()` to retrieve all open items. Count items by priority (P0, P1, P2, Ideas) and status from the returned `items` list. Each entry has `priority`, `status`, `title`, `issue`, `milestone`, and `groomed` fields.
 
-2. Query GitHub for the active milestone:
+2. Query the backend for the active milestone:
 
    ```text
-   # OWNER/REPO is discovered dynamically via discover_repo() from backlog_core.models
    # Use MCP: backlog_get_soonest_milestone()
    ```
 
@@ -32,7 +31,7 @@
      Ideas: {n} items
 
    Next recommended action:
-     /work-backlog-item {title}  — {title} (P{x}, groomed, in active milestone)
+     /dh:work-backlog-item {title}  — {title} (P{x}, groomed, in active milestone)
    ```
 
    If no active milestone exists, omit the milestone section and show only Overall Backlog counts.

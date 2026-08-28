@@ -4,9 +4,7 @@
 
 If the `groomed` field in the `backlog_list` output is absent or empty (item not yet groomed):
 
-```text
-Skill(skill: "groom-backlog-item", args: "{item title}")
-```
+Invoke `dh:groom-backlog-item {item title}`.
 
 The groom skill writes groomed content via the backlog MCP server. After grooming completes — including any BLOCKED/resolution cycles during the RT-ICA assessment — call `backlog_view` again to retrieve the groomed sections and proceed immediately to [rt-ica-gate.md](./rt-ica-gate.md). Do not stop or wait for re-invocation.
 
@@ -16,8 +14,8 @@ If `groomed` contains a date string (`YYYY-MM-DD`), do NOT consume cached groom 
 Run the two-phase staleness check before proceeding.
 
 **Note**: This taxonomy (FUNCTIONAL_DRIFT / SUPERSEDED / COSMETIC_ONLY) applies only to this step.
-The Step 2.5 drift-check taxonomy (Scope change / Partial fix / New callers / File moved / No impact)
-is a separate check at a different stage and is not unified with this one.
+[groom-drift.md](../groom/groom-drift.md)'s taxonomy (Scope change / Partial fix / New callers /
+File moved / No impact) is a separate check at a different stage and is not unified with this one.
 
 ### Extract Impact Radius files
 
@@ -71,7 +69,7 @@ flowchart TD
     AnyCommits -->|"Zero commits"| CachedOK(["Use cached groom content<br>→ rt-ica-gate.md"])
     AnyCommits -->|"1+ commits"| Phase2["Phase 2: Spawn drift-assessment agent<br>Input: item description + ACs +<br>git diff {groom_date_sha}..HEAD -- {files}"]
     Phase2 --> Classification{"Agent returns?"}
-    Classification -->|"FUNCTIONAL_DRIFT"| FD["Write 'staleness context' section to item<br>via backlog_groom (diff summary as content)<br>Invoke: groom-backlog-item"]
+    Classification -->|"FUNCTIONAL_DRIFT"| FD["Write 'staleness context' section to item<br>via backlog_groom (diff summary as content)<br>Invoke: dh:groom-backlog-item"]
     Classification -->|"SUPERSEDED"| SUP["backlog_close(reason='superseded',<br>comment='{commit refs}')"]
     Classification -->|"COSMETIC_ONLY"| CO(["Use cached groom content<br>→ rt-ica-gate.md"])
     Classification -->|"Ambiguous output"| FD
@@ -123,11 +121,7 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
      --content "Staleness detected {today}: functional commits since {groomed_date}.\n\n{diff summary — key changed interfaces, renamed functions, added/removed files}\n\nCommits:\n{list of qualifying commit one-liners}"
    ```
 
-2. Invoke re-groom:
-
-   ```text
-   Skill(skill: "groom-backlog-item", args: "{item title}")
-   ```
+2. Invoke re-groom: `dh:groom-backlog-item {item title}`.
 
 3. After re-groom completes, call `backlog_view` again to retrieve fresh sections.
 4. Proceed to [rt-ica-gate.md](./rt-ica-gate.md). RT-ICA will re-run automatically because `updated_at` is now

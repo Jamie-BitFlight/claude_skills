@@ -108,8 +108,6 @@ For a Skill:
 - Verify that the skill encodes domain-specific procedures, constraints, edge cases, and validation checks.
 - Verify that relevant agents can discover or use the skill when appropriate.
 
-This ordering makes the research pass domain-aware instead of only making the writing phase domain-aware.
-
 ### Step 1 - Find Supporting Skills
 
 Search for skills relevant to the item topic, using the artifact classification from Step 0.5 to guide discovery.

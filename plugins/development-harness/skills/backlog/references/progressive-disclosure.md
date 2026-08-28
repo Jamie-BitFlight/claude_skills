@@ -22,7 +22,7 @@ Ordinals must match `^\d+(\.\d+)*(\.code\.\d+)?$`.
 
 An ordinal that matches no node returns an error listing every valid ordinal in the item.
 
-## Parent versus leaf (ADR-7)
+## Parent versus leaf
 
 A node with sub-heading children returns `content=""`, `has_children=true`, and a `child_map`
 listing the child ordinals. Drill into a child ordinal to reach prose.
@@ -34,9 +34,7 @@ prose and code fences but no sub-headings is a leaf.
 
 1. Call `backlog_view(selector="#2969", map=True)`. The response is not currently token-bounded —
    for a large item `map_text` returns every entry in one response; `over_budget=true` flags that
-   case without truncating or paginating it. (Intended behavior is R2 in
-   [agent-markdown-consumption-contract.md](../../../docs/agent-markdown-consumption-contract.md);
-   the gap is tracked in [#3059](https://github.com/Jamie-BitFlight/claude_skills/issues/3059).)
+   case without truncating or paginating it.
    Each `map_text` line reads `{ordinal} {title} ({est_tokens}t) — "{first content line}"`. Select
    the ordinal whose title and preview match the target.
 2. Call `backlog_view(selector="#2969", navigate="4.0")`. When `has_children=true`, read `child_map`

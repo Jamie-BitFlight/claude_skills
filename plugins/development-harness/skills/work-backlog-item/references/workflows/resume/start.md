@@ -2,13 +2,13 @@
 
 **Trigger:** <mode/> is `resume`.
 
-1. Extract title from <item_ref/>+ joined. If <item_ref/> starts with `#`, fetch title from GitHub Issue (same logic as issue-first path).
+1. Extract title from <item_ref/>+ joined. If <item_ref/> starts with `#`, fetch title from the linked work item (same logic as issue-first path).
 
 2. Call `backlog_view(selector="{title or #N}", summary=false)`. Extract the `plan` field from the response. If absent or empty:
 
    ```text
    No plan file recorded for "{title}".
-   Run /work-backlog-item {title} to create a plan first.
+   Run /dh:work-backlog-item {title} to create a plan first.
    ```
 
    Then stop.
@@ -33,9 +33,9 @@
    Last completed:  {last_checked task text}
    Next to do:      {first_unchecked task text}
 
-   To continue: /implement-feature {slug}
-   To close:    /work-backlog-item close {title}
+   To continue: /dh:implement-feature {plan_address}
+   To close:    /dh:work-backlog-item close {title}
    ```
 
    If `checked_tasks == 0`, report "No tasks completed yet."
-   If `checked_tasks == total_tasks`, report "All tasks complete — run /work-backlog-item close {title}."
+   If `checked_tasks == total_tasks`, report "All tasks complete — run /dh:work-backlog-item close {title}."

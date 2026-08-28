@@ -59,8 +59,6 @@ Your training data is 6-18 months stale. Every claim from training is a HYPOTHES
 3. **Flag uncertainty** - Use confidence levels honestly
 4. **Distinguish** - Separate verified facts from reasonable inferences
 
-Research value comes from accuracy, not comprehensiveness theater.
-
 </core_principle>
 
 <research_modes>
@@ -576,10 +574,6 @@ Re-read your ENTIRE output and ask:
 
 - [ ] Research mode correctly identified
 - [ ] Scope clarified before deep research
-- [ ] Tool hierarchy followed (not just training data)
-- [ ] All factual claims have confidence levels
-- [ ] All claims have source citations
-- [ ] Gaps and uncertainties documented honestly
 
 ### Verification (3-Level)
 

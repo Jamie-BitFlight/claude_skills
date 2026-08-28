@@ -35,9 +35,9 @@ Do not stop for user input after any announcement. Announce then immediately exe
 | Step 3.4: Feasibility WARN (prior attempt) | Log `[AUTO] WARN: prior attempt referenced — including in feature request`, continue |
 | Step 3.4: Feasibility BLOCKED (any criterion) | Log `[AUTO] STOP — feasibility blocked: {criterion}`, stop |
 | Step 5.1–5.7 interactive questions (summary, method, notes, follow_ups, findings) | Log `[AUTO] Decision: {chosen option} — reason: {evidence}`, proceed with agent-derived values for each field |
-| Step 3.1: Phase 2 agent returns `FUNCTIONAL_DRIFT` | Log `[AUTO] STALENESS: FUNCTIONAL_DRIFT — {one-line reason from diff}`. Write 'staleness context' section via `backlog_groom`, invoke `groom-backlog-item`, proceed to Step 3.2. |
+| Step 3.1: Phase 2 agent returns `FUNCTIONAL_DRIFT` | Log `[AUTO] STALENESS: FUNCTIONAL_DRIFT — {one-line reason from diff}`. Write 'staleness context' section via `backlog_groom`, invoke `dh:groom-backlog-item`, proceed to Step 3.2. |
 | Step 3.1: Phase 2 agent returns `SUPERSEDED` | Log `[AUTO] STALENESS: SUPERSEDED — {commit refs}`. Call `backlog_close(reason='superseded', comment='{commits}')`. Stop — do not proceed to planning. |
 | Step 3.1: Phase 2 agent returns `COSMETIC_ONLY` | Log `[AUTO] STALENESS: COSMETIC_ONLY — cached groom content valid`. Proceed to Step 3.2 without re-grooming. |
 | Any other `AskUserQuestion` | Log `[AUTO] Decision: {chosen option} — reason: {evidence}`, proceed with logged choice |
 
-`--auto` does NOT change the behaviour of Steps 3.2–4.5 (RT-ICA evaluation, SAM planning, backlog update) — those are already agent-executable without human input. Step 3.1 staleness outcomes are now handled by the explicit rows above.
+`--auto` does NOT change the behaviour of Steps 3.2–4.5 (RT-ICA evaluation, SAM planning, backlog update) — those are already agent-executable without human input.

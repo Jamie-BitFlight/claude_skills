@@ -2,16 +2,7 @@
 
 Both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools require their servers
 to be connected before use. After a session restart, these servers initialize in
-approximately 1–2 seconds:
-
-- `backlog_core.server` full import: ~1.2 s (includes PyGithub, gitpython, ruamel.yaml, tiktoken)
-- `sam_schema.server` full import: ~0.8 s (includes pydantic models, tiktoken)
-- `tiktoken.get_encoding("cl100k_base")` alone: ~0.14 s (import 0.03 s + encoding load 0.11 s)
-- Both servers start in parallel at session startup (Claude Code spawns plugin MCP servers concurrently)
-
-Source: `backlog_core/server.py` line 77, `sam_schema/server.py` line 164.
-
-Measured 2026-07-12 via MCP `initialize` handshake: SAM 0.9–1.0 s, backlog 1.2 s.
+approximately 1–2 seconds, starting in parallel at session startup.
 
 ## When to Apply This Procedure
 

@@ -2671,7 +2671,7 @@ async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
 ) -> dict:
-    """Sync backlog items with GitHub: create missing issues and push groomed content.
+    """Sync backlog items with the configured backend: create missing work items and push groomed content.
 
     Use dry_run=true to preview changes without modifying anything.
 
@@ -2920,7 +2920,7 @@ async def backlog_update(
     verified: Annotated[
         bool,
         Field(
-            description="Apply status:verified label to the GitHub issue. "
+            description="Mark the linked work item as verified. "
             "Signals that /complete-implementation quality gates have passed. "
             "Auto-creates the label if absent. No-op when item has no issue number."
         ),
@@ -2931,10 +2931,10 @@ async def backlog_update(
     For groomed content, provide section + content for section updates.
     Use entry_id to replace a specific entry, or replace_section=True to
     strike all entries and append new content. Groomed content is synced
-    to the GitHub issue when the item has one.
+    to the linked work item when the item has one.
 
     Use verified=True after /complete-implementation quality gates pass to
-    apply the status:verified label to the linked GitHub issue.
+    mark the linked work item as verified.
 
     Returns:
         Dict with updated item title, applied changes, and output
@@ -3629,7 +3629,7 @@ async def backlog_strike_entry(
     """Strike (retract) an entry block within a backlog item.
 
     Wraps the entry in a collapsed details block with the reason,
-    preserving the original content for audit. Syncs to GitHub issue
+    preserving the original content for audit. Syncs to the linked work item
     if the item has one.
 
     Returns:

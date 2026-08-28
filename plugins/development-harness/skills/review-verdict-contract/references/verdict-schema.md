@@ -19,7 +19,7 @@ that section to gate the review. Do not register a verdict as a document artifac
 
 Each reviewer agent writes exactly one verdict block as the content of the `Review Results`
 section on its own task, and the orchestrating skill reads that section back. The block is
-JSON-serializable and version-stamped for #1430 compatibility.
+JSON-serializable.
 
 ```json
 {
@@ -41,7 +41,7 @@ JSON-serializable and version-stamped for #1430 compatibility.
 
 **Field constraints:**
 
-- `schema_version`: always `"1.0"` until #1430 defines a migration path
+- `schema_version`: always `"1.0"`
 - `perspective`: one of the four literal values listed above; lowercase
 - `verdict`: exactly one of `APPROVE`, `REJECT`, `SKIP`
 - `findings`: array; empty array `[]` is valid (APPROVE with no findings)
@@ -120,7 +120,7 @@ same pattern-list structure in this file.
 
 ---
 
-## §2.4 Gate Logic (Stub Consolidation — Pre-#1430)
+## §2.4 Gate Logic
 
 ```text
 PASS conditions:
@@ -137,7 +137,7 @@ FAIL conditions:
       "Perspective {X} did not return a verdict"
 ```
 
-The gate function signature (stable interface for #1430 swap):
+The gate function signature:
 
 ```text
 gate(verdicts: list[VerdictBlock]) -> GateResult
@@ -153,7 +153,7 @@ synthesis task writes — `punch_list["verdicts"]` carries each §2.1 block verb
 input is byte-identical to reading the four `Review Results` sections directly. The orchestrator
 may read those sections to check the punch list against them; the gate does not require it.
 
-**Pre-#1430 stub logic:**
+**Gate logic:**
 
 ```text
 verdicts = punch_list["verdicts"]
@@ -168,14 +168,6 @@ if all_skip:
     PASS — emit warning: "NOTE: No perspectives reviewed — all skipped"
 PASS
 ```
-
-**Gate interface contract:**
-
-- The `schema_version: "1.0"` field allows future consumers to detect schema version and apply
-  confidence/deduplication logic
-- The `findings` array structure is stable; future revisions may add `confidence` and
-  `dedup_key` fields per finding without breaking v1 consumers
-- The stub consolidation above implements the stable interface
 
 ---
 

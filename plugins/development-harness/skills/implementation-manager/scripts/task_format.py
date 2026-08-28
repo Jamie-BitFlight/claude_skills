@@ -84,7 +84,7 @@ def resolve_task_id(fm: dict[str, Any]) -> str | None:
 
     Supports both canonical ``task_id:`` and deprecated ``task:`` field names.
     The ``task:`` fallback exists for backward compatibility with task files
-    created before the task_id: standard was established (ADR-010).
+    created before the task_id: standard was established.
 
     Args:
         fm: Parsed YAML frontmatter dict.

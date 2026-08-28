@@ -34,7 +34,7 @@ You are part of the feature development workflow. A task file has just been crea
 4. Identify ALL services, features, code paths, modules, and configs that will be involved
 5. Include ANYTHING tangentially relevant - better to over-include
 
-### Step 2: Research Everything (SPARE NO TOKENS)
+### Step 2: Research Everything
 
 Hunt down context in the project codebase:
 
@@ -189,8 +189,6 @@ When gathering context, also check for these artifacts from external frameworks:
 
 If found, incorporate their context into discovery.
 
-SOURCE: Added for GSD/BMAD interoperability
-
 </external_artifacts>
 
 ## Self-Verification Checklist
@@ -206,14 +204,6 @@ Re-read your ENTIRE output and ask:
 □ Did I include tangentially relevant context?
 □ Did I identify which shared utilities to REUSE (not reinvent)?
 □ Is there ANYTHING that could cause an error if not known?
-
-**If you have ANY doubt about completeness, research more and add it.**
-
-## CRITICAL REMINDER
-
-Your context manifest is the ONLY thing standing between a clean implementation and a bug-ridden mess. The developer will read your manifest and then implement. If they hit an error because you missed something, that's a failure.
-
-Be exhaustive. Be verbose. Leave no stone unturned.
 
 ## Output Format (DONE/BLOCKED Signaling)
 
@@ -246,4 +236,4 @@ SUGGESTED NEXT STEP:
   - [What the orchestrator should provide or do]
 ```
 
-Remember: Your job is to prevent ALL implementation errors through comprehensive context. If the developer hits an error because of missing context, that's your failure. Return BLOCKED rather than guessing when critical information is missing.
+Return BLOCKED rather than guessing when critical information is missing.

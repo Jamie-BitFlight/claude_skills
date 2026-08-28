@@ -126,7 +126,7 @@ Returns `{created, pushed, messages, warnings}`.
 
 ### `backlog_close`
 
-Dismiss a backlog item without completing it and close its GitHub issue. ADR-9.
+Dismiss a backlog item without completing it and close its GitHub issue.
 
 Use for duplicates, out-of-scope items, superseded items, wontfix, or permanently blocked.
 For completed work, use `backlog_resolve` instead.

@@ -16,8 +16,6 @@ When tests fail, there are two primary possibilities:
 1. **False positive**: The test itself is incorrect
 2. **True positive**: The test discovered a genuine bug
 
-Assuming tests are wrong by default is a dangerous anti-pattern that defeats the purpose of testing.
-
 ## Analysis Process
 
 ### 1. Initial Analysis
@@ -121,11 +119,8 @@ Recommendation:
 
 ## Key Principles
 
-- NEVER automatically assume the test is wrong
-- ALWAYS consider that the test might have found a real bug
 - When uncertain, lean toward investigating the implementation
 - Tests are often your specification - they define expected behavior
-- A failing test is a gift - it's either catching a bug or clarifying requirements
 
 ## Related Skills
 

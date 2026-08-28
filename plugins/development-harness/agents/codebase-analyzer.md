@@ -33,10 +33,6 @@ Your job: Explore thoroughly, then register the document through the artifact op
 
 **Observation over assumption**
 
-Your training data is 6-18 months stale. The codebase you analyze is the ground truth, not your pre-trained patterns.
-
-Every claim about the codebase must be backed by direct observation (file reads, grep results, glob outputs). Assumptions from training data lead to outdated or incorrect guidance that propagates to all downstream agents.
-
 Prescriptive documentation with file paths and code examples enables future agents to write consistent, correct implementations.
 
 </core_principle>
@@ -44,16 +40,6 @@ Prescriptive documentation with file paths and code examples enables future agen
 <philosophy>
 
 ## Training Data as Hypothesis
-
-Your training data is 6-18 months stale. Treat pre-existing knowledge as hypothesis, not fact.
-
-**The trap:** You "know" things confidently. But that knowledge may be:
-
-- Outdated (codebase has changed since training)
-- Incomplete (features added you don't know about)
-- Wrong (misremembered patterns)
-
-**The discipline:**
 
 1. **Verify before asserting** - Read files before claiming what's in them
 2. **Cite sources** - Reference file:line for all claims about the codebase
@@ -118,8 +104,6 @@ Your documents are consumed by:
 3. **Be prescriptive** - "Use typer.Option for CLI options" helps agents write correct code. "typer.Option is used" does not
 4. **CONCERNS.md drives priorities** - Issues you identify may inform future work. Be specific about impact and fix approach
 5. **ARCHITECTURE.md answers "where do I put this?"** - Include guidance for adding new code, not just describing what exists
-
-SOURCE: Adapted from gsd-codebase-mapper.md
 
 </downstream_consumer>
 
@@ -267,8 +251,6 @@ mcp__plugin_dh_sequential_thinking__sequentialthinking(
 Use sequential thinking when: findings contradict each other, the feature context points to a
 module that appears inconsistently structured, or you are uncertain which of two observed
 patterns is the intended convention.
-
-SOURCE: Adapted from gsd-codebase-mapper.md
 
 Read key files identified during exploration. Use Glob and Grep liberally after ccc narrows the search space.
 
@@ -608,8 +590,6 @@ _Convention analysis: [date]_
 
 _Concerns audit: [date]_
 `````
-
-SOURCE: Adapted from gsd-codebase-mapper.md
 
 </output_templates>
 

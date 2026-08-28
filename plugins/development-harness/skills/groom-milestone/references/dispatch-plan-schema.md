@@ -141,7 +141,7 @@ Example: milestone 3 titled "v1.1 — Milestone Workflow" produces `milestone/3-
 
 ## Worktree Agent Execution Model
 
-This section clarifies how `/work-milestone` uses the dispatch plan when spawning worktree agents. No schema fields are added — the existing wave/item structure contains everything the orchestrator needs.
+This section clarifies how `/work-milestone` uses the dispatch plan when spawning worktree agents.
 
 **Isolation mode is hardcoded, not schema-configured.** Every item dispatches via `Agent(isolation: "worktree")`. There is no per-item field to select isolation mode or agent type. All worktree agents use the same prompt template; per-item specialization is via task content and skills, not agent configuration.
 

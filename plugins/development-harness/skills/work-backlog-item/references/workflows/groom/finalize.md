@@ -6,6 +6,7 @@ Post-swarm gates and final write. Runs after `swarm.md` completes.
 
 - [RT-ICA Final Pass](#rt-ica-final-pass) — re-assess conditions, self-resolve, write final report
 - [Output Validation Gate](#output-validation-gate) — verify required sections before write
+- [Hypothesis Resolution](#hypothesis-resolution) — rewrite a resolved creation-time hypothesis marker
 - [Write Groomed Content](#write-groomed-content) — batch or incremental write with `mark_groomed=True`
 - [Terminal States](#terminal-states) — Groomed, Blocked, Skipped, Drift
 
@@ -19,9 +20,6 @@ Runs after the grooming swarm completes. The orchestrator (not a subagent) execu
 backlog view --selector "{item_ref}"
 ```
 
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
-
 Extract: Impact Radius, Fact-Check, Issue Classification, Research (if Wave 0 ran), groomed subsections.
 
 2. Re-assess every condition from the initial RT-ICA snapshot:
@@ -32,19 +30,10 @@ Extract: Impact Radius, Fact-Check, Issue Classification, Research (if Wave 0 ra
 
 3. Self-resolution pass — for each MISSING or DERIVABLE condition:
    - Attempt tool-based resolution: Grep, Read, WebSearch, Bash.
-   - Every resolution must cite the tool result.
-   - Training data answers are not valid resolutions.
-   - If resolved: mark AVAILABLE with tool citation.
-
-#### Orchestrator checklist for Step 3
-
-No section may advance without satisfying all items:
-
-- For each DERIVABLE condition: run the cited tool (Grep/Read/Bash/WebSearch). Paste the exact tool output as the citation. Do not cite session context or training data recall. If the tool returns no result, the condition remains DERIVABLE.
-- For each MISSING condition resolved by user: paste the exact user message as citation. Mark AVAILABLE with that citation.
-- No condition status changes from DERIVABLE or MISSING to AVAILABLE without a tool output or user message pasted as its citation.
-
-SOURCE: Session observation — #1899 groom failure diagnosis, 2026-04-23
+   - Every resolution must cite the tool result — session context or training data recall is not a valid citation.
+   - If the tool returns no result, the condition remains DERIVABLE.
+   - For a MISSING condition resolved by the user instead, paste the exact user message as the citation.
+   - If resolved: mark AVAILABLE with the citation. No condition changes to AVAILABLE without one.
 
 4. Build RT-ICA Final report:
 
@@ -152,8 +141,6 @@ Optional sections (not validated for presence): `Root-Cause Analysis`, `Impact`,
 
 When a required section is absent or has 0 entries, identify the cause before acting.
 
-SOURCE: Session observation — #1899 groom failure diagnosis, 2026-04-23
-
 ```mermaid
 flowchart TD
     Start([Required section absent or 0 entries]) --> Q{Observable signal?}
@@ -166,10 +153,6 @@ flowchart TD
 The orchestrator must NOT write a required section directly unless `finalize.md` explicitly designates it as an orchestrator responsibility (e.g., RT-ICA Final Pass). For all other sections, the correct recovery is re-running the appropriate agent with a targeted prompt.
 
 3. If sections are missing — retry with same model, refined prompt:
-
-The failure mode here is an interrupted agent (token exhaustion, network timeout, session
-terminated), not a model capability gap. All models call MCP tools with the same fields.
-Escalating to a more capable model does not address interrupted writes.
 
 ```mermaid
 flowchart TD
@@ -205,9 +188,58 @@ backlog groom \
 
 5. When validation passes (all required sections present, scope check logged) → proceed to write.
 
+## Hypothesis Resolution
+
+Runs only when the item's `description` (read in RT-ICA Final Pass Step 1) contains one or more
+`**Hypothesis**: {text}` lines — a creation-time speculative cause the `create/scope.md` rule
+requires to be labeled, not stated as fact. If `description` has no such line, skip this section
+entirely. A description can carry more than one speculative cause; resolve every line found,
+independently — do not stop after the first.
+
+Rewrite `description` in place — not only a groomed section — so the resolution is visible even
+to an agent reading just a truncated glimpse of the item.
+
+1. For each `**Hypothesis**: {text}` line found, determine its resolution in this precedence
+   order:
+   - `description` contains exactly one `**Hypothesis**` line, AND `Root-Cause Analysis` section
+     is present and contains a `**Root cause**: {statement}` line (RCA ran via the `defect`
+     5-whys path, see `swarm.md`'s Root-Cause Analysis step) — this is authoritative regardless of
+     whether it matches the original guess. New text: `**Confirmed cause**: {statement}`. (RCA
+     analyzes one root cause for the item — with multiple hypothesis lines there is no reliable
+     way to attribute that single finding to one specific line over another, so this precedence
+     tier applies only when exactly one hypothesis line exists.)
+   - Else, `Fact-Check` section contains a claim prefixed `HYPOTHESIS:` whose text exactly matches
+     this line's `{text}` (per `swarm.md`'s fact-checker instruction, which prefixes every
+     hypothesis claim with `HYPOTHESIS:` using the claim's own exact text so each verdict maps
+     back to its originating line) — read its `verdict`:
+     - `VERIFIED` → `**Confirmed cause**: {original hypothesis text}`
+     - `REFUTED` → `**Hypothesis (refuted — see Fact-Check section)**: {original hypothesis text}`
+     - `INCONCLUSIVE` → no rewrite; the marker already correctly signals "not yet confirmed"
+   - Else (RCA tier doesn't apply and no matching Fact-Check claim exists for this line) → no
+     rewrite for this line.
+
+2. When a rewrite applies, replace that specific `**Hypothesis**: {text}` line within
+   `description` with its own resolved text from Step 1 — leave every other line unchanged,
+   including any hypothesis line that had no matching resolution — and write the result back
+   **before** the Write Groomed Content step below, in this same finalize pass:
+
+```bash
+mcp__plugin_dh_backlog__backlog_update(selector='{item_ref}', description='{description with the Hypothesis line replaced}')
+```
+
+   `description` updates do not sync to a remote provider on their own — run this call before the
+   batch write below, not after. That write's reconciliation re-fetches the item (now including
+   this rewrite) and pushes its full state, carrying the resolved text to the remote record.
+
+3. `--quick` items never reach this step — `--quick` skips grooming entirely, so a hypothesis
+   written there is never resolved. Accepted scope limitation, not a bug.
+
 ## Write Groomed Content
 
-Final step — write groomed content via MCP and mark the item as groomed.
+Final step — write groomed content via MCP and mark the item as groomed. None of `sections=`
+(batch write), `mark_groomed=True`, or `replace_section=True` have a CLI equivalent — `backlog
+groom`'s CLI form accepts only a single `--section`/`--content` pair with no equivalent flags —
+so every call below is left as MCP.
 
 #### Preferred: batch write with atomic status transition
 
@@ -236,18 +268,11 @@ mcp__plugin_dh_backlog__backlog_groom(
 )
 ```
 
-Note: no CLI equivalent for the batch `sections=`/`mark_groomed=True` write — `backlog groom`'s
-CLI form accepts only a single `--section`/`--content` pair and has no `--mark-groomed` flag (not
-in the verified mapping table's flag list). This call is left as MCP.
-
 After the batch write, verify the RT-ICA section was persisted:
 
 ```bash
 backlog view --selector "{item_ref}"
 ```
-
-Note: the CLI's `backlog view` has no `summary` parameter — it always returns full content
-(simpler/flatter than MCP's progressive-disclosure view).
 
 Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-DD` and
 `Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
@@ -269,9 +294,6 @@ if response.get("mark_groomed_skipped"):
     mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
 
-Note: no CLI equivalent for `mark_groomed=True` — not in `backlog groom`'s verified CLI flag
-list. This call is left as MCP.
-
 **Alternative: incremental section updates**
 
 When sections become available during the swarm (not at the end), write each immediately:
@@ -282,24 +304,15 @@ backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt-ica}"
 # ... each section as it completes ...
 ```
 
-Before calling `mark_groomed=True`, verify the RT-ICA section is present. If missing, write
-it with the final report from the RT-ICA Final Pass step above:
+Call the final status transition together with a content write in the same call — never
+`mark_groomed=True` alone. A `mark_groomed=True` call with no `section`/`content` skips
+`update_item()` entirely and only updates the local status and remote labels, so it never
+reconciles the Hypothesis Resolution rewrite (or anything else written locally since the last
+content call) to the remote provider:
 
 ```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True)
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True, mark_groomed=True)
 ```
-
-Note: no CLI equivalent for `replace_section=True` — not in `backlog groom`'s verified CLI flag
-list. This call is left as MCP.
-
-Then call the final status transition:
-
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
-```
-
-Note: no CLI equivalent for `mark_groomed=True` — not in `backlog groom`'s verified CLI flag
-list. This call is left as MCP.
 
 #### Handoff
 

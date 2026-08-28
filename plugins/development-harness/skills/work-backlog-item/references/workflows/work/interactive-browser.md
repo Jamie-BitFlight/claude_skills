@@ -7,10 +7,6 @@ classification and handling instructions.
 
 1. Call the CLI: `backlog list`.
 
-   Note: the CLI's `backlog list` has no `--search` flag (unlike the MCP `backlog_list` tool) —
-   full-text search across title/section/topic/type/description/body has no CLI path. Not needed
-   here since this call passes no search term.
-
    Parse the returned JSON. Each entry in `items` has `section`, `title`, `issue`, `plan`, `status`, `milestone`, `file_path` (index format), `groomed` (true if item has groomed content).
 
 2. **Groomed** = item has `groomed: true` in `backlog list` output. For full groomed content, call `backlog view --selector "{title or #N}"` (CLI has no `summary` parameter — its output is already the flatter, full-detail equivalent of MCP's `summary=false`) — the response `sections` dict contains groomed field values (e.g., `response["sections"]["Acceptance Criteria"]`). If groomed sections are present, use them.
@@ -47,8 +43,8 @@ classification and handling instructions.
 
 5. Handle the response:
    - `[number]` — use that item's title as the working title and proceed to [find-item.md](./find-item.md)
-   - `G [number]` — invoke `Skill(skill="groom-backlog-item", args="{item title}")` then re-display the list
-   - `G all` — invoke `Skill(skill="groom-backlog-item", args="all")` then re-display the list
+   - `G [number]` — invoke `dh:groom-backlog-item {item title}` then re-display the list
+   - `G all` — invoke `dh:groom-backlog-item all` then re-display the list
    - `D [number]` — display the full item description, research_first field, and groomed content (if present), then re-display the list
    - `C [number]` — proceed to close path with that item's title
    - `R [number]` — proceed to resolve path with that item's title

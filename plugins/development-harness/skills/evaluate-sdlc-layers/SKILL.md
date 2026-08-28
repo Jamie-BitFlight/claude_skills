@@ -127,13 +127,6 @@ After evaluation:
 2. **If no `--fix`**: Present findings; offer to create backlog items or apply fixes.
 3. **Re-run**: After fixes, re-run evaluation to confirm improvements.
 
----
-
-## Experiments
-
-Flow experiments and learnings live in [sam-flow-experiments](https://github.com/Jamie-BitFlight/sam-flow-experiments). Clone via SSH: `git clone git@github.com:Jamie-BitFlight/sam-flow-experiments.git`. When iterating, consider running experiments against concept fixtures to validate changes.
-
----
 
 ## References
 

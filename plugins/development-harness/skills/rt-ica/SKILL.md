@@ -57,7 +57,7 @@ flowchart TD
 
 **Step combining:** When two steps need the same project knowledge loaded, combining them is nearly free — the knowledge is loaded once, both steps execute in the remaining space. Splitting them wastes context by loading the same knowledge twice. Step boundaries belong where **information gaps** exist, not where implementation boundaries happen to fall.
 
-**Dynamic vs static constraints:** RT-ICA produces dynamic constraints — discovered fresh from the current goal, disposable after use. These provide visibility into edges that would cause problems if crossed blindly: scope creep, missing user opinions, abstract requirements that need to become definite. This is different from static process constraints (hardcoded gates, enforcement hooks, "MUST do X before Y" rules baked into workflow definitions) which carry maintenance cost and go stale. RT-ICA's value is turning the abstract into the definite for each specific task.
+**Dynamic vs static constraints:** RT-ICA produces dynamic constraints — discovered fresh from the current goal, disposable after use. These provide visibility into edges that would cause problems if crossed blindly: scope creep, missing user opinions, abstract requirements that need to become definite. RT-ICA's value is turning the abstract into the definite for each specific task.
 
 ## Self-Initialization from Backlog Item
 
@@ -615,5 +615,3 @@ Problem: Assumption may be wrong, causes rework or security issues
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------- |
 | RT-ICA Framework             | [Liu et al., 2025 - Reverse Thinking Enhances Missing Information Detection in LLMs](https://arxiv.org/abs/2512.10273) | 2026-01-20  |
 | CoVe (Chain of Verification) | [Dhuliawala et al., 2023 - Chain-of-Verification Reduces Hallucination](https://arxiv.org/abs/2309.11495)              | 2026-01-20  |
-
-**Note**: This skill adapts the RT-ICA (Reverse Thinking for Information Completeness Assessment) framework for planning workflows.

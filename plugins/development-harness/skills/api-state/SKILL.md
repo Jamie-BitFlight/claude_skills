@@ -110,8 +110,4 @@ information was found in primary sources."
 
 ## Constraints
 
-- Every claim must have a cited source: URL + access date, or file path + line number.
 - "Not documented in [source]" is a valid finding — state it rather than omitting it.
-- Do not rely on training data for version-specific facts — fetch primary sources.
-- Do not write to any backlog item — return all content to the caller.
-- Do not coordinate with other research angles — operate independently and return findings directly.

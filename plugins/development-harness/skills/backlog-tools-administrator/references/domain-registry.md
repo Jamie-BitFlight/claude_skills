@@ -2,8 +2,6 @@
 
 All files that compose the backlog tooling ecosystem. This is the scope of the backlog-tools-administrator skill — changes outside this registry are out of scope.
 
-Last updated: 2026-03-01
-
 ## Table of Contents
 
 - [Primary Script](#primary-script)

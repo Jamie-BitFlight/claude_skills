@@ -12,8 +12,6 @@ Grooming is the intake-clarification step that prepares a change request for lat
 
 Grooming is a stand-alone pre-planning step. It prepares the request so that a later planning phase can produce design, architecture, task decomposition, and implementation approach.
 
-Grooming covers the request's purpose, problem framing, context, constraints, urgency, dependencies, and blocking relationships for a feature, fix, or other inbound change.
-
 Grooming does NOT produce:
 - architecture
 - implementation design

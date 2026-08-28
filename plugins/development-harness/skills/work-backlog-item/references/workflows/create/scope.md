@@ -34,9 +34,6 @@ Do NOT include any of the following in the creation-stage backlog item:
 - scope additions that were not explicitly requested by the user
 - file-level or code-level prescriptions such as "modify file X" or "change line Y"
 
-Reason:
-Prescriptive fix content at creation time bypasses grooming, RT-ICA, and architecture review by turning unvalidated assumptions into apparent requirements.
-
 A creation-stage backlog item should contain only:
 - what is broken, missing, or requested
 - where it was observed
@@ -48,14 +45,18 @@ Allowed content at creation time:
 - expected behavior, if stated
 - reproduction context, if stated
 - direct evidence or references supplied by the user
+- a likely cause, labeled explicitly as `**Hypothesis**: {text}`, not stated as established fact
 
 Not allowed at creation time:
 - proposed implementation
 - design decisions
 - technical solutioning
 - extra work not requested by the user
+- speculation about why the problem occurs, stated in the same declarative voice as an observed fact
 
 If the user supplies a possible fix, preserve it as user-provided context or hypothesis, not as a requirement or implementation instruction.
+
+Cause verification is grooming's job (`find-cause`, `dh:fact-checker`), not creation's — an unlabeled causal claim at creation time reaches the groomed item, and eventually the live issue, indistinguishable from a verified fact.
 
 Solutions belong to later stages:
 - grooming may investigate causes, constraints, and candidate directions
@@ -65,5 +66,4 @@ Solutions belong to later stages:
 
 A backlog item whose description defines what an agent, system, or workflow must do contains the requirement as procedural text. Preserve the full procedural description as written.
 
-Reason:
-For behavioral and process-design items, the procedural description IS the requirement specification. Stripping it removes intent that cannot be reconstructed without the original context. This is structurally different from product feature items where requirements and implementation are separable.
+Exception — hypothesis labeling still applies: if the procedural text contains a causal claim about why the behavior occurs that is not a confirmed observation, label it `**Hypothesis**: {text}` in place, even though the surrounding text is otherwise preserved verbatim. This applies to MIXED items as well.

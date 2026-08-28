@@ -25,4 +25,4 @@ If evidence shows the work is already done:
 
 When <mode/> is `auto`: log `[AUTO] Work already implemented — closing #{N} with evidence: {sha/PR}` and stop.
 
-If no evidence, proceed to [github-sync.md](./github-sync.md) (Step 2.2).
+If no evidence, proceed to [issue-sync.md](./issue-sync.md) (Step 2.2).

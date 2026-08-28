@@ -45,7 +45,6 @@ Collect the Gaps section from every angle report. Separate into two priority tie
 - **Single-angle gaps** — appear in only one angle report.
 
 Write "None identified." when a tier has no entries. Both tiers must appear in the output.
-**Reason:** Omitting an empty tier signals to the orchestrator that the aggregation was not performed, not that there were no gaps.
 
 ## Step 5 — All-INCONCLUSIVE Gate
 

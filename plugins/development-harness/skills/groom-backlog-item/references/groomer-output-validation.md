@@ -80,7 +80,7 @@ flowchart TD
 
 ### Retry Model
 
-Escalation follows design decision D3 (haiku → haiku retry → sonnet → blocked):
+Escalation order: haiku → haiku retry → sonnet → blocked.
 
 1. **First attempt** — haiku groomer, targeted prompt listing missing sections only
 2. **Second attempt** — haiku groomer, same targeted prompt (second pass often resolves first-attempt gaps)
@@ -100,21 +100,3 @@ When `mark_groomed_skipped` is `true`:
 1. Check `mark_groomed_skip_reason` in the response for the failing selector
 2. Retry once: `backlog_groom(selector='{item_ref}', mark_groomed=True)` using the `#N` issue reference form (most reliable selector)
 3. If skip repeats: report to user — the item may have been renamed or removed during the grooming session
-
-### Placement in groom-backlog-item Workflow
-
-The SKILL.md workflow Mermaid diagram node sequence changes from:
-
-```text
-S48 to S85 to FinalDecision
-```
-
-to:
-
-```text
-S48 to S85 to FinalDecision(APPROVED path) to S87 to S9
-```
-
-Where S87 is: "Step 8.7 — Groomer Output Validation — Load references/groomer-output-validation.md"
-
-Full procedure lives here. The SKILL.md diagram shows the S87 node; this file contains the detail.

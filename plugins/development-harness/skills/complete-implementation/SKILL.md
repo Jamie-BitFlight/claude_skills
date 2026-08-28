@@ -265,8 +265,7 @@ On verification success:
 mcp__plugin_dh_backlog__backlog_update(selector="{item_ref}", verified=True)
 ```
 
-Note — no CLI equivalent exists for `verified=True` as of 2026-08-05 (backlog item #2793): the
-CLI's `backlog update` has no `--verified` flag. This call must stay MCP.
+Note — the CLI's `backlog update` has no `--verified` flag. This call must stay MCP.
 
 **Beads backend**: No `dh:state:verified` label — skip this call, continue.
 

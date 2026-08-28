@@ -9,8 +9,6 @@ Measure the quantitative cost of adding or changing an artifact: token injection
 
 This skill is one research angle in a multi-angle technical research system. It runs independently alongside `api-state` and `ecosystem-research` angles and returns its findings to the calling `technical-researcher` orchestrator.
 
-This skill covers the **cost dimension only**. For blast-radius (which files break, what needs migration), use the `@dh:impact-analyst` agent.
-
 ## Workflow
 
 ### Step 1 — Scope

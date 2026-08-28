@@ -115,19 +115,13 @@ Behavior:
 
 Before entering the wave dispatch loop, call `backlog_view` **once per issue** listed across all waves in the dispatch plan. Store each result in context keyed by issue number.
 
-**Fetch-once rule**: Do NOT call `backlog_view` for the same issue more than once per session. Use the already-fetched data for all subsequent references — wave loop iterations, discovery relay construction, result reporting. If an item's state genuinely changes (e.g., after a `backlog_update` call), replace the cached value with a single new `backlog_view` call for that issue only.
+Use the already-fetched data for all subsequent references — wave loop iterations, discovery relay construction, result reporting. If an item's state genuinely changes (e.g., after a `backlog_update` call), replace the cached value with a single new `backlog_view` call for that issue only.
 
 Pass the fetched data (title, AC, description) into spawned session prompts directly rather than having each spawned session re-fetch — see Step 5c prompt construction.
 
 ## Dispatch Step (Step 5 Detail)
 
 All items in a wave are independent by construction (guaranteed non-overlapping by the conflict group analysis in the dispatch plan). Each item gets its own worktree and its own kage-bunshin session — an independent `claude -p` process with full orchestrator capabilities.
-
-### Why Kage-Bunshin Instead of TeamCreate
-
-Teammates and subagents do NOT have the Agent tool. The `/work-backlog-item` flow is an orchestration skill that needs to spawn sub-agents (feature-researcher, codebase-analyzer, python-cli-architect, etc.). A teammate running `/work-backlog-item` is BLOCKED at the first agent delegation step.
-
-A kage-bunshin session is an independent `claude` CLI process — a full orchestrator that inherits all MCP servers, skills, plugins, and agents from the project directory. It CAN use Agent tool and TeamCreate internally.
 
 ### Worktree + Session Setup Per Item
 
@@ -199,7 +193,7 @@ done
 
 The `--model` flag on the kage-bunshin controls the spawned session's orchestrator model only. Sub-agents spawned inside that session use their own model per their agent frontmatter definition.
 
-Recommended: `--model sonnet` for spawned sessions (configurable via `dispatch_spawn` `model` parameter). Haiku viability as orchestrator is an open experiment. Use `--effort` to tune reasoning depth independently of model selection.
+Recommended: `--model sonnet` for spawned sessions (configurable via `dispatch_spawn` `model` parameter). Use `--effort` to tune reasoning depth independently of model selection.
 
 ## Step 10 Reminder: Pending Auto-Stashes
 

@@ -1,0 +1,8 @@
+The purpose and explicit goals of the skill work-backlog-item:
+
+1. **Unify the entire backlog lifecycle behind one command** — selection (interactive, by issue, by title, or quick), grooming, SAM planning, implementation, and resolution — so an agent never has to manually orchestrate the handoffs between stages.
+2. **Keep unvalidated or premature work out of the pipeline** — scope discipline at creation (problem not solution, hypotheses labeled not asserted), duplicate/already-implemented detection, and layered gates (eligibility, feasibility, RT-ICA) that block grooming or planning until an item is actually ready.
+3. **Make grooming produce trustworthy, complete context** — impact radius, fact-checking, issue classification, and mission-alignment analysis are sized to the item and validated for real content, so planning always proceeds from verified information rather than assumption or drift.
+4. **Keep the backlog synchronized and traceable against its GitHub/SAM system of record** — issue linkage, labels, milestones, and plan references stay current automatically, with drift detection surfacing divergence rather than silently trusting stale state.
+5. **Never let completion be claimed without evidence** — close and resolve are gated by mandatory reasons, verified acceptance criteria, and human-authored summaries, so abandoned and completed work stay distinguishable and auditable.
+6. **Let the workflow run autonomously without losing safety** — `--auto` mode chains the full lifecycle unattended while logging every substituted decision, and centralized error handling makes failures recoverable instead of silently abandoned.

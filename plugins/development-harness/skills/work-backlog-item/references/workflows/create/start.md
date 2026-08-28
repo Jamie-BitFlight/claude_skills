@@ -80,6 +80,7 @@ Required fields before write:
 
 Validation rules:
 - Apply the scope boundary rules in scope.md. For BEHAVIORAL/PROCESS items, the procedural description is preserved as written. For PRODUCT/FEATURE items, strip implementation instructions. For MIXED items, the behavioral spec is preserved and code prescriptions are isolated as `**User-provided context**`.
+- If `title` states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — strip the causal clause from `title` (keep only the symptom, e.g. "X failing") before writing, and ensure the full causal claim is captured as `**Hypothesis**: {cause}` in `description` per scope.md.
 - If stripping leaves `description` empty, stop and request a problem-only description.
 - Treat `warnings` as non-blocking unless the tool also returns `error` or non-empty `errors`.
 
@@ -109,9 +110,9 @@ Do not use `force=true` unless the user has already confirmed proceeding despite
 
 ## Step 4: Write via MCP or CLI
 
-MCP and CLI are two equivalent interfaces to the same underlying `add_item()` operation — follow
-this workflow's `scope.md` read (above) and the field rules in Step 1/Step 2 regardless of which
-interface writes the item. Prefer MCP when available; use the CLI for scripting/dispatch contexts.
+Follow this workflow's `scope.md` read (above) and the field rules in Step 1/Step 2 regardless of
+which interface writes the item. Prefer MCP when available; use the CLI for scripting/dispatch
+contexts.
 The canonical submission-quality template lives in both interfaces' own schemas — the `backlog_add`
 tool's `description` field (`backlog_core/server.py`) for MCP callers, and `backlog add`'s
 `--description` help text (`sam_schema/backlog.py`) for CLI callers.
@@ -139,7 +140,7 @@ backlog add \
   --type "{type}"
 ```
 
-Shared parameters (both interfaces call the same underlying `add_item()`):
+Shared parameters:
 - `title`: required
 - `priority`: required; must be `P0`, `P1`, `P2`, or `Ideas`
 - `description`: required

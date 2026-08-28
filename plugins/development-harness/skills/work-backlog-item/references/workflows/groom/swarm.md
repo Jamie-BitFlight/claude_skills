@@ -12,7 +12,11 @@ Each agent's section is how the others reach its findings — a teammate that mu
 
 2. **fact-checker** — Verify item claims against primary sources. Training data recall is NOT
    evidence. Valid evidence: WebFetch, WebSearch, command output, source code, MCP tool output.
-   Write to `section="Fact-Check"`, recording each `REFUTED:` claim there (they become MISSING in RT-ICA).
+   If `description` contains one or more `**Hypothesis**: {text}` lines, include each one as its
+   own separate claim to verify, every one prefixed `HYPOTHESIS:` using that claim's own exact
+   text, so `finalize.md` can match each verdict back to its originating line by exact-text
+   comparison (see Fact-Checker output contract below). Write to `section="Fact-Check"`, recording
+   each `REFUTED:` claim there (they become MISSING in RT-ICA).
 
 3. **rtica-assessor** — Assess information completeness using impact-analyst and fact-checker
    output. Write to `section="RT-ICA"`. Re-read Impact Radius and Fact-Check before
@@ -30,17 +34,6 @@ Each agent's section is how the others reach its findings — a teammate that mu
 6. **alignment-analyst** — Compare existing implementation against item design intent.
    Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment",
    leading the section with a MISSION_ALIGNED or MISSION_DIVERGENT verdict line.
-
-## Dependencies
-
-```text
-impact-analyst    → (none)
-fact-checker      → (none)
-classifier        → (none)
-rtica-assessor    → blocked by impact-analyst + fact-checker
-groomer           → blocked by rtica-assessor + classifier
-alignment-analyst → blocked by impact-analyst
-```
 
 ## Team mode (preferred)
 
@@ -70,7 +63,7 @@ sequenceDiagram
 
     Note over O,AA: Wave 1 — parallel (fact-checker receives Research section as prior context)
     O->>IA: spawn (item details, Files, Evidence, suggested_location)
-    O->>FC: spawn (item claims to verify + Research section as prior context if available)
+    O->>FC: spawn (item claims to verify, including any description Hypothesis line + Research section as prior context if available)
     O->>RT: spawn (item details — waits for IA + FC)
     O->>CL: spawn (item description)
 
@@ -216,6 +209,12 @@ claim: {exact claim from item}
 evidence: {tool result citation}
 source: {URL or file path with line numbers}
 ```
+
+When the claim is one of the item description's `**Hypothesis**: {text}` lines, prefix `claim:`
+with `HYPOTHESIS:` followed by that line's exact text verbatim — do not paraphrase (e.g.
+`claim: HYPOTHESIS: retries fail because the cache is stale`). With more than one hypothesis line,
+`finalize.md`'s Hypothesis Resolution step matches each verdict back to its originating line by
+comparing this exact text, so a paraphrased claim breaks that match.
 
 Validation rules:
 

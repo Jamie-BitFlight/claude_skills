@@ -298,7 +298,7 @@
         },
         {
           "condition": "--quick",
-          "target_label": "Load references/workflows/quick/start.md title source: item_ref joined",
+          "target_label": "Load references/workflows/quick/start.md — agent derives title and observations from raw item_ref text",
           "target_is_file_ref": true,
           "target_file": "references/workflows/quick/start.md"
         },

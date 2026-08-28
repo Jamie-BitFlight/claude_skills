@@ -199,16 +199,8 @@ Return:
 
 ## Linting Rules for Task Quality (Apply Before Finalizing)
 
-Before finalizing a task prompt, check:
-
-- Concise: no filler, no duplicated requirements
-- Logical: sections appear in the template order
-- Explicit: outputs, acceptance criteria, and verification are concrete
-- Adaptive: variants are present only when useful and bounded
-- Reflective: includes an assumption check and edge case awareness
-- CoVe: included only when accuracy risk justifies it, and questions are falsifiable
-
-If any item fails, revise the task prompt.
+Before finalizing a task prompt, check it against each CLEAR letter above plus the CoVe
+inclusion rule. If any item fails, revise the task prompt.
 
 ## Migration and Data Conversion Tasks
 
@@ -252,11 +244,8 @@ Any task that deletes source files must have deletion as a **separate explicit c
 
 ### Scorer behavior
 
-If any of these criteria are absent when the draft describes migration, the scorer returns:
-
-```text
-[E]: MISSING — migration task requires: content completeness check / real data sample test / edge case enumeration / deletion gate (see Migration and Data Conversion Tasks section)
-```
+If any of these criteria are absent when the draft describes migration, the scorer returns the
+matching `[E]: MISSING` message from above for each absent criterion.
 
 ## Special Guidance for Swarm Planning Agents
 

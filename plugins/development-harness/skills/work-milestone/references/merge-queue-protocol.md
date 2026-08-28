@@ -1,10 +1,5 @@
 # Merge Queue Protocol
 
-> **Signaling model**: Completion signaling is via Agent call return. Agents are synchronous
-> from the orchestrator's perspective — the Agent tool call blocks until the agent finishes.
-> The orchestrator merges worktree branches sequentially after all wave agents return.
-> Workers do not exist between waves — each wave spawns fresh worktree agents that terminate on completion.
-
 The orchestrator owns the merge slot. Only one merge proceeds at a time. Agents return when complete; the orchestrator processes returns sequentially.
 
 ## Merge Slot Lifecycle
@@ -86,7 +81,7 @@ When a heavy conflict triggers assign_back:
 
 The resolution backlog item is added to the current milestone and dispatched in the next wave like any other item. The orchestrator assigns it a worktree agent with the conflicting diffs embedded in the prompt. The agent can make a design decision and implement a clean merge.
 
-> No PR is created (branches are local-only). No mid-flight agent notification is possible — agents have already terminated before merging begins. Conflict resolution becomes a new backlog item dispatched in the next wave.
+> No PR is created. No mid-flight agent notification is possible — agents have already terminated before merging begins. Conflict resolution becomes a new backlog item dispatched in the next wave.
 
 ## Quality Gate Commands
 

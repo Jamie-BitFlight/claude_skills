@@ -3,8 +3,6 @@
 Canonical schema for per-item files at `~/.dh/projects/{slug}/backlog/{priority}-{slug}.md`.
 All skills that read or write item files MUST conform to this schema.
 
-SOURCE: Derived from comparative analysis of GSD repo patterns and claude_skills backlog skill implementations (accessed 2026-02-26).
-
 ---
 
 ## Frontmatter Fields
@@ -196,5 +194,3 @@ Both locations MUST be updated together. `group-items-to-milestone` is the only 
 ## Backlog Directory Structure
 
 The backlog script reads per-item files from `~/.dh/projects/{slug}/backlog/`. Each file is named `{priority}-{slug}.md` (e.g., `p1-error-recovery.md`). The `work-backlog-item progress` subcommand scans this directory to produce situational awareness output.
-
-SOURCE: claude_skills_backlog_management_systematic_improvements_list.md, Cross-Cutting Improvements section 5 (2026-02-26).

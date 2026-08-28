@@ -268,7 +268,7 @@ It reports the GitHub API availability status checked on every `backlog_list` ca
 ```
 
 `cache_open_count` reflects the same label/section/status/title/type/topic filters used for the
-`items` result — it is derived from the same local list, not a separate count (ADR-5).
+`items` result — it is derived from the same local list, not a separate count.
 
 #### BackendAvailability Values
 
@@ -280,8 +280,8 @@ It reports the GitHub API availability status checked on every `backlog_list` ca
 | `rate_limited` | Received 403 from GitHub API |
 | `error` | Other error during the availability probe |
 
-The probe runs on every `backlog_list` call regardless of the `from_github` parameter (ADR-2).
-No automatic sync is performed — the tool reports status only (ADR-3).
+The probe runs on every `backlog_list` call regardless of the `from_github` parameter.
+No automatic sync is performed — the tool reports status only.
 
 `type` and `topic` filters compose with AND logic. Items missing the filtered field are excluded
 when that filter is active. The returned `type` and `topic` fields enable downstream semantic
