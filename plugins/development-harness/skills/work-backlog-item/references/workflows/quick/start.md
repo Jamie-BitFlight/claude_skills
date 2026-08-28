@@ -13,7 +13,7 @@ of this workflow). The gate, not the user, authorizes the --quick routing decisi
 **Invocation form:** `flags.quick = true` (parser flag). Not a registry command. The title
 or issue reference is passed as `item_ref`.
 
-1. Extract title from <item_ref/>+ joined. Build slug: title lowercased, spaces → hyphens.
+1. Extract title from <item_ref/>+ joined. If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this path skips the rest of that workflow. Strip the causal clause from the title (keep only the symptom, e.g. "X failing") before any lookup or write, and record the full causal clause separately as `{hypothesis}` (`**Hypothesis**: {cause}`) for use in the description if a new item is created. Build slug from this normalized title: lowercased, spaces → hyphens. Every step below — the lookup, `--slug`, selectors, reported handoffs — uses this normalized `{title}`/`{slug}`, so a repeat invocation of the same command matches the item this workflow already created instead of attempting to create a duplicate.
 
 2. **In-Progress Relevance Check** — Before creating a new backlog item, determine whether this fix belongs to work already in progress. If it does, add it to the active plan instead of opening a new item.
 
@@ -73,15 +73,13 @@ or issue reference is passed as `item_ref`.
 
    Stop — do not continue to step 3 or create a new backlog item.
 
-3. Find the item via the CLI: `backlog view --selector "{title or #N}"`. If not found (JSON output contains an `error` key), create a minimal item:
-
-   If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this path skips the rest of that workflow. Strip the causal clause from the title (keep only the symptom, e.g. "X failing"), and rewrite the full causal clause as `**Hypothesis**: {cause}` in the description. If stripped, reassign `{title}` to this shorter form and recompute `{slug}` from it (lowercased, spaces → hyphens) — every later step in this workflow (selectors, `--slug`, reported handoffs) uses this persisted title, not the original argument.
+3. Find the item via the CLI: `backlog view --selector "{title or #N}"` (using the normalized `{title}` from Step 1). If not found (JSON output contains an `error` key), create a minimal item:
 
    ```bash
    backlog add \
      --title "{title}" \
      --priority P2 \
-     --description "{title, with any speculative cause labeled per above}"
+     --description "{title}" # append "\n\n{hypothesis}" when Step 1 recorded one
    ```
 
    If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`).

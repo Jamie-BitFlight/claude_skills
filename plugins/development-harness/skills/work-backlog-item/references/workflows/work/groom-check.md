@@ -4,9 +4,7 @@
 
 If the `groomed` field in the `backlog_list` output is absent or empty (item not yet groomed):
 
-```text
-Skill(skill: "dh:groom-backlog-item", args: "{item title}")
-```
+Invoke `dh:groom-backlog-item {item title}`.
 
 The groom skill writes groomed content via the backlog MCP server. After grooming completes — including any BLOCKED/resolution cycles during the RT-ICA assessment — call `backlog_view` again to retrieve the groomed sections and proceed immediately to [rt-ica-gate.md](./rt-ica-gate.md). Do not stop or wait for re-invocation.
 
@@ -123,11 +121,7 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
      --content "Staleness detected {today}: functional commits since {groomed_date}.\n\n{diff summary — key changed interfaces, renamed functions, added/removed files}\n\nCommits:\n{list of qualifying commit one-liners}"
    ```
 
-2. Invoke re-groom:
-
-   ```text
-   Skill(skill: "dh:groom-backlog-item", args: "{item title}")
-   ```
+2. Invoke re-groom: `dh:groom-backlog-item {item title}`.
 
 3. After re-groom completes, call `backlog_view` again to retrieve fresh sections.
 4. Proceed to [rt-ica-gate.md](./rt-ica-gate.md). RT-ICA will re-run automatically because `updated_at` is now
