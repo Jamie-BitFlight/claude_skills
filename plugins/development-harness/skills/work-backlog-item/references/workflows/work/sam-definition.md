@@ -33,8 +33,8 @@ The **canonical SAM specification** lives in the [bitflight-devops/stateless-age
 
 ## How work-backlog-item embodies SAM
 
-`work-backlog-item` bridges a backlog item into SAM by invoking `Skill(skill: "dh:add-new-feature", ...)`
-(Step 4.2) and, in `--auto` mode, `Skill(skill: "dh:implement-feature", ...)` afterward — the full
+`work-backlog-item` bridges a backlog item into SAM by invoking `dh:add-new-feature`
+(Step 4.2) and, in `--auto` mode, `dh:implement-feature` afterward — the full
 7-stage pipeline (Discovery through Final Verification), its artifact tokens, its per-stage
 escalation rules, and its plan-creation mechanics are owned and executed by those invoked skills,
 not by this one. What this skill itself must do:

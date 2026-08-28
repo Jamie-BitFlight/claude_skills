@@ -75,11 +75,11 @@ or issue reference is passed as `item_ref`.
 
 3. Find the item via the CLI: `backlog view --selector "{title or #N}"`. If not found (JSON output contains an `error` key), create a minimal item:
 
-   If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this path skips the rest of that workflow. Strip the causal clause from the title (keep only the symptom, e.g. "X failing"), and rewrite the full causal clause as `**Hypothesis**: {cause}` in the description.
+   If the title states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even though this path skips the rest of that workflow. Strip the causal clause from the title (keep only the symptom, e.g. "X failing"), and rewrite the full causal clause as `**Hypothesis**: {cause}` in the description. If stripped, reassign `{title}` to this shorter form and recompute `{slug}` from it (lowercased, spaces → hyphens) — every later step in this workflow (selectors, `--slug`, reported handoffs) uses this persisted title, not the original argument.
 
    ```bash
    backlog add \
-     --title "{title, with any speculative cause stripped per above}" \
+     --title "{title}" \
      --priority P2 \
      --description "{title, with any speculative cause labeled per above}"
    ```
