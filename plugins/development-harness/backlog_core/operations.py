@@ -3151,9 +3151,9 @@ def close_item(
 
     today()
 
-    reference = item.reference
+    storage_reference = item.reference
     # Unreachable — see BacklogItem class docstring (models.py).
-    if not reference:
+    if not storage_reference:
         msg = "Item has no backend reference"
         raise BacklogError(msg)
     already_closed = item.status.lower() in {"closed", "done"}
@@ -3161,7 +3161,18 @@ def close_item(
         out.info("Item already closed.")
         return {"title": item.title, "already_closed": True, **out.to_dict()}
 
-    update_item_metadata(reference, {"metadata": {"status": "closed", "close_reason": reason}}, output=out)
+    update_item_metadata(
+        storage_reference,
+        {
+            "metadata": {
+                "status": "closed",
+                "close_reason": reason,
+                "close_reference": reference,
+                "close_comment": comment,
+            }
+        },
+        output=out,
+    )
 
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
     if issue_ref:

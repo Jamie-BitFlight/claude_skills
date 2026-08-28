@@ -427,6 +427,31 @@ class TestCloseItem:
         # Assert
         assert result.state == "closed"
 
+    def test_close_context_metadata_round_trips(self, backend: WorkItemBackend) -> None:
+        item = BacklogItem(
+            title="Close Context",
+            description="A close-context round-trip fixture.",
+            reference="storage://close-context",
+            metadata=BacklogItemMetadata(
+                source="test",
+                added="2026-01-01",
+                priority="P1",
+                status="closed",
+                close_reason="superseded",
+                close_reference="#related-item",
+                close_comment="Superseded by the tracked item.",
+            ),
+        )
+
+        backend.put_work_item(item)
+
+        stored = backend.get_work_item("storage://close-context")
+        assert (stored.metadata.close_reason, stored.metadata.close_reference, stored.metadata.close_comment) == (
+            "superseded",
+            "#related-item",
+            "Superseded by the tracked item.",
+        )
+
 
 # ---------------------------------------------------------------------------
 # TestResolveItem
@@ -745,6 +770,33 @@ class TestBeadsBackendConformance:
         beads_backend.close_github_issue("bd-a3f8", "done")
 
         bd_runner.run_text.assert_called_once_with(["close", "bd-a3f8", "--reason", "done"])
+
+    def test_put_work_item_serializes_close_context(self, beads_backend, bd_runner) -> None:
+        item = BacklogItem(
+            title="Close Context",
+            description="A close-context round-trip fixture.",
+            reference="bd-close-context",
+            metadata=BacklogItemMetadata(
+                source="test",
+                added="2026-01-01",
+                priority="P1",
+                status="closed",
+                issue="bd-close-context",
+                close_reason="superseded",
+                close_reference="#related-item",
+                close_comment="Superseded by the tracked item.",
+            ),
+        )
+
+        beads_backend.put_work_item(item)
+
+        command = bd_runner.run_text.call_args.args[0]
+        notes = BacklogItem.model_validate_json(command[command.index("--notes") + 1])
+        assert (notes.metadata.close_reason, notes.metadata.close_reference, notes.metadata.close_comment) == (
+            "superseded",
+            "#related-item",
+            "Superseded by the tracked item.",
+        )
 
     def test_apply_status_in_progress_calls_bd_update_claim(self, beads_backend, bd_runner) -> None:
         """apply_status_in_progress calls bd update --claim with the beads ID."""

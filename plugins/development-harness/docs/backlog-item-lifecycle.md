@@ -772,7 +772,7 @@ flowchart TD
 | P7_CLOSE_REF | orchestrator | reason value | reference-needed check | duplicate/superseded → P7_CLOSE_ASK_REF, other → P7_CLOSE_COMMENT |
 | P7_CLOSE_ASK_REF | user | — | reference item (title or `#N`) | always → P7_CLOSE_COMMENT |
 | P7_CLOSE_COMMENT | user | — | optional comment text | always → P7_CLOSE_CALL |
-| P7_CLOSE_CALL | `backlog_close` MCP | selector, reason, reference, comment | work item closed, `{"status": "closed", "close_reason": "{reason}"}` metadata | terminal |
+| P7_CLOSE_CALL | `backlog_close` MCP | selector, reason, reference, comment | work item closed, `{"status": "closed", "close_reason": "{reason}", "close_reference": "{reference}", "close_comment": "{comment}"}` metadata | terminal |
 | P7_VERIFIED_GATE | orchestrator | verified status, `--force` flag, plan presence | verified gate result | verified → P7_CHECKLIST_GATE, absent + `--force` → P7_CHECKLIST_GATE, absent without force → P7_STOP_UNVERIFIED |
 | P7_STOP_UNVERIFIED | orchestrator | — | 3-option report (run QG, force, or close) | terminal |
 | P7_CHECKLIST_GATE | orchestrator | logical plan, task completion counts | checklist completeness check | incomplete → P7_STOP_UNCHECKED, 100% or no plan → P7_AC_GATE |
@@ -783,7 +783,7 @@ flowchart TD
 | P7_STOP_PR_WAIT | orchestrator | open PR reference | local status update only, wait for PR merge | terminal |
 | P7_RESOLVE_CALL | `backlog_resolve` MCP | selector, summary (required), plan, method, notes, follow_ups, findings | work item closed, `{"status": "done", "priority": "completed", "plan": "{plan}"}` metadata | terminal |
 
-**close metadata** (ADR-9): `{"status": "closed", "close_reason": "{reason}"}`. The configured backend records the close reason, reference, and comment and transitions the work item to closed.
+**close metadata** (ADR-9): `{"status": "closed", "close_reason": "{reason}", "close_reference": "{reference}", "close_comment": "{comment}"}`. The configured backend records the close reason, related reference, and comment and transitions the work item to closed.
 
 **resolve metadata** (ADR-9): `{"status": "done", "priority": "completed", "plan": "{plan}"}`. The configured backend records the evidence and transitions the work item to resolved.
 

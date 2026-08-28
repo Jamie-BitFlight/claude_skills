@@ -258,6 +258,20 @@ class TestBacklogItemMetadataCloseReason:
         m = BacklogItemMetadata(close_reason="superseded")
         assert m.close_reason == "superseded"
 
+    def test_close_context_defaults_empty(self) -> None:
+        m = BacklogItemMetadata()
+        assert (m.close_reason, m.close_reference, m.close_comment) == ("", "", "")
+
+    def test_close_context_accepted(self) -> None:
+        m = BacklogItemMetadata(
+            close_reason="superseded", close_reference="#related-item", close_comment="Superseded by the tracked item."
+        )
+        assert (m.close_reason, m.close_reference, m.close_comment) == (
+            "superseded",
+            "#related-item",
+            "Superseded by the tracked item.",
+        )
+
     def test_unknown_metadata_key_ignored(self) -> None:
         """Extra keys in frontmatter must be silently discarded, not raise ValidationError."""
         m = BacklogItemMetadata.model_validate({"status": "closed", "unknown_future_key": "value"})
