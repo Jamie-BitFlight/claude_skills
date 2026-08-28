@@ -10,28 +10,37 @@ If no backlog item exists for the fix, the agent does NOT call backlog_add first
 passes the descriptive title directly to `--quick`, which creates a minimal item inline (Step 2
 of this workflow). The gate, not the user, authorizes the --quick routing decision.
 
-**Invocation form:** `flags.quick = true` in the coerced input. Not a registry command. The title
-or issue reference is passed as `item_ref`. A caller with more detail than fits in a short title
-(e.g. an error message, or what was already ruled out) can supply it after a `--` delimiter:
-`--quick {title} -- {additional observations}` — see Step 1 for how this splits.
+**Invocation form:** `flags.quick = true` in the coerced input. Not a registry command. The raw
+request is passed as `item_ref` — it can be a question, a bug report, or a fix ask; it does not
+need to already read like a title (e.g. "why does login keep redirect-looping when SSO is
+enabled" is a valid `item_ref`, not just "Login redirect loop").
 
-1. Extract title from <item_ref/>. Per `SKILL.md`'s quick-mode exception to the freetext-delimiter
-   rule, this text is not yet split — if it contains a `--` delimiter, the portion before it is
-   the title and the portion after it is `{observations}`, additional detail to include in the
-   description rather than fold into the title. With no delimiter, there are no `{observations}`.
+1. From <item_ref/>, derive:
+   - `{title}` — a short, title-shaped label of the symptom or request (this is what you would
+     write as a backlog item title, not the raw request verbatim).
+   - `{observations}` — your own contextual restatement of what the raw request is actually about:
+     enough that a downstream reader (grooming, a task-worker, a human) understands the original
+     ask without re-reading the raw text or re-deriving context from a terse title alone. This is
+     not optional filler — a bare title frequently loses context a terser or more conversational
+     raw request carried (what triggered it, what's already been ruled out, an exact error
+     message) that this step is responsible for capturing.
 
-   If the title, or `{observations}` if present, states a cause for the problem (e.g. "X failing
-   because Y", "X due to Y") that is not a confirmed observation, the persisted text must not
-   assert it as fact either — the creation-time hypothesis-labeling rule (`create/scope.md`)
-   applies here too, even though this path skips the rest of that workflow. Strip the causal
-   clause from wherever it appears (title, `{observations}`, or both — check each independently)
-   before any lookup or write, keeping only the symptom (e.g. "X failing"), and record every
-   causal clause found as `{hypothesis}` (`**Hypothesis**: {cause}`, one line per clause if more
-   than one) for use in the description if a new item is created. Build slug from the normalized
-   title: lowercased, spaces → hyphens. Every step below — the lookup, `--slug`, selectors,
-   reported handoffs — uses this normalized `{title}`/`{slug}`, so a repeat invocation of the same
-   command matches the item this workflow already created instead of attempting to create a
-   duplicate.
+   Derive the same `{title}` for the same raw request as consistently as you can — prefer the most
+   literal, shortest faithful label over creative rephrasing — since Step 3's lookup matches on
+   `{title}` to avoid creating a duplicate on a repeat invocation. This is best-effort, not
+   deterministic: `{title}` is derived, not parsed, so exact stability across separate invocations
+   isn't guaranteed the way it would be for literal substring extraction.
+
+   If the title, or `{observations}`, states a cause for the problem (e.g. "X failing because Y",
+   "X due to Y") that is not a confirmed observation, the persisted text must not assert it as fact
+   either — the creation-time hypothesis-labeling rule (`create/scope.md`) applies here too, even
+   though this path skips the rest of that workflow. Strip the causal clause from wherever it
+   appears (title, `{observations}`, or both — check each independently) before any lookup or
+   write, keeping only the symptom (e.g. "X failing"), and record every causal clause found as
+   `{hypothesis}` (`**Hypothesis**: {cause}`, one line per clause if more than one) for use in the
+   description if a new item is created. Build slug from the normalized title: lowercased, spaces
+   → hyphens. Every step below — the lookup, `--slug`, selectors, reported handoffs — uses this
+   normalized `{title}`/`{slug}`.
 
 2. **In-Progress Relevance Check** — Before creating a new backlog item, determine whether this fix belongs to work already in progress. If it does, add it to the active plan instead of opening a new item.
 
