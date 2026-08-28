@@ -2402,15 +2402,12 @@ async def backlog_view(
         bool,
         Field(
             description=(
-                "Bypass the local cache and validate against the live backend. For GitHub, "
-                "resolves content through the authoritative head-pointer/audit-comment record "
-                "(never the raw issue body) — same resolution the write/reconcile path uses. "
-                "Applies to every selector shape: a title-substring selector that already "
-                "resolves locally gets the same live-check opportunity a numeric/#N/URL "
-                "selector does. When False (default), a selector that already resolves to a "
-                "local item returns the cached copy without a network call; a selector with no "
-                "local match still triggers a live lookup regardless of this flag, since that is "
-                "the only way to resolve its identity at all."
+                "Bypass the local cache and validate against the live backend for a "
+                "title-substring selector that already resolves locally. Selectors that "
+                "resolve via a numeric/#N/URL match are always validated against the live "
+                "backend regardless of this flag — that behavior is unchanged and predates "
+                "this parameter. For GitHub, resolves content through the authoritative "
+                "head-pointer/audit-comment record, never the raw issue body."
             )
         ),
     ] = False,
