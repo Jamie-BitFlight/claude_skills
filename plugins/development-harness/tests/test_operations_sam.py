@@ -27,8 +27,10 @@ from backlog_core.models import (
     Output,
 )
 from backlog_core.operations import create_sam_task, get_ready_sam_tasks, get_sam_tasks, update_sam_task_status
+from dh_core.operations import append_task, create_plan, finalize_plan
 from sam_schema.core.backends.content import ContentTaskProvider
-from sam_schema.core.models import Task, TaskStatus
+from sam_schema.core.exceptions import BookendValidationError
+from sam_schema.core.models import AcceptanceCriterion, BookendType, Task, TaskStatus
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -519,3 +521,117 @@ class TestGetReadySamTasks:
         # Verify issue_number is propagated to ready task
         ready_t3 = next(t for t in ready_tasks if t["id"] == "T3")
         assert ready_t3["issue_number"] == 301
+
+
+# ---------------------------------------------------------------------------
+# Bookend enforcement integration tests (backlog #3277)
+# ---------------------------------------------------------------------------
+
+
+class TestBookendEnforcement:
+    """Integration tests proving the BookendValidator gate through dh_core.operations.
+
+    These cases live here (rather than in tests_sam/) to reuse this file's
+    existing ``ContentTaskProvider(InMemoryBackend())`` fixture construction —
+    the architect's deliberate choice over adding a new fixture. Every case
+    calls a ``dh_core.operations`` function; none calls ``BookendValidator``
+    directly, since the defect this closes was invisible precisely because
+    prior coverage only exercised the validator in isolation.
+    """
+
+    def test_create_plan_rejects_missing_bookends(self) -> None:
+        """create_plan raises when structured criteria exist with no T0/TN bookends."""
+        task_provider = ContentTaskProvider(InMemoryBackend())
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+        task = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+
+        with pytest.raises(BookendValidationError) as exc_info:
+            create_plan(
+                task_provider,
+                slug="bookend-missing",
+                goal="Do the work",
+                tasks=[task],
+                acceptance_criteria_structured=[criterion],
+            )
+
+        assert any("T0 baseline task" in msg for msg in exc_info.value.errors)
+        assert any("TN verification task" in msg for msg in exc_info.value.errors)
+
+    def test_create_plan_accepts_correct_bookends(self) -> None:
+        """create_plan succeeds when T0/TN bookends satisfy every structural rule."""
+        task_provider = ContentTaskProvider(InMemoryBackend())
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+        t0 = Task(
+            id="T0",
+            title="Baseline",
+            status=TaskStatus.NOT_STARTED,
+            is_bookend=True,
+            bookend_type=BookendType.T0_BASELINE,
+        )
+        impl = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+        tn = Task(
+            id="T2",
+            title="Verify",
+            status=TaskStatus.NOT_STARTED,
+            is_bookend=True,
+            bookend_type=BookendType.TN_VERIFICATION,
+            dependencies=["T1"],
+        )
+
+        result = create_plan(
+            task_provider,
+            slug="bookend-correct",
+            goal="Do the work",
+            tasks=[t0, impl, tn],
+            acceptance_criteria_structured=[criterion],
+        )
+
+        assert result.task_count == 3
+
+    def test_create_plan_succeeds_without_structured_criteria(self) -> None:
+        """create_plan does not require bookends when no structured criteria are set."""
+        task_provider = ContentTaskProvider(InMemoryBackend())
+        task = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+
+        result = create_plan(task_provider, slug="bookend-no-criteria", goal="Do the work", tasks=[task])
+
+        assert result.task_count == 1
+
+    def test_finalize_plan_rejects_incremental_bookend_gap(self) -> None:
+        """append_task stays ungated, but finalize_plan closes the incremental-build gap."""
+        task_provider = ContentTaskProvider(InMemoryBackend())
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+
+        drafted = create_plan(
+            task_provider,
+            slug="bookend-incremental",
+            goal="Do the work",
+            tasks=[],
+            acceptance_criteria_structured=[criterion],
+        )
+
+        task = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+        append_task(task_provider, drafted.plan_id, task)
+
+        with pytest.raises(BookendValidationError) as exc_info:
+            finalize_plan(task_provider, drafted.plan_id)
+
+        assert any("T0 baseline task" in msg for msg in exc_info.value.errors)
+
+    def test_finalize_plan_is_noop_for_pre_existing_ready_plan(self) -> None:
+        """A non-compliant plan that predates the gate (already state=ready) is grandfathered."""
+        task_provider = ContentTaskProvider(InMemoryBackend())
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+        task = Task(id="T1", title="Implement thing", status=TaskStatus.NOT_STARTED)
+
+        # Write directly through the backend, below dh_core.operations, since
+        # create_plan would now reject this shape (see test above).
+        plan_data = task_provider.create_plan(
+            "bookend-grandfathered", "Do the work", [task], acceptance_criteria_structured=[criterion]
+        )
+        assert plan_data["state"] == "ready"
+
+        result = finalize_plan(task_provider, plan_data["plan_id"])
+
+        assert result.finalized is True
+        assert result.state == "ready"
