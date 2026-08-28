@@ -139,8 +139,11 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
 4. Build `{task_brief}` for Step 5, same rule as Step 2a — a SAM task is an execution brief, not a
    groomed artifact, so it never carries `{hypothesis}`, labeled or not, from any source:
    - Item found in Step 3 (already existed): `{task_brief}` = the fetched description, with any
-     `**Hypothesis**: {text}` line removed if present (an existing item can carry one same as a
-     freshly-created one), plus acceptance criteria if available.
+     line starting `**Hypothesis` removed if present — matching both the original
+     `**Hypothesis**: {text}` marker and the refuted variant `**Hypothesis (refuted — see
+     Fact-Check section)**: {text}` that `finalize.md`'s Hypothesis Resolution step writes (an
+     existing item can carry either, same as a freshly-created one), plus acceptance criteria if
+     available.
    - Item not found (just created in Step 3): `{task_brief}` = `{title}` plus `{observations}` from
      Step 1 — already excludes `{hypothesis}` by construction.
 
