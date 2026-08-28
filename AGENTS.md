@@ -431,7 +431,7 @@ this file) was removed to avoid two files drifting out of sync.
 2. **Symlink issues on Windows**: Git symlinks (mode 120000) become plain files on Windows. The `repair-symlinks` pre-commit hook fixes this. Both `ruff` and `ty` have `extend-exclude` entries for symlinked directories.
 3. **Skip magic trailing comma**: Ruff config has `skip-magic-trailing-comma = true` — formatting differences around trailing commas are expected.
 4. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
-5. **pytest parallelism**: Tests run with `-n auto --dist loadgroup` (xdist). Tests marked with `@pytest.mark.xdist_group` run in same worker.
+5. **pytest parallelism**: Tests run with `-n 2 --dist loadgroup` (xdist): one controller plus two workers. Tests marked with `@pytest.mark.xdist_group` run in same worker.
 6. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
 7. **Ignored planning context**: `plan/` and `.claude/backlog/` are ignored working context and excluded from markdownlint. Do not force-add either directory.
 8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
