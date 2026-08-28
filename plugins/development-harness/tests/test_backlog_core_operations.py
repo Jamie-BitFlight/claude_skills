@@ -447,7 +447,7 @@ class TestAddItemCreatesLocalFile:
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
         add_item(title="Pending Local Only Item", description="desc", priority="P2")
 
-        listed = list_items(from_github=False)
+        listed = list_items(refresh=False)
         list_entries = cast("list[dict[str, str | bool]]", listed["items"])
         entry = next(it for it in list_entries if it["title"] == "Pending Local Only Item")
         assert entry["issue"] == ""
@@ -709,7 +709,7 @@ class TestListItemsEmpty:
         """
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
-        result = list_items(from_github=False)
+        result = list_items(refresh=False)
 
         assert result["items"] == []
         assert result["count"] == 0
@@ -732,7 +732,7 @@ class TestListItemsFiltering:
         _seed_items([active, done])
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
-        result = list_items(from_github=False)
+        result = list_items(refresh=False)
 
         items = cast("list[dict[str, str | bool]]", result["items"])
         titles = [it["title"] for it in items]
@@ -755,7 +755,7 @@ class TestListItemsFiltering:
             return_value={7: IssueStatus(status="status:in-progress", milestone="v2")},
         )
 
-        result = list_items(from_github=False, status="status:in-progress")
+        result = list_items(refresh=False, status="status:in-progress")
 
         mock_batch.assert_called_once()
         items = cast("list[dict[str, str | bool]]", result["items"])
@@ -777,16 +777,16 @@ class TestListItemsFiltering:
         _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item")
         mock_batch = mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
-        list_items(from_github=False)
+        list_items(refresh=False)
 
         mock_batch.assert_called_once()
 
-    def test_list_items_from_github_calls_refresh(self, mocker: MockerFixture) -> None:
-        """Verify list_items with from_github=True triggers a cache refresh.
+    def test_list_items_refresh_calls_refresh_local_cache(self, mocker: MockerFixture) -> None:
+        """Verify list_items with refresh=True triggers a cache refresh.
 
-        Tests: from_github refresh path.
-        How: Patch refresh_local_cache_from_github; call list_items(from_github=True).
-        Why: from_github must invoke the refresh before returning local data.
+        Tests: refresh refresh path.
+        How: Patch refresh_local_cache_from_github; call list_items(refresh=True).
+        Why: refresh must invoke the refresh before returning local data.
         """
         mock_refresh = mocker.patch(
             "backlog_core.operations.refresh_local_cache_from_github",
@@ -794,7 +794,7 @@ class TestListItemsFiltering:
         )
         mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
-        list_items(from_github=True)
+        list_items(refresh=True)
 
         mock_refresh.assert_called_once()
 
@@ -841,7 +841,7 @@ class TestListItemsBeadsBackend:
         _seed_items([])
         mock_batch = mocker.patch("backlog_core.operations.batch_fetch_statuses")
 
-        list_items(from_github=False)
+        list_items(refresh=False)
 
         mock_batch.assert_not_called()
 
@@ -865,7 +865,7 @@ class TestListItemsBeadsBackend:
         )
         mocker.patch.object(backend, "list_work_items", return_value=[beads_item])
 
-        result = list_items(from_github=False)
+        result = list_items(refresh=False)
 
         items = cast("list[dict[str, str | bool]]", result["items"])
         assert len(items) == 1
@@ -891,7 +891,7 @@ class TestListItemsBeadsBackend:
         )
         mocker.patch.object(backend, "list_work_items", return_value=[beads_item])
 
-        result = list_items(from_github=False)
+        result = list_items(refresh=False)
 
         items = cast("list[dict[str, str | bool]]", result["items"])
         assert len(items) == 1
@@ -1757,7 +1757,7 @@ def test_list_items_section_derived_from_priority(
     _write_item(fake_dir, title=f"{priority} Item", priority=priority, topic=topic)
     mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
-    result = list_items(from_github=False)
+    result = list_items(refresh=False)
 
     items = cast("list[dict[str, str | bool]]", result["items"])
     assert len(items) == 1
