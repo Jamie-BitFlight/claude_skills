@@ -10,7 +10,7 @@ If no backlog item exists for the fix, the agent does NOT call backlog_add first
 passes the descriptive title directly to `--quick`, which creates a minimal item inline (Step 2
 of this workflow). The gate, not the user, authorizes the --quick routing decision.
 
-**Invocation form:** `flags.quick = true` (parser flag). Not a registry command. The title
+**Invocation form:** `flags.quick = true` in the coerced input. Not a registry command. The title
 or issue reference is passed as `item_ref`. A caller with more detail than fits in a short title
 (e.g. an error message, or what was already ruled out) can supply it after a `--` delimiter:
 `--quick {title} -- {additional observations}` — see Step 1 for how this splits.

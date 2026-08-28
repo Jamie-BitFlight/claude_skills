@@ -1,6 +1,6 @@
 ---
 name: work-backlog-item
-description: "Use when working, planning, grooming, or closing a backlog item. Bridges backlog items to SAM planning with GitHub Issue, Project, and Milestone tracking. Activates on interactive browsing with no args, loading an item from a GitHub issue reference like #N, matching by title substring to run auto-grooming plus RT-ICA gate plus GitHub sync plus SAM planning, autonomous --auto {title} mode that skips AskUserQuestion and derives data from research files while logging decisions, close {title} to dismiss an item without completion with a required reason (duplicate, out_of_scope, superseded, wontfix, blocked) per ADR-9, resolve {title} to mark DONE with an evidence trail and required summary per ADR-9, setup-github to initialize labels, project, and milestone, and --language or --stack flags that select the Layer 1 or Layer 2 profile. Stops when the item already has a Plan field or when RT-ICA returns BLOCKED."
+description: "Use when working, planning, grooming, or closing a backlog item. Bridges backlog items to SAM planning with issue, project, and milestone tracking against the configured backend. Activates on interactive browsing with no args, loading an item from an issue reference like #N, matching by title substring to run auto-grooming plus RT-ICA gate plus backend sync plus SAM planning, autonomous --auto {title} mode that skips AskUserQuestion and derives data from research files while logging decisions, --quick {title} for trivial fixes (`-- {observations}` for detail beyond the title), close {title} to dismiss without completion with a required reason (duplicate, out_of_scope, superseded, wontfix, blocked) per ADR-9, resolve {title} to mark DONE with an evidence trail and required summary per ADR-9, setup-github to initialize GitHub labels/project/milestone (GitHub-backed only), and --language or --stack flags selecting Layer 1/2 profile. Stops when the item already has a Plan field or RT-ICA returns BLOCKED."
 argument-hint: '[#N | --auto {title} | --language {lang} | --stack {stack} | item-title-substring | close {title} | resolve {title} [--force] | setup-github | --quick {title} | progress | resume [{title}]]'
 user-invocable: true
 ---
@@ -112,6 +112,8 @@ The configured backend is authoritative for its native work records. For Beads-b
 
 **To capture a new backlog item**: `/dh:work-backlog-item create -- "<what and why of the problem that triggered the need for a backlog issue>"`
 
+**Speculative causes**: if you state a guess at why something is broken, it's recorded as `**Hypothesis**: {text}` rather than fact — grooming later confirms or refutes it and rewrites that line to match what was actually found, so the item never keeps showing an unverified guess as settled.
+
 ## Arguments
 
 `route` is `none` only when argv is empty (no flags, no positionals, no freetext suffix): follow **Step 1.1 — Interactive Browser** below. It is not the same as `mode: "interactive"` (which only means `--auto` was not passed).
@@ -137,7 +139,11 @@ On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_te
 
 ### --quick mode
 
-Loads [references/workflows/quick/start.md](./references/workflows/quick/start.md) with `flags.quick = true` (parser flag) and `item_ref` set to the supplied title or issue reference (e.g. `#N`).
+Loads [references/workflows/quick/start.md](./references/workflows/quick/start.md) with `flags.quick = true` in the coerced input and `item_ref` set to the supplied title or issue reference (e.g. `#N`). For one-file fixes where full grooming is disproportionate. Append `-- {observations}` when there's more detail than fits in the title (an error message, what was already ruled out) — it flows into the created item's description and its task's brief, not just the title:
+
+```text
+/work-backlog-item --quick Login redirect loop -- Only reproduces with SSO enabled; cookie domain mismatch suspected
+```
 
 **Proactive fix routing**: The Proactive Fix Gate in `.claude/CLAUDE.md` (Proactive Fix Gate section) routes trivial discovered issues to this `--quick` path autonomously.
 
