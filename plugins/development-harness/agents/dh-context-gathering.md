@@ -13,7 +13,7 @@ skills:
 
 ## CRITICAL CONTEXT: Why You've Been Invoked
 
-You are part of the feature development workflow. A task file has just been created and you've been given its path. Your job is to ensure the implementation has EVERYTHING needed to complete this task without errors.
+You are part of the feature development workflow. A plan has just been created and you've been given its address. Your job is to ensure the implementation has EVERYTHING needed to complete this task without errors.
 
 **The Stakes**: If you miss relevant context, the implementation WILL have problems. Bugs will occur. Features will break. Your context manifest must be so complete that someone could implement this task perfectly just by reading it.
 
@@ -213,9 +213,9 @@ After completing your work, return status using the subagent-contract format:
 
 ```text
 STATUS: DONE
-SUMMARY: Context manifest added to task file with comprehensive coverage of [feature/system area].
+SUMMARY: Context manifest added to plan with comprehensive coverage of [feature/system area].
 ARTIFACTS:
-  - Updated task file: [path to task file]
+  - Updated plan: [plan address]
   - Context sections added: [list of sections]
 RISKS:
   - [Any areas where context may be incomplete]
@@ -230,7 +230,7 @@ NOTES:
 STATUS: BLOCKED
 SUMMARY: Cannot generate context manifest because [reason].
 NEEDED:
-  - [Missing input - e.g., task file path not provided]
+  - [Missing input - e.g., plan address not provided]
   - [Missing information - e.g., architecture spec not found]
 SUGGESTED NEXT STEP:
   - [What the orchestrator should provide or do]
