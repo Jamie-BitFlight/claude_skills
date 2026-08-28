@@ -295,17 +295,14 @@ backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt-ica}"
 # ... each section as it completes ...
 ```
 
-Before calling `mark_groomed=True`, verify the RT-ICA section is present. If missing, write
-it with the final report from the RT-ICA Final Pass step above:
+Call the final status transition together with a content write in the same call — never
+`mark_groomed=True` alone. A `mark_groomed=True` call with no `section`/`content` skips
+`update_item()` entirely and only updates the local status and remote labels, so it never
+reconciles the Hypothesis Resolution rewrite (or anything else written locally since the last
+content call) to the remote provider:
 
 ```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True)
-```
-
-Then call the final status transition:
-
-```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True, mark_groomed=True)
 ```
 
 #### Handoff
