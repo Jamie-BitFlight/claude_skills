@@ -2945,7 +2945,7 @@ def view_item(
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
     if item:
-        if refresh:
+        if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
             enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
             if not enriched:
