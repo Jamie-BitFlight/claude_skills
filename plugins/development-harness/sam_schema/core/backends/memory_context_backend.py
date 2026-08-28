@@ -56,7 +56,6 @@ class InMemoryContextBackend:
             The stored ActiveTaskContext instance.
         """
         context = ActiveTaskContext(
-            task_file_path=f"{plan_dir}/{plan}.yaml",
             task_id=task,
             plan=plan,
             task=task,

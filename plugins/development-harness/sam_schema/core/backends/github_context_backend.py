@@ -26,7 +26,7 @@ Architecture notes:
 
 Dependency direction (acyclic):
 
-    github_context_backend imports from: models, dh_paths
+    github_context_backend imports from: models
     github_context_backend does NOT import from: server, context_config,
     context_backend (Protocol), backlog_core
 """
@@ -38,10 +38,8 @@ import logging
 import re
 from datetime import UTC, datetime
 from functools import cached_property
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-import dh_paths
 from github import Auth, Github, GithubException
 
 from sam_schema.core.models import ActiveTaskContext
@@ -178,7 +176,6 @@ class GitHubContextBackend:
         self._session_issues[session_id] = parent_issue_number
 
         context = ActiveTaskContext(
-            task_file_path=_resolve_task_file_path(plan, plan_dir),
             task_id=task,
             plan=plan,
             task=task,
@@ -345,19 +342,3 @@ def _parse_comment_body(body: str) -> ActiveTaskContext | None:
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("_parse_comment_body: failed to parse context payload: %s", exc)
         return None
-
-
-def _resolve_task_file_path(plan: str, plan_dir: str) -> str:
-    """Resolve the absolute path to the plan YAML file.
-
-    Mirrors ``LocalContextBackend._resolve_task_file_path``.
-
-    Args:
-        plan: Plan address (e.g., ``"P1601"``).
-        plan_dir: Plan directory sentinel ``"plan"`` or an absolute path.
-
-    Returns:
-        Absolute path string to the plan YAML file.
-    """
-    base: Path = dh_paths.plan_dir() if plan_dir == "plan" else Path(plan_dir)
-    return str(base / f"{plan}.yaml")
