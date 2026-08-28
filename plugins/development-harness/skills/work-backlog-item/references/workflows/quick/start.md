@@ -75,11 +75,14 @@ or issue reference is passed as `item_ref`.
 
 3. Find the item via the CLI: `backlog view --selector "{title or #N}"` (using the normalized `{title}` from Step 1). If not found (JSON output contains an `error` key), create a minimal item:
 
+   If Step 1 recorded a `{hypothesis}`, the description is `{title}\n\n{hypothesis}`; otherwise it
+   is just `{title}`.
+
    ```bash
    backlog add \
      --title "{title}" \
      --priority P2 \
-     --description "{title}" # append "\n\n{hypothesis}" when Step 1 recorded one
+     --description "{description from above}"
    ```
 
    If found, extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`).
