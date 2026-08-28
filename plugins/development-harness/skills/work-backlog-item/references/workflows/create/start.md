@@ -80,6 +80,7 @@ Required fields before write:
 
 Validation rules:
 - Apply the scope boundary rules in scope.md. For BEHAVIORAL/PROCESS items, the procedural description is preserved as written. For PRODUCT/FEATURE items, strip implementation instructions. For MIXED items, the behavioral spec is preserved and code prescriptions are isolated as `**User-provided context**`.
+- If `title` states a cause for the problem (e.g. "X failing because Y", "X due to Y") that is not a confirmed observation, the persisted title must not assert it as fact either — strip the causal clause from `title` (keep only the symptom, e.g. "X failing") before writing, and ensure the full causal claim is captured as `**Hypothesis**: {cause}` in `description` per scope.md.
 - If stripping leaves `description` empty, stop and request a problem-only description.
 - Treat `warnings` as non-blocking unless the tool also returns `error` or non-empty `errors`.
 
