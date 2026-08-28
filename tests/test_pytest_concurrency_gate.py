@@ -25,8 +25,24 @@ def run_gate(command: str) -> subprocess.CompletedProcess[str]:
         "uv run --no-sync pytest tests/test_run_bounded.py",
         "uv run -q --locked pytest tests/test_run_bounded.py",
         "env PYTEST_ADDOPTS=-q pytest tests/test_run_bounded.py",
+        "PYTEST_ADDOPTS=-q pytest tests/test_run_bounded.py",
+        "env -i pytest tests/test_run_bounded.py",
+        "env --ignore-environment pytest tests/test_run_bounded.py",
+        "command -p pytest tests/test_run_bounded.py",
+        "python3 -B -m pytest tests/test_run_bounded.py",
+        "nice pytest tests/test_run_bounded.py",
+        "time pytest tests/test_run_bounded.py",
         "pytest tests/test_run_bounded.py # scripts/run_bounded.py",
         "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- true; pytest tests/test_run_bounded.py",
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest $(pytest tests/test_run_bounded.py)",
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest <(pytest tests/test_run_bounded.py)",
+        "uv run --no-sync --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest tests/test_run_bounded.py",
+        "python scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest tests/test_run_bounded.py",
+        "uv run --script /tmp/scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest tests/test_run_bounded.py",
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run --project . pytest tests/test_run_bounded.py",
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run --directory /tmp pytest tests/test_run_bounded.py",
+        'uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest "#"; pytest tests/test_run_bounded.py',
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest\npytest tests/test_run_bounded.py",
     ],
 )
 def test_gate_rejects_raw_pytest_commands(command: str) -> None:
@@ -45,10 +61,8 @@ def test_gate_allows_the_canonical_bounded_pytest_wrapper() -> None:
     assert result.stderr == ""
 
 
-def test_gate_allows_a_canonical_wrapper_with_a_trailing_comment() -> None:
-    result = run_gate(
-        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest tests/test_run_bounded.py # bounded"
-    )
+def test_gate_allows_the_canonical_wrapper_with_safe_arguments() -> None:
+    result = run_gate('uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -m "not slow"')
 
     assert result.returncode == 0
     assert result.stderr == ""
