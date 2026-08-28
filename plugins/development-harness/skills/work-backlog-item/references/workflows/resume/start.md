@@ -2,7 +2,7 @@
 
 **Trigger:** <mode/> is `resume`.
 
-1. Extract title from <item_ref/>+ joined. If <item_ref/> starts with `#`, fetch title from GitHub Issue (same logic as issue-first path).
+1. Extract title from <item_ref/>+ joined. If <item_ref/> starts with `#`, fetch title from the linked work item (same logic as issue-first path).
 
 2. Call `backlog_view(selector="{title or #N}", summary=false)`. Extract the `plan` field from the response. If absent or empty:
 

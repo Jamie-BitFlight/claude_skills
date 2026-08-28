@@ -314,13 +314,13 @@ provider reference, not a filesystem path or a guaranteed `P...` token.
 
 Propagate provider outcome metadata to the agent:
 
-- A GitHub cache-backed read can return `stale: true` when the remote is unavailable. Use the
+- A provider cache-backed read can return `stale: true` when the remote is unavailable. Use the
   content only as an explicitly stale snapshot and report that status before making decisions.
 - A queued offline write is `pending: true`; do not claim remote acknowledgement until the
   provider reports replay success.
 - A cache miss, invalid native record, missing `bd` executable, or provider API failure is an
   unavailable result. Report the provider error and stop or request recovery; do not silently
-  fall back to GitHub or a local file.
+  fall back to a direct remote query or a local file.
 - Native local providers (`beads`, `sqlite`, `memory`) do not imply a remote copy. Their
   successful reads are authoritative for that selected provider, and their failures remain
   provider failures.

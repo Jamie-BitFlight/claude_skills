@@ -4,7 +4,7 @@
 
 1. Call `backlog_list()` to retrieve all open items. Count items by priority (P0, P1, P2, Ideas) and status from the returned `items` list. Each entry has `priority`, `status`, `title`, `issue`, `milestone`, and `groomed` fields.
 
-2. Query GitHub for the active milestone:
+2. Query the backend for the active milestone:
 
    ```text
    # Use MCP: backlog_get_soonest_milestone()

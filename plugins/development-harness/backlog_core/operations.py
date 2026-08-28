@@ -1615,7 +1615,7 @@ def refresh_local_cache_from_github(
 def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
     """Return the effective status string for an item.
 
-    For items with a numeric GitHub issue reference, looks up the live status
+    For items with a numeric issue reference, looks up the live status
     from *status_map*.  For items with a non-integer issue reference (e.g. a
     beads nanoid ``"bd-a3f8"``) or no issue at all, falls back to the locally
     cached ``item.status`` field.  This prevents beads and other string-ID
@@ -1623,9 +1623,9 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     empty (ADR-002).
 
     Returns:
-        Status string — either the GitHub label value from *status_map* or the
-        local ``item.status`` value, defaulting to ``"needs-grooming"`` when
-        neither is available.
+        Status string — either the provider status value from *status_map* or
+        the local ``item.status`` value, defaulting to ``"needs-grooming"``
+        when neither is available.
     """
     num = parse_issue_number(item.issue)
     if num is not None:
@@ -3675,7 +3675,7 @@ def strike_entry(
 
     Finds the entry by ``entry_id`` across all sections (or within a specific
     section if provided), wraps it in a collapsed ``<details>`` with the
-    reason, writes the file back, and syncs to GitHub if an issue exists.
+    reason, writes the file back, and syncs to the remote provider if a linked reference exists.
 
     Args:
         selector: Item title, slug, or issue reference.
@@ -3785,12 +3785,12 @@ def _issue_fields_to_metadata(fields: IssueLocalFields) -> dict[str, str | list[
 def pull_single_issue(
     issue_num: int, output: Output | None = None, diff_mode: bool = False
 ) -> dict[str, str | list[str] | None]:
-    """Reconcile one GitHub issue through the configured sync backend.
+    """Reconcile one work item through the configured backend.
 
     If filepath is None, derives it from the issue title and priority.
 
     Args:
-        issue_num: GitHub issue number to fetch.
+        issue_num: Work item reference number to fetch.
         output: Optional Output collector for messages and warnings.
         diff_mode: When True, computes a unified diff of old vs new body content and
             includes it in the return dict under the ``"diff"`` key.
@@ -3818,16 +3818,16 @@ def pull_single_issue(
 def pull_by_selector(
     selector: str, repo: str = "", output: Output | None = None, diff: bool = False
 ) -> dict[str, str | list[str] | None]:
-    """Pull a single GitHub issue into the provider-backed record by selector.
+    """Pull a single work item into the provider-backed record by selector.
 
     Supports issue number selectors (#N, bare number, URL) and title substrings.
-    For issue number selectors, fetches directly from GitHub.
+    For issue number selectors, fetches directly from the backend.
     For title substrings, finds the local item, reads its issue number,
-    then fetches from GitHub.
+    then fetches from the backend.
 
     Args:
         selector: Issue number, URL, or title substring.
-        repo: GitHub repository slug (owner/name).
+        repo: Remote repository slug (owner/name).
         output: Optional Output collector for messages and warnings.
         diff: When True, computes a unified diff of old vs new body content and
             includes it in the return dict under the ``"diff"`` key.
@@ -3838,7 +3838,7 @@ def pull_by_selector(
 
     Raises:
         ItemNotFoundError: If selector matches no item in the provider-backed record.
-        BacklogError: If matched item has no linked GitHub issue.
+        BacklogError: If matched item has no linked remote reference.
     """
     out = output or Output()
     issue_num_str = parse_issue_selector(selector)
@@ -3851,7 +3851,7 @@ def pull_by_selector(
 
         issue_ref = item.issue
         if not issue_ref:
-            msg = f"Item '{item.title}' has no linked GitHub issue. Use backlog_pull() for bulk pull."
+            msg = f"Item '{item.title}' has no linked remote reference. Use backlog_pull() for bulk pull."
             raise BacklogError(msg)
 
         issue_num_str = parse_issue_selector(issue_ref)

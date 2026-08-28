@@ -4,7 +4,7 @@ Runs after every groom workflow exit — whether the outcome is Groomed, Blocked
 
 ## Steps
 
-1. **Refresh local cache** (if needed): `backlog_groom` writes each section to GitHub synchronously as it runs — no explicit flush step is required. If the local cache needs to reflect the current GitHub state after grooming, call `backlog_pull(selector=<item_ref>)` to refresh that single item.
+1. **Refresh local cache** (if needed): `backlog_groom` writes each section to the backend synchronously as it runs — no explicit flush step is required. If the local cache needs to reflect the current backend state after grooming, call `backlog_pull(selector=<item_ref>)` to refresh that single item.
 
    > **Do NOT call `backlog_sync()` — that runs a full sweep of all issues and is expensive.**
 

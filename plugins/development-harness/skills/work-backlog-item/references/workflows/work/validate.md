@@ -8,17 +8,17 @@ Before planning, verify the feature/fix hasn't already been implemented (stale o
 
 ## Step 2.2: Issue Link Check
 
-After Step 1.4, check for `**Issue**: #N` in the matched item. Load [github-sync.md](./github-sync.md) for MCP tool calls, yes/no branching, and issue creation.
+After Step 1.4, check for `**Issue**: #N` in the matched item. Load [issue-sync.md](./issue-sync.md) for MCP tool calls, yes/no branching, and issue creation.
 
 **Note:** On the Issue-first path (Step 1.2), the `backlog_view` response already contains issue state — carry it forward without re-fetching.
 
 ## Step 2.3: Create Linked Issue
 
-Load [github-sync.md](./github-sync.md#step-23-create-linked-issue).
+Load [issue-sync.md](./issue-sync.md#step-23-create-linked-issue).
 
 ## Step 2.4: Set In-Progress
 
-Load [github-sync.md](./github-sync.md#step-24-set-in-progress).
+Load [issue-sync.md](./issue-sync.md#step-24-set-in-progress).
 
 **Two-part step:** (a) Always run `backlog update --selector "{title}" --status "in-progress"` for the current item. (b) Run `milestone start` only on explicit user intent to start the whole milestone — it bulk-transitions all open milestone issues, not just the current one.
 
