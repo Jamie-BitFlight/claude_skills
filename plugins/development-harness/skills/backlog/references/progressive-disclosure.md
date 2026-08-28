@@ -22,7 +22,7 @@ Ordinals must match `^\d+(\.\d+)*(\.code\.\d+)?$`.
 
 An ordinal that matches no node returns an error listing every valid ordinal in the item.
 
-## Parent versus leaf (ADR-7)
+## Parent versus leaf
 
 A node with sub-heading children returns `content=""`, `has_children=true`, and a `child_map`
 listing the child ordinals. Drill into a child ordinal to reach prose.

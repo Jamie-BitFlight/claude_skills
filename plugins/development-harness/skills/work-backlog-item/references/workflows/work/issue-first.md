@@ -21,7 +21,7 @@ From the JSON response build the working item:
 | `milestone` | `milestone` |
 | `plan` | `plan` field, or search `body` for `**Plan**:` line |
 
-The `backlog view` command (CLI or MCP `backlog_view`) operates in two modes depending on backend reachability (architect spec §5.2, ADR-002):
+The `backlog view` command (CLI or MCP `backlog_view`) operates in two modes depending on backend reachability:
 
 - **Connected**: sections and `sections_index` are derived from the live backend record (takes priority over local cache)
 - **Offline**: sections and `sections_index` are derived from local YAML cache; the response `warnings` field contains `"backend unreachable"` indicating potentially stale data

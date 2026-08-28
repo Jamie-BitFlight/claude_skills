@@ -14,7 +14,7 @@ This hook script handles multiple hook events:
 - PostToolUse (Write|Edit|Bash): Update LastActivity timestamp using context file
 
 All task state WRITES route through the SAM MCP server via fastmcp CLI subprocess,
-making the hook backend-agnostic (ADR-001: hooks must not write directly to YAML).
+making the hook backend-agnostic (hooks must not write directly to YAML).
 
 Context File Mechanism:
 - The /start-task command writes task context to ~/.dh/projects/{slug}/context/active-task-{session_id}.json

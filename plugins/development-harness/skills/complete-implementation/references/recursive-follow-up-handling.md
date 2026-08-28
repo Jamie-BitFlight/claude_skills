@@ -178,24 +178,24 @@ If the planner-rt-ica artifact for this follow-up contains BLOCKED-FOR-PLANNING:
   Do not apply status:verified label for the blocked follow-up.
 ```
 
-If no BLOCKED-FOR-PLANNING signal: continue to Condition 1 (ADR-3).
+If no BLOCKED-FOR-PLANNING signal: continue to Condition 1.
 
 **Evaluation order for each in-scope follow-up:**
 1. Guard 1: depth check (`{recursion_depth} >= 5` → stop all)
 2. Guard 2: RT-ICA BLOCKED check (`BLOCKED-FOR-PLANNING` in plan artifact → stop this follow-up)
-3. Condition 1 (ADR-3): slug match
-4. Condition 2 (ADR-2): High priority
+3. Condition 1: slug match
+4. Condition 2: High priority
 5. Both Conditions 1 and 2 met → increment depth, recurse
 6. Either not met → defer to backlog
 
 For each follow-up plan, evaluate two conditions. BOTH must be true for recursion.
 
-**Condition 1 -- Same session scope (ADR-3)**: The follow-up plan's slug matches the parent
+**Condition 1 -- Same session scope**: The follow-up plan's slug matches the parent
 plan's slug. Read the follow-up plan's `feature` field via
 `sam_plan(plan="{followup_plan_address}", config={"action": "read"})`, strip the
 `-followup-{k}` suffix, and compare it with the parent plan's `feature` field. Slugs must match.
 
-**Condition 2 -- High priority (ADR-2)**: Use that read result's `context` field and extract the
+**Condition 2 -- High priority**: Use that read result's `context` field and extract the
 `## Priority` section. Only `High` qualifies for immediate recursion.
 
 **If BOTH conditions are met** -- recurse immediately:
