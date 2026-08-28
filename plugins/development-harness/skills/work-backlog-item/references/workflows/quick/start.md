@@ -59,9 +59,12 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
    - Else: call `mcp__plugin_dh_backlog__backlog_view(selector="{first in_progress_items title}", summary=false)` and read the item's `plan` field as `active_plan_id`.
    - If neither yields a plan ID: fall through to step 3 (cannot integrate without a plan reference).
 
-   Append the fix as a new task on the active plan. Set `description` the same way Step 3 builds
-   the description for a new item — `{observations}` and `{hypothesis}` from Step 1, when present,
-   go here too; this path must not discard them just because it isn't creating a new item:
+   Append the fix as a new task on the active plan. A SAM task is a direct execution brief for
+   whichever agent implements it, not a groomed artifact — `--quick` never grooms, so nothing ever
+   verifies `{hypothesis}` before that agent would read it. Set `description` to `{title}` plus
+   `{observations}` (factual context Step 1 already separated from any causal guess) if present —
+   never `{hypothesis}`; an unverified guess about cause has no business being handed to an agent
+   as if it were part of its brief.
 
    ```text
    mcp__plugin_dh_sam__sam_plan(
@@ -71,7 +74,7 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
        "task": {
          "id": "T{next_available_id}",
          "title": "{title}",
-         "description": "{title, plus observations and hypothesis if Step 1 recorded them}",
+         "description": "{title, plus observations if Step 1 recorded any — never hypothesis}",
          "status": "not-started",
          "agent": "task-worker",
          "dependencies": [],
@@ -96,9 +99,11 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
 
 3. Find the item via the CLI: `backlog view --selector "{title or #N}"` (using the normalized `{title}` from Step 1). If not found (JSON output contains an `error` key), create a minimal item:
 
-   The description starts as `{title}`, then appends each of `{observations}` and `{hypothesis}`
-   that Step 1 recorded, each on its own paragraph, in that order (`{title}\n\n{observations}\n\n{hypothesis}`
-   when both are present). With neither, the description matches the title exactly.
+   The backlog item's `description` starts as `{title}`, then appends each of `{observations}` and
+   `{hypothesis}` that Step 1 recorded, each on its own paragraph, in that order
+   (`{title}\n\n{observations}\n\n{hypothesis}` when both are present). With neither, the
+   description matches the title exactly. This full description — hypothesis included — is the
+   backlog item's own informational record; it is not what Step 5 uses as the task brief below.
 
    ```bash
    backlog add \
@@ -111,14 +116,16 @@ or issue reference is passed as `item_ref`. A caller with more detail than fits 
 
 4. Extract the item's description and acceptance criteria if available.
 
-5. Create the quick plan via the CLI:
+5. Create the quick plan via the CLI. Same rule as Step 2a: a SAM task is an execution brief, not
+   a groomed artifact, so `--goal` and `--task-title` use `{title}` plus `{observations}` only
+   (call this `{task_brief}`) — never `{hypothesis}`, which no `--quick` path ever verifies:
 
    ```bash
    plan create \
      --slug "quick-{slug}" \
-     --goal "{goal from description or acceptance_criteria}" \
+     --goal "{goal from task_brief or acceptance_criteria}" \
      --task-id T1 \
-     --task-title "{description}" \
+     --task-title "{task_brief}" \
      --task-agent "task-worker" \
      --task-priority 1 \
      --task-complexity low
