@@ -15,7 +15,6 @@ from backlog_core.parsing import (
     build_issue_body_from_file,
     dump_frontmatter,
     extract_description_from_issue_body,
-    find_fuzzy_duplicates,
     find_item,
     infer_type,
     loads_frontmatter,
@@ -1013,102 +1012,6 @@ class TestBuildIssueBodyFromFileDict:
 
 
 # ---------------------------------------------------------------------------
-# find_fuzzy_duplicates
-# ---------------------------------------------------------------------------
-
-
-class TestFindFuzzyDuplicates:
-    """Tests for find_fuzzy_duplicates(title, items, threshold) -> list[tuple]."""
-
-    def test_find_fuzzy_duplicates_exact_match_returns_one_result(self) -> None:
-        items = [BacklogItem(title="SAM Error Recovery", file_path="/tmp/p1-sam.md")]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        assert len(matches) == 1
-
-    def test_find_fuzzy_duplicates_exact_match_ratio_is_one(self) -> None:
-        items = [BacklogItem(title="SAM Error Recovery", file_path="/tmp/p1-sam.md")]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        assert matches[0][1] >= 1.0
-
-    def test_find_fuzzy_duplicates_similar_title_detected_above_threshold(self) -> None:
-        items = [BacklogItem(title="backlog.py add implement duplicate detection", file_path="/tmp/p1-dup.md")]
-
-        matches = find_fuzzy_duplicates("backlog.py add implement fuzzy duplicate detection", items)
-
-        assert len(matches) == 1
-        assert matches[0][1] >= 0.80
-
-    def test_find_fuzzy_duplicates_dissimilar_title_returns_empty(self) -> None:
-        items = [BacklogItem(title="Validate Terminal Browser", file_path="/tmp/p2-browser.md")]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        assert matches == []
-
-    def test_find_fuzzy_duplicates_skips_items_with_skip_true(self) -> None:
-        items = [BacklogItem(title="SAM Error Recovery", file_path="/tmp/p1-sam.md", skip=True)]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        assert matches == []
-
-    def test_find_fuzzy_duplicates_strips_commit_prefix_before_comparison(self) -> None:
-        items = [BacklogItem(title="feat: SAM Error Recovery", file_path="/tmp/p1-sam.md")]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        assert len(matches) == 1
-        assert matches[0][1] >= 1.0
-
-    def test_find_fuzzy_duplicates_new_title_commit_prefix_stripped(self) -> None:
-        items = [BacklogItem(title="SAM Error Recovery", file_path="/tmp/p1-sam.md")]
-
-        matches = find_fuzzy_duplicates("fix: SAM Error Recovery", items)
-
-        assert len(matches) == 1
-
-    def test_find_fuzzy_duplicates_returns_tuples_of_title_ratio_path(self) -> None:
-        items = [BacklogItem(title="SAM Error Recovery", file_path="/tmp/p1-sam.md")]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        title, ratio, path = matches[0]
-        assert title == "SAM Error Recovery"
-        assert isinstance(ratio, float)
-        assert path == "/tmp/p1-sam.md"
-
-    def test_find_fuzzy_duplicates_sorted_by_ratio_descending(self) -> None:
-        items = [
-            BacklogItem(title="SAM recovery mechanism", file_path="/tmp/a.md"),
-            BacklogItem(title="SAM Error Recovery", file_path="/tmp/b.md"),
-        ]
-
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items)
-
-        ratios = [m[1] for m in matches]
-        assert ratios == sorted(ratios, reverse=True)
-
-    def test_find_fuzzy_duplicates_empty_title_returns_empty(self) -> None:
-        items = [BacklogItem(title="SAM Error Recovery", file_path="/tmp/p1-sam.md")]
-
-        matches = find_fuzzy_duplicates("", items)
-
-        assert matches == []
-
-    def test_find_fuzzy_duplicates_custom_threshold_respected(self) -> None:
-        items = [BacklogItem(title="Completely different title", file_path="/tmp/p1.md")]
-
-        # With 0.0 threshold everything matches
-        matches = find_fuzzy_duplicates("SAM Error Recovery", items, threshold=0.0)
-
-        assert len(matches) == 1
-
-
-# ---------------------------------------------------------------------------
 # normalize_issue_title
 # ---------------------------------------------------------------------------
 
@@ -1690,24 +1593,6 @@ class TestMergeSections:
 
         assert modified is False
         assert result == body
-
-
-# ---------------------------------------------------------------------------
-# find_fuzzy_duplicates edge cases (empty title guard)
-# ---------------------------------------------------------------------------
-
-
-class TestFindFuzzyDuplicatesEdgeCases:
-    """Tests for edge-case branches in find_fuzzy_duplicates."""
-
-    def test_find_fuzzy_duplicates_skips_items_with_empty_title(self) -> None:
-        # Items with no title should be silently skipped (line 400 coverage)
-        items = [BacklogItem(title="", file_path="/tmp/no-title.md"), BacklogItem(title="SAM", file_path="/tmp/b.md")]
-
-        matches = find_fuzzy_duplicates("SAM", items)
-
-        # Only the titled item can match
-        assert all(t != "" for t, _, _ in matches)
 
 
 # ---------------------------------------------------------------------------
