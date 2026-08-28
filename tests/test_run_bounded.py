@@ -44,6 +44,25 @@ def test_runner_times_out_and_returns_the_timeout_status() -> None:
     assert "timed out after 0.1 seconds" in result.stderr
 
 
+@pytest.mark.parametrize(
+    "pytest_arguments",
+    [
+        ("-n", "3"),
+        ("-n99",),
+        ("--numprocesses", "3"),
+        ("--numprocesses=99",),
+        ("-n", "auto"),
+        ("-n",),
+        ("-n", "2", "--numprocesses", "2"),
+    ],
+)
+def test_runner_rejects_unsafe_pytest_worker_options(pytest_arguments: tuple[str, ...]) -> None:
+    result = run_runner("--timeout-seconds", "1", "--", "uv", "run", "pytest", *pytest_arguments)
+
+    assert result.returncode == 2
+    assert "pytest worker count" in result.stderr
+
+
 @pytest.mark.skipif(os.name != "posix", reason="pytest locking is supported on POSIX hosts")
 def test_runner_serializes_concurrent_pytest_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     start_file = tmp_path / "starts.txt"

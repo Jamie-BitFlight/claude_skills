@@ -43,6 +43,14 @@ def run_gate(command: str) -> subprocess.CompletedProcess[str]:
         "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run --directory /tmp pytest tests/test_run_bounded.py",
         'uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest "#"; pytest tests/test_run_bounded.py',
         "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest\npytest tests/test_run_bounded.py",
+        "pyte''st tests/test_run_bounded.py",
+        'pyte""st tests/test_run_bounded.py',
+        "pyte\\st tests/test_run_bounded.py",
+        "\\pytest tests/test_run_bounded.py",
+        'python -m pyte""st tests/test_run_bounded.py',
+        "uv run pyte\\st tests/test_run_bounded.py",
+        "sh -c 'pyte''st tests/test_run_bounded.py'",
+        "x=pytest; $x tests/test_run_bounded.py",
     ],
 )
 def test_gate_rejects_raw_pytest_commands(command: str) -> None:

@@ -205,9 +205,9 @@ async def test_tool_schema():
 Commands:
 
 ```bash
-pytest -n 2 --inline-snapshot=create        # populate empty snapshots
-pytest -n 2 --inline-snapshot=fix           # update after intentional changes
-pytest -n 2 --inline-snapshot=fix,create    # combined: create new and fix existing
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 --inline-snapshot=create        # populate empty snapshots
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 --inline-snapshot=fix           # update after intentional changes
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 --inline-snapshot=fix,create    # combined: create new and fix existing
 ```
 
 For values that change between runs (timestamps, IDs, random data), use `dirty-equals` for flexible equality assertions:
@@ -375,12 +375,12 @@ async def test_tool(): ...
 ## Running Tests [18]
 
 ```bash
-uv run pytest -n 2                       # run all tests in parallel
-uv run pytest -n 2 -x                    # stop on first failure
-uv run pytest -n 2 path/to/test.py       # run specific file
-uv run pytest -n 2 -k "test_name"        # run tests matching pattern
-uv run pytest -n 2 -m "not integration"  # exclude integration tests
-uv run pytest -n 2 --cov=fastmcp         # run with coverage
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2                       # run all tests in parallel
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 -x                    # stop on first failure
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 path/to/test.py       # run specific file
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 -k "test_name"        # run tests matching pattern
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 -m "not integration"  # exclude integration tests
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -n 2 --cov=fastmcp         # run with coverage
 ```
 
 ---

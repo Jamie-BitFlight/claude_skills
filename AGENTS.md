@@ -469,7 +469,7 @@ this file) was removed to avoid two files drifting out of sync.
 2. **Plan**: Write architect/feature-context docs in `plan/`
 3. **Implement**: Write code following conventions above
 4. **Validate**: Run `uv run ruff check --fix && uv run ruff format && uv run ty check`
-5. **Test**: Run `uv run pytest` on affected areas
+5. **Test**: Run `uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest` on affected areas
 6. **Pre-commit**: Run `uv run prek run --files <changed-files>` to verify hooks pass
 7. **Commit**: Use conventional commit format with required scope
 

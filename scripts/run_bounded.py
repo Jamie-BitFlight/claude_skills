@@ -29,6 +29,7 @@ PYTEST_LOCK_PATH = (
     Path(tempfile.gettempdir()) / f"claude-skills-pytest-{os.getuid() if os.name == 'posix' else 'unsupported'}.lock"
 )
 LOCK_POLL_SECONDS = 0.05
+MAX_XDIST_WORKERS = 2
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -75,15 +76,54 @@ def process_group_is_alive(pgid: int) -> bool:
 
 
 def _is_pytest_command(command: list[str]) -> bool:
+    return _pytest_arguments(command) is not None
+
+
+def _pytest_arguments(command: list[str]) -> list[str] | None:
     if not command:
-        return False
+        return None
 
     executable = Path(command[0]).name.lower()
     if executable in {"pytest", "pytest.exe"}:
-        return True
+        return command[1:]
     if command[1:3] == ["-m", "pytest"]:
-        return True
-    return command[:2] == ["uv", "run"] and (command[2:3] == ["pytest"] or command[2:4] == ["-m", "pytest"])
+        return command[3:]
+    if command[:3] == ["uv", "run", "pytest"]:
+        return command[3:]
+    if command[:4] == ["uv", "run", "-m", "pytest"]:
+        return command[4:]
+    return None
+
+
+def _validate_pytest_workers(command: list[str]) -> None:
+    arguments = _pytest_arguments(command)
+    if arguments is None:
+        return
+
+    worker_values: list[str] = []
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument in {"-n", "--numprocesses"}:
+            index += 1
+            if index == len(arguments):
+                raise ValueError("pytest worker count requires a value")
+            worker_values.append(arguments[index])
+        elif argument.startswith("-n"):
+            worker_values.append(argument.removeprefix("-n"))
+        elif argument.startswith("--numprocesses="):
+            worker_values.append(argument.removeprefix("--numprocesses="))
+        elif argument.startswith("--numprocesses"):
+            raise ValueError("pytest worker count is malformed")
+        index += 1
+
+    if len(worker_values) > 1:
+        raise ValueError("pytest worker count is ambiguous")
+    if not worker_values:
+        return
+    worker_value = worker_values[0]
+    if not worker_value.isdecimal() or int(worker_value) > MAX_XDIST_WORKERS:
+        raise ValueError("pytest worker count must be an integer no greater than 2")
 
 
 def _open_pytest_lock() -> TextIO:
@@ -169,6 +209,7 @@ def run_command(command: list[str], timeout_seconds: float) -> int:
         raise ValueError("--timeout-seconds must be greater than zero")
     if not command:
         raise ValueError("A command is required after --")
+    _validate_pytest_workers(command)
 
     deadline = time.monotonic() + timeout_seconds
     process: subprocess.Popen[Any] | None = None

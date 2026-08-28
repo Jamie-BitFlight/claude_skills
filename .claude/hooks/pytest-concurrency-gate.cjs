@@ -21,10 +21,24 @@ function isCanonicalWrapper(command) {
   return !unsafeShellSyntaxPattern.test(command) && canonicalWrapperPattern.test(command);
 }
 
+function normalizeShellWords(command) {
+  return command
+    .replace(
+      /'([^']*)'|"([^"]*)"/g,
+      (_, singleQuoted, doubleQuoted) => singleQuoted ?? doubleQuoted ?? '',
+    )
+    .replace(/\\(.)/g, '$1');
+}
+
 const event = readEvent();
 const command = typeof event?.tool_input?.command === 'string' ? event.tool_input.command : '';
+const normalizedCommand = normalizeShellWords(command);
+const hasDynamicPytestExpansion = command.includes('$') && normalizedCommand.includes('pytest');
 
-if (pytestTokenPattern.test(command) && !isCanonicalWrapper(command)) {
+if (
+  (pytestTokenPattern.test(normalizedCommand) || hasDynamicPytestExpansion) &&
+  !isCanonicalWrapper(command)
+) {
   process.stderr.write(
     'Run pytest through the shared host lock: uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest <args>\n',
   );
