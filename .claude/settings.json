@@ -40,6 +40,17 @@
         ],
         "matcher": "init|maintenance"
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pytest-concurrency-gate.cjs",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
     ]
   },
   "worktree": {

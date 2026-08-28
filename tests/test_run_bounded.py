@@ -39,6 +39,58 @@ def test_runner_times_out_and_returns_the_timeout_status() -> None:
     assert "timed out after 0.1 seconds" in result.stderr
 
 
+def test_runner_serializes_concurrent_python_module_pytest_invocations(tmp_path: Path) -> None:
+    start_file = tmp_path / "starts.txt"
+    pytest_config = tmp_path / "pytest.ini"
+    sleeping_test = tmp_path / "test_sleeping.py"
+    pytest_config.write_text("[pytest]\n")
+    sleeping_test.write_text(
+        "import os\n"
+        "import time\n"
+        "from pathlib import Path\n\n"
+        "def test_holds_lock():\n"
+        "    with Path(os.environ['PYTEST_LOCK_START_FILE']).open('a') as start_log:\n"
+        "        start_log.write(f'{time.monotonic()}\\n')\n"
+        "    time.sleep(0.5)\n"
+    )
+    environment = {**os.environ, "PYTEST_LOCK_START_FILE": str(start_file)}
+    command = [
+        sys.executable,
+        str(RUNNER),
+        "--timeout-seconds",
+        "10",
+        "--",
+        sys.executable,
+        "-m",
+        "pytest",
+        "-c",
+        str(pytest_config),
+        str(sleeping_test),
+    ]
+
+    first = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        time.sleep(0.1)
+        second = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            first_output, first_error = first.communicate(timeout=15)
+            second_output, second_error = second.communicate(timeout=15)
+        finally:
+            if second.poll() is None:
+                second.kill()
+                second.wait()
+    finally:
+        if first.poll() is None:
+            first.kill()
+            first.wait()
+
+    assert first.returncode == 0, first_output + first_error
+    assert second.returncode == 0, second_output + second_error
+    starts = sorted(float(value) for value in start_file.read_text().splitlines())
+    assert len(starts) == 2
+    assert starts[1] - starts[0] >= 0.3
+
+
 def test_runner_timeout_terminates_a_sleeping_grandchild() -> None:
     """Timeout cleanup reaches descendants that inherit the child process group."""
     child_program = (
