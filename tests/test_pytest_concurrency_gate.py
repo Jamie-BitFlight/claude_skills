@@ -20,6 +20,13 @@ def run_gate(command: str) -> subprocess.CompletedProcess[str]:
         "pytest tests/test_run_bounded.py",
         "uv run pytest tests/test_run_bounded.py",
         "python -m pytest tests/test_run_bounded.py",
+        "command pytest tests/test_run_bounded.py",
+        "/tmp/pytest tests/test_run_bounded.py",
+        "uv run --no-sync pytest tests/test_run_bounded.py",
+        "uv run -q --locked pytest tests/test_run_bounded.py",
+        "env PYTEST_ADDOPTS=-q pytest tests/test_run_bounded.py",
+        "pytest tests/test_run_bounded.py # scripts/run_bounded.py",
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- true; pytest tests/test_run_bounded.py",
     ],
 )
 def test_gate_rejects_raw_pytest_commands(command: str) -> None:
@@ -32,6 +39,15 @@ def test_gate_rejects_raw_pytest_commands(command: str) -> None:
 def test_gate_allows_the_canonical_bounded_pytest_wrapper() -> None:
     result = run_gate(
         "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest tests/test_run_bounded.py"
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+
+
+def test_gate_allows_a_canonical_wrapper_with_a_trailing_comment() -> None:
+    result = run_gate(
+        "uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest tests/test_run_bounded.py # bounded"
     )
 
     assert result.returncode == 0

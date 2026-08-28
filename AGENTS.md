@@ -44,11 +44,11 @@ uvx skilllint@latest check <path>          # Validate skill/agent/plugin frontma
 ### Testing
 
 ```bash
-uv run pytest                              # Run full test suite (parallel via xdist)
-uv run pytest -m "not slow"                # Skip slow tests
-uv run pytest --cov=scripts                # Coverage is always on (addopts); this flag is redundant
-uv run pytest plugins/development-harness/tests/  # Specific test directory
-uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py  # Specific test file
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest  # Run full suite (parallel via xdist)
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest -m "not slow"  # Skip slow tests
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest --cov=scripts  # Coverage is always on (addopts)
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest plugins/development-harness/tests/  # Specific directory
+uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py  # Specific file
 ```
 
 ### Plugin Testing
@@ -432,7 +432,7 @@ this file) was removed to avoid two files drifting out of sync.
 3. **Skip magic trailing comma**: Ruff config has `skip-magic-trailing-comma = true` — formatting differences around trailing commas are expected.
 4. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
 5. **pytest parallelism**: Tests run with `-n 2 --dist loadgroup` (xdist): one controller plus two workers. Tests marked with `@pytest.mark.xdist_group` run in same worker.
-6. **Agent pytest concurrency**: Run agent pytest through `uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest <args>`. It serializes wrapped pytest invocations on this host; Claude's Bash hook rejects raw pytest commands. Direct terminal commands or other tool integrations bypass that enforcement boundary.
+6. **Agent pytest concurrency**: On POSIX hosts, run agent pytest through `uv run --script scripts/run_bounded.py --timeout-seconds 300 -- uv run pytest <args>`. It safely serializes wrapped pytest invocations on this host, including lock waiting; unsupported hosts fail closed. Claude's Bash hook rejects raw pytest commands. Direct terminal commands or other tool integrations bypass that enforcement boundary.
 7. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
 8. **Ignored planning context**: `plan/` and `.claude/backlog/` are ignored working context and excluded from markdownlint. Do not force-add either directory.
 9. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.

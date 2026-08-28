@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -17,6 +18,10 @@ RUNNER = Path(__file__).parents[1] / "scripts" / "run_bounded.py"
 def run_runner(*arguments: str) -> subprocess.CompletedProcess[str]:
     """Invoke the standalone runner under the current test interpreter."""
     return subprocess.run([sys.executable, str(RUNNER), *arguments], capture_output=True, check=False, text=True)
+
+
+def _run_pytest_helper(helper_path: str, timeout_seconds: float) -> None:
+    raise SystemExit(run_bounded.run_command([helper_path], timeout_seconds))
 
 
 def test_runner_relays_a_successful_childs_output_and_status() -> None:
@@ -39,56 +44,94 @@ def test_runner_times_out_and_returns_the_timeout_status() -> None:
     assert "timed out after 0.1 seconds" in result.stderr
 
 
-def test_runner_serializes_concurrent_python_module_pytest_invocations(tmp_path: Path) -> None:
+@pytest.mark.skipif(os.name != "posix", reason="pytest locking is supported on POSIX hosts")
+def test_runner_serializes_concurrent_pytest_helpers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     start_file = tmp_path / "starts.txt"
-    pytest_config = tmp_path / "pytest.ini"
-    sleeping_test = tmp_path / "test_sleeping.py"
-    pytest_config.write_text("[pytest]\n")
-    sleeping_test.write_text(
+    helper = tmp_path / "pytest"
+    helper.write_text(
+        f"#!{sys.executable}\n"
         "import os\n"
         "import time\n"
         "from pathlib import Path\n\n"
-        "def test_holds_lock():\n"
-        "    with Path(os.environ['PYTEST_LOCK_START_FILE']).open('a') as start_log:\n"
-        "        start_log.write(f'{time.monotonic()}\\n')\n"
-        "    time.sleep(0.5)\n"
+        "with Path(os.environ['PYTEST_LOCK_START_FILE']).open('a') as start_log:\n"
+        "    start_log.write(f'{time.monotonic()}\\n')\n"
+        "time.sleep(0.5)\n"
     )
-    environment = {**os.environ, "PYTEST_LOCK_START_FILE": str(start_file)}
-    command = [
-        sys.executable,
-        str(RUNNER),
-        "--timeout-seconds",
-        "10",
-        "--",
-        sys.executable,
-        "-m",
-        "pytest",
-        "-c",
-        str(pytest_config),
-        str(sleeping_test),
-    ]
-
-    first = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    helper.chmod(0o700)
+    monkeypatch.setattr(run_bounded, "PYTEST_LOCK_PATH", tmp_path / "pytest.lock")
+    monkeypatch.setenv("PYTEST_LOCK_START_FILE", str(start_file))
+    context = multiprocessing.get_context("fork")
+    first = context.Process(target=_run_pytest_helper, args=(str(helper), 10))
     try:
-        time.sleep(0.1)
-        second = subprocess.Popen(command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        first.start()
+        for _ in range(100):
+            if start_file.exists():
+                break
+            time.sleep(0.01)
+        second = context.Process(target=_run_pytest_helper, args=(str(helper), 10))
         try:
-            first_output, first_error = first.communicate(timeout=15)
-            second_output, second_error = second.communicate(timeout=15)
+            second.start()
+            first.join(timeout=15)
+            second.join(timeout=15)
         finally:
-            if second.poll() is None:
-                second.kill()
-                second.wait()
+            if second.is_alive():
+                second.terminate()
+                second.join()
     finally:
-        if first.poll() is None:
-            first.kill()
-            first.wait()
+        if first.is_alive():
+            first.terminate()
+            first.join()
 
-    assert first.returncode == 0, first_output + first_error
-    assert second.returncode == 0, second_output + second_error
+    assert first.exitcode == 0
+    assert second.exitcode == 0
     starts = sorted(float(value) for value in start_file.read_text().splitlines())
     assert len(starts) == 2
     assert starts[1] - starts[0] >= 0.3
+
+
+@pytest.mark.skipif(os.name != "posix", reason="pytest locking is supported on POSIX hosts")
+def test_runner_timeout_includes_pytest_lock_wait(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    start_file = tmp_path / "starts.txt"
+    helper = tmp_path / "pytest"
+    helper.write_text(
+        f"#!{sys.executable}\n"
+        "import os\n"
+        "import time\n"
+        "from pathlib import Path\n\n"
+        "Path(os.environ['PYTEST_LOCK_START_FILE']).touch()\n"
+        "time.sleep(0.5)\n"
+    )
+    helper.chmod(0o700)
+    monkeypatch.setattr(run_bounded, "PYTEST_LOCK_PATH", tmp_path / "pytest.lock")
+    monkeypatch.setenv("PYTEST_LOCK_START_FILE", str(start_file))
+    holder = multiprocessing.get_context("fork").Process(target=_run_pytest_helper, args=(str(helper), 10))
+    try:
+        holder.start()
+        for _ in range(100):
+            if start_file.exists():
+                break
+            time.sleep(0.01)
+        start = time.monotonic()
+        exit_code = run_bounded.run_command([str(helper)], 0.1)
+        elapsed = time.monotonic() - start
+    finally:
+        if holder.is_alive():
+            holder.terminate()
+            holder.join()
+
+    assert exit_code == 124
+    assert elapsed < 0.3
+
+
+@pytest.mark.skipif(os.name != "posix", reason="pytest locking is supported on POSIX hosts")
+def test_runner_refuses_a_symlinked_pytest_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "target"
+    lock_path = tmp_path / "pytest.lock"
+    lock_path.symlink_to(target)
+    monkeypatch.setattr(run_bounded, "PYTEST_LOCK_PATH", lock_path)
+
+    with pytest.raises(OSError, match="Too many levels of symbolic links"):
+        run_bounded.run_command([str(tmp_path / "pytest")], 1)
 
 
 def test_runner_timeout_terminates_a_sleeping_grandchild() -> None:
