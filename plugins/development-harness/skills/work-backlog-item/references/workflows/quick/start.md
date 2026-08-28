@@ -2,6 +2,16 @@
 
 **Trigger:** <mode/> is `--quick`. Skips grooming, RT-ICA, and SAM planning. For one-file fixes, broken links, and typo patches where full pipeline overhead is disproportionate.
 
+**Why skipping grooming is safe here**: a task and plan normally require gathering real detail —
+scope, where the problem occurs, whether it's even true — before they exist. `--quick` skips
+that gathering step, not the need for it. It's normally invoked mid-task, as an addendum to work
+already in progress, so the invoking agent already has that context from its own session — it
+already knows the scope and has already confirmed the problem, or it wouldn't have flagged it.
+Step 1's `{observations}` is where that already-known context gets written down, not investigated
+fresh. If the invoking agent doesn't actually have that context (a bare guess, not something it
+confirmed while doing other work), `--quick` produces a task too thin to act on — that's a sign
+the fix isn't actually trivial enough for this path, not something `--quick` itself can fix.
+
 **Entry point from proactive fix routing:** When an agent's pre-fix check classifies a discovered
 issue as trivial and routes it to --quick, the agent invokes this workflow as:
   /dh:work-backlog-item --quick {item title or #N}
