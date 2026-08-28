@@ -1229,7 +1229,16 @@ async def sync_now(
     )
 )
 async def backlog_add(
-    title: Annotated[str, Field(description="Item title")],
+    title: Annotated[
+        str,
+        Field(
+            description=(
+                "Item title — do not add a type prefix like 'fix:'/'docs:'/'chore:' yourself, "
+                "even though existing item titles show one: it is derived from `type` and "
+                "prepended automatically when the backend issue is created."
+            )
+        ),
+    ],
     priority: Annotated[str, Field(description="Priority level: P0, P1, P2, or Ideas")],
     description: Annotated[
         str,
