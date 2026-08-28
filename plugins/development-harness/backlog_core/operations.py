@@ -2851,6 +2851,28 @@ def _assemble_view_content(
 # ---------------------------------------------------------------------------
 
 
+def _live_lookup_id(item: BacklogItem | None, issue_num: str | None, selector: str) -> str | None:
+    """Resolve the identifier to pass to view_enrich_from_github() for a live check.
+
+    Precedence: an already-parsed numeric selector; else the cached item's own
+    known issue number/id (for a title-selector match — never the raw title
+    text, which the GitHub backend cannot resolve); else the raw selector
+    (bare beads nanoid with no local match yet).
+
+    Returns:
+        The identifier to pass to view_enrich_from_github(), or None when no
+        identifier of any kind is resolvable. Never an empty string.
+    """
+    if issue_num:
+        return issue_num
+    if item is not None:
+        number = getattr(item, "number", None)
+        if number:
+            return str(number)
+        return item.issue.lstrip("#") or None
+    return selector.strip() or None
+
+
 def view_item(
     selector: str,
     repo: str = "",
@@ -2861,6 +2883,7 @@ def view_item(
     output: Output | None = None,
     include_content: bool = True,
     section: str | None = None,
+    refresh: bool = False,
 ) -> ViewItemResult:
     """View a backlog item or GitHub issue by URL, #N, bare number, or title.
 
@@ -2896,6 +2919,13 @@ def view_item(
             For backend-owned structured items with structured sections but no raw body, supports
             numeric index (``"2"``), comma-separated indices (``"0,2"``),
             regex (``"/impact.*/``), or substring match.
+        refresh: When True, forces a live-backend check through the authoritative
+            resolution chain for every selector shape, including a title
+            substring that already resolved locally. When False (default), a
+            selector that already resolves to a local item returns the cached
+            copy without a network call; a selector with no local match still
+            triggers a live lookup regardless of this flag, since that is the
+            only way to resolve its identity at all.
 
     Returns:
         ViewItemResult with item/issue details. When ``include_content=True``,
@@ -2914,23 +2944,24 @@ def view_item(
 
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
-    if issue_num:
-        enriched = view_enrich_from_github(result, issue_num, repo)
-        if not enriched:
-            if not item:
-                raise ItemNotFoundError(selector)
-            out.warnings.append("backend unreachable — sections_index reflects provider-backed record, may be stale")
+    if item:
+        if refresh:
+            live_id = _live_lookup_id(item, issue_num, selector)
+            enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+            if not enriched:
+                out.warnings.append(
+                    "backend unreachable — sections_index reflects provider-backed record, may be stale"
+                )
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
-        if item:
-            result.groomed = item.metadata.groomed
-    elif not item:
-        if get_config().backend.issue_id_type == "string":
-            enriched = view_enrich_from_github(result, selector.strip(), repo)
-            if not enriched:
-                raise ItemNotFoundError(selector)
-        else:
+        result.groomed = item.metadata.groomed
+    elif issue_num or get_config().backend.issue_id_type == "string":
+        live_id = _live_lookup_id(item, issue_num, selector)
+        enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+        if not enriched:
             raise ItemNotFoundError(selector)
+    else:
+        raise ItemNotFoundError(selector)
 
     # MCP clients send numeric show values as strings; convert before forwarding.
     parsed_show: str | int | None = show
