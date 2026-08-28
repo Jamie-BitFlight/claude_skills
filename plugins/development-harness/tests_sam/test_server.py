@@ -1189,6 +1189,7 @@ def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path, monke
     from sam_schema.core.task_config import TaskConfig, reset_task_config, set_task_config
 
     mock_backend = MagicMock()
+    mock_backend.read_plan.return_value = {"feature": "test-plan", "tasks": []}
     mock_backend.finalize_plan.return_value = {"finalized": True, "state": "ready"}
     mock_backend.update_plan_fields.return_value = {"updated": True}
     set_task_config(TaskConfig(backend=mock_backend))

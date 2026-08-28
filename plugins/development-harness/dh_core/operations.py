@@ -71,8 +71,14 @@ from backlog_core.models import (
 from dispatch_schema import Wave
 from github import GithubException
 from pydantic import BaseModel
-from sam_schema.core.dependencies import DependencyGraph
-from sam_schema.core.exceptions import ConcurrentClaimUnsupportedError, PlanNotFoundError, SamError, TaskNotFoundError
+from sam_schema.core.dependencies import BookendValidator, DependencyGraph
+from sam_schema.core.exceptions import (
+    BookendValidationError,
+    ConcurrentClaimUnsupportedError,
+    PlanNotFoundError,
+    SamError,
+    TaskNotFoundError,
+)
 from sam_schema.core.models import (
     AcceptanceCriterion,
     ActiveTaskClearResult,
@@ -234,6 +240,8 @@ def create_plan(
     Raises:
         ValueError: When any task definition fails schema validation.
         ArtifactWriteError: When the configured provider cannot persist the plan.
+        BookendValidationError: When ``tasks`` is non-empty and its T0/TN
+            bookend tasks fail structural validation.
     """
     # Normalize tasks to Task models if they aren't already.
     # The CLI passes raw dicts (from YAML), the MCP server passes
@@ -251,6 +259,17 @@ def create_plan(
             normalized_tasks.append(Task.model_validate(t.model_dump()))
         else:
             normalized_tasks.append(Task.model_validate(dict(t)))
+
+    if normalized_tasks:
+        transient_plan = Plan(
+            feature=slug,
+            goal=goal,
+            tasks=normalized_tasks,
+            acceptance_criteria_structured=list(acceptance_criteria_structured or []),
+        )
+        errors = BookendValidator(transient_plan).validate()
+        if errors:
+            raise BookendValidationError(slug, errors)
 
     plan_data = backend.create_plan(
         slug=slug,
@@ -695,7 +714,15 @@ def finalize_plan(backend: TaskBackend, plan: str) -> FinalizePlanResult:
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
+        BookendValidationError: When the plan is not already ``ready`` and
+            its T0/TN bookend tasks fail structural validation.
     """
+    current = read_plan(backend, plan)
+    if current.plan.state != PlanState.READY:
+        errors = BookendValidator(current.plan).validate()
+        if errors:
+            raise BookendValidationError(current.plan.plan_id or plan, errors)
+
     result = backend.finalize_plan(plan)
     return FinalizePlanResult(finalized=result["finalized"], state=result["state"])
 
