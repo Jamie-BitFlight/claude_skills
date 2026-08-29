@@ -39,6 +39,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -335,7 +336,7 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
     return None, None
 
 
-def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str | None, str | None, str | int | None]:
+def _call_sam_active_task_get(session_id: str, timeout: int = 8) -> tuple[str | None, str | None, str | int | None]:
     """Retrieve active task context via the SAM CLI's ``active-task get`` subcommand.
 
     Primary retrieval path for SubagentStop. Returns parsed fields from the
@@ -380,7 +381,7 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
     return None, None, None
 
 
-def _call_sam_active_task_clear(session_id: str, timeout: int = 10) -> bool:
+def _call_sam_active_task_clear(session_id: str, timeout: int = 8) -> bool:
     """Clear active task context via the SAM CLI's ``active-task clear`` subcommand.
 
     Best-effort cleanup after SubagentStop completes. Never raises.
@@ -407,17 +408,29 @@ def _get_uv_executable() -> str | None:
     return shutil.which("uv")
 
 
-def _call_sam_cli(args: list[str], timeout: int = 15) -> str | None:
+def _call_sam_cli(args: list[str], timeout: int = 8) -> str | None:
     """Execute the SAM CLI as a subprocess and return raw stdout.
 
     Handles uv resolution, subprocess execution, and common failure modes.
     Callers are responsible for JSON parsing and context-specific error
     logging.
 
+    Launches the subprocess in its own session (``start_new_session=True``)
+    so a timeout can kill the whole process group, not just the immediate
+    ``uv`` child -- ``uv run --script`` may spawn its own child interpreter,
+    and killing only the ``uv`` pid would leave that interpreter orphaned.
+    The default timeout is kept comfortably below the 10-second PostToolUse
+    hook deadline in ``hooks/hooks.json`` -- a default at or above that
+    deadline lets Claude Code's own external SIGKILL win the race before
+    this method's internal timeout handling (and process-group cleanup) ever
+    runs, which is exactly the orphaned-process failure mode described in
+    ``.claude/rules/hook-subprocess-invocation.md``.
+
     Args:
         args: Subcommand and options to pass to the SAM CLI (e.g.
             ``["plan", "read", "--address", "P1/T1"]``).
-        timeout: Subprocess timeout in seconds.
+        timeout: Subprocess timeout in seconds. Must stay below the
+            PostToolUse hook's own timeout for the reason above.
 
     Returns:
         Raw stdout string on success, None on any failure (uv missing,
@@ -428,25 +441,33 @@ def _call_sam_cli(args: list[str], timeout: int = 15) -> str | None:
         return None
 
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             [uv, "run", "--script", str(_SAM_CLI_PATH), *args],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
-            check=False,
+            start_new_session=True,
         )
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
+    except (subprocess.SubprocessError, OSError):
         return None
 
-    if result.returncode != 0:
-        if result.stderr:
-            print(f"[hook] sam CLI {args[0] if args else ''} failed: {result.stderr.strip()}", file=sys.stderr)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        proc.communicate()
         return None
 
-    return result.stdout
+    if proc.returncode != 0:
+        if stderr:
+            print(f"[hook] sam CLI {args[0] if args else ''} failed: {stderr.strip()}", file=sys.stderr)
+        return None
+
+    return stdout
 
 
-def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, timeout: int = 15) -> bool:
+def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, timeout: int = 8) -> bool:
     """Update task status via the SAM CLI's ``plan state`` subcommand.
 
     Routes state writes through the SAM CLI, keeping the hook
@@ -481,7 +502,7 @@ def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, ti
 _UPDATE_FIELD_OPTIONS: dict[str, str] = {"completed": "--completed", "last-activity": "--last-activity"}
 
 
-def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, Any], timeout: int = 15) -> bool:
+def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, Any], timeout: int = 8) -> bool:
     """Update task fields via the SAM CLI's ``plan update`` subcommand.
 
     Only fields with a mapped CLI option are supported (a typed allowlist,
@@ -521,7 +542,7 @@ def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, An
     return True
 
 
-def _call_sam_task_read(plan_id: str, task_id: str, timeout: int = 15) -> SamTask | None:
+def _call_sam_task_read(plan_id: str, task_id: str, timeout: int = 8) -> SamTask | None:
     """Read a task via the SAM CLI's ``plan read`` subcommand.
 
     Routes task reads through the SAM CLI, keeping the hook backend-agnostic.

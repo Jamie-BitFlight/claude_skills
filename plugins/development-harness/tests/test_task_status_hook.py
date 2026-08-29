@@ -13,7 +13,9 @@ Covers:
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import json
+import signal
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess, SubprocessError, TimeoutExpired
@@ -66,6 +68,37 @@ def _cli_success_response(data: dict[str, Any]) -> CompletedProcess[str]:
 def _mcp_error_response(returncode: int = 1) -> CompletedProcess[str]:
     """Build a failed SAM CLI subprocess response."""
     return CompletedProcess(args=[], returncode=returncode, stdout="", stderr="error")
+
+
+def _popen_from_completed(cp: CompletedProcess[str], pid: int = 4242) -> MagicMock:
+    """Build a fake Popen instance whose communicate()/.returncode mirror a CompletedProcess.
+
+    The implementation moves off subprocess.run onto subprocess.Popen + communicate() so it
+    can redirect a timeout's kill to the whole process group. This adapts tests that already
+    express expected results as CompletedProcess to that new contract.
+    """
+    proc = MagicMock()
+    proc.communicate.return_value = (cp.stdout, cp.stderr)
+    proc.returncode = cp.returncode
+    proc.poll.return_value = cp.returncode
+    proc.pid = pid
+    proc.__enter__.return_value = proc
+    proc.__exit__.return_value = False
+    return proc
+
+
+def _popen_timeout(timeout: float = 8, pid: int = 4242) -> MagicMock:
+    """Build a fake Popen instance whose communicate() times out once, then reaps cleanly.
+
+    A list side_effect (rather than a bare exception) tolerates an implementation that calls
+    communicate() a second time after killing the process group to reap pipes/avoid warnings.
+    """
+    proc = MagicMock()
+    proc.communicate.side_effect = [TimeoutExpired(cmd="uv", timeout=timeout), ("", "")]
+    proc.pid = pid
+    proc.__enter__.return_value = proc
+    proc.__exit__.return_value = False
+    return proc
 
 
 def _argv_after(cmd: list[str], token: str) -> list[str]:
@@ -307,15 +340,15 @@ def test_call_sam_task_state_routes_through_mcp_subprocess(tmp_path: Path) -> No
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=response) as mock_run,
+        patch("subprocess.Popen", return_value=_popen_from_completed(response)) as mock_popen,
     ):
         # Act
         result = _call_sam_task_state(plan_addr, task_id, status)
 
     # Assert
     assert result is True
-    mock_run.assert_called_once()
-    cmd = mock_run.call_args[0][0]
+    mock_popen.assert_called_once()
+    cmd = mock_popen.call_args[0][0]
     assert _argv_after(cmd, "plan") == ["plan", "state", "--address", f"{plan_addr}/{task_id}", "--new-status", status]
 
 
@@ -352,7 +385,7 @@ def test_call_sam_task_state_returns_false_on_nonzero_returncode() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=_mcp_error_response()),
+        patch("subprocess.Popen", return_value=_popen_from_completed(_mcp_error_response())),
     ):
         # Act
         result = _call_sam_task_state("Pabc123", "T1", "complete")
@@ -367,7 +400,9 @@ def test_call_sam_task_state_returns_false_on_timeout() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", side_effect=TimeoutExpired(cmd="uv", timeout=15)),
+        patch("subprocess.Popen", return_value=_popen_timeout()),
+        patch("os.getpgid", return_value=4242),
+        patch("os.killpg"),
     ):
         # Act
         result = _call_sam_task_state("Pabc123", "T1", "complete")
@@ -382,7 +417,7 @@ def test_call_sam_task_state_returns_false_on_subprocess_error() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", side_effect=SubprocessError("broken pipe")),
+        patch("subprocess.Popen", side_effect=SubprocessError("broken pipe")),
     ):
         # Act
         result = _call_sam_task_state("Pabc123", "T1", "complete")
@@ -398,7 +433,7 @@ def test_call_sam_task_state_returns_false_on_malformed_json_response() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=bad_response),
+        patch("subprocess.Popen", return_value=_popen_from_completed(bad_response)),
     ):
         # Act
         result = _call_sam_task_state("Pabc123", "T1", "complete")
@@ -423,14 +458,14 @@ def test_call_sam_task_update_routes_through_mcp_subprocess() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=response) as mock_run,
+        patch("subprocess.Popen", return_value=_popen_from_completed(response)) as mock_popen,
     ):
         # Act
         result = _call_sam_task_update(plan_addr, task_id, fields)
 
     # Assert
     assert result is True
-    cmd = mock_run.call_args[0][0]
+    cmd = mock_popen.call_args[0][0]
     assert _argv_after(cmd, "plan") == [
         "plan",
         "update",
@@ -450,14 +485,14 @@ def test_call_sam_task_update_completed_maps_to_cli_option() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=response) as mock_run,
+        patch("subprocess.Popen", return_value=_popen_from_completed(response)) as mock_popen,
     ):
         # Act
         result = _call_sam_task_update("Pabc123", "T1", {"completed": timestamp})
 
     # Assert
     assert result is True
-    cmd = mock_run.call_args[0][0]
+    cmd = mock_popen.call_args[0][0]
     assert ["--completed", timestamp] == cmd[cmd.index("--completed") : cmd.index("--completed") + 2]
 
 
@@ -470,14 +505,14 @@ def test_call_sam_task_update_last_activity_maps_to_cli_option() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=response) as mock_run,
+        patch("subprocess.Popen", return_value=_popen_from_completed(response)) as mock_popen,
     ):
         # Act
         result = _call_sam_task_update("Pabc123", "T1", {"last-activity": timestamp})
 
     # Assert
     assert result is True
-    cmd = mock_run.call_args[0][0]
+    cmd = mock_popen.call_args[0][0]
     assert ["--last-activity", timestamp] == cmd[cmd.index("--last-activity") : cmd.index("--last-activity") + 2]
 
 
@@ -489,13 +524,13 @@ def test_call_sam_task_update_returns_false_for_unmapped_field() -> None:
     helper — it must fail closed rather than silently drop the field or crash.
     """
     # Arrange
-    with patch("subprocess.run") as mock_run:
+    with patch("subprocess.Popen") as mock_popen:
         # Act
         result = _call_sam_task_update("Pabc123", "T1", {"title": "New title"})
 
     # Assert
     assert result is False
-    mock_run.assert_not_called()
+    mock_popen.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -520,7 +555,7 @@ def test_call_sam_task_update_returns_false_on_nonzero_returncode() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=_mcp_error_response()),
+        patch("subprocess.Popen", return_value=_popen_from_completed(_mcp_error_response())),
     ):
         # Act
         result = _call_sam_task_update("Pabc123", "T1", {"last-activity": "ts"})
@@ -535,7 +570,9 @@ def test_call_sam_task_update_returns_false_on_timeout() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", side_effect=TimeoutExpired(cmd="uv", timeout=15)),
+        patch("subprocess.Popen", return_value=_popen_timeout()),
+        patch("os.getpgid", return_value=4242),
+        patch("os.killpg"),
     ):
         # Act
         result = _call_sam_task_update("Pabc123", "T1", {"last-activity": "ts"})
@@ -551,7 +588,7 @@ def test_call_sam_task_update_returns_false_on_malformed_json() -> None:
     with (
         patch("shutil.which", return_value="/usr/bin/uv"),
         patch.object(Path, "exists", return_value=True),
-        patch("subprocess.run", return_value=bad_response),
+        patch("subprocess.Popen", return_value=_popen_from_completed(bad_response)),
     ):
         # Act
         result = _call_sam_task_update("Pabc123", "T1", {"x": "y"})
@@ -726,7 +763,7 @@ def test_call_sam_task_read_success_returns_task_object(mocker: MockerFixture) -
 
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mock_run = mocker.patch("subprocess.run", return_value=response)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
 
     # Act
     result = _hook_mod._call_sam_task_read("Pf4281187", "T1")
@@ -735,7 +772,7 @@ def test_call_sam_task_read_success_returns_task_object(mocker: MockerFixture) -
     assert result is not None
     assert isinstance(result, Task)
     assert result.status == TaskStatus.IN_PROGRESS
-    mock_run.assert_called_once()
+    mock_popen.assert_called_once()
 
 
 def test_call_sam_task_read_sends_correct_mcp_input_json(mocker: MockerFixture) -> None:
@@ -753,14 +790,14 @@ def test_call_sam_task_read_sends_correct_mcp_input_json(mocker: MockerFixture) 
 
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mock_run = mocker.patch("subprocess.run", return_value=response)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
 
     # Act
     _hook_mod._call_sam_task_read("Pdec8934d", "T3")
 
     # Assert — correct CLI argv shape
-    mock_run.assert_called_once()
-    cmd = mock_run.call_args[0][0]
+    mock_popen.assert_called_once()
+    cmd = mock_popen.call_args[0][0]
     assert _argv_after(cmd, "plan") == ["plan", "read", "--address", "Pdec8934d/T3"]
 
 
@@ -787,7 +824,10 @@ def test_call_sam_task_read_returns_none_on_subprocess_failure(mocker: MockerFix
     """
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mocker.patch("subprocess.run", return_value=CompletedProcess(args=[], returncode=1, stdout="", stderr="err"))
+    mocker.patch(
+        "subprocess.Popen",
+        return_value=_popen_from_completed(CompletedProcess(args=[], returncode=1, stdout="", stderr="err")),
+    )
 
     call_sam_task_read = getattr(_hook_mod, "_call_sam_task_read", None)
     assert call_sam_task_read is not None, "_call_sam_task_read does not exist (RED)"
@@ -802,11 +842,11 @@ def test_call_sam_task_read_returns_none_on_timeout(mocker: MockerFixture) -> No
 
     RED: function does not exist on current code.
     """
-    from subprocess import TimeoutExpired
-
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mocker.patch("subprocess.run", side_effect=TimeoutExpired(cmd="uv", timeout=15))
+    mocker.patch("subprocess.Popen", return_value=_popen_timeout())
+    mocker.patch("os.getpgid", return_value=4242)
+    mocker.patch("os.killpg")
 
     call_sam_task_read = getattr(_hook_mod, "_call_sam_task_read", None)
     assert call_sam_task_read is not None, "_call_sam_task_read does not exist (RED)"
@@ -1018,10 +1058,10 @@ def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: Mocker
     active_task = {"active_task": {"plan": "Pf4281187", "task_id": "T1", "parent_issue_number": None}}
     mcp_response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(active_task), stderr="")
 
-    # Patch subprocess.run so _call_sam_active_task_get uses our response
+    # Patch subprocess.Popen so _call_sam_active_task_get uses our response
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mocker.patch("subprocess.run", return_value=mcp_response)
+    mocker.patch("subprocess.Popen", return_value=_popen_from_completed(mcp_response))
 
     # Act — let _resolve_active_task_context → _call_sam_active_task_get run naturally
     result = _hook_mod._resolve_active_task_context(hook_input)
@@ -1132,14 +1172,14 @@ def test_call_sam_active_task_get_passes_sam_active_task_target(mocker: MockerFi
 
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mock_run = mocker.patch("subprocess.run", return_value=response)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
 
     # Act
     _hook_mod._call_sam_active_task_get("test-session-id")
 
     # Assert
-    mock_run.assert_called_once()
-    cmd: list[str] = mock_run.call_args[0][0]
+    mock_popen.assert_called_once()
+    cmd: list[str] = mock_popen.call_args[0][0]
     assert _argv_after(cmd, "active-task") == ["active-task", "get", "--session-id", "test-session-id"]
 
 
@@ -1155,14 +1195,14 @@ def test_call_sam_active_task_clear_passes_sam_active_task_target(mocker: Mocker
 
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
-    mock_run = mocker.patch("subprocess.run", return_value=response)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
 
     # Act
     _hook_mod._call_sam_active_task_clear("test-session-id")
 
     # Assert
-    mock_run.assert_called_once()
-    cmd: list[str] = mock_run.call_args[0][0]
+    mock_popen.assert_called_once()
+    cmd: list[str] = mock_popen.call_args[0][0]
     assert _argv_after(cmd, "active-task") == ["active-task", "clear", "--session-id", "test-session-id"]
 
 
@@ -1316,3 +1356,100 @@ def test_hook_source_contains_no_fastmcp_invocation() -> None:
     """
     source = _hook_path.read_text(encoding="utf-8")
     assert "fastmcp" not in source.lower()
+
+
+# ---------------------------------------------------------------------------
+# PR #3306 review response — timeout ordering + process-group cleanup
+#
+# Two compounding defects fixed here:
+#   1. Every _call_sam_cli-family timeout default (15s, or 10s for the
+#      active-task helpers) is not safely below the outer 10s PostToolUse hook
+#      deadline Claude Code itself enforces — the external SIGKILL can beat
+#      subprocess's own internal timeout handling.
+#   2. subprocess.run(timeout=...) only kills the immediate child (uv); a
+#      descendant process uv forks (the real sam_schema/cli.py interpreter)
+#      can be left running — the orphaned-process failure mode this whole
+#      area of the codebase exists to prevent.
+# ---------------------------------------------------------------------------
+
+
+def test_timeout_defaults_are_below_outer_hook_deadline() -> None:
+    """Every _call_sam_cli-family function's own timeout default must be < 10s.
+
+    The outer PostToolUse hook deadline is a hard 10s SIGKILL of the whole
+    hook process, enforced externally by Claude Code. An internal subprocess
+    timeout default at or above that value can never fire before the outer
+    kill does, so subprocess's own timeout/cleanup path never gets a chance
+    to run — this is the exact defect already fixed once for the old
+    fastmcp-call path, recurring here for the plain-CLI replacement.
+    """
+    funcs = [
+        _hook_mod._call_sam_cli,
+        _hook_mod._call_sam_task_state,
+        _hook_mod._call_sam_task_update,
+        _hook_mod._call_sam_task_read,
+        _hook_mod._call_sam_active_task_get,
+        _hook_mod._call_sam_active_task_clear,
+    ]
+    for func in funcs:
+        default = inspect.signature(func).parameters["timeout"].default
+        assert default < 10, f"{func.__name__} timeout default is {default!r}, must be < 10"
+
+
+def test_call_sam_cli_kills_entire_process_group_on_timeout(mocker: MockerFixture) -> None:
+    """On timeout, _call_sam_cli kills the whole process group, not just the immediate pid.
+
+    subprocess.run(timeout=...) only ever calls .kill() on the immediate child
+    (the uv process). If `uv run --script` forks rather than execs into the
+    actual interpreter, that descendant survives — an orphaned process. The
+    fix kills the entire process group via os.killpg(os.getpgid(pid), SIGKILL).
+    """
+    proc = _popen_timeout(pid=4242)
+
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mocker.patch("subprocess.Popen", return_value=proc)
+    mocker.patch("os.getpgid", return_value=4242)
+    mock_killpg = mocker.patch("os.killpg")
+
+    result = _hook_mod._call_sam_cli(["plan", "read", "--address", "P1/T1"])
+
+    assert result is None
+    mock_killpg.assert_called_once_with(4242, signal.SIGKILL)
+
+
+def test_call_sam_cli_launches_subprocess_in_new_session(mocker: MockerFixture) -> None:
+    """_call_sam_cli launches its subprocess with start_new_session=True.
+
+    A new session/process group is the prerequisite for os.killpg to be able
+    to target the whole process tree instead of just the immediate child pid.
+    """
+    proc = _popen_from_completed(CompletedProcess(args=[], returncode=0, stdout="{}", stderr=""), pid=1234)
+
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=proc)
+
+    _hook_mod._call_sam_cli(["plan", "read", "--address", "P1/T1"])
+
+    mock_popen.assert_called_once()
+    assert mock_popen.call_args.kwargs.get("start_new_session") is True
+
+
+def test_call_sam_cli_timeout_killpg_race_does_not_raise(mocker: MockerFixture) -> None:
+    """A ProcessLookupError from os.killpg (process already exited) does not propagate.
+
+    Between the timeout firing and the killpg call, the process may have already
+    exited on its own — a benign race, not a failure the hook should crash on.
+    """
+    proc = _popen_timeout(pid=4242)
+
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mocker.patch("subprocess.Popen", return_value=proc)
+    mocker.patch("os.getpgid", return_value=4242)
+    mocker.patch("os.killpg", side_effect=ProcessLookupError)
+
+    result = _hook_mod._call_sam_cli(["plan", "read", "--address", "P1/T1"])
+
+    assert result is None
