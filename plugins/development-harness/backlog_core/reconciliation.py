@@ -48,6 +48,7 @@ class CacheAction(BaseModel):
     phase: Literal["before_provider", "checkpoint"] = "before_provider"
     record: LogicalCacheRecord
     requires_patch: str = ""
+    reference: str = ""
 
 
 class ReconcilePlan(BaseModel):
@@ -197,9 +198,15 @@ def _action(
     phase: Literal["before_provider", "checkpoint"] = "before_provider",
     requires_patch: str = "",
     kind: Literal["upsert", "unlink"] = "upsert",
+    reference: str = "",
 ) -> CacheAction:
     return CacheAction(
-        key=key, kind=kind, phase=phase, record=LogicalCacheRecord(key=key, item=item), requires_patch=requires_patch
+        key=key,
+        kind=kind,
+        phase=phase,
+        record=LogicalCacheRecord(key=key, item=item),
+        requires_patch=requires_patch,
+        reference=reference or item.metadata.issue,
     )
 
 
@@ -222,7 +229,7 @@ def _plan_item(
             sections=local.sections,
             metadata=metadata,
         )
-        plan.cache_actions.append(_action(record.key, unlinked, kind="unlink"))
+        plan.cache_actions.append(_action(record.key, unlinked, kind="unlink", reference=local.metadata.issue))
         plan.result.changed_references.append(provider.reference)
         return
     candidate, patch = _candidate(local, provider, request)

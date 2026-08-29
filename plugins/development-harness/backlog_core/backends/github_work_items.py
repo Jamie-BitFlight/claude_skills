@@ -513,7 +513,7 @@ class _GitHubReconciliation:
             patch_statuses = {patch.reference: "pending" for patch in plan.provider_patches}
             patch_statuses.update({result.reference: result.status for result in patch_results})
             failed_cache_references = {
-                action.record.item.metadata.issue
+                action.reference
                 for action in plan.cache_actions
                 for result in cache_results
                 if (action.key, action.phase) == (result.key, result.phase) and result.status == "error"

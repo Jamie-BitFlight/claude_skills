@@ -278,6 +278,52 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
     assert backend._apply_patches.call_count == 1
 
 
+def test_reconcile_does_not_acknowledge_pending_mutation_when_unlink_snapshot_save_fails(tmp_path: Path) -> None:
+    """A GitHub-deleted issue produces an unlink CacheAction whose ``record.item``
+
+    has ``metadata.issue`` already cleared to ``""`` (see ``_plan_item``'s
+    unlinked-copy construction). If the acknowledgement guard in
+    ``github_work_items.reconcile`` keys ``failed_cache_references`` off
+    ``action.record.item.metadata.issue`` it collects ``""`` instead of the
+    real reference, so a failed unlink write never blocks acknowledgement and
+    the still-pending local mutation is wrongly dropped. Fails (RED) against
+    the unfixed guard.
+    """
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    local = BacklogItem(title="Issue 1", description="local body")
+    local.metadata.issue = "#1"
+    backend.put_work_item(local)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body="",
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                    exists=False,
+                )
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    cache._save_work_item_snapshot = MagicMock(side_effect=OSError("disk full"))
+
+    # When: reconciliation processes the unlink action and its cache write fails
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    # Then: the pending mutation must remain queued -- it was never durably unlinked
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+    assert [mutation.item.metadata.issue for mutation in pending] == ["#1"], (
+        "Mutation was acknowledged despite the unlink cache write failing"
+    )
+
+
 def test_github_reconcile_retains_mutation_queued_after_plan_construction(tmp_path: Path) -> None:
     # Given: a queued body change whose provider patch will succeed
     cache = FileCache(tmp_path)
