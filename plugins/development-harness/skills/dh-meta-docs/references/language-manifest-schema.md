@@ -14,7 +14,7 @@ Language manifests extend Layer 0 (SDLC-agnostic). They do **not** redefine:
 - RT-ICA, verification protocol
 - Task record schema
 
-See [.claude/docs/sdlc-layers/layer-0/](../../../../.claude/docs/sdlc-layers/layer-0/). Layer 0 gates apply before role resolution.
+See [docs/sdlc-layers/layer-0/](../../../docs/sdlc-layers/layer-0/). Layer 0 gates apply before role resolution.
 
 ---
 
@@ -375,7 +375,7 @@ Validation failures produce warnings but do not block the pipeline. The harness 
 
 - Role resolution protocol: [./role-resolution-protocol.md](./role-resolution-protocol.md)
 - Language manifest template: [../../templates/language-manifest-template.md](../../templates/language-manifest-template.md)
-- Layer 1 overview: [.claude/docs/sdlc-layers/layer-1/layer-1-overview.md](../../../../.claude/docs/sdlc-layers/layer-1/layer-1-overview.md)
+- Layer 1 overview: [docs/sdlc-layers/layer-1/layer-1-overview.md](../../../docs/sdlc-layers/layer-1/layer-1-overview.md)
 
 ---
 
