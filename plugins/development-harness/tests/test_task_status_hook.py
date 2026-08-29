@@ -1475,7 +1475,7 @@ def _write_activity_update_context(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     context_dir = dh_paths.context_dir()
     context_dir.mkdir(parents=True, exist_ok=True)
     context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "task_id": "T1"}))
+    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "plan": "Pf4281187", "task_id": "T1"}))
 
     return {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
 
