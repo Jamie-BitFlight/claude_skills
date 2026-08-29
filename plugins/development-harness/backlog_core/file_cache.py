@@ -165,8 +165,18 @@ class FileCache:
                     "stale": False,
                 }
             )
+            # A prior rejection for this reference is moot the moment new intent is
+            # queued for it -- mirrors discard_pending treating a rejected entry as
+            # stale once superseded, and stops it from outliving a later successful write.
+            rejected = [item for item in state.rejected if item.write.reference != write.reference]
             return (
-                state.model_copy(update={"records": self._replace_record(state.records, cached), "pending": pending}),
+                state.model_copy(
+                    update={
+                        "records": self._replace_record(state.records, cached),
+                        "pending": pending,
+                        "rejected": rejected,
+                    }
+                ),
                 mutation,
             )
 
@@ -203,19 +213,26 @@ class FileCache:
 
         self._state.transaction(discard)
 
-    def reject_pending(self, reference: ContentRef, reason: str) -> None:
-        """Move the queued mutation for a reference out of ``pending`` into ``rejected``.
+    def reject_pending(self, reference: ContentRef, idempotency_key: str, reason: str) -> None:
+        """Move the queued mutation matching ``idempotency_key`` out of ``pending`` into ``rejected``.
 
         Called when a replay attempt fails with a precondition error that
         retrying can never satisfy, so the mutation must stop occupying the
         unbounded-retry pending queue while still being retained for inspection.
+
+        Matches by ``idempotency_key`` rather than ``reference`` alone: a newer
+        ``queue_write`` call can replace the pending entry for a reference between
+        when a replay attempt started and when it failed, and rejecting by
+        reference alone would wrongly discard that newer, never-attempted
+        mutation. A no-op when no pending entry matches the key -- the mutation
+        that failed has already been superseded or otherwise handled.
         """
 
         def reject(state: _CacheState) -> tuple[_CacheState, None]:
-            entry = next((item for item in state.pending if item.write.reference == reference), None)
+            entry = next((item for item in state.pending if item.idempotency_key == idempotency_key), None)
             if entry is None:
                 return state, None
-            remaining = [item for item in state.pending if item.write.reference != reference]
+            remaining = [item for item in state.pending if item.idempotency_key != idempotency_key]
             rejected = [
                 *(item for item in state.rejected if item.write.reference != reference),
                 _RejectedMutation(idempotency_key=entry.idempotency_key, write=entry.write, reason=reason),

@@ -385,7 +385,7 @@ class _GitHubContentCache:
                 record = self._provider._write_online_content(mutation.write, cached)
             except (ContentConflictError, UnsupportedCapabilityError) as exc:
                 _log.warning("replay rejected %s: %s", mutation.write.reference.model_dump_json(), exc)
-                self._cache.reject_pending(mutation.write.reference, str(exc))
+                self._cache.reject_pending(mutation.write.reference, mutation.idempotency_key, str(exc))
                 continue
             except (BacklogError, ContentUnavailableError, OSError):
                 break

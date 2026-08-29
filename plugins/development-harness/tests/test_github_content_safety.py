@@ -415,6 +415,46 @@ def test_replay_conflict_rejects_pending_mutation(tmp_path: Path, monkeypatch: p
     assert len(backend._cache.rejected_mutations()) == 1
 
 
+def test_replay_conflict_does_not_reject_mutation_that_superseded_it_mid_flight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mutation superseded while its own replay is in flight must survive a later rejection.
+
+    Regression test for a review finding on PR #3306: `replay_pending()` snapshots
+    `pending_mutations()` at loop start, then calls `_write_online_content()` per
+    entry -- a network call that can race with a fresh offline edit for the same
+    reference landing in between (simulated here inside the write double). If that
+    first mutation's write then raises `ContentConflictError`, rejecting by
+    `reference` alone (the pre-fix behavior) discards whatever now occupies that
+    reference -- the newer, never-attempted mutation -- instead of the one that
+    actually failed.
+    """
+    reference = ContentRef(kind=ContentKind.PLAN, name="P123")
+    cached = ContentRecord(reference=reference, content="cached", revision="current")
+    cache = FileCache(tmp_path / "github-cache")
+    cache.cache_content(cached)
+    first = cache.queue_write(cached, ContentWrite(reference=reference, content="first", expected_revision="current"))
+    backend = GitHubBackend(cache=cache, plan_persistence=_UnavailablePlanPersistence())
+    monkeypatch.setattr(backend, "try_get_github", MagicMock)
+
+    def write(request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        cache.queue_write(
+            cached or ContentRecord(reference=reference, content="", revision=""),
+            ContentWrite(reference=reference, content="second", expected_revision="current"),
+        )
+        raise ContentConflictError("conflict")
+
+    monkeypatch.setattr(backend, "_write_online_content", write)
+
+    backend._replay_pending_content()
+
+    pending = backend._cache.pending_mutations()
+    assert len(pending) == 1
+    assert pending[0].write.content == "second"
+    assert pending[0].idempotency_key != first.idempotency_key
+    assert all(entry.idempotency_key != pending[0].idempotency_key for entry in backend._cache.rejected_mutations())
+
+
 def test_replay_conflict_continues_to_later_mutation_and_acknowledges_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

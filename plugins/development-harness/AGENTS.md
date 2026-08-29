@@ -85,9 +85,11 @@ MCP, CLI, skills, and agents use its logical protocols and do not select a secon
 
 Remote-capable providers privately compose `FileCache` for snapshots, stale reads, queued offline
 mutations, provider revisions, and artifact/plan continuity. Cache misses are unavailable data,
-not authoritative empty results; revision conflicts retain pending work. Beads, SQLite, and Memory
-use native storage directly: they never instantiate `FileCache`, read or write backlog YAML, or
-queue remote mutations.
+not authoritative empty results. A revision conflict stays pending and is retried until it either
+succeeds or a replay attempt determines it can never succeed, at which point it moves to a
+terminal, inspectable `rejected` state rather than being retried forever or silently dropped.
+Beads, SQLite, and Memory use native storage directly: they never instantiate `FileCache`, read or
+write backlog YAML, or queue remote mutations.
 
 Agents address plans and tasks logically (`P{id}/T{M}`) through `sam_plan`, `sam_task`, or the
 grouped DH CLI adapter. Physical paths, cache records, provider IDs, and wire formats are backend

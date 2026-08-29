@@ -12,7 +12,13 @@ import pydantic
 import pytest
 from backlog_core import file_cache
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
-from backlog_core.file_cache_state import PendingMutation, _CacheState, _CacheStateStore, _PendingWorkItemMutation
+from backlog_core.file_cache_state import (
+    PendingMutation,
+    _CacheState,
+    _CacheStateStore,
+    _PendingWorkItemMutation,
+    _RejectedMutation,
+)
 from backlog_core.models import (
     BacklogItem,
     ContentKind,
@@ -305,6 +311,93 @@ def test_file_cache_serializes_concurrent_instances_and_reopens_valid_state(tmp_
         CacheCheckpoint(reference=references[0], revision="rev-2", fingerprint="item-1-fp"),
         CacheCheckpoint(reference=references[1], revision="rev-2", fingerprint="item-2-fp"),
     ]
+
+
+def test_reject_pending_is_a_noop_when_the_targeted_mutation_was_superseded(tmp_path: Path) -> None:
+    """A stale idempotency key must not let reject_pending discard a superseding mutation.
+
+    Regression test for a review finding on PR #3306: reject_pending() looked up the
+    entry to move into `rejected` by `reference` alone. `queue_write()` deduplicates by
+    reference -- a newer queue_write() call for the same reference replaces the older
+    pending entry outright, so at most one pending entry per reference can ever exist.
+    If a replay attempt for the superseded (older) mutation later fails, rejecting by
+    reference alone would silently reject the newer, never-attempted mutation instead
+    of the one that actually failed. reject_pending must match by idempotency_key, so
+    it is inert once its target has already been superseded.
+    """
+    cache = FileCache(tmp_path)
+    reference = _reference("#1")
+    record = _record(reference, "before")
+    first = cache.queue_write(record, ContentWrite(reference=reference, content="first", expected_revision="rev-1"))
+    second = cache.queue_write(record, ContentWrite(reference=reference, content="second", expected_revision="rev-1"))
+    assert cache.pending_mutations() == [second]
+
+    cache.reject_pending(reference, first.idempotency_key, "stale replay failure")
+
+    assert cache.pending_mutations() == [second]
+    assert cache.rejected_mutations() == []
+
+
+def test_reject_pending_moves_the_matching_mutation_by_idempotency_key(tmp_path: Path) -> None:
+    """reject_pending still moves the correct mutation into `rejected` when it is current."""
+    cache = FileCache(tmp_path)
+    reference = _reference("#1")
+    record = _record(reference, "before")
+    mutation = cache.queue_write(record, ContentWrite(reference=reference, content="only", expected_revision="rev-1"))
+
+    cache.reject_pending(reference, mutation.idempotency_key, "precondition failed")
+
+    assert cache.pending_mutations() == []
+    rejected = cache.rejected_mutations()
+    assert len(rejected) == 1
+    assert rejected[0].idempotency_key == mutation.idempotency_key
+    assert rejected[0].reason == "precondition failed"
+
+
+def test_rejected_entry_is_cleared_once_a_superseding_write_is_acknowledged(tmp_path: Path) -> None:
+    """A rejected entry must not survive past a later successful write for the same reference.
+
+    Regression test for a review finding on PR #3306: discard_pending() clears both
+    `state.pending` and `state.rejected` for a reference, but acknowledge_replay() only
+    ever cleared `state.pending`. A reference whose earlier write was rejected (a genuine
+    terminal conflict), then edited and replayed again successfully, left the stale
+    rejected entry sitting in `rejected_mutations()` forever even though fresher content
+    had since landed for that reference. The rejected entry is seeded directly through
+    the durable state store here so this test exercises acknowledge_replay's own clearing
+    behavior independent of reject_pending's call signature.
+    """
+    cache = FileCache(tmp_path)
+    reference = _reference("#1")
+    record = _record(reference, "before")
+    cache.cache_content(record)
+    stale_rejected_write = ContentWrite(reference=reference, content="rejected", expected_revision="rev-1")
+    store = _CacheStateStore(tmp_path)
+    store.transaction(
+        lambda state: (
+            state.model_copy(
+                update={
+                    "rejected": [
+                        _RejectedMutation(
+                            idempotency_key="stale-key", write=stale_rejected_write, reason="precondition failed"
+                        )
+                    ]
+                }
+            ),
+            None,
+        )
+    )
+    assert len(cache.rejected_mutations()) == 1
+
+    retried = cache.queue_write(record, ContentWrite(reference=reference, content="retried", expected_revision="rev-1"))
+    cache.acknowledge_replay([
+        ReplayAcknowledgement(
+            idempotency_key=retried.idempotency_key,
+            record=_record(reference, "retried", revision="rev-2"),
+            fingerprint="fp-2",
+        )
+    ])
+
+    assert cache.rejected_mutations() == []
 
 
 def _populated_cache_state() -> _CacheState:
