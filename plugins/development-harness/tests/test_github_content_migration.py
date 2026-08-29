@@ -194,5 +194,10 @@ def test_replay_pending_discards_mutation_that_can_never_land(
     content_cache.replay_pending()
 
     # Then: the unresolvable mutation is discarded, not left to retry forever
+    # -- but retained (with its failure surfaced) in the rejected bucket
+    # rather than lost outright.
     assert provider.write_calls == 1
     assert cache.pending_mutations() == []
+    [rejected] = cache.rejected_mutations()
+    assert rejected.write.content == "queued content"
+    assert rejected.reason

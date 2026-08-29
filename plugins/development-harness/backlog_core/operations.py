@@ -1174,7 +1174,8 @@ def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
         return
     output.info(
         f"Reconciled {item.issue}: {result.provider_patches} provider patch(es), "
-        f"{result.pending_mutations} pending mutation(s), {result.failures} failure(s)."
+        f"{result.pending_mutations} pending mutation(s), {result.rejected_mutations} rejected mutation(s), "
+        f"{result.failures} failure(s)."
     )
 
 

@@ -22,6 +22,7 @@ from .file_cache_state import (
     _CacheStateStore,
     _PendingWorkItemMutation,
     _ProviderSnapshotCheckpoint,
+    _RejectedMutation,
 )
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
 from .yaml_io import load_item, load_item_text, save_item
@@ -175,25 +176,53 @@ class FileCache:
         """Return pending mutations in durable insertion order."""
         return list(self._load_state().pending)
 
+    def rejected_mutations(self) -> list[_RejectedMutation]:
+        """Return rejected mutations in durable insertion order."""
+        return list(self._load_state().rejected)
+
     def discard_pending(self, reference: ContentRef) -> None:
-        """Drop any queued mutation for a reference without touching cached content.
+        """Drop any queued or rejected mutation for a reference without touching cached content.
 
         Called after a direct online write for a reference lands successfully --
         that write already ran ahead of :meth:`pending_mutations` for the same
         reference (``put_content`` always calls ``replay_pending`` first), so a
         mutation still queued for it afterward is stale, superseded intent that
         must never be replayed against the fresher record it would land on top of.
-        No companion update to ``state.records`` is needed here: a stored record
-        never independently tracks pending status, so removing the queue entry
-        alone is sufficient -- the next :meth:`get_content` call derives
+        A rejected entry for the same reference is equally stale -- the newer
+        write supersedes whatever precondition previously failed. No companion
+        update to ``state.records`` is needed here: a stored record never
+        independently tracks pending status, so removing the queue entry alone
+        is sufficient -- the next :meth:`get_content` call derives
         ``pending=False`` from this queue's absence of an entry.
         """
 
         def discard(state: _CacheState) -> tuple[_CacheState, None]:
             remaining = [entry for entry in state.pending if entry.write.reference != reference]
-            return state.model_copy(update={"pending": remaining}), None
+            remaining_rejected = [entry for entry in state.rejected if entry.write.reference != reference]
+            return state.model_copy(update={"pending": remaining, "rejected": remaining_rejected}), None
 
         self._state.transaction(discard)
+
+    def reject_pending(self, reference: ContentRef, reason: str) -> None:
+        """Move the queued mutation for a reference out of ``pending`` into ``rejected``.
+
+        Called when a replay attempt fails with a precondition error that
+        retrying can never satisfy, so the mutation must stop occupying the
+        unbounded-retry pending queue while still being retained for inspection.
+        """
+
+        def reject(state: _CacheState) -> tuple[_CacheState, None]:
+            entry = next((item for item in state.pending if item.write.reference == reference), None)
+            if entry is None:
+                return state, None
+            remaining = [item for item in state.pending if item.write.reference != reference]
+            rejected = [
+                *(item for item in state.rejected if item.write.reference != reference),
+                _RejectedMutation(idempotency_key=entry.idempotency_key, write=entry.write, reason=reason),
+            ]
+            return state.model_copy(update={"pending": remaining, "rejected": rejected}), None
+
+        self._state.transaction(reject)
 
     def _queue_work_item(self, key: str, item: BacklogItem) -> _PendingWorkItemMutation:
         payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
@@ -218,6 +247,8 @@ class FileCache:
         return list(self._load_state().pending_work_items)
 
     def _acknowledge_work_items(self, idempotency_keys: set[str]) -> None:
+        if not idempotency_keys:
+            return
         self._state.transaction(
             lambda state: (
                 state.model_copy(
@@ -411,6 +442,10 @@ class FileCache:
         flag is ever independently trusted; every record written into
         ``state.records`` is normalised to ``pending=False`` on write
         (:meth:`cache_content`, :meth:`queue_write`, :meth:`acknowledge_replay`)
-        and this method recomputes the true value on every read.
+        and this method recomputes the true value on every read. A reference
+        moved to ``state.rejected`` by :meth:`reject_pending` is deliberately
+        *not* pending here -- once a mutation's precondition can never be
+        satisfied, a fresh online/legacy read is trusted again instead of
+        being shadowed by the stale queued content forever.
         """
         return any(entry.write.reference == reference for entry in state.pending)

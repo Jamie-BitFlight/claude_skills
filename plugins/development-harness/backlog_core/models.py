@@ -1313,6 +1313,7 @@ class ReconcileResult(BaseModel):
     stale: bool = False
     unavailable_references: list[str] = Field(default_factory=list)
     pending_mutations: int = 0
+    rejected_mutations: int = 0
 
 
 class Output(BaseModel):

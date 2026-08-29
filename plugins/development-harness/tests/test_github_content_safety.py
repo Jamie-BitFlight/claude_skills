@@ -146,18 +146,22 @@ def test_online_artifact_read_remains_available(tmp_path: Path) -> None:
 
 
 def test_pending_artifact_manifest_write_is_not_clobbered_by_empty_legacy_read(tmp_path: Path) -> None:
-    """A queued manifest write that cannot land yet must stay visible to readers.
+    """A create-only manifest write that already exists on the legacy store is rejected, not stuck.
 
-    Regression test for backlog item #2899: ``artifact_register`` reported
-    success but the artifact was invisible to ``artifact_list``/``artifact_get``
-    immediately after. Root cause -- ``GitHubGistArtifactProvider.get_manifest``
-    (the legacy fallback ``read_legacy`` uses for ``ARTIFACT_MANIFEST``) never
-    raises ``ContentNotFoundError`` for an item with no manifest data yet; it
-    returns a valid, empty manifest instead. Before the fix, ``get_content``
-    trusted that empty read as authoritative and cached it over the top of the
-    still-pending queued write (e.g. one blocked by a branch-protection ruleset
-    that rejects direct Contents API commits), erasing the just-registered
-    artifact from view.
+    Regression test for backlog item #2899, updated for Leak B (sibling to
+    ``test_replay_conflict_rejects_pending_mutation``): ``artifact_register``
+    reported success but the artifact was invisible to
+    ``artifact_list``/``artifact_get`` immediately after. Root cause --
+    ``GitHubGistArtifactProvider.get_manifest`` (the legacy fallback
+    ``read_legacy`` uses for ``ARTIFACT_MANIFEST``) never raises
+    ``ContentNotFoundError`` for an item with no manifest data yet; it returns
+    a valid, empty manifest instead, so the create-only write's replay attempt
+    trips ``ContentConflictError`` ("Content already exists") against that
+    legacy record. That precondition can never be satisfied by retrying, so
+    the mutation is rejected out of the pending queue -- no longer shadowing
+    reads forever -- and a fresh, authoritative read is trusted again. The
+    write's content is not silently lost: it lands in ``rejected_mutations()``
+    intact for inspection.
     """
     reference = ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace="1", name="manifest")
     base = ContentRecord(reference=reference, content="", revision="")
@@ -174,9 +178,13 @@ def test_pending_artifact_manifest_write_is_not_clobbered_by_empty_legacy_read(t
 
     record = backend.get_content(reference)
 
-    assert (record.content, record.pending) == (manifest_with_entry, True)
+    assert record.pending is False
+    assert record.content != manifest_with_entry
     provider.get_manifest.assert_called()
-    assert len(backend._cache.pending_mutations()) == 1
+    assert backend._cache.pending_mutations() == []
+    rejected = backend._cache.rejected_mutations()
+    assert len(rejected) == 1
+    assert rejected[0].write.content == manifest_with_entry
 
 
 def test_pending_write_still_surfaces_integrity_error_on_underlying_reference(tmp_path: Path) -> None:
@@ -284,18 +292,18 @@ class _LegacyPlanStore:
 
 
 def test_list_content_does_not_clobber_pending_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A queued PLAN write stuck behind a conflicting legacy record must survive ``list_content()``.
+    """A queued PLAN write stuck behind a conflicting legacy record is rejected, not silently dropped.
 
-    Regression test for a review finding on PR #2906: ``list_content()``'s per-record
+    Regression test for a review finding on PR #2906, updated for Leak B (sibling to
+    ``test_replay_conflict_rejects_pending_mutation``): ``list_content()``'s per-record
     cache-refresh loop called ``FileCache.cache_content()`` unconditionally for every
     legacy/online record, with no pending guard -- unlike ``get_content()``'s guarded
     read path. A create-only write queued for a PLAN reference that conflicts with an
     existing legacy plan-index record can never land through replay
-    (``ContentConflictError`` on every attempt), so the reference stays pending
-    forever. Before the fix, the very next ``list_content()`` call clobbered that
-    cached pending record with the older legacy content and reset ``pending`` back to
-    ``False`` -- silently discarding the caller's own unacknowledged write and
-    reopening the exact clobber bug PR #2906 fixed for ``get_content()``.
+    (``ContentConflictError`` on every attempt), so under Leak B that mutation is
+    rejected out of the pending queue during ``list_content()``'s own replay pass --
+    not left to be silently clobbered later. The write's content is not lost: it
+    lands in ``rejected_mutations()`` intact.
     """
     reference = ContentRef(kind=ContentKind.PLAN, name="P123")
     legacy = ContentRecord(reference=reference, content="legacy content", revision="legacy-rev")
@@ -315,9 +323,10 @@ def test_list_content_does_not_clobber_pending_write(tmp_path: Path, monkeypatch
 
     backend.list_content(ContentQuery(kind=ContentKind.PLAN))
 
-    cached = backend._cache.get_content(reference)
-    assert (cached.content, cached.pending) == ("pending write", True)
-    assert len(backend._cache.pending_mutations()) == 1
+    assert backend._cache.pending_mutations() == []
+    rejected = backend._cache.rejected_mutations()
+    assert len(rejected) == 1
+    assert rejected[0].write.content == "pending write"
 
 
 class _UnavailablePlanPersistence:
@@ -381,7 +390,7 @@ def test_replay_oserror_keeps_pending_mutation_and_put_queues_latest_write(
     assert pending[0].write.content == "latest"
 
 
-def test_replay_conflict_keeps_pending_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_replay_conflict_rejects_pending_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     reference = ContentRef(kind=ContentKind.PLAN, name="P123")
     cached = ContentRecord(reference=reference, content="cached", revision="current")
     cache = FileCache(tmp_path / "github-cache")
@@ -397,7 +406,13 @@ def test_replay_conflict_keeps_pending_mutation(tmp_path: Path, monkeypatch: pyt
 
     backend._replay_pending_content()
 
-    assert len(backend._cache.pending_mutations()) == 1
+    # Intentional behavior change, not a regression: a ContentConflictError
+    # means this mutation's precondition can never be satisfied by retrying,
+    # so it is relocated out of the unbounded-retry pending queue into the
+    # rejected bucket instead of staying stuck in `pending_mutations()`
+    # forever. The mutation itself is retained, not lost.
+    assert backend._cache.pending_mutations() == []
+    assert len(backend._cache.rejected_mutations()) == 1
 
 
 def test_replay_conflict_continues_to_later_mutation_and_acknowledges_once(
@@ -431,12 +446,12 @@ def test_replay_conflict_continues_to_later_mutation_and_acknowledges_once(
     backend._replay_pending_content()
     backend._replay_pending_content()
 
-    assert [mutation.write.reference for mutation in cache.pending_mutations()] == [first_reference]
-    assert [call.args[0].reference for call in writes.call_args_list] == [
-        first_reference,
-        later_reference,
-        first_reference,
-    ]
+    # The conflicting first mutation is rejected on its first attempt and
+    # moved out of the pending queue, so the second replay call has nothing
+    # left to retry for it -- no wasted third write call.
+    assert cache.pending_mutations() == []
+    assert [mutation.write.reference for mutation in cache.rejected_mutations()] == [first_reference]
+    assert [call.args[0].reference for call in writes.call_args_list] == [first_reference, later_reference]
     assert acknowledge.call_count == 1
     assert [entry.record.reference for entry in acknowledge.call_args.args[0]] == [later_reference]
     assert cache.get_content(later_reference).pending is False

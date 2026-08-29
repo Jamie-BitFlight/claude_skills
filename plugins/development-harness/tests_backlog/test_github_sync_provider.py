@@ -756,10 +756,12 @@ def test_github_content_provider_replay_preserves_concurrent_remote_revision(tmp
     # When: reconnect reads the authoritative remote content before replay
     current = backend.get_content(reference)
 
-    # Then: the remote wins and the conflicting queued mutation remains available for retry or diagnosis
+    # Then: the remote wins, and the conflicting queued mutation is relocated
+    # out of the unbounded-retry pending queue into the rejected bucket --
+    # still available for diagnosis, not lost, and no longer retried forever.
     assert current.content == "revision-two"
     assert remote["content"] == "revision-two"
-    assert [mutation.write.content for mutation in cache.pending_mutations()] == ["queued"]
+    assert [mutation.write.content for mutation in cache.rejected_mutations()] == ["queued"]
     artifact_provider.store_artifact_content.assert_not_called()
 
 

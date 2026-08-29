@@ -522,12 +522,14 @@ class _GitHubReconciliation:
                 mutation.idempotency_key
                 for mutation in pending_work_items
                 if mutation.item.metadata.issue in snapshot_by_reference
-                and mutation.item.title == snapshot_by_reference[mutation.item.metadata.issue].title
+                and mutation.item.metadata.issue not in set(plan.conflicted_references)
                 and mutation.item.metadata.issue not in failed_cache_references
                 and (patch_statuses.get(mutation.item.metadata.issue, "no_patch") in {"no_patch", "applied"})
             })
         pending_mutations = len(self._cache.pending_mutations()) + len(self._cache._pending_work_item_mutations())
-        return outcome.result.model_copy(update={"pending_mutations": pending_mutations})
+        return outcome.result.model_copy(
+            update={"pending_mutations": pending_mutations, "rejected_mutations": len(self._cache.rejected_mutations())}
+        )
 
     def load_records(
         self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
