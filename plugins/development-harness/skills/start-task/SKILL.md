@@ -21,7 +21,7 @@ $ARGUMENTS
 
 ---
 
-**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
+**MCP server availability**: This skill uses `mcp__plugin_dh_sam__*` tools. If a tool is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md.
 
 ## Parse Arguments
 

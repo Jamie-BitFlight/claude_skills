@@ -30,7 +30,7 @@ cite the tool result. Answering project-specific conditions from training data i
 Agent(
   description: "Groom backlog item",
   subagent_type: "dh:backlog-item-groomer",
-  prompt: "Groom this backlog item. Output groomed content in the standard template format (see .claude/docs/backlog-item-groomed-schema.md). Output only the groomed body (no ## Groomed header). The groomer agent does NOT perform classification or root-cause analysis — it receives these as inputs and incorporates them into groomed output.
+  prompt: "Groom this backlog item. Output groomed content in the standard template format — load dh:dh-meta-docs and read the Backlog Item Groomed Schema document it lists. Output only the groomed body (no ## Groomed header). The groomer agent does NOT perform classification or root-cause analysis — it receives these as inputs and incorporates them into groomed output.
 
 SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementation steps, architecture decisions, code design, or proposed solutions. Those belong in the SAM planning phase (add-new-feature / architect spec), which runs AFTER grooming. Groomed output describes: (1) what the problem is and where it lives, (2) what success looks like, (3) how the specialist will know they have reached it. Acceptance criteria must be observable checks — not implementation steps.
 
@@ -71,7 +71,7 @@ Batch in waves of 5 if more than 5 items. Each agent uses `subagent_type: "dh:ba
 Agent(
   description: "Groom backlog item",
   subagent_type: "dh:backlog-item-groomer",
-  prompt: "Groom this backlog item. Output groomed content in the standard template format (see .claude/docs/backlog-item-groomed-schema.md). Output only the groomed body (no ## Groomed header). The groomer agent does NOT perform classification or root-cause analysis — it receives these as inputs and incorporates them into groomed output.
+  prompt: "Groom this backlog item. Output groomed content in the standard template format — load dh:dh-meta-docs and read the Backlog Item Groomed Schema document it lists. Output only the groomed body (no ## Groomed header). The groomer agent does NOT perform classification or root-cause analysis — it receives these as inputs and incorporates them into groomed output.
 
 SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementation steps, architecture decisions, code design, or proposed solutions. Those belong in the SAM planning phase (add-new-feature / architect spec), which runs AFTER grooming. Groomed output describes: (1) what the problem is and where it lives, (2) what success looks like, (3) how the specialist will know they have reached it. Acceptance criteria must be observable checks — not implementation steps.
 

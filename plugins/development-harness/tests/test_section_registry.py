@@ -506,7 +506,7 @@ def _producer_subsection_names() -> set[str]:
         with the leading '### ' stripped.
     """
     groomer_text = (_PLUGIN_ROOT / "agents" / "backlog-item-groomer.md").read_text(encoding="utf-8")
-    template_text = (_PLUGIN_ROOT / "skills" / "backlog" / "templates" / "item.md").read_text(encoding="utf-8")
+    template_text = (_PLUGIN_ROOT / "templates" / "backlog-item.md").read_text(encoding="utf-8")
     # Only the fenced "Output Format" markdown block in the groomer doc names
     # real subsection content — every other '### ' in that file is one of its
     # own instructional section headers, not a subsection name it produces.
@@ -521,7 +521,7 @@ def test_producer_subsection_name_resolves_through_registry(name: str) -> None:
 
     Tests: section_registry SubsectionKey completeness
     How: Reads the live producer files (backlog-item-groomer.md Output Format
-         block, skills/backlog/templates/item.md Groomed subsections) rather
+         block, templates/backlog-item.md Groomed subsections) rather
          than a hardcoded name list, so this test tracks the producers
          instead of drifting from them.
     Why: A subsection name a producer emits on every real grooming run should

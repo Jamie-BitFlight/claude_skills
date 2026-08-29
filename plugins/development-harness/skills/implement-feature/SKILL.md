@@ -13,7 +13,7 @@ This workflow continues from `add-new-feature`. It executes tasks from the selec
 
 ---
 
-**MCP server availability**: This skill uses both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools. Both servers initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
+**MCP server availability**: This skill uses both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools. Both servers initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md.
 
 ## Resolve Plan
 

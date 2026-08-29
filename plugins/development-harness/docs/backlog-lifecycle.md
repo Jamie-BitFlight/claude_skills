@@ -568,6 +568,5 @@ SOURCE: Architect spec Issue #398, Section 9 (AC7 severity policy decision) (acc
 - [Groom Workflow](../skills/work-backlog-item/references/workflows/groom/start.md) — groom stage index
 - [Groom Finalize](../skills/work-backlog-item/references/workflows/groom/finalize.md) — output validation and write procedure
 - [Backend Providers](./backend-providers.md) — provider capabilities, configuration, and transport boundaries
-- [State Machine](../skills/backlog/references/state-machine.md) — canonical state DAG source
 - [Feasibility Gate](../skills/work-backlog-item/references/workflows/work/feasibility-gate.md) — work stage feasibility check
 - Architect Spec — access via `artifact_read(item_id="<provider-reference>", artifact_type="architect")` — authoritative design decisions

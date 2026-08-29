@@ -2456,7 +2456,13 @@ async def backlog_update(
     plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
     status: Annotated[
         str | None,
-        Field(description="Set item status (e.g. 'in-progress'). Updates GitHub issue labels when applicable."),
+        Field(
+            description=(
+                "Set item status (e.g. 'in-progress'). Updates GitHub issue labels when "
+                "applicable — do not set status labels directly with `gh label`; they are "
+                "owned by this transition."
+            )
+        ),
     ] = None,
     section: Annotated[
         str | None, Field(description="Section name for groomed content update (use with content parameter)")
