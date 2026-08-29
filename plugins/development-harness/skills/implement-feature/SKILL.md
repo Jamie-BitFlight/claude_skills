@@ -245,7 +245,7 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 1. Display a compact task result summary:
    - Task ID and title
    - Completion status (complete / error)
-   - Any concerns raised (from the concerns block check in step 4)
+   - Any concerns raised — read fresh via `backlog_view(selector="{issue}", section="Concerns", show="last")` (no `#` prefix — see #3313 for why) immediately before rendering this summary, not from step 4's in-memory `<concerns>` block check. Step 4a's contract-verification agent (when dispatched) delivers its findings directly to the Concerns section and is never captured by step 4's check, so a fresh read is the only way this summary sees them.
 
 2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
    examples include "Ready to dispatch the next task? (yes/no)" or a numbered menu
