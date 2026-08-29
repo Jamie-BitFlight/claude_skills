@@ -885,6 +885,48 @@ class TestCheckForDuplicatesFreshness:
 
         assert "file_path" in result
 
+    def test_uppercase_legacy_terminal_status_candidate_never_blocks_new_item(self, mocker: MockerFixture) -> None:
+        """A cached numeric-issue candidate with an uppercase legacy status is not a live duplicate.
+
+        Tests: ``_duplicate_candidates`` normalizes status case and recognizes
+        "completed" as terminal, matching ``SKIP_STATUS`` in models.py -- not
+        just the lowercase ``_TERMINAL_STATUSES`` subset used elsewhere.
+        How: Seed a numeric-issue item built directly (bypassing the
+        parsing-time skip computation), with ``status="COMPLETED"`` and
+        ``skip`` left at its default ``False`` -- reproducing a numeric-issue
+        item that reloaded with a legacy/uppercase status string without
+        having gone through ``parsing.py``'s skip derivation.
+        Why: A case-sensitive, lowercase-only terminal-status check would
+        blank this item's status to "" via ``_build_list_entry`` and let it
+        survive as a live duplicate candidate, incorrectly blocking a
+        legitimate new item.
+        """
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        backend.put_work_item(
+            BacklogItem(
+                title="Sync engine mishandles retryable network errors",
+                description=_DUPLICATE_DESCRIPTION,
+                reference="p1-sync-retryable",
+                metadata=BacklogItemMetadata(
+                    source="test",
+                    added="2026-01-01",
+                    priority="P1",
+                    status="COMPLETED",
+                    issue="42",
+                    topic="sync-retryable",
+                ),
+            )
+        )
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        result = add_item(
+            title="Retryable network error handling in sync", description=_DUPLICATE_DESCRIPTION, priority="P1"
+        )
+
+        assert "file_path" in result
+
     def test_transient_network_error_downgrades_to_could_not_verify(self, mocker: MockerFixture) -> None:
         """A transient network exception from refresh downgrades to a warning, not a crash.
 

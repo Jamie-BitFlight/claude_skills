@@ -1339,6 +1339,9 @@ def _validate_add_item_type(type_: str) -> None:
     raise ValidationError(msg)
 
 
+_DUPLICATE_TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed", "completed"})
+
+
 def _duplicate_candidates() -> list[dict[str, str | bool]]:
     """Build duplicate-check candidates, excluding skipped and terminal-status items.
 
@@ -1346,13 +1349,20 @@ def _duplicate_candidates() -> list[dict[str, str | bool]]:
     numeric-issue items (no batch-fetched status map is available here), which
     ``find_content_duplicates`` cannot match against its excluded-status set.
     Filtering skip/terminal items before building entries keeps done/resolved/
-    closed/skipped items from surviving as live duplicate candidates.
+    closed/skipped items from surviving as live duplicate candidates. The
+    status check is case-insensitive because numeric-issue items reloaded with
+    a legacy/uppercase status (e.g. ``"COMPLETED"``) may not have gone through
+    the parsing-time skip computation that lowercases and sets ``item.skip``.
 
     Returns:
         List entry dicts for every non-skipped, non-terminal-status item.
     """
-    items = [it for it in get_config().backend.list_work_items() if not it.skip]
-    return [_build_list_entry(it, {}) for it in _filter_closed_items(items, include_closed=False)]
+    items = [
+        it
+        for it in get_config().backend.list_work_items()
+        if not it.skip and it.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES
+    ]
+    return [_build_list_entry(it, {}) for it in items]
 
 
 def _classify_duplicate_check(
