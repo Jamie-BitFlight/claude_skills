@@ -118,35 +118,22 @@ def _token_count(serialised: str) -> int:
 def _view_payload_token_count(full_response: dict[str, object]) -> int:
     """Token-count the delivered ``backlog_view`` payload without double-counting.
 
-    The full-content view USUALLY returns the section content TWICE: once in
-    ``full_response["body"]`` (the rendered body) and again inside each
-    ``full_response["sections"][name]["entries"][i]["content"]`` entry.  Counting
-    the serialised payload verbatim therefore measures the section content roughly
-    twice, so a body whose own token count sits comfortably under
-    ``_VIEW_TOKEN_BUDGET`` can trip the over-budget directory purely from this
-    metadata duplication (issue #2495 finding #4).
+    The full-content view can return section content twice: once in
+    ``full_response["body"]`` and again inside each
+    ``full_response["sections"][name]["entries"][i]["content"]``. Counting the
+    serialised payload verbatim would double that content's weight and could
+    falsely trip the over-budget directory.
 
-    De-duplication is therefore conditional on the duplication actually existing.
-    The per-entry ``content`` is redundant for sizing ONLY when ``body`` carries
-    that text once — i.e. when ``body`` is non-empty.  On the structured-key drift
-    path (``_filter_view_sections`` matched the structured ``sections`` key but no
-    rendered ``## ``/``### `` body header, so it CLEARED ``body``), the per-entry
-    ``content`` under ``sections`` is the SOLE delivered copy of the content.
-    Blanking it then would under-count the real delivered payload and let a
-    response that genuinely exceeds ``_VIEW_TOKEN_BUDGET`` slip through the gate
-    inline (issue #2495, Codex P2 — the over-budget measurement under-counts when
-    body was cleared).
+    The per-entry ``content`` is blanked for this measurement only when
+    ``body`` is non-empty (so it already carries that text once). When
+    ``body`` is empty — the structured-key drift path, where a structured
+    ``sections`` match had no rendered body header to populate it — the
+    per-entry ``content`` is the only delivered copy and must be measured in
+    full, or a genuinely over-budget response would slip through the gate.
+    ``body`` itself is always measured in full, so a body that alone exceeds
+    the budget still gates.
 
-    This helper therefore blanks the per-entry ``content`` for the measurement
-    copy ONLY when ``body`` is non-empty (the body carries that text once, so the
-    section copy is redundant).  When ``body`` is empty/cleared, the section
-    content is the only delivered copy and is measured in full.  Equivalently: the
-    measurement always reflects the ACTUAL serialised delivered payload — content
-    the caller receives once is counted once, never subtracted away.  ``body`` is
-    always measured in full, so a body that genuinely exceeds the budget on its
-    own still gates.
-
-    The returned payload itself is never mutated — only the measurement copy is.
+    The returned payload is never mutated — only this measurement copy.
 
     Args:
         full_response: The serialised ``ViewItemResult`` dict about to be returned.
@@ -758,24 +745,24 @@ def _filter_view_sections(
     The ``sections`` dict in the response is filtered to the named keys only,
     matched case-insensitively (case-folded, exact-name not substring) so a
     ``sections=['rt-ica']`` request keeps an ``RT-ICA`` structured key — consistent
-    with the body and ``sections_metadata`` arms (Codex P2, #2495).  All other
-    top-level keys are preserved.
+    with the body and ``sections_metadata`` arms. All other top-level keys are
+    preserved.
 
     In compact mode (``include_content=False``) the response carries no body and
-    an empty ``sections`` dict; the inventory lives in ``sections_metadata``.  The
+    an empty ``sections`` dict; the inventory lives in ``sections_metadata``. The
     requested names are matched and filtered against that inventory too, so a
-    VALID name is not reported as a miss merely because the body and ``sections``
-    dict are absent (issue #2495 finding #4).
+    valid name is not reported as a miss merely because the body and ``sections``
+    dict are absent.
 
-    The plural ``sections=[...]`` path also signals a no-match (issue #2495, m1):
-    when none of the requested names resolve to a structured section key, a
-    compact ``sections_metadata`` entry, OR a raw-body ``## ``/``### `` header,
-    ``section_filter_miss`` is set to ``True`` on BOTH the response dict and
+    The plural ``sections=[...]`` path also signals a no-match: when none of the
+    requested names resolve to a structured section key, a compact
+    ``sections_metadata`` entry, or a raw-body ``## ``/``### `` header,
+    ``section_filter_miss`` is set to ``True`` on both the response dict and
     *result* so the caller can distinguish "the names were wrong" from "the item
     is too big" — mirroring how the singular ``section=`` path signals a miss.
     Setting it on *result* keeps the signal present when the payload is over
     budget and the response is rebuilt from *result* via
-    :func:`_build_over_budget_view`.  Following
+    :func:`_build_over_budget_view`. Per
     ``.claude/rules/silent-failure-prevention.md``, the branch on the requested
     names has an explicit no-match fallback rather than returning the body
     unchanged with no signal.
@@ -783,7 +770,7 @@ def _filter_view_sections(
     When the structured ``sections`` dict matches but no body header does (case or
     format drift between YAML keys and rendered headers), the un-narrowed body is
     cleared so the matched narrowing fits the view budget instead of being
-    replaced by the over-budget directory (issue #2495 finding #5).
+    replaced by the over-budget directory.
 
     Args:
         response: Full serialised ViewItemResult dict (mutated in place).
@@ -797,17 +784,18 @@ def _filter_view_sections(
     """
     # Case-folded set of requested names — shared by the structured-dict, body, and
     # metadata arms so all three match section names case-insensitively (the plural
-    # ``sections=[...]`` contract is exact-name, case-insensitive — Codex P2, #2495).
+    # ``sections=[...]`` contract is exact-name, case-insensitive).
     requested_folded: frozenset[str] = frozenset(s.casefold() for s in sections)
     raw_sections = response.get("sections")
     dict_matched = False
     if isinstance(raw_sections, dict):
-        # Case-INSENSITIVE membership: a ``sections=['rt-ica']`` request must keep an
+        # Case-insensitive membership: a ``sections=['rt-ica']`` request must keep an
         # ``RT-ICA`` structured key, consistent with ``narrow_body_to_named_sections``
-        # (body arm) and the ``sections_metadata`` arm.  A case-sensitive ``k in
-        # requested`` test silently dropped the metadata while the body arm matched,
-        # desyncing ``sections`` from ``body`` with no ``section_filter_miss`` signal
-        # (Codex P2, #2495).  Exact-name (not substring) semantics are preserved.
+        # (body arm) and the ``sections_metadata`` arm. A case-sensitive ``k in
+        # requested`` test would silently drop the metadata while the body arm
+        # matched, desyncing ``sections`` from ``body`` with no
+        # ``section_filter_miss`` signal. Exact-name (not substring) semantics are
+        # preserved.
         kept = {k: v for k, v in raw_sections.items() if isinstance(k, str) and k.casefold() in requested_folded}
         response["sections"] = kept
         dict_matched = bool(kept)
@@ -878,9 +866,9 @@ def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Out
     ``suggestion`` key only when difflib finds a close match in ``valid_names``
     (SequenceMatcher ratio >= 0.6, equivalent to Levenshtein-adjacent proximity).
 
-    Adds an ``unresolved_sections`` key (issue #2974) when *valid_names* contains
-    a raw ``unknown__``-prefixed storage key — the signature left by content
-    stored under a mis-keyed, unrecognized heading (#2956) that
+    Adds an ``unresolved_sections`` key when *valid_names* contains a raw
+    ``unknown__``-prefixed storage key — the signature left by content stored
+    under a mis-keyed, unrecognized heading that
     :func:`~.section_registry.resolve_section_name` could not resolve at write
     time.  The ``unknown__`` prefix is checked literally (not via
     ``resolve_section_name`` here) because many legitimate, non-canonical
@@ -1233,11 +1221,11 @@ async def backlog_add(
         str,
         Field(
             description=(
-                "Item title — do not add a type prefix like 'fix:'/'docs:'/'chore:' yourself. "
-                "On the GitHub backend, one is derived from `type` and prepended automatically "
-                "when the GitHub issue is created, so existing GitHub-backed titles show one; "
-                "the Beads, SQLite, and in-memory backends create the issue with the title "
-                "unchanged, with no prefix added."
+                "Item title, unprefixed — do not add 'fix:'/'docs:'/'chore:' yourself. "
+                "The GitHub backend derives a type prefix from `type` and prepends it "
+                "automatically when the GitHub issue is created, so existing GitHub-backed "
+                "titles show one; the Beads, SQLite, and in-memory backends create the issue "
+                "with the title exactly as given, with no prefix added."
             )
         ),
     ],
@@ -3238,8 +3226,10 @@ async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum l
     """List repository labels (read-only).
 
     Returns all labels defined on the repository, up to ``limit``.
-    Label mutations are not supported by this tool; they are owned by
-    the state transition handler.
+    This tool is read-only. Status labels change as a side effect of
+    ``backlog_update``, ``backlog_groom``, ``backlog_resolve``, or
+    ``backlog_close`` changing an item's status — there is no separate
+    label-mutation tool to call directly.
 
     Returns:
         Dict with ``labels`` (list of dicts with ``name``, ``color``, ``description``),

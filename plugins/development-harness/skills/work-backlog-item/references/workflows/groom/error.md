@@ -13,19 +13,15 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
 1. Identify the failed agent (its teammate/agent name, or `agentId` from `ListAgents`) and the
    step it was executing.
 2. Read the agent's last output (if any) to determine what completed and what did not.
-3. Spawn a diagnostic agent to review the failed agent's session. Give it a concrete locator —
-   the failed agent's name/`agentId` from step 1, plus the session JSONL directory
-   (`~/.claude/projects/{project-slug}/*.jsonl`, filterable by `agentId`, where `{project-slug}`
-   is the absolute project path with `/` replaced by `-`) — the same locator shape
-   `implement-feature/SKILL.md`'s Agent Health Check gives its own diagnostic dispatch. Without
-   one, the diagnostic agent has no deterministic way to find "the failed agent's session" and
-   could emit a well-formed but fabricated `DIAGNOSTIC` entry undetectable by step 4's
-   malformed-line check:
+3. Spawn a diagnostic agent to review the failed agent's session. Give it a concrete
+   locator — matching `implement-feature/SKILL.md`'s Agent Health Check pattern — so it can
+   actually find the failed agent's session rather than guessing:
 
    ```text
    Agent(subagent_type="dh:task-worker", prompt="
      Review the session transcript for the failed agent working on <item_ref/>.
      Failed agent: {agent_name_or_id from step 1}
+     Step: {step it was executing, from step 1}
      Session JSONL directory: ~/.claude/projects/{project-slug}/*.jsonl, filter by agentId={agent_name_or_id}
      Identify:
      - Last successful tool call or output
@@ -37,7 +33,7 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
          selector=\"<item_ref/>\",
          section=\"Context\",
          append=True,
-         content=\"DIAGNOSTIC ({ISO8601 timestamp}): stage={the step identified in step 1 above}; last_success={last_success}; first_failure={first_failure}; failure_type={failure_type} (task-worker diagnostic)\"
+         content=\"DIAGNOSTIC ({ISO8601 timestamp}): stage={step}; last_success={last_success}; first_failure={first_failure}; failure_type={failure_type} (task-worker diagnostic)\"
      )
 
      failure_type is one of: interrupted | tool_error | unknown.
@@ -57,7 +53,9 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
 
 ```mermaid
 flowchart TD
-    Diag{"failure_type?"} -->|"interrupted"| Resume["Agent was interrupted mid-work<br>Spawn a new agent with:<br>- same task instructions<br>- 'Continue from where the previous agent stopped'<br>- list of sections already written (from backlog_view)"]
+    Entry{"Most recent Context entry is a<br>well-formed DIAGNOSTIC (...) line?"} -->|"No — missing or malformed"| SysErrEntry(["→ System Error procedure<br>(do not guess failure_type)"])
+    Entry -->|"Yes"| Diag{"failure_type?"}
+    Diag -->|"interrupted"| Resume["Agent was interrupted mid-work<br>Spawn a new agent with:<br>- same task instructions<br>- 'Continue from where the previous agent stopped'<br>- list of sections already written (from backlog_view)"]
     Diag -->|"tool_error"| ToolErr["MCP tool returned an error<br>Route to System Error below"]
     Diag -->|"unknown"| Retry["Spawn a fresh agent with the same task<br>If this is the 2nd failure on the same task:<br>route to Escalation"]
     Resume --> Continue(["Agent completes — resume workflow"])
