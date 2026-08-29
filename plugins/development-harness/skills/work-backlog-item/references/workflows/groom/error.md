@@ -37,11 +37,11 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
          selector=\"<item_ref/>\",
          section=\"Context\",
          append=True,
-         content=\"DIAGNOSTIC ({ISO8601 timestamp}): stage={stage}; last_success={last_success}; first_failure={first_failure}; failure_type={failure_type} (task-worker diagnostic)\"
+         content=\"DIAGNOSTIC ({ISO8601 timestamp}): stage={the step identified in step 1 above}; last_success={last_success}; first_failure={first_failure}; failure_type={failure_type} (task-worker diagnostic)\"
      )
 
      failure_type is one of: interrupted | tool_error | unknown.
-     Then return STATUS: DONE as the final line.
+     Per dh:subagent-contract, begin your response with STATUS: DONE as its own first line.
    ")
    ```
 
