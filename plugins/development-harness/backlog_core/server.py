@@ -1233,9 +1233,11 @@ async def backlog_add(
         str,
         Field(
             description=(
-                "Item title — do not add a type prefix like 'fix:'/'docs:'/'chore:' yourself, "
-                "even though existing item titles show one: it is derived from `type` and "
-                "prepended automatically when the backend issue is created."
+                "Item title — do not add a type prefix like 'fix:'/'docs:'/'chore:' yourself. "
+                "On the GitHub backend, one is derived from `type` and prepended automatically "
+                "when the GitHub issue is created, so existing GitHub-backed titles show one; "
+                "the Beads, SQLite, and in-memory backends create the issue with the title "
+                "unchanged, with no prefix added."
             )
         ),
     ],
