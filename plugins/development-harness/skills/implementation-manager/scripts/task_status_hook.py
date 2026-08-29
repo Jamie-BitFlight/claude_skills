@@ -13,8 +13,8 @@ This hook script handles multiple hook events:
 - SubagentStop: Parse prompt for task info, set status to COMPLETE, add Completed timestamp
 - PostToolUse (Write|Edit|Bash): Update LastActivity timestamp using context file
 
-All task state WRITES route through the SAM MCP server via fastmcp CLI subprocess,
-making the hook backend-agnostic (hooks must not write directly to YAML).
+All task state WRITES route through the SAM CLI (scripts/run_sam_cli.py) as a single
+subprocess, making the hook backend-agnostic (hooks must not write directly to YAML).
 
 Context File Mechanism:
 - The /start-task command writes task context to ~/.dh/projects/{slug}/context/active-task-{session_id}.json
@@ -49,7 +49,7 @@ _DH_PLUGIN_DIR = Path(__file__).resolve().parents[3]
 if str(_DH_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_DH_PLUGIN_DIR))
 
-_SAM_RUN_SERVER_PATH = _DH_PLUGIN_DIR / "scripts" / "run_sam_server.py"
+_SAM_CLI_PATH = _DH_PLUGIN_DIR / "scripts" / "run_sam_cli.py"
 
 import dh_paths as _dh_paths
 
@@ -153,7 +153,7 @@ def run_strict_pre_completion_checks(task: SamTask, task_id: str) -> list[str]:
     Warnings are observational — they do not prevent task completion.
 
     Args:
-        task: The already-loaded SamTask object (avoids a second MCP round-trip).
+        task: The already-loaded SamTask object (avoids a second SAM CLI subprocess call).
         task_id: Task ID being completed (used in warning messages).
 
     Returns:
@@ -336,7 +336,7 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
 
 
 def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str | None, str | None, str | int | None]:
-    """Retrieve active task context via fastmcp CLI call to sam_active_task(action='get').
+    """Retrieve active task context via the SAM CLI's ``active-task get`` subcommand.
 
     Primary retrieval path for SubagentStop. Returns parsed fields from the
     ``ActiveTaskContext`` on success, or ``(None, None, None)`` if the call fails
@@ -352,16 +352,12 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
         All ``None`` when the call fails or active task is not set.
     """
     resolved = session_id or "_default"
-    stdout = _call_sam_fastmcp(
-        {"config": {"action": "get"}, "session_id": resolved}, timeout=timeout, target="sam_active_task"
-    )
+    stdout = _call_sam_cli(["active-task", "get", "--session-id", resolved], timeout=timeout)
     if stdout is None:
         return None, None, None
 
     try:
-        outer = json.loads(stdout)
-        text = outer["content"][0]["text"]
-        data: dict[str, Any] = json.loads(text)
+        data: dict[str, Any] = json.loads(stdout)
         active = data.get("active_task")
         if not active:
             return None, None, None
@@ -385,7 +381,7 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
 
 
 def _call_sam_active_task_clear(session_id: str, timeout: int = 10) -> bool:
-    """Clear active task context via fastmcp CLI call to sam_active_task(action='clear').
+    """Clear active task context via the SAM CLI's ``active-task clear`` subcommand.
 
     Best-effort cleanup after SubagentStop completes. Never raises.
 
@@ -398,9 +394,7 @@ def _call_sam_active_task_clear(session_id: str, timeout: int = 10) -> bool:
         ``True`` if the active task was successfully cleared, ``False`` otherwise.
     """
     resolved = session_id or "_default"
-    stdout = _call_sam_fastmcp(
-        {"config": {"action": "clear"}, "session_id": resolved}, timeout=timeout, target="sam_active_task"
-    )
+    stdout = _call_sam_cli(["active-task", "clear", "--session-id", resolved], timeout=timeout)
     return stdout is not None
 
 
@@ -413,47 +407,32 @@ def _get_uv_executable() -> str | None:
     return shutil.which("uv")
 
 
-def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15, target: str = "sam_task") -> str | None:
-    """Execute a fastmcp call against the SAM server and return raw stdout.
+def _call_sam_cli(args: list[str], timeout: int = 15) -> str | None:
+    """Execute the SAM CLI as a subprocess and return raw stdout.
 
-    Handles uv resolution, environment setup, subprocess execution, and
-    common failure modes. Callers are responsible for JSON parsing and
-    context-specific error logging.
+    Handles uv resolution, subprocess execution, and common failure modes.
+    Callers are responsible for JSON parsing and context-specific error
+    logging.
 
     Args:
-        input_data: Dict to serialise as the ``--input-json`` argument.
+        args: Subcommand and options to pass to the SAM CLI (e.g.
+            ``["plan", "read", "--address", "P1/T1"]``).
         timeout: Subprocess timeout in seconds.
-        target: MCP tool name to invoke on the SAM server (e.g. ``"sam_task"``
-            or ``"sam_active_task"``). Defaults to ``"sam_task"``.
 
     Returns:
         Raw stdout string on success, None on any failure (uv missing,
-        server script missing, subprocess error, timeout, non-zero exit).
+        CLI script missing, subprocess error, timeout, non-zero exit).
     """
     uv = _get_uv_executable()
-    if uv is None or not _SAM_RUN_SERVER_PATH.exists():
+    if uv is None or not _SAM_CLI_PATH.exists():
         return None
 
-    env = {**os.environ, "FASTMCP_SHOW_SERVER_BANNER": "false", "FASTMCP_LOG_ENABLED": "false"}
     try:
         result = subprocess.run(
-            [
-                uv,
-                "run",
-                "fastmcp",
-                "call",
-                "--command",
-                f"uv run --script {_SAM_RUN_SERVER_PATH}",
-                "--target",
-                target,
-                "--input-json",
-                json.dumps(input_data),
-                "--json",
-            ],
+            [uv, "run", "--script", str(_SAM_CLI_PATH), *args],
             capture_output=True,
             text=True,
             timeout=timeout,
-            env=env,
             check=False,
         )
     except (subprocess.TimeoutExpired, subprocess.SubprocessError, OSError):
@@ -461,17 +440,17 @@ def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15, target: str
 
     if result.returncode != 0:
         if result.stderr:
-            print(f"[hook] fastmcp {target} failed: {result.stderr.strip()}", file=sys.stderr)
+            print(f"[hook] sam CLI {args[0] if args else ''} failed: {result.stderr.strip()}", file=sys.stderr)
         return None
 
     return result.stdout
 
 
 def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, timeout: int = 15) -> bool:
-    """Update task status via fastmcp CLI call to sam_task(action='state').
+    """Update task status via the SAM CLI's ``plan state`` subcommand.
 
-    Routes state writes through the SAM MCP server, keeping the hook
-    backend-agnostic. The server handles downstream skip cascades when
+    Routes state writes through the SAM CLI, keeping the hook
+    backend-agnostic. The CLI handles downstream skip cascades when
     ``status="failed"``.
 
     Args:
@@ -481,52 +460,61 @@ def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, ti
         timeout: Subprocess timeout in seconds.
 
     Returns:
-        ``True`` if the MCP call succeeded, ``False`` on any failure.
+        ``True`` if the CLI call succeeded, ``False`` on any failure.
     """
-    stdout = _call_sam_fastmcp(
-        {"plan": plan_addr, "task": task_id, "config": {"action": "state", "status": status}}, timeout=timeout
+    stdout = _call_sam_cli(
+        ["plan", "state", "--address", f"{plan_addr}/{task_id}", "--new-status", str(status)], timeout=timeout
     )
     if stdout is None:
         print(f"[hook] sam_task state={status} failed for {plan_addr}/{task_id}", file=sys.stderr)
         return False
 
     try:
-        outer = json.loads(stdout)
-        json.loads(outer["content"][0]["text"])
-    except (json.JSONDecodeError, KeyError, IndexError):
+        json.loads(stdout)
+    except json.JSONDecodeError:
         print(f"[hook] sam_task state: unexpected response for {plan_addr}/{task_id}", file=sys.stderr)
         return False
 
     return True
 
 
-def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, Any], timeout: int = 15) -> bool:
-    """Update task fields via fastmcp CLI call to sam_task(action='update').
+_UPDATE_FIELD_OPTIONS: dict[str, str] = {"completed": "--completed", "last-activity": "--last-activity"}
 
-    Routes field writes through the SAM MCP server, keeping the hook
-    backend-agnostic.
+
+def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, Any], timeout: int = 15) -> bool:
+    """Update task fields via the SAM CLI's ``plan update`` subcommand.
+
+    Only fields with a mapped CLI option are supported (a typed allowlist,
+    not a generic JSON passthrough). An unmapped field fails closed without
+    invoking the CLI at all.
 
     Args:
         plan_addr: Plan address (e.g. ``"Pf4281187"``).
         task_id: Task ID within the plan (e.g. ``"T1"``).
-        set_fields: Field name/value pairs to patch on the task.
+        set_fields: Field name/value pairs to patch on the task. Keys must
+            be one of ``_UPDATE_FIELD_OPTIONS``.
         timeout: Subprocess timeout in seconds.
 
     Returns:
-        ``True`` if the MCP call succeeded, ``False`` on any failure.
+        ``True`` if the CLI call succeeded, ``False`` on any failure or
+        unmapped field.
     """
-    stdout = _call_sam_fastmcp(
-        {"plan": plan_addr, "task": task_id, "config": {"action": "update", "set_fields_json": set_fields}},
-        timeout=timeout,
-    )
+    options: list[str] = []
+    for key, value in set_fields.items():
+        option = _UPDATE_FIELD_OPTIONS.get(key)
+        if option is None:
+            print(f"[hook] sam_task update: unsupported field {key!r} for {plan_addr}/{task_id}", file=sys.stderr)
+            return False
+        options.extend([option, str(value)])
+
+    stdout = _call_sam_cli(["plan", "update", "--plan-address", f"{plan_addr}/{task_id}", *options], timeout=timeout)
     if stdout is None:
         print(f"[hook] sam_task update failed for {plan_addr}/{task_id}", file=sys.stderr)
         return False
 
     try:
-        outer = json.loads(stdout)
-        json.loads(outer["content"][0]["text"])
-    except (json.JSONDecodeError, KeyError, IndexError):
+        json.loads(stdout)
+    except json.JSONDecodeError:
         print(f"[hook] sam_task update: unexpected response for {plan_addr}/{task_id}", file=sys.stderr)
         return False
 
@@ -534,9 +522,9 @@ def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, An
 
 
 def _call_sam_task_read(plan_id: str, task_id: str, timeout: int = 15) -> SamTask | None:
-    """Read a task via fastmcp CLI call to sam_task(action='read').
+    """Read a task via the SAM CLI's ``plan read`` subcommand.
 
-    Routes task reads through the SAM MCP server, keeping the hook backend-agnostic.
+    Routes task reads through the SAM CLI, keeping the hook backend-agnostic.
     Returns the parsed Task object on success, None on any failure.
 
     Args:
@@ -547,39 +535,35 @@ def _call_sam_task_read(plan_id: str, task_id: str, timeout: int = 15) -> SamTas
     Returns:
         The parsed ``SamTask`` on success, ``None`` on any failure.
     """
-    stdout = _call_sam_fastmcp({"plan": plan_id, "task": task_id, "config": {"action": "read"}}, timeout=timeout)
+    stdout = _call_sam_cli(["plan", "read", "--address", f"{plan_id}/{task_id}"], timeout=timeout)
     if stdout is None:
         return None
 
     try:
-        outer = json.loads(stdout)
-        text = outer["content"][0]["text"]
-        data: dict[str, Any] = json.loads(text)
+        data: dict[str, Any] = json.loads(stdout)
         task_data = data.get("task")
-        if not task_data:
-            return None
-        return SamTask.model_validate(task_data)
-    except (json.JSONDecodeError, KeyError, IndexError, ValueError):
+        return SamTask.model_validate(task_data) if task_data else None
+    except (json.JSONDecodeError, ValueError):
         return None
 
 
 def _cleanup_active_task_context(session_id: str | None, fallback_context_file: Path | None) -> None:
     """Clean up active task context after SubagentStop completes.
 
-    Primary path: call sam_active_task(action='clear') via fastmcp CLI.
-    Fallback: delete the filesystem context file if MCP clear fails or is unavailable.
+    Primary path: call the SAM CLI's ``active-task clear`` subcommand.
+    Fallback: delete the filesystem context file if the CLI clear fails or is unavailable.
 
     Args:
-        session_id: Sub-agent session identifier for MCP clear. ``None`` skips
-            the MCP path entirely.
-        fallback_context_file: Filesystem context file to delete if MCP clear
-            fails or session_id is ``None``.
+        session_id: Sub-agent session identifier for the CLI clear call. ``None``
+            skips that path entirely.
+        fallback_context_file: Filesystem context file to delete if the CLI
+            clear fails or session_id is ``None``.
     """
-    mcp_cleared = False
+    cli_cleared = False
     if session_id:
-        mcp_cleared = _call_sam_active_task_clear(session_id)
+        cli_cleared = _call_sam_active_task_clear(session_id)
 
-    if not mcp_cleared and fallback_context_file is not None:
+    if not cli_cleared and fallback_context_file is not None:
         with contextlib.suppress(FileNotFoundError):
             fallback_context_file.unlink()
 
@@ -792,10 +776,10 @@ def _resolve_active_task_context(
     """Resolve the active task context for the agent that just stopped.
 
     Three-step resolution chain:
-    1. sam_active_task(action='get') via fastmcp CLI using the sub-agent's
+    1. The SAM CLI's ``active-task get`` subcommand, using the sub-agent's
        session_id extracted from the transcript (primary path).
     2. Filesystem context file via ``_resolve_context_file_from_transcript``
-       (fallback when agent did not call sam_active_task(set)).
+       (fallback when the agent did not call ``active-task set``).
     3. Prompt extraction from the JSONL transcript via
        ``_extract_prompt_from_transcript`` + ``extract_task_info_from_prompt``
        (final fallback for agents dispatched without context registration).
@@ -818,7 +802,7 @@ def _resolve_active_task_context(
     parent_issue_number: str | int | None = None
     context_file: Path | None = None
 
-    # Step 1: MCP lookup via sam_active_task(get)
+    # Step 1: SAM CLI lookup via active-task get
     if sub_agent_session_id:
         plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
 
@@ -858,10 +842,10 @@ def _cascade_failed_task(
 ) -> None:
     """Best-effort downstream skip cascade when a task is already in FAILED status.
 
-    Routes the cascade through the SAM MCP server via sam_task(action='state',
-    status='failed'). The server handles DependencyGraph construction and
+    Routes the cascade through the SAM CLI's ``plan state`` subcommand
+    (``--new-status failed``). The CLI handles DependencyGraph construction and
     downstream SKIPPED writes atomically. Absorbs all failures — SubagentStop
-    critical path must not be blocked by network or write errors.
+    critical path must not be blocked by subprocess or write errors.
 
     Args:
         plan_id: Plan address string (e.g. ``"Pf4281187"``).
@@ -879,19 +863,20 @@ def _cascade_failed_task(
 def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:
     """Handle SubagentStop event - mark task COMPLETE with timestamp.
 
-    Discovers the active task via sam_active_task MCP tool (primary) or the
-    ``active-task-{session_id}.json`` context file (fallback). This ensures only
-    the task belonging to the finished agent is marked complete — not all
-    in-progress tasks — which is critical for correct behaviour with parallel agents.
+    Discovers the active task via the SAM CLI's ``active-task get`` subcommand
+    (primary) or the ``active-task-{session_id}.json`` context file (fallback).
+    This ensures only the task belonging to the finished agent is marked
+    complete — not all in-progress tasks — which is critical for correct
+    behaviour with parallel agents.
 
     Discovery steps:
     1. Extract sub-agent's session_id from ``agent_transcript_path``.
-    2. Call sam_active_task(action='get') via fastmcp CLI (primary path).
-    3. Fall back to ``active-task-{session_id}.json`` on disk if MCP call fails.
-    4. After status update, call sam_active_task(action='clear') or delete file.
+    2. Call the SAM CLI's ``active-task get`` subcommand (primary path).
+    3. Fall back to ``active-task-{session_id}.json`` on disk if that call fails.
+    4. After status update, call ``active-task clear`` or delete the file.
 
-    All status and field writes route through the SAM MCP server via fastmcp CLI,
-    making the hook backend-agnostic.
+    All status and field writes route through the SAM CLI as a single
+    subprocess, making the hook backend-agnostic.
 
     When profile is STRICT, runs pre-completion validation checks and prints
     any warnings to stderr before completing (warnings do not prevent completion).
@@ -917,7 +902,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     current_task = _call_sam_task_read(plan_addr, task_id)
     if current_task is None:
         print(
-            f"[hook] SubagentStop: could not read task {task_id} from plan {plan_addr} via MCP — skipping",
+            f"[hook] SubagentStop: could not read task {task_id} from plan {plan_addr} via the SAM CLI — skipping",
             file=sys.stderr,
         )
         _cleanup_active_task_context(sub_agent_session_id, context_file)
@@ -929,7 +914,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
 
     if current_task.status == SamTaskStatus.FAILED:
         # Agent explicitly set task to FAILED before stopping.
-        # Cascade skip signals to all downstream dependents via MCP.
+        # Cascade skip signals to all downstream dependents via the SAM CLI.
         # _cascade_failed_task is terminal (calls sys.exit(0)); return guards mocked callers.
         _cascade_failed_task(plan_addr, task_id, sub_agent_session_id, context_file)
         return
@@ -941,7 +926,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     timestamp = get_iso_timestamp()
     state_ok = _call_sam_task_state(plan_addr, task_id, SamTaskStatus.COMPLETE)
     if not state_ok:
-        print(f"[hook] SubagentStop: failed to mark {task_id} complete via MCP", file=sys.stderr)
+        print(f"[hook] SubagentStop: failed to mark {task_id} complete via the SAM CLI", file=sys.stderr)
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
     _call_sam_task_update(plan_addr, task_id, {"completed": timestamp})
@@ -952,7 +937,7 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     """Handle PostToolUse event - update LastActivity timestamp.
 
     Reads task info from context file and updates the last-activity field
-    via the SAM MCP server (backend-agnostic write path).
+    via the SAM CLI (backend-agnostic write path).
 
     Args:
         hook_input: Parsed hook input from stdin.
@@ -971,7 +956,7 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     current_task = _call_sam_task_read(plan_addr, task_id)
     if current_task is None:
         print(
-            f"[hook] PostToolUse: could not read task {task_id} from plan {plan_addr} via MCP — skipping",
+            f"[hook] PostToolUse: could not read task {task_id} from plan {plan_addr} via the SAM CLI — skipping",
             file=sys.stderr,
         )
     elif current_task.status == SamTaskStatus.COMPLETE:

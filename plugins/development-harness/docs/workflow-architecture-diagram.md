@@ -310,7 +310,7 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 flowchart TD
     Created([Task created]) -->|"swarm-task-planner via `plan create`"| NS[not-started]
     NS -->|"start-task skill via sam_task claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
-    IP -->|"task_status_hook.py SubagentStop<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'complete'})"| CO[complete]
+    IP -->|"task_status_hook.py SubagentStop<br>via sam plan state --address {plan_address}/{task_address} --new-status complete"| CO[complete]
     IP -->|"agent or human operator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'blocked'})"| BL[blocked]
     IP -->|"agent or orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'failed'})"| FA[failed]
     NS -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'deferred'})"| DE[deferred]
@@ -402,11 +402,11 @@ Processing sequence:
 2. Parse prompt for `/start-task <path> --task <id>` or `Skill(skill="start-task", args="<path> --task <id>")` pattern.
 3. If no match, read the session-scoped active-task context.
 4. If still no match, exit 0 silently (not a `/start-task` sub-agent).
-5. Call `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"state", "status":"complete"})` via the FastMCP CLI subprocess; on MCP failure, exit 0 (best-effort).
-6. Call `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"update", "set_fields":{"completed": <ISO timestamp>}})` via the FastMCP CLI subprocess.
+5. Call `sam plan state --address {plan_address}/{task_address} --new-status complete` via the SAM CLI subprocess (`scripts/run_sam_cli.py`); on failure, exit 0 (best-effort).
+6. Call `sam plan update --plan-address {plan_address}/{task_address} --completed <ISO timestamp>` via the SAM CLI subprocess.
 7. Clear the session-scoped active-task context.
 
-Backend synchronization is the responsibility of the configured backend (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and only routes status writes through the SAM MCP server.
+Backend synchronization is the responsibility of the configured backend (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and only routes status writes through the provider-neutral SAM CLI.
 
 Fields written: `status: complete`, `completed: <ISO timestamp>`
 

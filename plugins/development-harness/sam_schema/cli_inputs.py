@@ -137,6 +137,12 @@ class TaskUpdateFields(_CliInput):
     is_bookend: bool | None = None
     bookend_type: BookendType | None = None
     github_issue: int | None = Field(default=None, ge=1)
+    completed: str | None = None
+    last_activity: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("last-activity", "last_activity"),
+        serialization_alias="last-activity",
+    )
 
     @model_validator(mode="after")
     def require_patch(self) -> TaskUpdateFields:

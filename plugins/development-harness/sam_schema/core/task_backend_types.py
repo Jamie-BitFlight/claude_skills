@@ -191,7 +191,7 @@ class TaskFieldsUpdate(TypedDict, total=False):
     created: str | None
     started: str | None
     completed: str | None
-    last_activity: str | None
+    last_activity: Annotated[str | None, Field(validation_alias=AliasChoices("last-activity", "last_activity"))]
     body: str
     description: str
     objective: str
