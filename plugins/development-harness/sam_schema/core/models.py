@@ -10,7 +10,7 @@ import re
 from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -809,6 +809,33 @@ class ActiveTaskContext(BaseModel):
             return v
         msg = f"parent_issue_number must be int, str (beads ID), or None; got {type(v).__name__!r}"
         raise TypeError(msg)
+
+    @model_validator(mode="after")
+    def require_an_address(self) -> ActiveTaskContext:
+        """Reject a context that cannot identify its owning plan.
+
+        ``task_id`` alone names a task within *some* plan, but not which one.
+        Every backend already sets ``plan`` unconditionally (verified against
+        all four ``ActiveTaskContext`` construction sites); ``task_file_path``
+        is the one legitimate legacy-only alternative for local-YAML sessions
+        predating the ``plan``/``task`` fields. A record with neither is
+        malformed, not merely incomplete — reject it here instead of letting
+        it surface downstream as a silently unusable binding.
+
+        Returns:
+            ``self``, unchanged, when at least one address representation is present.
+
+        Raises:
+            ValueError: If both ``plan`` and ``task_file_path`` are absent.
+        """
+        if self.plan is None and self.task_file_path is None:
+            msg = (
+                "ActiveTaskContext must set 'plan' (structured address) or "
+                "'task_file_path' (legacy local-YAML path) to identify the owning plan; "
+                f"got neither for task_id={self.task_id!r}"
+            )
+            raise ValueError(msg)
+        return self
 
 
 class ActiveTaskGetResult(BaseModel):
