@@ -124,11 +124,13 @@ If operation is `resolve`:
    ```
 
    **If no acceptance criteria exist**: a filtered call for an absent section does not return an
-   empty section — it returns a `section_filter_miss` error dict with no `body` field. Instruct the
-   agent: if the response contains `section_filter_miss` (or an `error` key), warn "No
-   **Acceptance Criteria**: field found — falling back to description-based verification", then make
-   a second `backlog_view(selector=item_ref, summary=False)` call (no `sections` filter) to fetch the
-   item description, and verify against that instead.
+   empty section — it returns an error dict with `section_filter_miss: true` and no `body` field.
+   Instruct the agent: only when the response's `section_filter_miss` field is explicitly `true`,
+   warn "No **Acceptance Criteria**: field found — falling back to description-based verification",
+   then make a second `backlog_view(selector=item_ref, summary=False)` call (no `sections` filter) to
+   fetch the item description, and verify against that instead. An `error` key present WITHOUT
+   `section_filter_miss: true` is a different failure (transient backend error, ambiguous selector,
+   etc.) — do not treat it as "no criteria"; report it as a block instead of silently falling back.
 
 5. Parse the agent verdict:
 

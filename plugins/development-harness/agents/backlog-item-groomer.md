@@ -66,6 +66,13 @@ not. Fetch each section that `sections_index` shows as present individually, e.g
 `backlog_view(selector=item_ref, summary=False, sections=["Impact Radius"])`, before proceeding.
 Do not groom against a truncated read.
 
+The over-budget check re-applies to the narrowed response: if one section alone still exceeds the
+budget, that per-section fetch returns `_over_budget: true` again with no body for that section
+either. When this happens, switch to EXTRACT-mode pagination instead of retrying the same call:
+`backlog_view(selector=item_ref, map=True)` to get the section's ordinal, then
+`backlog_view(selector=item_ref, navigate="{ordinal}", head=2000)` and follow the response's
+`next_call` hint until `truncated=False` to read the section in full.
+
 Extract from the response (or from the individual per-section fetches above, when `_over_budget`
 applied):
 
