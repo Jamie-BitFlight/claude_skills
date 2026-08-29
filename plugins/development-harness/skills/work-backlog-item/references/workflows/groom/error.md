@@ -10,13 +10,23 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
 
 **Procedure:**
 
-1. Identify the failed agent and the step it was executing.
+1. Identify the failed agent (its teammate/agent name, or `agentId` from `ListAgents`) and the
+   step it was executing.
 2. Read the agent's last output (if any) to determine what completed and what did not.
-3. Spawn a diagnostic agent to review the failed agent's session:
+3. Spawn a diagnostic agent to review the failed agent's session. Give it a concrete locator —
+   the failed agent's name/`agentId` from step 1, plus the session JSONL directory
+   (`~/.claude/projects/{project-slug}/*.jsonl`, filterable by `agentId`, where `{project-slug}`
+   is the absolute project path with `/` replaced by `-`) — the same locator shape
+   `implement-feature/SKILL.md`'s Agent Health Check gives its own diagnostic dispatch. Without
+   one, the diagnostic agent has no deterministic way to find "the failed agent's session" and
+   could emit a well-formed but fabricated `DIAGNOSTIC` entry undetectable by step 4's
+   malformed-line check:
 
    ```text
    Agent(subagent_type="dh:task-worker", prompt="
      Review the session transcript for the failed agent working on <item_ref/>.
+     Failed agent: {agent_name_or_id from step 1}
+     Session JSONL directory: ~/.claude/projects/{project-slug}/*.jsonl, filter by agentId={agent_name_or_id}
      Identify:
      - Last successful tool call or output
      - First error, timeout, or missing output

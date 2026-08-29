@@ -4,7 +4,6 @@ description: Post-task verifier that compares method signatures and type contrac
 model: haiku
 tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
-  - subagent-contract
   - dh:subagent-contract
 color: yellow
 ---
@@ -78,17 +77,19 @@ source_line: <line number in architect spec where this appears>
 
 ### Step 3 — Locate Actual Signatures
 
-For each modified file in the input list, extract actual function and class definitions:
+This plugin is polyglot — do not assume Python. Pick the grep pattern by the modified file's
+extension:
 
-```bash
-grep -n "^def \|^async def \|^class " <modified_file>
-```
+- `.py`: `grep -n "^def \|^async def \|^class "`
+- `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`: `grep -n "^export function \|^function \|^export class \|^class \|^export interface \|^interface \|^export type "`
+- Any other extension, or a language with no recognized pattern above: do not run a signature
+  grep and do not report a CONTRACT GAP for that file on the strength of a zero-match grep —
+  a language mismatch is not evidence of a missing contract. Note the file as
+  "signature extraction not supported for this file type" and skip contract comparison for it.
 
-For type-annotated functions, also extract parameter and return type annotations:
-
-```bash
-grep -n "def " <modified_file>
-```
+For type-annotated functions, also extract parameter and return type annotations by reading
+the matched lines (and the language's own conventions — Python's `->`/parameter annotations,
+TypeScript's `:` type annotations) rather than a second blind grep.
 
 Read relevant sections of the file around each match to capture full signatures including
 multi-line definitions.
@@ -105,7 +106,7 @@ For each contract extracted in Steps 1 and 2, check whether the modified files c
 Apply these rules:
 
 - A function present in the spec but absent from all modified files is a CONTRACT GAP
-  (unless it belongs to a module not in the modified files list — skip those silently)
+  (subject to the scope narrowing in Step 5)
 - A function present in both spec and code with mismatched parameter types or missing
   return annotation is a CONTRACT VIOLATION
 - A type contract defined in the spec with no corresponding implementation evidence

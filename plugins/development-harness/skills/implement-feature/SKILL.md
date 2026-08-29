@@ -170,7 +170,7 @@ Verify the just-completed task against the architect spec.
 
 Task ID: {task_id}
 Plan: {plan_ref}
-Architect spec: {architect_spec_content_or_path}
+Architect spec path: {architect_spec_path}
 Issue number: {issue}
 Modified files:
 {modified_files_list}
