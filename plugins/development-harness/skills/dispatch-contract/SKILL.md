@@ -8,8 +8,10 @@ user-invocable: false
 
 <dispatch_selection>
 
-A dispatch that hands over no dh operation — an independent review whose finding is its response —
-has nothing here to reach: any specialist that fits runs it, dh roster or not.
+A dispatch that hands over no dh operation — an independent review, say — has no dh-roster
+requirement to reach: any specialist that fits runs it, dh roster or not. Where its finding goes is
+never decided here, for that or any dispatch — it is governed by `subagent-contract`'s
+`<result_destination>` clause, every time, including for review-only dispatches.
 
 Once a dispatch hands over one, dispatch a `dh:` specialist that fits the task and whose declared
 tools reach every operation handed over; failing that, `dh:task-worker` — this plugin's

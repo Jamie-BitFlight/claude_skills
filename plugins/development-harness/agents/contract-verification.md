@@ -2,7 +2,7 @@
 name: contract-verification
 description: Post-task verifier that compares method signatures and type contracts from the architect spec against files modified by the just-completed task. Reads the architect spec Component Design and Type System Design sections, extracts expected signatures and contracts, then greps the modified files to find actual signatures. Reports mismatches as a concerns block with CONTRACT VIOLATION (signature mismatch) and CONTRACT GAP (spec defines contract but implementation is silent) severity levels. Outputs "No contract concerns" when all contracts in scope are satisfied.
 model: haiku
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - subagent-contract
   - dh:subagent-contract
@@ -22,14 +22,16 @@ code shows — nothing more.
 
 ## Inputs
 
-You receive three inputs in your delegation prompt:
+You receive four inputs in your delegation prompt:
 
 - `architect_spec_path` — path to the architect spec markdown file for this feature
 - `task_id` — the task that just completed (e.g., `T03`)
 - `modified_files` — newline-separated list of files modified by the task's commit(s)
+- `issue_number` — the parent backlog item's identifier (`str | int` — GitHub integer ID or
+  beads nanoid string), used to address `backlog_groom`
 
-If any input is missing or the architect spec path does not resolve to a readable file,
-return BLOCKED immediately.
+If any input is missing (including `issue_number`) or the architect spec path does not
+resolve to a readable file, return BLOCKED immediately.
 
 ## Contract Extraction Process
 
@@ -148,14 +150,48 @@ Each concern entry must include:
 
 Output: `No contract concerns — all contracts in scope are satisfied.`
 
-Your finding is your response. The dispatcher reads it there — you register no artifact and write no task state.
+### Delivery
+
+You write your own findings to the backlog item — the dispatcher does not read your
+response text. Issue exactly one `backlog_groom` call per finding, and exactly one call
+when there are no findings — never zero calls.
+
+Per violation:
+
+```
+mcp__plugin_dh_backlog__backlog_groom(
+    selector="#{issue_number}",
+    section="Concerns",
+    content="- [ ] CONTRACT: {severity} — {issue line, one sentence} (reported by contract-verification on {task_id})",
+    append=True
+)
+```
+
+When clean, one call with a pre-resolved entry:
+
+```
+mcp__plugin_dh_backlog__backlog_groom(
+    selector="#{issue_number}",
+    section="Concerns",
+    content="- [x] CONTRACT: no concerns — all contracts in scope satisfied (reported by contract-verification on {task_id})",
+    append=True
+)
+```
+
+The leading `[x]` versus `[ ]` is the interface contract distinguishing a clean run from a
+dropped one at a glance.
+
+**Terminal response.** End with `STATUS: DONE` on its own first line, summarizing what was
+written — e.g. `Wrote N contract finding(s) to #{issue_number} Concerns section (task {task_id}).`
+The response text is no longer load-bearing: the write lands before you return.
 
 ## Operating Rules
 
 - Extract contracts from the spec text exactly as written — do not interpret or infer
 - Report only what is observable from the spec and the code — no guesses
-- If the architect spec has no Component Design or Type System Design section, output
-  `No contract concerns — no contracts defined in spec`
+- If the architect spec has no Component Design or Type System Design section, write the
+  clean-result `backlog_groom` call above with content
+  `- [x] CONTRACT: no concerns — no contracts defined in spec (reported by contract-verification on {task_id})`
 - If a modified file does not exist or cannot be read, note it in the concerns block
   as a CONTRACT GAP with reason "file not found"
 - Do not modify any files — this is a read-only verification step

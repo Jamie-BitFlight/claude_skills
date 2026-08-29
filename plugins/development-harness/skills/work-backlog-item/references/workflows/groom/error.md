@@ -16,16 +16,34 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
 
    ```text
    Agent(subagent_type="dh:task-worker", prompt="
-     Review the session transcript for the failed agent.
+     Review the session transcript for the failed agent working on <item_ref/>.
      Identify:
      - Last successful tool call or output
      - First error, timeout, or missing output
      - Whether the agent was interrupted (token limit, network) or hit a tool error
-     Report: last_success, first_failure, failure_type (interrupted | tool_error | unknown)
+     Record the finding via:
+
+     mcp__plugin_dh_backlog__backlog_groom(
+         selector=\"<item_ref/>\",
+         section=\"Context\",
+         append=True,
+         content=\"DIAGNOSTIC ({ISO8601 timestamp}): stage={stage}; last_success={last_success}; first_failure={first_failure}; failure_type={failure_type} (task-worker diagnostic)\"
+     )
+
+     failure_type is one of: interrupted | tool_error | unknown.
+     Then return STATUS: DONE as the final line.
    ")
    ```
 
-4. Based on the diagnostic:
+4. Wait for the diagnostic agent to go idle — the runtime delivers this automatically as a completion notification once the dispatch finishes, so no new polling call is needed — then read back its result:
+
+   ```text
+   mcp__plugin_dh_backlog__backlog_view(selector="<item_ref/>", section="Context", show="last")
+   ```
+
+   Parse `failure_type` from the most recent `DIAGNOSTIC (...)` line — that parsed value is what the decision tree below branches on. The idle notification only confirms the diagnostic agent stopped running; it does not by itself guarantee the write happened. If the most recent Context entry is not a well-formed `DIAGNOSTIC (...)` line, or there is no qualifying entry at all, treat this as the diagnostic agent having failed to register — route to the System Error procedure below rather than guessing a `failure_type`.
+
+5. Based on the diagnostic:
 
 ```mermaid
 flowchart TD

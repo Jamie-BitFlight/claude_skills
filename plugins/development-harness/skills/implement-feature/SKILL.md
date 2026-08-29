@@ -171,6 +171,7 @@ Verify the just-completed task against the architect spec.
 Task ID: {task_id}
 Plan: {plan_ref}
 Architect spec: {architect_spec_content_or_path}
+Issue number: {issue}
 Modified files:
 {modified_files_list}
 
@@ -183,19 +184,6 @@ If no mismatches are found, output `No contract concerns — all contracts in sc
 """
 )
 ```
-
-If the contract-verification agent returns a `<concerns>` block, append each concern to the backlog item with a `CONTRACT:` prefix:
-
-```text
-mcp__plugin_dh_backlog__backlog_groom(
-    selector="#{issue}",
-    section="Concerns",
-    content="- [ ] CONTRACT: {concern text} (reported by contract-verification on {task_id})",
-    append=True
-)
-```
-
-Use the MCP tool for this call.
 
 If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely. Proportional quality gate items without an architect spec automatically skip this step.
 
