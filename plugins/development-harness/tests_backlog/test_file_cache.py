@@ -6,6 +6,7 @@ from multiprocessing import get_context
 from multiprocessing.synchronize import Barrier as ProcessBarrier
 from pathlib import Path
 from threading import Barrier, Thread
+from unittest.mock import MagicMock
 
 import pydantic
 import pytest
@@ -100,6 +101,22 @@ def test_file_cache_acknowledges_work_item_by_idempotency_key(tmp_path: Path) ->
 
     # Then: the acknowledged entry is removed
     assert cache._pending_work_item_mutations() == []
+
+
+def test_acknowledge_work_items_skips_transaction_for_empty_key_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given: a durable work-item intent and a caller that acknowledges nothing
+    cache = FileCache(tmp_path)
+    cache._queue_work_item("#1", BacklogItem(title="One"))
+    spy = MagicMock(wraps=cache._state.transaction)
+    monkeypatch.setattr(cache._state, "transaction", spy)
+
+    # When: acknowledgement is called with an empty key set (every reconcile without acks)
+    cache._acknowledge_work_items(set())
+
+    # Then: no lock/load/write cycle runs for a no-op acknowledgement
+    spy.assert_not_called()
 
 
 def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> None:

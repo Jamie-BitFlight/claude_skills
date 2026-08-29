@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from backlog_core.backends.github_content_migration import _GitHubContentMigration
-from backlog_core.models import ContentKind, ContentNotFoundError, ContentQuery, ContentRecord, ContentRef
+import pytest
+from backlog_core.backends.github_content_migration import _GitHubContentCache, _GitHubContentMigration
+from backlog_core.file_cache import FileCache
+from backlog_core.models import (
+    ContentConflictError,
+    ContentKind,
+    ContentNotFoundError,
+    ContentQuery,
+    ContentRecord,
+    ContentRef,
+    ContentWrite,
+    UnsupportedCapabilityError,
+)
 
 if TYPE_CHECKING:
+    from github.Repository import Repository
     from pytest_mock import MockerFixture
 
 
@@ -124,3 +137,62 @@ def test_read_legacy_resolves_artifact_provider_at_call_time(mocker: MockerFixtu
     container["provider"] = _FakeArtifactProvider("replacement")
 
     assert migration.read(reference).content == "replacement"
+
+
+class _UnresolvablyFailingProvider:
+    """_OnlineContent double whose write always raises a non-retryable error."""
+
+    def __init__(self, error: BaseException) -> None:
+        self._error = error
+        self.write_calls = 0
+
+    def try_get_github(self, repo: str = "") -> Repository | None:
+        return None
+
+    def _list_online_content(self, query: ContentQuery) -> list[ContentRecord]:
+        raise NotImplementedError
+
+    def _read_online_content(self, reference: ContentRef, cached: ContentRecord | None) -> ContentRecord:
+        raise NotImplementedError
+
+    def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        self.write_calls += 1
+        raise self._error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ContentConflictError("Content revision no longer matches"),
+        UnsupportedCapabilityError("Content reference is provider-private"),
+    ],
+)
+def test_replay_pending_discards_mutation_that_can_never_land(
+    tmp_path: Path, error: ContentConflictError | UnsupportedCapabilityError
+) -> None:
+    """Regression test for the pending-queue leak in _GitHubContentCache.replay_pending.
+
+    A ContentConflictError/UnsupportedCapabilityError means the queued write's
+    precondition is permanently violated -- retrying it on every future replay
+    can never succeed. The sane target behavior is to discard the mutation
+    (with its failure surfaced) rather than leave it silently stuck forever.
+    This assertion is expected to fail (RED) against the current bare
+    `except (...): continue`, which neither acknowledges nor discards it.
+    """
+    # Given: one durably queued write whose replay will always raise a
+    # non-retryable error
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P1")
+    cache.queue_write(
+        ContentRecord(reference=reference, content="", revision=""),
+        ContentWrite(reference=reference, content="queued content", expected_revision="stale-rev"),
+    )
+    provider = _UnresolvablyFailingProvider(error)
+    content_cache = _GitHubContentCache(cache=cache, provider=provider)
+
+    # When: reconciliation replays the durable queue
+    content_cache.replay_pending()
+
+    # Then: the unresolvable mutation is discarded, not left to retry forever
+    assert provider.write_calls == 1
+    assert cache.pending_mutations() == []

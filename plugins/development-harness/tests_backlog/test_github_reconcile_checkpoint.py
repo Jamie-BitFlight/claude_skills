@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.backends import github_work_items
 from backlog_core.backends._github_work_item_versions import root_revision
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
 from backlog_core.file_cache import FileCache, _ProviderSnapshotCheckpoint
@@ -20,9 +21,10 @@ from backlog_core.models import (
     ProviderPatch,
     ProviderSnapshot,
     ReconcileRequest,
+    ReconcileResult,
     ReconcileScope,
 )
-from backlog_core.reconciliation import synchronized_fingerprint
+from backlog_core.reconciliation import ReconcilePlan, synchronized_fingerprint
 from sam_schema.core.plan_id_index import PlanIndexEntry
 
 
@@ -433,6 +435,71 @@ def test_github_queued_title_rename_survives_reconnect(tmp_path: Path) -> None:
     assert result.conflicts == 1
     assert [mutation.item.title for mutation in pending] == ["Renamed offline"]
     assert backend._apply_patches.call_args.args[0][0].body
+
+
+def test_github_work_item_ack_ignores_stable_reference_when_title_drifted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given: a queued body-only edit whose patch will land successfully, while
+    # GitHub's title has drifted for reasons unrelated to the queued change
+    # (e.g. renamed by someone else after the item was queued locally).
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = BacklogItem(title="Issue 1", description="provider body")
+    baseline.metadata.issue = "#1"
+    baseline.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
+    local = baseline.model_copy(update={"description": "local body"})
+    backend.put_work_item(local)  # frozen queued title: "Issue 1"
+
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Renamed on GitHub",
+                    body=backend.render_issue_body(baseline),
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                )
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    backend._apply_patches = MagicMock(
+        return_value=[PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
+    )
+
+    # The pure reconcile engine has its own, separate title-conflict gate
+    # (reconciliation.py's `candidate.title != provider.title` check) that
+    # would otherwise co-fire alongside the acknowledgement guard under test
+    # and mask which one is responsible for the stuck entry. Substituting a
+    # clean patch-only plan isolates the acknowledgement guard itself.
+    def isolated_plan(records: object, snapshot: ProviderSnapshot, request: ReconcileRequest) -> ReconcilePlan:
+        return ReconcilePlan(
+            provider_patches=[
+                ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="patched body")
+            ],
+            result=ReconcileResult(fetched_pages=snapshot.pages_fetched, fetched_items=len(snapshot.items)),
+            snapshot_checkpoint=snapshot.sync_started_at,
+        )
+
+    monkeypatch.setattr(github_work_items, "reconcile_backlog", isolated_plan)
+
+    # When: reconciliation applies the patch against a GitHub snapshot whose
+    # title no longer matches what was frozen at queue time
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    # Then: the mutation should be acknowledged -- it shares the same stable
+    # reference ("#1") and its patch landed -- but the frozen-title equality
+    # guard in `_acknowledge_work_items` (github_work_items.py) can never
+    # match a title that changed after the item was queued, so the mutation
+    # leaks in `pending_work_items` forever. This pins the sane target
+    # behavior (acknowledge by stable reference, not title text) and is
+    # expected to fail (RED) against the current guard.
+    assert FileCache(tmp_path)._pending_work_item_mutations() == []
 
 
 def test_github_plan_discovery_lists_all_owners_when_owner_is_omitted(monkeypatch: pytest.MonkeyPatch) -> None:
