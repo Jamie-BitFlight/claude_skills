@@ -51,11 +51,14 @@ Read the task via MCP:
 sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
 ```
 
-Extract:
+`{plan_id}` and `{task_id}` are the address already supplied to the call above — retain them as-is
+for the rest of this workflow; `sam_task(action="read")` returns a `TaskAssignment` with no
+top-level `plan_id`/`task_id` fields (the plan is `plan-number`, the task is nested at `task.id`),
+so do not attempt to re-extract the address from the response. Never parse `plan_id` for a plan
+number or slug — read those from `sam_plan(config={"action": "read"})`.
 
-- `plan_id` and `task_id` — the plan/task address pair, opaque logical identifiers such as
-  `Pdec8934d`/`T3`; resolved by MCP tools, not filesystem paths. Never parse `plan_id` for a
-  plan number or slug — read those from `sam_plan(config={"action": "read"})`
+From the response, extract:
+
 - `item_id` — required for artifact registration; if absent, BLOCK immediately
 - `expected_outputs` — the implementation files produced by Stage 5 (listed in the task's
   "Files Changed" or "Expected Outputs" section)

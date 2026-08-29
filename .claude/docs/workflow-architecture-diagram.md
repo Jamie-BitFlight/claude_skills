@@ -243,7 +243,9 @@ Written by `/start-task` skill. Read by `task_status_hook.py` PostToolUse handle
 }
 ```
 
-The `ActiveTaskContext` model also carries a local-YAML-only absolute plan-file-path field, populated only by the `LocalContextBackend`; it is `None` for the memory, GitHub, and beads backends. The hook's primary retrieval path is `sam_active_task(action="get")`; a filesystem read of this JSON file is only a local-backend fallback. `parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
+The `ActiveTaskContext` model also carries a local-YAML-only absolute plan-file-path field, populated only by the `LocalContextBackend`; it is `None` for the memory, GitHub, and beads backends. `parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
+
+The two hooks that read this file differ in retrieval path. **SubagentStop**'s `_resolve_active_task_context()` tries `sam_active_task(action="get")` via MCP first and falls back to this filesystem file only for local-YAML sessions (see §6.1). **PostToolUse**'s `handle_activity_update()` reads only this filesystem file via `read_task_context()` — it has no MCP fallback and exits silently when the file is absent, so `last-activity` tracking works only for local-YAML backend sessions.
 
 ### 2.7 sam_claim output
 
