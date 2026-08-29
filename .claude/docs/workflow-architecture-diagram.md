@@ -338,16 +338,16 @@ Matcher:    (none — fires on every sub-agent completion)
 Context:    Declared on /implement-feature skill and /complete-implementation skill
 ```
 
-Processing sequence:
+Processing sequence — `_resolve_active_task_context()` resolves the task in three ordered steps, MCP first:
 
-1. Read `agent_transcript_path` from hook input. If absent, exit 0 (cannot correlate agent to task).
-2. Call `_extract_session_id_from_transcript(transcript_path)` — reads first 10 JSONL lines, returns the `session_id` field of the first parseable record. If not found, exit 0.
-3. Construct `~/.dh/projects/{slug}/context/active-task-{sub_agent_session_id}.json` via `dh_paths.context_dir()`. If the file does not exist, exit 0 (not a `/start-task` sub-agent).
-4. Read `plan`, `task_id`, and `parent_issue_number` from the context file (or via `sam_active_task(action="get")` on the primary path).
-5. If task is already `status: complete`, delete the context file and exit 0.
-6. Call `sam_update_status(full_path, task_id, COMPLETE, timestamp_field="completed")`.
-7. Delete the context file.
-8. Call `sync_completion_to_github()` — best-effort, never changes exit code.
+1. Read `agent_transcript_path` from hook input; call `_extract_session_id_from_transcript(transcript_path)` — reads the first 10 JSONL lines, returns the `session_id` field of the first parseable record.
+2. **Primary path**: if a session_id was found, call `sam_active_task(action="get")` via the MCP server for `plan`, `task_id`, `parent_issue_number`.
+3. **Fallback**: if `plan`/`task_id` are still unresolved, resolve `~/.dh/projects/{slug}/context/active-task-{sub_agent_session_id}.json` via `dh_paths.context_dir()` and read `plan`, `task_id`, `parent_issue_number` from that file. This path exists only for local-YAML sessions predating full MCP tracking; memory, GitHub, and beads sessions never write this file and rely on step 2.
+4. **Final fallback**: if still unresolved and a transcript path is present, extract the task reference from the dispatching agent's own prompt in the JSONL transcript.
+5. If `plan`/`task_id` remain unresolved after all three steps, exit 0 (not a task-tracked sub-agent).
+6. Read the current task via `sam_task(action="read")`. If already `status: complete` or `status: failed`, clean up the active-task context (MCP clear and/or file delete) and exit 0 — a `failed` task also cascades a skip to its downstream dependents via `sam_task(action="state")` before exiting.
+7. Call `sam_task(action="state", status="complete")`, then `sam_task(action="update")` to set `completed: <ISO timestamp>`.
+8. Clean up the active-task context (MCP clear and/or file delete).
 
 Fields written: `status: complete`, `completed: <ISO timestamp>`
 
