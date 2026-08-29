@@ -570,6 +570,13 @@ class TestSyncErrorClassification:
         exc = requests.exceptions.ChunkedEncodingError("Connection broken: IncompleteRead")
         assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
 
+    def test_requests_content_decoding_error_is_retryable(self) -> None:
+        """requests.exceptions.ContentDecodingError (corrupted compressed body) -> RETRYABLE."""
+        import requests
+
+        exc = requests.exceptions.ContentDecodingError("Failed to decode response body")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
     def test_requests_connect_timeout_subclass_is_retryable(self) -> None:
         """requests.exceptions.ConnectTimeout (Timeout subclass) -> RETRYABLE."""
         import requests

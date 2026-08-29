@@ -31,12 +31,15 @@ from .models import BackendUnavailableError, BacklogError
 # aliases it to OSError) and the requests exceptions PyGithub's Requester can raise
 # for a dropped/failed HTTP transport (via requests.exceptions.RequestException).
 # ConnectTimeout/ReadTimeout subclass Timeout; SSLError/ProxyError subclass
-# ConnectionError -- covered without listing them.
+# ConnectionError -- covered without listing them. ContentDecodingError covers a
+# corrupted/truncated compressed response body -- also transient transport noise,
+# not a config or filesystem failure.
 _RETRYABLE_TRANSIENT_EXCEPTIONS = (
     asyncio.TimeoutError,
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
     requests.exceptions.ChunkedEncodingError,
+    requests.exceptions.ContentDecodingError,
 )
 
 __all__ = ["SyncErrorKind", "SyncState", "SyncStatus", "classify_sync_error", "get_sync_state", "reset_sync_state"]
@@ -251,10 +254,11 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     - ``GithubException`` with status >= 500 — RETRYABLE.
     - ``asyncio.TimeoutError`` — RETRYABLE (transient network timeout; checked before
       OSError because Python 3.11+ aliases it to OSError).
-    - ``requests.exceptions.ConnectionError``, ``.Timeout``, ``.ChunkedEncodingError``
-      (and subclasses, e.g. ``ConnectTimeout``, ``ReadTimeout``, ``SSLError``,
-      ``ProxyError``) — RETRYABLE (dropped/failed network transport underlying a
-      PyGithub call; checked before OSError because these are OSError subclasses).
+    - ``requests.exceptions.ConnectionError``, ``.Timeout``, ``.ChunkedEncodingError``,
+      ``.ContentDecodingError`` (and subclasses, e.g. ``ConnectTimeout``, ``ReadTimeout``,
+      ``SSLError``, ``ProxyError``) — RETRYABLE (dropped/failed network transport or a
+      corrupted compressed response body underlying a PyGithub call; checked before
+      OSError because these are OSError subclasses).
     - ``OSError`` (any other instance, e.g. local cache-file write failure) —
       NON_RETRYABLE (filesystem failure; requires operator action).
     - ``ValueError`` — NON_RETRYABLE (config error from ``resolve_repo``).
