@@ -83,7 +83,7 @@ backlog groom \
 
 ### recurring-pattern — 6-sigma
 
-Call `backlog list --status "resolved"` (the CLI's `backlog list` has no `--search` full-text flag, but `--status` used here is fully supported), filter by keywords related to this defect class, count matches, and write the measurement section:
+Call `backlog list --status "resolved"` (the CLI's `backlog list` also supports `--search` for full-text search), filter by keywords related to this defect class, count matches, and write the measurement section:
 
 ```bash
 backlog groom \

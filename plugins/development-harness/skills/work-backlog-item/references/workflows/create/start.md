@@ -88,7 +88,7 @@ Validation rules:
 
 Duplicate detection uses boolean substring matching, not semantic matching.
 
-1. Extract 2 to 4 key concepts from `title`.
+1. Extract 2 to 4 key concepts from `title` and `description`.
 2. If fewer than 2 usable concepts exist, use all usable non-trivial concepts.
 3. Build search string:
    `{concept1} OR {concept2} OR {concept3}`
