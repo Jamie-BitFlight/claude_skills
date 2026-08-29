@@ -1403,6 +1403,141 @@ class TestViewItem:
         assert "rt_ica" not in sections, f"Raw storage key leaked into sections: {list(sections.keys())}"
         assert "RT-ICA" in sections, f"Expected 'RT-ICA' in sections, got: {list(sections.keys())}"
 
+    # -----------------------------------------------------------------
+    # refresh cache-bypass control flow (#3275)
+    #
+    # Scenario 5 from the plan ("no cached item + beads nanoid selector +
+    # refresh=False -> live lookup still fires") already has coverage via
+    # TestViewItemBeadsNanoidUncached.test_view_item_beads_nanoid_uncached_calls_enrich
+    # below — that test calls view_item("bd-e2f4") with no local item and no
+    # explicit refresh kwarg (i.e. the refresh=False default) against a
+    # BeadsBackend (issue_id_type="string") and asserts the live enrich call
+    # fires. Adding a second test for the identical scenario would duplicate
+    # it, so this class covers only the remaining five refresh scenarios.
+    # -----------------------------------------------------------------
+
+    def test_view_item_title_selector_refresh_true_uses_item_identifier(self, mocker: MockerFixture) -> None:
+        """Cached item + title-substring selector + refresh=True calls enrich with the item's id.
+
+        Tests: view_item's opt-in live check for Case H (title selector, refresh=True).
+        How: Write a local item with a known issue number; call view_item with a title
+             substring and refresh=True; assert view_enrich_from_github was called with
+             the item's issue-derived identifier, never the raw title text.
+        Why: A naive implementation could forward the title substring straight into
+             view_enrich_from_github(), which crashes downstream (int(issue_num) in
+             gh_client.py). _live_lookup_id() must resolve the cached item's own id.
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(fake_dir, title="Refreshable Title Item", priority="P1", topic="refreshable-title", issue="77")
+        mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
+
+        view_item("Refreshable Title", refresh=True)
+
+        mock_enrich.assert_called_once()
+        selector_arg = mock_enrich.call_args.args[1]
+        assert selector_arg == "77"
+        assert selector_arg != "Refreshable Title Item"
+
+    def test_view_item_title_selector_refresh_false_skips_live_check(self, mocker: MockerFixture) -> None:
+        """Cached item + title-substring selector + refresh=False (default) does not call enrich.
+
+        Tests: view_item's new default for Case H — the live check is opt-in only.
+             REGRESSION GUARD: locks in that a title-selector hit on a cached item
+             makes no network call unless refresh=True is passed explicitly.
+        How: Write a local item; call view_item with a title substring and no
+             refresh kwarg; assert view_enrich_from_github was never called.
+        Why: Before this plan, no live-check path existed at all for title
+             selectors. The new opt-in capability must not become an unconditional
+             call — that would silently add a network call to every title-based
+             view for an item that already has a local, cached copy.
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(fake_dir, title="Cached Title Item", priority="P1", topic="cached-title-item", issue="88")
+        mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
+
+        view_item("Cached Title Item")
+
+        mock_enrich.assert_not_called()
+
+    def test_view_item_numeric_selector_refresh_false_still_calls_enrich(self, mocker: MockerFixture) -> None:
+        """Cached item + numeric selector + refresh=False still calls enrich (Case A/B).
+
+        Tests: view_item's unconditional live check for an already-cached item
+             matched by numeric selector. REGRESSION GUARD: confirms Case A/B
+             stayed unconditional (today's pre-existing behavior) and was not
+             accidentally gated behind refresh alongside the new Case H opt-in.
+        How: Write a local item with issue="55"; call view_item("55") with no
+             refresh kwarg; assert view_enrich_from_github was called with "55".
+        Why: 52 pre-existing tests elsewhere in the suite (via
+             backlog_core/tests/_view_test_helpers.py::_configure_memory_view)
+             depend on this unconditional call for numeric selectors. `refresh`
+             is additive-only (ADR-3, corrected) — it must never remove this
+             existing behavior.
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(fake_dir, title="Numeric Selector Item", priority="P1", topic="numeric-selector-item", issue="55")
+        mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
+
+        # show="1" (MCP clients send numeric `show` values as strings) also exercises
+        # view_item's str->int show conversion alongside the refresh control flow.
+        view_item("55", show="1")
+
+        mock_enrich.assert_called_once()
+        assert mock_enrich.call_args.args[1] == "55"
+
+    def test_view_item_no_cached_item_numeric_selector_refresh_false_still_resolves(
+        self, mocker: MockerFixture
+    ) -> None:
+        """No cached item + numeric selector + refresh=False still performs a live lookup.
+
+        Tests: view_item's unconditional identity-resolution live call (Case C/D).
+             REGRESSION GUARD (ADR-3): a not-yet-synced item must still resolve via
+             a live lookup regardless of refresh, or it would raise a false
+             ItemNotFoundError.
+        How: Write NO local item; call view_item("999") with no refresh kwarg and
+             enrich mocked to succeed; assert enrich was called with "999" and no
+             exception was raised.
+        Why: Gating the identity-resolution call behind refresh would break every
+             not-yet-synced item lookup — the exact bug ADR-3 exists to prevent.
+        """
+        mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
+
+        # show="not-a-number" exercises the ValueError fallback branch of view_item's
+        # str->int show conversion alongside the identity-resolution control flow.
+        view_item("999", show="not-a-number")
+
+        mock_enrich.assert_called_once()
+        assert mock_enrich.call_args.args[1] == "999"
+
+    def test_view_item_refresh_true_no_identifier_appends_warning_without_call(self, mocker: MockerFixture) -> None:
+        """Cached item with no resolvable id + refresh=True appends a warning, no call, no raise.
+
+        Tests: view_item's guard against calling enrich with no identifier at all.
+        How: Write a local item with no issue number set; call view_item by title
+             with refresh=True; assert enrich was never called, no exception was
+             raised, and the "backend unreachable" warning was appended.
+        Why: _live_lookup_id() must never return an empty string, and its None
+             return means the caller has no identifier to send to the backend —
+             the correct outcome is a warning, not a crash or a call with an
+             invalid argument.
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(fake_dir, title="No Identifier Item", priority="P1", topic="no-identifier-item", issue="")
+        mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
+
+        result = view_item("No Identifier Item", refresh=True)
+
+        mock_enrich.assert_not_called()
+        assert "backend unreachable — sections_index reflects provider-backed record, may be stale" in result.warnings
+
 
 # ---------------------------------------------------------------------------
 # close_item
