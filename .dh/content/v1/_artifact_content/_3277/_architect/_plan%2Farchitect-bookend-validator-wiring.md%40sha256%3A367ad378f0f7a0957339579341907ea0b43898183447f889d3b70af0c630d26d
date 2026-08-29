@@ -1,0 +1,1 @@
+{"version":1,"reference":{"kind":"artifact_content","namespace":"3277","artifact_type":"architect","name":"plan/architect-bookend-validator-wiring.md@sha256:367ad378f0f7a0957339579341907ea0b43898183447f889d3b70af0c630d26d"},"owner_reference":"3277","content":"$(cat architect_annotated.md)"}
