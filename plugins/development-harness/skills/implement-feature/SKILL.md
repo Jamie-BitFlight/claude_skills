@@ -170,12 +170,12 @@ Verify the just-completed task against the architect spec.
 
 Task ID: {task_id}
 Plan: {plan_ref}
-Architect spec path: {architect_spec_path}
 Issue number: {issue}
 Modified files:
 {modified_files_list}
 
-Read the architect spec's Component Design and Type System Design sections.
+Fetch the architect spec yourself (per your own agent file) and read its Component Design and
+Type System Design sections.
 For each modified file, grep for function/class definitions and extract actual signatures.
 Compare against the contracts defined in the spec.
 Deliver findings per your own agent file's Delivery section — do not return them in your
