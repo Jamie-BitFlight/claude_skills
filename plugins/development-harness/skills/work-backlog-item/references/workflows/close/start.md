@@ -142,7 +142,9 @@ If operation is `resolve`:
    ordinals (sub-heading structure), page each child individually the same way — recursing into any
    further nested children the same way, never stopping at the first level — and never the parent
    ordinal, which bounds only its child menu, not criteria text — until every leaf under the section
-   has been read.
+   has been read. Skip any ordinal the `map` response lists in `struck_ordinals`, and stop reading
+   further into a branch the moment a `navigate` response returns `struck: true` — a struck criterion
+   is retracted and must not be verified as if it were current.
 
 5. Parse the agent verdict:
 

@@ -77,7 +77,9 @@ ordinal, page it directly: `backlog_view(selector=item_ref, navigate="{ordinal}"
 following `next_call` until `truncated=False`. If it does have children, repeat this per-ordinal
 navigate+head pagination for each child ordinal individually (recursing into any further nested
 children the same way) — never the parent's own ordinal — until every leaf under the section has
-been read in full.
+been read in full. Skip any ordinal the `map` response lists in `struck_ordinals`, and stop reading
+further into a branch the moment a `navigate` response returns `struck: true` — a struck entry is
+retracted historical content and must not be treated as current when grooming.
 
 Extract from the response (or from the individual per-section fetches above, when `_over_budget`
 applied):
