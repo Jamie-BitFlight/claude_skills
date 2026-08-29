@@ -851,6 +851,118 @@ class TestCheckForDuplicatesFreshness:
         refresh_mock.assert_not_called()
         assert "file_path" in result
 
+    def test_terminal_status_candidate_never_blocks_new_item(self, mocker: MockerFixture) -> None:
+        """A cached numeric-issue candidate with terminal local status is not a live duplicate.
+
+        Tests: ``_duplicate_candidates`` filters skip/terminal-status items
+        before building list entries (Fix 1), instead of passing every item
+        straight through ``_build_list_entry(item, {})``.
+        How: Seed a numeric-issue item whose local status is "done", sharing
+        content with the new item. With no batch status map available at
+        duplicate-check time, ``_build_list_entry`` would otherwise derive an
+        empty ("") status string for it -- which the duplicate search's
+        excluded-status set cannot match.
+        Why: Without the pre-filter, this closed/skipped item survives as a
+        live candidate and incorrectly blocks a legitimate new item.
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(
+            fake_dir,
+            title="Sync engine mishandles retryable network errors",
+            priority="P1",
+            topic="sync-retryable",
+            issue="42",
+            skip=True,  # sets metadata.status="done"
+            description=_DUPLICATE_DESCRIPTION,
+        )
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        result = add_item(
+            title="Retryable network error handling in sync", description=_DUPLICATE_DESCRIPTION, priority="P1"
+        )
+
+        assert "file_path" in result
+
+    def test_transient_network_error_downgrades_to_could_not_verify(self, mocker: MockerFixture) -> None:
+        """A transient network exception from refresh downgrades to a warning, not a crash.
+
+        Tests: ``requests.exceptions.ConnectionError`` (not a ``GithubException``
+        or ``BacklogError`` subclass) is caught via ``RETRYABLE_TRANSIENT_EXCEPTIONS``
+        (Fix 2).
+        How: Mock ``refresh_local_cache_from_github`` to raise
+        ``requests.exceptions.ConnectionError``, mirroring the existing
+        GithubException-refresh-failure test.
+        Why: Before Fix 2, this exception type propagated uncaught out of
+        ``add_item``, aborting item creation entirely instead of downgrading
+        to COULD_NOT_VERIFY.
+        """
+        import requests
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+        mocker.patch(
+            "backlog_core.operations.refresh_local_cache_from_github",
+            side_effect=requests.exceptions.ConnectionError("boom"),
+        )
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
+        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
+        out = Output()
+
+        result = add_item(
+            title="Completely Unrelated New Feature Proposal",
+            description="Adds a brand-new capability unrelated to anything else in the backlog.",
+            priority="P2",
+            output=out,
+        )
+
+        assert result["file_path"]
+        assert len(out.warnings) == 1
+        assert "Could not verify duplicate status" in out.warnings[0]
+        stored_titles = [item.title for item in backend.list_work_items()]
+        assert "Completely Unrelated New Feature Proposal" in stored_titles
+
+    def test_partial_reconcile_failures_downgrade_to_could_not_verify(self, mocker: MockerFixture) -> None:
+        """A refresh that reports partial reconciliation failures is not treated as clean.
+
+        Tests: The duplicate-check call site inspects the ``"failures"`` count
+        returned by ``refresh_local_cache_from_github`` and downgrades to
+        COULD_NOT_VERIFY rather than trusting a partially-reconciled cache
+        (Fix 3).
+        How: Mock ``refresh_local_cache_from_github`` to return a dict with
+        ``"failures": 3`` instead of raising.
+        Why: Before Fix 3, the return value was discarded entirely, so a
+        partial failure looked identical to a clean refresh and could return
+        NO_DUPLICATE on incomplete data.
+        """
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+        mocker.patch(
+            "backlog_core.operations.refresh_local_cache_from_github",
+            return_value={"refreshed": 0, "reconciled": 0, "failures": 3},
+        )
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
+        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
+        out = Output()
+
+        result = add_item(
+            title="Completely Unrelated New Feature Proposal",
+            description="Adds a brand-new capability unrelated to anything else in the backlog.",
+            priority="P2",
+            output=out,
+        )
+
+        assert result["file_path"]
+        assert len(out.warnings) == 1
+        assert "Could not verify duplicate status" in out.warnings[0]
+        assert "3 item(s) failed to reconcile" in out.warnings[0]
+        stored_titles = [item.title for item in backend.list_work_items()]
+        assert "Completely Unrelated New Feature Proposal" in stored_titles
+
 
 class TestListItemsSearch:
     """list_items(search=...) filters via backlog_core.search; None skips filtering (AC4/AC7)."""

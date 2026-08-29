@@ -471,6 +471,9 @@ max-complexity = 12
     "line-too-long",                          # Line length relaxed for test data
     "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
 ]
+# Regression test for RETRYABLE_TRANSIENT_EXCEPTIONS handling needs a genuine
+# requests exception instance to verify exact-type matching in the except clause.
+"**/tests/test_backlog_core_operations.py" = ["banned-api"]
 # Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
 # (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
 # Modifying these to satisfy linters would remove the seeded defects the experiment measures.

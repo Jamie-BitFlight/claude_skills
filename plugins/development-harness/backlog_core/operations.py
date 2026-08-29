@@ -77,6 +77,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -1338,6 +1339,22 @@ def _validate_add_item_type(type_: str) -> None:
     raise ValidationError(msg)
 
 
+def _duplicate_candidates() -> list[dict[str, str | bool]]:
+    """Build duplicate-check candidates, excluding skipped and terminal-status items.
+
+    ``_build_list_entry(item, {})`` falls back to an empty ``status`` string for
+    numeric-issue items (no batch-fetched status map is available here), which
+    ``find_content_duplicates`` cannot match against its excluded-status set.
+    Filtering skip/terminal items before building entries keeps done/resolved/
+    closed/skipped items from surviving as live duplicate candidates.
+
+    Returns:
+        List entry dicts for every non-skipped, non-terminal-status item.
+    """
+    items = [it for it in get_config().backend.list_work_items() if not it.skip]
+    return [_build_list_entry(it, {}) for it in _filter_closed_items(items, include_closed=False)]
+
+
 def _classify_duplicate_check(
     title: str, description: str, repo: str, out: Output
 ) -> tuple[DuplicateCheckStatus, list[ContentDuplicateMatch]]:
@@ -1361,19 +1378,20 @@ def _classify_duplicate_check(
         ``DUPLICATE_FOUND``.
     """
     backend = get_config().backend
-    candidates = [_build_list_entry(item, {}) for item in backend.list_work_items()]
-    matches = find_content_duplicates(title, description, candidates)
+    matches = find_content_duplicates(title, description, _duplicate_candidates())
     if matches:
         return DuplicateCheckStatus.DUPLICATE_FOUND, matches
     if not isinstance(backend, SyncProvider):
         return DuplicateCheckStatus.NO_DUPLICATE, []
     try:
-        refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
-    except (GithubException, BacklogError) as e:
+        refresh = refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
+    except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
         out.warn(f"  WARNING: Could not verify duplicate status: {e}")
         return DuplicateCheckStatus.COULD_NOT_VERIFY, []
-    candidates = [_build_list_entry(item, {}) for item in backend.list_work_items()]
-    matches = find_content_duplicates(title, description, candidates)
+    if refresh.get("failures"):
+        out.warn(f"  WARNING: Could not verify duplicate status: {refresh['failures']} item(s) failed to reconcile")
+        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
+    matches = find_content_duplicates(title, description, _duplicate_candidates())
     if matches:
         return DuplicateCheckStatus.DUPLICATE_FOUND, matches
     return DuplicateCheckStatus.NO_DUPLICATE, []
@@ -1654,7 +1672,12 @@ def refresh_local_cache_from_github(
         f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
         f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures."
     )
-    return {"refreshed": result.local_updates, "reconciled": result.deleted_provider_items, **out.to_dict()}
+    return {
+        "refreshed": result.local_updates,
+        "reconciled": result.deleted_provider_items,
+        "failures": result.failures,
+        **out.to_dict(),
+    }
 
 
 def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
@@ -1867,8 +1890,9 @@ def list_items(
     # batch_fetch_statuses because their issue IDs are strings with no integer
     # representation (BacklogBackend.supports_batch_status_fetch == False).
     # The backend-owned status field is authoritative for such backends — pass an
-    # empty map.  _item_derived_status and _build_list_entry both fall back to
-    # item.status when the map is empty.
+    # empty map.  _item_derived_status falls back to item.status when the map is
+    # empty, but _build_list_entry does NOT: for numeric-issue items it falls
+    # back to "" instead (see _duplicate_candidates, which filters around this).
     if get_config().backend.supports_batch_status_fetch:
         status_map = batch_fetch_statuses(open_items, repo)
     else:

@@ -34,7 +34,7 @@ from .models import BackendUnavailableError, BacklogError
 # ConnectionError -- covered without listing them. ContentDecodingError covers a
 # corrupted/truncated compressed response body -- also transient transport noise,
 # not a config or filesystem failure.
-_RETRYABLE_TRANSIENT_EXCEPTIONS = (
+RETRYABLE_TRANSIENT_EXCEPTIONS = (
     asyncio.TimeoutError,
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
@@ -42,7 +42,15 @@ _RETRYABLE_TRANSIENT_EXCEPTIONS = (
     requests.exceptions.ContentDecodingError,
 )
 
-__all__ = ["SyncErrorKind", "SyncState", "SyncStatus", "classify_sync_error", "get_sync_state", "reset_sync_state"]
+__all__ = [
+    "RETRYABLE_TRANSIENT_EXCEPTIONS",
+    "SyncErrorKind",
+    "SyncState",
+    "SyncStatus",
+    "classify_sync_error",
+    "get_sync_state",
+    "reset_sync_state",
+]
 
 # HTTP status code constants used in error classification (avoids PLR2004 magic values).
 _HTTP_UNAUTHORIZED = 401
@@ -277,7 +285,7 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         return SyncErrorKind.RETRYABLE
     if isinstance(exc, GithubException):
         return _classify_github_exception(exc)
-    if isinstance(exc, _RETRYABLE_TRANSIENT_EXCEPTIONS):
+    if isinstance(exc, RETRYABLE_TRANSIENT_EXCEPTIONS):
         return SyncErrorKind.RETRYABLE
     if isinstance(exc, (OSError, ValueError)):
         return SyncErrorKind.NON_RETRYABLE
