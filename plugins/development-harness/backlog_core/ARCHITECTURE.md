@@ -69,6 +69,7 @@ timestamps.py         ← standalone, no imports from other mcp modules; shared 
 backend_types.py      ← provider-neutral protocols and node types; imports models for type annotations
 entry_blocks.py       ← timestamped entry block parse/render/rewrite; imports from models, timestamps
 parsing.py            ← imports from models, section_registry, entry_blocks; pure parsing, selection, and transformation helpers
+search.py             ← standalone, no imports from other mcp modules (never imports fastmcp/mcp); full-text search engine and content-based duplicate detection
 yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
@@ -77,9 +78,9 @@ gh_client.py          ← imports from models, parsing
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imports section_registry; imported by backend implementations
 backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
-operations.py         ← imports from models, pure helpers, and backend_protocol only
+operations.py         ← imports from models, pure helpers, search, and backend_protocol only
 dispatch_state.py     ← imports from models (DispatchItemRecord, DispatchWaveRecord); no MCP awareness
-server.py             ← imports from models, operations, dispatch_state, backend_protocol
+server.py             ← imports from models, operations, dispatch_state, backend_protocol, search
 backlog.py            ← imports from operations (thin CLI wrapper)
 ```
 
@@ -204,7 +205,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
-- `DuplicateItemError(duplicates)` — fuzzy duplicate detected
+- `DuplicateItemError(duplicates)` — content-based duplicate detected
 - `GitHubUnavailableError` — GITHUB_TOKEN missing or API unreachable
 - `ValidationError` — input validation failure
 
@@ -216,7 +217,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 
 **Functions/data extracted from backlog.py** (line references are approximate):
 
-- Constants: `BACKLOG_DIR`, `DEFAULT_REPO`, `SECTION_RE`, `SKIP_STATUS`, `GITHUB_ISSUE_URL_RE`, `GITHUB_ISSUE_TITLE_TRUNCATE`, `MIN_FRONTMATTER_PARTS`, `TYPE_TO_LABEL`, `FUZZY_DUPLICATE_THRESHOLD`, `_COMMIT_PREFIX_RE`, `_FIELD_TO_INDEX`
+- Constants: `BACKLOG_DIR`, `DEFAULT_REPO`, `SECTION_RE`, `SKIP_STATUS`, `GITHUB_ISSUE_URL_RE`, `GITHUB_ISSUE_TITLE_TRUNCATE`, `MIN_FRONTMATTER_PARTS`, `TYPE_TO_LABEL`, `_COMMIT_PREFIX_RE`, `_FIELD_TO_INDEX`
 - Add new: `PRIORITY_SECTIONS` dict mapping priority strings to section headings (from the `add` command)
 - Exception classes: `BacklogError`, `ItemNotFoundError`, `DuplicateItemError`, `AmbiguousSelectorError`, `GitHubUnavailableError`, `ValidationError`
 - Pydantic models: `Entry`, `Section`, `GroomedData`, `BacklogItem`, `Output`, `IssueStatus`, `PullRequestRef`, `ViewItemResult`, `IssueLocalFields`
@@ -357,7 +358,7 @@ utilities, view helpers, and normalize helpers. Runtime backlog-directory traver
   tooling). Existing `parse_backlog_from_directory()` and `parse_backlog()` entry points are
   migration debt; runtime callers must use the configured backend, and remote cache traversal moves
   behind `FileCache`.
-- Item search: `find_item()` (dedup rule: when multiple title-substring matches share exactly one distinct issue number, returns the first match instead of raising `AmbiguousSelectorError`; still raises when matches have different issue numbers, or when any matching item is unnumbered), `find_fuzzy_duplicates()`
+- Item search: `find_item()` (dedup rule: when multiple title-substring matches share exactly one distinct issue number, returns the first match instead of raising `AmbiguousSelectorError`; still raises when matches have different issue numbers, or when any matching item is unnumbered)
 - Item filtering: `items_needing_issues()`, `items_with_issues()`
 - Issue body: `build_issue_body()`, `build_issue_body_from_file()`
 - Body utilities: `extract_groomed_section()`, `build_body_extra_only()`, `merge_sections()`
@@ -370,6 +371,52 @@ utilities, view helpers, and normalize helpers. Runtime backlog-directory traver
 **Imports from other modules**: `from .models import ...`, `from .entry_blocks import
 find_entry_spans, _entry_from_span, _deduplicate_timestamps` (entry extent — see `entry_blocks.py`
 below), `from ruamel.yaml import YAML, YAMLError`.
+
+---
+
+## Module: search.py
+
+**Responsibility**: Full-text search engine over the `list[dict[str, str | bool]]` item shape
+produced by `operations._build_list_entry`, plus content-based duplicate detection built on top of
+it (#3169). Must never import `fastmcp` or `mcp` — that constraint is what makes it importable from
+`operations.py`, which cannot depend on the FastMCP server module. Extracted from `server.py`
+(ADR-001: search is a distinct concern from markdown parsing, so it is not folded into `parsing.py`).
+
+**Search engine**:
+
+- Tokenizer/parser: `tokenize_search()`, `_SearchParser` — recursive-descent grammar (`NOT` > `AND`
+  > `OR`, parenthetical grouping) built from `_Predicate` subclasses (`_TermPred`, `_AndPred`,
+  `_OrPred`, `_NotPred`, `_TruePred`).
+- Term matching: `_item_matches_term()` — supports `/regex/` or `regex:pattern`, `field:value`
+  (`title`, `section`, `topic`, `type`, `body`), and plain substring terms against the
+  `_SEARCH_FIELDS` haystack built by `_build_haystack()`.
+- Public entry point: `apply_search_filter(items, search)` — used by both `operations.list_items()`
+  (MCP and CLI `backlog list --search`) and `find_content_duplicates()` below.
+- Snippet helpers: `_make_snippet()`, `_make_snippet_parts()`, `_format_match_text()`,
+  `_parse_body_sections()`.
+
+**Content-based duplicate detection** (replaces the deleted title-character-ratio matcher that
+previously lived in `parsing.py`, per ADR-004):
+
+- `DuplicateCheckStatus(StrEnum)` — `DUPLICATE_FOUND`, `NO_DUPLICATE`, `COULD_NOT_VERIFY`. The
+  tri-state result `operations._classify_duplicate_check()` returns; `COULD_NOT_VERIFY` never blocks
+  item creation.
+- `ContentDuplicateMatch` (frozen dataclass) — `title`, `item_ref`, `matched_field`, `snippet`,
+  `match_count`. The actionable reference a caller can act on, replacing the old file-path-only
+  result.
+- `build_concept_query(title, description)` — extracts up to 4 significant words (stopword- and
+  length-filtered) from title + description into a `term1 OR term2 ...` query.
+- `find_content_duplicates(title, description, candidates)` — runs the concept query through
+  `apply_search_filter()` against live (non-terminal-status) candidates, scores matches by
+  concept-term overlap in the full item haystack (title, description, and all section bodies, not
+  title characters alone), and returns up to `max_results` `ContentDuplicateMatch` entries ordered by
+  `match_count` descending.
+
+**Exports**: `tokenize_search`, `apply_search_filter`, `DuplicateCheckStatus`,
+`ContentDuplicateMatch`, `build_concept_query`, `find_content_duplicates`.
+
+**Imports from other modules**: None — no `fastmcp`/`mcp` imports, so both `server.py` and
+`operations.py` can depend on it without a cycle.
 
 ---
 

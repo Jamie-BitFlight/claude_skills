@@ -53,7 +53,9 @@ def add(
     priority: Annotated[str, typer.Option("--priority", help="Priority level (P0/P1/P2/Ideas)")] = "P1",
     source: Annotated[str, typer.Option("--source", help="Source of the item")] = "Not specified",
     type_: Annotated[str, typer.Option("--type", help="Item type (Feature/Bug/etc.)")] = "Feature",
-    force: Annotated[bool, typer.Option("--force", help="Force creation even if duplicate suspected")] = False,
+    force: Annotated[
+        bool, typer.Option("--force", help="Force creation even if a content-based duplicate is suspected")
+    ] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
 ) -> None:
     """Add a new item to the backlog."""
@@ -87,6 +89,9 @@ def list_items(
     topic: Annotated[str | None, typer.Option("--topic", help="Filter by topic")] = None,
     include_closed: Annotated[bool, typer.Option("--include-closed", help="Include closed items")] = False,
     filters: Annotated[list[str] | None, typer.Option("--filter", help="Filter by key=value (repeatable)")] = None,
+    search: Annotated[
+        str | None, typer.Option("--search", help="Full-text search query (see backlog_list search syntax)")
+    ] = None,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
 ) -> None:
     """List backlog items, optionally filtered."""
@@ -101,6 +106,7 @@ def list_items(
         topic=topic,
         include_closed=include_closed,
         filter_by_key=_filter_pairs(filters),
+        search=search,
         repo=repo,
         output=output,
     )

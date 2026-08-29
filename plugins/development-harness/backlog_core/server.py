@@ -66,6 +66,18 @@ from .models import (
     UnsupportedCapabilityError,
     init as _init_models,
 )
+from .search import (
+    _DEFAULT_SNIPPET_CONTEXT,
+    _META_FIELDS,
+    _REGEX_SLASH_MIN_LEN,
+    _SEARCH_FIELDS,
+    _format_match_text,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._format_match_text test imports
+    _make_snippet,
+    _make_snippet_parts,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._make_snippet_parts test imports
+    _parse_body_sections,
+    apply_search_filter as _apply_search_filter,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._apply_search_filter test imports
+    tokenize_search as _tokenize_search,
+)
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
 
 if TYPE_CHECKING:
@@ -187,15 +199,6 @@ def _section_without_entry_content(section: object) -> object:
     return trimmed
 
 
-# Fields searched by default when no field-specific prefix is given.
-# ``body`` contains the full item content (description + all section entries)
-# built by operations._build_item_body so that plain-text and regex searches
-# cover the complete backlog item, not just the 4 metadata fields.
-_SEARCH_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type", "body")
-
-# Minimum length for a valid /pattern/ regex term (e.g. "/x/" has length 3).
-_REGEX_SLASH_MIN_LEN = 2
-
 # All fields that callers can request via the fields= parameter on backlog_list.
 # Fields in _DEFAULT_ITEM_FIELDS are returned when no fields= parameter is given.
 # ``body`` is omitted from the default set because it makes responses large.
@@ -242,461 +245,6 @@ def _apply_fields_projection(
         return [{k: v for k, v in item.items() if k != "body"} for item in items]
     # Widen to the declared return type — items may be the narrower str|bool variant.
     return [dict(item) for item in items]
-
-
-def _item_field_text(item: dict[str, str | bool], field: str) -> str:
-    """Return the casefolded text for a single field of an item dict."""
-    return str(item.get(field, "") or "").casefold()
-
-
-def _build_haystack(item: dict[str, str | bool]) -> str:
-    """Return a single casefolded string combining all default search fields.
-
-    Building the haystack is O(fields) per item.  Pre-computing it once before
-    evaluating multiple terms avoids rebuilding it for every (item, term) pair.
-    """
-    return " ".join(_item_field_text(item, f) for f in _SEARCH_FIELDS)
-
-
-def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | None = None) -> bool:
-    """Return True if a single search term matches the item.
-
-    Supported term forms (evaluated in order):
-    - ``/pattern/`` or ``regex:pattern`` — compiled regex matched against all
-      default search fields joined with a space (title, section, topic, type,
-      and full body content).
-    - ``field:value`` — substring match restricted to a named field
-      (``title``, ``section``, ``topic``, ``type``, ``body``).  Unknown field
-      names fall back to full-text substring match.
-    - plain text — case-insensitive substring match across all default fields
-      (existing behaviour, fully preserved).
-
-    Args:
-        item: Backlog item dict.
-        term: A single search term (no AND/OR operators).
-        haystack: Pre-computed full-text string from ``_build_haystack``.
-            When provided, avoids rebuilding the haystack inside this call.
-            Pass ``None`` (default) to let this function build it on demand.
-    """
-    term = term.strip()
-    if not term:
-        return True
-
-    # Regex form: /pattern/ or regex:pattern
-    if (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN) or term.startswith("regex:"):
-        pattern_str = term[1:-1] if term.startswith("/") else term[len("regex:") :]
-        try:
-            pattern = _re.compile(pattern_str, _re.IGNORECASE)
-        except _re.error:
-            # Invalid regex — fall through to plain substring match on the raw term.
-            pass
-        else:
-            hs = haystack if haystack is not None else _build_haystack(item)
-            return bool(pattern.search(hs))
-
-    # Field-specific form: field:value
-    if ":" in term:
-        field, _, value = term.partition(":")
-        field = field.strip().lower()
-        value = value.strip().casefold()
-        if field in _SEARCH_FIELDS:
-            return value in _item_field_text(item, field)
-        # Unknown field prefix — treat as plain text (fall through).
-
-    # Plain text — existing case-insensitive substring match across all fields.
-    needle = term.casefold()
-    hs = haystack if haystack is not None else _build_haystack(item)
-    return needle in hs
-
-
-# ---------------------------------------------------------------------------
-# Search expression AST — predicates defined first so the parser can annotate
-# return types without forward references.
-# ---------------------------------------------------------------------------
-
-
-class _Predicate:
-    """Base class for search predicates.
-
-    Subclasses implement ``__call__(item, haystack) -> bool``.
-    """
-
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        """Evaluate the predicate against a single backlog item.
-
-        Args:
-            item: Backlog item dict.
-            haystack: Pre-computed full-text string from ``_build_haystack``.
-
-        Returns:
-            True if the item matches the predicate.
-        """
-        raise NotImplementedError
-
-
-@dataclasses.dataclass
-class _TermPred(_Predicate):
-    """Match a single leaf term against an item."""
-
-    term: str
-
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return _item_matches_term(item, self.term, haystack)
-
-
-@dataclasses.dataclass
-class _AndPred(_Predicate):
-    """Conjunction: both sub-predicates must match."""
-
-    left: _Predicate
-    right: _Predicate
-
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return self.left(item, haystack) and self.right(item, haystack)
-
-
-@dataclasses.dataclass
-class _OrPred(_Predicate):
-    """Disjunction: at least one sub-predicate must match."""
-
-    left: _Predicate
-    right: _Predicate
-
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return self.left(item, haystack) or self.right(item, haystack)
-
-
-@dataclasses.dataclass
-class _NotPred(_Predicate):
-    """Negation: the sub-predicate must not match."""
-
-    operand: _Predicate
-
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return not self.operand(item, haystack)
-
-
-class _TruePred(_Predicate):
-    """Always-true predicate used as a safe no-op fallback."""
-
-    def __call__(self, item: dict[str, str | bool], haystack: str) -> bool:
-        return True
-
-
-# ---------------------------------------------------------------------------
-# Tokenizer and recursive-descent parser
-# ---------------------------------------------------------------------------
-
-
-def _tokenize_search(search: str) -> list[str]:
-    """Tokenize a search query into a flat list of tokens.
-
-    Tokens are one of: ``(``, ``)``, ``AND``, ``OR``, ``NOT``, or a bare term
-    string.  Keywords are matched case-insensitively and emitted in uppercase.
-    Whitespace between tokens is consumed.  Terms that contain colons (field
-    prefixes), slashes (regex), or other non-keyword text are preserved as-is.
-
-    Args:
-        search: Raw search query string.
-
-    Returns:
-        List of string tokens.
-    """
-    tokens: list[str] = []
-    i = 0
-    n = len(search)
-    while i < n:
-        if search[i].isspace():
-            i += 1
-            continue
-        if search[i] in "()":
-            tokens.append(search[i])
-            i += 1
-            continue
-        j = i
-        while j < n and not search[j].isspace() and search[j] not in "()":
-            j += 1
-        word = search[i:j]
-        upper = word.upper()
-        tokens.append(upper if upper in {"AND", "OR", "NOT"} else word)
-        i = j
-    return tokens
-
-
-class _SearchParser:
-    """Recursive descent parser for search queries.
-
-    Grammar (precedence: NOT > AND > OR)::
-
-        expr     := or_expr
-        or_expr  := and_expr ( OR and_expr )*
-        and_expr := not_expr ( AND not_expr )*
-        not_expr := NOT not_expr | atom
-        atom     := LPAREN expr RPAREN | TERM
-
-    The parse result is a ``_Predicate`` callable ``(item, haystack) -> bool``.
-    """
-
-    def __init__(self, tokens: list[str]) -> None:
-        self._tokens = tokens
-        self._pos = 0
-
-    def _peek(self) -> str | None:
-        """Return the next token without consuming it, or None at end-of-input."""
-        if self._pos < len(self._tokens):
-            return self._tokens[self._pos]
-        return None
-
-    def _consume(self) -> str:
-        """Consume and return the next token.
-
-        Returns:
-            The token at the current position.
-        """
-        tok = self._tokens[self._pos]
-        self._pos += 1
-        return tok
-
-    def parse(self) -> _Predicate:
-        """Parse all tokens and return a root predicate.
-
-        Remaining unparsed tokens after the top-level ``or_expr`` are joined
-        with implicit AND so that malformed partial queries still match
-        sensibly rather than silently ignoring trailing terms.
-
-        Returns:
-            Callable predicate representing the full expression.
-        """
-        pred = self._parse_or()
-        while self._peek() is not None and self._peek() not in {")", "OR"}:
-            if self._peek() == "AND":
-                self._consume()
-            right = self._parse_not()
-            pred = _AndPred(pred, right)
-        return pred
-
-    def _parse_or(self) -> _Predicate:
-        left = self._parse_and()
-        while self._peek() == "OR":
-            self._consume()
-            right = self._parse_and()
-            left = _OrPred(left, right)
-        return left
-
-    def _parse_and(self) -> _Predicate:
-        left = self._parse_not()
-        while self._peek() == "AND":
-            self._consume()
-            right = self._parse_not()
-            left = _AndPred(left, right)
-        return left
-
-    def _parse_not(self) -> _Predicate:
-        if self._peek() == "NOT":
-            self._consume()
-            operand = self._parse_not()
-            return _NotPred(operand)
-        return self._parse_atom()
-
-    def _parse_atom(self) -> _Predicate:
-        tok = self._peek()
-        if tok == "(":
-            self._consume()
-            pred = self._parse_or()
-            if self._peek() == ")":
-                self._consume()
-            return pred
-        if tok is not None and tok not in {"AND", "OR", "NOT", ")"}:
-            self._consume()
-            return _TermPred(tok)
-        # Empty or unexpected token — safe no-op fallback.
-        return _TruePred()
-
-
-def _apply_search_filter(items: list[dict[str, str | bool]], search: str) -> list[dict[str, str | bool]]:
-    """Filter items using the full-text search query syntax.
-
-    Query syntax (operator precedence: NOT > AND > OR):
-
-    - ``term1 OR term2``  — item matches if either term matches.
-    - ``term1 AND term2`` — item matches only if both terms match.
-    - ``NOT term`` — item matches only if the term does *not* match.
-    - ``(term1 OR term2) AND term3`` — parenthetical grouping controls precedence.
-    - Bare text without operators — original substring behaviour (single term).
-
-    Operators are whitespace-delimited and case-insensitive.
-
-    Each individual term supports:
-
-    - ``/regex/`` or ``regex:pattern`` — regex match
-    - ``field:value`` — field-specific substring match
-    - plain text — substring match across all default fields
-
-    Args:
-        items: Backlog item dicts to filter.
-        search: Query string.
-
-    Returns:
-        Filtered list of items that match the search query.
-    """
-    search = search.strip()
-    if not search:
-        return items
-
-    tokens = _tokenize_search(search)
-    parser = _SearchParser(tokens)
-    predicate = parser.parse()
-
-    result = []
-    for item in items:
-        hs = _build_haystack(item)
-        if predicate(item, hs):
-            result.append(item)
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Primitive 1: match_context helpers
-# ---------------------------------------------------------------------------
-
-# Snippet window: characters before and after the match position.
-# Used as the default when snippet_context is not supplied to _make_snippet.
-_SNIPPET_WINDOW = 60
-
-# Default snippet_context value (pre + post budget combined).
-_DEFAULT_SNIPPET_CONTEXT = 2 * _SNIPPET_WINDOW
-
-
-def _parse_body_sections(body: str) -> list[tuple[str, str]]:
-    """Parse a markdown body string into (section_slug, text) tuples.
-
-    Splits on ``## Heading`` lines. Text before the first heading is attributed
-    to ``"body:preamble"``.
-
-    Args:
-        body: Raw markdown body string.
-
-    Returns:
-        List of (section_slug, text) pairs in document order.
-    """
-    sections: list[tuple[str, str]] = []
-    current_slug = "body:preamble"
-    current_parts: list[str] = []
-    for line in body.splitlines(keepends=True):
-        if line.startswith("## "):
-            if current_parts:
-                sections.append((current_slug, "".join(current_parts)))
-            heading = line[3:].strip()
-            current_slug = "body:" + heading.lower().replace(" ", "-")
-            current_parts = []
-        else:
-            current_parts.append(line)
-    if current_parts:
-        sections.append((current_slug, "".join(current_parts)))
-    return sections
-
-
-def _make_snippet(text: str, start: int, end: int, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT) -> str:
-    """Extract a snippet around a match position with sliding-window budget.
-
-    The total character budget is *snippet_context*, split equally between the
-    text before and after the match.  Unused budget on either side is
-    redistributed to the other side so the window is as wide as possible.
-
-    Args:
-        text: The full text in which the match was found.
-        start: Match start index.
-        end: Match end (exclusive) index.
-        snippet_context: Total characters to show before and after the match
-            (combined).  Defaults to ``2 * _SNIPPET_WINDOW`` (120) to preserve
-            prior behaviour when callers do not supply the argument.
-
-    Returns:
-        Up to *snippet_context* + (end-start) characters centred on the match,
-        with leading/trailing ``...`` markers when content was truncated.
-    """
-    raw, matched, _snip_start, _snip_end = _make_snippet_parts(text, start, end, snippet_context)
-    del matched
-    return raw
-
-
-def _make_snippet_parts(
-    text: str, start: int, end: int, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
-) -> tuple[str, str, int, int]:
-    """Compute snippet parts for a match, enabling both plain and formatted output.
-
-    Implements the sliding-window budget: pre and post budgets each receive half
-    of *snippet_context*; any unused budget on one side is redistributed to the
-    other so the window stays as wide as possible.
-
-    Args:
-        text: The full text in which the match was found.
-        start: Match start index (inclusive).
-        end: Match end index (exclusive).
-        snippet_context: Total character budget split across pre and post sides.
-
-    Returns:
-        Tuple of (raw_snippet, matched_text, snip_start, snip_end) where
-        raw_snippet is the text[snip_start:snip_end] with leading/trailing
-        ``...`` markers, matched_text is text[start:end], and snip_start/
-        snip_end are the absolute window boundaries in *text*.
-    """
-    pre_budget = snippet_context // 2
-    post_budget = snippet_context // 2
-
-    # Sliding window: redistribute surplus from whichever side is near a boundary.
-    actual_pre = min(pre_budget, start)
-    surplus_pre = pre_budget - actual_pre
-    adjusted_post = post_budget + surplus_pre
-
-    actual_post = min(adjusted_post, len(text) - end)
-    surplus_post = post_budget - min(post_budget, len(text) - end)  # surplus from original split
-    if surplus_post > 0:
-        pre_budget += surplus_post
-        actual_pre = min(pre_budget, start)
-
-    snip_start = start - actual_pre
-    snip_end = end + actual_post
-    snippet = text[snip_start:snip_end]
-    if snip_start > 0:
-        snippet = "..." + snippet
-    if snip_end < len(text):
-        snippet += "..."
-    return snippet, text[start:end], snip_start, snip_end
-
-
-def _format_match_text(
-    field: str, match_index: int, text: str, start: int, end: int, snippet_context: int = _DEFAULT_SNIPPET_CONTEXT
-) -> str:
-    """Format a single match entry as a human-readable snippet line.
-
-    The section label ``[segment: field]`` is always shown and is NOT counted
-    against the character budget.  The sliding window applies only to the
-    haystack text excluding the label.
-
-    Format::
-
-        N::[segment: field]:: ...pre-text...MATCHED TERM...post-text...
-
-    where ``...`` prefix/suffix are present only when content was truncated.
-
-    Args:
-        field: Field or section slug (e.g. ``"title"``, ``"body:acceptance-criteria"``).
-        match_index: 1-based index of this match within the item.
-        text: The full haystack text (section content, not including the label).
-        start: Match start index within *text*.
-        end: Match end index (exclusive) within *text*.
-        snippet_context: Total character budget for pre + post context.
-
-    Returns:
-        Formatted match line string.
-    """
-    raw_snippet, matched, ss, se = _make_snippet_parts(text, start, end, snippet_context)
-    del matched, ss, se
-    return f"{match_index}::[segment: {field}]:: {raw_snippet}"
-
-
-_META_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
 
 
 def _match_body_sections(
@@ -917,7 +465,7 @@ def _enrich_with_match_context(
     grouped display: the header appears once, then each ``text`` line follows.
 
     Args:
-        items: Items filtered by ``_apply_search_filter``.
+        items: Items already filtered by search (via ``operations.list_items``).
         search: The original search query string, or ``None``.
         snippet_context: Total character budget for pre + post context per match.
 
@@ -1699,7 +1247,7 @@ async def backlog_add(
     type_: Annotated[
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
-    force: Annotated[bool, Field(description="Skip fuzzy duplicate check")] = False,
+    force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
 ) -> dict:
     """Add a new item through the configured backend and optionally create its native issue.
 
@@ -2149,6 +1697,7 @@ async def backlog_list(
                 topic=topic,
                 include_closed=include_closed,
                 filter_by_key=filter_by_key,
+                search=search,
                 output=out,
             ),
             asyncio.to_thread(_probe_backend_status),
@@ -2160,10 +1709,6 @@ async def backlog_list(
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
     all_items: list[dict[str, str | bool]] = _extract_item_list(result)
-
-    # Apply cross-field search filter when requested.
-    if search is not None:
-        all_items = _apply_search_filter(all_items, search)
 
     # Deduplicate by issue number — the cache may contain duplicate entries for
     # the same issue (observed: #260 appeared twice when multiple match paths

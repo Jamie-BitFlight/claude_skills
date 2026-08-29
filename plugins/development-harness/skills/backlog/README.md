@@ -246,9 +246,9 @@ backlog list \
   --topic "matching"
 ```
 
-Note: the CLI's `backlog list` has no `--search` flag — full-text search across title, section,
-topic, type, description, and body has no CLI path as of 2026-08-05 (backlog item #2793). Use the
-MCP `backlog_list(search=...)` tool for full-text search.
+Note: the CLI's `backlog list` supports a `--search` flag for full-text search across title,
+section, topic, type, description, and body — same query syntax as the MCP
+`backlog_list(search=...)` tool.
 
 The `backend` dict is always present in the response, regardless of the `from_github` parameter.
 It reports the GitHub API availability status checked on every `backlog_list` call.

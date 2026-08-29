@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from backlog_core.models import BackendAvailability, BackendStatus, BacklogError, Output, ViewItemResult
+from backlog_core.search import apply_search_filter
 from backlog_core.server import mcp
 from fastmcp.client import Client
 
@@ -34,6 +35,20 @@ def _make_output_dict(
 ) -> dict[str, list[str]]:
     """Build the Output.to_dict() structure returned by all operations."""
     return {"messages": messages or [], "warnings": warnings or [], "errors": errors or []}
+
+
+def _search_aware_list_items(op_result: dict) -> object:
+    """Build a dh_core.operations.list_items side_effect that applies search like production.
+
+    Search filtering moved from backlog_list into operations.list_items (#3169 T4),
+    so a plain return_value mock no longer exercises it — this replicates that step.
+    """
+
+    def _side_effect(*args: object, search: str | None = None, **kwargs: object) -> dict:
+        items = op_result["items"]
+        return {**op_result, "items": items if search is None else apply_search_filter(items, search)}
+
+    return _side_effect
 
 
 def _make_view_result(data: dict) -> ViewItemResult:
@@ -260,7 +275,7 @@ async def test_backlog_list_search_filters_across_title_description_topic_type()
         {"title": "Refactor", "description": "clean up", "topic": "quality", "type": "Refactor"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "sam"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -279,7 +294,7 @@ async def test_backlog_list_search_is_case_insensitive():
         {"title": "unrelated", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response_lower = await _call("backlog_list", {"search": "sam"})
         response_upper = await _call("backlog_list", {"search": "SAM"})
 
@@ -383,7 +398,7 @@ async def test_backlog_list_search_or_operator_matches_either_term():
         {"title": "Refactor models", "description": "", "topic": "", "type": "Refactor"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "auth OR deploy"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -400,7 +415,7 @@ async def test_backlog_list_search_and_operator_requires_both_terms():
         {"title": "Deploy bug", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "auth AND bug"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -417,7 +432,7 @@ async def test_backlog_list_search_regex_slash_form_matches_pattern():
         {"title": "Unrelated", "description": "", "topic": "", "type": "Refactor"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "/auth.*bug/"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -433,7 +448,7 @@ async def test_backlog_list_search_regex_prefix_form_matches_pattern():
         {"title": "Auth feature", "description": "", "topic": "", "type": "Feature"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "regex:auth.*bug"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -449,7 +464,7 @@ async def test_backlog_list_search_field_specific_title_prefix():
         {"title": "Deploy", "description": "", "topic": "", "type": "Bug"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "title:auth"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -467,7 +482,7 @@ async def test_backlog_list_search_field_specific_type_prefix():
         {"title": "Deploy", "description": "", "topic": "", "type": "Feature"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "type:bug"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -483,7 +498,7 @@ async def test_backlog_list_search_invalid_regex_falls_back_to_plain_text():
         {"title": "Unrelated", "description": "", "topic": "", "type": "Feature"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "/[invalid/"})
 
     # Falls back to substring match on the literal string "/[invalid/"
@@ -516,7 +531,7 @@ async def test_backlog_list_search_matches_body_content():
         },
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "sdlc-layers"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -544,7 +559,7 @@ async def test_backlog_list_search_body_field_specific_prefix():
         {"title": "Unrelated task", "section": "P2", "topic": "", "type": "Bug", "body": "Fixes a crash"},
     ]
     op_result = {"items": items}
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "body:sdlc-layers"})
 
     returned_titles = [item["title"] for item in response["items"]]
@@ -2255,7 +2270,7 @@ async def test_backlog_list_search_not_operator_excludes_term():
             {"title": "Backlog quality review", "section": "P1", "topic": "quality", "type": "Chore", "body": ""},
         ]
     }
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "backlog NOT quality"})
 
     titles = [i["title"] for i in response["items"]]
@@ -2336,7 +2351,7 @@ async def test_backlog_list_search_grouped_or_and():
             {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
         ]
     }
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"search": "(auth OR deploy) AND quality"})
 
     titles = [i["title"] for i in response["items"]]
@@ -2388,7 +2403,7 @@ async def test_backlog_list_count_only_respects_search_filter():
             {"title": "Auth token refresh", "section": "P1", "topic": "security", "type": "Bug", "body": ""},
         ]
     }
-    with patch("dh_core.operations.list_items", return_value=op_result):
+    with patch("dh_core.operations.list_items", side_effect=_search_aware_list_items(op_result)):
         response = await _call("backlog_list", {"count_only": True, "search": "auth"})
 
     assert response["count"] == 2, f"Expected 2 auth items, got {response['count']}"

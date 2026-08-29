@@ -544,6 +544,46 @@ class TestSyncErrorClassification:
         exc = OSError("Permission denied: /cache")
         assert classify_sync_error(exc) == SyncErrorKind.NON_RETRYABLE
 
+    def test_requests_connection_error_is_retryable(self) -> None:
+        """requests.exceptions.ConnectionError (dropped HTTP connection) -> RETRYABLE.
+
+        ConnectionError is an OSError subclass (via RequestException); without an
+        explicit branch it misfires into the generic OSError -> NON_RETRYABLE branch,
+        identical to a genuine local filesystem failure.
+        """
+        import requests
+
+        exc = requests.exceptions.ConnectionError("Connection aborted.")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
+    def test_requests_timeout_is_retryable(self) -> None:
+        """requests.exceptions.Timeout (transient network timeout) -> RETRYABLE."""
+        import requests
+
+        exc = requests.exceptions.Timeout("Read timed out.")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
+    def test_requests_chunked_encoding_error_is_retryable(self) -> None:
+        """requests.exceptions.ChunkedEncodingError (truncated response body) -> RETRYABLE."""
+        import requests
+
+        exc = requests.exceptions.ChunkedEncodingError("Connection broken: IncompleteRead")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
+    def test_requests_content_decoding_error_is_retryable(self) -> None:
+        """requests.exceptions.ContentDecodingError (corrupted compressed body) -> RETRYABLE."""
+        import requests
+
+        exc = requests.exceptions.ContentDecodingError("Failed to decode response body")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
+    def test_requests_connect_timeout_subclass_is_retryable(self) -> None:
+        """requests.exceptions.ConnectTimeout (Timeout subclass) -> RETRYABLE."""
+        import requests
+
+        exc = requests.exceptions.ConnectTimeout("Connection timed out.")
+        assert classify_sync_error(exc) == SyncErrorKind.RETRYABLE
+
     def test_value_error_is_non_retryable(self) -> None:
         """ValueError (config error from resolve_repo) -> NON_RETRYABLE."""
         exc = ValueError("repo not configured")

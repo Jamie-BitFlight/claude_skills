@@ -5,10 +5,8 @@ Extracted from ``backlog.py`` — pure functions with no GitHub or typer depende
 
 from __future__ import annotations
 
-import difflib
 import io
 import logging
-import operator
 import re
 import sys
 from datetime import UTC, datetime
@@ -35,7 +33,6 @@ from . import models
 from .entry_blocks import _deduplicate_timestamps, _entry_from_span, find_entry_spans
 from .models import (
     COMMIT_PREFIX_RE,
-    FUZZY_DUPLICATE_THRESHOLD,
     GITHUB_ISSUE_URL_RE,
     MIN_FRONTMATTER_PARTS,
     SKIP_STATUS,
@@ -66,7 +63,6 @@ __all__ = [
     "extract_groomed_section",
     "extract_normalize_metadata",
     "extract_sections",
-    "find_fuzzy_duplicates",
     "find_item",
     "infer_type",
     "issues_to_title_map",
@@ -531,44 +527,6 @@ def find_item(items: list[BacklogItem], selector: str) -> BacklogItem | None:
             return matches[0]
         raise AmbiguousSelectorError(selector, matches)
     return None
-
-
-def find_fuzzy_duplicates(
-    title: str, items: list[BacklogItem], threshold: float = FUZZY_DUPLICATE_THRESHOLD
-) -> list[tuple[str, float, str]]:
-    """Find existing backlog items with titles similar to the given title.
-
-    Uses ``difflib.SequenceMatcher`` on normalized titles (conventional-commit
-    prefixes stripped, lowercased) to detect near-duplicates.
-
-    Args:
-        title: The new item title to check.
-        items: Existing backlog items from ``parse_backlog()``.
-        threshold: Similarity ratio (0.0-1.0) above which a match is reported.
-
-    Returns:
-        List of ``(existing_title, similarity_ratio, file_path)`` tuples sorted
-        by similarity descending. Empty list if no matches above threshold.
-    """
-    normalized_new = normalize_issue_title(title)
-    if not normalized_new:
-        return []
-    matches: list[tuple[str, float, str]] = []
-    for item in items:
-        existing_title = item.title
-        if not existing_title:
-            continue
-        # Skip done/resolved items
-        if item.skip:
-            continue
-        normalized_existing = normalize_issue_title(existing_title)
-        if not normalized_existing:
-            continue
-        ratio = difflib.SequenceMatcher(None, normalized_new, normalized_existing).ratio()
-        if ratio >= threshold:
-            matches.append((existing_title, ratio, item.file_path))
-    matches.sort(key=operator.itemgetter(1), reverse=True)
-    return matches
 
 
 # ---------------------------------------------------------------------------

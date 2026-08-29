@@ -63,7 +63,6 @@ from .models import (
 )
 from .parsing import (
     SectionSpan,
-    find_fuzzy_duplicates,
     find_item,
     items_needing_issues,
     items_with_issues,
@@ -76,7 +75,9 @@ from .parsing import (
     view_result_from_local_item,
 )
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
+from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -1338,23 +1339,95 @@ def _validate_add_item_type(type_: str) -> None:
     raise ValidationError(msg)
 
 
-def _check_for_duplicates(title: str, force: bool) -> None:
-    """Raise DuplicateItemError if a fuzzy duplicate exists and force is False.
+_DUPLICATE_TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed", "completed"})
+
+
+def _duplicate_candidates() -> list[dict[str, str | bool]]:
+    """Build duplicate-check candidates, excluding skipped and terminal-status items.
+
+    ``_build_list_entry(item, {})`` falls back to an empty ``status`` string for
+    numeric-issue items (no batch-fetched status map is available here), which
+    ``find_content_duplicates`` cannot match against its excluded-status set.
+    Filtering skip/terminal items before building entries keeps done/resolved/
+    closed/skipped items from surviving as live duplicate candidates. The
+    status check is case-insensitive because numeric-issue items reloaded with
+    a legacy/uppercase status (e.g. ``"COMPLETED"``) may not have gone through
+    the parsing-time skip computation that lowercases and sets ``item.skip``.
+
+    Returns:
+        List entry dicts for every non-skipped, non-terminal-status item.
+    """
+    items = [
+        it
+        for it in get_config().backend.list_work_items()
+        if not it.skip and it.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES
+    ]
+    return [_build_list_entry(it, {}) for it in items]
+
+
+def _classify_duplicate_check(
+    title: str, description: str, repo: str, out: Output
+) -> tuple[DuplicateCheckStatus, list[ContentDuplicateMatch]]:
+    """Classify whether title/description content matches an existing backlog item.
+
+    Checks the local cache first. When nothing matches locally and the active
+    backend is a ``SyncProvider``, performs one bounded incremental refresh and
+    re-checks — absence of a local match alone does not prove no duplicate
+    exists for backends fed by an external provider. A refresh failure never
+    blocks item creation: it downgrades the result to ``COULD_NOT_VERIFY`` and
+    records a warning on *out*.
 
     Args:
         title: Title of the new item.
+        description: Description of the new item.
+        repo: Repository slug used for the optional refresh.
+        out: Output collector for a COULD_NOT_VERIFY warning.
+
+    Returns:
+        Tuple of (status, matches). *matches* is non-empty only when status is
+        ``DUPLICATE_FOUND``.
+    """
+    backend = get_config().backend
+    matches = find_content_duplicates(title, description, _duplicate_candidates())
+    if matches:
+        return DuplicateCheckStatus.DUPLICATE_FOUND, matches
+    if not isinstance(backend, SyncProvider):
+        return DuplicateCheckStatus.NO_DUPLICATE, []
+    try:
+        refresh = refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
+    except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
+        out.warn(f"  WARNING: Could not verify duplicate status: {e}")
+        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
+    if refresh.get("failures"):
+        out.warn(f"  WARNING: Could not verify duplicate status: {refresh['failures']} item(s) failed to reconcile")
+        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
+    matches = find_content_duplicates(title, description, _duplicate_candidates())
+    if matches:
+        return DuplicateCheckStatus.DUPLICATE_FOUND, matches
+    return DuplicateCheckStatus.NO_DUPLICATE, []
+
+
+def _check_for_duplicates(title: str, description: str, force: bool, repo: str, out: Output) -> None:
+    """Raise DuplicateItemError if a content duplicate is found and force is False.
+
+    Args:
+        title: Title of the new item.
+        description: Description of the new item.
         force: When True, skip the check entirely.
+        repo: Repository slug used for the optional refresh.
+        out: Output collector for a COULD_NOT_VERIFY warning.
 
     Raises:
-        DuplicateItemError: If one or more similar titles are found.
+        DuplicateItemError: If one or more content-matching items are found.
     """
     if force:
         return
-    existing_items = get_config().backend.list_work_items()
-    duplicates = find_fuzzy_duplicates(title, existing_items)
-    if not duplicates:
-        return
-    raise DuplicateItemError(duplicates)
+    status, matches = _classify_duplicate_check(title, description, repo, out)
+    match status:
+        case DuplicateCheckStatus.DUPLICATE_FOUND:
+            raise DuplicateItemError(matches)
+        case DuplicateCheckStatus.NO_DUPLICATE | DuplicateCheckStatus.COULD_NOT_VERIFY:
+            return
 
 
 def _resolve_reference(priority: str, slug: str) -> str:
@@ -1500,7 +1573,7 @@ def add_item(
 
     out = output or Output()
 
-    _check_for_duplicates(title, force)
+    _check_for_duplicates(title, description, force, repo, out)
 
     today_str = today()
     slug = title_to_slug(title)
@@ -1609,7 +1682,12 @@ def refresh_local_cache_from_github(
         f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
         f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures."
     )
-    return {"refreshed": result.local_updates, "reconciled": result.deleted_provider_items, **out.to_dict()}
+    return {
+        "refreshed": result.local_updates,
+        "reconciled": result.deleted_provider_items,
+        "failures": result.failures,
+        **out.to_dict(),
+    }
 
 
 def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
@@ -1775,6 +1853,7 @@ def list_items(
     repo: str = "",
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
+    search: str | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
     """List backlog items. Default reads provider-backed record only. Use from_github=True to refresh first.
 
@@ -1797,6 +1876,9 @@ def list_items(
             comparison). All pairs compose with AND logic. A key the item does
             not carry returns no match (a no-op, not an error). Existing
             type/topic/status filters are unaffected.
+        search: Full-text search query (see backlog_core.search for syntax).
+            Applied after filter_by_key, on the result item dicts. None skips
+            search filtering entirely.
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
@@ -1818,8 +1900,9 @@ def list_items(
     # batch_fetch_statuses because their issue IDs are strings with no integer
     # representation (BacklogBackend.supports_batch_status_fetch == False).
     # The backend-owned status field is authoritative for such backends — pass an
-    # empty map.  _item_derived_status and _build_list_entry both fall back to
-    # item.status when the map is empty.
+    # empty map.  _item_derived_status falls back to item.status when the map is
+    # empty, but _build_list_entry does NOT: for numeric-issue items it falls
+    # back to "" instead (see _duplicate_candidates, which filters around this).
     if get_config().backend.supports_batch_status_fetch:
         status_map = batch_fetch_statuses(open_items, repo)
     else:
@@ -1828,6 +1911,8 @@ def list_items(
     result_items = [_build_list_entry(it, status_map) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
+    if search is not None:
+        result_items = apply_search_filter(result_items, search)
     return {"items": result_items, "count": len(result_items), **out.to_dict()}
 
 
