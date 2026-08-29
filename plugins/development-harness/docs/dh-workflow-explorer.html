@@ -464,13 +464,13 @@ body {
 
   <div class="toolbar-sep"></div>
 
-  <select id="route-filter">
+  <select id="route-filter" aria-label="Filter by route">
     <option value="">All routes</option>
   </select>
 
   <input id="search-input" type="text" placeholder="Search nodes…">
 
-  <div id="gap-badge">0 gaps</div>
+  <div id="gap-badge" role="button" tabindex="0">0 gaps</div>
 
   <button id="reset-btn" title="Reset view">⊙ Fit</button>
 </div>
@@ -497,7 +497,7 @@ body {
 </div>
 
 <!-- LEGEND -->
-<button id="legend-btn" title="Toggle legend">◈</button>
+<button id="legend-btn" title="Toggle legend" aria-label="Toggle legend">◈</button>
 <div id="legend-panel">
   <div class="legend-section">
     <h3>Node Types</h3>
@@ -1044,6 +1044,13 @@ body {
 
   gapBadge.addEventListener('click', () => {
     applyGapFilter();
+  });
+
+  gapBadge.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      applyGapFilter();
+    }
   });
 
   resetBtn.addEventListener('click', () => {
