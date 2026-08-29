@@ -178,9 +178,8 @@ Modified files:
 Read the architect spec's Component Design and Type System Design sections.
 For each modified file, grep for function/class definitions and extract actual signatures.
 Compare against the contracts defined in the spec.
-Report mismatches in a <concerns> block with severity CONTRACT VIOLATION (signature mismatch)
-or CONTRACT GAP (spec defines contract but implementation is silent).
-If no mismatches are found, output `No contract concerns — all contracts in scope are satisfied.` with no <concerns> block.
+Deliver findings per your own agent file's Delivery section — do not return them in your
+response text; the dispatcher does not read it.
 """
 )
 ```

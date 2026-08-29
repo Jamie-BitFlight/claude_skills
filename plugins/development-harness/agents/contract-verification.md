@@ -122,9 +122,13 @@ positives for contracts that will be implemented in a later task.
 
 ## Output Format
 
+Use this format to derive each `backlog_groom` content line in the Delivery section below —
+it is your working analysis format, not your response: the dispatcher does not read your
+response text, per Delivery.
+
 ### When Mismatches Are Found
 
-Return only the concerns block — no other text:
+Analyze in this form:
 
 ```xml
 <concerns>
@@ -160,18 +164,22 @@ Per violation:
 
 ```
 mcp__plugin_dh_backlog__backlog_groom(
-    selector="#{issue_number}",
+    selector="{issue_number}",
     section="Concerns",
     content="- [ ] CONTRACT: {severity} — {issue line, one sentence} (reported by contract-verification on {task_id})",
     append=True
 )
 ```
 
+Do not prepend `#` — `find_item` resolves a bare GitHub issue number and a bare beads nanoid
+(e.g. `bd-a3f8`) equally well, but `#bd-a3f8` matches neither its numeric-selector path nor
+its string-ID exact match, so a prefixed beads selector silently fails to resolve.
+
 When clean, one call with a pre-resolved entry:
 
 ```
 mcp__plugin_dh_backlog__backlog_groom(
-    selector="#{issue_number}",
+    selector="{issue_number}",
     section="Concerns",
     content="- [x] CONTRACT: no concerns — all contracts in scope satisfied (reported by contract-verification on {task_id})",
     append=True
@@ -182,7 +190,7 @@ The leading `[x]` versus `[ ]` is the interface contract distinguishing a clean 
 dropped one at a glance.
 
 **Terminal response.** End with `STATUS: DONE` on its own first line, summarizing what was
-written — e.g. `Wrote N contract finding(s) to #{issue_number} Concerns section (task {task_id}).`
+written — e.g. `Wrote N contract finding(s) to {issue_number} Concerns section (task {task_id}).`
 The response text is no longer load-bearing: the write lands before you return.
 
 ## Operating Rules
