@@ -492,7 +492,7 @@ flowchart TD
     P5_WAIT --> P5_BATCH_CHECK
 
     P5_COMPLETE(["Completion Gate:<br>All tasks show COMPLETE"])
-    P5_COMPLETE --> P5_INVOKE_QG["Invoke directly:<br>Skill(skill='complete-implementation',<br>args='{task_file_path}')<br>Explicit invocation — not a suggestion"]
+    P5_COMPLETE --> P5_INVOKE_QG["Invoke directly:<br>Skill(skill='complete-implementation',<br>args='{plan_address_or_item_reference}')<br>Explicit invocation — not a suggestion"]
 ```
 
 ### Node Contracts
@@ -535,7 +535,7 @@ flowchart TD
 - Both persist through the configured backend
 - `artifact_register` instructions are added to bookend task delegation prompts
 
-**complete-implementation is explicitly invoked** when all tasks show COMPLETE. The skill uses `Skill(skill="complete-implementation", args="{task_file_path}")` — a direct invocation, not a text suggestion.
+**complete-implementation is explicitly invoked** when all tasks show COMPLETE. The skill uses `Skill(skill="complete-implementation", args="{plan_address_or_item_reference}")` — a direct invocation, not a text suggestion.
 
 **BLOCKED task handling**: NOT FOUND in source. Neither `implement-feature` nor `start-task` documents an explicit procedure for BLOCKED tasks. The completion gate triggers only when all tasks are COMPLETE. No documented escalation path or loop-exit condition for BLOCKED tasks exists in these skill files.
 
