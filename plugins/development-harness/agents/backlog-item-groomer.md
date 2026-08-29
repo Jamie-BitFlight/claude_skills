@@ -60,7 +60,14 @@ Call `mcp__plugin_dh_backlog__backlog_view(selector=item_ref, summary=False)` to
 item. Do not begin grooming from memory, from assumptions, or from anything other than this
 response — always fetch the item first.
 
-Extract from the response:
+If the response contains `_over_budget: true`, the item exceeded the server's view token budget:
+only metadata, `description`, and `sections_index` came back — the section bodies listed below did
+not. Fetch each section that `sections_index` shows as present individually, e.g.
+`backlog_view(selector=item_ref, summary=False, sections=["Impact Radius"])`, before proceeding.
+Do not groom against a truncated read.
+
+Extract from the response (or from the individual per-section fetches above, when `_over_budget`
+applied):
 
 - `title`, `description` — the primary grooming input
 - Any `**Hypothesis**:` lines inside the description — treated as research questions

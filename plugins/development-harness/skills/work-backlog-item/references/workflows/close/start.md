@@ -107,8 +107,10 @@ If operation is `resolve`:
 4. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: `item_ref`
    (the same selector used in Step 5.2), `section="Acceptance Criteria"`, plan address (e.g.,
    `P{id}`), and checklist status (100%). Instruct the agent to: call
-   `mcp__plugin_dh_backlog__backlog_view(selector=item_ref, sections=["Acceptance Criteria"])` and
-   parse each `-` line as a separate criterion itself, read the plan via
+   `mcp__plugin_dh_backlog__backlog_view(selector=item_ref, summary=False, sections=["Acceptance Criteria"])`
+   — `summary=False` is required; `backlog_view` defaults to `summary=True`, which returns the
+   compact routing manifest and ignores `sections` entirely — and parse each `-` line as a separate
+   criterion itself, read the plan via
    `mcp__plugin_dh_sam__sam_plan(plan="{address}", config={"action": "read"})`, search
    `git log --oneline -20`, check relevant files for each criterion, and return per-criterion
    PASS/FAIL with file:line evidence. Do not parse or re-type the criteria text into the dispatch
@@ -121,9 +123,12 @@ If operation is `resolve`:
    Overall: PASS or FAIL (N/M criteria met)
    ```
 
-   **If no acceptance criteria exist**: the agent's own `backlog_view` call returns an empty or
-   absent `Acceptance Criteria` section — instruct it in the prompt to warn "No **Acceptance Criteria**: field found — falling back to description-based verification"
-   and verify against the item description instead.
+   **If no acceptance criteria exist**: a filtered call for an absent section does not return an
+   empty section — it returns a `section_filter_miss` error dict with no `body` field. Instruct the
+   agent: if the response contains `section_filter_miss` (or an `error` key), warn "No
+   **Acceptance Criteria**: field found — falling back to description-based verification", then make
+   a second `backlog_view(selector=item_ref, summary=False)` call (no `sections` filter) to fetch the
+   item description, and verify against that instead.
 
 5. Parse the agent verdict:
 
