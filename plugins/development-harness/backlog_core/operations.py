@@ -1843,7 +1843,7 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
 
 
 def list_items(
-    from_github: bool = False,
+    refresh: bool = False,
     label: str | None = None,
     section: str | None = None,
     status: str | None = None,
@@ -1856,10 +1856,10 @@ def list_items(
     filter_by_key: dict[str, str] | None = None,
     search: str | None = None,
 ) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
-    """List backlog items. Default reads provider-backed record only. Use from_github=True to refresh first.
+    """List backlog items. Default reads provider-backed record only. Use refresh=True to refresh first.
 
     Args:
-        from_github: Refresh provider-backed record from GitHub Issues before listing.
+        refresh: Refresh the provider-backed record from the configured backend before listing.
         label: Filter by GitHub label (applied during refresh).
         section: Filter by priority section — P0, P1, P2, or Ideas (case-insensitive).
         status: Filter by status value e.g. 'needs-grooming', 'status:in-progress'.
@@ -1886,7 +1886,7 @@ def list_items(
         file_path, groomed, status, and milestone fields for items with a GitHub issue).
     """
     out = output or Output()
-    if from_github:
+    if refresh:
         refresh_local_cache_from_github(repo, label, output=out)
     items = get_config().backend.list_work_items()
     # Start with non-skipped items that have a section. The skip flag may be set
@@ -2937,6 +2937,28 @@ def _assemble_view_content(
 # ---------------------------------------------------------------------------
 
 
+def _live_lookup_id(item: BacklogItem | None, issue_num: str | None, selector: str) -> str | None:
+    """Resolve the identifier to pass to view_enrich_from_github() for a live check.
+
+    Precedence: an already-parsed numeric selector; else the cached item's own
+    known issue number/id (for a title-selector match — never the raw title
+    text, which the GitHub backend cannot resolve); else the raw selector
+    (bare beads nanoid with no local match yet).
+
+    Returns:
+        The identifier to pass to view_enrich_from_github(), or None when no
+        identifier of any kind is resolvable. Never an empty string.
+    """
+    if issue_num:
+        return issue_num
+    if item is not None:
+        number = getattr(item, "number", None)
+        if number:
+            return str(number)
+        return item.issue.lstrip("#") or None
+    return selector.strip() or None
+
+
 def view_item(
     selector: str,
     repo: str = "",
@@ -2947,6 +2969,7 @@ def view_item(
     output: Output | None = None,
     include_content: bool = True,
     section: str | None = None,
+    refresh: bool = False,
 ) -> ViewItemResult:
     """View a backlog item or GitHub issue by URL, #N, bare number, or title.
 
@@ -2982,6 +3005,11 @@ def view_item(
             For backend-owned structured items with structured sections but no raw body, supports
             numeric index (``"2"``), comma-separated indices (``"0,2"``),
             regex (``"/impact.*/``), or substring match.
+        refresh: When True, forces a live-backend check through the authoritative
+            resolution chain for an already-cached title-substring selector.
+            A numeric/#N/URL match, or a selector with no local match, is always
+            live-checked regardless of this flag — the only case this flag gates
+            is a cached title-substring selector.
 
     Returns:
         ViewItemResult with item/issue details. When ``include_content=True``,
@@ -3000,23 +3028,24 @@ def view_item(
 
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
-    if issue_num:
-        enriched = view_enrich_from_github(result, issue_num, repo)
-        if not enriched:
-            if not item:
-                raise ItemNotFoundError(selector)
-            out.warnings.append("backend unreachable — sections_index reflects provider-backed record, may be stale")
+    if item:
+        if issue_num or refresh:
+            live_id = _live_lookup_id(item, issue_num, selector)
+            enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+            if not enriched:
+                out.warnings.append(
+                    "backend unreachable — sections_index reflects provider-backed record, may be stale"
+                )
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
-        if item:
-            result.groomed = item.metadata.groomed
-    elif not item:
-        if get_config().backend.issue_id_type == "string":
-            enriched = view_enrich_from_github(result, selector.strip(), repo)
-            if not enriched:
-                raise ItemNotFoundError(selector)
-        else:
+        result.groomed = item.metadata.groomed
+    elif issue_num or get_config().backend.issue_id_type == "string":
+        live_id = _live_lookup_id(item, issue_num, selector)
+        enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+        if not enriched:
             raise ItemNotFoundError(selector)
+    else:
+        raise ItemNotFoundError(selector)
 
     # MCP clients send numeric show values as strings; convert before forwarding.
     parsed_show: str | int | None = show

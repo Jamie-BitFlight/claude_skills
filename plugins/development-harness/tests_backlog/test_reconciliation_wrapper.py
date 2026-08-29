@@ -108,7 +108,7 @@ def test_unscoped_refresh_forwards_cached_references(sync_provider) -> None:
 
 def test_list_wrapper_forwards_label_to_reconciliation(sync_provider) -> None:
     # Given: a GitHub-backed list restricted to one label
-    list_items(from_github=True, label="review")
+    list_items(refresh=True, label="review")
 
     # Then: its refresh uses the same typed snapshot filter
     assert sync_provider.requests == [ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="review")]

@@ -209,19 +209,19 @@ async def test_backlog_list_success_returns_items():
 
     mock_list.assert_called_once()
     call_kwargs = mock_list.call_args.kwargs
-    assert call_kwargs["from_github"] is False
+    assert call_kwargs["refresh"] is False
     assert call_kwargs["label"] is None
     assert response["items"][0]["title"] == "Item A"
 
 
 async def test_backlog_list_passes_filter_params():
-    """backlog_list forwards from_github and label flags."""
+    """backlog_list forwards refresh and label flags."""
     op_result = {"items": []}
     with patch("dh_core.operations.list_items", return_value=op_result) as mock_list:
-        await _call("backlog_list", {"from_github": True, "label": "priority:p0"})
+        await _call("backlog_list", {"refresh": True, "label": "priority:p0"})
 
     call_kwargs = mock_list.call_args.kwargs
-    assert call_kwargs["from_github"] is True
+    assert call_kwargs["refresh"] is True
     assert call_kwargs["label"] == "priority:p0"
 
 
@@ -825,6 +825,26 @@ async def test_backlog_view_passes_pagination_params():
     call_kwargs = mock_view.call_args.kwargs
     assert call_kwargs["offset"] == 5
     assert call_kwargs["limit"] == 20
+
+
+async def test_backlog_view_forwards_refresh_true():
+    """backlog_view forwards refresh=True to operations.view_item when requested."""
+    op_result = _make_view_result({"title": "Item", "body": "line1\nline2\nline3"})
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
+        await _call("backlog_view", {"selector": "Item", "refresh": True})
+
+    call_kwargs = mock_view.call_args.kwargs
+    assert call_kwargs["refresh"] is True
+
+
+async def test_backlog_view_forwards_refresh_false_by_default():
+    """backlog_view forwards refresh=False to operations.view_item when the key is omitted."""
+    op_result = _make_view_result({"title": "Item", "body": "line1\nline2\nline3"})
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
+        await _call("backlog_view", {"selector": "Item"})
+
+    call_kwargs = mock_view.call_args.kwargs
+    assert call_kwargs["refresh"] is False
 
 
 async def test_backlog_view_backlog_error_returns_error_key():

@@ -300,7 +300,9 @@ class BacklogViewDisclosureHandler:
         self._normalizer = normalizer if normalizer is not None else ItemContentNormalizer()
         self._extractor = extractor if extractor is not None else TokenBoundedExtractor()
 
-    def handle(self, selector: str, request: DisclosureRequest) -> MapResponse | NavigateResponse | BoundedResponse:
+    def handle(
+        self, selector: str, request: DisclosureRequest, refresh: bool = False
+    ) -> MapResponse | NavigateResponse | BoundedResponse:
         """Fetch item content and dispatch to the appropriate disclosure handler.
 
         Calls ``operations.view_item(selector)`` once (un-gated, full content),
@@ -311,6 +313,9 @@ class BacklogViewDisclosureHandler:
                 to ``operations.view_item()``.
             request: Validated ``DisclosureRequest`` produced by
                 ``DisclosureRequestParser``.
+            refresh: Forwarded unchanged to ``operations.view_item()``. Drop this
+                and ``refresh=True`` silently no-ops under map/navigate/extract —
+                the bug this parameter fixes.
 
         Returns:
             ``MapResponse``, ``NavigateResponse``, or ``BoundedResponse``
@@ -327,7 +332,7 @@ class BacklogViewDisclosureHandler:
         # Un-gated fetch (ADR-5): call via module reference so spy on
         # ``backlog_core.operations.view_item`` intercepts the call.
         # ``include_content=True`` is the default — full body and sections.
-        view_result = operations.view_item(selector)
+        view_result = operations.view_item(selector, refresh=refresh)
         sections = self._normalizer.normalize(view_result)
 
         # Fresh mapper per call — OrdinalPathMapper is stateful per-item.

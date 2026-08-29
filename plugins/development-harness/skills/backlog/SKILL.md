@@ -51,7 +51,7 @@ List open backlog items with optional filters.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `from_github` | `bool` | `False` | Refresh local cache from GitHub before listing |
+| `refresh` | `bool` | `False` | Refresh the local cache from the configured backend before listing |
 | `label` | `str \| None` | `None` | Filter by GitHub label (e.g. `"priority:p1"`) |
 | `section` | `str \| None` | `None` | Filter by priority section: `P0`, `P1`, `P2`, or `Ideas` |
 | `status` | `str \| None` | `None` | Filter by status (e.g. `"needs-grooming"`, `"status:in-progress"`) |
@@ -90,6 +90,7 @@ View a single backlog item in detail. Supports pagination for long bodies.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `selector` | `str` | required | GitHub issue URL, `#N`, bare number, or title substring |
+| `refresh` | `bool` | `False` | Bypass the cache and live-check an already-cached title-substring selector against the backend, including under `map`/`navigate`/`head`. Numeric/#N/URL selectors are always live-checked regardless of this flag. For GitHub, prefers the authoritative head-pointer/audit-comment record; on a resolution failure it silently falls back to the raw issue body, with no signal in the response that this happened. |
 | `include_content` | `bool` | `True` | When True (default), returns full body and section entries. When False, returns metadata and section inventory only (section names with entry counts, no body or entry content). |
 | `offset` | `int` | `0` | Skip N entry blocks from body start (for pagination) |
 | `limit` | `int` | `0` | Show at most N entry blocks (`0` = all, no truncation) |

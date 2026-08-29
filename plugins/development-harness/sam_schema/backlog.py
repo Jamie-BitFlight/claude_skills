@@ -97,7 +97,7 @@ def list_items(
     """List backlog items, optionally filtered."""
     output = Output()
     result = operations.list_items(
-        from_github=refresh,
+        refresh=refresh,
         label=label,
         section=section,
         status=status,
@@ -116,6 +116,9 @@ def list_items(
 @app.command("view")
 def view(
     selector: Annotated[str, typer.Option("--selector", help="Item selector")],
+    refresh: Annotated[
+        bool, typer.Option("--refresh", help="Bypass the local cache and validate against the live backend")
+    ] = False,
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
     offset: Annotated[int, typer.Option("--offset", min=0, help="Pagination offset")] = 0,
     limit: Annotated[int, typer.Option("--limit", min=0, help="Maximum items to return (0 = all)")] = 0,
@@ -126,7 +129,15 @@ def view(
     """View a single backlog item by selector."""
     output = Output()
     result = operations.view_item(
-        selector=selector, repo=repo, offset=offset, limit=limit, show=show, since=since, output=output, section=section
+        selector=selector,
+        repo=repo,
+        offset=offset,
+        limit=limit,
+        show=show,
+        since=since,
+        output=output,
+        section=section,
+        refresh=refresh,
     )
     _emit(result, output)
 

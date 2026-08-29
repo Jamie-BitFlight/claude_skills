@@ -1481,7 +1481,9 @@ def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int
     )
 )
 async def backlog_list(
-    from_github: Annotated[bool, Field(description="Refresh local cache from GitHub Issues before listing")] = False,
+    refresh: Annotated[
+        bool, Field(description="Refresh the local cache from the configured backend before listing")
+    ] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
     section: Annotated[
         str | None, Field(description="Filter by priority section: P0, P1, P2, or Ideas (case-insensitive)")
@@ -1649,7 +1651,7 @@ async def backlog_list(
 ) -> dict:
     """List all open backlog items.
 
-    Use from_github=true to refresh the local cache from GitHub before listing.
+    Use refresh=true to refresh the local cache from the backend before listing.
     Use label to filter items by a specific GitHub label.
     Use section to filter by priority section (P0, P1, P2, Ideas).
     Use status to filter by status value (e.g. needs-grooming, status:in-progress).
@@ -1688,7 +1690,7 @@ async def backlog_list(
         result, backend_status = await asyncio.gather(
             asyncio.to_thread(
                 operations.list_items,
-                from_github=from_github,
+                refresh=refresh,
                 label=label,
                 section=section,
                 status=status,
@@ -1902,7 +1904,9 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
     return compact
 
 
-def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) -> dict[str, object] | None:
+def _execute_disclosure_or_passthrough(
+    selector: str, req: DisclosureRequest, refresh: bool = False
+) -> dict[str, object] | None:
     """Execute a non-PASSTHROUGH progressive disclosure request synchronously.
 
     Intended for ``asyncio.to_thread``.  The caller guards on
@@ -1913,6 +1917,13 @@ def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) ->
     error dicts so the ``to_thread`` caller receives a clean return value with
     no exception.
 
+    Args:
+        selector: Issue selector forwarded to the disclosure handler.
+        req: Validated disclosure request (mode + ordinal/token params).
+        refresh: Forwarded to ``BacklogViewDisclosureHandler.handle()`` so
+            map/navigate/extract calls get the same bypass-cache live check
+            as the passthrough path.
+
     Returns:
         Serialised response dict for MAP/NAVIGATE/EXTRACT, None for PASSTHROUGH
         (safety net only), or an error dict when OrdinalNotFoundError or
@@ -1921,7 +1932,7 @@ def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) ->
     if req.mode == DisclosureMode.PASSTHROUGH:
         return None  # safety net — caller should never reach this branch
     try:
-        response = BacklogViewDisclosureHandler().handle(selector, req)
+        response = BacklogViewDisclosureHandler().handle(selector, req, refresh=refresh)
         return dataclasses.asdict(response)
     except OrdinalNotFoundError as exc:
         return {"error": str(exc), "requested_ordinal": exc.requested, "valid_ordinals": exc.valid_ordinals}
@@ -1941,6 +1952,19 @@ async def backlog_view(
             description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
         ),
     ],
+    refresh: Annotated[
+        bool,
+        Field(
+            description=(
+                "Bypass the cache and live-check an already-cached title-substring selector "
+                "against the backend. Numeric/#N/URL selectors are always live-checked "
+                "regardless of this flag. For GitHub, prefers the authoritative "
+                "head-pointer/audit-comment record; on a resolution failure it silently "
+                "falls back to the raw issue body, with no signal in the response that "
+                "this happened."
+            )
+        ),
+    ] = False,
     summary: Annotated[
         bool,
         Field(
@@ -2116,7 +2140,9 @@ async def backlog_view(
     try:
         disclosure_req = DisclosureRequestParser().parse(map=map, navigate=navigate, head=head, skip_tokens=skip_tokens)
         if disclosure_req.mode != DisclosureMode.PASSTHROUGH:
-            disclosure_result = await asyncio.to_thread(_execute_disclosure_or_passthrough, selector, disclosure_req)
+            disclosure_result = await asyncio.to_thread(
+                _execute_disclosure_or_passthrough, selector, disclosure_req, refresh
+            )
     except DisclosureParamError as exc:
         disclosure_result = {"error": str(exc), "invalid_params": exc.invalid_params}
 
@@ -2143,6 +2169,7 @@ async def backlog_view(
             since=since,
             section=section,
             output=out,
+            refresh=refresh,
         )
         full_response = result.model_dump()
         if not summary:

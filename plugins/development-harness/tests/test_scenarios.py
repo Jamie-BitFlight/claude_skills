@@ -113,10 +113,10 @@ class TestWorkBacklogItem:
             assert "milestone" in item
 
     # Scenario 3: list sourced from GitHub (refresh_local_cache_from_github path)
-    async def test_list_from_github(self, backlog_dir, mock_github, provider_state):
+    async def test_list_with_refresh(self, backlog_dir, mock_github, provider_state):
         provider_state.return_value = ReconcileResult(fetched_items=2, local_updates=1)
 
-        result = await _call("backlog_list", {"from_github": True})
+        result = await _call("backlog_list", {"refresh": True})
 
         assert isinstance(result["items"], list)
         assert result["count"] >= 0
@@ -1513,8 +1513,8 @@ class TestResolveVerifiedGate:
 
         provider_state.side_effect = reconcile_closed
 
-        # Trigger reconciliation via from_github=True
-        result = await _call("backlog_list", {"from_github": True, "include_closed": True})
+        # Trigger reconciliation via refresh=True
+        result = await _call("backlog_list", {"refresh": True, "include_closed": True})
 
         assert isinstance(result["items"], list)
         provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#206"]))
