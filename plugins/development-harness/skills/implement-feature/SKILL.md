@@ -92,7 +92,7 @@ Spawn one teammate per ready task. When only one task is ready, a single Agent c
 
 For each task being dispatched:
 
-- Choose the `subagent_type` with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) — the task definition's `agent` field is read after dispatch, not by the orchestrator.
+- Choose which agent to dispatch with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) — the task definition's `agent` field is read after dispatch, not by the orchestrator.
 - Launch the chosen agent with the task reference as its entire prompt:
 
 ```text

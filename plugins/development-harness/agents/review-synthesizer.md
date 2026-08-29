@@ -5,7 +5,6 @@ model: opus
 tools: Read, Grep, mcp__plugin_dh_sam__sam_task, Skill
 skills:
   - dh:subagent-contract
-  - dh:dispatch-contract
 user-invocable: false
 color: purple
 ---

@@ -4,7 +4,6 @@ description: Blank-canvas SAM task executor carrying the dh tools and skills a w
 model: sonnet
 skills:
   - dh:subagent-contract
-  - dh:dispatch-contract
 ---
 
 # Task Worker
