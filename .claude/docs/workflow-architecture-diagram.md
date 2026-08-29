@@ -5,7 +5,7 @@
 
 > **Snapshot**: 2026-03-22T15:00:00Z (SAM-enforced quality gates)
 >
-> Sources: `plugins/development-harness/docs/TASK_FILE_FORMAT.md`, `backlog_core/server.py`, `backlog_core/models.py`,
+> Sources: `plugins/development-harness/sam_schema/core/models.py`, `backlog_core/server.py`, `backlog_core/models.py`,
 > `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`,
 > `plugins/development-harness/skills/complete-implementation/SKILL.md`
 > Last verified: 2026-03-22
@@ -237,7 +237,7 @@ Written by `/start-task` skill. Read by `task_status_hook.py` PostToolUse handle
 
 ```json
 {
-  "plan": "P719-my-feature",
+  "plan": "P719abcd",
   "task_id": "T04",
   "parent_issue_number": 719
 }
