@@ -268,6 +268,16 @@ class _GitHubContentCache:
                         len(records),
                         len(records) - stored,
                     )
+                # Same reasoning as get_content(): replay_pending() above may have just
+                # rejected one of these exact references during this same call, and
+                # conflict_reason is only ever derived live from cache state.
+                state = self._cache._load_state()
+                records = [
+                    record.model_copy(
+                        update={"conflict_reason": self._cache._rejection_reason(state, record.reference)}
+                    )
+                    for record in records
+                ]
                 return records[query.offset : query.offset + query.limit]
         # A stored record's own `pending` field is never trusted (FileCache normalises it
         # to False on write) -- the durable mutation queue is the sole source of truth, so

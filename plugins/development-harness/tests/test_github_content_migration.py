@@ -256,3 +256,55 @@ def test_get_content_surfaces_a_rejection_discovered_during_this_same_call(tmp_p
 
     assert result.content == "remote content"
     assert result.conflict_reason
+
+
+class _OnlineProviderWithListableContent:
+    """_OnlineContent double that is reachable and whose list always succeeds.
+
+    Its write always raises a non-retryable error, so a pending mutation
+    replayed against it is rejected rather than retried.
+    """
+
+    def __init__(self, error: BaseException, list_records: list[ContentRecord]) -> None:
+        self._error = error
+        self._list_records = list_records
+
+    def try_get_github(self, repo: str = "") -> Repository | None:
+        return cast("Repository", object())
+
+    def _list_online_content(self, query: ContentQuery) -> list[ContentRecord]:
+        return self._list_records
+
+    def _read_online_content(self, reference: ContentRef, cached: ContentRecord | None) -> ContentRecord:
+        raise NotImplementedError
+
+    def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        raise self._error
+
+
+def test_list_content_surfaces_a_rejection_discovered_during_this_same_call(tmp_path: Path) -> None:
+    """list_content()'s online branch must also surface a conflict_reason.
+
+    Regression test for a review finding on PR #3306: ContentTaskProvider
+    loads plans through list_content(), not get_content(). The online branch
+    of list_content() returned raw provider records directly (no pending or
+    conflict_reason derivation at all), so a rejection replay_pending()
+    discovers as the first step of this same call was invisible to any
+    list-based consumer, exactly like the get_content() gap fixed above.
+    """
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P1")
+    cache.queue_write(
+        ContentRecord(reference=reference, content="", revision=""),
+        ContentWrite(reference=reference, content="queued content", expected_revision="stale-rev"),
+    )
+    fresh_record = ContentRecord(reference=reference, content="remote content", revision="remote-rev")
+    provider = _OnlineProviderWithListableContent(
+        ContentConflictError("Content revision no longer matches"), [fresh_record]
+    )
+    content_cache = _GitHubContentCache(cache=cache, provider=provider)
+
+    [result] = content_cache.list_content(ContentQuery(kind=ContentKind.PLAN))
+
+    assert result.content == "remote content"
+    assert result.conflict_reason

@@ -52,16 +52,16 @@ if str(_DH_PLUGIN_DIR) not in sys.path:
 
 _SAM_CLI_PATH = _DH_PLUGIN_DIR / "scripts" / "run_sam_cli.py"
 
+_DH_PLUGIN_SCRIPTS_DIR = str(_DH_PLUGIN_DIR / "scripts")
+if _DH_PLUGIN_SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _DH_PLUGIN_SCRIPTS_DIR)
+
 import dh_paths as _dh_paths
 
 _HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
 _HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
 if _HOOK_SAM_PACKAGES_DIR not in sys.path:
     sys.path.insert(0, _HOOK_SAM_PACKAGES_DIR)
-
-_HOOK_REPO_SCRIPTS_DIR = str(_HOOK_REPO_ROOT / "scripts")
-if _HOOK_REPO_SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, _HOOK_REPO_SCRIPTS_DIR)
 
 # Import directly from submodules for concrete types (avoids lazy __getattr__ object).
 from sam_schema.core.addressing import AddressingError, resolve_plan_address

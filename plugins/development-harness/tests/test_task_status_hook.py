@@ -1546,3 +1546,16 @@ def test_handle_activity_update_skips_update_when_budget_exhausted(
     handle_activity_update(hook_input)
 
     mock_update.assert_not_called()
+
+
+def test_terminate_process_tree_resolves_from_inside_the_plugin_package() -> None:
+    """Regression test for a review finding on PR #3306.
+
+    _call_sam_cli's terminate_process_tree import previously reached into a
+    repo-root-only scripts/ directory that a marketplace install never ships
+    (only plugins/development-harness itself is distributed). Assert the
+    imported function's own source file lives inside the plugin directory,
+    not the sibling repo-root scripts/ directory.
+    """
+    source_file = Path(_hook_mod.terminate_process_tree.__code__.co_filename).resolve()
+    assert _plugin_dir.resolve() in source_file.parents
