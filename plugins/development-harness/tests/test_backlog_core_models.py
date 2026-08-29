@@ -30,6 +30,7 @@ from backlog_core.models import (
     ViewItemResult,
     resolve_repo,
 )
+from backlog_core.search import ContentDuplicateMatch
 from pydantic import ValidationError as PydanticValidationError
 
 # ---------------------------------------------------------------------------
@@ -524,48 +525,61 @@ class TestItemNotFoundError:
 
 
 class TestDuplicateItemError:
-    """DuplicateItemError formats message with titles and percentages."""
+    """DuplicateItemError formats its message from ContentDuplicateMatch entries.
+
+    No similarity percentage is derived or displayed — content matching is
+    token-overlap based, not a distance metric (spec #3169 ADR-004/ADR-005).
+    """
 
     def test_duplicate_item_error_stores_duplicates(self) -> None:
-        dupes = [("My Feature", 0.95, "/path/to/file.md")]
+        dupes = [
+            ContentDuplicateMatch(title="My Feature", item_ref="#42", matched_field="title", snippet="s", match_count=2)
+        ]
         err = DuplicateItemError(dupes)
         assert err.duplicates == dupes
 
     def test_duplicate_item_error_message_contains_title(self) -> None:
-        dupes = [("My Feature", 0.95, "/path.md")]
+        dupes = [
+            ContentDuplicateMatch(title="My Feature", item_ref="#42", matched_field="title", snippet="s", match_count=2)
+        ]
         err = DuplicateItemError(dupes)
         assert "My Feature" in str(err)
 
-    def test_duplicate_item_error_message_contains_percentage(self) -> None:
-        dupes = [("My Feature", 0.95, "/path.md")]
-        err = DuplicateItemError(dupes)
-        assert "95%" in str(err)
-
     def test_duplicate_item_error_message_format_single(self) -> None:
-        dupes = [("Alpha", 0.80, "/alpha.md")]
+        dupes = [ContentDuplicateMatch(title="Alpha", item_ref="#1", matched_field="title", snippet="s", match_count=1)]
         err = DuplicateItemError(dupes)
-        assert str(err) == 'Similar backlog items found: "Alpha" (80%)'
+        assert str(err) == 'Similar backlog items found: "Alpha" (#1)'
 
     def test_duplicate_item_error_message_format_multiple(self) -> None:
-        dupes = [("Alpha", 0.80, "/a.md"), ("Beta", 1.0, "/b.md")]
+        dupes = [
+            ContentDuplicateMatch(title="Alpha", item_ref="#1", matched_field="title", snippet="s", match_count=1),
+            ContentDuplicateMatch(title="Beta", item_ref="p1-beta", matched_field="body", snippet="s2", match_count=3),
+        ]
         err = DuplicateItemError(dupes)
         msg = str(err)
         assert "Alpha" in msg
         assert "Beta" in msg
-        assert "80%" in msg
-        assert "100%" in msg
+        assert "#1" in msg
+        assert "p1-beta" in msg
 
     def test_duplicate_item_error_is_raised_as_backlog_error(self) -> None:
         with pytest.raises(BacklogError):
-            raise DuplicateItemError([("X", 1.0, "/x.md")])
+            raise DuplicateItemError([
+                ContentDuplicateMatch(title="X", item_ref="#9", matched_field="title", snippet="s", match_count=1)
+            ])
 
-    @pytest.mark.parametrize(
-        ("title", "ratio", "expected_pct"),
-        [("A", 1.0, "100%"), ("B", 0.90, "90%"), ("C", 0.85, "85%"), ("D", 0.80, "80%")],
-    )
-    def test_duplicate_item_error_percentage_rounding(self, title: str, ratio: float, expected_pct: str) -> None:
-        err = DuplicateItemError([(title, ratio, "/path.md")])
-        assert expected_pct in str(err)
+    def test_duplicate_item_error_message_and_duplicates_carry_item_ref_not_file_path(self) -> None:
+        """AC3: message and .duplicates expose an actionable item_ref, never a bare file path."""
+        dupes = [
+            ContentDuplicateMatch(
+                title="Alpha", item_ref="#7", matched_field="body", snippet="matched snippet text", match_count=2
+            )
+        ]
+        err = DuplicateItemError(dupes)
+
+        assert err.duplicates[0].item_ref == "#7"
+        assert "#7" in str(err)
+        assert ".md" not in str(err)
 
 
 class TestGitHubUnavailableError:

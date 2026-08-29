@@ -15,9 +15,13 @@ fallback) instead of the documented JSON contract.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from backlog_core.models import BacklogError
+from backlog_core import operations
+from backlog_core.backend_protocol import reset_config, set_config
+from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata
 from typer.testing import CliRunner
 
 from sam_schema.cli import app
@@ -28,6 +32,10 @@ if TYPE_CHECKING:
 runner = CliRunner()
 
 _CLI_ENV = {"NO_COLOR": "1"}
+
+_DUPLICATE_DESCRIPTION = (
+    "Sync engine misclassifies transient network errors as non-retryable, causing sync to abort instead of retrying."
+)
 
 
 class TestBacklogAddErrorContract:
@@ -109,3 +117,79 @@ class TestBacklogSyncFallback:
         payload = json.loads(result.stdout)
         assert payload["synced"] is False
         assert "dry_run" not in payload
+
+
+class TestBacklogListCliSearch:
+    """``backlog list --search`` matches the MCP ``list_items(search=...)`` path (AC4/AC7/DO-7).
+
+    Both paths run against the same real (in-memory) backend and configured
+    query -- this is a cross-interface parity test, not two mocks asserting
+    against each other.
+    """
+
+    def test_cli_search_matches_operations_search_result(self) -> None:
+        backend = InMemoryBackend()
+        set_config(BacklogConfig(backend=backend))
+        try:
+            backend.put_work_item(BacklogItem(title="Sync engine retry handling", section="P1", skip=False))
+            backend.put_work_item(BacklogItem(title="Unrelated documentation cleanup", section="P2", skip=False))
+
+            cli_result = runner.invoke(app, ["backlog", "list", "--search", "retry"], env=_CLI_ENV)
+            unfiltered = operations.list_items(search=None)
+            filtered = operations.list_items(search="retry")
+        finally:
+            reset_config()
+
+        assert cli_result.exit_code == 0, cli_result.stderr
+        filtered_items = cast("list[dict[str, str | bool]]", filtered["items"])
+        unfiltered_items = cast("list[dict[str, str | bool]]", unfiltered["items"])
+        cli_titles = {item["title"] for item in json.loads(cli_result.stdout)["items"]}
+        filtered_titles = {item["title"] for item in filtered_items}
+
+        assert cli_titles == filtered_titles == {"Sync engine retry handling"}
+        assert 0 < len(cli_titles) < len(unfiltered_items)
+
+
+class TestBacklogAddCliContentDuplicateEndToEnd:
+    """``backlog add`` surfaces a content duplicate end-to-end, not only via ``list --search`` (AC4).
+
+    ``list --search`` parity alone does not prove ``add`` itself reports a
+    duplicate result to the caller -- this test exercises the ``add`` command
+    directly against a corpus containing a known content duplicate.
+    """
+
+    def test_add_reports_duplicate_found_for_content_overlapping_item(self) -> None:
+        backend = InMemoryBackend()
+        set_config(BacklogConfig(backend=backend))
+        try:
+            backend.put_work_item(
+                BacklogItem(
+                    title="Sync engine mishandles retryable network errors",
+                    description=_DUPLICATE_DESCRIPTION,
+                    metadata=BacklogItemMetadata(
+                        source="test", added="2026-01-01", priority="P1", status="open", issue="", topic="sync-retry"
+                    ),
+                )
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "backlog",
+                    "add",
+                    "--title",
+                    "Retryable network error handling in sync",
+                    "--description",
+                    _DUPLICATE_DESCRIPTION,
+                    "--priority",
+                    "P1",
+                ],
+                env=_CLI_ENV,
+            )
+        finally:
+            reset_config()
+
+        assert result.exit_code == 1
+        payload = json.loads(result.stdout)
+        assert "Similar backlog items found" in payload["error"]
+        assert "Sync engine mishandles retryable network errors" in payload["error"]

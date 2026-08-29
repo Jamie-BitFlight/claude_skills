@@ -14,6 +14,7 @@ from unittest.mock import ANY, MagicMock
 import backlog_core.models as _bc_models
 import backlog_core.operations as ops
 import pytest
+from backlog_core.backend_types import SyncProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
@@ -46,6 +47,7 @@ from backlog_core.operations import (
     view_item,
 )
 from backlog_core.reconciliation import LogicalCacheRecord, ReconcilePlan, reconcile_backlog, synchronized_fingerprint
+from backlog_core.search import ContentDuplicateMatch
 from github import GithubException
 
 if TYPE_CHECKING:
@@ -113,6 +115,7 @@ def _write_item(
     issue: str = "",
     skip: bool = False,
     extra_body: str = "",
+    description: str = "A test item",
 ) -> Path:
     slug = topic
     filename = f"{priority.lower()}-{slug}.md"
@@ -121,7 +124,7 @@ def _write_item(
     _seed_items([
         BacklogItem(
             title=title,
-            description="A test item" + (f"\n\n{extra_body}" if extra_body else ""),
+            description=description + (f"\n\n{extra_body}" if extra_body else ""),
             reference=str(filepath),
             file_path=str(filepath),
             metadata=BacklogItemMetadata(
@@ -642,44 +645,75 @@ class TestAddItemBeadsBackend:
             reset_config()
 
 
+_DUPLICATE_DESCRIPTION = (
+    "Sync engine misclassifies transient network errors as non-retryable, causing sync to abort instead of retrying."
+)
+
+
 class TestAddItemDuplicateDetection:
-    """add_item raises DuplicateItemError on fuzzy duplicates unless force=True."""
+    """add_item raises DuplicateItemError on content duplicates unless force=True."""
 
-    def test_add_item_raises_on_fuzzy_duplicate(self, mocker: MockerFixture) -> None:
-        """Verify add_item raises DuplicateItemError when a similar item already exists.
+    def test_add_item_raises_on_content_duplicate(self, mocker: MockerFixture) -> None:
+        """Verify add_item raises DuplicateItemError when a content-overlapping item already exists.
 
-        Tests: Duplicate detection in add_item.
-        How: Write an existing item, attempt to add one with a near-identical title.
-        Why: Duplicate items waste effort and cause confusion.
+        Tests: Content-based duplicate detection in add_item (not title-character matching).
+        How: Write an existing item sharing description content, attempt to add a
+             reworded-title item with the same description content.
+        Why: Duplicate items waste effort and cause confusion; reworded titles must
+             still be caught (AC1).
         """
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Implement Error Recovery", priority="P1", topic="implement-error-recovery")
+        _write_item(
+            fake_dir,
+            title="Sync engine mishandles retryable network errors",
+            priority="P1",
+            topic="sync-retryable",
+            description=_DUPLICATE_DESCRIPTION,
+        )
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        with pytest.raises(DuplicateItemError):
-            add_item(title="Implement Error Recovery Logic", description="desc", priority="P1")
+        with pytest.raises(DuplicateItemError) as exc_info:
+            add_item(
+                title="Retryable network error handling in sync", description=_DUPLICATE_DESCRIPTION, priority="P1"
+            )
+
+        matches = exc_info.value.duplicates
+        assert len(matches) == 1
+        assert isinstance(matches[0], ContentDuplicateMatch)
+        assert matches[0].title == "Sync engine mishandles retryable network errors"
 
     def test_add_item_force_bypasses_duplicate_check(self, mocker: MockerFixture) -> None:
         """Verify add_item with force=True creates item despite existing duplicate.
 
         Tests: force=True bypass in add_item.
-        How: Write existing item, add similar one with force=True.
+        How: Write existing item, add content-overlapping one with force=True.
         Why: Users must override when items are intentionally distinct.
         """
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Implement Error Recovery", priority="P1", topic="implement-error-recovery")
+        _write_item(
+            fake_dir,
+            title="Sync engine mishandles retryable network errors",
+            priority="P1",
+            topic="sync-retryable",
+            description=_DUPLICATE_DESCRIPTION,
+        )
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        result = add_item(title="Implement Error Recovery Logic", description="desc", priority="P1", force=True)
+        result = add_item(
+            title="Retryable network error handling in sync",
+            description=_DUPLICATE_DESCRIPTION,
+            priority="P1",
+            force=True,
+        )
 
-        assert result["title"] == "Implement Error Recovery Logic"
+        assert result["title"] == "Retryable network error handling in sync"
 
     def test_add_item_no_duplicate_succeeds(self, mocker: MockerFixture) -> None:
-        """Verify add_item succeeds when no similar items exist.
+        """Verify add_item succeeds when no content-overlapping items exist.
 
         Tests: add_item happy path with duplicate check enabled.
         How: Empty backlog; add an item without force.
@@ -687,9 +721,162 @@ class TestAddItemDuplicateDetection:
         """
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        result = add_item(title="Completely Unique Novel Feature", description="desc", priority="P2")
+        result = add_item(
+            title="Completely Unique Novel Feature",
+            description="Adds a brand-new capability unrelated to anything else in the backlog.",
+            priority="P2",
+        )
 
         assert "file_path" in result
+
+
+class TestCheckForDuplicatesFreshness:
+    """_classify_duplicate_check's tri-state freshness behaviour (AC2).
+
+    Absence of a local match is not proof of "no duplicate" for a
+    SyncProvider-backed backend fed by an external provider: one bounded
+    refresh is attempted before declaring NO_DUPLICATE, and a refresh
+    failure downgrades to COULD_NOT_VERIFY rather than blocking creation.
+    """
+
+    def test_sync_provider_refresh_surfaces_new_match_raises_duplicate(self, mocker: MockerFixture) -> None:
+        """A SyncProvider backend with no local match that gains one after refresh raises.
+
+        Tests: The concurrent-session case from the #3169 incident -- a
+        duplicate created by another session between this session's stale
+        local cache and the write attempt.
+        How: The default test backend (see conftest's ``_isolated_backend``)
+        is already a SyncProvider. Mock ``refresh_local_cache_from_github``
+        to simulate an external session's write landing during the refresh,
+        by inserting a content-overlapping item into the live backend.
+        Why: If refresh-on-empty-result is deleted, this duplicate is missed
+        entirely -- exactly the incident being fixed.
+        """
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+
+        def _refresh_surfaces_duplicate(*_args: object, **_kwargs: object) -> dict[str, int]:
+            backend.put_work_item(
+                BacklogItem(
+                    title="Sync engine mishandles retryable network errors",
+                    description=_DUPLICATE_DESCRIPTION,
+                    reference="p1-sync-retryable",
+                    metadata=BacklogItemMetadata(
+                        source="test",
+                        added="2026-01-01",
+                        priority="P1",
+                        status="open",
+                        issue="",
+                        topic="sync-retryable",
+                    ),
+                )
+            )
+            return {"refreshed": 1, "reconciled": 0}
+
+        mocker.patch("backlog_core.operations.refresh_local_cache_from_github", side_effect=_refresh_surfaces_duplicate)
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        with pytest.raises(DuplicateItemError):
+            add_item(
+                title="Retryable network error handling in sync", description=_DUPLICATE_DESCRIPTION, priority="P1"
+            )
+
+    def test_sync_provider_refresh_failure_reports_could_not_verify_but_still_creates(
+        self, mocker: MockerFixture
+    ) -> None:
+        """A refresh failure never blocks creation -- it downgrades to a warning.
+
+        Tests: AC5/DO-2 together -- an unverifiable duplicate status must not
+        become a rejection, and must not become a silent, warning-less success
+        either.
+        How: Mock ``refresh_local_cache_from_github`` to raise ``GithubException``.
+        Mock the GitHub issue-creation path to succeed (not merely "unavailable"),
+        isolating the warning under assertion to the COULD_NOT_VERIFY path only.
+        Why: Deleting the ``except (GithubException, BacklogError)`` handler in
+        ``_classify_duplicate_check`` would let this exception propagate and
+        abort item creation entirely -- this test fails loudly if that happens.
+        """
+        from backlog_core.backend_protocol import get_config
+
+        backend = get_config().backend
+        assert isinstance(backend, SyncProvider)
+        mocker.patch(
+            "backlog_core.operations.refresh_local_cache_from_github", side_effect=GithubException(503, "boom", None)
+        )
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.MagicMock())
+        mocker.patch("backlog_core.operations.create_issue_for_item", return_value=42)
+        out = Output()
+
+        result = add_item(
+            title="Completely Unrelated New Feature Proposal",
+            description="Adds a brand-new capability unrelated to anything else in the backlog.",
+            priority="P2",
+            output=out,
+        )
+
+        assert result["file_path"]
+        assert len(out.warnings) == 1
+        assert "Could not verify duplicate status" in out.warnings[0]
+        stored_titles = [item.title for item in backend.list_work_items()]
+        assert "Completely Unrelated New Feature Proposal" in stored_titles
+
+    def test_non_sync_provider_backend_never_attempts_refresh(self, mocker: MockerFixture) -> None:
+        """A non-SyncProvider backend (e.g. plain in-memory) never triggers a refresh.
+
+        Tests: The refresh path is gated on backend capability, not run
+        unconditionally for every empty local result.
+        How: Swap in a bare ``InMemoryBackend`` (verified NOT a SyncProvider),
+        then assert ``refresh_local_cache_from_github`` is never called.
+        Why: Deleting the ``isinstance(backend, SyncProvider)`` guard would
+        make this assertion fail for backends that cannot refresh anything.
+        """
+        from backlog_core.backend_protocol import reset_config, set_config
+        from backlog_core.backend_types import BacklogConfig as BackendBacklogConfig
+
+        plain_backend = InMemoryBackend()
+        assert not isinstance(plain_backend, SyncProvider)
+        set_config(BackendBacklogConfig(backend=plain_backend))
+        refresh_mock = mocker.patch("backlog_core.operations.refresh_local_cache_from_github")
+        mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+        try:
+            result = add_item(
+                title="Yet Another Unique Feature", description="Nothing like it exists yet.", priority="P2"
+            )
+        finally:
+            reset_config()
+
+        refresh_mock.assert_not_called()
+        assert "file_path" in result
+
+
+class TestListItemsSearch:
+    """list_items(search=...) filters via backlog_core.search; None skips filtering (AC4/AC7)."""
+
+    def test_search_filters_to_matching_items(self, mocker: MockerFixture) -> None:
+        auth_item = BacklogItem(title="Add authentication flow", section="P1", skip=False)
+        other_item = BacklogItem(title="Fix pagination bug", section="P1", skip=False)
+        _seed_items([auth_item, other_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(search="auth")
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 1
+        assert items[0]["title"] == "Add authentication flow"
+
+    def test_search_none_returns_unfiltered_set(self, mocker: MockerFixture) -> None:
+        auth_item = BacklogItem(title="Add authentication flow", section="P1", skip=False)
+        other_item = BacklogItem(title="Fix pagination bug", section="P1", skip=False)
+        _seed_items([auth_item, other_item])
+        mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
+
+        result = list_items(search=None)
+
+        items = cast("list[dict[str, str | bool]]", result["items"])
+        assert len(items) == 2
 
 
 # ---------------------------------------------------------------------------
