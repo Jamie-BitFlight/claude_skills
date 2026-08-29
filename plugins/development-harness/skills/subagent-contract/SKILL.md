@@ -22,11 +22,14 @@ Return BLOCKED when a required input is missing, rather than inferring it.
 
 <dispatch_input>
 
-If your `tools:` list carries `mcp__plugin_dh_backlog`, fetch the backlog item yourself —
-`backlog_view(selector=<item_ref>, ...)` — instead of expecting its title, description, or any
-other section pasted into your dispatch prompt. Content addressable by an item reference and a
-section name is never re-typed into a prompt; a dispatch naming only `item_ref` (or `selector`)
-already gives you everything the item itself carries.
+If your dispatch concerns a specific backlog item and your `tools:` list carries
+`mcp__plugin_dh_backlog`, fetch that item yourself — `backlog_view(selector=<item_ref>, ...)` —
+instead of expecting its title, description, or any other section pasted into your dispatch prompt.
+Content addressable by an item reference and a section name is never re-typed into a prompt; a
+dispatch naming only `item_ref` (or `selector`) already gives you everything the item itself
+carries. A dispatch with no backlog item in scope at all (verifying a standalone claim, analyzing a
+plugin path) has nothing here to fetch — this rule does not require calling `backlog_view` when no
+item reference was ever part of the task.
 
 This does not cover content that exists only because the current run produced it — a claim string
 to verify, a finding a peer teammate computed this run — since no `item_ref` lookup retrieves

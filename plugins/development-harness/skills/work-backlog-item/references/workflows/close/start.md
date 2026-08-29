@@ -139,9 +139,10 @@ If operation is `resolve`:
    pagination instead. Call `backlog_view(selector=item_ref, map=True)` to find the Acceptance
    Criteria ordinal; if the map shows no children under it, page it directly with
    `navigate="{ordinal}", head=2000`, following `next_call` until `truncated=False`. If it has child
-   ordinals (sub-heading structure), page each child individually the same way — never the parent
-   ordinal, which bounds only its child menu, not criteria text — until every criterion has been
-   read.
+   ordinals (sub-heading structure), page each child individually the same way — recursing into any
+   further nested children the same way, never stopping at the first level — and never the parent
+   ordinal, which bounds only its child menu, not criteria text — until every leaf under the section
+   has been read.
 
 5. Parse the agent verdict:
 
