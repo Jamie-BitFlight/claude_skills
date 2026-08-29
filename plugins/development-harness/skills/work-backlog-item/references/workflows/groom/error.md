@@ -10,26 +10,52 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
 
 **Procedure:**
 
-1. Identify the failed agent and the step it was executing.
+1. Identify the failed agent (its teammate/agent name, or `agentId` from `ListAgents`) and the
+   step it was executing.
 2. Read the agent's last output (if any) to determine what completed and what did not.
-3. Spawn a diagnostic agent to review the failed agent's session:
+3. Spawn a diagnostic agent to review the failed agent's session. Give it a concrete
+   locator — matching `implement-feature/SKILL.md`'s Agent Health Check pattern — so it can
+   actually find the failed agent's session rather than guessing:
 
    ```text
    Agent(subagent_type="dh:task-worker", prompt="
-     Review the session transcript for the failed agent.
+     Review the session transcript for the failed agent working on <item_ref/>.
+     Failed agent: {agent_name_or_id from step 1}
+     Step: {step it was executing, from step 1}
+     Session JSONL directory: ~/.claude/projects/{project-slug}/*.jsonl, filter by agentId={agent_name_or_id}
      Identify:
      - Last successful tool call or output
      - First error, timeout, or missing output
      - Whether the agent was interrupted (token limit, network) or hit a tool error
-     Report: last_success, first_failure, failure_type (interrupted | tool_error | unknown)
+     Record the finding via:
+
+     mcp__plugin_dh_backlog__backlog_groom(
+         selector=\"<item_ref/>\",
+         section=\"Context\",
+         append=True,
+         content=\"DIAGNOSTIC ({ISO8601 timestamp}): stage={step}; last_success={last_success}; first_failure={first_failure}; failure_type={failure_type} (task-worker diagnostic)\"
+     )
+
+     failure_type is one of: interrupted | tool_error | unknown.
+     Per dh:subagent-contract, begin your response with STATUS: DONE as its own first line.
    ")
    ```
 
-4. Based on the diagnostic:
+4. Wait for the diagnostic agent to go idle — the runtime delivers this automatically as a completion notification once the dispatch finishes, so no new polling call is needed — then read back its result:
+
+   ```text
+   mcp__plugin_dh_backlog__backlog_view(selector="<item_ref/>", section="Context", show="last", summary=False)
+   ```
+
+   Parse `failure_type` from the most recent `DIAGNOSTIC (...)` line — that parsed value is what the decision tree below branches on. The idle notification only confirms the diagnostic agent stopped running; it does not by itself guarantee the write happened. If the most recent Context entry is not a well-formed `DIAGNOSTIC (...)` line, or there is no qualifying entry at all, treat this as the diagnostic agent having failed to register — route to the System Error procedure below rather than guessing a `failure_type`.
+
+5. Based on the diagnostic:
 
 ```mermaid
 flowchart TD
-    Diag{"failure_type?"} -->|"interrupted"| Resume["Agent was interrupted mid-work<br>Spawn a new agent with:<br>- same task instructions<br>- 'Continue from where the previous agent stopped'<br>- list of sections already written (from backlog_view)"]
+    Entry{"Most recent Context entry is a<br>well-formed DIAGNOSTIC (...) line?"} -->|"No — missing or malformed"| SysErrEntry(["→ System Error procedure<br>(do not guess failure_type)"])
+    Entry -->|"Yes"| Diag{"failure_type?"}
+    Diag -->|"interrupted"| Resume["Agent was interrupted mid-work<br>Spawn a new agent with:<br>- same task instructions<br>- 'Continue from where the previous agent stopped'<br>- list of sections already written (from backlog_view)"]
     Diag -->|"tool_error"| ToolErr["MCP tool returned an error<br>Route to System Error below"]
     Diag -->|"unknown"| Retry["Spawn a fresh agent with the same task<br>If this is the 2nd failure on the same task:<br>route to Escalation"]
     Resume --> Continue(["Agent completes — resume workflow"])

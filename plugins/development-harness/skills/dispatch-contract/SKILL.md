@@ -8,14 +8,16 @@ user-invocable: false
 
 <dispatch_selection>
 
-A dispatch that hands over no dh operation — an independent review whose finding is its response —
-has nothing here to reach: any specialist that fits runs it, dh roster or not.
+A dispatch that hands over no dh operation — an independent review, say — has no dh-roster
+requirement to reach: any specialist that fits runs it, dh roster or not. Where its finding goes is
+never decided here — `subagent-contract`'s `<result_destination>` clause governs that for every
+dispatch, review-only included.
 
 Once a dispatch hands over one, dispatch a `dh:` specialist that fits the task and whose declared
 tools reach every operation handed over; failing that, `dh:task-worker` — this plugin's
-general-purpose worker, arriving with dh's tools and hooks. Outside capability reaches such a task
-through it: an outside agent as the profile it loads, an outside skill through the task's own
-`skills` list, since a profile resolves to an agent.
+general-purpose worker, arriving with dh's tools and hooks. A profile resolves to an agent, so
+outside capability reaches a task two ways through `dh:task-worker`: an outside agent as the
+profile it loads, or an outside skill through the task's own `skills` list.
 
 </dispatch_selection>
 

@@ -88,11 +88,11 @@ The team name follows the pattern `impl-{slug}` where `{slug}` is derived from t
 `feature` value. This team name is reused by `complete-implementation` for QG agent
 dispatch and is shut down in the Final Step of that skill.
 
-Spawn one teammate per ready task. When only one task is ready, a single Agent call is acceptable. `TeamCreate` is the standard parallel dispatch mechanism — use it whenever 2+ tasks are ready at the same time.
+Spawn one teammate per ready task. When only one task is ready, a single Agent call is acceptable.
 
 For each task being dispatched:
 
-- Choose the `subagent_type` with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) — the task definition's `agent` field is read after dispatch, not by the orchestrator.
+- Choose which agent to dispatch with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) — the task definition's `agent` field is read after dispatch, not by the orchestrator.
 - Launch the chosen agent with the task reference as its entire prompt:
 
 ```text
@@ -137,7 +137,9 @@ flowchart TD
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(
-    selector="#{issue}",  # {issue} is str | int — GitHub integer ID or beads string ID
+    selector="{issue}",  # {issue} is str | int — GitHub integer ID or beads string ID.
+                         # No '#' prefix: find_item resolves a bare GitHub number or a
+                         # bare beads nanoid, but a '#'-prefixed nanoid resolves neither.
     section="Concerns",
     content="- [ ] {concern text} (reported by {agent_name} on {task_id})",
     append=True
@@ -170,32 +172,19 @@ Verify the just-completed task against the architect spec.
 
 Task ID: {task_id}
 Plan: {plan_ref}
-Architect spec: {architect_spec_content_or_path}
+Issue number: {issue}
 Modified files:
 {modified_files_list}
 
-Read the architect spec's Component Design and Type System Design sections.
+Fetch the architect spec yourself (per your own agent file) and read its Component Design and
+Type System Design sections.
 For each modified file, grep for function/class definitions and extract actual signatures.
 Compare against the contracts defined in the spec.
-Report mismatches in a <concerns> block with severity CONTRACT VIOLATION (signature mismatch)
-or CONTRACT GAP (spec defines contract but implementation is silent).
-If no mismatches are found, output `No contract concerns — all contracts in scope are satisfied.` with no <concerns> block.
+Deliver findings per your own agent file's Delivery section — do not return them in your
+response text; the dispatcher does not read it.
 """
 )
 ```
-
-If the contract-verification agent returns a `<concerns>` block, append each concern to the backlog item with a `CONTRACT:` prefix:
-
-```text
-mcp__plugin_dh_backlog__backlog_groom(
-    selector="#{issue}",
-    section="Concerns",
-    content="- [ ] CONTRACT: {concern text} (reported by contract-verification on {task_id})",
-    append=True
-)
-```
-
-Use the MCP tool for this call.
 
 If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely. Proportional quality gate items without an architect spec automatically skip this step.
 
@@ -258,7 +247,7 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 1. Display a compact task result summary:
    - Task ID and title
    - Completion status (complete / error)
-   - Any concerns raised (from the concerns block check in step 4)
+   - Any concerns raised — read fresh via `backlog_view(selector="{issue}", section="Concerns", show="last")` (no `#` prefix, per step 4 above) immediately before rendering this summary, not from step 4's in-memory `<concerns>` block check. Step 4a's contract-verification agent (when dispatched) delivers its findings directly to the Concerns section and is never captured by step 4's check, so a fresh read is the only way this summary sees them.
 
 2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
    examples include "Ready to dispatch the next task? (yes/no)" or a numbered menu

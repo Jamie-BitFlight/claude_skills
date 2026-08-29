@@ -261,14 +261,6 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 ---
 
-## Dispatch Pattern
-
-Dispatch behaviour is defined in the `dispatch-contract` skill
-([./skills/dispatch-contract/SKILL.md](./skills/dispatch-contract/SKILL.md)) — that skill is the
-one an executing agent loads, so the decision belongs there and nowhere else.
-
----
-
 ## Skills Overview
 
 **Main orchestration:**
@@ -326,7 +318,6 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 
 - `/dh:dispatch` - Dispatch tasks to agents using teams-first parallel execution; prefer over implement-feature when milestone-scoped work needs concurrent agent dispatch
 - `/dh:dh-meta-docs` - Plugin meta-documentation
-- `/dh:dispatch-contract` - Which agent a dh workflow dispatches, and the artifact consumer invariant
 - `/dh:interop` - Cross-plugin interoperability
 - `/dh:subagent-contract` - Where a dispatched step's output goes, and how it signals state upstream
 
