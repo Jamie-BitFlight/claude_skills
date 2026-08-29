@@ -191,9 +191,11 @@ When `/dh:execution` launches a sub-agent via `/start-task {plan} --task {id}`, 
 
 **PostToolUse (Activity Tracking)**:
 
-When `/dh:start-task` runs, it creates a context file at `~/.dh/projects/{slug}/context/active-task-{session_id}.json` (resolved via `dh_paths.context_dir(session_id)`) containing the plan address and task ID (plus, for the local-YAML backend only, the task file path). On each Write, Edit, or Bash operation, the PostToolUse hook:
+Only the local-YAML `ContextBackend` writes this file; the memory, GitHub, and beads backends persist `ActiveTaskContext` in their own provider and never create it, so `LastActivity` tracking below applies only to local-YAML sessions.
 
-1. Reads the context file to identify the active task
+When `/dh:start-task` runs on the local-YAML backend, it creates a context file at `~/.dh/projects/{slug}/context/active-task-{session_id}.json` (resolved via `dh_paths.context_dir(session_id)`) containing the plan address, task ID, and task file path. On each Write, Edit, or Bash operation, the PostToolUse hook:
+
+1. Reads the context file to identify the active task — `handle_activity_update()` has no MCP fallback and exits silently when the file is absent
 2. Updates `**LastActivity**: {ISO timestamp}` in the task section
 
 ### Timestamp Field Responsibilities
