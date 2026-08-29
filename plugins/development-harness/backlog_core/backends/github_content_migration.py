@@ -282,10 +282,21 @@ class _GitHubContentCache:
         # A stored record's own `pending` field is never trusted (FileCache normalises it
         # to False on write) -- the durable mutation queue is the sole source of truth, so
         # it is recomputed here the same way FileCache.get_content() derives it live.
+        # conflict_reason is likewise recomputed live rather than trusted from the stored
+        # record, for the same reason -- this fallback path builds records manually
+        # instead of routing through FileCache.get_content(), so it needs its own
+        # derivation to stay consistent with that method's live-derivation contract.
+        state = self._cache._load_state()
         pending_references = [mutation.write.reference for mutation in self._cache.pending_mutations()]
         records = [
-            record.model_copy(update={"stale": not online, "pending": record.reference in pending_references})
-            for record in self._cache._load_state().records
+            record.model_copy(
+                update={
+                    "stale": not online,
+                    "pending": record.reference in pending_references,
+                    "conflict_reason": self._cache._rejection_reason(state, record.reference),
+                }
+            )
+            for record in state.records
             if record.reference.kind == query.kind
             and not is_work_item_head_ref(record.reference)
             and (query.owner_reference is None or record.owner_reference == query.owner_reference)

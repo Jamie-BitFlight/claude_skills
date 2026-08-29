@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from backlog_core.backends.github_content_migration import _GitHubContentCache, _GitHubContentMigration
 from backlog_core.file_cache import FileCache
+from backlog_core.file_cache_state import _CacheStateStore, _RejectedMutation
 from backlog_core.models import (
     ContentConflictError,
     ContentKind,
@@ -308,3 +309,42 @@ def test_list_content_surfaces_a_rejection_discovered_during_this_same_call(tmp_
 
     assert result.content == "remote content"
     assert result.conflict_reason
+
+
+def test_list_content_offline_fallback_preserves_a_prior_rejection(tmp_path: Path) -> None:
+    """list_content()'s offline/cached-fallback branch must also surface conflict_reason.
+
+    Regression test for a review finding on PR #3306: the offline fallback
+    branch (GitHub unreachable, or the online list call itself fails) builds
+    records manually from cached state instead of routing through
+    FileCache.get_content() -- it already derived `pending` this way but not
+    `conflict_reason`, so a plan rejected on an earlier call still loaded as
+    ordinary current state whenever a caller (e.g. an offline SAM process)
+    hit this fallback path rather than the online branch fixed above.
+    """
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P1")
+    cache.cache_content(ContentRecord(reference=reference, content="cached content", revision="rev-1"))
+    stale_rejected_write = ContentWrite(reference=reference, content="rejected", expected_revision="rev-1")
+    store = _CacheStateStore(tmp_path)
+    store.transaction(
+        lambda state: (
+            state.model_copy(
+                update={
+                    "rejected": [
+                        _RejectedMutation(
+                            idempotency_key="stale-key", write=stale_rejected_write, reason="precondition failed"
+                        )
+                    ]
+                }
+            ),
+            None,
+        )
+    )
+    offline_provider = _UnresolvablyFailingProvider(ContentConflictError("unused"))
+    content_cache = _GitHubContentCache(cache=cache, provider=offline_provider)
+
+    [result] = content_cache.list_content(ContentQuery(kind=ContentKind.PLAN))
+
+    assert result.content == "cached content"
+    assert result.conflict_reason == "precondition failed"
