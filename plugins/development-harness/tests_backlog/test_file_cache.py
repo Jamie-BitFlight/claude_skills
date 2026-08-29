@@ -400,6 +400,37 @@ def test_rejected_entry_is_cleared_once_a_superseding_write_is_acknowledged(tmp_
     assert cache.rejected_mutations() == []
 
 
+def test_get_content_surfaces_the_rejection_reason_for_a_rejected_reference(tmp_path: Path) -> None:
+    """A caller reading content through get_content() must see why its write was dropped.
+
+    Regression test for a review finding on PR #3306: `rejected_mutations()` is a
+    private FileCache method absent from the logical ContentProvider interface, so a
+    caller whose offline write was later rejected during replay had no way to learn
+    about it through get_content() -- only a logger warning fired at replay time, which
+    the original caller (a different call, possibly a different process) never sees.
+    conflict_reason must be derived live from state.rejected, mirroring how `pending`
+    is already derived live from state.pending.
+    """
+    cache = FileCache(tmp_path)
+    reference = _reference("#1")
+    record = _record(reference, "before")
+    cache.cache_content(record)
+
+    unrejected = cache.get_content(reference)
+    assert unrejected.conflict_reason == ""
+
+    mutation = cache.queue_write(record, ContentWrite(reference=reference, content="doomed", expected_revision="rev-1"))
+    cache.reject_pending(reference, mutation.idempotency_key, "revision no longer matches")
+
+    rejected_view = cache.get_content(reference)
+    assert rejected_view.conflict_reason == "revision no longer matches"
+
+    # A fresh write for the same reference supersedes the rejection (Fix 2 above);
+    # get_content() must stop surfacing the stale reason once that happens.
+    cache.queue_write(record, ContentWrite(reference=reference, content="retry", expected_revision="rev-1"))
+    assert cache.get_content(reference).conflict_reason == ""
+
+
 def _populated_cache_state() -> _CacheState:
     # A realistic mix of the nested models actually persisted to cache.yaml.
     artifact_ref = _reference("#1")

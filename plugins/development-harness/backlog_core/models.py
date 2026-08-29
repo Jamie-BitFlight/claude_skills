@@ -1269,6 +1269,7 @@ class ContentRecord(BaseModel):
     revision: str = ""
     stale: bool = False
     pending: bool = False
+    conflict_reason: str = ""
 
 
 class ContentWrite(BaseModel):

@@ -46,12 +46,22 @@ class FileCache:
         ``pending`` is derived live from the durable mutation queue
         (``state.pending``) rather than trusted from the stored record --
         that queue is the sole source of truth for whether a reference has
-        unreplayed intent. See :meth:`_is_pending`.
+        unreplayed intent. See :meth:`_is_pending`. ``conflict_reason`` is
+        likewise derived live from ``state.rejected`` -- this is the logical
+        API surface a caller (possibly a different call than the one whose
+        write was rejected) uses to discover a terminal replay conflict,
+        since :meth:`reject_pending` only logs a warning at replay time.
         """
         state = self._load_state()
         for record in state.records:
             if record.reference == reference:
-                return record.model_copy(update={"stale": stale, "pending": self._is_pending(state, reference)})
+                return record.model_copy(
+                    update={
+                        "stale": stale,
+                        "pending": self._is_pending(state, reference),
+                        "conflict_reason": self._rejection_reason(state, reference),
+                    }
+                )
         raise ContentUnavailableError(str(reference.model_dump(mode="json")))
 
     def cache_content(self, record: ContentRecord, *, acknowledge_pending: bool = False) -> None:
@@ -466,3 +476,15 @@ class FileCache:
         being shadowed by the stale queued content forever.
         """
         return any(entry.write.reference == reference for entry in state.pending)
+
+    @staticmethod
+    def _rejection_reason(state: _CacheState, reference: ContentRef) -> str:
+        """Return the reason a reference's mutation was terminally rejected, or "".
+
+        Mirrors :meth:`_is_pending`: ``state.rejected`` is the sole source of
+        truth, recomputed on every read rather than trusted from the stored
+        record, so a reference cleared of its rejection (:meth:`queue_write`)
+        stops surfacing a stale reason immediately.
+        """
+        entry = next((item for item in state.rejected if item.write.reference == reference), None)
+        return entry.reason if entry is not None else ""
