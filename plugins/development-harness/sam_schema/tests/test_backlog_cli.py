@@ -76,6 +76,45 @@ class TestBacklogAddErrorContract:
         assert json.loads(result.stdout) == {"title": "new item", "priority": "P1", "item_ref": "#123"}
 
 
+class TestBacklogViewRefreshForwarding:
+    """``backlog view`` forwards the ``--refresh`` flag to ``operations.view_item``."""
+
+    def test_refresh_flag_forwards_true(self, mocker: MockerFixture) -> None:
+        """``--refresh`` forwards ``refresh=True`` into ``operations.view_item``."""
+        mock_view = mocker.patch(
+            "sam_schema.backlog.operations.view_item", return_value={"title": "Item", "issue": "#42"}
+        )
+
+        result = runner.invoke(app, ["backlog", "view", "--selector", "#42", "--refresh"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        assert mock_view.call_args.kwargs["refresh"] is True
+
+    def test_no_refresh_flag_forwards_false(self, mocker: MockerFixture) -> None:
+        """Omitting ``--refresh`` forwards ``refresh=False`` into ``operations.view_item``."""
+        mock_view = mocker.patch(
+            "sam_schema.backlog.operations.view_item", return_value={"title": "Item", "issue": "#42"}
+        )
+
+        result = runner.invoke(app, ["backlog", "view", "--selector", "#42"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        assert mock_view.call_args.kwargs["refresh"] is False
+
+
+class TestBacklogListRefreshForwarding:
+    """``backlog list`` forwards the ``--refresh`` flag to ``operations.list_items``."""
+
+    def test_refresh_flag_forwards_true(self, mocker: MockerFixture) -> None:
+        """``--refresh`` forwards ``refresh=True`` into ``operations.list_items``."""
+        mock_list = mocker.patch("sam_schema.backlog.operations.list_items", return_value={"items": []})
+
+        result = runner.invoke(app, ["backlog", "list", "--refresh"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        assert mock_list.call_args.kwargs["refresh"] is True
+
+
 class TestBacklogSyncFallback:
     """The ``backlog sync`` fallback invokes a command that actually exists."""
 

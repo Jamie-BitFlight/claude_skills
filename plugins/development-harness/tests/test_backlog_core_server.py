@@ -812,6 +812,26 @@ async def test_backlog_view_passes_pagination_params():
     assert call_kwargs["limit"] == 20
 
 
+async def test_backlog_view_forwards_refresh_true():
+    """backlog_view forwards refresh=True to operations.view_item when requested."""
+    op_result = _make_view_result({"title": "Item", "body": "line1\nline2\nline3"})
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
+        await _call("backlog_view", {"selector": "Item", "refresh": True})
+
+    call_kwargs = mock_view.call_args.kwargs
+    assert call_kwargs["refresh"] is True
+
+
+async def test_backlog_view_forwards_refresh_false_by_default():
+    """backlog_view forwards refresh=False to operations.view_item when the key is omitted."""
+    op_result = _make_view_result({"title": "Item", "body": "line1\nline2\nline3"})
+    with patch("dh_core.operations.view_item", return_value=op_result) as mock_view:
+        await _call("backlog_view", {"selector": "Item"})
+
+    call_kwargs = mock_view.call_args.kwargs
+    assert call_kwargs["refresh"] is False
+
+
 async def test_backlog_view_backlog_error_returns_error_key():
     """backlog_view catches BacklogError when item is not found."""
     with patch("dh_core.operations.view_item", side_effect=BacklogError("No item found for: #999")):
