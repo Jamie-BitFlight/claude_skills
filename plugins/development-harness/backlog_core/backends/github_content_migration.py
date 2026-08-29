@@ -334,7 +334,15 @@ class _GitHubContentCache:
         except (BacklogError, ContentUnavailableError, OSError):
             return self._cache.get_content(reference, stale=True)
         self._cache.cache_content(record)
-        return record
+        # Route through FileCache.get_content() rather than returning `record`
+        # directly: replay_pending() above may have just rejected this exact
+        # reference's pending mutation during this same call, and conflict_reason
+        # is only ever derived live inside get_content() -- returning the raw
+        # provider record would silently drop that discovery. Look up by
+        # record.reference, not the queried reference -- a legacy-fallback read
+        # can return content under a different (normalized) reference than the
+        # one queried, and cache_content() stores it under record.reference.
+        return self._cache.get_content(record.reference)
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Write content, durably queueing it while GitHub is offline.

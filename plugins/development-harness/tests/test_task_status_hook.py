@@ -15,7 +15,7 @@ from __future__ import annotations
 import importlib.util
 import inspect
 import json
-import signal
+import os
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess, SubprocessError, TimeoutExpired
@@ -1396,13 +1396,18 @@ def test_timeout_defaults_are_below_outer_hook_deadline() -> None:
         assert default < 10, f"{func.__name__} timeout default is {default!r}, must be < 10"
 
 
-def test_call_sam_cli_kills_entire_process_group_on_timeout(mocker: MockerFixture) -> None:
-    """On timeout, _call_sam_cli kills the whole process group, not just the immediate pid.
+def test_call_sam_cli_delegates_timeout_cleanup_to_terminate_process_tree(mocker: MockerFixture) -> None:
+    """On timeout, _call_sam_cli delegates process-tree cleanup to run_bounded.terminate_process_tree.
 
-    subprocess.run(timeout=...) only ever calls .kill() on the immediate child
-    (the uv process). If `uv run --script` forks rather than execs into the
-    actual interpreter, that descendant survives — an orphaned process. The
-    fix kills the entire process group via os.killpg(os.getpgid(pid), SIGKILL).
+    Supersedes the hand-rolled os.killpg(os.getpgid(pid), SIGKILL) approach, which only
+    works on POSIX (os.killpg does not exist on Windows) and always jumps straight to
+    SIGKILL with no graceful-termination attempt. The repo already solves this — see
+    scripts/run_bounded.py's terminate_process_tree, already used the same way by
+    scripts/validate_codex_plugin_isolated.py.
+
+    Kept safe against the still-unfixed hand-rolled cleanup by stubbing os.getpgid/os.killpg
+    too, so this test cannot SIGKILL a real, unrelated process group on the test machine
+    while it is RED.
     """
     proc = _popen_timeout(pid=4242)
 
@@ -1410,19 +1415,23 @@ def test_call_sam_cli_kills_entire_process_group_on_timeout(mocker: MockerFixtur
     mocker.patch.object(Path, "exists", return_value=True)
     mocker.patch("subprocess.Popen", return_value=proc)
     mocker.patch("os.getpgid", return_value=4242)
-    mock_killpg = mocker.patch("os.killpg")
+    mocker.patch("os.killpg")
+    mock_terminate = mocker.patch.object(_hook_mod, "terminate_process_tree", create=True)
 
     result = _hook_mod._call_sam_cli(["plan", "read", "--address", "P1/T1"])
 
     assert result is None
-    mock_killpg.assert_called_once_with(4242, signal.SIGKILL)
+    mock_terminate.assert_called_once_with(proc)
 
 
-def test_call_sam_cli_launches_subprocess_in_new_session(mocker: MockerFixture) -> None:
-    """_call_sam_cli launches its subprocess with start_new_session=True.
+def test_call_sam_cli_uses_posix_session_flag(mocker: MockerFixture) -> None:
+    """_call_sam_cli launches its subprocess with start_new_session matching the platform.
 
-    A new session/process group is the prerequisite for os.killpg to be able
-    to target the whole process tree instead of just the immediate child pid.
+    POSIX process groups are the prerequisite for terminate_process_tree's group-wide
+    SIGTERM/SIGKILL escalation; Windows has no such concept and terminate_process_tree
+    instead walks the OS process tree by PID via taskkill (see
+    run_bounded.terminate_windows_process_tree). The assertion is written against
+    os.name == "posix" rather than a hardcoded True so it stays correct off of POSIX too.
     """
     proc = _popen_from_completed(CompletedProcess(args=[], returncode=0, stdout="{}", stderr=""), pid=1234)
 
@@ -1433,23 +1442,107 @@ def test_call_sam_cli_launches_subprocess_in_new_session(mocker: MockerFixture) 
     _hook_mod._call_sam_cli(["plan", "read", "--address", "P1/T1"])
 
     mock_popen.assert_called_once()
-    assert mock_popen.call_args.kwargs.get("start_new_session") is True
+    assert mock_popen.call_args.kwargs.get("start_new_session") == (os.name == "posix")
 
 
-def test_call_sam_cli_timeout_killpg_race_does_not_raise(mocker: MockerFixture) -> None:
-    """A ProcessLookupError from os.killpg (process already exited) does not propagate.
+# ---------------------------------------------------------------------------
+# PR #3306 review response, round 3 — handle_activity_update shares a single
+# wall-clock deadline across its two sequential _call_sam_cli-backed calls
+#
+# _call_sam_task_read then _call_sam_task_update are each individually kept
+# below the outer 10s PostToolUse hook deadline, but nothing today stops their
+# SUM from exceeding it: worst case ~8s + ~8s = ~16s, well past the 10s
+# external SIGKILL Claude Code enforces on the whole hook process. The fix
+# computes a shared remaining-budget deadline once (time.monotonic()) and
+# passes the REMAINING time to each call, skipping the update call outright
+# once the budget is exhausted rather than dispatching it with a doomed
+# near-zero/negative timeout.
+# ---------------------------------------------------------------------------
 
-    Between the timeout firing and the killpg call, the process may have already
-    exited on its own — a benign race, not a failure the hook should crash on.
+
+def _write_activity_update_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, session_id: str) -> dict[str, Any]:
+    """Set up a plan file + context file for handle_activity_update and return its hook_input.
+
+    Shared fixture setup for the two shared-deadline tests below — mirrors the setup
+    already used by test_handle_activity_update_calls_mcp_update.
     """
-    proc = _popen_timeout(pid=4242)
+    plan_file = tmp_path / "Pf4281187-feature.yaml"
+    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
 
-    mocker.patch("shutil.which", return_value="/usr/bin/uv")
-    mocker.patch.object(Path, "exists", return_value=True)
-    mocker.patch("subprocess.Popen", return_value=proc)
-    mocker.patch("os.getpgid", return_value=4242)
-    mocker.patch("os.killpg", side_effect=ProcessLookupError)
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    import dh_paths
 
-    result = _hook_mod._call_sam_cli(["plan", "read", "--address", "P1/T1"])
+    context_dir = dh_paths.context_dir()
+    context_dir.mkdir(parents=True, exist_ok=True)
+    context_file = context_dir / f"active-task-{session_id}.json"
+    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "task_id": "T1"}))
 
-    assert result is None
+    return {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
+
+
+def test_handle_activity_update_shares_deadline_between_read_and_update(
+    mocker: MockerFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The timeout passed to _call_sam_task_update reflects the budget remaining after the read call.
+
+    time.monotonic() is mocked to a 3-value sequence: [deadline computed, right before the
+    read call, right before the update call] = [0.0, 0.0, 6.0] — simulating the read call
+    alone consuming 6 of the shared budget's seconds. The update call must NOT receive its
+    own fresh ~8s default; it must receive whatever budget remains (< 8s).
+
+    RED on current code: handle_activity_update calls _call_sam_task_update(plan_addr,
+    task_id, set_fields) with no timeout= kwarg at all (it relies on the function's own
+    8s default), so mock_update.call_args.kwargs.get("timeout") is None here.
+    """
+    session_id = "sess-budget-shared"
+    hook_input = _write_activity_update_context(tmp_path, monkeypatch, session_id)
+
+    from sam_schema.core.models import Task, TaskStatus
+
+    mock_task = mocker.MagicMock(spec=Task)
+    mock_task.status = TaskStatus.IN_PROGRESS
+
+    mocker.patch("time.monotonic", side_effect=[0.0, 0.0, 6.0])
+    mocker.patch.object(_hook_mod, "_call_sam_task_read", return_value=mock_task, create=True)
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+
+    handle_activity_update(hook_input)
+
+    mock_update.assert_called_once()
+    passed_timeout = mock_update.call_args.kwargs.get("timeout")
+    assert passed_timeout is not None, (
+        "expected _call_sam_task_update to receive an explicit timeout= reflecting the "
+        "remaining shared budget, not fall back to its own default"
+    )
+    assert 0 < passed_timeout < 8, f"expected a reduced remaining-budget timeout, got {passed_timeout!r}"
+
+
+def test_handle_activity_update_skips_update_when_budget_exhausted(
+    mocker: MockerFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_call_sam_task_update is skipped entirely once the shared budget is exhausted by the read call.
+
+    time.monotonic() simulates the read call alone consuming the entire shared budget
+    (remaining <= 0 by the time the update call would be dispatched). Rather than
+    dispatching _call_sam_task_update with a doomed near-zero/negative timeout, the fix
+    must skip it outright (logging to stderr) and return.
+
+    RED on current code: handle_activity_update unconditionally calls
+    _call_sam_task_update whenever the task isn't already COMPLETE — there is no budget
+    check at all, so mock_update.assert_not_called() fails (it WAS called).
+    """
+    session_id = "sess-budget-exhausted"
+    hook_input = _write_activity_update_context(tmp_path, monkeypatch, session_id)
+
+    from sam_schema.core.models import Task, TaskStatus
+
+    mock_task = mocker.MagicMock(spec=Task)
+    mock_task.status = TaskStatus.IN_PROGRESS
+
+    mocker.patch("time.monotonic", side_effect=[0.0, 0.0, 8.5])
+    mocker.patch.object(_hook_mod, "_call_sam_task_read", return_value=mock_task, create=True)
+    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
+
+    handle_activity_update(hook_input)
+
+    mock_update.assert_not_called()

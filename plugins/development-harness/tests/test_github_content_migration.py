@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from backlog_core.backends.github_content_migration import _GitHubContentCache, _GitHubContentMigration
@@ -201,3 +201,58 @@ def test_replay_pending_discards_mutation_that_can_never_land(
     [rejected] = cache.rejected_mutations()
     assert rejected.write.content == "queued content"
     assert rejected.reason
+
+
+class _OnlineProviderWithReadableContent:
+    """_OnlineContent double that is reachable and whose read always succeeds.
+
+    Its write always raises a non-retryable error, so a pending mutation
+    replayed against it is rejected rather than retried.
+    """
+
+    def __init__(self, error: BaseException, read_record: ContentRecord) -> None:
+        self._error = error
+        self._read_record = read_record
+
+    def try_get_github(self, repo: str = "") -> Repository | None:
+        return cast("Repository", object())
+
+    def _list_online_content(self, query: ContentQuery) -> list[ContentRecord]:
+        raise NotImplementedError
+
+    def _read_online_content(self, reference: ContentRef, cached: ContentRecord | None) -> ContentRecord:
+        return self._read_record
+
+    def _write_online_content(self, request: ContentWrite, cached: ContentRecord | None) -> ContentRecord:
+        raise self._error
+
+
+def test_get_content_surfaces_a_rejection_discovered_during_this_same_call(tmp_path: Path) -> None:
+    """A conflict discovered by replay_pending() inside get_content() must not vanish.
+
+    Regression test for a review finding on PR #3306: get_content() calls
+    replay_pending() as its first step whenever GitHub is reachable. If that
+    replay rejects the reference's pending mutation, the reference is no
+    longer "pending" (FileCache._is_pending treats a rejected reference as
+    not-pending by design), so get_content() falls through to the online-read
+    success branch -- which previously returned the freshly read provider
+    record directly instead of routing it through FileCache.get_content(),
+    the only place conflict_reason is derived. The caller who triggers the
+    very replay that discovers the conflict never saw it.
+    """
+    cache = FileCache(tmp_path)
+    reference = ContentRef(kind=ContentKind.PLAN, name="P1")
+    cache.queue_write(
+        ContentRecord(reference=reference, content="", revision=""),
+        ContentWrite(reference=reference, content="queued content", expected_revision="stale-rev"),
+    )
+    fresh_record = ContentRecord(reference=reference, content="remote content", revision="remote-rev")
+    provider = _OnlineProviderWithReadableContent(
+        ContentConflictError("Content revision no longer matches"), fresh_record
+    )
+    content_cache = _GitHubContentCache(cache=cache, provider=provider)
+
+    result = content_cache.get_content(reference)
+
+    assert result.content == "remote content"
+    assert result.conflict_reason
