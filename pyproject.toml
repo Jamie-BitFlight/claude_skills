@@ -60,7 +60,7 @@ addopts = [
     "--tb=short",
     "--import-mode=importlib",
     "-n",
-    "auto",
+    "2",
     "--dist",
     "loadgroup",
     "-m",
