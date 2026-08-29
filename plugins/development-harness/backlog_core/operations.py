@@ -2920,12 +2920,10 @@ def view_item(
             numeric index (``"2"``), comma-separated indices (``"0,2"``),
             regex (``"/impact.*/``), or substring match.
         refresh: When True, forces a live-backend check through the authoritative
-            resolution chain for a title-substring selector that already resolved
-            locally. A selector that resolves via a numeric/#N/URL match is always
-            validated against the live backend regardless of this flag — that
-            behavior is unchanged and predates this parameter. A selector with no
-            local match still triggers a live lookup regardless of this flag,
-            since that is the only way to resolve its identity at all.
+            resolution chain for an already-cached title-substring selector.
+            A numeric/#N/URL match, or a selector with no local match, is always
+            live-checked regardless of this flag — the only case this flag gates
+            is a cached title-substring selector.
 
     Returns:
         ViewItemResult with item/issue details. When ``include_content=True``,

@@ -2359,7 +2359,9 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
     return compact
 
 
-def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) -> dict[str, object] | None:
+def _execute_disclosure_or_passthrough(
+    selector: str, req: DisclosureRequest, refresh: bool = False
+) -> dict[str, object] | None:
     """Execute a non-PASSTHROUGH progressive disclosure request synchronously.
 
     Intended for ``asyncio.to_thread``.  The caller guards on
@@ -2370,6 +2372,13 @@ def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) ->
     error dicts so the ``to_thread`` caller receives a clean return value with
     no exception.
 
+    Args:
+        selector: Issue selector forwarded to the disclosure handler.
+        req: Validated disclosure request (mode + ordinal/token params).
+        refresh: Forwarded to ``BacklogViewDisclosureHandler.handle()`` so
+            map/navigate/extract calls get the same bypass-cache live check
+            as the passthrough path.
+
     Returns:
         Serialised response dict for MAP/NAVIGATE/EXTRACT, None for PASSTHROUGH
         (safety net only), or an error dict when OrdinalNotFoundError or
@@ -2378,7 +2387,7 @@ def _execute_disclosure_or_passthrough(selector: str, req: DisclosureRequest) ->
     if req.mode == DisclosureMode.PASSTHROUGH:
         return None  # safety net — caller should never reach this branch
     try:
-        response = BacklogViewDisclosureHandler().handle(selector, req)
+        response = BacklogViewDisclosureHandler().handle(selector, req, refresh=refresh)
         return dataclasses.asdict(response)
     except OrdinalNotFoundError as exc:
         return {"error": str(exc), "requested_ordinal": exc.requested, "valid_ordinals": exc.valid_ordinals}
@@ -2402,12 +2411,12 @@ async def backlog_view(
         bool,
         Field(
             description=(
-                "Bypass the local cache and validate against the live backend for a "
-                "title-substring selector that already resolves locally. Selectors that "
-                "resolve via a numeric/#N/URL match are always validated against the live "
-                "backend regardless of this flag — that behavior is unchanged and predates "
-                "this parameter. For GitHub, resolves content through the authoritative "
-                "head-pointer/audit-comment record, never the raw issue body."
+                "Bypass the cache and live-check an already-cached title-substring selector "
+                "against the backend. Numeric/#N/URL selectors are always live-checked "
+                "regardless of this flag. For GitHub, prefers the authoritative "
+                "head-pointer/audit-comment record; on a resolution failure it silently "
+                "falls back to the raw issue body, with no signal in the response that "
+                "this happened."
             )
         ),
     ] = False,
@@ -2586,7 +2595,9 @@ async def backlog_view(
     try:
         disclosure_req = DisclosureRequestParser().parse(map=map, navigate=navigate, head=head, skip_tokens=skip_tokens)
         if disclosure_req.mode != DisclosureMode.PASSTHROUGH:
-            disclosure_result = await asyncio.to_thread(_execute_disclosure_or_passthrough, selector, disclosure_req)
+            disclosure_result = await asyncio.to_thread(
+                _execute_disclosure_or_passthrough, selector, disclosure_req, refresh
+            )
     except DisclosureParamError as exc:
         disclosure_result = {"error": str(exc), "invalid_params": exc.invalid_params}
 

@@ -90,7 +90,7 @@ View a single backlog item in detail. Supports pagination for long bodies.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `selector` | `str` | required | GitHub issue URL, `#N`, bare number, or title substring |
-| `refresh` | `bool` | `False` | Bypass the local cache and validate against the live backend for a title-substring selector that already resolves locally. Selectors that resolve via a numeric/#N/URL match are always validated against the live backend regardless of this flag — that behavior is unchanged and predates this parameter. For GitHub, resolves content through the authoritative head-pointer/audit-comment record, never the raw issue body. |
+| `refresh` | `bool` | `False` | Bypass the cache and live-check an already-cached title-substring selector against the backend, including under `map`/`navigate`/`head`. Numeric/#N/URL selectors are always live-checked regardless of this flag. For GitHub, prefers the authoritative head-pointer/audit-comment record; on a resolution failure it silently falls back to the raw issue body, with no signal in the response that this happened. |
 | `include_content` | `bool` | `True` | When True (default), returns full body and section entries. When False, returns metadata and section inventory only (section names with entry counts, no body or entry content). |
 | `offset` | `int` | `0` | Skip N entry blocks from body start (for pagination) |
 | `limit` | `int` | `0` | Show at most N entry blocks (`0` = all, no truncation) |

@@ -630,6 +630,50 @@ class TestUngatedViewItemPath:
 
     @_skip_without_2515
     @_skip_without_real_enc
+    def test_handle_forwards_refresh_true_to_view_item(
+        self, view_result_2515: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """handle(refresh=True) forwards refresh=True to view_item(), not the default False.
+
+        Regression guard: combining refresh=True with map/navigate/head must not
+        silently drop the bypass-cache request — the disclosure path must get the
+        same live-backend check as the passthrough (summary/default) path.
+        """
+        view_item_spy = mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
+
+        BacklogViewDisclosureHandler().handle("#2515", DisclosureRequestParser().parse(map=True), refresh=True)
+
+        call_args = view_item_spy.call_args
+        assert call_args is not None, "view_item() must have been called."
+        pos_args = list(call_args.args) if call_args.args else []
+        kw_args = call_args.kwargs or {}
+        pos_refresh = pos_args[1] if len(pos_args) > 1 else None
+        kw_refresh = kw_args.get("refresh")
+        assert pos_refresh is True or kw_refresh is True, (
+            f"view_item() must receive refresh=True as positional or keyword arg.\n"
+            f"Got positional[1]={pos_refresh!r}, keyword refresh={kw_refresh!r}."
+        )
+
+    @_skip_without_2515
+    @_skip_without_real_enc
+    def test_handle_defaults_refresh_to_false(self, view_result_2515: ViewItemResult, mocker: MockerFixture) -> None:
+        """handle() with no refresh argument forwards refresh=False (unchanged default)."""
+        view_item_spy = mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
+
+        BacklogViewDisclosureHandler().handle("#2515", DisclosureRequestParser().parse(map=True))
+
+        call_args = view_item_spy.call_args
+        assert call_args is not None, "view_item() must have been called."
+        pos_args = list(call_args.args) if call_args.args else []
+        kw_args = call_args.kwargs or {}
+        pos_refresh = pos_args[1] if len(pos_args) > 1 else None
+        kw_refresh = kw_args.get("refresh", False)
+        failure_detail = f"Got positional[1]={pos_refresh!r}, keyword refresh={kw_refresh!r}."
+        assert pos_refresh in (False, None), f"view_item() must default to refresh=False.\n{failure_detail}"
+        assert kw_refresh is False, f"view_item() must default to refresh=False.\n{failure_detail}"
+
+    @_skip_without_2515
+    @_skip_without_real_enc
     def test_overbudget_item_produces_non_empty_map_text(
         self, view_result_2515: ViewItemResult, mocker: MockerFixture
     ) -> None:
