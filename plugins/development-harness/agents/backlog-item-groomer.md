@@ -69,9 +69,15 @@ Do not groom against a truncated read.
 The over-budget check re-applies to the narrowed response: if one section alone still exceeds the
 budget, that per-section fetch returns `_over_budget: true` again with no body for that section
 either. When this happens, switch to EXTRACT-mode pagination instead of retrying the same call:
-`backlog_view(selector=item_ref, map=True)` to get the section's ordinal, then
-`backlog_view(selector=item_ref, navigate="{ordinal}", head=2000)` and follow the response's
-`next_call` hint until `truncated=False` to read the section in full.
+`backlog_view(selector=item_ref, map=True)` to get the section's ordinal and see whether it has
+child ordinals nested beneath it in the map (a sub-heading structure). Paging a parent ordinal that
+has children returns only its child menu, not their content — `navigate` on a node with sub-heading
+children bounds `child_map` text, not prose. If the map shows no children under the section's
+ordinal, page it directly: `backlog_view(selector=item_ref, navigate="{ordinal}", head=2000)`,
+following `next_call` until `truncated=False`. If it does have children, repeat this per-ordinal
+navigate+head pagination for each child ordinal individually (recursing into any further nested
+children the same way) — never the parent's own ordinal — until every leaf under the section has
+been read in full.
 
 Extract from the response (or from the individual per-section fetches above, when `_over_budget`
 applied):

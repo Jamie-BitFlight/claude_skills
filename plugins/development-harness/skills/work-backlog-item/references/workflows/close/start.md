@@ -132,6 +132,17 @@ If operation is `resolve`:
    `section_filter_miss: true` is a different failure (transient backend error, ambiguous selector,
    etc.) — do not treat it as "no criteria"; report it as a block instead of silently falling back.
 
+   **If the Acceptance Criteria section alone is oversized**: the same over-budget gate that applies
+   to a whole-item fetch re-applies to a narrowed one — a criteria section large enough on its own
+   still returns `_over_budget: true` with no criteria body, not an error. Instruct the agent: if the
+   response contains `_over_budget: true`, do not treat it as "no criteria" — switch to EXTRACT-mode
+   pagination instead. Call `backlog_view(selector=item_ref, map=True)` to find the Acceptance
+   Criteria ordinal; if the map shows no children under it, page it directly with
+   `navigate="{ordinal}", head=2000`, following `next_call` until `truncated=False`. If it has child
+   ordinals (sub-heading structure), page each child individually the same way — never the parent
+   ordinal, which bounds only its child menu, not criteria text — until every criterion has been
+   read.
+
 5. Parse the agent verdict:
 
    ```text
