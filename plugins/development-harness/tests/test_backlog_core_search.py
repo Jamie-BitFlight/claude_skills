@@ -393,6 +393,15 @@ class TestBuildConceptQuery:
         assert "the" not in query.split(" OR ")
         assert "and" not in query.split(" OR ")
 
+    def test_description_word_survives_a_verbose_title_that_fills_max_concepts(self) -> None:
+        # Title alone has >= 4 usable words, so under old title-first-then-break
+        # behavior the description would never be scanned and "redis" would be lost.
+        query = build_concept_query(
+            "Improve caching layer performance significantly", "Add redis support", max_concepts=4
+        )
+
+        assert "redis" in query.split(" OR ")
+
 
 # ---------------------------------------------------------------------------
 # ContentDuplicateMatch

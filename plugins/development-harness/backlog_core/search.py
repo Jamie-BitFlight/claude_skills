@@ -9,9 +9,12 @@ Operates on the ``list[dict[str, str | bool]]`` shape produced by
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import operator
 import re as _re
 from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict
 
 # Fields searched by default when no field-specific prefix is given.
 # ``body`` contains the full item content (description + all section entries)
@@ -486,6 +489,8 @@ _META_FIELDS: tuple[str, ...] = ("title", "section", "topic", "type")
 _DUPLICATE_EXCLUDED_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed", "skip"})
 
 # Common words dropped from concept extraction — not indicative of topic.
+# Includes "backlog"/"item" since every item in this tracker is a backlog item,
+# so those words carry no discriminating power for duplicate detection here.
 _CONCEPT_STOPWORDS: frozenset[str] = frozenset({
     "a",
     "an",
@@ -493,11 +498,14 @@ _CONCEPT_STOPWORDS: frozenset[str] = frozenset({
     "are",
     "as",
     "at",
+    "backlog",
     "be",
     "been",
+    "both",
     "but",
     "by",
     "can",
+    "during",
     "for",
     "from",
     "had",
@@ -508,6 +516,7 @@ _CONCEPT_STOPWORDS: frozenset[str] = frozenset({
     "into",
     "is",
     "it",
+    "item",
     "its",
     "near",
     "no",
@@ -539,7 +548,6 @@ _CONCEPT_STOPWORDS: frozenset[str] = frozenset({
     "would",
     "you",
     "your",
-    "both",
 })
 
 # Concept tokens shorter than this are treated as noise, not a topic word.
@@ -556,9 +564,10 @@ class DuplicateCheckStatus(StrEnum):
     COULD_NOT_VERIFY = "could_not_verify"
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
-class ContentDuplicateMatch:
+class ContentDuplicateMatch(BaseModel):
     """A single candidate duplicate surfaced by ``find_content_duplicates``."""
+
+    model_config = ConfigDict(frozen=True)
 
     title: str
     item_ref: str
@@ -567,12 +576,34 @@ class ContentDuplicateMatch:
     match_count: int
 
 
+def _extract_concept_words(text: str) -> list[str]:
+    """Return casefolded, deduplicated, stopword-filtered words from ``text``, in order."""
+    words: list[str] = []
+    seen: set[str] = set()
+    for word in _WORD_RE.findall(text.casefold()):
+        if len(word) < _MIN_CONCEPT_TOKEN_LEN or word in _CONCEPT_STOPWORDS or word in seen:
+            continue
+        seen.add(word)
+        words.append(word)
+    return words
+
+
 def build_concept_query(title: str, description: str, *, max_concepts: int = 4) -> str:
     """Build an OR search query from the significant words in title and description.
 
     Mirrors the manual concept-extraction step already prescribed by
     ``skills/work-backlog-item/references/workflows/create/start.md`` Step 3:
     "extract 2 to 4 key concepts ... build {c1} OR {c2} OR {c3}".
+
+    A share of the budget is reserved for description words that add
+    information the title doesn't already contain, so a verbose title can
+    never fill ``max_concepts`` before any *new* description content is
+    considered. Words the title and description both use (generic,
+    frequently-reused terms in a single-subsystem backlog) are not treated
+    as that new information, since they carry no extra discriminating
+    power over title-only matching. The remaining budget is filled from
+    the title first (preserving prior behavior when description is short,
+    empty, or repeats the title), then from any leftover description words.
 
     Args:
         title: New item title.
@@ -583,10 +614,17 @@ def build_concept_query(title: str, description: str, *, max_concepts: int = 4) 
         A ``term1 OR term2 ...`` query string, or ``""`` when no usable
         concept word remains after filtering.
     """
+    title_words = _extract_concept_words(title)
+    desc_words = _extract_concept_words(description)
+    title_word_set = set(title_words)
+    desc_only_words = [word for word in desc_words if word not in title_word_set]
+
     concepts: list[str] = []
     seen: set[str] = set()
-    for word in _WORD_RE.findall(f"{title} {description}".casefold()):
-        if len(word) < _MIN_CONCEPT_TOKEN_LEN or word in _CONCEPT_STOPWORDS or word in seen:
+    reserved = min(len(desc_only_words), max(1, max_concepts // 2)) if desc_only_words else 0
+    candidates = itertools.chain(desc_only_words[:reserved], title_words, desc_only_words[reserved:], desc_words)
+    for word in candidates:
+        if word in seen:
             continue
         seen.add(word)
         concepts.append(word)
