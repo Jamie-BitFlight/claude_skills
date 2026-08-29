@@ -35,10 +35,8 @@ import contextlib
 import json
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
-import dh_paths
 from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
 from backlog_core.backends.beads_models import (
     BeadsIssueRaw,
@@ -1303,9 +1301,7 @@ class BeadsContextBackend:
         Returns:
             The stored :class:`~sam_schema.core.models.ActiveTaskContext` instance.
         """
-        task_file_path = _resolve_task_file_path(plan, plan_dir)
         context = ActiveTaskContext(
-            task_file_path=task_file_path,
             task_id=task,
             plan=plan,
             task=task,
@@ -1368,22 +1364,3 @@ class BeadsContextBackend:
             except (json.JSONDecodeError, ValueError):
                 continue
         return results
-
-
-# ---------------------------------------------------------------------------
-# Module-level helpers
-# ---------------------------------------------------------------------------
-
-
-def _resolve_task_file_path(plan: str, plan_dir: str) -> str:
-    """Resolve the plan YAML file path (mirrors LocalContextBackend pattern).
-
-    Args:
-        plan: Plan address (e.g. ``'Pa1b2c3d4'`` or a slug).
-        plan_dir: Sentinel ``'plan'`` or an absolute path string.
-
-    Returns:
-        Absolute path string to the plan YAML file.
-    """
-    base: Path = dh_paths.plan_dir() if plan_dir == "plan" else Path(plan_dir)
-    return str(base / f"{plan}.yaml")

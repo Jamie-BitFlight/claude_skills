@@ -307,7 +307,7 @@ Retrieves the active task context for the session.
 sam_active_task(config={"action": "get"}, session_id="abc123")
 ```
 
-Response (set): `{"active_task": {task_file_path, task_id, parent_issue_number, session_id, feature_slug, started_at}}`
+Response (set): `{"active_task": {plan, task, task_id, plan_dir, parent_issue_number, session_id, feature_slug, started_at}}` (plus a local-YAML-only absolute plan-file path field, `None` for the memory, GitHub, and beads backends).
 Response (not set): `{"active_task": null}`
 
 #### `set`
@@ -662,9 +662,10 @@ The claim operation is the ONLY permitted way to mark a task `in-progress`. Dire
 
 `sam_active_task` provides session-scoped storage of the currently executing task. Its purpose:
 
-1. **Hook integration**: The `SubagentStop` hook reads `active-task-{session_id}.json` directly
-   from the filesystem when an agent session ends. It uses the stored `task_file_path` and
-   `task_id` to mark the task `complete` and optionally sync to GitHub.
+1. **Hook integration**: The `SubagentStop` hook calls `sam_active_task(action="get")` (falling
+   back to reading `active-task-{session_id}.json` directly for the local-YAML backend) when an
+   agent session ends. It uses the stored `plan` address and `task_id` to mark the task `complete`
+   and optionally sync to GitHub.
 
 2. **Shorthand updates**: After setting the active task, agents can call
    `sam_active_task(action='update')` to patch fields or append sections without repeating
@@ -677,7 +678,7 @@ The claim operation is the ONLY permitted way to mark a task `in-progress`. Dire
 
 | Field | Description |
 |-------|-------------|
-| `task_file_path` | Absolute path to the plan YAML file containing this task |
+| `plan` | Plan address (e.g., `"P1"` or slug) used to address the task |
 | `task_id` | Task identifier within the plan (e.g., `"T3"`) |
 | `parent_issue_number` | Optional GitHub issue number for GitHub sync by the hook |
 | `session_id` | Claude Code session identifier |

@@ -148,7 +148,7 @@ call. The control set (below) is part of the Frontend: it's Navigation's local c
 something the Backend knows about or participates in.
 
 **Collection**:
-Gathering source content from wherever it lives — issue body, plan file, task file, artifact.
+Gathering source content from wherever it lives — issue body, plan file, SAM task, artifact.
 Unbounded: never truncated, never budget-checked. Unrelated to Control set below or to session
 identity. For remote-capable providers (GitHub today), Collection's primary path is a live
 network read, not a local cache hit — `GitHubContentCache.get_content()` reads online whenever

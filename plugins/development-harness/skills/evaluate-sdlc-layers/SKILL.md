@@ -28,10 +28,10 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 - [ ] `sam-definition.md` — exists at `plugins/development-harness/skills/work-backlog-item/references/sam-definition.md`
 - [ ] `plugins/development-harness/CLAUDE.md` — exists
 - [ ] `stateless-agent-methodology/research/arl/PROVENANCE.md` — exists (sibling repo or configured path)
-- [ ] Layer 0 docs → `TASK_FILE_FORMAT.md` — exists at `plugins/development-harness/docs/TASK_FILE_FORMAT.md`
+- [ ] Layer 0 docs → domain model source — exists at `plugins/development-harness/sam_schema/core/models.py`
 - [ ] Layer 1 → `dh:dh-meta-docs` routes `language-manifest-schema.md` and `role-resolution-protocol.md`
 - [ ] Layer 2 → `plugins/development-harness/docs/sdlc-layers/layer-2/` — exists with README, schema, pilot profiles
-- [ ] Layer-0 redirect stubs — `artifact-conventions.md`, `task-file-format.md`, `sam-pipeline.md`, `arl-touchpoints.md` contain redirect pointers to canonical locations. Validate each redirect target exists.
+- [ ] Layer-0 redirect stubs — `artifact-conventions.md`, `sam-pipeline.md`, `arl-touchpoints.md` contain redirect pointers to canonical locations. Validate each redirect target exists.
 
 **Evidence:** List each path checked and result (exists / 404 / wrong content).
 
@@ -40,7 +40,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 ### 2. Doc Completeness
 
 - [ ] Layer 0 content files (6): README, rt-ica-gate, verification-protocol, evidence-discipline, orchestrator-discipline, context-fit-complexity
-- [ ] Layer 0 redirect stubs (4): sam-pipeline, arl-touchpoints, artifact-conventions, task-file-format — each must contain a redirect pointing to its canonical skill reference location
+- [ ] Layer 0 redirect stubs (3): sam-pipeline, arl-touchpoints, artifact-conventions — each must contain a redirect pointing to its canonical skill reference location
 - [ ] Layer 1: All 6 docs present (README, layer-1-overview, language-manifest-template, linting-discovery-protocol, workflow-pattern-taxonomy, harness-role-mapping)
 - [ ] Layer 2: README, layer-2-overview, stack-profile-schema, stack-profile-template; pilot profiles python-fastapi, python-cli
 - [ ] ARL: arl-meta-layer.md, arl-human-probing-design.md

@@ -1,12 +1,12 @@
 ---
 name: interop
-description: Routes a Superpowers plan file through the /work-backlog-item pipeline and writes SAM task back-references and chunk annotations into the original plan. Use when given a path to a Superpowers plan file via $ARGUMENTS and needing to create a linked backlog item plus SAM task file.
+description: Routes a Superpowers plan file through the /work-backlog-item pipeline and writes SAM task back-references and chunk annotations into the original plan. Use when given a path to a Superpowers plan file via $ARGUMENTS and needing to create a linked backlog item plus SAM task plan.
 ---
 
 # /dh:interop — Superpowers Plan Interop Adapter
 
 Routes a Superpowers plan file through the `/work-backlog-item` pipeline to produce a SAM task
-file, then writes back-references into the original plan. Does not re-implement any pipeline
+plan, then writes back-references into the original plan. Does not re-implement any pipeline
 logic — delegates entirely to `/work-backlog-item`.
 
 The plan file path is provided as `$ARGUMENTS`.
@@ -119,7 +119,7 @@ Skill(skill="work-backlog-item", args="#N")
 ```
 
 Include the Superpowers plan file path as additional context in the invocation prompt so the
-pipeline can read the plan's Goal, Spec, and Chunks when producing the SAM task file. Pass the
+pipeline can read the plan's Goal, Spec, and Chunks when producing the SAM task plan. Pass the
 plan file path as a note in the prompt (e.g., "Plan file for context: {plan-file-path}") — the
 `work-backlog-item` skill does not accept a second positional argument, so the path is passed
 as contextual prose in the delegation prompt, not as an arg.

@@ -396,7 +396,7 @@ None found. Zero SKILL.md files reference `bd`, `beads`, or `BACKLOG_BACKEND`.
 ### task_status_hook.py (PostToolUse + SubagentStop)
 
 - **Trigger event**: PostToolUse (matcher: Write|Edit|Bash) and SubagentStop (matcher: ^task-worker$)
-- **Reads SAM context**: Yes — reads `~/.dh/projects/{slug}/context/active-task-{session_id}.json` to discover which SAM task is active. Extracts `task_file_path`, `task_id`, and `parent_issue_number` from this file.
+- **Reads SAM context**: Yes — reads `~/.dh/projects/{slug}/context/active-task-{session_id}.json` (or calls `sam_active_task(action='get')` on the primary path) to discover which SAM task is active. Extracts `plan`, `task_id`, and `parent_issue_number` from this file.
 - **Calls MCP tools**: Yes — calls SAM MCP tools via fastmcp CLI subprocess:
   - `sam_active_task(action='get')` — retrieve active task context
   - `sam_active_task(action='clear')` — clear context after task completion

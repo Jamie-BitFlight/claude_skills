@@ -5,7 +5,7 @@
 
 > **Snapshot**: 2026-03-22T15:00:00Z (SAM-enforced quality gates)
 >
-> Sources: `plugins/development-harness/docs/TASK_FILE_FORMAT.md`, `backlog_core/server.py`, `backlog_core/models.py`,
+> Sources: `plugins/development-harness/sam_schema/core/models.py`, `backlog_core/server.py`, `backlog_core/models.py`,
 > `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`,
 > `plugins/development-harness/skills/complete-implementation/SKILL.md`
 > Last verified: 2026-03-22
@@ -237,13 +237,15 @@ Written by `/start-task` skill. Read by `task_status_hook.py` PostToolUse handle
 
 ```json
 {
-  "task_file_path": "~/.dh/projects/{slug}/plan/P719-my-feature.yaml",
+  "plan": "P719abcd",
   "task_id": "T04",
   "parent_issue_number": 719
 }
 ```
 
-`parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
+The `ActiveTaskContext` model also carries a local-YAML-only absolute plan-file-path field, populated only by the `LocalContextBackend`; it is `None` for the memory, GitHub, and beads backends. `parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
+
+The two hooks that read this file differ in retrieval path. **SubagentStop**'s `_resolve_active_task_context()` tries `sam_active_task(action="get")` via MCP first and falls back to this filesystem file only for local-YAML sessions (see §6.1). **PostToolUse**'s `handle_activity_update()` reads only this filesystem file via `read_task_context()` — it has no MCP fallback and exits silently when the file is absent, so `last-activity` tracking works only for local-YAML backend sessions.
 
 ### 2.7 sam_claim output
 
@@ -338,16 +340,16 @@ Matcher:    (none — fires on every sub-agent completion)
 Context:    Declared on /implement-feature skill and /complete-implementation skill
 ```
 
-Processing sequence:
+Processing sequence — `_resolve_active_task_context()` resolves the task in three ordered steps, MCP first:
 
-1. Read `agent_transcript_path` from hook input. If absent, exit 0 (cannot correlate agent to task).
-2. Call `_extract_session_id_from_transcript(transcript_path)` — reads first 10 JSONL lines, returns the `session_id` field of the first parseable record. If not found, exit 0.
-3. Construct `~/.dh/projects/{slug}/context/active-task-{sub_agent_session_id}.json` via `dh_paths.context_dir()`. If the file does not exist, exit 0 (not a `/start-task` sub-agent).
-4. Read `task_file_path`, `task_id`, and `parent_issue_number` from the context file.
-5. If task is already `status: complete`, delete the context file and exit 0.
-6. Call `sam_update_status(full_path, task_id, COMPLETE, timestamp_field="completed")`.
-7. Delete the context file.
-8. Call `sync_completion_to_github()` — best-effort, never changes exit code.
+1. Read `agent_transcript_path` from hook input; call `_extract_session_id_from_transcript(transcript_path)` — reads the first 10 JSONL lines, returns the `session_id` field of the first parseable record.
+2. **Primary path**: if a session_id was found, call `sam_active_task(action="get")` via the MCP server for `plan`, `task_id`, `parent_issue_number`.
+3. **Fallback**: if `plan`/`task_id` are still unresolved, resolve `~/.dh/projects/{slug}/context/active-task-{sub_agent_session_id}.json` via `dh_paths.context_dir()` and read `plan`, `task_id`, `parent_issue_number` from that file. This path exists only for local-YAML sessions predating full MCP tracking; memory, GitHub, and beads sessions never write this file and rely on step 2.
+4. **Final fallback**: if still unresolved and a transcript path is present, extract the task reference from the dispatching agent's own prompt in the JSONL transcript.
+5. If `plan`/`task_id` remain unresolved after all three steps, exit 0 (not a task-tracked sub-agent).
+6. Read the current task via `sam_task(action="read")`. If already `status: complete` or `status: failed`, clean up the active-task context (MCP clear and/or file delete) and exit 0 — a `failed` task also cascades a skip to its downstream dependents via `sam_task(action="state")` before exiting.
+7. Call `sam_task(action="state", status="complete")`, then `sam_task(action="update")` to set `completed: <ISO timestamp>`.
+8. Clean up the active-task context (MCP clear and/or file delete).
 
 Fields written: `status: complete`, `completed: <ISO timestamp>`
 
@@ -364,7 +366,7 @@ Processing sequence:
 
 1. Read `session_id` from hook input. If absent, exit 0.
 2. Read `~/.dh/projects/{slug}/context/active-task-{session_id}.json`. If absent, exit 0.
-3. Resolve `task_file_path` and `task_id` from context file.
+3. Resolve `plan` and `task_id` from context file.
 4. Read current task via `sam_get_task`. If `status == complete`, return without writing.
 5. Call `sam_update_plan_fields(full_path, task_id, set_fields={"last-activity": <ISO timestamp>})`.
 

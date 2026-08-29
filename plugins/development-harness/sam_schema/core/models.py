@@ -10,7 +10,7 @@ import re
 from enum import IntEnum, StrEnum
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -34,7 +34,7 @@ STATUS_MAP: dict[str, str] = {
     "DEFERRED": "deferred",
     "SKIPPED": "skipped",
     "WONT FIX": "wont-fix",
-    # Lowercase single-word variants (used in follow-up task files)
+    # Lowercase single-word variants (used in follow-up tasks)
     "pending": "not-started",
     "todo": "not-started",
     "done": "complete",
@@ -102,10 +102,7 @@ class AnalysisMethod(StrEnum):
 
 
 class BookendType(StrEnum):
-    """Bookend task type — constrains the two allowed values for ``Task.bookend_type``.
-
-    Values mirror the JSON schema enum defined in TASK_FILE_FORMAT.md §490.
-    """
+    """Bookend task type — constrains the two allowed values for ``Task.bookend_type``."""
 
     T0_BASELINE = "t0-baseline"
     TN_VERIFICATION = "tn-verification"
@@ -735,10 +732,13 @@ class FinalizePlanResult(BaseModel):
 
 
 class ActiveTaskContext(BaseModel):
-    """Session-to-task binding stored in context_dir() as active-task-{session_id}.json.
+    """Session-to-task binding, identified by its (plan, task) address across all backends.
 
-    The SubagentStop hook reads this file directly from the filesystem.
-    The MCP server writes it via ContextBackend.
+    Persistence as context_dir()/active-task-{session_id}.json is a local-YAML
+    ContextBackend storage detail, not a universal contract — the memory, GitHub,
+    and beads backends hold the same binding without writing that file. The
+    SubagentStop hook's primary retrieval path is the sam_active_task(action="get")
+    fastmcp call; a file read is only a local-backend fallback.
 
     Schema note: new fields (session_id, feature_slug, started_at) are additive.
     Existing files without these fields remain valid — all new fields default to None.
@@ -746,7 +746,13 @@ class ActiveTaskContext(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    task_file_path: str = Field(description="Absolute path to the plan YAML file containing this task.")
+    task_file_path: str | None = Field(
+        default=None,
+        description=(
+            "Absolute path to the plan YAML file containing this task. "
+            "Populated only by the local-YAML ContextBackend; None for memory, GitHub, and beads."
+        ),
+    )
     task_id: str = Field(description="Task identifier within the plan (e.g., 'T3').")
     plan: str | None = Field(
         default=None,
@@ -803,6 +809,33 @@ class ActiveTaskContext(BaseModel):
             return v
         msg = f"parent_issue_number must be int, str (beads ID), or None; got {type(v).__name__!r}"
         raise TypeError(msg)
+
+    @model_validator(mode="after")
+    def require_an_address(self) -> ActiveTaskContext:
+        """Reject a context that cannot identify its owning plan.
+
+        ``task_id`` alone names a task within *some* plan, but not which one.
+        Every backend already sets ``plan`` unconditionally (verified against
+        all four ``ActiveTaskContext`` construction sites); ``task_file_path``
+        is the one legitimate legacy-only alternative for local-YAML sessions
+        predating the ``plan``/``task`` fields. A record with neither is
+        malformed, not merely incomplete — reject it here instead of letting
+        it surface downstream as a silently unusable binding.
+
+        Returns:
+            ``self``, unchanged, when at least one address representation is present.
+
+        Raises:
+            ValueError: If both ``plan`` and ``task_file_path`` are absent.
+        """
+        if self.plan is None and self.task_file_path is None:
+            msg = (
+                "ActiveTaskContext must set 'plan' (structured address) or "
+                "'task_file_path' (legacy local-YAML path) to identify the owning plan; "
+                f"got neither for task_id={self.task_id!r}"
+            )
+            raise ValueError(msg)
+        return self
 
 
 class ActiveTaskGetResult(BaseModel):

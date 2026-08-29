@@ -1,6 +1,6 @@
 ---
 name: implementation-manager
-description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, claiming tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing task files or configuring hook profiles.
+description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, claiming tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing tasks or configuring hook profiles.
 user-invocable: false
 disable-model-invocation: false
 ---
@@ -15,7 +15,7 @@ disable-model-invocation: false
 **Active task context (if any):**
 !`python3 -c "from dh_paths import context_dir; import os; cdir = context_dir(os.environ.get('CLAUDE_CODE_SESSION_ID', '')); files = list(cdir.glob('active-task-*.json')) if cdir.exists() else []; print(files[0].read_text() if files else 'No active task')" 2>/dev/null || echo "No active task"`
 
-A skill for querying and managing feature implementation task files. Provides programmatic access to task status for orchestrators coordinating multi-step feature implementations.
+A skill for querying and managing feature implementation tasks. Provides programmatic access to task status for orchestrators coordinating multi-step feature implementations.
 
 ## SAM MCP Tool Usage
 
@@ -25,7 +25,7 @@ Use the configured provider's native interface for native state. In a Beads work
 
 #### list
 
-List all features with task files in the project's `plan/` directory:
+List all features with tasks tracked in the project's `plan/` directory:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list
@@ -35,10 +35,11 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list
 
 ```json
 {
-  "features": [
+  "items": [
     {
-      "slug": "prepare-host",
-      "task_file": "tasks-1-prepare-host.md"
+      "plan_id": "P1",
+      "feature": "prepare-host",
+      "task_count": 8
     }
   ],
   "count": 1
@@ -58,7 +59,6 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P1
 ```json
 {
   "feature": "prepare-host",
-  "task_file": "tasks-1-prepare-host.md",
   "total_tasks": 8,
   "completed": 8,
   "in_progress": 0,
@@ -133,9 +133,9 @@ setting the plan-level `context` field is not enumerated in the current CLI-pari
 verify the exact flag via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --help`
 before converting this call site to CLI form.
 
-## Task File Format
+## Task Schema
 
-Task files use YAML frontmatter format. The SAM MCP tools validate all fields — do not parse task files directly.
+Tasks are represented as YAML frontmatter fields, defined in `sam_schema/core/models.py`. The SAM MCP tools validate all fields — do not parse tasks directly from storage.
 
 ```yaml
 ---
@@ -183,17 +183,19 @@ The `task_status_hook.py` script provides automated task status tracking via Cla
 
 **SubagentStop (Task Completion)**:
 
-When `/dh:execution` launches a sub-agent via `/start-task {task_file} --task {id}`, the SubagentStop hook fires when the sub-agent completes. The hook script:
+When `/dh:execution` launches a sub-agent via `/start-task {plan} --task {id}`, the SubagentStop hook fires when the sub-agent completes. The hook script:
 
-1. Parses the original prompt to extract task file path and task ID
+1. Parses the original prompt to extract the plan address and task ID
 2. Updates task status from `IN PROGRESS` to `COMPLETE`
 3. Adds `**Completed**: {ISO timestamp}` to the task section
 
 **PostToolUse (Activity Tracking)**:
 
-When `/dh:start-task` runs, it creates a context file at `~/.dh/projects/{slug}/context/active-task-{session_id}.json` (resolved via `dh_paths.context_dir(session_id)`) containing the task file path and task ID. On each Write, Edit, or Bash operation, the PostToolUse hook:
+Only the local-YAML `ContextBackend` writes this file; the memory, GitHub, and beads backends persist `ActiveTaskContext` in their own provider and never create it, so `LastActivity` tracking below applies only to local-YAML sessions.
 
-1. Reads the context file to identify the active task
+When `/dh:start-task` runs on the local-YAML backend, it creates a context file at `~/.dh/projects/{slug}/context/active-task-{session_id}.json` (resolved via `dh_paths.context_dir(session_id)`) containing the plan address, task ID, and task file path. On each Write, Edit, or Bash operation, the PostToolUse hook:
+
+1. Reads the context file to identify the active task — `handle_activity_update()` has no MCP fallback and exits silently when the file is absent
 2. Updates `**LastActivity**: {ISO timestamp}` in the task section
 
 ### Timestamp Field Responsibilities
@@ -251,7 +253,7 @@ export CLAUDE_SKILLS_DISABLED_HOOKS="task-status:post-tool-use,task-status:subag
 
 The `/dh:execution` orchestrator uses this skill to:
 
-1. Query task file status via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status`
+1. Query task status via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status`
 2. Find ready tasks via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready`
 3. Launch appropriate agents based on task's `agent` field
 4. Update timestamps via hook scripts when tasks start/complete

@@ -485,7 +485,7 @@ From architecture spec, identify:
 
 ## Step 3: Parse All Tasks
 
-Extract from task file:
+Extract from tasks:
 
 - All task IDs and names
 - Dependencies for each task
@@ -681,7 +681,7 @@ issues:
 
 ### Categorization (Pre-Validation)
 
-- [ ] Task file located and readable
+- [ ] Task located and readable
 - [ ] Architecture spec located and readable
 
 ### Plan Structure Verification (3-Level)

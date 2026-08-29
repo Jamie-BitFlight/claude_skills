@@ -204,4 +204,4 @@ durable only when the caller supplies a persistent database path.
 
 - [Plan and artifact lifecycle](./plan-artifact-lifecycle.md) — creation, mutation, divergence, and completion rules.
 - [Backlog item lifecycle](./backlog-item-lifecycle.md) — end-to-end work-item state transitions.
-- [Task file format](./TASK_FILE_FORMAT.md) — legacy field reference; verify current fields against the active backend contract.
+- [Task field reference](../sam_schema/core/models.py) — authoritative field definitions; verify current fields against the active backend contract.

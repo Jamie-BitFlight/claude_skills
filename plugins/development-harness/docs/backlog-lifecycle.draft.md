@@ -570,7 +570,7 @@ metadata:
   groomed: 2026-02-21                             # set by groom-backlog-item
   issue: '#42'                                    # GitHub issue number
   milestone: 3                                    # GitHub milestone number
-  plan: ~/.dh/projects/{slug}/plan/P005-fix-error-recovery.yaml          # SAM task file path
+  plan: ~/.dh/projects/{slug}/plan/P005-fix-error-recovery.yaml          # SAM plan file path
 ---
 
 ## Description

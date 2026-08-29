@@ -72,5 +72,5 @@ Beads is the source of truth for Beads-native issue state. Structured workflow a
 ## Related documentation
 
 - [`backend-providers.md`](backend-providers.md)
-- [`TASK_FILE_FORMAT.md`](TASK_FILE_FORMAT.md)
+- [`sam_schema/core/models.py`](../sam_schema/core/models.py)
 - [`.hermes/plans/reference/cli-redesign-implementation-plan.md`](../../../.hermes/plans/reference/cli-redesign-implementation-plan.md)

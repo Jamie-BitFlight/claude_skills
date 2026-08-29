@@ -6,7 +6,7 @@ storage details shown here are not caller-facing interfaces.
 
 > **Snapshot**: 2026-08-12 (SAM-enforced quality gates and configured-backend storage)
 >
-> Sources: `plugins/development-harness/docs/TASK_FILE_FORMAT.md`, `backlog_core/server.py`, `backlog_core/models.py`,
+> Sources: `plugins/development-harness/sam_schema/core/models.py`, `backlog_core/server.py`, `backlog_core/models.py`,
 > `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`,
 > `plugins/development-harness/skills/complete-implementation/SKILL.md`
 > Last verified: 2026-08-12
@@ -298,8 +298,8 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `last-activity` field in task | `task_status_hook.py` PostToolUse handler | progress reporting |
 | `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | ``plan ready` readiness evaluation |
 | `status: in-progress`, `started` field | `sam_task claim` via `/start-task` | `sam_plan status`, `sam_plan ready` exclusion |
-| Follow-up task files | `code-reviewer` | `/complete-implementation` recursion gate |
-| Context Manifest in task file | `context-gathering`, `context-refinement` | executing agents, future sessions |
+| Follow-up tasks | `code-reviewer` | `/complete-implementation` recursion gate |
+| Context Manifest in task | `context-gathering`, `context-refinement` | executing agents, future sessions |
 | Artifact manifest (configured backend) | Producer agents via `artifact_register` | Consumer agents via `artifact_list`, worktree agents via `artifact_read` |
 
 ---
@@ -499,6 +499,5 @@ Read these together to get the full system picture:
 - [Artifact Conventions](../skills/dh-meta-docs/references/artifact-conventions.md) — naming, file layout, cross-referencing
 - [Plan Artifact Lifecycle](./plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
 - [Backlog Item Lifecycle](./backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
-- [Task File Format](./TASK_FILE_FORMAT.md) — task field reference, authorized writers, sam CLI (snapshot — verify against `models.py` for planning)
 - [Beads and workflow usage](./beads-and-workflow-usage.md) — provider-native versus structured workflow routing
 - [Domain model source](../sam_schema/core/models.py) — authoritative field definitions (`Task` class)

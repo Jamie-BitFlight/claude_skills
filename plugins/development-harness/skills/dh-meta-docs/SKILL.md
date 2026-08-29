@@ -1,6 +1,6 @@
 ---
 name: dh-meta-docs
-description: Development harness plugin documentation index. Use when looking up SAM pipeline, backlog lifecycle, SDLC layers, task file format, plan artifacts, quality gates, or dispatch schema documentation.
+description: Development harness plugin documentation index. Use when looking up SAM pipeline, backlog lifecycle, SDLC layers, task/plan schema, plan artifacts, quality gates, or dispatch schema documentation.
 user-invocable: false
 ---
 
@@ -16,6 +16,7 @@ own or run the development-harness lifecycle.
 
 - [Artifact Conventions](./references/artifact-conventions.md) — artifact naming, logical storage, and cross-reference tokens.
 - [Default Development Flow](./references/default-development-flow.md) — S1–S7 sequencing, stage handoffs, and ARL gates.
+- [DH CLI Usage Guide](./references/dh-cli-usage-guide.md) — grouped-command reference for the DH CLI adapter.
 - [Human Touchpoint Model](./references/human-touchpoint-model.md) — whether a constraint requires human escalation.
 - [Language Manifest Schema](./references/language-manifest-schema.md) — create or validate a language-plugin manifest.
 - [Role Resolution Protocol](./references/role-resolution-protocol.md) — resolve abstract harness roles to language-plugin agents.

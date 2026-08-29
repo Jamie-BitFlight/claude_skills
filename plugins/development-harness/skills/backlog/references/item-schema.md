@@ -21,7 +21,7 @@ metadata:
   groomed: YYYY-MM-DD     # optional — set by groom-backlog-item when all required sections present (defined in finalize.md)
   issue: '#N'             # optional — GitHub issue number (string with # prefix)
   milestone: integer      # optional — GitHub milestone number
-  plan: string            # optional — relative path to SAM task file
+  plan: string            # optional — SAM plan address (plan_ref), e.g. "Pa1b2c3d4"
 ---
 ```
 
@@ -40,7 +40,7 @@ metadata:
 | `metadata.groomed` | groom-backlog-item | Set when all required sections present (defined in finalize.md) |
 | `metadata.issue` | backlog script | Set on GitHub issue creation |
 | `metadata.milestone` | group-items-to-milestone | Set on milestone assignment |
-| `metadata.plan` | work-backlog-item | Set when SAM task file created |
+| `metadata.plan` | work-backlog-item | Set to the `plan_ref` returned by SAM plan creation |
 
 ---
 
@@ -154,7 +154,7 @@ Overall: FAIL (2/3 criteria met)
 | RT-ICA assessed | + | + RT-ICA section |
 | Fully groomed | `metadata.groomed` set | All required sections present (defined in finalize.md validation table) |
 | In-milestone | `metadata.milestone` set, `metadata.status: in-milestone` | (same as fully groomed) |
-| In-progress | `metadata.plan` set, `metadata.status: in-progress` | + plan file exists at path |
+| In-progress | `metadata.plan` set, `metadata.status: in-progress` | + plan retrievable via `sam_plan(action="read")` for that address |
 | Done | `metadata.status: done` | + Acceptance Criteria Verification section (all criteria PASS) |
 | Closed | `metadata.status: closed` | Terminal — set by complete-milestone only |
 

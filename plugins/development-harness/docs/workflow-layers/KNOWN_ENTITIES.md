@@ -348,7 +348,7 @@ registration is sourced from legacy production data in the live `.dh` backlog ca
 display titles exist to give a clean, human-readable heading to sections real historical backlog
 items already carry under those raw storage keys, not because any current doc instructs an agent to
 write or read them. `Divergence Notes` additionally appears as a live `## Divergence Notes` heading
-in **SAM task files** (`skills/start-task/SKILL.md`, `agents/context-refinement.md`) — a different
+in **SAM tasks** (`skills/start-task/SKILL.md`, `agents/context-refinement.md`) — a different
 artifact type from backlog items, parsed independently of `backlog_core`'s section mechanism
 entirely. Kept, not removed, per the Living Document Protocol below — flagging provenance is
 required before removal, and legacy data may still reference these keys.

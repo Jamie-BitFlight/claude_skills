@@ -1,6 +1,6 @@
 ---
 name: dispatch
-description: Orchestrate parallel agent teams as a manager — not a micromanager. Use when coordinating 2+ independent workers, running SAM task waves, relaying discoveries between worker waves, handling blockers, or synthesizing team results. Covers both SAM structured dispatch (task file does the work) and ad-hoc dispatch (reference agent-orchestration for prompt template).
+description: Orchestrate parallel agent teams as a manager — not a micromanager. Use when coordinating 2+ independent workers, running SAM task waves, relaying discoveries between worker waves, handling blockers, or synthesizing team results. Covers both SAM structured dispatch (the task does the work) and ad-hoc dispatch (reference agent-orchestration for prompt template).
 user-invocable: true
 ---
 
@@ -15,8 +15,8 @@ For the delegation prompt template and pre-send verification, activate the `/age
 
 ```mermaid
 flowchart TD
-    Start(["Work to dispatch"]) --> Q{"Is there a SAM task file<br>for this work?"}
-    Q -->|"Yes — SAM plan exists"| SAM["SAM Dispatch<br>Minimal prompt — task file has everything"]
+    Start(["Work to dispatch"]) --> Q{"Is there a SAM task<br>for this work?"}
+    Q -->|"Yes — SAM plan exists"| SAM["SAM Dispatch<br>Minimal prompt — task has everything"]
     Q -->|"No — ad-hoc work"| AdHoc["Ad-Hoc Dispatch<br>Use delegation template from<br>/agent-orchestration:agent-orchestration"]
     SAM --> SAMPrompt["Agent prompt:<br>'You are working on P{N}/T{M}'<br>Agent loads task via sam_task —<br>acceptance criteria, context, verification steps all there"]
     AdHoc --> AdHocPrompt["Write OBSERVATIONS + DEFINITION OF SUCCESS +<br>CONTEXT per agent-orchestration template"]
@@ -40,7 +40,7 @@ Name the team after the work and wave number. One team per parallel wave.
 
 Each worker gets exactly the context needed — no more.
 
-**SAM dispatch (task file is the delegation):**
+**SAM dispatch (the task is the delegation):**
 
 ```text
 Agent(
@@ -50,7 +50,7 @@ Agent(
 )
 ```
 
-The agent calls `sam_task` to load the task. All acceptance criteria, verification steps, and context live in the task file.
+The agent calls `sam_task` to load the task. All acceptance criteria, verification steps, and context live in the task.
 
 **Ad-hoc dispatch:** follow the delegation template from `/agent-orchestration:agent-orchestration` — OBSERVATIONS, DEFINITION OF SUCCESS, CONTEXT.
 

@@ -6,9 +6,7 @@ in task files. Used by both implementation_manager.py and task_status_hook.py.
 Source references:
     - STATUS_MAP: migrate_task_format.py lines 59-71
     - normalize_status: migrate_task_format.py lines 74-109
-    - TASK_ID_PATTERN: TASK_FILE_FORMAT.md line 272 (JSON schema)
-    - VALID_STATUSES: TASK_FILE_FORMAT.md line 283
-    - VALID_COMPLEXITIES: TASK_FILE_FORMAT.md line 310
+    - TASK_ID_PATTERN, VALID_STATUSES, VALID_COMPLEXITIES: sam_schema/core/models.py
 """
 
 from __future__ import annotations

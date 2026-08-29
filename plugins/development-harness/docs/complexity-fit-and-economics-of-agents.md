@@ -303,7 +303,7 @@ Each claim is numbered for cross-reference in experiment designs.
 
 **Method**:
 
-1. Select 3 domain-specific tasks requiring specialized knowledge (e.g., FastMCP server patterns, SAM task file format, backlog lifecycle rules)
+1. Select 3 domain-specific tasks requiring specialized knowledge (e.g., FastMCP server patterns, SAM task schema, backlog lifecycle rules)
 2. For each task, run two conditions:
    - **Upfront**: load all potentially relevant skills, reference docs, and context before the agent starts
    - **Iterative**: start with minimal context; after each agent attempt, audit which claims were speculative (not grounded in loaded context); load only the knowledge that would have grounded those specific claims; re-run

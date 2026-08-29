@@ -32,38 +32,22 @@ if TYPE_CHECKING:
 class TestParentIssueNumberValidator:
     def test_none_accepted(self) -> None:
         """parent_issue_number=None must be accepted."""
-        ctx = ActiveTaskContext.model_validate({
-            "task_file_path": "/tmp/plan.yaml",
-            "task_id": "T01",
-            "parent_issue_number": None,
-        })
+        ctx = ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": None})
         assert ctx.parent_issue_number is None
 
     def test_positive_int_accepted(self) -> None:
         """A positive integer issue number must be accepted."""
-        ctx = ActiveTaskContext.model_validate({
-            "task_file_path": "/tmp/plan.yaml",
-            "task_id": "T01",
-            "parent_issue_number": 42,
-        })
+        ctx = ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": 42})
         assert ctx.parent_issue_number == 42
 
     def test_zero_int_accepted(self) -> None:
         """Zero is a non-negative integer and must be accepted."""
-        ctx = ActiveTaskContext.model_validate({
-            "task_file_path": "/tmp/plan.yaml",
-            "task_id": "T01",
-            "parent_issue_number": 0,
-        })
+        ctx = ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": 0})
         assert ctx.parent_issue_number == 0
 
     def test_beads_id_accepted(self) -> None:
         """A valid beads ID string (bd-xxxx pattern) must be accepted."""
-        ctx = ActiveTaskContext.model_validate({
-            "task_file_path": "/tmp/plan.yaml",
-            "task_id": "T01",
-            "parent_issue_number": "bd-a1b2",
-        })
+        ctx = ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": "bd-a1b2"})
         assert ctx.parent_issue_number == "bd-a1b2"
 
     def test_boolean_rejected(self) -> None:
@@ -73,20 +57,12 @@ class TestParentIssueNumberValidator:
         Pydantic v2 does not wrap TypeError in ValidationError — it propagates directly.
         """
         with pytest.raises(TypeError):
-            ActiveTaskContext.model_validate({
-                "task_file_path": "/tmp/plan.yaml",
-                "task_id": "T01",
-                "parent_issue_number": True,
-            })
+            ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": True})
 
     def test_negative_int_rejected(self) -> None:
         """Negative integers must be rejected."""
         with pytest.raises(ValidationError):
-            ActiveTaskContext.model_validate({
-                "task_file_path": "/tmp/plan.yaml",
-                "task_id": "T01",
-                "parent_issue_number": -1,
-            })
+            ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": -1})
 
     def test_arbitrary_string_rejected(self) -> None:
         """Strings that are not valid beads IDs must be rejected.
@@ -96,11 +72,7 @@ class TestParentIssueNumberValidator:
         The validator raises ValueError which Pydantic wraps in ValidationError.
         """
         with pytest.raises(ValidationError):
-            ActiveTaskContext.model_validate({
-                "task_file_path": "/tmp/plan.yaml",
-                "task_id": "T01",
-                "parent_issue_number": "CAPS-id",
-            })
+            ActiveTaskContext.model_validate({"task_id": "T01", "plan": "Ptest", "parent_issue_number": "CAPS-id"})
 
 
 # ---------------------------------------------------------------------------

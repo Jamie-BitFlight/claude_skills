@@ -32,7 +32,7 @@ registered through the configured backend. Stages gate on artifact completion, n
 1. **S1 Discovery** - Understand the feature, codebase, and constraints
 2. **S2 Planning + RT-ICA** - Generate a plan with information completeness analysis
 3. **S3 Context Integration** - Validate the plan against actual codebase state
-4. **S4 Task Decomposition** - Break the plan into executable task files
+4. **S4 Task Decomposition** - Break the plan into executable tasks
 5. **S5 Execution** - Implement tasks using language-appropriate specialists
 6. **S6 Forensic Review** - Verify each task against its acceptance criteria
 7. **S7 Final Verification** - Certify the feature meets original requirements
@@ -111,9 +111,7 @@ partial plan. Only `finalize` makes the plan visible to the dispatch loop.
 
 CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_reference>` (omit
 `--task-id`/`--task-title` to start in `state="drafting"`) → `plan append-task --plan-address
-<plan_id> --task-id ... --task-title ...` × N → `plan finalize --plan-address <plan_id>`. See
-[docs/TASK_FILE_FORMAT.md](./docs/TASK_FILE_FORMAT.md) "DH CLI Usage Guide" for the full
-grouped-command reference.
+<plan_id> --task-id ... --task-title ...` × N → `plan finalize --plan-address <plan_id>`.
 
 **Gotcha — `append_task` is single-writer only:**
 
@@ -278,8 +276,8 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 **SAM workflow:**
 
 - `/dh:add-new-feature` - Plan a feature: discovery, analysis, architecture, task decomposition
-- `/dh:implement-feature` - Execute tasks from a SAM task file via agent delegation loop
-- `/dh:start-task` - Start or complete a specific task inside a SAM task file
+- `/dh:implement-feature` - Execute tasks from a SAM plan via agent delegation loop
+- `/dh:start-task` - Start or complete a specific SAM task
 - `/dh:complete-implementation` - Quality gates after all tasks are COMPLETE
 - `/dh:gate-push` - Resolve branch → backlog issue/plan, then run complete-implementation gates and push/PR
 
@@ -296,7 +294,7 @@ one an executing agent loads, so the decision belongs there and nowhere else.
 **Planning tools:**
 
 - `/dh:clear-cove-task-design` - Task design methodology
-- `/dh:generate-task` - Generate individual task files
+- `/dh:generate-task` - Generate individual tasks
 - `/dh:planner-rt-ica` - Information completeness analysis for planning
 - `/dh:validation-protocol` - Validation patterns and checklists
 
@@ -406,7 +404,6 @@ Load these documents based on what you are doing. They contain the system design
 **Modifying data structures, domain models, or task/plan schemas:**
 
 - Load [Domain model source](./sam_schema/core/models.py) — authoritative `Task` and `Plan` Pydantic models. This is the source of truth for all field definitions. Notable plan-level fields: `autonomy` (enum `full_auto` | `checkpoint` | `per_task`, default `full_auto`) controls implement-feature dispatch gating — see `Plan` class and [implement-feature SKILL.md](./skills/implement-feature/SKILL.md) for how it is consumed.
-- Load [Task File Format](./docs/TASK_FILE_FORMAT.md) — field reference, authorized writers, sam CLI usage. **Drift warning**: this is a snapshot. Verify fields against `models.py` before relying on it for implementation.
 - Load [Workflow Architecture Diagram](./docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, SAM state machine, hook trigger conditions
 
 **Modifying the backlog lifecycle, grooming, or issue state machine:**
@@ -451,7 +448,7 @@ After completing your work, update the architectural documents above if your cha
 | Change type | Update required |
 |---|---|
 | Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
-| Data structure change (new field, changed type, new entity) | Yes — update `models.py` first, then Task File Format |
+| Data structure change (new field, changed type, new entity) | Yes — update `models.py` first |
 | New or removed MCP tool | Yes — update Workflow Architecture Diagram; run `/dh:meta-workflow-graph-refresh` to update G8 layer |
 | New artifact type or changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
 | New skill, agent, or Mermaid decision fork added | Yes — run `/dh:meta-workflow-graph-refresh` to update L0/L1 or G4 layer |

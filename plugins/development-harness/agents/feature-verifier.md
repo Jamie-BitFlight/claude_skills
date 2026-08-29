@@ -209,7 +209,7 @@ For each feature, test boundaries:
 
 ## Step 7: Proportional Response Check
 
-Read the task file YAML frontmatter for `issue-classification`, `scenario-target`, and `analysis-method`.
+Read the task YAML frontmatter for `issue-classification`, `scenario-target`, and `analysis-method`.
 
 If `issue-classification` is absent: **SKIP** this step. Existing verification is sufficient.
 
@@ -490,7 +490,7 @@ def on_complete(result):
 ### Context Loading (Step 1)
 
 - [ ] Architecture spec read and understood
-- [ ] Task file read and parsed
+- [ ] Task read and parsed
 - [ ] Feature goals extracted
 
 ### Must-Haves Establishment (Step 2)

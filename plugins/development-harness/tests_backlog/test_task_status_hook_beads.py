@@ -53,13 +53,9 @@ _HOOK_SCRIPT = (
 )
 
 
-def _context_json(task_file_path: str, task_id: str, parent_issue_number: int | str | None) -> str:
+def _context_json(plan: str, task_id: str, parent_issue_number: int | str | None) -> str:
     """Serialise a minimal active-task context JSON payload."""
-    payload: dict[str, object] = {
-        "task_file_path": task_file_path,
-        "task_id": task_id,
-        "parent_issue_number": parent_issue_number,
-    }
+    payload: dict[str, object] = {"plan": plan, "task_id": task_id, "parent_issue_number": parent_issue_number}
     return json.dumps(payload)
 
 
@@ -98,24 +94,21 @@ def test_read_context_file_beads_id_no_valueerror(tmp_path: Path) -> None:
     ``str | int | None`` and removed the cast.
     """
     ctx = tmp_path / "active-task-test.json"
-    ctx.write_text(
-        _context_json(task_file_path="/tmp/plan/P001-feature.yaml", task_id="T1", parent_issue_number="bd-a3f8"),
-        encoding="utf-8",
-    )
+    ctx.write_text(_context_json(plan="P001", task_id="T1", parent_issue_number="bd-a3f8"), encoding="utf-8")
 
-    task_path, task_id, parent = _read_context_file(ctx)
+    plan_addr, task_id, parent = _read_context_file(ctx)
 
     assert parent == "bd-a3f8", "beads nanoid must be returned as-is (str), not int-cast"
     assert isinstance(parent, str), "type must be str, not int"
     assert task_id == "T1"
-    assert task_path == "/tmp/plan/P001-feature.yaml"
+    assert plan_addr == "P001"
 
 
 @pytest.mark.unit
 def test_read_context_file_beads_id_type_is_str(tmp_path: Path) -> None:
     """Explicit type check: parent_issue_number for beads ID is str, not None or int."""
     ctx = tmp_path / "active-task-test.json"
-    ctx.write_text(_context_json("/tmp/plan/P001.yaml", "T2", "bd-a3f8"), encoding="utf-8")
+    ctx.write_text(_context_json("P001", "T2", "bd-a3f8"), encoding="utf-8")
 
     _, _, parent = _read_context_file(ctx)
 
@@ -131,9 +124,9 @@ def test_read_context_file_beads_id_type_is_str(tmp_path: Path) -> None:
 def test_read_context_file_integer_parent_issue_number(tmp_path: Path) -> None:
     """Regression: integer parent_issue_number (GitHub) is returned unchanged as int."""
     ctx = tmp_path / "active-task-42.json"
-    ctx.write_text(_context_json("/tmp/plan/P042.yaml", "T3", 42), encoding="utf-8")
+    ctx.write_text(_context_json("P042", "T3", 42), encoding="utf-8")
 
-    _task_path, task_id, parent = _read_context_file(ctx)
+    _plan_addr, task_id, parent = _read_context_file(ctx)
 
     assert parent == 42
     assert isinstance(parent, int)
@@ -144,7 +137,7 @@ def test_read_context_file_integer_parent_issue_number(tmp_path: Path) -> None:
 def test_read_context_file_none_parent_issue_number(tmp_path: Path) -> None:
     """parent_issue_number absent from context file is returned as None."""
     ctx = tmp_path / "active-task-none.json"
-    ctx.write_text(_context_json("/tmp/plan/P001.yaml", "T4", None), encoding="utf-8")
+    ctx.write_text(_context_json("P001", "T4", None), encoding="utf-8")
 
     _, _, parent = _read_context_file(ctx)
 

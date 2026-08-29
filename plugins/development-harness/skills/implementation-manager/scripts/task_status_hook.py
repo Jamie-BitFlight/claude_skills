@@ -243,7 +243,7 @@ def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]
         prompt: The sub-agent's prompt string.
 
     Returns:
-        Tuple of (task_file_path, task_id) or (None, None) if not extractable.
+        Tuple of (resolved_path, task_id) or (None, None) if not extractable.
         Returns (None, None) when a plan address is found but cannot be resolved
         (plan not found in the DH state directory).
     """
@@ -309,9 +309,7 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
         session_id: Session ID from hook input.
 
     Returns:
-        Tuple of (plan_id_or_path, task_id) or (None, None) if not found.
-        The first element is the raw string value from the JSON context file
-        (plan address or filesystem path).
+        Tuple of (plan_address, task_id) or (None, None) if not found.
     """
     context_file = get_context_file_path(cwd, session_id)
     if not context_file.exists():
@@ -319,10 +317,18 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
 
     try:
         context_data: dict[str, str] = json.loads(context_file.read_text(encoding="utf-8"))
-        task_file = context_data.get("task_file_path")
+        plan_addr = context_data.get("plan")
         task_id = context_data.get("task_id")
-        if task_file and task_id:
-            return task_file, task_id
+        if plan_addr and task_id:
+            return plan_addr, task_id
+        if context_data.get("task_file_path") and task_id:
+            print(
+                f"[hook] read_task_context: {context_file}: legacy context record has "
+                "task_file_path but no plan address (predates the plan/task fields) — not "
+                "falling back to path-parsing; activity tracking for this session will not "
+                "resume until a fresh /start-task runs",
+                file=sys.stderr,
+            )
     except json.JSONDecodeError as exc:
         print(f"[hook] read_task_context: malformed JSON in {context_file}: {exc}", file=sys.stderr)
 
@@ -342,8 +348,7 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
         timeout: Subprocess timeout in seconds.
 
     Returns:
-        Tuple of ``(plan_id, task_id, parent_issue_number)`` where ``plan_id``
-        is the raw string value from the MCP response (plan address or path).
+        Tuple of ``(plan_address, task_id, parent_issue_number)``.
         All ``None`` when the call fails or active task is not set.
     """
     resolved = session_id or "_default"
@@ -360,11 +365,19 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
         active = data.get("active_task")
         if not active:
             return None, None, None
-        task_file_raw = active.get("task_file_path")
+        plan_addr = active.get("plan")
         task_id = active.get("task_id")
-        if task_file_raw and task_id:
+        if plan_addr and task_id:
             parent_issue: str | int | None = active.get("parent_issue_number")
-            return task_file_raw, task_id, parent_issue
+            return plan_addr, task_id, parent_issue
+        if active.get("task_file_path") and task_id:
+            print(
+                f"[hook] _call_sam_active_task_get: session {resolved}: legacy active-task "
+                "record has task_file_path but no plan address (predates the plan/task "
+                "fields) — not falling back to path-parsing; activity tracking for this "
+                "session will not resume until a fresh /start-task runs",
+                file=sys.stderr,
+            )
     except (json.JSONDecodeError, KeyError, IndexError):
         pass
 
@@ -452,21 +465,6 @@ def _call_sam_fastmcp(input_data: dict[str, Any], timeout: int = 15, target: str
         return None
 
     return result.stdout
-
-
-def _extract_plan_addr_from_path(task_file_path: str | Path) -> str | None:
-    """Extract plan address from a task file path.
-
-    Searches for a hex plan ID token (e.g. ``Pf4281187``) in the filename.
-
-    Args:
-        task_file_path: Path to the plan file.
-
-    Returns:
-        Plan address string (e.g. ``"Pf4281187"``) or ``None`` if not found.
-    """
-    m = re.search(r"(P[0-9a-f]+)", Path(task_file_path).name, re.IGNORECASE)
-    return m.group(1) if m else None
 
 
 def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, timeout: int = 15) -> bool:
@@ -711,29 +709,35 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
 
 
 def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str | int | None]:
-    """Read task_file_path, task_id, and parent_issue_number from a context file.
+    """Read plan address, task_id, and parent_issue_number from a context file.
 
     Args:
         context_file: Path to an active-task-*.json file.
 
     Returns:
-        Tuple of (plan_id_or_path, task_id, parent_issue_number) where the first
-        element is the raw string value from the JSON (plan address or filesystem path).
-        Any field absent or unreadable is returned as None.
+        Tuple of (plan_address, task_id, parent_issue_number). Any field absent
+        or unreadable is returned as None.
     """
     try:
         data: dict[str, Any] = json.loads(context_file.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None, None, None
 
-    raw_path = data.get("task_file_path")
+    plan_addr = data.get("plan")
     task_id = data.get("task_id")
-    if not raw_path or not task_id:
+    if not plan_addr or not task_id:
+        if data.get("task_file_path") and task_id:
+            print(
+                f"[hook] {context_file}: legacy context record has task_file_path but no plan "
+                "address (predates the plan/task fields) — not falling back to path-parsing; "
+                "activity tracking for this session will not resume until a fresh /start-task runs",
+                file=sys.stderr,
+            )
         return None, None, None
 
     parent_issue: str | int | None = data.get("parent_issue_number")
 
-    return raw_path, task_id, parent_issue
+    return plan_addr, task_id, parent_issue
 
 
 def _resolve_context_file_from_transcript(hook_input: dict[str, Any]) -> Path | None:
@@ -801,7 +805,7 @@ def _resolve_active_task_context(
 
     Returns:
         ``(sub_agent_session_id, plan_id, task_id, parent_issue_number, context_file)``
-        where ``plan_id`` is a str (plan address or raw path string from context).
+        where ``plan_id`` is the plan address string.
         Returns ``None`` when no active task exists (caller should exit 0).
     """
     transcript_path_raw = hook_input.get("agent_transcript_path", "")
@@ -830,11 +834,11 @@ def _resolve_active_task_context(
         if prompt_text:
             extracted_path, extracted_id = extract_task_info_from_prompt(prompt_text)
             if extracted_path is not None and extracted_id is not None:
-                # Convert Path to plan_id string: extract plan address from filename
-                # or use the path string directly as a fallback identifier.
-                extracted_plan_id = _extract_plan_addr_from_path(extracted_path)
-                if extracted_plan_id is None:
-                    extracted_plan_id = str(extracted_path)
+                # extract_task_info_from_prompt resolves plan-arg to a local filesystem
+                # path (resolve_plan_address). Recover the address token from its filename,
+                # falling back to the path string itself if no address token is present.
+                address_match = re.search(r"(P[0-9a-f]+)", extracted_path.name, re.IGNORECASE)
+                extracted_plan_id = address_match.group(1) if address_match else str(extracted_path)
                 print(
                     f"[hook] SubagentStop: resolved task from prompt — {extracted_plan_id} / {extracted_id}",
                     file=sys.stderr,
@@ -908,8 +912,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
-    plan_addr_candidate = _extract_plan_addr_from_path(plan_id)
-    plan_addr = plan_addr_candidate if plan_addr_candidate is not None else plan_id
+    plan_addr = plan_id
 
     current_task = _call_sam_task_read(plan_addr, task_id)
     if current_task is None:
@@ -960,13 +963,9 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
     if not session_id:
         sys.exit(0)
 
-    raw_plan_ref, task_id = read_task_context(cwd, session_id)
+    plan_addr, task_id = read_task_context(cwd, session_id)
 
-    if raw_plan_ref is None or task_id is None:
-        sys.exit(0)
-
-    plan_addr = _extract_plan_addr_from_path(raw_plan_ref)
-    if plan_addr is None:
+    if plan_addr is None or task_id is None:
         sys.exit(0)
 
     current_task = _call_sam_task_read(plan_addr, task_id)

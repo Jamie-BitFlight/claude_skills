@@ -27,7 +27,6 @@ Three-layer architecture separating SDLC-agnostic framework/process from languag
 │   ├── artifact-conventions.md
 │   ├── rt-ica-gate.md
 │   ├── verification-protocol.md
-│   ├── task-file-format.md
 │   ├── evidence-discipline.md
 │   └── orchestrator-discipline.md
 ├── layer-1/            # Language-specific overview

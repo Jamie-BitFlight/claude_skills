@@ -70,8 +70,8 @@ What happens:
 1. A feature researcher studies the problem space, desired outcomes, and constraints
 2. A codebase analyzer maps existing patterns and conventions in your repo
 3. An architecture agent writes a specification
-4. A task planner decomposes the spec into a parallel-executable task file
-5. A plan validator checks the task file for completeness and feasibility
+4. A task planner decomposes the spec into a parallel-executable task plan
+5. A plan validator checks the task plan for completeness and feasibility
 6. A context-gathering agent writes a context manifest so subsequent agents have full situational awareness
 
 The resulting context, architecture, and plan remain available to subsequent workflow stages and
@@ -89,7 +89,7 @@ Executes a SAM task plan produced by `/dh:add-new-feature`.
 
 What happens:
 
-- Queries the task file for ready tasks (not-started with all dependencies complete)
+- Queries the plan for ready tasks (not-started with all dependencies complete)
 - When 2 or more tasks are ready simultaneously, dispatches parallel agents via TeamCreate
 - Each task runs through `/dh:start-task`, which claims the task, executes it, and records divergence notes when implementation differs from plan
 - A SubagentStop hook automatically marks tasks complete
@@ -259,7 +259,7 @@ Task design methodology for decomposing features into executable, independently-
 
 #### `/dh:generate-task`
 
-Generates individual task files following SAM conventions. Useful when you want to add tasks to an existing plan manually.
+Generates individual tasks following SAM conventions. Useful when you want to add tasks to an existing plan manually.
 
 #### `/dh:validation-protocol`
 
@@ -402,7 +402,7 @@ The harness ships specialist agents invoked automatically during pipeline stages
 **Planning and decomposition:**
 
 - `swarm-task-planner` — Decomposes a feature into parallel-executable task streams with explicit dependency ordering
-- `plan-validator` — Validates a task file for completeness, feasibility, and DAG integrity before execution begins
+- `plan-validator` — Validates a task plan for completeness, feasibility, and DAG integrity before execution begins
 
 **Research and analysis:**
 
