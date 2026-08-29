@@ -221,7 +221,7 @@ backlog add \
 
 ```python
 mcp__plugin_dh_backlog__backlog_list(
-    from_github=False,  # refresh local cache from GitHub first
+    refresh=False,  # refresh local cache from the backend first
     label="priority:p1",  # filter by GitHub label
     section="P1",  # filter by priority: P0, P1, P2, Ideas
     status="needs-grooming",  # filter by status value
@@ -250,7 +250,7 @@ Note: the CLI's `backlog list` has no `--search` flag — full-text search acros
 topic, type, description, and body has no CLI path as of 2026-08-05 (backlog item #2793). Use the
 MCP `backlog_list(search=...)` tool for full-text search.
 
-The `backend` dict is always present in the response, regardless of the `from_github` parameter.
+The `backend` dict is always present in the response, regardless of the `refresh` parameter.
 It reports the GitHub API availability status checked on every `backlog_list` call.
 
 ```python
@@ -280,7 +280,7 @@ It reports the GitHub API availability status checked on every `backlog_list` ca
 | `rate_limited` | Received 403 from GitHub API |
 | `error` | Other error during the availability probe |
 
-The probe runs on every `backlog_list` call regardless of the `from_github` parameter.
+The probe runs on every `backlog_list` call regardless of the `refresh` parameter.
 No automatic sync is performed — the tool reports status only.
 
 `type` and `topic` filters compose with AND logic. Items missing the filtered field are excluded
@@ -324,6 +324,7 @@ human-authored backlog titles.
 ```python
 mcp__plugin_dh_backlog__backlog_view(
     selector="#142",  # GitHub issue URL, #N, bare number, or title substring
+    refresh=False,  # bypass the local cache and validate a title-substring selector against the live backend
     offset=0,  # skip N entry blocks (for pagination)
     limit=0,  # show at most N entry blocks (0 = all, no truncation)
 )
@@ -334,6 +335,9 @@ CLI equivalent:
 
 ```bash
 backlog view --selector "#142" --offset 0 --limit 0
+
+# bypass the local cache and validate against the live backend
+backlog view --selector "Fix duplicate detection" --refresh
 ```
 
 ### `backlog_sync` — Sync to GitHub
