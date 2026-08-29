@@ -10,6 +10,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Final, TypeVar
 
+import pydantic
 from pydantic import BaseModel, ConfigDict, Field
 from ruamel.yaml import YAML
 
@@ -90,9 +91,12 @@ class _CacheStateStore:
     def load(self) -> _CacheState:
         if not self._state_path.exists():
             return _CacheState()
-        yaml = YAML(typ="safe")
-        with self._state_path.open(encoding="utf-8") as stream:
-            return _CacheState.model_validate(yaml.load(stream))
+        raw_text = self._state_path.read_text(encoding="utf-8")
+        try:
+            return _CacheState.model_validate_json(raw_text)
+        except pydantic.ValidationError:
+            yaml = YAML(typ="safe")
+            return _CacheState.model_validate(yaml.load(raw_text))
 
     def transaction(self, transform: Callable[[_CacheState], tuple[_CacheState, _T]]) -> _T:
         with self._lock():
@@ -129,9 +133,7 @@ class _CacheStateStore:
                 mode="w", encoding="utf-8", dir=self._root, suffix=".tmp", delete=False
             ) as stream:
                 temporary_path = Path(stream.name)
-                yaml = YAML(typ="safe")
-                yaml.default_flow_style = False
-                yaml.dump(state.model_dump(mode="json"), stream)
+                stream.write(state.model_dump_json())
                 stream.flush()
                 os.fsync(stream.fileno())
             temporary_path.replace(self._state_path)
