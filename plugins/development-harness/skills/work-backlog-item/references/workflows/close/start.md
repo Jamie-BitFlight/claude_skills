@@ -104,21 +104,18 @@ If operation is `resolve`:
 
 ## Step 5.6: Resolve path — typed acceptance-criteria verification
 
-4. Extract acceptance criteria from the `backlog_view` response. Call `backlog view --selector "{title}"`, then read `response["sections"]["Acceptance Criteria"]`. The field format is a bullet list:
-
-   Note: the CLI's `backlog view` has no `summary` toggle — it always returns the flatter,
-   full-content equivalent of `summary=false`.
-
-   ```markdown
-   **Acceptance Criteria**:
-   - {criterion 1}
-   - {criterion 2}
-   - {criterion 3}
-   ```
-
-   Parse each `-` line as a separate criterion.
-
-5. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: item title, plan address (e.g., `P{id}`), checklist status (100%), and each criterion listed individually as "Criterion N: {text}". Instruct the agent to: read the plan via `mcp__plugin_dh_sam__sam_plan(plan="{address}", config={"action": "read"})`, search `git log --oneline -20`, check relevant files for each criterion, and return per-criterion PASS/FAIL with file:line evidence. Required return format:
+4. Spawn a verification agent with subagent_type="dh:task-worker". Prompt must include: `item_ref`
+   (the same selector used in Step 5.2), `section="Acceptance Criteria"`, plan address (e.g.,
+   `P{id}`), and checklist status (100%). Instruct the agent to: call
+   `mcp__plugin_dh_backlog__backlog_view(selector=item_ref, summary=False, sections=["Acceptance Criteria"])`
+   — `summary=False` is required; `backlog_view` defaults to `summary=True`, which returns the
+   compact routing manifest and ignores `sections` entirely — and parse each `-` line as a separate
+   criterion itself, read the plan via
+   `mcp__plugin_dh_sam__sam_plan(plan="{address}", config={"action": "read"})`, search
+   `git log --oneline -20`, check relevant files for each criterion, and return per-criterion
+   PASS/FAIL with file:line evidence. Do not parse or re-type the criteria text into the dispatch
+   prompt — the agent has backlog MCP access and fetches the item's Acceptance Criteria section
+   itself. Required return format:
 
    ```text
    [PASS] {criterion} — verified at {file}:{line} (or commit {sha})
@@ -126,9 +123,30 @@ If operation is `resolve`:
    Overall: PASS or FAIL (N/M criteria met)
    ```
 
-   **If no acceptance criteria exist**: warn "No **Acceptance Criteria**: field found — falling back to description-based verification" and spawn agent with the description as the goal instead.
+   **If no acceptance criteria exist**: a filtered call for an absent section does not return an
+   empty section — it returns an error dict with `section_filter_miss: true` and no `body` field.
+   Instruct the agent: only when the response's `section_filter_miss` field is explicitly `true`,
+   warn "No **Acceptance Criteria**: field found — falling back to description-based verification",
+   then make a second `backlog_view(selector=item_ref, summary=False)` call (no `sections` filter) to
+   fetch the item description, and verify against that instead. An `error` key present WITHOUT
+   `section_filter_miss: true` is a different failure (transient backend error, ambiguous selector,
+   etc.) — do not treat it as "no criteria"; report it as a block instead of silently falling back.
 
-6. Parse the agent verdict:
+   **If the Acceptance Criteria section alone is oversized**: the same over-budget gate that applies
+   to a whole-item fetch re-applies to a narrowed one — a criteria section large enough on its own
+   still returns `_over_budget: true` with no criteria body, not an error. Instruct the agent: if the
+   response contains `_over_budget: true`, do not treat it as "no criteria" — switch to EXTRACT-mode
+   pagination instead. Call `backlog_view(selector=item_ref, map=True)` to find the Acceptance
+   Criteria ordinal; if the map shows no children under it, page it directly with
+   `navigate="{ordinal}", head=2000`, following `next_call` until `truncated=False`. If it has child
+   ordinals (sub-heading structure), page each child individually the same way — recursing into any
+   further nested children the same way, never stopping at the first level — and never the parent
+   ordinal, which bounds only its child menu, not criteria text — until every leaf under the section
+   has been read. Skip any ordinal the `map` response lists in `struck_ordinals`, and stop reading
+   further into a branch the moment a `navigate` response returns `struck: true` — a struck criterion
+   is retracted and must not be verified as if it were current.
+
+5. Parse the agent verdict:
 
    ```text
    Acceptance Criteria Verification:
@@ -140,7 +158,7 @@ If operation is `resolve`:
    Overall: FAIL (2/3 criteria met)
    ```
 
-7. Collect agent verdict:
+6. Collect agent verdict:
    - **Overall PASS** (all criteria met): proceed to Step 5.7
    - **Overall FAIL** (any criterion failed): report gaps, do not resolve:
 
@@ -157,7 +175,7 @@ If operation is `resolve`:
 
 ## Step 5.7: Invoke backlog resolve
 
-8. If the item has a linked GitHub Issue (`#N`), check whether an open PR already references it:
+7. If the item has a linked GitHub Issue (`#N`), check whether an open PR already references it:
 
    ```bash
    git log --oneline -20 --grep="Fixes #N\|Closes #N"
@@ -177,15 +195,15 @@ If operation is `resolve`:
 
    - **No open PR / no linked issue**: proceed to invoke backlog resolve below.
 
-9. Use `AskUserQuestion` to ask: "Summarize what was done (1-2 sentences):" (free text — this is the required `summary` field).
+8. Use `AskUserQuestion` to ask: "Summarize what was done (1-2 sentences):" (free text — this is the required `summary` field).
 
-10. Optionally gather additional evidence fields (can be skipped for trivial items):
+9. Optionally gather additional evidence fields (can be skipped for trivial items):
     - `method` — "How was the work done?"
     - `notes` — "Any problems found or surprises?"
     - `follow_ups` — "Any follow-up tickets created?" (comma-separated refs)
     - `findings` — "Any retrospective learnings?"
 
-11. Call `backlog resolve`:
+10. Call `backlog resolve`:
 
     - `--selector`: `"{title}"` or `"#{N}"`
     - `--summary`: `"{summary}"`
@@ -195,9 +213,9 @@ If operation is `resolve`:
     - `--follow-ups`: `"{follow_ups}"` (if provided)
     - `--findings`: `"{findings}"` (if provided)
 
-12. Check the returned dict for an `error` key. Report the result to the user.
+11. Check the returned dict for an `error` key. Report the result to the user.
 
-13. Before emitting Handoff E, determine whether all milestone issues are resolved:
+12. Before emitting Handoff E, determine whether all milestone issues are resolved:
 
     a. Read the `milestone` field from the `backlog_resolve` response. If the resolved item has no `milestone` field (or `milestone` is null/empty), skip Handoff E — no milestone context exists.
 
