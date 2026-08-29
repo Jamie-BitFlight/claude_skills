@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import get_context
 from multiprocessing.synchronize import Barrier as ProcessBarrier
 from pathlib import Path
 from threading import Barrier, Thread
 
+import pydantic
 import pytest
 from backlog_core import file_cache
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
+from backlog_core.file_cache_state import PendingMutation, _CacheState, _CacheStateStore, _PendingWorkItemMutation
 from backlog_core.models import (
     BacklogItem,
     ContentKind,
@@ -17,6 +20,7 @@ from backlog_core.models import (
     ContentUnavailableError,
     ContentWrite,
 )
+from ruamel.yaml import YAML
 
 
 def _reference(namespace: str, artifact_type: str = "research") -> ContentRef:
@@ -284,6 +288,129 @@ def test_file_cache_serializes_concurrent_instances_and_reopens_valid_state(tmp_
         CacheCheckpoint(reference=references[0], revision="rev-2", fingerprint="item-1-fp"),
         CacheCheckpoint(reference=references[1], revision="rev-2", fingerprint="item-2-fp"),
     ]
+
+
+def _populated_cache_state() -> _CacheState:
+    # A realistic mix of the nested models actually persisted to cache.yaml.
+    artifact_ref = _reference("#1")
+    plan_ref = ContentRef(kind=ContentKind.PLAN, name="P12.yaml")
+    return _CacheState(
+        records=[
+            _record(artifact_ref, "artifact body"),
+            ContentRecord(reference=plan_ref, owner_reference="", content="plan body", revision="rev-2", stale=True),
+        ],
+        checkpoints=[CacheCheckpoint(reference=artifact_ref, revision="rev-1", fingerprint="fp-1")],
+        pending=[
+            PendingMutation(
+                idempotency_key="key-1",
+                write=ContentWrite(reference=artifact_ref, content="updated", expected_revision="rev-1"),
+            )
+        ],
+        pending_work_items=[
+            _PendingWorkItemMutation(idempotency_key="key-2", key="#1", item=BacklogItem(title="Offline edit"))
+        ],
+        snapshot_checkpoint=_ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z"),
+    )
+
+
+def _write_legacy_yaml(path: Path, state: _CacheState) -> None:
+    yaml = YAML(typ="safe")
+    yaml.default_flow_style = False
+    with path.open("w", encoding="utf-8") as stream:
+        yaml.dump(state.model_dump(mode="json"), stream)
+
+
+def _write_new_json(path: Path, state: _CacheState) -> None:
+    path.write_text(state.model_dump_json(), encoding="utf-8")
+
+
+def test_load_reads_legacy_yaml_cache_file_with_full_fidelity(tmp_path: Path) -> None:
+    # Given: a cache.yaml written the way every process writes it today
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_legacy_yaml(store._state_path, state)
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: every record, checkpoint, pending mutation, and snapshot survives intact
+    assert loaded == state
+
+
+def test_load_reads_new_json_cache_file_with_full_fidelity(tmp_path: Path) -> None:
+    # Given: a cache.yaml written by a process that already has the JSON-codec fix
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_new_json(store._state_path, state)
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: every record, checkpoint, pending mutation, and snapshot survives intact
+    assert loaded == state
+
+
+def test_yaml_safe_load_already_parses_json_written_cache_files(tmp_path: Path) -> None:
+    # Given: a cache.yaml written by a process running the new JSON-codec fix
+    state = _populated_cache_state()
+    path = tmp_path / "cache.yaml"
+    _write_new_json(path, state)
+
+    # When: an old-code process reads it using only its current YAML-safe-load logic
+    yaml = YAML(typ="safe")
+    with path.open(encoding="utf-8") as stream:
+        loaded = _CacheState.model_validate(yaml.load(stream))
+
+    # Then: it round-trips correctly, because JSON is valid YAML -- this is the
+    # backward-compatibility property the migration depends on
+    assert loaded == state
+
+
+def test_save_writes_content_parseable_as_plain_json(tmp_path: Path) -> None:
+    # Given: a populated state persisted through the store's own save path
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    store._save(state)
+
+    # When: the raw bytes on disk are parsed as plain JSON (not YAML)
+    raw_text = store._state_path.read_text(encoding="utf-8")
+
+    # Then: json.loads succeeds directly, proving the on-disk format is JSON
+    json.loads(raw_text)
+
+
+def test_empty_state_round_trips_through_save_and_load(tmp_path: Path) -> None:
+    # Given: the default empty cache state
+    state = _CacheState()
+    store = _CacheStateStore(tmp_path)
+
+    # When: it is saved and reloaded
+    store._save(state)
+    loaded = store.load()
+
+    # Then: it comes back identical
+    assert loaded == state
+
+
+def test_load_returns_empty_state_when_file_is_missing(tmp_path: Path) -> None:
+    # Given: a cache root with no cache.yaml written yet
+    store = _CacheStateStore(tmp_path)
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: it is an empty state, not an error
+    assert loaded == _CacheState()
+
+
+def test_load_raises_instead_of_silently_returning_empty_state_for_corrupt_file(tmp_path: Path) -> None:
+    # Given: a cache.yaml that exists but is neither valid JSON nor a valid _CacheState
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text("just a garbage string, not a mapping", encoding="utf-8")
+
+    # When/Then: loading raises rather than silently discarding the on-disk state
+    with pytest.raises(pydantic.ValidationError):
+        store.load()
 
 
 def test_file_cache_serializes_process_writers(tmp_path: Path) -> None:
