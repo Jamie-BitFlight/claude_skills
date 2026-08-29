@@ -61,6 +61,16 @@ class _PendingWorkItemMutation(BaseModel):
     item: BacklogItem
 
 
+class _RejectedMutation(BaseModel):
+    """Durable provider mutation whose precondition can never be satisfied by retrying."""
+
+    model_config = ConfigDict(frozen=True)
+
+    idempotency_key: str
+    write: ContentWrite
+    reason: str
+
+
 class ReplayAcknowledgement(BaseModel):
     """Applied provider mutation and its resulting checkpoint."""
 
@@ -77,6 +87,7 @@ class _CacheState(BaseModel):
     records: list[ContentRecord] = Field(default_factory=list)
     checkpoints: list[CacheCheckpoint] = Field(default_factory=list)
     pending: list[PendingMutation] = Field(default_factory=list)
+    rejected: list[_RejectedMutation] = Field(default_factory=list)
     pending_work_items: list[_PendingWorkItemMutation] = Field(default_factory=list)
     snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
 

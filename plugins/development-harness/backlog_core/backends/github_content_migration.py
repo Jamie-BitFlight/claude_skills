@@ -268,14 +268,35 @@ class _GitHubContentCache:
                         len(records),
                         len(records) - stored,
                     )
+                # Same reasoning as get_content(): replay_pending() above may have just
+                # rejected one of these exact references during this same call, and
+                # conflict_reason is only ever derived live from cache state.
+                state = self._cache._load_state()
+                records = [
+                    record.model_copy(
+                        update={"conflict_reason": self._cache._rejection_reason(state, record.reference)}
+                    )
+                    for record in records
+                ]
                 return records[query.offset : query.offset + query.limit]
         # A stored record's own `pending` field is never trusted (FileCache normalises it
         # to False on write) -- the durable mutation queue is the sole source of truth, so
         # it is recomputed here the same way FileCache.get_content() derives it live.
+        # conflict_reason is likewise recomputed live rather than trusted from the stored
+        # record, for the same reason -- this fallback path builds records manually
+        # instead of routing through FileCache.get_content(), so it needs its own
+        # derivation to stay consistent with that method's live-derivation contract.
+        state = self._cache._load_state()
         pending_references = [mutation.write.reference for mutation in self._cache.pending_mutations()]
         records = [
-            record.model_copy(update={"stale": not online, "pending": record.reference in pending_references})
-            for record in self._cache._load_state().records
+            record.model_copy(
+                update={
+                    "stale": not online,
+                    "pending": record.reference in pending_references,
+                    "conflict_reason": self._cache._rejection_reason(state, record.reference),
+                }
+            )
+            for record in state.records
             if record.reference.kind == query.kind
             and not is_work_item_head_ref(record.reference)
             and (query.owner_reference is None or record.owner_reference == query.owner_reference)
@@ -334,7 +355,15 @@ class _GitHubContentCache:
         except (BacklogError, ContentUnavailableError, OSError):
             return self._cache.get_content(reference, stale=True)
         self._cache.cache_content(record)
-        return record
+        # Route through FileCache.get_content() rather than returning `record`
+        # directly: replay_pending() above may have just rejected this exact
+        # reference's pending mutation during this same call, and conflict_reason
+        # is only ever derived live inside get_content() -- returning the raw
+        # provider record would silently drop that discovery. Look up by
+        # record.reference, not the queried reference -- a legacy-fallback read
+        # can return content under a different (normalized) reference than the
+        # one queried, and cache_content() stores it under record.reference.
+        return self._cache.get_content(record.reference)
 
     def put_content(self, request: ContentWrite) -> ContentRecord:
         """Write content, durably queueing it while GitHub is offline.
@@ -383,7 +412,9 @@ class _GitHubContentCache:
             cached = self.cached_content(mutation.write.reference)
             try:
                 record = self._provider._write_online_content(mutation.write, cached)
-            except (ContentConflictError, UnsupportedCapabilityError):
+            except (ContentConflictError, UnsupportedCapabilityError) as exc:
+                _log.warning("replay rejected %s: %s", mutation.write.reference.model_dump_json(), exc)
+                self._cache.reject_pending(mutation.write.reference, mutation.idempotency_key, str(exc))
                 continue
             except (BacklogError, ContentUnavailableError, OSError):
                 break

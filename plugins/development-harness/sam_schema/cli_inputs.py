@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 from sam_schema.core.action_models import AppendTaskConfig, CreatePlanConfig, TaskDefinition
 from sam_schema.core.models import (
@@ -137,6 +138,27 @@ class TaskUpdateFields(_CliInput):
     is_bookend: bool | None = None
     bookend_type: BookendType | None = None
     github_issue: int | None = Field(default=None, ge=1)
+    completed: str | None = None
+    last_activity: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("last-activity", "last_activity"),
+        serialization_alias="last-activity",
+    )
+
+    @field_validator("completed", "last_activity")
+    @classmethod
+    def _validate_iso_datetime(cls, value: str | None) -> str | None:
+        """Reject non-ISO-8601 strings without converting the stored value.
+
+        Kept as ``str`` (not ``datetime``) because click's ``DateTime`` CLI
+        type rejects UTC-offset ISO-8601 strings; this only validates shape.
+
+        Returns:
+            The original string, unconverted.
+        """
+        if value is not None:
+            datetime.fromisoformat(value)
+        return value
 
     @model_validator(mode="after")
     def require_patch(self) -> TaskUpdateFields:

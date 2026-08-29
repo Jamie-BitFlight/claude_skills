@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from backlog_core.backends import github_work_items
 from backlog_core.backends._github_work_item_versions import root_revision
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
 from backlog_core.file_cache import FileCache, _ProviderSnapshotCheckpoint
@@ -20,9 +21,10 @@ from backlog_core.models import (
     ProviderPatch,
     ProviderSnapshot,
     ReconcileRequest,
+    ReconcileResult,
     ReconcileScope,
 )
-from backlog_core.reconciliation import synchronized_fingerprint
+from backlog_core.reconciliation import ReconcilePlan, synchronized_fingerprint
 from sam_schema.core.plan_id_index import PlanIndexEntry
 
 
@@ -276,6 +278,52 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
     assert backend._apply_patches.call_count == 1
 
 
+def test_reconcile_does_not_acknowledge_pending_mutation_when_unlink_snapshot_save_fails(tmp_path: Path) -> None:
+    """A GitHub-deleted issue produces an unlink CacheAction whose ``record.item``
+
+    has ``metadata.issue`` already cleared to ``""`` (see ``_plan_item``'s
+    unlinked-copy construction). If the acknowledgement guard in
+    ``github_work_items.reconcile`` keys ``failed_cache_references`` off
+    ``action.record.item.metadata.issue`` it collects ``""`` instead of the
+    real reference, so a failed unlink write never blocks acknowledgement and
+    the still-pending local mutation is wrongly dropped. Fails (RED) against
+    the unfixed guard.
+    """
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    local = BacklogItem(title="Issue 1", description="local body")
+    local.metadata.issue = "#1"
+    backend.put_work_item(local)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body="",
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                    exists=False,
+                )
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    cache._save_work_item_snapshot = MagicMock(side_effect=OSError("disk full"))
+
+    # When: reconciliation processes the unlink action and its cache write fails
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    # Then: the pending mutation must remain queued -- it was never durably unlinked
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+    assert [mutation.item.metadata.issue for mutation in pending] == ["#1"], (
+        "Mutation was acknowledged despite the unlink cache write failing"
+    )
+
+
 def test_github_reconcile_retains_mutation_queued_after_plan_construction(tmp_path: Path) -> None:
     # Given: a queued body change whose provider patch will succeed
     cache = FileCache(tmp_path)
@@ -433,6 +481,227 @@ def test_github_queued_title_rename_survives_reconnect(tmp_path: Path) -> None:
     assert result.conflicts == 1
     assert [mutation.item.title for mutation in pending] == ["Renamed offline"]
     assert backend._apply_patches.call_args.args[0][0].body
+
+
+def _leak_a_baseline(title: str = "Issue 1", description: str = "provider body") -> BacklogItem:
+    """Return a baseline shaped the way ``_checkpoint`` would persist it.
+
+    ``_checkpoint`` (reconciliation.py) always receives a ``_compose``d
+    candidate, whose ``metadata.status`` is always ``provider.state.lower()``
+    -- never the empty string a bare ``BacklogItem()`` carries. The
+    ``_merged_title`` probe recomputes ``synchronized_fingerprint`` -- which
+    hashes ``metadata.status`` -- against this baseline's stored fingerprint,
+    so a baseline built with ``status == ""`` can never match the probe's
+    projection (whose status is always the real provider state). Every probe
+    call would then silently fall through to the safe ``local.title`` answer,
+    passing regardless of whether ``_merged_title`` actually works. Setting
+    ``status`` explicitly here is what makes these 5 tests a real exercise of
+    the merge logic instead of false-confidence passes.
+    """
+    baseline = BacklogItem(title=title, description=description)
+    baseline.metadata.issue = "#1"
+    baseline.metadata.status = "open"
+    baseline.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
+    return baseline
+
+
+def _leak_a_snapshot(backend: GitHubBackend, *, title: str, body_item: BacklogItem) -> ProviderSnapshot:
+    return ProviderSnapshot(
+        items=[
+            ProviderItem(
+                provider_id="node-1",
+                reference="#1",
+                title=title,
+                body=backend.render_issue_body(body_item),
+                state="OPEN",
+                labels=[],
+                revision="rev-1",
+            )
+        ],
+        sync_started_at="2026-08-12T02:00:00Z",
+        pages_fetched=1,
+    )
+
+
+def _leak_a_applied_patches() -> MagicMock:
+    return MagicMock(
+        return_value=[PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
+    )
+
+
+def test_github_reconcile_accepts_remote_rename_when_local_only_edited_body(tmp_path: Path) -> None:
+    """Remote renamed the title; local only edited the body. The fix's whole point:
+
+    this must NOT be treated as a title conflict. Fails (RED) without the
+    ``_merged_title`` fix, which would otherwise fall back to ``local.title``
+    and discard the remote rename as a spurious conflict.
+    """
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = _leak_a_baseline()
+    local = baseline.model_copy(update={"description": "local body"})
+    backend.put_work_item(local)
+    backend._fetch_snapshot = MagicMock(
+        return_value=_leak_a_snapshot(backend, title="Renamed on GitHub", body_item=baseline)
+    )
+    backend._apply_patches = _leak_a_applied_patches()
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    assert result.conflicts == 0
+
+
+def test_github_reconcile_retains_local_rename_when_remote_title_unchanged(tmp_path: Path) -> None:
+    """DATA LOSS GUARD: local renamed the title offline; remote is unchanged.
+
+    The offline rename must surface as a conflict and be retained, never
+    silently overwritten by the provider's stale title. Must stay correct
+    forever.
+    """
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = _leak_a_baseline()
+    renamed = baseline.model_copy(update={"title": "Renamed offline"})
+    backend.put_work_item(renamed)
+    backend._fetch_snapshot = MagicMock(return_value=_leak_a_snapshot(backend, title="Issue 1", body_item=baseline))
+    backend._apply_patches = _leak_a_applied_patches()
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+    assert result.conflicts == 1, "DATA LOSS: offline rename silently accepted the provider title"
+    assert [mutation.item.title for mutation in pending] == ["Renamed offline"]
+
+
+def test_github_reconcile_conflicts_when_remote_renamed_and_remote_body_changed(tmp_path: Path) -> None:
+    """Remote renamed the title AND the remote body changed in the same snapshot.
+
+    Documented, deliberate fallback ceiling: the merge probe can only prove a
+    remote-only rename by reproducing the baseline fingerprint with local's
+    title substituted in, which requires every other field (including body)
+    to match the baseline exactly. A concurrent remote body change breaks
+    that substitution, so this falls back to ``local.title`` and surfaces as
+    a conflict -- safe, just not optimized. Do not "fix" this without
+    re-reading the design rationale in reconciliation.py's ``_merged_title``.
+    """
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = _leak_a_baseline()
+    remote_body_item = baseline.model_copy(update={"description": "remote body moved on"})
+    local = baseline.model_copy(update={"description": "local body"})
+    backend.put_work_item(local)
+    backend._fetch_snapshot = MagicMock(
+        return_value=_leak_a_snapshot(backend, title="Renamed on GitHub", body_item=remote_body_item)
+    )
+    backend._apply_patches = _leak_a_applied_patches()
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    assert result.conflicts == 1
+
+
+def test_github_reconcile_retains_local_rename_when_remote_body_also_changed(tmp_path: Path) -> None:
+    """DATA LOSS GUARD: local renamed offline while the remote body also moved on."""
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = _leak_a_baseline()
+    remote_body_item = baseline.model_copy(update={"description": "remote body moved on"})
+    renamed = baseline.model_copy(update={"title": "Renamed offline"})
+    backend.put_work_item(renamed)
+    backend._fetch_snapshot = MagicMock(
+        return_value=_leak_a_snapshot(backend, title="Issue 1", body_item=remote_body_item)
+    )
+    backend._apply_patches = _leak_a_applied_patches()
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+    assert result.conflicts == 1
+    assert [mutation.item.title for mutation in pending] == ["Renamed offline"]
+
+
+def test_github_reconcile_retains_local_rename_when_both_sides_renamed_differently(tmp_path: Path) -> None:
+    """DATA LOSS GUARD: local renamed offline AND remote renamed differently."""
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = _leak_a_baseline()
+    renamed = baseline.model_copy(update={"title": "Renamed offline"})
+    backend.put_work_item(renamed)
+    backend._fetch_snapshot = MagicMock(
+        return_value=_leak_a_snapshot(backend, title="Renamed on GitHub", body_item=baseline)
+    )
+    backend._apply_patches = _leak_a_applied_patches()
+
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    pending = FileCache(tmp_path)._pending_work_item_mutations()
+    assert result.conflicts == 1, "DATA LOSS: concurrent rename resolved to the provider title"
+    assert [mutation.item.title for mutation in pending] == ["Renamed offline"]
+
+
+def test_github_work_item_ack_ignores_stable_reference_when_title_drifted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given: a queued body-only edit whose patch will land successfully, while
+    # GitHub's title has drifted for reasons unrelated to the queued change
+    # (e.g. renamed by someone else after the item was queued locally).
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    baseline = BacklogItem(title="Issue 1", description="provider body")
+    baseline.metadata.issue = "#1"
+    baseline.metadata.sync_fingerprint = synchronized_fingerprint(baseline)
+    local = baseline.model_copy(update={"description": "local body"})
+    backend.put_work_item(local)  # frozen queued title: "Issue 1"
+
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Renamed on GitHub",
+                    body=backend.render_issue_body(baseline),
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                )
+            ],
+            sync_started_at="2026-08-12T02:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    backend._apply_patches = MagicMock(
+        return_value=[PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
+    )
+
+    # The pure reconcile engine has its own, separate title-conflict gate
+    # (reconciliation.py's `candidate.title != provider.title` check) that
+    # would otherwise co-fire alongside the acknowledgement guard under test
+    # and mask which one is responsible for the stuck entry. Substituting a
+    # clean patch-only plan isolates the acknowledgement guard itself.
+    def isolated_plan(records: object, snapshot: ProviderSnapshot, request: ReconcileRequest) -> ReconcilePlan:
+        return ReconcilePlan(
+            provider_patches=[
+                ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="patched body")
+            ],
+            result=ReconcileResult(fetched_pages=snapshot.pages_fetched, fetched_items=len(snapshot.items)),
+            snapshot_checkpoint=snapshot.sync_started_at,
+        )
+
+    monkeypatch.setattr(github_work_items, "reconcile_backlog", isolated_plan)
+
+    # When: reconciliation applies the patch against a GitHub snapshot whose
+    # title no longer matches what was frozen at queue time
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#1"]))
+
+    # Then: the mutation should be acknowledged -- it shares the same stable
+    # reference ("#1") and its patch landed -- but the frozen-title equality
+    # guard in `_acknowledge_work_items` (github_work_items.py) can never
+    # match a title that changed after the item was queued, so the mutation
+    # leaks in `pending_work_items` forever. This pins the sane target
+    # behavior (acknowledge by stable reference, not title text) and is
+    # expected to fail (RED) against the current guard.
+    assert FileCache(tmp_path)._pending_work_item_mutations() == []
 
 
 def test_github_plan_discovery_lists_all_owners_when_owner_is_omitted(monkeypatch: pytest.MonkeyPatch) -> None:

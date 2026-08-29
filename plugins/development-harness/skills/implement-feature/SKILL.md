@@ -298,7 +298,7 @@ Skip this gate when `autonomy_mode` is `"full_auto"` or `"per_task"`.
 Note: under `"per_task"`, per-task gates already fire for each task; no additional wave gate is needed.
 
 > **Hook behavior on SubagentStop**: When a sub-agent finishes, `task_status_hook.py` marks
-> the task complete via the SAM MCP server (backend-agnostic). After updating the SAM state,
+> the task complete via the SAM CLI (backend-agnostic). After updating the SAM state,
 > the hook syncs completion to the external tracker (if `parent_issue_number` is set in the
 > active-task context). External tracker sync failure does not affect the hook exit code.
 > `parent_issue_number` accepts `str | int` — GitHub integer IDs and beads string IDs are

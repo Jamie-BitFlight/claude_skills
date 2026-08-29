@@ -57,3 +57,24 @@ def test_update_adapters_reject_incomplete_sections_and_empty_patches() -> None:
         )
     with pytest.raises(ValidationError, match="at least one plan update field"):
         PlanUpdateInput(plan_address="P1")
+
+
+def test_completed_and_last_activity_reject_non_iso_datetime_strings() -> None:
+    """`completed`/`last-activity` are deliberately `str` fields (click's DateTime type
+    rejects UTC-offset ISO-8601 strings), but that must not mean any string is accepted.
+    """
+    with pytest.raises(ValidationError):
+        TaskUpdateFields(completed="not-a-date")
+    with pytest.raises(ValidationError):
+        TaskUpdateFields(last_activity="not-a-date")
+
+
+def test_completed_and_last_activity_accept_iso_datetime_strings_and_stay_strings() -> None:
+    """Naive and UTC-offset ISO-8601 strings are both valid and round-trip as strings, not datetimes."""
+    naive = TaskUpdateFields(completed="2026-08-29T12:00:00")
+    offset = TaskUpdateFields(last_activity="2026-08-29T12:00:00+00:00")
+
+    assert naive.as_operation_fields() == {"completed": "2026-08-29T12:00:00"}
+    assert isinstance(naive.completed, str)
+    assert offset.as_operation_fields() == {"last-activity": "2026-08-29T12:00:00+00:00"}
+    assert isinstance(offset.last_activity, str)

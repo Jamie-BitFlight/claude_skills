@@ -48,6 +48,7 @@ class CacheAction(BaseModel):
     phase: Literal["before_provider", "checkpoint"] = "before_provider"
     record: LogicalCacheRecord
     requires_patch: str = ""
+    reference: str = ""
 
 
 class ReconcilePlan(BaseModel):
@@ -58,6 +59,7 @@ class ReconcilePlan(BaseModel):
     result: ReconcileResult = Field(default_factory=ReconcileResult)
     snapshot_checkpoint: str = ""
     dry_run: bool = False
+    conflicted_references: list[str] = Field(default_factory=list)
 
 
 class ActionResult(BaseModel):
@@ -144,6 +146,23 @@ def _checkpoint(item: BacklogItem, revision: str) -> BacklogItem:
     )
 
 
+def _merged_title(local: BacklogItem, remote: BacklogItem, baseline: str) -> str:
+    """Return the provider's title when local never edited it, else keep local's.
+
+    Substitutes ``local.title`` into the remote projection and checks whether
+    that hypothetical fingerprint reproduces ``baseline``. A match proves the
+    only thing distinguishing ``remote`` from ``baseline`` was its title, so
+    ``local`` never touched the title and the remote rename is safe to accept.
+    A remote-side change to any other field breaks the substitution even when
+    local's title is untouched -- that case falls back to ``local.title`` and
+    surfaces as a conflict instead of silently discarding the remote change.
+    """
+    if not baseline:
+        return local.title
+    probe = remote.model_copy(update={"title": local.title})
+    return remote.title if synchronized_fingerprint(probe) == baseline else local.title
+
+
 def _candidate(
     local: BacklogItem, provider: ProviderItem, request: ReconcileRequest
 ) -> tuple[BacklogItem, ProviderPatch | None]:
@@ -155,7 +174,8 @@ def _candidate(
     if request.force:
         candidate = remote
     elif local_changed and remote_changed:
-        candidate = _compose(local, provider, merge_item(local, remote_body), title=local.title)
+        merged_title = _merged_title(local, remote, baseline)
+        candidate = _compose(local, provider, merge_item(local, remote_body), title=merged_title)
     elif remote_changed:
         candidate = remote
     else:
@@ -178,9 +198,15 @@ def _action(
     phase: Literal["before_provider", "checkpoint"] = "before_provider",
     requires_patch: str = "",
     kind: Literal["upsert", "unlink"] = "upsert",
+    reference: str = "",
 ) -> CacheAction:
     return CacheAction(
-        key=key, kind=kind, phase=phase, record=LogicalCacheRecord(key=key, item=item), requires_patch=requires_patch
+        key=key,
+        kind=kind,
+        phase=phase,
+        record=LogicalCacheRecord(key=key, item=item),
+        requires_patch=requires_patch,
+        reference=reference or item.metadata.issue,
     )
 
 
@@ -203,7 +229,7 @@ def _plan_item(
             sections=local.sections,
             metadata=metadata,
         )
-        plan.cache_actions.append(_action(record.key, unlinked, kind="unlink"))
+        plan.cache_actions.append(_action(record.key, unlinked, kind="unlink", reference=local.metadata.issue))
         plan.result.changed_references.append(provider.reference)
         return
     candidate, patch = _candidate(local, provider, request)
@@ -214,6 +240,7 @@ def _plan_item(
             plan.provider_patches.append(patch)
         plan.result.conflicts += 1
         plan.result.changed_references.append(provider.reference)
+        plan.conflicted_references.append(provider.reference)
         if request.include_diff and patch is not None:
             plan.result.diffs[provider.reference] = (
                 f"{_normalized_body(provider.body)}\n---\n{_normalized_body(patch.body)}"

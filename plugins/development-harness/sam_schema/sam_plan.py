@@ -321,6 +321,8 @@ def update(
     skill: Annotated[list[str] | None, typer.Option("--skill")] = None,
     append_section: Annotated[str | None, typer.Option("--append-section")] = None,
     section_content: Annotated[str | None, typer.Option("--section-content")] = None,
+    completed: Annotated[str | None, typer.Option("--completed")] = None,
+    last_activity: Annotated[str | None, typer.Option("--last-activity")] = None,
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
 ) -> None:
     """Update declared plan/task fields or append a task section."""
@@ -344,7 +346,18 @@ def update(
             )
         try:
             has_task_fields = any(
-                value is not None for value in (title, task_status, agent, priority, complexity, dependency, skill)
+                value is not None
+                for value in (
+                    title,
+                    task_status,
+                    agent,
+                    priority,
+                    complexity,
+                    dependency,
+                    skill,
+                    completed,
+                    last_activity,
+                )
             )
             fields = (
                 TaskUpdateFields(
@@ -355,6 +368,8 @@ def update(
                     complexity=complexity,
                     dependencies=dependency,
                     skills=skill,
+                    completed=completed,
+                    last_activity=last_activity,
                 )
                 if has_task_fields
                 else None

@@ -388,6 +388,53 @@ class TestSamUpdateSetField:
 
 
 # ---------------------------------------------------------------------------
+# sam plan update -- --completed / --last-activity
+# ---------------------------------------------------------------------------
+
+
+class TestSamUpdateTimestampFields:
+    """Test ``sam plan update`` with --completed and --last-activity.
+
+    Tests: CLI acceptance and persistence of task completion/activity timestamps.
+    How: Update T1 with both flags using an ISO string with a UTC offset (the
+        exact shape ``datetime.now(UTC).isoformat(timespec="seconds")`` produces),
+        read back and verify both values round-tripped unchanged.
+    Why: The task-status hook writes these fields via the CLI post-migration from
+        fastmcp; an unverified option here means task completion timestamps would
+        silently stop being recorded (the hook returns False but the harness sees
+        exit 0).
+    """
+
+    def test_update_accepts_completed_and_last_activity(
+        self, plan_dir: Path, content_backend: ContentTaskProvider
+    ) -> None:
+        timestamp = "2026-08-29T12:00:00+00:00"
+
+        result = runner.invoke(
+            app,
+            [
+                "plan",
+                "update",
+                "--plan-address",
+                f"{plan_dir.name}/T1",
+                "--completed",
+                timestamp,
+                "--last-activity",
+                timestamp,
+                "--plan-dir",
+                str(plan_dir),
+            ],
+            env={"NO_COLOR": "1"},
+        )
+
+        assert result.exit_code == 0, result.stdout
+        plan_data = _stored_plan(content_backend, plan_dir)
+        task = plan_data["tasks"][0]
+        assert task["completed"] == timestamp
+        assert task["last_activity"] == timestamp
+
+
+# ---------------------------------------------------------------------------
 # sam plan update -- append-section
 # ---------------------------------------------------------------------------
 
