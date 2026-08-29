@@ -321,6 +321,14 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
         task_id = context_data.get("task_id")
         if plan_addr and task_id:
             return plan_addr, task_id
+        if context_data.get("task_file_path") and task_id:
+            print(
+                f"[hook] read_task_context: {context_file}: legacy context record has "
+                "task_file_path but no plan address (predates the plan/task fields) — not "
+                "falling back to path-parsing; activity tracking for this session will not "
+                "resume until a fresh /start-task runs",
+                file=sys.stderr,
+            )
     except json.JSONDecodeError as exc:
         print(f"[hook] read_task_context: malformed JSON in {context_file}: {exc}", file=sys.stderr)
 
@@ -362,6 +370,14 @@ def _call_sam_active_task_get(session_id: str, timeout: int = 10) -> tuple[str |
         if plan_addr and task_id:
             parent_issue: str | int | None = active.get("parent_issue_number")
             return plan_addr, task_id, parent_issue
+        if active.get("task_file_path") and task_id:
+            print(
+                f"[hook] _call_sam_active_task_get: session {resolved}: legacy active-task "
+                "record has task_file_path but no plan address (predates the plan/task "
+                "fields) — not falling back to path-parsing; activity tracking for this "
+                "session will not resume until a fresh /start-task runs",
+                file=sys.stderr,
+            )
     except (json.JSONDecodeError, KeyError, IndexError):
         pass
 
@@ -710,6 +726,13 @@ def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str 
     plan_addr = data.get("plan")
     task_id = data.get("task_id")
     if not plan_addr or not task_id:
+        if data.get("task_file_path") and task_id:
+            print(
+                f"[hook] {context_file}: legacy context record has task_file_path but no plan "
+                "address (predates the plan/task fields) — not falling back to path-parsing; "
+                "activity tracking for this session will not resume until a fresh /start-task runs",
+                file=sys.stderr,
+            )
         return None, None, None
 
     parent_issue: str | int | None = data.get("parent_issue_number")

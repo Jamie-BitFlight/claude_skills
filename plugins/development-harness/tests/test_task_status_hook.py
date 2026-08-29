@@ -1338,3 +1338,29 @@ def test_read_task_context_returns_none_tuple_and_logs_on_malformed_json(
     captured = capsys.readouterr()
     assert "[hook]" in captured.err
     assert str(context_file) in captured.err
+
+
+def test_read_task_context_fails_loudly_on_legacy_record_missing_plan_field(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A pre-migration context record (task_file_path + task_id, no plan) returns (None, None)
+    and logs a stderr diagnostic — it must not silently do nothing, and must not fall back to
+    parsing the address out of task_file_path (that fallback was deliberately rejected; see #3151).
+    """
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    import dh_paths
+
+    context_dir = dh_paths.context_dir()
+    context_dir.mkdir(parents=True, exist_ok=True)
+    session_id = "sess-legacy-pre-migration"
+    context_file = context_dir / f"active-task-{session_id}.json"
+    context_file.write_text(json.dumps({"task_file_path": str(tmp_path / "plan" / "Pf4281187.yaml"), "task_id": "T1"}))
+
+    result = _hook_mod.read_task_context(tmp_path, session_id)
+
+    assert result == (None, None)
+
+    captured = capsys.readouterr()
+    assert "[hook]" in captured.err
+    assert "legacy context record" in captured.err
+    assert str(context_file) in captured.err
