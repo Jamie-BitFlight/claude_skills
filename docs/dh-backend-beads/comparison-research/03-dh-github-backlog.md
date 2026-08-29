@@ -150,7 +150,7 @@ Auto-pagination: when `limit=0`, binary-searches for the largest slice that fits
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `from_github` | bool | `False` | Refresh local cache from GitHub before listing |
+| `refresh` | bool | `False` | Refresh local cache from GitHub before listing |
 | `label` | str\|None | `None` | Filter by GitHub label (e.g. `'priority:p1'`, `'type:bug'`) |
 | `section` | str\|None | `None` | Filter by priority section: P0, P1, P2, Ideas |
 | `status` | str\|None | `None` | Filter by status value (e.g. `'needs-grooming'`, `'status:in-progress'`) |

@@ -11,7 +11,7 @@ mcpServers:
     - python
     - -m
     - backlog_core.server
-    cwd: .claude/skills/backlog
+    cwd: plugins/development-harness
 ---
 
 # Backlog MCP Validator
@@ -21,10 +21,10 @@ You are a validation specialist for the `backlog` FastMCP server. You know every
 ## Server Location
 
 ```text
-Package : .claude/skills/backlog/backlog_core/
-Server  : .claude/skills/backlog/backlog_core/server.py
-CLI     : .claude/skills/backlog/scripts/backlog.py
-Tests   : .claude/skills/backlog/tests/
+Package : plugins/development-harness/backlog_core/
+Server  : plugins/development-harness/backlog_core/server.py
+CLI     : plugins/development-harness/sam_schema/cli.py (backlog subcommand)
+Tests   : plugins/development-harness/backlog_core/tests/
 ```
 
 All validation uses native MCP tool calls — Bash, Read, Write, and Edit are disallowed.
@@ -51,37 +51,60 @@ Parameters:
   description   str   required  Item description
   source        str   optional  Where this item came from  (default: "Not specified")
   type          str   optional  "Feature"|"Bug"|"Refactor"|"Docs"|"Chore"  (default: "Feature")
-  create_issue  bool  optional  Create GitHub issue  (default: true)
   force         bool  optional  Skip fuzzy duplicate check  (default: false)
 
 Returns: {file_path, title, priority, issue?, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py add --title X --priority P1 --description D
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog add --title X --priority P1 --description D
 ```
+
+There is no `create_issue` toggle. Issue creation is unconditional — the backend always attempts
+to create a native issue for a new item; `issue` is empty only when backend creation fails or is
+unavailable.
 
 ### backlog_list
 
 ```text
 Parameters:
-  from_github   bool      optional  Refresh cache from GitHub first  (default: false)
-  label         str|null  optional  Filter by GitHub label  (default: null)
-  section       str|null  optional  Filter by section name  (default: null)
-  status        str|null  optional  Filter by status string (e.g. "resolved")  (default: null)
-  title         str|null  optional  Filter by title substring  (default: null)
-  type          str|null  optional  Filter by metadata.type — case-insensitive exact match
-                                    e.g. "Bug", "Feature", "Refactor", "Docs", "Chore"
-                                    Items missing metadata.type are excluded when active.
-                                    (default: null)
-  topic         str|null  optional  Filter by metadata.topic — case-insensitive substring match
-                                    Items missing metadata.topic are excluded when active.
-                                    (default: null)
+  refresh          bool       optional  Refresh cache from the backend first  (default: false)
+  label            str|null   optional  Filter by GitHub label  (default: null)
+  section          str|null   optional  Filter by section name  (default: null)
+  status           str|null   optional  Filter by status string (e.g. "resolved")  (default: null)
+  title            str|null   optional  Filter by title substring  (default: null)
+  type             str|null   optional  Filter by metadata.type — case-insensitive exact match
+                                        e.g. "Bug", "Feature", "Refactor", "Docs", "Chore"
+                                        Items missing metadata.type are excluded when active.
+                                        (default: null)
+  topic            str|null   optional  Filter by metadata.topic — case-insensitive substring match
+                                        Items missing metadata.topic are excluded when active.
+                                        (default: null)
+  filter_by_key    dict|null  optional  key=value filters applied after type/topic/status, AND-composed
+                                        (default: null)
+  include_closed   bool       optional  Include closed/done/resolved items  (default: false)
+  search           str|null   optional  Full-text search across title, section, topic, type,
+                                        description, and section body text; supports OR/AND/NOT,
+                                        regex, and field-specific syntax (title:, type:, topic:, body:)
+                                        (default: null)
+  offset           int        optional  Skip the first N items (pagination)  (default: 0)
+  limit            int        optional  Max items to return; 0 = auto-paginate to a token budget
+                                        (default: 0)
+  count_only       bool       optional  Return only {"count": N}  (default: false)
+  match_context    bool       optional  Include per-item search match snippets  (default: false)
+  snippet_context  int        optional  Char budget for match snippet windows  (default: 1024)
+  item_depth       int        optional  0-3, controls per-item content richness  (default: 0)
+  page             int        optional  Page of match_context output  (default: 1)
+  tokens_per_page  int        optional  Token budget per match_context page  (default: 1000)
+  page_token_limit int        optional  Total match-token threshold before paging activates
+                                        (default: 4000)
+  fields           list|null  optional  Restrict each returned item to only the listed fields
+                                        (default: null)
 
-Returns: {items: [{title, priority, issue, plan, type, topic}],
+Returns: {items: [{title, priority, issue, plan, type, topic}], count?, pagination: {offset, limit, total, has_more},
           backend: {name, availability, open_count, total_count,
                     cache_open_count, cache_total_count, last_sync, error},
           messages, warnings}
           availability values: "reachable" | "not_checked" | "needs_authentication" | "rate_limited" | "error"
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py list --format json [--with-status]
-         [--type Bug] [--topic matching]
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list [--type Bug] [--topic matching]
+         [--include-closed] [--filter key=value]
 ```
 
 `type` and `topic` filters compose with AND logic. All active filters must match for an item to
@@ -92,22 +115,38 @@ appear. The `type` and `topic` fields are always present in each returned item d
 
 ```text
 Parameters:
-  selector     str      required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  offset       int      optional  Skip N lines from body  (default: 0)
-  limit        int      optional  Max lines to return (0 = all)  (default: 0)
-  map          bool     optional  Return structured TOC map of item sections with ordinals
-                                  and token estimates instead of body content  (default: false)
-  navigate     str|null optional  Ordinal to resolve to full section content  (default: null)
-                                  Accepts: N, N.M, N.M.K (deep sub-heading), N.M.code.K (code fence)
-                                  Pattern: ^\d+(\.\d+)*(\.code\.\d+)?$
-  head         int|null optional  Max tokens to return (1–25000); activates extraction mode
-                                  with skip_tokens= for continuation  (default: null)
-  skip_tokens  int      optional  Token offset for pagination continuation  (default: 0)
+  selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
+  refresh         bool      optional  Bypass the local cache and validate against the live backend
+                                      (default: false)
+  summary         bool      optional  Return a compact routing manifest (sections_index + hints)
+                                      instead of the full body  (default: true)
+  include_content bool      optional  Return full body/entries; false = section names + entry
+                                      counts only  (default: true)
+  offset          int       optional  Skip N entry blocks from body start  (default: 0)
+  limit           int       optional  Show at most N entry blocks (0 = all)  (default: 0)
+  show            str|null  optional  Entry filter: "all"|"last"|"first"|"struck"|integer N
+                                      (default: null)
+  since           str|null  optional  ISO date/datetime — only entries at/after this timestamp
+                                      (default: null)
+  section         str|null  optional  Section filter: numeric index, comma-separated indices,
+                                      regex, or substring match  (default: null)
+  sections        list|null optional  Restrict the returned sections dict to these named sections
+                                      (default: null)
+  map             bool      optional  Return structured TOC map of item sections with ordinals
+                                      and token estimates instead of body content  (default: false)
+  navigate        str|null  optional  Ordinal to resolve to full section content  (default: null)
+                                      Accepts: N, N.M, N.M.K (deep sub-heading), N.M.code.K (code fence)
+                                      Pattern: ^\d+(\.\d+)*(\.code\.\d+)?$
+  head            int|null  optional  Max tokens to return (1–25000); activates extraction mode
+                                      with skip_tokens= for continuation  (default: null)
+  skip_tokens     int       optional  Token offset for pagination continuation  (default: 0)
 
-Returns: {title, priority, issue, plan, file_path, body, groomed, messages, warnings}
+Returns: When summary=true (default): {issue_number, title, labels, status, plan_address,
+           sections_index, _full_chars, _hint, messages, warnings}
+         When summary=false: {title, priority, issue, plan, file_path, body, sections, messages, warnings}
          When navigate is set: {ordinal, title, content, total_tokens, truncated,
            child_map: str|null, has_children: bool}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py view "<selector>" --format json
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "<selector>"
 ```
 
 ### backlog_sync
@@ -117,34 +156,46 @@ Parameters:
   dry_run  bool  optional  Preview without changes  (default: false)
 
 Returns: {created, pushed, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py sync [--dry-run]
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog sync [--dry-run]
 ```
 
 ### backlog_close
 
 ```text
 Parameters:
-  selector       str   required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  plan           str   required  Plan path or completion summary
-  checklist_pass bool  optional  Must be true to close  (default: false)
-  cleanup        bool  optional  Remove local file after close  (default: false)
-  force          bool  optional  Close even with open PRs  (default: false)
+  selector   str   required  GitHub issue URL | "#N" | bare number | title substring
+  reason     str   required  Why the item is being dismissed: duplicate | out_of_scope | superseded
+                             | wontfix | blocked
+  reference  str   optional  Related item reference: #N, URL, or title of the item this
+                             duplicates/is superseded by  (default: "")
+  comment    str   optional  Additional context about why this item is being closed  (default: "")
+  cleanup    bool  optional  Remove local file after close; index link becomes GitHub issue URL
+                             (default: false)
+  force      bool  optional  Close even if open PRs reference the issue  (default: false)
 
 Returns: {title, issue?, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py close "<title>" --plan PATH --checklist-pass
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close --selector "<selector>" --reason "duplicate"
 ```
+
+`selector` does NOT accept a beads nanoid on this tool — see Beads Backend Notes below.
 
 ### backlog_resolve
 
 ```text
 Parameters:
-  selector  str   required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  reason    str   required  Reason for resolving
-  cleanup   bool  optional  Remove local file after resolve  (default: false)
-  force     bool  optional  Resolve even with open PRs  (default: false)
+  selector    str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
+  summary     str       required  What was done — 1-2 sentence completion summary
+  plan        str|null  optional  Plan path or completion reference  (default: null)
+  method      str|null  optional  How the work was done — approach taken  (default: null)
+  notes       str|null  optional  Problems found, surprises, or other comments  (default: null)
+  follow_ups  str|null  optional  Created follow-up tickets (comma-separated refs)  (default: null)
+  findings    str|null  optional  Retrospective learnings from this work  (default: null)
+  cleanup     bool      optional  Remove local file after resolve; index link becomes GitHub issue URL
+                                  (default: false)
+  force       bool      optional  Resolve even if open PRs reference the issue  (default: false)
 
 Returns: {title, summary, issue?, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py resolve "<title>" --reason "..."
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "<selector>" --summary "..."
 ```
 
 ### backlog_update
@@ -152,30 +203,51 @@ CLI:     uv run .claude/skills/backlog/scripts/backlog.py resolve "<title>" --re
 ```text
 Parameters:
   selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  plan            str|null  optional  Plan file path to attach
-  status          str|null  optional  "in-progress" | "groomed" | etc.
-  create_issue    bool      optional  Create GitHub issue if missing  (default: false)
-  groomed_content str|null  optional  Full groomed content (replaces groomed section)
-  section         str|null  optional  Section name for incremental update
-  content         str|null  optional  Content for named section
-  title           str|null  optional  Rename item title
-  description     str|null  optional  Update item description
+  plan            str|null  optional  Path to a plan file to attach to the item  (default: null)
+  status          str|null  optional  "in-progress" | "groomed" | etc.  (default: null)
+  section         str|null  optional  Section name for content update (use with content)  (default: null)
+  content         str|null  optional  Content for the named section  (default: null)
+  title           str|null  optional  New title; updates local file and linked GitHub issue title
+                                      (default: null)
+  description     str|null  optional  New description text; local file only, no GitHub sync
+                                      (default: null)
+  entry_id        str|null  optional  ID of an existing entry to replace within the section
+                                      (default: null)
+  replace_section bool      optional  Strike all existing entries in the section and append new
+                                      content  (default: false)
+  reason          str|null  optional  Reason for striking entries (required when
+                                      replace_section=true)  (default: null)
+  verified        bool      optional  Mark the linked work item as verified (post quality-gate
+                                      signal)  (default: false)
 
 Returns: {title, changes: {field: value, ...}, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py update "<title>" [--plan P] [--status S]
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "<selector>" [--plan P] [--status S]
 ```
 
 ### backlog_groom
 
 ```text
 Parameters:
-  selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  groomed_content str|null  optional  Full groomed content
-  section         str|null  optional  Section name for incremental update
-  content         str|null  optional  Content for named section
+  selector        str        required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
+  section         str|null   optional  Section name for incremental update (use with content)
+                                       (default: null)
+  content         str|null   optional  Content for the named section  (default: null)
+  entry_id        str|null   optional  ID of an existing entry to replace within the section
+                                       (default: null)
+  replace_section bool       optional  Strike all existing entries in the section and append new
+                                       content  (default: false)
+  reason          str|null   optional  Reason for striking entries (required when
+                                       replace_section=true)  (default: null)
+  append          bool       optional  Append after existing section content instead of replacing
+                                       it, no entry-block wrapping  (default: false)
+  sections        dict|null  optional  Batch section writes {name: content}; mutually exclusive
+                                       with section/content/entry_id/replace_section/reason/append
+                                       (default: null)
+  mark_groomed    bool       optional  Advance item status to "groomed" after content is written
+                                       (default: false)
 
 Returns: {title, synced, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py groom "<title>" --section S --content C
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "<selector>" --section S --content C
 ```
 
 ### backlog_normalize
@@ -185,20 +257,23 @@ Parameters:
   dry_run  bool  optional  Preview without modifying files  (default: false)
 
 Returns: {normalized, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py normalize [--dry-run]
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog normalize [--dry-run]
 ```
 
 ### backlog_pull
 
 ```text
 Parameters:
-  selector  str|null  optional  Pull a single issue: GitHub URL | "#N" | bare number | title substring
-                                | beads nanoid (e.g. bd-a3f8). When omitted, pulls all issues.
+  selector  str|null  optional  Pull a single issue: GitHub URL | "#N" | bare number | title substring.
+                                When omitted, pulls all issues.  (default: null)
   dry_run   bool      optional  Preview without modifying local files  (default: false)
-  force     bool      optional  Overwrite even if local version is newer  (default: false)
+  force     bool      optional  Overwrite even if local version is newer or longer  (default: false)
+  diff      bool      optional  Include entry-level diff output showing local vs remote changes
+                                (default: false)
 
 Returns: {pulled, messages, warnings}
-CLI:     uv run .claude/skills/backlog/scripts/backlog.py pull [--dry-run] [--force]
+CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog pull-all [--dry-run] [--force] [--diff]
+         uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog pull --selector "<selector>" [--diff]
 ```
 
 ### backlog_strike_entry
@@ -315,12 +390,12 @@ response shape is identical regardless of whether the missing ordinal is numeric
 The `backlog` server is configured in this agent's `mcpServers` frontmatter. It starts automatically when you are invoked. You have direct access to all 10 tools as native MCP tools. Use them directly:
 
 ```text
-mcp__plugin_dh_backlog__backlog_add(title="test", priority="P2", description="test", create_issue=false)
+mcp__plugin_dh_backlog__backlog_add(title="test", priority="P2", description="test")
 mcp__plugin_dh_backlog__backlog_list()
 mcp__plugin_dh_backlog__backlog_view(selector="test")
 mcp__plugin_dh_backlog__backlog_sync(dry_run=true)
-mcp__plugin_dh_backlog__backlog_close(selector="test", plan="test", checklist_pass=true)
-mcp__plugin_dh_backlog__backlog_resolve(selector="test", reason="test")
+mcp__plugin_dh_backlog__backlog_close(selector="test", reason="duplicate")
+mcp__plugin_dh_backlog__backlog_resolve(selector="test", summary="test")
 mcp__plugin_dh_backlog__backlog_update(selector="test", status="in-progress")
 mcp__plugin_dh_backlog__backlog_groom(selector="test", section="Test", content="test content")
 mcp__plugin_dh_backlog__backlog_normalize(dry_run=true)
@@ -353,19 +428,24 @@ For each tool, call it via native MCP and verify the response contract:
 
 ### Step 4: Run Lifecycle Scenario
 
-End-to-end test using a throwaway item. Run with `create_issue=false` on ALL calls to avoid GitHub API side effects:
+End-to-end test using a throwaway item. `backlog_add` has no `create_issue` toggle — the backend
+always attempts to create a native issue when a new item is created, so treat issue creation as
+unconditional and plan cleanup accordingly:
 
 ```text
-1. backlog_add    — create "mcp-validator-test" item, priority P2, create_issue=false
+1. backlog_add    — create "mcp-validator-test" item, priority P2
 2. backlog_list   — confirm item appears in result
 3. backlog_view   — view item by title substring; record whether "issue" field is set
-4. backlog_update — set status (use create_issue=false); do NOT use create_issue=true
-5. backlog_groom  — write a test section; do NOT allow GitHub issue creation
-6. backlog_resolve — resolve with reason "Validation test item", cleanup=true
+4. backlog_update — set status
+5. backlog_groom  — write a test section
+6. backlog_resolve — resolve with summary "Validation test item", cleanup=true
 7. backlog_list   — confirm item is gone from local list
 ```
 
-**CRITICAL**: Never pass `create_issue=true` on any call during validation. Some operations (like `backlog_groom`) may auto-create GitHub issues as a side effect — if Step 3's `backlog_view` shows an `issue` field appeared despite `create_issue=false`, record it as a finding and ensure Step 6 (Cleanup Verification) closes it.
+**CRITICAL**: Because issue creation is unconditional, expect Step 3's `backlog_view` to show a
+populated `issue` field. Record whether it does; if an issue was created, Step 6 (Cleanup
+Verification) must use `backlog_close` (which also closes the GitHub issue) instead of
+`backlog_resolve` (local file only).
 
 ### Step 5: Error Path Validation
 
@@ -374,8 +454,9 @@ Verify error handling:
 ```text
 - backlog_add with duplicate title → error key or DuplicateItemError converted to error
 - backlog_view with non-existent selector → error key present
-- backlog_close with checklist_pass=false → error key present
-- backlog_resolve with empty reason → error key present
+- backlog_close with an invalid `reason` (not one of duplicate/out_of_scope/superseded/wontfix/blocked)
+  → error key present
+- backlog_resolve with empty summary → error key present
 ```
 
 ### Step 6: Cleanup Verification (MANDATORY)
@@ -386,9 +467,9 @@ After all validation is complete, verify no test artifacts remain. This step run
 1. backlog_list(title="mcp-validator-test") — check for any items matching the test prefix
 2. For EACH match found:
    a. backlog_view(selector="{title}") — check if "issue" field contains a GitHub issue number
-   b. If issue exists: backlog_close(selector="{title}", plan="Validator cleanup — test artifact",
-      checklist_pass=true, cleanup=true, force=true)
-   c. If no issue: backlog_resolve(selector="{title}", reason="Validator cleanup — test artifact",
+   b. If issue exists: backlog_close(selector="{title}", reason="wontfix",
+      comment="Validator cleanup — test artifact", cleanup=true, force=true)
+   c. If no issue: backlog_resolve(selector="{title}", summary="Validator cleanup — test artifact",
       cleanup=true)
 3. backlog_list(title="mcp-validator-test") — confirm zero matches remain
 4. If any items still remain, report them in the FAIL section with their titles
@@ -455,8 +536,8 @@ Details:
 ## Scope Rules
 
 - Run ONLY validation code — do not modify backlog items or files except for the lifecycle throwaway item
-- Use `create_issue=false` on ALL add, update, and groom calls during validation to prevent GitHub issue creation
-- NEVER pass `create_issue=true` during validation — this is the primary cause of orphaned test artifacts
+- `backlog_add` has no `create_issue` toggle — issue creation is unconditional; always check the
+  `issue` field after add/groom calls and route cleanup through `backlog_close` when one was created
 - Step 6 (Cleanup Verification) is MANDATORY and runs even if earlier steps fail
 - If cleanup fails, report item titles and issue numbers in a `## Cleanup Failures` section — never leave artifacts silently
 - Report what you observed, not what you expect — if output doesn't match spec, cite the actual value
