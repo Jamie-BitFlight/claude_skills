@@ -166,10 +166,15 @@ Per violation:
 mcp__plugin_dh_backlog__backlog_groom(
     selector="{issue_number}",
     section="Concerns",
-    content="- [ ] CONTRACT: {severity} — {issue line, one sentence} (reported by contract-verification on {task_id})",
+    content="- [ ] CONTRACT: {severity} at {file}:{line} — expected {expected, one sentence}; actual {actual, one sentence}; {issue, one sentence} (reported by contract-verification on {task_id})",
     append=True
 )
 ```
+
+Carry forward the Expected/Actual/file:line identifying detail from your analysis above —
+a later verifier (`complete-implementation`'s concerns-processing) reads this entry to decide
+which file to open and what to check; a bare severity-plus-issue-sentence with no file or line
+gives it nothing to act on.
 
 Do not prepend `#` — `find_item` resolves a bare GitHub issue number and a bare beads nanoid
 (e.g. `bd-a3f8`) equally well, but `#bd-a3f8` matches neither its numeric-selector path nor

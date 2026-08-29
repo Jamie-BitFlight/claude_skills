@@ -38,7 +38,7 @@ An agent (swarm teammate, groomer, discovery, drift-assessment) did not produce 
 4. Wait for the diagnostic agent to go idle — the runtime delivers this automatically as a completion notification once the dispatch finishes, so no new polling call is needed — then read back its result:
 
    ```text
-   mcp__plugin_dh_backlog__backlog_view(selector="<item_ref/>", section="Context", show="last")
+   mcp__plugin_dh_backlog__backlog_view(selector="<item_ref/>", section="Context", show="last", summary=False)
    ```
 
    Parse `failure_type` from the most recent `DIAGNOSTIC (...)` line — that parsed value is what the decision tree below branches on. The idle notification only confirms the diagnostic agent stopped running; it does not by itself guarantee the write happened. If the most recent Context entry is not a well-formed `DIAGNOSTIC (...)` line, or there is no qualifying entry at all, treat this as the diagnostic agent having failed to register — route to the System Error procedure below rather than guessing a `failure_type`.
