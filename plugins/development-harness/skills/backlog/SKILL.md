@@ -39,7 +39,7 @@ Create a new backlog item and a GitHub issue.
 | `description` | `str` | required | Item description |
 | `source` | `str` | `"Not specified"` | Where this item came from |
 | `type` | `str` | `"Feature"` | `Feature`, `Bug`, `Refactor`, `Docs`, or `Chore` |
-| `force` | `bool` | `False` | Skip fuzzy duplicate check |
+| `force` | `bool` | `False` | Skip content-based duplicate check |
 
 Returns `{filepath, filename, title, priority, issue_num?, messages, warnings}`.
 

@@ -123,7 +123,7 @@ flowchart TD
     P1_COLLECT_AUTO --> P1_VALIDATE
 
     P1_VALIDATE -->|"required field missing"| P1_STOP_INVALID(["STOP — report missing field<br>(title, priority, or description)"])
-    P1_VALIDATE -->|"all required fields present"| P1_DEDUP{"Step 3: Duplicate detection<br>backlog_list search/filter<br>title overlap ≤ 2 token edit distance"}
+    P1_VALIDATE -->|"all required fields present"| P1_DEDUP{"Step 3: Duplicate detection<br>Content-scoped token/boolean match<br>across title, description, and section bodies"}
     P1_DEDUP -->|"Duplicate found (guided/quick)"| P1_CONFIRM{"User confirms<br>proceed?"}
     P1_DEDUP -->|"Duplicate found (--auto)"| P1_STOP_DUP(["STOP — duplicate detected<br>No file written"])
     P1_DEDUP -->|No duplicate| P1_COMPOSE
@@ -151,7 +151,7 @@ flowchart TD
 | P1_COLLECT_QUICK | orchestrator | priority + description args | collected fields, `verbatim_user_report` = full argument string | always → P1_VALIDATE |
 | P1_COLLECT_AUTO | orchestrator | description text | inferred fields (priority from keywords, source=Agent task, type=Feature) | always → P1_VALIDATE |
 | P1_VALIDATE | orchestrator | collected fields | validated fields, stripped description | valid → P1_DEDUP, missing required field → STOP |
-| P1_DEDUP | orchestrator | validated title, `backlog/` file listing | duplicate match result | duplicate + guided/quick → P1_CONFIRM, duplicate + auto → P1_STOP_DUP, no duplicate → P1_COMPOSE |
+| P1_DEDUP | orchestrator | validated title, description, cached backlog item list | duplicate match result | duplicate + guided/quick → P1_CONFIRM, duplicate + auto → P1_STOP_DUP, no duplicate → P1_COMPOSE |
 | P1_CONFIRM | user | duplicate item title | proceed/decline decision | yes → P1_COMPOSE, no → P1_STOP_DECLINE |
 | P1_STOP_DUP | orchestrator | duplicate detection result | error report (no file written) | terminal |
 | P1_STOP_DECLINE | orchestrator | user decline | error report | terminal |
@@ -174,7 +174,7 @@ flowchart TD
 **Failure paths**:
 
 - Missing required field (title, priority, description) — STOP, report field name.
-- Duplicate detected in auto mode — STOP, no file written.
+- Content duplicate detected in auto mode — STOP, no file written.
 - Remote provider unavailable — backend reports the failure explicitly; callers do not switch to a local storage provider.
 
 **Transition to next phase**: Text suggestion only ("Next steps: Groom: /dh:groom-backlog-item {title}"). No automatic invocation. The transition from capture to grooming is entirely implied — a human or orchestrator must decide to invoke the next step. (Confirmed: audit Finding 9 Gap A.)

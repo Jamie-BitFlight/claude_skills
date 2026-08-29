@@ -95,6 +95,8 @@ Duplicate detection uses boolean substring matching, not semantic matching.
 4. Call:
    `mcp__plugin_dh_backlog__backlog_list(search="{concept1} OR {concept2} OR {concept3}", match_context=true)`
 
+Scripted or dispatch contexts that cannot call MCP can run the same check via `backlog list --search "{concept1} OR {concept2} OR {concept3}"` on the CLI.
+
 Match handling:
 - If no overlaps are found, continue.
 - If one or more overlaps are found, use the highest-confidence returned match first.
