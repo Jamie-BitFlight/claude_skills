@@ -221,23 +221,30 @@ def reply(
     body: Annotated[str, typer.Option(help="Reply text.")],
     owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
     repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
+    gh_timeout_seconds: Annotated[
+        float | None, typer.Option(min=0, help="Seconds to bound the `gh` call to. Unbounded by default.")
+    ] = None,
 ) -> None:
     """Reply to a review comment. Prints gh's created-comment response as compact JSON."""
-    raw = run_gh([
-        "api",
-        "-X",
-        "POST",
-        f"repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies",
-        "-f",
-        f"body={body}",
-    ])
+    raw = run_gh(
+        ["api", "-X", "POST", f"repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies", "-f", f"body={body}"],
+        timeout=gh_timeout_seconds,
+    )
     typer.echo(raw.strip())
 
 
 @app.command()
-def resolve(thread_id: Annotated[str, typer.Option(help="Review thread id, from `fetch`.")]) -> None:
+def resolve(
+    thread_id: Annotated[str, typer.Option(help="Review thread id, from `fetch`.")],
+    gh_timeout_seconds: Annotated[
+        float | None, typer.Option(min=0, help="Seconds to bound the `gh` call to. Unbounded by default.")
+    ] = None,
+) -> None:
     """Resolve a review thread. Prints gh's mutation response as compact JSON."""
-    raw = run_gh(["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={thread_id}"])
+    raw = run_gh(
+        ["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={thread_id}"],
+        timeout=gh_timeout_seconds,
+    )
     typer.echo(raw.strip())
 
 

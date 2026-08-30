@@ -790,6 +790,35 @@ def test_internal_result_models_are_not_strict() -> None:
         assert model.model_config.get("strict") is not True
 
 
+# --- every command can bound its own gh calls -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["fetch", "--pr", "3208", "--gh-timeout-seconds", "7"],
+        ["reply", "--pr", "3208", "--comment-id", "1", "--body", "x", "--gh-timeout-seconds", "7"],
+        ["resolve", "--thread-id", "T1", "--gh-timeout-seconds", "7"],
+    ],
+    ids=["fetch", "reply", "resolve"],
+)
+def test_every_gh_backed_command_accepts_a_timeout_bound(argv: list[str], mocker: MockerFixture) -> None:
+    """`--gh-timeout-seconds` reaches `run_gh` from every command that shells out.
+
+    Regression coverage for a Codex review of the change that removed the hardcoded
+    `_GH_TIMEOUT_SECONDS`: `reply` and `resolve` were left with no way to bound their `gh` call at
+    all, so an unattended workflow could hang on them indefinitely with no option to prevent it.
+    """
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
+    run_gh_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value="{}")
+
+    result = runner.invoke(app, argv)
+
+    assert result.exit_code == 0, result.output
+    if argv[0] != "fetch":
+        assert run_gh_mock.call_args.kwargs["timeout"] == pytest.approx(7)
+
+
 # --- FetchResult.has_outstanding_work -----------------------------------------------------------
 
 
