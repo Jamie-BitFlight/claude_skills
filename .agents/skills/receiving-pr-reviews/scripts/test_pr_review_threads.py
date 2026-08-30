@@ -8,26 +8,34 @@
 #   "pytest-mock",
 # ]
 # ///
-"""Tests for pr_review_threads.py.
+"""Tests for pr_review_threads.py, pr_review_gh.py, and pr_review_models.py.
 
-Covers the non-trivial logic identified in review: `_build_fetch_result`'s multi-page
-flattening, resolved-thread filtering, `comments_truncated` derivation, and
-`reviews_with_body` filtering (including a null `author`, which a deleted GitHub account
-produces); and `watch`'s baseline-diff — both the "new activity found" and "timed out with
-none" outcomes.
+Covers: `pr_review_gh.build_fetch_result`'s multi-page flattening, resolved-thread filtering,
+`comments_truncated` derivation, `reviews_with_body` filtering (including a null `author`, which a
+deleted GitHub account produces), `unresponded_reviews` derivation against PR-level comment
+timing, and `codex_approved` reaction detection — all as one JSON-in/JSON-out pipeline test plus a
+matrix of focused unit tests against `build_fetch_result` directly. Also covers
+`FetchResult.has_outstanding_work` (the single trigger rule `watch` polls for) and `watch`'s own
+loop: returning immediately when the first fetch is already actionable, polling until it becomes
+actionable, timing out when it never does, and the deadline-budget/transient-failure mechanics
+carried over from the pre-existing polling loop.
 """
 
 from __future__ import annotations
 
 import json
 import subprocess
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
 from typer.testing import CliRunner
 
+import pr_review_gh
 import pr_review_threads
-from pr_review_threads import FetchResult, app
+from pr_review_gh import _is_codex_thumbs_up, build_fetch_result
+from pr_review_models import Author, FetchResult, IssueComment, Reaction, ReviewNode, UnresolvedThread
+from pr_review_threads import app
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -69,14 +77,56 @@ def _reviews_page(*, nodes: list[dict[str, object]], total_count: int) -> dict[s
     }
 
 
-def test_fetch_flattens_pages_filters_resolved_and_handles_null_author(mocker: MockerFixture) -> None:
-    """`fetch` flattens multi-page thread results, dropping resolved threads and counting right.
+def _rest_pages(*items: dict[str, object]) -> str:
+    """Build the `--paginate --slurp` output for a plain REST array endpoint: one page of items."""
+    return json.dumps([list(items)])
 
-    Two thread pages are fed to `_run_gh` (page 1 has a resolved and an unresolved thread; page
-    2's lone thread has `comments.pageInfo.hasNextPage: true`). One reviews page has a review
-    with a null `author` (a deleted account) alongside an empty-body review — both must be
-    parsed without error, and only the non-empty-body review must survive into
-    `reviews_with_body`.
+
+def _review(review_id: str, *, body: str, submitted_at: datetime | None, login: str = "codex") -> ReviewNode:
+    return ReviewNode(id=review_id, author=Author(login=login), state="COMMENTED", body=body, submittedAt=submitted_at)
+
+
+def _state(
+    *, unresolved_count: int = 0, unresponded_reviews: list[ReviewNode] | None = None, codex_approved: bool = False
+) -> FetchResult:
+    """Build a minimal `FetchResult` for `watch`-loop tests, with `has_outstanding_work` control."""
+    return FetchResult(
+        reviews_count=0,
+        reviews_with_body=[],
+        unresponded_reviews=unresponded_reviews or [],
+        threads_count=unresolved_count,
+        unresolved=[
+            UnresolvedThread(id=f"T{i}", path="x.py", comments=[], comments_truncated=False)
+            for i in range(unresolved_count)
+        ],
+        unresolved_count=unresolved_count,
+        codex_approved=codex_approved,
+    )
+
+
+def _reviews_conn(nodes: list[ReviewNode]) -> pr_review_gh.ReviewsConnection:
+    return pr_review_gh.ReviewsConnection(totalCount=len(nodes), nodes=nodes)
+
+
+def _empty_threads() -> list[pr_review_gh.ReviewThreadsConnection]:
+    """A single empty `reviewThreads` page — `build_fetch_result` always indexes page zero."""
+    return [pr_review_gh.ReviewThreadsConnection(totalCount=0, nodes=[])]
+
+
+# --- fetch: full JSON-in/JSON-out pipeline -----------------------------------------------------
+
+
+def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: MockerFixture) -> None:
+    """`fetch` flattens multi-page thread results, dropping resolved threads and counting right,
+    and derives `unresponded_reviews` and `codex_approved` from the issue-comments and reactions
+    calls in the same pipeline.
+
+    Two thread pages are fed to `run_gh` (page 1 has a resolved and an unresolved thread; page
+    2's lone thread has `comments.pageInfo.hasNextPage: true`). One reviews page has a review with
+    a null `author` (a deleted account) alongside an empty-body review — both must be parsed
+    without error, and only the non-empty-body review must survive into `reviews_with_body`. One
+    PR-level comment postdates the review, so it must NOT appear in `unresponded_reviews`. One
+    reaction is Codex's "+1", so `codex_approved` must be `True`.
     """
     thread_pages = [
         _thread_page(
@@ -139,12 +189,24 @@ def test_fetch_flattens_pages_filters_resolved_and_handles_null_author(mocker: M
         _reviews_page(
             total_count=2,
             nodes=[
-                {"id": "R1", "author": {"login": "codex"}, "state": "COMMENTED", "body": "Some feedback"},
-                {"id": "R2", "author": None, "state": "APPROVED", "body": ""},
+                {
+                    "id": "R1",
+                    "author": {"login": "codex"},
+                    "state": "COMMENTED",
+                    "body": "Some feedback",
+                    "submittedAt": "2026-01-01T00:00:00Z",
+                },
+                {"id": "R2", "author": None, "state": "APPROVED", "body": "", "submittedAt": "2026-01-01T00:00:00Z"},
             ],
         )
     ]
-    mocker.patch.object(pr_review_threads, "_run_gh", side_effect=[json.dumps(thread_pages), json.dumps(reviews_pages)])
+    issue_comments_raw = _rest_pages({"created_at": "2026-01-02T00:00:00Z"})
+    reactions_raw = _rest_pages({"content": "+1", "user": {"login": "chatgpt-codex-connector[bot]"}})
+    mocker.patch.object(
+        pr_review_gh,
+        "run_gh",
+        side_effect=[json.dumps(thread_pages), json.dumps(reviews_pages), issue_comments_raw, reactions_raw],
+    )
 
     result = runner.invoke(app, ["fetch", "--pr", "3208"])
 
@@ -159,19 +221,152 @@ def test_fetch_flattens_pages_filters_resolved_and_handles_null_author(mocker: M
     assert data["reviews_count"] == 2
     assert len(data["reviews_with_body"]) == 1
     assert data["reviews_with_body"][0]["author"]["login"] == "codex"
+    # The PR-level comment (2026-01-02) postdates R1's review (2026-01-01) — already followed up.
+    assert data["unresponded_reviews"] == []
+    assert data["codex_approved"] is True
 
 
-def test_watch_reports_new_thread_when_activity_appears(mocker: MockerFixture) -> None:
-    """`watch` returns `timed_out: False` and the new thread id as soon as a poll finds one."""
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
-    updated = FetchResult.model_validate({
-        "reviews_count": 0,
-        "reviews_with_body": [],
-        "threads_count": 1,
-        "unresolved": [{"id": "T9", "path": "d.py", "comments": [], "comments_truncated": False}],
-        "unresolved_count": 1,
-    })
-    mocker.patch.object(pr_review_threads, "_build_fetch_result", side_effect=[baseline, updated])
+# --- build_fetch_result: unresponded_reviews / codex_approved unit matrix ----------------------
+
+
+def test_build_fetch_result_unresponded_when_no_pr_comments_exist(mocker: MockerFixture) -> None:
+    """A bodied, submitted review is unresponded when the PR has no PR-level comments at all."""
+    review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_responded_when_pr_comment_postdates_review(mocker: MockerFixture) -> None:
+    """A review is excluded from `unresponded_reviews` once a PR-level comment postdates it."""
+    review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == []
+
+
+def test_build_fetch_result_unresponded_when_pr_comment_predates_review(mocker: MockerFixture) -> None:
+    """A review submitted after the newest PR-level comment is still unresponded."""
+    review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
+    comment = IssueComment(created_at=datetime(2026, 1, 1, tzinfo=UTC))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_excludes_review_with_no_submitted_at(mocker: MockerFixture) -> None:
+    """A review that has not actually been submitted yet is never unresponded."""
+    review = _review("R1", body="feedback", submitted_at=None)
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == []
+
+
+def test_build_fetch_result_codex_approved_true_for_bot_thumbs_up(mocker: MockerFixture) -> None:
+    """`codex_approved` is `True` when the bot's "+1" reaction is present on the PR."""
+    reaction = Reaction(content="+1", user=Author(login="chatgpt-codex-connector[bot]"))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[reaction])
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.codex_approved is True
+
+
+@pytest.mark.parametrize(
+    "reaction",
+    [
+        Reaction(content="heart", user=Author(login="chatgpt-codex-connector[bot]")),
+        Reaction(content="+1", user=Author(login="some-human")),
+        Reaction(content="+1", user=None),
+    ],
+    ids=["wrong-content", "wrong-user", "null-user"],
+)
+def test_is_codex_thumbs_up_false_for_non_matching_reactions(reaction: Reaction) -> None:
+    """Only a "+1" from a `chatgpt-codex-connector`-prefixed login counts as Codex's approval."""
+    assert _is_codex_thumbs_up(reaction) is False
+
+
+def test_is_codex_thumbs_up_true_regardless_of_bot_suffix() -> None:
+    """Matches both the GraphQL-style login (no `[bot]`) and REST-style login (`[bot]` suffix)."""
+    assert _is_codex_thumbs_up(Reaction(content="+1", user=Author(login="chatgpt-codex-connector"))) is True
+    assert _is_codex_thumbs_up(Reaction(content="+1", user=Author(login="chatgpt-codex-connector[bot]"))) is True
+
+
+# --- FetchResult.has_outstanding_work -----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        _state(unresolved_count=1),
+        _state(unresponded_reviews=[_review("R1", body="x", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))]),
+        _state(codex_approved=True),
+    ],
+    ids=["unresolved-thread", "unresponded-review", "codex-approved"],
+)
+def test_has_outstanding_work_true_when_any_signal_present(state: FetchResult) -> None:
+    assert state.has_outstanding_work() is True
+
+
+def test_has_outstanding_work_false_when_all_clear() -> None:
+    assert _state().has_outstanding_work() is False
+
+
+# --- watch: immediate return when already actionable ---------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        _state(unresolved_count=1),
+        _state(unresponded_reviews=[_review("R1", body="x", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))]),
+        _state(codex_approved=True),
+    ],
+    ids=["unresolved-thread", "unresponded-review", "codex-approved"],
+)
+def test_watch_returns_immediately_when_first_fetch_already_actionable(
+    state: FetchResult, mocker: MockerFixture
+) -> None:
+    """`watch` returns on its first fetch, without sleeping, when that fetch is already actionable."""
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
+    sleep_mock = mocker.patch.object(pr_review_threads.time, "sleep")
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "20"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["timed_out"] is False
+    fetch_mock.assert_called_once()
+    sleep_mock.assert_not_called()
+
+
+def test_watch_polls_until_thread_becomes_unresolved(mocker: MockerFixture) -> None:
+    """`watch` keeps polling while nothing is outstanding, and returns once a thread appears."""
+    mocker.patch.object(pr_review_threads, "build_fetch_result", side_effect=[_state(), _state(unresolved_count=1)])
     mocker.patch.object(pr_review_threads.time, "sleep")
 
     # timeout-seconds must clear _MIN_POLL_BUDGET_SECONDS with real headroom: with time.sleep
@@ -182,68 +377,26 @@ def test_watch_reports_new_thread_when_activity_appears(mocker: MockerFixture) -
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
-    assert data["new_thread_ids"] == ["T9"]
-    assert data["new_reviews_with_body"] == []
+    assert data["state"]["unresolved_count"] == 1
 
 
-def test_watch_reports_edited_review_with_unchanged_id(mocker: MockerFixture) -> None:
-    """`watch` treats a baseline review whose body/state changed as new activity, same id or not.
-
-    Regression coverage for comparing reviews by id alone: a reviewer editing an existing review
-    (GitHub keeps its GraphQL id stable across edits) must still be detected — SKILL.md documents
-    this as counting as new activity.
-    """
-    review_v1 = {"id": "R1", "author": {"login": "codex"}, "state": "COMMENTED", "body": "first pass"}
-    review_v2 = {"id": "R1", "author": {"login": "codex"}, "state": "COMMENTED", "body": "edited after more thought"}
-    baseline = FetchResult.model_validate({
-        "reviews_count": 1,
-        "reviews_with_body": [review_v1],
-        "threads_count": 0,
-        "unresolved": [],
-        "unresolved_count": 0,
-    })
-    edited = FetchResult.model_validate({
-        "reviews_count": 1,
-        "reviews_with_body": [review_v2],
-        "threads_count": 0,
-        "unresolved": [],
-        "unresolved_count": 0,
-    })
-    mocker.patch.object(pr_review_threads, "_build_fetch_result", side_effect=[baseline, edited])
-    mocker.patch.object(pr_review_threads.time, "sleep")
-
-    # timeout-seconds must clear _MIN_POLL_BUDGET_SECONDS with real headroom: with time.sleep
-    # mocked to a no-op, almost no wall-clock time elapses between polls, so a timeout right at
-    # (or below) the guard threshold spuriously trips it before this test's second poll runs.
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "20"])
-
-    assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    assert data["timed_out"] is False
-    assert len(data["new_reviews_with_body"]) == 1
-    assert data["new_reviews_with_body"][0]["body"] == "edited after more thought"
-
-
-def test_watch_times_out_when_no_new_activity(mocker: MockerFixture) -> None:
-    """`watch` returns `timed_out: True` when `timeout_seconds` elapses with nothing new."""
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
-    mocker.patch.object(pr_review_threads, "_build_fetch_result", return_value=baseline)
+def test_watch_times_out_when_nothing_outstanding(mocker: MockerFixture) -> None:
+    """`watch` returns `timed_out: True` when `timeout_seconds` elapses with nothing outstanding."""
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
 
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "0"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is True
-    assert data["new_thread_ids"] == []
-    assert data["new_reviews_with_body"] == []
 
 
 def test_watch_skips_final_poll_when_budget_too_low(mocker: MockerFixture) -> None:
     """`watch` stops polling, without attempting a doomed call, once the budget remaining before
     `deadline` drops below `_MIN_POLL_BUDGET_SECONDS`.
 
-    Regression coverage: `_gh_timeout_budget` floors an exhausted deadline to 0.1s — far too
-    little for a real `gh` call. Because `_DEFAULT_WATCH_TIMEOUT_SECONDS` is an exact multiple of
+    Regression coverage: `gh_timeout_budget` floors an exhausted deadline to 0.1s — far too little
+    for a real `gh` call. Because `_DEFAULT_WATCH_TIMEOUT_SECONDS` is an exact multiple of
     `_DEFAULT_WATCH_INTERVAL_SECONDS` (270 / 90 = 3), the loop's final sleep lands within a
     fraction of a second of `deadline` on essentially every real run, so an unguarded poll there
     reliably raised `TimeoutExpired` instead of returning a clean `timed_out` result. Mocks
@@ -251,8 +404,7 @@ def test_watch_skips_final_poll_when_budget_too_low(mocker: MockerFixture) -> No
     computation, the loop condition, the sleep-duration calculation, the budget check) so the
     near-deadline condition is reproduced without a real wait.
     """
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
-    fetch_mock = mocker.patch.object(pr_review_threads, "_build_fetch_result", return_value=baseline)
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
     mocker.patch.object(pr_review_threads.time, "sleep")
     # 0.0 (deadline = 0.0 + 100), 0.0 (loop condition), 0.0 (sleep-duration calc), 96.0 (budget
     # check: 100.0 - 96.0 = 4.0 < _MIN_POLL_BUDGET_SECONDS's 5.0 — guard fires, loop breaks).
@@ -263,7 +415,7 @@ def test_watch_skips_final_poll_when_budget_too_low(mocker: MockerFixture) -> No
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is True
-    # Only the baseline fetch happened — the guard prevented a second, doomed poll attempt.
+    # Only the first fetch happened — the guard prevented a second, doomed poll attempt.
     assert fetch_mock.call_count == 1
 
 
@@ -272,18 +424,10 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     crash `watch` — it counts as no fresh data for that one poll, and the loop continues toward
     `deadline` on its own schedule rather than propagating the exception.
     """
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
-    updated = FetchResult.model_validate({
-        "reviews_count": 0,
-        "reviews_with_body": [],
-        "threads_count": 1,
-        "unresolved": [{"id": "T9", "path": "d.py", "comments": [], "comments_truncated": False}],
-        "unresolved_count": 1,
-    })
     mocker.patch.object(
         pr_review_threads,
-        "_build_fetch_result",
-        side_effect=[baseline, subprocess.TimeoutExpired(cmd=["gh"], timeout=30), updated],
+        "build_fetch_result",
+        side_effect=[_state(), subprocess.TimeoutExpired(cmd=["gh"], timeout=30), _state(unresolved_count=1)],
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
 
@@ -292,7 +436,7 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
-    assert data["new_thread_ids"] == ["T9"]
+    assert data["state"]["unresolved_count"] == 1
 
 
 def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None:
@@ -301,18 +445,17 @@ def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None
 
     Regression coverage for a Codex review on the fix that introduced the try/except around each
     poll: silently returning `timed_out: true` here would claim a confirmed check found nothing
-    new, when no check after the baseline ever succeeded — a caller trusting that signal would
-    wrongly conclude the PR is clean instead of retrying. Mocks `time.monotonic` to a fixed
-    sequence for exactly two failed poll attempts (each iteration: loop condition, sleep-duration
-    calc, guard check) followed by the window naturally expiring, matching the real function's
-    call order the same way `test_watch_skips_final_poll_when_budget_too_low` does.
+    outstanding, when no check after the first fetch ever succeeded — a caller trusting that
+    signal would wrongly conclude the PR is clean instead of retrying. Mocks `time.monotonic` to a
+    fixed sequence for exactly two failed poll attempts (each iteration: loop condition,
+    sleep-duration calc, guard check) followed by the window naturally expiring, matching the real
+    function's call order the same way `test_watch_skips_final_poll_when_budget_too_low` does.
     """
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
     mocker.patch.object(
         pr_review_threads,
-        "_build_fetch_result",
+        "build_fetch_result",
         side_effect=[
-            baseline,
+            _state(),
             subprocess.TimeoutExpired(cmd=["gh"], timeout=30),
             subprocess.CalledProcessError(1, ["gh"]),
         ],
@@ -345,23 +488,15 @@ def test_watch_polls_final_leg_instead_of_skipping_it(mocker: MockerFixture) -> 
     t=95 (`min(90, 100-5-90)=5`), where `100-95=5` does *not* trip the guard, so the second poll
     is attempted and finds the new activity it otherwise would have missed for this call entirely.
     """
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
-    no_change = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
-    updated = FetchResult.model_validate({
-        "reviews_count": 0,
-        "reviews_with_body": [],
-        "threads_count": 1,
-        "unresolved": [{"id": "T9", "path": "d.py", "comments": [], "comments_truncated": False}],
-        "unresolved_count": 1,
-    })
     fetch_mock = mocker.patch.object(
-        pr_review_threads, "_build_fetch_result", side_effect=[baseline, no_change, updated]
+        pr_review_threads, "build_fetch_result", side_effect=[_state(), _state(), _state(unresolved_count=1)]
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
     # 0.0 (deadline=100). Iter 1: 0.0 (loop cond), 0.0 (sleep calc: min(90,95)=90), 90.0 (guard:
-    # 100-90=10 ≥ 5) → poll succeeds, no new activity. Iter 2: 90.0 (loop cond), 90.0 (sleep calc:
-    # min(90, 100-5-90=5)=5 — the fixed reservation, not the interval), 95.0 (guard: 100-95=5, not
-    # < 5) → poll attempted (would have been skipped under the pre-fix formula) and finds T9.
+    # 100-90=10 ≥ 5) → poll succeeds, nothing outstanding. Iter 2: 90.0 (loop cond), 90.0 (sleep
+    # calc: min(90, 100-5-90=5)=5 — the fixed reservation, not the interval), 95.0 (guard:
+    # 100-95=5, not < 5) → poll attempted (would have been skipped under the pre-fix formula) and
+    # finds the unresolved thread.
     mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 95.0])
 
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "100"])
@@ -369,7 +504,7 @@ def test_watch_polls_final_leg_instead_of_skipping_it(mocker: MockerFixture) -> 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
-    assert data["new_thread_ids"] == ["T9"]
+    assert data["state"]["unresolved_count"] == 1
     assert fetch_mock.call_count == 3
 
 
@@ -379,20 +514,19 @@ def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) ->
 
     Regression coverage for a second Codex review, on the fix above: tracking whether *any* poll
     succeeded is not enough — an early success does not confirm the tail of the window after a
-    later failure. If poll 1 succeeds (finding nothing new) and poll 2 then fails as the window
-    ends, `current` is stale (still poll 1's data) and the final stretch before `deadline` was
-    never actually observed; `watch` must still fail rather than report a `timed_out: true` built
-    from that stale state.
+    later failure. If poll 1 succeeds (finding nothing outstanding) and poll 2 then fails as the
+    window ends, `current` is stale (still poll 1's data) and the final stretch before `deadline`
+    was never actually observed; `watch` must still fail rather than report a `timed_out: true`
+    built from that stale state.
     """
-    baseline = FetchResult(reviews_count=0, reviews_with_body=[], threads_count=0, unresolved=[], unresolved_count=0)
     mocker.patch.object(
         pr_review_threads,
-        "_build_fetch_result",
-        side_effect=[baseline, baseline, subprocess.TimeoutExpired(cmd=["gh"], timeout=30)],
+        "build_fetch_result",
+        side_effect=[_state(), _state(), subprocess.TimeoutExpired(cmd=["gh"], timeout=30)],
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
     # Same 8-call shape as the all-fail test above, but iter 1's poll succeeds this time (finding
-    # nothing new, so the loop does not break) before iter 2's poll fails as the window ends.
+    # nothing outstanding, so the loop does not break) before iter 2's poll fails as the window ends.
     mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 10.0, 20.0, 20.0, 30.0, 105.0])
 
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
