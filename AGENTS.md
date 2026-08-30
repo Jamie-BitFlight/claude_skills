@@ -31,13 +31,14 @@ uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # I
 For full uv/ty/ruff usage guidance beyond this repo's own overrides, load the `astral` plugin
 skills (`/astral:uv`, `/astral:ty`, `/astral:ruff`) if installed, or see `docs.astral.sh` directly.
 
+`prek` aggregates ruff, ty, and every other configured hook — never run `ruff check`/`ruff
+format`/`ty check` standalone when `prek` is available; it dispatches to the same tools and skips
+hooks that don't apply to the given files.
+
 ```bash
-uv run ruff check --fix path/to/file.py    # Lint with auto-fix
-uv run ruff format path/to/file.py         # Format Python
-uv run ty check path/to/file.py            # Type check (Astral's ty)
 uv run prek run --files path/to/file.py    # Run ALL pre-commit hooks on specific files
 uv run prek run --all-files                # Run ALL hooks on all files (slow)
-uv run prek run ruff --files <file>        # Run single hook on specific files
+uv run prek run ruff --files <file>        # Run one hook by id (e.g. ruff, ty) on specific files
 uvx skilllint@latest check <path>          # Validate skill/agent/plugin frontmatter
 ```
 
@@ -344,7 +345,7 @@ commit and changed path.
 For full ty usage guidance beyond this repo's own overrides, load the `astral` plugin skill
 (`/astral:ty`) if installed, or see `docs.astral.sh` directly.
 
-This repository enforces **ty** (Astral) only: `uv run ty check .`. `mypy`,
+This repository enforces **ty** (Astral) only, run via `prek`. `mypy`,
 `pyright`, and `basedpyright` are not repository quality gates; references to
 them in plugin-facing documentation describe options for external plugin users.
 
