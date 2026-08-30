@@ -377,9 +377,6 @@ closed           — terminal: milestone archived by complete-milestone
 `verified` exists as a cross-route signal applied by `complete-implementation` after quality
 gates pass. It is NOT a lifecycle state and has no entry/exit transitions in the state machine.
 
-SOURCE: `skills/backlog/references/state-machine.md` (now deleted; accessed 2026-03-30).
-Updated 2026-04-06 for route-based naming.
-
 ---
 
 ## 5. Priority and Auto-Mode Defaults
