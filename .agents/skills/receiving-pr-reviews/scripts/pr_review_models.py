@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 
-class _GitHubResponseModel(BaseModel):
+class GitHubResponseModel(BaseModel):
     """Base for every model that ingests a raw GitHub response, GraphQL or REST.
 
     `strict=True` so a producer-shape mismatch — GitHub or `gh` returning a string where the
@@ -57,13 +57,13 @@ class _GitHubResponseModel(BaseModel):
 GitHubTimestamp = Annotated[datetime, Field(strict=False)]
 
 
-class Author(_GitHubResponseModel):
+class Author(GitHubResponseModel):
     """A GitHub account login, as GraphQL returns it for a comment/review/reaction author."""
 
     login: str
 
 
-class CommentNode(_GitHubResponseModel):
+class CommentNode(GitHubResponseModel):
     """A single review comment, in the shape GitHub's GraphQL API returns it.
 
     `author` is `None` for a comment left by an account that has since been deleted — GitHub's
@@ -77,7 +77,7 @@ class CommentNode(_GitHubResponseModel):
     author: Author | None
 
 
-class PageInfo(_GitHubResponseModel):
+class PageInfo(GitHubResponseModel):
     """The `hasNextPage` half of a GraphQL connection's `pageInfo`.
 
     `endCursor` is consumed entirely by `gh api graphql --paginate` itself and never read by this
@@ -87,7 +87,7 @@ class PageInfo(_GitHubResponseModel):
     hasNextPage: bool
 
 
-class CommentsConnection(_GitHubResponseModel):
+class CommentsConnection(GitHubResponseModel):
     """One page's `comments` connection, nested inside a `reviewThreads` node."""
 
     totalCount: int
@@ -95,7 +95,7 @@ class CommentsConnection(_GitHubResponseModel):
     nodes: list[CommentNode]
 
 
-class ReviewThreadNode(_GitHubResponseModel):
+class ReviewThreadNode(GitHubResponseModel):
     """One review thread, in the shape GitHub's GraphQL API returns it."""
 
     id: str
@@ -104,7 +104,7 @@ class ReviewThreadNode(_GitHubResponseModel):
     comments: CommentsConnection
 
 
-class ReviewThreadsConnection(_GitHubResponseModel):
+class ReviewThreadsConnection(GitHubResponseModel):
     """One page's `reviewThreads` connection, already unwrapped from `data.repository.pullRequest`.
 
     `pr_review_gh._fetch_pages` pulls this dict straight out of each slurped page by subscripting
@@ -118,7 +118,7 @@ class ReviewThreadsConnection(_GitHubResponseModel):
     nodes: list[ReviewThreadNode]
 
 
-class ReviewNode(_GitHubResponseModel):
+class ReviewNode(GitHubResponseModel):
     """A top-level review submission, in the shape GitHub's GraphQL API returns it.
 
     Distinct from a review *comment* (`CommentNode`): this is the review object itself — its
@@ -151,7 +151,7 @@ class ReviewNode(_GitHubResponseModel):
     url: str
 
 
-class ReviewsConnection(_GitHubResponseModel):
+class ReviewsConnection(GitHubResponseModel):
     """One page's `reviews` connection, already unwrapped — see `ReviewThreadsConnection`."""
 
     totalCount: int
@@ -162,7 +162,7 @@ class UnresolvedThread(BaseModel):
     """One unresolved review thread and its full comment history, as emitted to the caller.
 
     Assembled by `pr_review_gh.build_fetch_result` from already-validated `ReviewThreadNode`
-    values, so it is an output shape rather than an ingress one — see `_GitHubResponseModel`.
+    values, so it is an output shape rather than an ingress one — see `GitHubResponseModel`.
     """
 
     id: str
@@ -171,7 +171,7 @@ class UnresolvedThread(BaseModel):
     comments_truncated: bool
 
 
-class IssueComment(_GitHubResponseModel):
+class IssueComment(GitHubResponseModel):
     """One PR-level (issue) comment, in the shape GitHub's REST API returns it.
 
     `pr_review_gh._unresponded_reviews` treats a comment authored by the currently-authenticated
@@ -187,7 +187,7 @@ class IssueComment(_GitHubResponseModel):
     body: str
 
 
-class Reaction(_GitHubResponseModel):
+class Reaction(GitHubResponseModel):
     """One reaction left on the PR itself, in the shape GitHub's REST reactions API returns it.
 
     `user` is `None` for a reaction left by an account that has since been deleted, same null
@@ -202,13 +202,13 @@ class Reaction(_GitHubResponseModel):
     created_at: GitHubTimestamp
 
 
-class GitHubCommitDate(_GitHubResponseModel):
+class GitHubCommitDate(GitHubResponseModel):
     """The `committedDate` field of a GraphQL `Commit` object."""
 
     committedDate: GitHubTimestamp
 
 
-class HeadCommitNode(_GitHubResponseModel):
+class HeadCommitNode(GitHubResponseModel):
     """One commit from GraphQL's `pullRequest.commits(last: 1)` connection.
 
     Requesting `last: 1` asks the server directly for the tail element — GraphQL's connection
@@ -220,13 +220,13 @@ class HeadCommitNode(_GitHubResponseModel):
     commit: GitHubCommitDate
 
 
-class HeadCommitsConnection(_GitHubResponseModel):
+class HeadCommitsConnection(GitHubResponseModel):
     """The `commits(last: 1)` connection nested inside `PullRequestHeadState`."""
 
     nodes: list[HeadCommitNode]
 
 
-class PullRequestHeadState(_GitHubResponseModel):
+class PullRequestHeadState(GitHubResponseModel):
     """The PR-level fields `pr_review_gh._fetch_head_state` reads in one GraphQL query.
 
     All four live on the same `pullRequest` object, so they cost one round trip together: the head
@@ -237,7 +237,7 @@ class PullRequestHeadState(_GitHubResponseModel):
     `DIRTY`, `BLOCKED`, `BEHIND`, `UNSTABLE`, `DRAFT`, `HAS_HOOKS`, or `UNKNOWN`. Both are kept as
     plain strings rather than enums: GitHub can add a state at any time, and an unrecognized one
     must reach the caller as data instead of failing validation on a PR that is otherwise fine.
-    Strict against that string type, though — `strict=True` via `_GitHubResponseModel` means a
+    Strict against that string type, though — `strict=True` via `GitHubResponseModel` means a
     number or a null arriving where a state name belongs is rejected rather than stringified, and
     `isDraft` must be a real boolean rather than `"false"`. None of the three is a timestamp, so
     none needs the `GitHubTimestamp` relaxation.
@@ -269,7 +269,7 @@ class Reviewability(BaseModel):
     it on every poll, and `fetch` is cheap to re-run.
 
     Derived by `pr_review_gh._reviewability` from an already-validated `PullRequestHeadState`, so
-    it is an output shape rather than an ingress one and does not inherit `_GitHubResponseModel` —
+    it is an output shape rather than an ingress one and does not inherit `GitHubResponseModel` —
     same reason as `UnresolvedThread` and `FetchResult`.
     """
 
@@ -279,7 +279,7 @@ class Reviewability(BaseModel):
     blockers: list[str]
 
 
-class ForcePushEvent(_GitHubResponseModel):
+class ForcePushEvent(GitHubResponseModel):
     """One `HeadRefForcePushedEvent` GraphQL timeline item.
 
     `createdAt` is when GitHub's server recorded the force-push itself — independent of any

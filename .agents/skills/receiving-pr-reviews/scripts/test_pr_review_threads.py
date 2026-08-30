@@ -7,6 +7,19 @@
 #   "pytest",
 #   "pytest-mock",
 # ]
+# [tool.ty.environment]
+# # ty 0.0.75 treats any file carrying PEP 723 inline script metadata as an
+# # isolated single-file script and ignores [tool.ty.environment].extra-paths
+# # from pyproject.toml entirely, so this table (not the one in pyproject.toml)
+# # is what ty actually reads for this file. Relative extra-paths declared here
+# # resolve relative to this script's own directory, not the invocation cwd or
+# # the project root -- "." is therefore this directory, which is where the
+# # sibling pr_review_threads, pr_review_gh, and pr_review_models modules live.
+# # `ty check` already passes without this table (pyproject.toml's own
+# # extra-paths entry for this directory covers it in practice), but it is
+# # added here for parity with skilllint's copy of this script and to remove
+# # the dependency on pyproject.toml staying in sync with this file's location.
+# extra-paths = ["."]
 # ///
 """Tests for pr_review_threads.py, pr_review_gh.py, and pr_review_models.py.
 
@@ -810,7 +823,7 @@ def test_ingress_models_reject_a_coerced_producer_shape(model: type[BaseModel], 
     """A `gh` response whose scalar types do not match the schema fails at the boundary.
 
     In lax mode `"3"` silently becomes `3` and `"false"` becomes `True` — a producer-shape change
-    would then reach review state looking valid. `_GitHubResponseModel` sets `strict=True` so it
+    would then reach review state looking valid. `GitHubResponseModel` sets `strict=True` so it
     raises here instead.
     """
     with pytest.raises(ValidationError):
@@ -836,7 +849,7 @@ def test_internal_result_models_are_not_strict() -> None:
     """`FetchResult`/`WatchResult`/`UnresolvedThread` are output shapes, not ingress.
 
     They are assembled from already-validated values, so they deliberately do not inherit
-    `_GitHubResponseModel` — see its docstring.
+    `GitHubResponseModel` — see its docstring.
     """
     for model in (pr_review_models.FetchResult, pr_review_models.WatchResult, pr_review_models.UnresolvedThread):
         assert model.model_config.get("strict") is not True
