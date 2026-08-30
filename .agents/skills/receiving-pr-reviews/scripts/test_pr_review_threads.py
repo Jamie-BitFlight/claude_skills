@@ -41,7 +41,16 @@ import pr_review_gh
 import pr_review_models
 import pr_review_threads
 from pr_review_gh import _is_codex_thumbs_up, build_fetch_result
-from pr_review_models import Author, FetchResult, IssueComment, Reaction, ReviewNode, UnresolvedThread
+from pr_review_models import (
+    Author,
+    FetchResult,
+    IssueComment,
+    PullRequestHeadState,
+    Reaction,
+    Reviewability,
+    ReviewNode,
+    UnresolvedThread,
+)
 from pr_review_threads import app
 
 if TYPE_CHECKING:
@@ -124,6 +133,22 @@ def _own_comment(
     return IssueComment(created_at=created_at, user=Author(login=login), body=body)
 
 
+def _head_state(
+    commit_date: datetime = _OLD_COMMIT_DATE,
+    *,
+    is_draft: bool = False,
+    mergeable: str = "MERGEABLE",
+    merge_state_status: str = "CLEAN",
+) -> PullRequestHeadState:
+    """Build a `PullRequestHeadState`, defaulting to a reviewable (non-draft, conflict-free) PR."""
+    return PullRequestHeadState.model_validate({
+        "isDraft": is_draft,
+        "mergeable": mergeable,
+        "mergeStateStatus": merge_state_status,
+        "commits": {"nodes": [{"commit": {"committedDate": commit_date}}]},
+    })
+
+
 def _state(
     *, unresolved_count: int = 0, unresponded_reviews: list[ReviewNode] | None = None, codex_approved: bool = False
 ) -> FetchResult:
@@ -139,6 +164,7 @@ def _state(
         ],
         unresolved_count=unresolved_count,
         codex_approved=codex_approved,
+        reviewability=Reviewability(is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=[]),
     )
 
 
@@ -159,13 +185,14 @@ def _patch_identity_and_commit_date(
     force_push_at: datetime | None = None,
 ) -> None:
     """Stub the three `build_fetch_result` calls every matrix test below needs but does not itself
-    exercise — the authenticated identity (for `unresponded_reviews`), the head commit date, and
-    the latest force-push timestamp (both for `codex_approved`) — so each test's own `_fetch_*`
-    mocks stay focused on what it covers. `force_push_at` defaults to `None` (this PR has never
-    been force-pushed), matching most tests' scenarios.
+    exercise — the authenticated identity (for `unresponded_reviews`), the PR head state (its
+    commit date, for `codex_approved`, plus the reviewability fields), and the latest force-push
+    timestamp (also for `codex_approved`) — so each test's own `_fetch_*` mocks stay focused on
+    what it covers. `force_push_at` defaults to `None` (this PR has never been force-pushed),
+    matching most tests' scenarios, and the stubbed head state is a plain reviewable PR.
     """
     mocker.patch.object(pr_review_gh, "_fetch_authenticated_login", return_value=login)
-    mocker.patch.object(pr_review_gh, "_fetch_latest_commit_date", return_value=commit_date)
+    mocker.patch.object(pr_review_gh, "_fetch_head_state", return_value=_head_state(commit_date))
     mocker.patch.object(pr_review_gh, "_fetch_latest_force_push_at", return_value=force_push_at)
 
 
@@ -278,10 +305,15 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
         "user": {"login": "chatgpt-codex-connector[bot]"},
         "created_at": "2026-01-03T00:00:00Z",
     })
-    commits_raw = json.dumps({
+    head_state_raw = json.dumps({
         "data": {
             "repository": {
-                "pullRequest": {"commits": {"nodes": [{"commit": {"committedDate": "2026-01-01T12:00:00Z"}}]}}
+                "pullRequest": {
+                    "isDraft": False,
+                    "mergeable": "MERGEABLE",
+                    "mergeStateStatus": "CLEAN",
+                    "commits": {"nodes": [{"commit": {"committedDate": "2026-01-01T12:00:00Z"}}]},
+                }
             }
         }
     })
@@ -296,7 +328,7 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
             issue_comments_raw,
             reactions_raw,
             _AGENT_LOGIN,
-            commits_raw,
+            head_state_raw,
             force_push_raw,
         ],
     )
@@ -318,6 +350,13 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
     assert data["unresponded_reviews"] == []
     # Codex's "+1" (2026-01-03) postdates the head commit (2026-01-01T12:00) — a live approval.
     assert data["codex_approved"] is True
+    # A ready, conflict-free PR: reviews can happen, so nothing blocks them.
+    assert data["reviewability"] == {
+        "is_draft": False,
+        "mergeable": "MERGEABLE",
+        "merge_state_status": "CLEAN",
+        "blockers": [],
+    }
 
 
 # --- build_fetch_result: unresponded_reviews / codex_approved unit matrix ----------------------
@@ -662,8 +701,8 @@ def test_build_fetch_result_codex_approved_true_when_reaction_postdates_force_pu
     assert result.codex_approved is True
 
 
-def test_fetch_latest_commit_date_reads_via_graphql_last_one(mocker: MockerFixture) -> None:
-    """`_fetch_latest_commit_date` reads the head commit's date from GraphQL's `commits(last: 1)`.
+def test_fetch_head_state_reads_commit_date_via_graphql_last_one(mocker: MockerFixture) -> None:
+    """`_fetch_head_state` reads the head commit's date from GraphQL's `commits(last: 1)`.
 
     Regression coverage for a Codex review: the REST `/pulls/{pr}/commits` endpoint this used to
     call is documented as listing a maximum of 250 commits total regardless of pagination, so on a
@@ -673,15 +712,20 @@ def test_fetch_latest_commit_date_reads_via_graphql_last_one(mocker: MockerFixtu
     raw = json.dumps({
         "data": {
             "repository": {
-                "pullRequest": {"commits": {"nodes": [{"commit": {"committedDate": "2026-01-06T00:00:00Z"}}]}}
+                "pullRequest": {
+                    "isDraft": False,
+                    "mergeable": "MERGEABLE",
+                    "mergeStateStatus": "CLEAN",
+                    "commits": {"nodes": [{"commit": {"committedDate": "2026-01-06T00:00:00Z"}}]},
+                }
             }
         }
     })
     mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
 
-    result = pr_review_gh._fetch_latest_commit_date("o", "r", 1, gh_timeout=None)
+    result = pr_review_gh._fetch_head_state("o", "r", 1, gh_timeout=None)
 
-    assert result == datetime(2026, 1, 6, tzinfo=UTC)
+    assert result.commits.nodes[-1].commit.committedDate == datetime(2026, 1, 6, tzinfo=UTC)
 
 
 def test_fetch_latest_force_push_at_returns_none_when_never_force_pushed(mocker: MockerFixture) -> None:
@@ -751,8 +795,16 @@ def test_is_codex_thumbs_up_true_regardless_of_bot_suffix() -> None:
         (pr_review_models.CommentNode, {"databaseId": "12", "body": "b", "line": 1, "originalLine": 1, "author": None}),
         (pr_review_models.PageInfo, {"hasNextPage": "false"}),
         (pr_review_models.ReviewThreadsConnection, {"totalCount": "3", "nodes": []}),
+        (
+            pr_review_models.PullRequestHeadState,
+            {"isDraft": "false", "mergeable": "MERGEABLE", "mergeStateStatus": "CLEAN", "commits": {"nodes": []}},
+        ),
+        (
+            pr_review_models.PullRequestHeadState,
+            {"isDraft": False, "mergeable": 1, "mergeStateStatus": "CLEAN", "commits": {"nodes": []}},
+        ),
     ],
-    ids=["int-as-string", "bool-as-string", "count-as-string"],
+    ids=["int-as-string", "bool-as-string", "count-as-string", "is-draft-as-string", "mergeable-as-number"],
 )
 def test_ingress_models_reject_a_coerced_producer_shape(model: type[BaseModel], payload: dict[str, object]) -> None:
     """A `gh` response whose scalar types do not match the schema fails at the boundary.
@@ -817,6 +869,96 @@ def test_every_gh_backed_command_accepts_a_timeout_bound(argv: list[str], mocker
     assert result.exit_code == 0, result.output
     if argv[0] != "fetch":
         assert run_gh_mock.call_args.kwargs["timeout"] == pytest.approx(7)
+
+
+# --- reviewability -------------------------------------------------------------------------------
+
+
+def test_reviewability_reports_no_blockers_for_a_ready_conflict_free_pr() -> None:
+    """A non-draft, mergeable PR can be reviewed, so `blockers` is empty."""
+    result = pr_review_gh._reviewability(_head_state())
+
+    assert result.blockers == []
+    assert result.is_draft is False
+    assert result.mergeable == "MERGEABLE"
+    assert result.merge_state_status == "CLEAN"
+
+
+def test_reviewability_reports_a_draft_pr() -> None:
+    """A draft PR gets no reviewers requested, so an empty review queue is expected, not clean."""
+    result = pr_review_gh._reviewability(_head_state(is_draft=True, merge_state_status="DRAFT"))
+
+    assert result.is_draft is True
+    assert result.blockers == ["draft: reviewers are not requested until the PR is marked ready for review"]
+
+
+def test_reviewability_reports_a_conflicting_pr() -> None:
+    """A conflicting PR gets no review runs, so an empty review queue is expected, not clean."""
+    result = pr_review_gh._reviewability(_head_state(mergeable="CONFLICTING", merge_state_status="DIRTY"))
+
+    assert result.mergeable == "CONFLICTING"
+    assert result.merge_state_status == "DIRTY"
+    assert result.blockers == ["conflicting: reviews will not run until the merge conflicts are resolved"]
+
+
+def test_reviewability_reports_both_blockers_when_both_apply() -> None:
+    """A draft PR that also conflicts names both consequences, not just the first one found."""
+    result = pr_review_gh._reviewability(
+        _head_state(is_draft=True, mergeable="CONFLICTING", merge_state_status="DIRTY")
+    )
+
+    assert len(result.blockers) == 2
+
+
+def test_reviewability_does_not_treat_unknown_mergeable_as_a_conflict() -> None:
+    """`UNKNOWN` is GitHub still computing mergeability, not a conflict — reporting one is a lie.
+
+    GitHub computes mergeability in a background job and returns `UNKNOWN` while it runs, which is
+    exactly the moment just after a push — precisely when this script is most likely to be called.
+    The value is surfaced as data and left for the next check to resolve; `watch` re-reads it every
+    poll.
+    """
+    result = pr_review_gh._reviewability(_head_state(mergeable="UNKNOWN", merge_state_status="UNKNOWN"))
+
+    assert result.mergeable == "UNKNOWN"
+    assert result.blockers == []
+
+
+def test_reviewability_survives_a_merge_state_status_this_script_has_never_seen() -> None:
+    """An unrecognized GitHub state reaches the caller as data instead of failing validation."""
+    result = pr_review_gh._reviewability(_head_state(merge_state_status="SOME_FUTURE_STATE"))
+
+    assert result.merge_state_status == "SOME_FUTURE_STATE"
+    assert result.blockers == []
+
+
+def test_watch_reports_reviewability_on_a_timed_out_result(mocker: MockerFixture) -> None:
+    """`watch` carries the blockers too: blocking 270s for reviews on a draft PR is pure waste."""
+    blocked = _state()
+    blocked.reviewability = Reviewability(
+        is_draft=True, mergeable="CONFLICTING", merge_state_status="DIRTY", blockers=["draft: x", "conflicting: y"]
+    )
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=blocked)
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--timeout-seconds", "0"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["timed_out"] is True
+    assert data["state"]["reviewability"]["blockers"] == ["draft: x", "conflicting: y"]
+
+
+def test_blockers_do_not_change_has_outstanding_work() -> None:
+    """Reviewability explains an empty result set; it never creates or suppresses work."""
+    blocked = _state()
+    blocked.reviewability = Reviewability(
+        is_draft=True, mergeable="CONFLICTING", merge_state_status="DIRTY", blockers=["draft: x"]
+    )
+    assert blocked.has_outstanding_work() is False
+
+    blocked_with_work = _state(unresolved_count=1)
+    blocked_with_work.reviewability = blocked.reviewability
+    assert blocked_with_work.has_outstanding_work() is True
 
 
 # --- FetchResult.has_outstanding_work -----------------------------------------------------------

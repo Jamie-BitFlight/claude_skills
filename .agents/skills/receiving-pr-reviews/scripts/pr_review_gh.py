@@ -21,9 +21,10 @@ from pydantic import TypeAdapter
 from pr_review_models import (
     FetchResult,
     ForcePushEvent,
-    HeadCommitNode,
     IssueComment,
+    PullRequestHeadState,
     Reaction,
+    Reviewability,
     ReviewNode,
     ReviewsConnection,
     ReviewThreadsConnection,
@@ -85,10 +86,18 @@ query($o: String!, $r: String!, $pr: Int!) {
 }
 """
 
-_LATEST_HEAD_COMMIT_QUERY = """
+# `isDraft`/`mergeable`/`mergeStateStatus` are selected alongside the head commit rather than in a
+# query of their own: they live on the same `pullRequest` object, so asking for them here costs no
+# extra round trip, and `build_fetch_result` is already seven sequential `gh` calls deep. Verified
+# against this repository's own API (2026-08-30) that `mergeStateStatus` needs no preview `Accept`
+# header on `gh api graphql`.
+_HEAD_STATE_QUERY = """
 query($o: String!, $r: String!, $pr: Int!) {
   repository(owner: $o, name: $r) {
     pullRequest(number: $pr) {
+      isDraft
+      mergeable
+      mergeStateStatus
       commits(last: 1) {
         nodes { commit { committedDate } }
       }
@@ -297,19 +306,20 @@ def _fetch_authenticated_login(*, gh_timeout: float | None) -> str:
     return run_gh(["api", "user", "--jq", ".login"], timeout=gh_timeout).strip()
 
 
-def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> datetime:
-    """Fetch the PR's current head commit's committed-date via GraphQL's `commits(last: 1)`.
+def _fetch_head_state(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> PullRequestHeadState:
+    """Fetch the PR's head-commit date and its three reviewability fields in one GraphQL query.
 
-    Deliberately GraphQL rather than the REST `GET /repos/{owner}/{repo}/pulls/{pr}/commits`
-    endpoint: that REST endpoint is documented as listing a maximum of 250 commits total,
-    regardless of pagination, so `--paginate` cannot retrieve a commit beyond that hard cap — on a
-    PR with more than 250 commits, its last element would not reliably be the actual head.
-    GraphQL's `commits` connection has no such flat cap; requesting `last: 1` asks the server
-    directly for the tail element regardless of how many commits the PR has.
+    The commit date is read via GraphQL's `commits(last: 1)` rather than the REST
+    `GET /repos/{owner}/{repo}/pulls/{pr}/commits` endpoint: that endpoint is documented as listing
+    a maximum of 250 commits total regardless of pagination, so `--paginate` cannot retrieve a
+    commit beyond that hard cap — on a PR with more than 250 commits, its last element would not
+    reliably be the actual head. GraphQL's `commits` connection has no such flat cap; requesting
+    `last: 1` asks the server directly for the tail element regardless of how many commits the PR
+    has.
 
-    `build_fetch_result` compares a Codex approval reaction's timestamp against the later of this
-    and `_fetch_latest_force_push_at`'s result — this call alone is not sufficient on its own: a
-    force-push that creates a brand-new commit (the overwhelmingly common case — a rebase or
+    `build_fetch_result` compares a Codex approval reaction's timestamp against the later of that
+    date and `_fetch_latest_force_push_at`'s result — this call alone is not sufficient on its own:
+    a force-push that creates a brand-new commit (the overwhelmingly common case — a rebase or
     amend) refreshes that commit's own committed date to the time of the push, but a force-push
     that resets the branch back onto a pre-existing commit object (reusing its original, older
     committed date) would not, which is exactly what `_fetch_latest_force_push_at`'s
@@ -323,30 +333,67 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
             `run_gh`.
 
     Returns:
-        The head commit's committed date.
+        The PR's draft/mergeable/merge-state fields plus its head commit.
 
     Raises:
         IndexError: the PR has no commits at all — not possible for a real, open pull request, so
             this is an acceptable boundary failure for an invariant this script does not control.
     """
     raw = run_gh(
-        [
-            "api",
-            "graphql",
-            "-f",
-            f"query={_LATEST_HEAD_COMMIT_QUERY}",
-            "-f",
-            f"o={owner}",
-            "-f",
-            f"r={repo}",
-            "-F",
-            f"pr={pr}",
-        ],
+        ["api", "graphql", "-f", f"query={_HEAD_STATE_QUERY}", "-f", f"o={owner}", "-f", f"r={repo}", "-F", f"pr={pr}"],
         timeout=gh_timeout,
     )
-    nodes = json.loads(raw)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
-    commits = [HeadCommitNode.model_validate(node) for node in nodes]
-    return commits[-1].commit.committedDate
+    return PullRequestHeadState.model_validate(json.loads(raw)["data"]["repository"]["pullRequest"])
+
+
+def _latest_revision_at(head_state: PullRequestHeadState, force_push_at: datetime | None) -> datetime:
+    """The moment the PR's current revision came into being.
+
+    Neither input is sufficient alone. A force-push that creates a brand-new commit — a rebase or
+    amend, the overwhelmingly common case — refreshes that commit's own committed date, so the head
+    commit carries it. A force-push that resets the branch back onto a pre-existing commit object
+    reuses that commit's original, older date, and only the server-recorded event timestamp from
+    `_fetch_latest_force_push_at` reflects the push.
+
+    Args:
+        head_state: The PR head state from `_fetch_head_state`.
+        force_push_at: The most recent force-push timestamp, or `None` if never force-pushed.
+
+    Returns:
+        The later of the head commit's date and the force-push timestamp.
+    """
+    head_commit_date = head_state.commits.nodes[-1].commit.committedDate
+    return max(head_commit_date, force_push_at or head_commit_date)
+
+
+def _reviewability(head_state: PullRequestHeadState) -> Reviewability:
+    """Derive whether this PR can be reviewed at all, and say what is stopping it if not.
+
+    Only two conditions produce a blocker, because only these two stop reviews from happening:
+    a draft PR does not get reviewers requested, and a conflicting one does not get review runs.
+    `mergeStateStatus` is reported as data but drives no blocker of its own — its `DRAFT` and
+    `DIRTY` values restate `isDraft` and `mergeable` respectively, and its remaining values
+    (`BLOCKED`, `BEHIND`, `UNSTABLE`, `HAS_HOOKS`) describe merge readiness, not reviewability.
+
+    `mergeable: "UNKNOWN"` yields no blocker on purpose — see `Reviewability`.
+
+    Args:
+        head_state: The PR-level fields from `_fetch_head_state`.
+
+    Returns:
+        The three fields as reported, plus a plain-sentence blocker per condition present.
+    """
+    blockers = []
+    if head_state.isDraft:
+        blockers.append("draft: reviewers are not requested until the PR is marked ready for review")
+    if head_state.mergeable == "CONFLICTING":
+        blockers.append("conflicting: reviews will not run until the merge conflicts are resolved")
+    return Reviewability(
+        is_draft=head_state.isDraft,
+        mergeable=head_state.mergeable,
+        merge_state_status=head_state.mergeStateStatus,
+        blockers=blockers,
+    )
 
 
 def _fetch_latest_force_push_at(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> datetime | None:
@@ -354,7 +401,7 @@ def _fetch_latest_force_push_at(owner: str, repo: str, pr: int, *, gh_timeout: f
 
     A `HeadRefForcePushedEvent` is a server-recorded timeline entry created at the moment of the
     force-push itself, independent of any commit's own embedded author/committer metadata — the
-    signal `_fetch_latest_commit_date` cannot provide on its own for a force-push that resets the
+    signal `_fetch_head_state` cannot provide on its own for a force-push that resets the
     branch back onto a pre-existing commit object (see that function's docstring).
 
     Args:
@@ -524,7 +571,7 @@ def build_fetch_result(
     (for `unresponded_reviews`), every reaction on the PR itself (for `codex_approved`), the
     currently-authenticated `gh` identity (also for `unresponded_reviews`), and the PR's head
     commit date plus its most recent force-push timestamp, if any (both also for `codex_approved`
-    — see `_fetch_latest_commit_date` and `_fetch_latest_force_push_at`). Every one of the seven is
+    — see `_fetch_head_state` and `_fetch_latest_force_push_at`). Every one of the seven is
     a fresh snapshot taken by this call alone — nothing here is compared against an earlier call's
     result, which is what makes two `watch` calls back to back, or a `watch` call issued right
     after a `fetch`, incapable of missing or double-counting activity that happened in between (the
@@ -545,7 +592,7 @@ def build_fetch_result(
     merely one that starts with the same text — see `_CODEX_REACTOR_LOGINS`) exists on the PR
     itself at the moment of this call *and* that reaction's own timestamp is at or after the later
     of the PR's current head commit's date and its most recent force-push timestamp, if any — see
-    `_fetch_pr_reactions`, `_fetch_latest_commit_date`, and `_fetch_latest_force_push_at`. Neither
+    `_fetch_pr_reactions`, `_fetch_head_state`, and `_fetch_latest_force_push_at`. Neither
     date alone is sufficient: a reaction left approving an earlier revision would otherwise keep
     reporting as approval indefinitely, even after a later push the reaction never actually saw,
     including a force-push that resets the branch back onto a pre-existing commit object whose own
@@ -568,11 +615,11 @@ def build_fetch_result(
     issue_comments = _fetch_issue_comments(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
     reactions = _fetch_pr_reactions(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
     authenticated_login = _fetch_authenticated_login(gh_timeout=gh_timeout_budget(deadline, gh_timeout))
-    latest_commit_date = _fetch_latest_commit_date(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    head_state = _fetch_head_state(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
     latest_force_push_at = _fetch_latest_force_push_at(
         owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout)
     )
-    latest_revision_at = max(latest_commit_date, latest_force_push_at or latest_commit_date)
+    latest_revision_at = _latest_revision_at(head_state, latest_force_push_at)
 
     all_threads = [node for page in thread_pages for node in page.nodes]
     all_reviews = [node for page in review_pages for node in page.nodes]
@@ -604,4 +651,5 @@ def build_fetch_result(
         unresolved=unresolved,
         unresolved_count=len(unresolved),
         codex_approved=codex_approved,
+        reviewability=_reviewability(head_state),
     )

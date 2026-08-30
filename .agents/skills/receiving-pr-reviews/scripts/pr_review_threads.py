@@ -69,7 +69,7 @@ def fetch(
     """Fetch a PR's outstanding review activity, auto-paginated so none is silently truncated.
 
     Prints compact JSON with `reviews_count`, `threads_count`, `unresolved`, `unresolved_count`,
-    `reviews_with_body`, `unresponded_reviews`, and `codex_approved`. A `threads_count` of 0 means
+    `reviews_with_body`, `unresponded_reviews`, `codex_approved`, and `reviewability`. A `threads_count` of 0 means
     no reviews have landed yet — different from a nonzero `threads_count` with `unresolved_count:
     0`, which means every thread found was already resolved. Never treat an empty `unresolved`
     array as "nothing to do" without checking these counts first. Each unresolved thread carries
@@ -85,6 +85,11 @@ def fetch(
     see `pr_review_gh.build_fetch_result` for exactly how that is derived; treat each as
     actionable input. `codex_approved` is `True` when Codex's thumbs-up reaction is currently
     present on the PR.
+
+    `reviewability.blockers` is non-empty when the PR itself is why nothing is outstanding: a draft
+    gets no reviewers requested and a conflicting branch gets no review runs, so an empty
+    `unresolved` array there means "nothing can happen yet", not "nothing to do". Read it before
+    concluding a PR is clean. An empty `blockers` means reviews can proceed.
     """
     result = build_fetch_result(owner, repo, pr, gh_timeout=gh_timeout_seconds)
     typer.echo(result.model_dump_json())
@@ -131,7 +136,10 @@ def watch(
     never miss activity in between (nothing here depends on what an earlier call saw). The
     receiving-pr-reviews SKILL.md documents this loop pattern.
 
-    Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`.
+    Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`. Check
+    `state.reviewability.blockers` on a `timed_out: true` result before issuing another call:
+    waiting out another window for reviews that cannot arrive — the PR is a draft, or conflicting —
+    is pure waste, and the fix is on the PR rather than in the review queue.
 
     `deadline` is the only cutoff. The loop polls while a full `interval_seconds` still fits before
     it and stops once less than that remains — the point past which `gh_timeout_budget` would
