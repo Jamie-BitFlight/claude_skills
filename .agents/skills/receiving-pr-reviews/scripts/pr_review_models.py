@@ -11,8 +11,9 @@ documents and what a caller already parses.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "Author",
@@ -29,13 +30,38 @@ __all__ = [
 ]
 
 
-class Author(BaseModel):
+class _GitHubResponseModel(BaseModel):
+    """Base for every model that ingests a raw GitHub response, GraphQL or REST.
+
+    `strict=True` so a producer-shape mismatch — GitHub or `gh` returning a string where the
+    schema declares an integer or a boolean — is rejected at ingress instead of being coerced
+    into apparently valid review state. Lax mode would turn `"totalCount": "0"` into `0` and
+    `"isResolved": "false"` into `True` without a word, which is exactly the kind of silence a
+    boundary exists to break.
+
+    Models this script builds itself from already-validated values (`UnresolvedThread`,
+    `FetchResult`, `WatchResult`) are not ingress and deliberately do not inherit this: no
+    untrusted input reaches them.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+
+# Every GitHub timestamp arrives as an ISO-8601 *string*, which is the documented wire shape, not
+# a producer mismatch. These models are validated from `json.loads` output — Pydantic's Python
+# mode — where strict `datetime` accepts only a `datetime` instance and would reject the string
+# GitHub actually sends. Relaxing strictness on exactly these fields keeps ISO-8601 parsing while
+# every int, bool and str field around them stays strict.
+GitHubTimestamp = Annotated[datetime, Field(strict=False)]
+
+
+class Author(_GitHubResponseModel):
     """A GitHub account login, as GraphQL returns it for a comment/review/reaction author."""
 
     login: str
 
 
-class CommentNode(BaseModel):
+class CommentNode(_GitHubResponseModel):
     """A single review comment, in the shape GitHub's GraphQL API returns it.
 
     `author` is `None` for a comment left by an account that has since been deleted — GitHub's
@@ -49,7 +75,7 @@ class CommentNode(BaseModel):
     author: Author | None
 
 
-class PageInfo(BaseModel):
+class PageInfo(_GitHubResponseModel):
     """The `hasNextPage` half of a GraphQL connection's `pageInfo`.
 
     `endCursor` is consumed entirely by `gh api graphql --paginate` itself and never read by this
@@ -59,7 +85,7 @@ class PageInfo(BaseModel):
     hasNextPage: bool
 
 
-class CommentsConnection(BaseModel):
+class CommentsConnection(_GitHubResponseModel):
     """One page's `comments` connection, nested inside a `reviewThreads` node."""
 
     totalCount: int
@@ -67,7 +93,7 @@ class CommentsConnection(BaseModel):
     nodes: list[CommentNode]
 
 
-class ReviewThreadNode(BaseModel):
+class ReviewThreadNode(_GitHubResponseModel):
     """One review thread, in the shape GitHub's GraphQL API returns it."""
 
     id: str
@@ -76,7 +102,7 @@ class ReviewThreadNode(BaseModel):
     comments: CommentsConnection
 
 
-class ReviewThreadsConnection(BaseModel):
+class ReviewThreadsConnection(_GitHubResponseModel):
     """One page's `reviewThreads` connection, already unwrapped from `data.repository.pullRequest`.
 
     `pr_review_gh._fetch_pages` pulls this dict straight out of each slurped page by subscripting
@@ -90,7 +116,7 @@ class ReviewThreadsConnection(BaseModel):
     nodes: list[ReviewThreadNode]
 
 
-class ReviewNode(BaseModel):
+class ReviewNode(_GitHubResponseModel):
     """A top-level review submission, in the shape GitHub's GraphQL API returns it.
 
     Distinct from a review *comment* (`CommentNode`): this is the review object itself — its
@@ -118,12 +144,12 @@ class ReviewNode(BaseModel):
     author: Author | None
     state: str
     body: str
-    submittedAt: datetime | None
-    lastEditedAt: datetime | None
+    submittedAt: GitHubTimestamp | None
+    lastEditedAt: GitHubTimestamp | None
     url: str
 
 
-class ReviewsConnection(BaseModel):
+class ReviewsConnection(_GitHubResponseModel):
     """One page's `reviews` connection, already unwrapped — see `ReviewThreadsConnection`."""
 
     totalCount: int
@@ -131,7 +157,11 @@ class ReviewsConnection(BaseModel):
 
 
 class UnresolvedThread(BaseModel):
-    """One unresolved review thread and its full comment history, as emitted to the caller."""
+    """One unresolved review thread and its full comment history, as emitted to the caller.
+
+    Assembled by `pr_review_gh.build_fetch_result` from already-validated `ReviewThreadNode`
+    values, so it is an output shape rather than an ingress one — see `_GitHubResponseModel`.
+    """
 
     id: str
     path: str
@@ -139,7 +169,7 @@ class UnresolvedThread(BaseModel):
     comments_truncated: bool
 
 
-class IssueComment(BaseModel):
+class IssueComment(_GitHubResponseModel):
     """One PR-level (issue) comment, in the shape GitHub's REST API returns it.
 
     `pr_review_gh._unresponded_reviews` treats a comment authored by the currently-authenticated
@@ -150,12 +180,12 @@ class IssueComment(BaseModel):
     left by an account that has since been deleted, same null pattern as `CommentNode.author`.
     """
 
-    created_at: datetime
+    created_at: GitHubTimestamp
     user: Author | None
     body: str
 
 
-class Reaction(BaseModel):
+class Reaction(_GitHubResponseModel):
     """One reaction left on the PR itself, in the shape GitHub's REST reactions API returns it.
 
     `user` is `None` for a reaction left by an account that has since been deleted, same null
@@ -167,16 +197,16 @@ class Reaction(BaseModel):
 
     content: str
     user: Author | None
-    created_at: datetime
+    created_at: GitHubTimestamp
 
 
-class GitHubCommitDate(BaseModel):
+class GitHubCommitDate(_GitHubResponseModel):
     """The `committedDate` field of a GraphQL `Commit` object."""
 
-    committedDate: datetime
+    committedDate: GitHubTimestamp
 
 
-class HeadCommitNode(BaseModel):
+class HeadCommitNode(_GitHubResponseModel):
     """One commit from GraphQL's `pullRequest.commits(last: 1)` connection.
 
     Requesting `last: 1` asks the server directly for the tail element — GraphQL's connection
@@ -188,7 +218,7 @@ class HeadCommitNode(BaseModel):
     commit: GitHubCommitDate
 
 
-class ForcePushEvent(BaseModel):
+class ForcePushEvent(_GitHubResponseModel):
     """One `HeadRefForcePushedEvent` GraphQL timeline item.
 
     `createdAt` is when GitHub's server recorded the force-push itself — independent of any
@@ -197,7 +227,7 @@ class ForcePushEvent(BaseModel):
     own dates predate it (see `pr_review_gh._fetch_latest_force_push_at`).
     """
 
-    createdAt: datetime
+    createdAt: GitHubTimestamp
 
 
 class FetchResult(BaseModel):

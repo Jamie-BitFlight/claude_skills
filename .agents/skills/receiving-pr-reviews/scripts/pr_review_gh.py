@@ -103,7 +103,13 @@ query($o: String!, $r: String!, $pr: Int!) {
 # from the exec call itself rather than a custom error path.
 _GH = shutil.which("gh") or "gh"
 
-_GH_TIMEOUT_SECONDS = 30
+# `gh` calls are bounded by the caller, not by a constant here. A single fixed cap would have to
+# cover a whole `gh api --paginate` run — every page requested sequentially inside one subprocess —
+# on an arbitrarily large PR over an arbitrarily slow link, and `build_fetch_result` now makes
+# seven such calls per snapshot rather than the two it made when the old 30-second cap was written.
+# This repository has no source for that number (CLAUDE.md, "No invented constraints"), so `fetch`
+# and `watch` expose `--gh-timeout-seconds` instead, unbounded by default, and `watch` additionally
+# bounds each *poll* by its own `--timeout-seconds` deadline, which the caller chose.
 
 _ISSUE_COMMENT_ADAPTER: TypeAdapter[list[IssueComment]] = TypeAdapter(list[IssueComment])
 _REACTION_ADAPTER: TypeAdapter[list[Reaction]] = TypeAdapter(list[Reaction])
@@ -116,7 +122,7 @@ _REACTION_ADAPTER: TypeAdapter[list[Reaction]] = TypeAdapter(list[Reaction])
 _CODEX_REACTOR_LOGINS = frozenset({"chatgpt-codex-connector", "chatgpt-codex-connector[bot]"})
 
 
-def run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
+def run_gh(args: list[str], *, timeout: float | None = None) -> str:
     """Run a `gh` command and return its captured stdout.
 
     `gh` spawns no child processes of its own, so a plain timeout is enough to bound it — no
@@ -124,9 +130,9 @@ def run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
 
     Args:
         args: Full `gh` argv, excluding the executable itself (e.g. `["api", "graphql", ...]`).
-        timeout: Seconds to allow before killing the process. Defaults to `_GH_TIMEOUT_SECONDS`;
-            `watch` passes a smaller value as its own deadline approaches so one slow call near
-            the end of a poll window can't push the whole command past `--timeout-seconds`.
+        timeout: Seconds to allow before killing the process, or `None` for no bound. `watch`
+            passes the time left before its own deadline so one slow call near the end of a poll
+            window can't push the whole command past `--timeout-seconds`.
 
     Returns:
         The command's stdout, decoded as text.
@@ -141,16 +147,15 @@ def run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
     return result.stdout
 
 
-def _fetch_pages(
-    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
-) -> list[ReviewThreadsConnection]:
+def _fetch_pages(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[ReviewThreadsConnection]:
     """Fetch and validate every paginated page of a PR's review threads.
 
     Args:
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         One validated `reviewThreads` connection per page `gh api graphql --paginate` returned.
@@ -178,9 +183,7 @@ def _fetch_pages(
     ]
 
 
-def _fetch_review_pages(
-    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
-) -> list[ReviewsConnection]:
+def _fetch_review_pages(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[ReviewsConnection]:
     """Fetch and validate every paginated page of a PR's top-level reviews.
 
     A separate `gh` invocation from `_fetch_pages`: `gh api graphql --paginate` follows exactly
@@ -191,7 +194,8 @@ def _fetch_review_pages(
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         One validated `reviews` connection per page `gh api graphql --paginate` returned.
@@ -219,9 +223,7 @@ def _fetch_review_pages(
     ]
 
 
-def _fetch_issue_comments(
-    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
-) -> list[IssueComment]:
+def _fetch_issue_comments(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[IssueComment]:
     """Fetch every PR-level (issue) comment's timestamp and author, auto-paginated and flattened.
 
     A PR-level comment — `gh pr comment`, or any comment posted through the Issues REST API
@@ -237,7 +239,8 @@ def _fetch_issue_comments(
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         Every PR-level comment, flattened across all pages. `--slurp` is used even though this is
@@ -250,7 +253,7 @@ def _fetch_issue_comments(
     return [comment for page in json.loads(raw) for comment in _ISSUE_COMMENT_ADAPTER.validate_python(page)]
 
 
-def _fetch_pr_reactions(owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> list[Reaction]:
+def _fetch_pr_reactions(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[Reaction]:
     """Fetch every reaction left on the PR itself (not on any individual comment), flattened.
 
     Confirmed empirically against this repository's own review history (PR #3318, #3306): Codex's
@@ -266,7 +269,8 @@ def _fetch_pr_reactions(owner: str, repo: str, pr: int, *, gh_timeout: float = _
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         Every reaction on the PR itself, flattened across all pages — see `_fetch_issue_comments`
@@ -276,7 +280,7 @@ def _fetch_pr_reactions(owner: str, repo: str, pr: int, *, gh_timeout: float = _
     return [reaction for page in json.loads(raw) for reaction in _REACTION_ADAPTER.validate_python(page)]
 
 
-def _fetch_authenticated_login(*, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> str:
+def _fetch_authenticated_login(*, gh_timeout: float | None) -> str:
     """Fetch the GitHub login `gh` is currently authenticated as.
 
     Repo-independent (unlike every other `_fetch_*` helper here): the authenticated identity is
@@ -284,7 +288,8 @@ def _fetch_authenticated_login(*, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> st
     `owner`/`repo`/`pr` arguments.
 
     Args:
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         The authenticated user's login, e.g. `"jane-doe"`.
@@ -292,7 +297,7 @@ def _fetch_authenticated_login(*, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> st
     return run_gh(["api", "user", "--jq", ".login"], timeout=gh_timeout).strip()
 
 
-def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> datetime:
+def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> datetime:
     """Fetch the PR's current head commit's committed-date via GraphQL's `commits(last: 1)`.
 
     Deliberately GraphQL rather than the REST `GET /repos/{owner}/{repo}/pulls/{pr}/commits`
@@ -314,7 +319,8 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         The head commit's committed date.
@@ -343,9 +349,7 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
     return commits[-1].commit.committedDate
 
 
-def _fetch_latest_force_push_at(
-    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
-) -> datetime | None:
+def _fetch_latest_force_push_at(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> datetime | None:
     """Fetch the timestamp of the PR's most recent force-push, if it has ever had one.
 
     A `HeadRefForcePushedEvent` is a server-recorded timeline entry created at the moment of the
@@ -357,7 +361,8 @@ def _fetch_latest_force_push_at(
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+        gh_timeout: Seconds to bound the underlying `gh` call to, or `None` for no bound — see
+            `run_gh`.
 
     Returns:
         The most recent force-push's timestamp, or `None` if this PR's head has never been
@@ -485,28 +490,31 @@ def _is_codex_thumbs_up(reaction: Reaction) -> bool:
     )
 
 
-def gh_timeout_budget(deadline: float | None) -> float:
-    """Bound a `gh` call to whatever time remains before `deadline`, capped at `_GH_TIMEOUT_SECONDS`.
+def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float | None:
+    """Choose the timeout for one `gh` call.
 
-    `deadline` is `None` for a plain `fetch` (no overall time budget to respect — use the full
-    default). For `watch`, passing its own `deadline` here means each of `build_fetch_result`'s
-    `gh` calls is bounded by whatever is actually left, not by a fixed worst-case reservation
-    subtracted from every poll regardless of how fast GitHub responds — a call made with plenty of
-    time left still gets the full `_GH_TIMEOUT_SECONDS`, and only a call made close to `deadline`
-    is tightened.
+    `deadline` is `None` for a plain `fetch` and for `watch`'s mandatory first fetch: neither has a
+    window to respect, so the caller's `--gh-timeout-seconds` applies unchanged (`None` = no
+    bound). `watch` passes its own `deadline` for each *poll*, so all seven of
+    `build_fetch_result`'s `gh` calls are bounded by whatever is actually left, re-measured between
+    them, rather than by a fixed reservation subtracted from every poll regardless of how fast
+    GitHub responds.
 
     Args:
         deadline: A `time.monotonic()` timestamp to respect, or `None` for no deadline.
+        gh_timeout: The caller's own per-call bound, used when there is no deadline.
 
     Returns:
-        Seconds to pass as `run_gh`'s `timeout`, always positive.
+        Seconds to pass as `run_gh`'s `timeout`, or `None` for no bound.
     """
     if deadline is None:
-        return _GH_TIMEOUT_SECONDS
-    return max(0.1, min(_GH_TIMEOUT_SECONDS, deadline - time.monotonic()))
+        return gh_timeout
+    return max(0.0, deadline - time.monotonic())
 
 
-def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None = None) -> FetchResult:
+def build_fetch_result(
+    owner: str, repo: str, pr: int, *, deadline: float | None = None, gh_timeout: float | None = None
+) -> FetchResult:
     """Fetch and assemble one PR's full outstanding-work snapshot: threads, reviews, and approval.
 
     Shared by `fetch` (prints the result once, `deadline=None`) and `watch` (calls this repeatedly
@@ -549,18 +557,21 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
         pr: Pull request number.
         deadline: A `time.monotonic()` timestamp the caller wants this call's seven `gh`
             invocations to respect — see `gh_timeout_budget`. `None` means no deadline.
+        gh_timeout: Per-call bound applied when `deadline` is `None`; `None` means no bound.
 
     Returns:
         Totals plus every currently-unresolved thread, every unresponded review, and whether
         Codex's approval reaction is present right now for the current revision.
     """
-    thread_pages = _fetch_pages(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
-    review_pages = _fetch_review_pages(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
-    issue_comments = _fetch_issue_comments(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
-    reactions = _fetch_pr_reactions(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
-    authenticated_login = _fetch_authenticated_login(gh_timeout=gh_timeout_budget(deadline))
-    latest_commit_date = _fetch_latest_commit_date(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
-    latest_force_push_at = _fetch_latest_force_push_at(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
+    thread_pages = _fetch_pages(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    review_pages = _fetch_review_pages(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    issue_comments = _fetch_issue_comments(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    reactions = _fetch_pr_reactions(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    authenticated_login = _fetch_authenticated_login(gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    latest_commit_date = _fetch_latest_commit_date(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout))
+    latest_force_push_at = _fetch_latest_force_push_at(
+        owner, repo, pr, gh_timeout=gh_timeout_budget(deadline, gh_timeout)
+    )
     latest_revision_at = max(latest_commit_date, latest_force_push_at or latest_commit_date)
 
     all_threads = [node for page in thread_pages for node in page.nodes]
