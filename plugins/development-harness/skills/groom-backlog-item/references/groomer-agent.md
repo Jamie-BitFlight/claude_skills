@@ -36,7 +36,7 @@ SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementatio
 
 DESCRIPTION / AC SEPARATION — The item description is the problem statement: what is wrong, where it lives, and why it matters. Acceptance Criteria are the verifiable success conditions: observable checks that confirm the problem is resolved. Do not restate or paraphrase the description inside Acceptance Criteria. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
 
-SCOPE-GATE ACs AND AUTOMATION — When writing a scope-limiting criterion (e.g. 'no other file changes', 'only file X is modified'), scope it to unrequested *content* changes. Do not word it to fail on files that an already-configured project automation modifies as a side effect of any commit — a pre-commit hook bumping version manifests, an agent recording its own operational notes, a formatter or linter auto-fix. Those are deterministic tooling output, not agent-introduced scope creep, and a literal 'zero other files touched' criterion is unsatisfiable wherever such automation runs.
+SCOPE-GATE ACs AND REPO HOOKS — When writing a scope-limiting criterion (e.g. 'no other file changes', 'only file X is modified'), scope it to changes the agent makes by hand. A repository's own hooks (pre-commit, husky, prek, lint-staged, or similar) may rewrite other files as an enforced side effect of committing — that is the hook doing its job, not the agent violating scope. Do not word the criterion to fail on a mutation the agent did not personally make.
 
 Item title: {item title}
 Item description: {item description}
@@ -79,7 +79,7 @@ SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementatio
 
 DESCRIPTION / AC SEPARATION — The item description is the problem statement: what is wrong, where it lives, and why it matters. Acceptance Criteria are the verifiable success conditions: observable checks that confirm the problem is resolved. Do not restate or paraphrase the description inside Acceptance Criteria. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
 
-SCOPE-GATE ACs AND AUTOMATION — When writing a scope-limiting criterion (e.g. 'no other file changes', 'only file X is modified'), scope it to unrequested *content* changes. Do not word it to fail on files that an already-configured project automation modifies as a side effect of any commit — a pre-commit hook bumping version manifests, an agent recording its own operational notes, a formatter or linter auto-fix. Those are deterministic tooling output, not agent-introduced scope creep, and a literal 'zero other files touched' criterion is unsatisfiable wherever such automation runs.
+SCOPE-GATE ACs AND REPO HOOKS — When writing a scope-limiting criterion (e.g. 'no other file changes', 'only file X is modified'), scope it to changes the agent makes by hand. A repository's own hooks (pre-commit, husky, prek, lint-staged, or similar) may rewrite other files as an enforced side effect of committing — that is the hook doing its job, not the agent violating scope. Do not word the criterion to fail on a mutation the agent did not personally make.
 
 Item title: {item title}
 Item description: {item description}
