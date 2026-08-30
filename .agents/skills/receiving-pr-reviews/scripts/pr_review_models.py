@@ -23,8 +23,10 @@ __all__ = [
     "GitHubCommitDate",
     "HeadCommitNode",
     "IssueComment",
+    "PullRequestHeadState",
     "Reaction",
     "ReviewNode",
+    "Reviewability",
     "UnresolvedThread",
     "WatchResult",
 ]
@@ -218,6 +220,65 @@ class HeadCommitNode(_GitHubResponseModel):
     commit: GitHubCommitDate
 
 
+class HeadCommitsConnection(_GitHubResponseModel):
+    """The `commits(last: 1)` connection nested inside `PullRequestHeadState`."""
+
+    nodes: list[HeadCommitNode]
+
+
+class PullRequestHeadState(_GitHubResponseModel):
+    """The PR-level fields `pr_review_gh._fetch_head_state` reads in one GraphQL query.
+
+    All four live on the same `pullRequest` object, so they cost one round trip together: the head
+    commit's date (for `codex_approved`'s staleness check) plus the three fields that say whether
+    this PR can be reviewed at all.
+
+    `mergeable` is `MERGEABLE`, `CONFLICTING`, or `UNKNOWN`; `mergeStateStatus` is one of `CLEAN`,
+    `DIRTY`, `BLOCKED`, `BEHIND`, `UNSTABLE`, `DRAFT`, `HAS_HOOKS`, or `UNKNOWN`. Both are kept as
+    plain strings rather than enums: GitHub can add a state at any time, and an unrecognized one
+    must reach the caller as data instead of failing validation on a PR that is otherwise fine.
+    Strict against that string type, though — `strict=True` via `_GitHubResponseModel` means a
+    number or a null arriving where a state name belongs is rejected rather than stringified, and
+    `isDraft` must be a real boolean rather than `"false"`. None of the three is a timestamp, so
+    none needs the `GitHubTimestamp` relaxation.
+    """
+
+    isDraft: bool
+    mergeable: str
+    mergeStateStatus: str
+    commits: HeadCommitsConnection
+
+
+class Reviewability(BaseModel):
+    """Whether this PR is in a state where reviews can happen at all.
+
+    A PR that is a draft or has merge conflicts receives no reviews — reviewers are not requested
+    for a draft, and review runs do not start on a conflicting branch. Without this, an empty
+    `unresolved` array reads as "nothing to do" when the truth is "nothing can happen until the PR
+    itself is fixed", which is the same misleading-empty-result trap the `reviews_count` /
+    `threads_count` / `unresolved_count` triple already warns about.
+
+    `blockers` is empty exactly when neither condition holds. Each entry is a plain sentence naming
+    the consequence, not just the state name, because the reader needs to know what will not
+    happen.
+
+    `mergeable: "UNKNOWN"` is deliberately **not** a blocker. GitHub computes mergeability in a
+    background job and returns `UNKNOWN` while it runs — which is precisely the moment just after a
+    push, when this script is most likely to be called. Reporting a conflict there would be a false
+    alarm, so `UNKNOWN` is surfaced as data and left for the next check to resolve; `watch` re-reads
+    it on every poll, and `fetch` is cheap to re-run.
+
+    Derived by `pr_review_gh._reviewability` from an already-validated `PullRequestHeadState`, so
+    it is an output shape rather than an ingress one and does not inherit `_GitHubResponseModel` —
+    same reason as `UnresolvedThread` and `FetchResult`.
+    """
+
+    is_draft: bool
+    mergeable: str
+    merge_state_status: str
+    blockers: list[str]
+
+
 class ForcePushEvent(_GitHubResponseModel):
     """One `HeadRefForcePushedEvent` GraphQL timeline item.
 
@@ -245,6 +306,7 @@ class FetchResult(BaseModel):
     unresolved: list[UnresolvedThread]
     unresolved_count: int
     codex_approved: bool
+    reviewability: Reviewability
 
     def has_outstanding_work(self) -> bool:
         """Whether this snapshot has anything a reviewing agent still needs to act on.
@@ -253,6 +315,11 @@ class FetchResult(BaseModel):
         followed up on yet, or Codex has left its thumbs-up approval reaction — the three
         independent stop conditions `watch` polls for. Defined once here, on the data it reads,
         so `watch` and any future caller apply the exact same rule to the exact same state.
+
+        Deliberately independent of `reviewability`: a draft or conflicting PR can still carry
+        unresolved threads that need answering, and a reviewable PR with nothing outstanding is
+        still nothing to act on. `reviewability.blockers` explains an *empty* result set; it never
+        creates or suppresses work.
 
         Returns:
             `True` if any of the three outstanding-work signals is present on this snapshot.
