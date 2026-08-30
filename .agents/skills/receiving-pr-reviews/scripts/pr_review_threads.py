@@ -5,6 +5,9 @@
 #   "pydantic>=2.0",
 #   "typer",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """GitHub PR review-thread operations for the receiving-pr-reviews skill.
 
