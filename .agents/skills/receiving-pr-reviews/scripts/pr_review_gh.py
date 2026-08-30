@@ -24,6 +24,7 @@ from pr_review_models import (
     IssueComment,
     PullRequestHeadState,
     Reaction,
+    RepoIdentity,
     Reviewability,
     ReviewNode,
     ReviewsConnection,
@@ -154,6 +155,33 @@ def run_gh(args: list[str], *, timeout: float | None = None) -> str:
     """
     result = subprocess.run([_GH, *args], stdout=subprocess.PIPE, text=True, timeout=timeout, check=True)
     return result.stdout
+
+
+def detect_repo_identity(*, gh_timeout: float | None = None) -> tuple[str, str]:
+    """Detect this checkout's own GitHub `(owner, repo)` via `gh repo view`.
+
+    Relies entirely on `gh`'s own remote resolution (the same one `gh pr view`, `gh pr comment`
+    etc. use for this checkout) -- this function adds no guessing of its own. A wrong owner/repo
+    would send a reply to the wrong repository, so a caller unable to detect must stop rather than
+    fall back to a default (CLAUDE.md, "No invented constraints").
+
+    Args:
+        gh_timeout: Seconds to bound the `gh` call to, or `None` for no bound -- see `run_gh`.
+
+    Returns:
+        The `(owner, repo)` pair `gh` reports for this checkout.
+
+    Raises:
+        FileNotFoundError: `gh` is not on PATH.
+        subprocess.CalledProcessError: `gh` could not resolve a repository for this checkout --
+            no remote, not a git repository, or `gh` is unauthenticated.
+        subprocess.TimeoutExpired: the command exceeded `gh_timeout`.
+        pydantic.ValidationError: `gh`'s output does not match the expected shape.
+    """
+    raw = run_gh(["repo", "view", "--json", "nameWithOwner"], timeout=gh_timeout)
+    identity = RepoIdentity.model_validate(json.loads(raw))
+    owner, repo = identity.nameWithOwner.split("/", 1)
+    return owner, repo
 
 
 def _fetch_pages(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[ReviewThreadsConnection]:

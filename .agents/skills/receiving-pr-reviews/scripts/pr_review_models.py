@@ -25,6 +25,7 @@ __all__ = [
     "IssueComment",
     "PullRequestHeadState",
     "Reaction",
+    "RepoIdentity",
     "ReviewNode",
     "Reviewability",
     "UnresolvedThread",
@@ -61,6 +62,18 @@ class Author(GitHubResponseModel):
     """A GitHub account login, as GraphQL returns it for a comment/review/reaction author."""
 
     login: str
+
+
+class RepoIdentity(GitHubResponseModel):
+    """This checkout's own `owner/repo`, as `gh repo view --json nameWithOwner` reports it.
+
+    `nameWithOwner` is `gh`'s own canonical `"owner/repo"` string (always exactly one `/`, since
+    neither half of a GitHub repository identity may itself contain one) -- the shape
+    `pr_review_gh.detect_repo_identity` splits into the `(owner, repo)` pair every other `gh` call
+    in this script takes as separate query variables.
+    """
+
+    nameWithOwner: str
 
 
 class CommentNode(GitHubResponseModel):

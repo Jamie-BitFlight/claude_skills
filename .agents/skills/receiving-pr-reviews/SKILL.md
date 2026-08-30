@@ -44,7 +44,7 @@ description: Work through every unresolved review thread on a PR to completion â
 
 <gotchas>
 
-- All commands default `--owner`/`--repo` to this checkout; pass them explicitly to target a different repository.
+- `fetch`/`watch`/`reply` detect this checkout's own repository via `gh repo view`; pass `--github owner/repo` to target a different one, or when detection fails.
 - `--gh-timeout-seconds` is unbounded by default on `fetch` and `watch`. One snapshot is seven sequential `gh api` calls, some of them paginating a large PR, so choose a bound against your own network. Inside `watch` it applies to the first fetch only; each poll is bounded by the time left before `--timeout-seconds`.
 - `reply`'s `--comment-id` is a comment's `databaseId` and `resolve`'s `--thread-id` is a thread's `id` â€” both come straight from step 1's output. When a thread already has more than one comment, pass the *first* comment's `databaseId`: `comments` is in creation order, and GitHub rejects a reply targeted at another reply.
 - A `reviews_with_body`/`unresponded_reviews` entry is not a thread, so it cannot be replied to or resolved through this script. Address it and post the response on the PR itself per step 6.

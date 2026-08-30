@@ -71,6 +71,19 @@ if TYPE_CHECKING:
 
 runner = CliRunner()
 
+
+@pytest.fixture(autouse=True)
+def _default_github_detection(mocker: MockerFixture) -> None:
+    """Stub `--github` autodetection for every test in this module by default.
+
+    Every `fetch`/`watch`/`reply` invocation below that omits `--github` would otherwise shell out
+    to the real `gh repo view` during the test run. The tests under "--github: autodetect vs
+    explicit override" re-patch `detect_repo_identity` themselves to cover detection directly; this
+    fixture only keeps every other test's `--github`-less invocation decoupled from it.
+    """
+    mocker.patch.object(pr_review_threads, "detect_repo_identity", return_value=("o", "r"))
+
+
 _AGENT_LOGIN = "reviewing-agent"
 _OLD_COMMIT_DATE = datetime(2025, 12, 1, tzinfo=UTC)
 
@@ -861,8 +874,8 @@ def test_internal_result_models_are_not_strict() -> None:
 @pytest.mark.parametrize(
     "argv",
     [
-        ["fetch", "--pr", "3208", "--gh-timeout-seconds", "7"],
-        ["reply", "--pr", "3208", "--comment-id", "1", "--body", "x", "--gh-timeout-seconds", "7"],
+        ["fetch", "--pr", "3208", "--github", "o/r", "--gh-timeout-seconds", "7"],
+        ["reply", "--pr", "3208", "--comment-id", "1", "--body", "x", "--github", "o/r", "--gh-timeout-seconds", "7"],
         ["resolve", "--thread-id", "T1", "--gh-timeout-seconds", "7"],
     ],
     ids=["fetch", "reply", "resolve"],
@@ -882,6 +895,69 @@ def test_every_gh_backed_command_accepts_a_timeout_bound(argv: list[str], mocker
     assert result.exit_code == 0, result.output
     if argv[0] != "fetch":
         assert run_gh_mock.call_args.kwargs["timeout"] == pytest.approx(7)
+
+
+# --- --github: autodetect vs explicit override ---------------------------------------------------
+
+
+def test_fetch_uses_detected_github_when_not_overridden(mocker: MockerFixture) -> None:
+    """Without `--github`, `fetch` autodetects this checkout's own `owner/repo` and uses it."""
+    detect_mock = mocker.patch.object(
+        pr_review_threads, "detect_repo_identity", return_value=("detected-owner", "detected-repo")
+    )
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208"])
+
+    assert result.exit_code == 0, result.output
+    detect_mock.assert_called_once()
+    assert fetch_mock.call_args.args[:2] == ("detected-owner", "detected-repo")
+
+
+def test_fetch_exits_nonzero_and_names_github_flag_when_detection_fails(mocker: MockerFixture) -> None:
+    """When autodetection fails, `fetch` exits non-zero and names `--github` as the way out.
+
+    A wrong owner/repo would send a reply to the wrong repository, so a failed detection must stop
+    the command rather than fall back to a guess (CLAUDE.md, "No invented constraints" — the same
+    principle rules out silently guessing an identity here).
+    """
+    mocker.patch.object(pr_review_threads, "detect_repo_identity", side_effect=subprocess.CalledProcessError(1, ["gh"]))
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result")
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208"])
+
+    assert result.exit_code != 0
+    assert "--github" in result.output
+    fetch_mock.assert_not_called()
+
+
+def test_fetch_uses_explicit_github_override_and_skips_detection(mocker: MockerFixture) -> None:
+    """`--github owner/repo` is used as-is, and autodetection is never attempted."""
+    detect_mock = mocker.patch.object(pr_review_threads, "detect_repo_identity")
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--github", "acme/widgets"])
+
+    assert result.exit_code == 0, result.output
+    detect_mock.assert_not_called()
+    assert fetch_mock.call_args.args[:2] == ("acme", "widgets")
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["no-slash-here", "/repo", "owner/", "owner/repo/extra"],
+    ids=["no-slash", "empty-owner", "empty-repo", "too-many-slashes"],
+)
+def test_fetch_rejects_a_malformed_github_override(value: str, mocker: MockerFixture) -> None:
+    """A `--github` value must be exactly one `owner/repo` pair with both halves non-empty."""
+    detect_mock = mocker.patch.object(pr_review_threads, "detect_repo_identity")
+    build_mock = mocker.patch.object(pr_review_threads, "build_fetch_result")
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--github", value])
+
+    assert result.exit_code != 0
+    detect_mock.assert_not_called()
+    build_mock.assert_not_called()
 
 
 # --- reviewability -------------------------------------------------------------------------------

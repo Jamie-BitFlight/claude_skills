@@ -36,14 +36,10 @@ import time
 from typing import Annotated
 
 import typer
+from pydantic import ValidationError
 
-from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, run_gh
+from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_models import WatchResult
-
-# This checkout's own owner/repo — override with --owner/--repo to target any other repository;
-# every `gh` call below takes them as explicit query variables, so nothing here is repo-specific.
-DEFAULT_OWNER = "Jamie-BitFlight"
-DEFAULT_REPO = "claude_skills"
 
 app = typer.Typer(help="GitHub PR review-thread operations (fetch/watch/reply/resolve) via gh.")
 
@@ -60,11 +56,80 @@ _DEFAULT_WATCH_INTERVAL_SECONDS = 90
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
 
+def _validate_github_option(value: str | None) -> str | None:
+    """Typer callback: reject a malformed `--github` value before any command body runs.
+
+    Args:
+        value: The raw `--github` argument, or `None` when the flag was not passed.
+
+    Returns:
+        `value` unchanged, once confirmed to be `None` or `"owner/repo"` with both halves
+        non-empty.
+
+    Raises:
+        typer.BadParameter: `value` is not exactly one `/` with both halves non-empty.
+    """
+    if value is None:
+        return None
+    owner, separator, repo = value.partition("/")
+    if not separator or not owner or not repo or "/" in repo:
+        message = "must be 'owner/repo' -- exactly one '/', with both halves non-empty"
+        raise typer.BadParameter(message)
+    return value
+
+
+# Shared by every command that targets a specific repository (`fetch`, `watch`, `reply`) so the
+# flag, its help text, and its format validation stay identical across all three rather than
+# duplicated per command.
+GithubOption = Annotated[
+    str | None,
+    typer.Option(
+        "--github",
+        help="Target repository as 'owner/repo'. Detected via `gh repo view` when omitted.",
+        callback=_validate_github_option,
+    ),
+]
+
+
+def _owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, str]:
+    """Resolve the `(owner, repo)` to operate on: an explicit `--github` override, or autodetected.
+
+    Detection relies entirely on `gh repo view`'s own remote resolution for this checkout -- see
+    `pr_review_gh.detect_repo_identity`. A wrong owner/repo would send a reply to the wrong
+    repository, so a failed detection stops the command rather than falling back to a guess
+    (CLAUDE.md, "No invented constraints").
+
+    Args:
+        github: The `--github` value, already format-validated by `_validate_github_option`, or
+            `None` to autodetect.
+        gh_timeout: Seconds to bound the detection `gh` call to, or `None` for no bound.
+
+    Returns:
+        The `(owner, repo)` pair to query.
+
+    Raises:
+        typer.Exit: Autodetection was attempted (no `--github` given) and failed -- `gh` is
+            missing, unauthenticated, or this checkout has no GitHub remote `gh` recognizes.
+            Exits with code 1; nothing else is printed to stdout.
+    """
+    if github is not None:
+        owner, repo = github.split("/", 1)
+        return owner, repo
+    try:
+        return detect_repo_identity(gh_timeout=gh_timeout)
+    except (FileNotFoundError, subprocess.CalledProcessError, ValidationError) as exc:
+        typer.echo(
+            f"Could not detect this checkout's GitHub repository via `gh repo view` ({exc}). "
+            "Pass --github owner/repo to specify it explicitly.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
+
+
 @app.command()
 def fetch(
     pr: Annotated[int, typer.Option(help="Pull request number.")],
-    owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
-    repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
+    github: GithubOption = None,
     gh_timeout_seconds: Annotated[
         float | None, typer.Option(min=0, help="Seconds to bound each `gh` call to. Unbounded by default.")
     ] = None,
@@ -94,6 +159,7 @@ def fetch(
     `unresolved` array there means "nothing can happen yet", not "nothing to do". Read it before
     concluding a PR is clean. An empty `blockers` means reviews can proceed.
     """
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
     result = build_fetch_result(owner, repo, pr, gh_timeout=gh_timeout_seconds)
     typer.echo(result.model_dump_json())
 
@@ -102,8 +168,7 @@ def fetch(
 def watch(
     pr: Annotated[int, typer.Option(help="Pull request number.")],
     *,
-    owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
-    repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
+    github: GithubOption = None,
     interval_seconds: Annotated[
         int, typer.Option(min=1, help="Seconds to sleep between polls. Must be positive.")
     ] = _DEFAULT_WATCH_INTERVAL_SECONDS,
@@ -164,6 +229,7 @@ def watch(
     ending rather than a failure; a non-zero `gh` exit never is — see the two handlers below.
     """
     deadline = time.monotonic() + timeout_seconds
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
     # The first fetch is mandatory and is *not* deadline-bounded: with `--timeout-seconds 0` the
     # deadline is already spent, and starving this call would turn the documented immediate
     # snapshot into a `TimeoutExpired`. Only the polls below race the deadline.
@@ -231,13 +297,13 @@ def reply(
     pr: Annotated[int, typer.Option(help="Pull request number.")],
     comment_id: Annotated[int, typer.Option(help="Review comment databaseId, from `fetch`.")],
     body: Annotated[str, typer.Option(help="Reply text.")],
-    owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
-    repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
+    github: GithubOption = None,
     gh_timeout_seconds: Annotated[
         float | None, typer.Option(min=0, help="Seconds to bound the `gh` call to. Unbounded by default.")
     ] = None,
 ) -> None:
     """Reply to a review comment. Prints gh's created-comment response as compact JSON."""
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
     raw = run_gh(
         ["api", "-X", "POST", f"repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies", "-f", f"body={body}"],
         timeout=gh_timeout_seconds,
