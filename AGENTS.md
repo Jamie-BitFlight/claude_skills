@@ -345,9 +345,7 @@ commit and changed path.
 For full ty usage guidance beyond this repo's own overrides, load the `astral` plugin skill
 (`/astral:ty`) if installed, or see `docs.astral.sh` directly.
 
-This repository enforces **ty** (Astral) only, run via `prek`. `mypy`,
-`pyright`, and `basedpyright` are not repository quality gates; references to
-them in plugin-facing documentation describe options for external plugin users.
+This repository enforces **ty** (Astral) only, run via `prek`.
 
 ### ty overrides and suppression policy
 
