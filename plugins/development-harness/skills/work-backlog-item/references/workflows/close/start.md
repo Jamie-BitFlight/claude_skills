@@ -217,7 +217,7 @@ If operation is `resolve`:
 
 12. Before emitting Handoff E, determine whether all milestone issues are resolved:
 
-    a. Read the `milestone` field from the `backlog_resolve` response. If the resolved item has no `milestone` field (or `milestone` is null/empty), skip Handoff E — no milestone context exists.
+    a. Read the `milestone` field from Step 5.2's `backlog_view` response (`backlog_resolve`'s own response carries no `milestone` field). If the item has no `milestone` value (null or empty), skip Handoff E — no milestone context exists.
 
     b. If a milestone is present, call:
 

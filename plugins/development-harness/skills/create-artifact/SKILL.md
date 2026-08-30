@@ -66,6 +66,9 @@ One of the recognized type strings:
 | `T0-baseline` | t0-baseline-capture | Pre-implementation baseline of acceptance criteria |
 | `TN-verification` | tn-verification-gate | Post-implementation verification results |
 | `research` | any research agent | Investigation findings, coverage analysis, rationale |
+| `task-plan` | `sam_plan` (internal, auto-registered) | Never call `artifact_register` directly for this type — see [task-plan](#task-plan) below |
+| `dispatch-plan` | `dispatch_create_plan` (internal, auto-registered) | Milestone dispatch plan; created automatically by the `dispatch_create_plan` MCP tool, not by direct registration |
+| `audit-report` | doc-drift-auditor | Documentation drift audit findings for a completed work item |
 
 ### `artifact_id`
 
@@ -127,7 +130,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 ### task-plan
 
-Task plans live exclusively in SAM plan storage. Create them with
+`task-plan` is a valid `artifact_register` type, but it is written internally — `sam_plan(config={"action": "create", "issue": N, ...})` auto-registers it, making the plan readable via `artifact_read`/`artifact_list` for worktree-isolated agents. Never call `artifact_register(artifact_type="task-plan", ...)` directly; create plans with
 `mcp__plugin_dh_sam__sam_plan(config={"action": "create", ...})` and retrieve them with
 `mcp__plugin_dh_sam__sam_plan(plan="{plan_ref}", config={"action": "read"})`.
 
