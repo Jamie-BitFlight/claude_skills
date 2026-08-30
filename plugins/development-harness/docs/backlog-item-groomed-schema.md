@@ -2,25 +2,25 @@
 
 **Purpose**: Define the structure of groomed content written into backlog item files. Grooming (backlog refinement) transforms items from vague ("this problem happens") to ready for planning — problem is clear, facts are verified, resources are mapped, effort is estimated, and blockers are surfaced. The agent does this autonomously: fact-checking claims, searching the codebase for related work, and identifying gaps. It does NOT produce architecture, task decomposition, or implementation plans — those happen in the SAM planning phase.
 
-**Location**: Groomed content lives in the **body** of `~/.dh/projects/{slug}/backlog/{priority}-{slug}.md` (resolved via `dh_paths.backlog_dir()`). Frontmatter uses the research-style `metadata:` block (aligned with `./research/` entries). Body has no duplication of frontmatter — only extra fields when present, plus `## Groomed` when groomed.
+**Scope**: This document defines the groomed *content* schema — frontmatter shape, body sections, and `## Groomed` subsections — passed through `backlog_groom(groomed_content=...)`. This content is identical regardless of which backend (github, sqlite, memory, beads) stores it; physical storage format and location are backend internals (see `plugins/development-harness/AGENTS.md` §Backend Providers) and are out of scope here. Frontmatter uses the research-style `metadata:` block (aligned with `./research/` entries). Body has no duplication of frontmatter — only extra fields when present, plus `## Groomed` when groomed.
 
 ---
 
 ## Frontmatter (Research-Style)
 
-Aligned with [research/README.md](../../research/README.md) metadata format:
+Aligned with [research/README.md](../../../research/README.md) metadata format:
 
 ```yaml
 ---
-name: "Item title"
+title: "Item title"
 description: "Main problem statement or description"
 metadata:
   topic: "slug-from-title"
   source: "Source description"
   added: "YYYY-MM-DD"
-  priority: P0|P1|P2|Ideas
+  priority: P0|P1|P2|Ideas|completed  # "completed" is set internally on completion, not chosen by the groomer
   type: Feature|Bug|Refactor|Docs|Chore
-  status: open|in-progress|done|resolved
+  status: open|done|in-progress|needs-grooming|closed
   # optional:
   issue: "#N"
   plan: "path/to/plan.md"
@@ -43,7 +43,7 @@ Body is **empty** when un-groomed and no extra details. When present, body conta
 - **Files** — when applicable
 - **## Groomed (YYYY-MM-DD)** — when groomed (see below)
 
-Do **not** duplicate `name`, `description`, `source`, `added`, `priority`, `type`, `issue` in the body — they live in frontmatter.
+Do **not** duplicate `title`, `description`, `source`, `added`, `priority`, `type`, `issue` in the body — they live in frontmatter.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: multi-perspective-review
-argument-hint: "--diff <git-range> [--issue <N>]"
+argument-hint: "--diff <git-range> [--issue <N>] [--slug <str>]"
 user-invocable: true
 description: "Use when a diff needs four parallel perspective reviewers (Security, Performance, Quality, Accessibility). Creates an ephemeral SAM plan, collects structured verdicts, synthesizes them into one deduplicated cross-referenced punch list, prints one summary line per perspective, and exits non-zero if any perspective returns REJECT. SKIP is a passing outcome."
 ---
@@ -9,12 +9,9 @@ description: "Use when a diff needs four parallel perspective reviewers (Securit
 
 ## Role
 
-Orchestrates four independent perspective reviewers in parallel against a diff. Each reviewer
-specialises in a single dimension: Security, Performance, Quality, or Accessibility. The skill
-creates an ephemeral SAM plan, dispatches four `dh:task-worker` teammates via `TeamCreate`,
-dispatches a fifth worker that reads the four verdict blocks back and synthesizes them into one
-deduplicated punch list, applies the gate logic to that punch list, and prints one canonical
-summary line per perspective.
+Dispatches every worker — the four reviewers and the synthesizer — as `dh:task-worker`, never a
+specialist agent directly, so each can claim and close its own SAM task (see Behavioral Rules). The
+gate in Step 7 applies to the synthesizer's punch list, not to the four raw verdicts.
 
 Activate `dh:review-verdict-contract` before the first verdict-schema operation.
 
@@ -22,7 +19,7 @@ Activate `dh:review-verdict-contract` before the first verdict-schema operation.
 
 | Argument | Type | Description |
 |----------|------|-------------|
-| `--diff <git-range>` | **required** | Git range passed to `git diff --name-only`. Examples: `HEAD~1..HEAD`, `main..feature-branch`, `abc123..def456`. |
+| `--diff <git-range>` | **required** | Passed to `git diff --name-only`. Commit outstanding changes first, then pass `<base>..HEAD`, where `<base>` is a commit SHA captured before this work's first commit — the caller is responsible for supplying one that still resolves. |
 | `--issue <N>` | optional | GitHub issue number used for ephemeral plan linkage and slug derivation. |
 | `--slug <str>` | optional | Explicit slug override. When omitted, derived from `--issue` or current git branch. |
 
@@ -164,13 +161,7 @@ result has `task_count=5`.
 
 ---
 
-## Step 4: TeamCreate and Dispatch Four Workers in Parallel
-
-Create the team:
-
-```text
-TeamCreate(team_name="multi-{review_slug}")
-```
+## Step 4: Dispatch Four Workers in Parallel
 
 Dispatch all four workers simultaneously. Do NOT wait between spawns — all four are independent
 and must run in parallel. Each worker receives a minimal prompt that tells it to run the
@@ -188,12 +179,10 @@ Every prompt names the same output destination: the `Review Results` section of 
 task. That section is the only channel the synthesizer reads in Step 6 — a reviewer that does not
 write it is a missing verdict, and the punch list records it as one. The loaded profile — not the
 dispatch prompt — performs that write: each reviewer agent's own SOP ends with a mandatory write
-to `Review Results` as part of what `dh:start-task` executes. Do not instruct the worker to write
-the section itself before running `dh:start-task`.
+to `Review Results` as part of what `dh:start-task` executes.
 
 ```text
 Agent(
-  team_name="multi-{review_slug}",
   name="{worker}",
   subagent_type="dh:task-worker",
   prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are working on {lens} review. Your task: {PA}/{task}.\n\nRun the dh:start-task skill against {PA} --task {task}. The loaded profile writes your structured verdict block into the task's Review Results section — that is where the punch list reads your verdict. Do not write that section yourself first; the profile's own SOP performs the single write."
@@ -231,12 +220,10 @@ Dispatch one more worker against `T5`. It reads the four `Review Results` sectio
 findings that name the same defect across perspectives into single entries, and writes the
 punch-list block into `T5`'s own `Punch List` section. As with the four reviewer workers, the
 `dh:review-synthesizer` profile — loaded by `dh:start-task` — performs that write as its own Step
-5; the dispatch prompt only tells the worker where to look and where its output is read, not to
-write the section itself.
+5.
 
 ```text
 Agent(
-  team_name="multi-{review_slug}",
   name="synthesis-worker",
   subagent_type="dh:task-worker",
   prompt="Before starting work, load these skills: dh:subagent-contract\n\nYou are synthesizing the four perspective verdicts on plan {PA} into one punch list. Your task: {PA}/T5.\n\nRun the dh:start-task skill against {PA} --task T5. The loaded profile writes your punch-list block into the task's Punch List section — that is where the gate reads your output. Do not write that section yourself first; the profile's own SOP performs the single write."
@@ -288,9 +275,8 @@ rests on these two checks, so both run on every synthesis, not only when somethi
 **Punch list not produced:** a terminal `T5` whose `Punch List` section is absent, does not
 parse as JSON, or fails any validation check above is synthesis that did not happen. FAIL with
 `Punch list not produced`, name the check that failed, report which perspectives did write a
-`Review Results` section so the run is diagnosable, then run `TeamDelete(team_name="multi-{review_slug}")`
-and exit non-zero — this failure happens before Step 7, so its own team cleanup and exit are the
-only ones that will run for it.
+`Review Results` section so the run is diagnosable, then exit non-zero — this failure happens
+before Step 7, so this exit is the only one that will run for it.
 
 ---
 
@@ -332,19 +318,15 @@ Take each `{token}` from the verdict-to-token mapping in
 `review-verdict-contract` §2.2, which also shows a fully
 rendered example line.
 
-### Exit and Cleanup
+### Exit
 
-1. If gate FAILED (missing verdict or any REJECT): print the summary line, then TeamDelete, then
-   exit non-zero.
+1. If gate FAILED (missing verdict or any REJECT): print the summary line, then exit non-zero.
 2. If gate PASSED (all-SKIP warning applies): print the summary line, then print the warning
-   line `NOTE: No perspectives reviewed — all skipped`, then TeamDelete, then exit 0.
-3. If gate PASSED (normal): print the summary line, then TeamDelete, then exit 0.
+   line `NOTE: No perspectives reviewed — all skipped`, then exit 0.
+3. If gate PASSED (normal): print the summary line, then exit 0.
 
-TeamDelete cleans up the team after all workers are done:
-
-```text
-TeamDelete(team_name="multi-{review_slug}")
-```
+Each of the four reviewer workers and the synthesis worker terminates on its own once its task
+completes — there is no shared group object to release.
 
 ---
 
