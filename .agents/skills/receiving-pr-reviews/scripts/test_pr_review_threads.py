@@ -513,6 +513,48 @@ def test_build_fetch_result_both_reviews_responded_when_one_comment_references_b
     assert result.unresponded_reviews == []
 
 
+def test_build_fetch_result_shorter_review_stays_unresponded_when_only_longer_id_referenced(
+    mocker: MockerFixture,
+) -> None:
+    """A comment quoting only a review whose id is a numeric superset of another review's id (e.g.
+    `pullrequestreview-1234` vs `pullrequestreview-123`) does not also clear the shorter one.
+
+    Regression coverage for a Codex review: plain substring containment does not enforce a
+    boundary at the end of the id, so `"...pullrequestreview-123" in "...pullrequestreview-1234..."`
+    is `True` even though the two are different reviews — `_references_review` must reject that.
+    """
+    shorter_review = _review("123", body="first round of feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    longer_review = _review("1234", body="second round of feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
+    comment = _own_comment(datetime(2026, 1, 3, tzinfo=UTC), references=longer_review)
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(
+        pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([shorter_review, longer_review])]
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [shorter_review]
+
+
+@pytest.mark.parametrize(
+    ("comment_body", "expected"),
+    [
+        ("Addressed https://github.com/o/r/pull/1#pullrequestreview-123.", True),
+        ("Addressed https://github.com/o/r/pull/1#pullrequestreview-123", True),
+        ("Addressed https://github.com/o/r/pull/1#pullrequestreview-1234.", False),
+        ("No reference here.", False),
+    ],
+    ids=["trailing-punctuation", "end-of-string", "longer-id-does-not-match-shorter", "no-match"],
+)
+def test_references_review_enforces_id_boundary(comment_body: str, expected: bool) -> None:
+    assert (
+        pr_review_gh._references_review(comment_body, "https://github.com/o/r/pull/1#pullrequestreview-123") is expected
+    )
+
+
 def test_build_fetch_result_excludes_review_with_no_submitted_at(mocker: MockerFixture) -> None:
     """A review that has not actually been submitted yet is never unresponded."""
     review = _review("R1", body="feedback", submitted_at=None)

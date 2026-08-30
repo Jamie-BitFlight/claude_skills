@@ -10,6 +10,7 @@ layer's `reply`/`resolve` commands call it directly for their own single-shot `g
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import time
@@ -410,21 +411,44 @@ def _review_effective_timestamp(review: ReviewNode) -> datetime:
     return max(review.submittedAt, review.lastEditedAt)
 
 
+def _references_review(comment_body: str, review_url: str) -> bool:
+    """Whether `comment_body` quotes `review_url` as a complete permalink, not a mere id prefix.
+
+    A review's `url` ends in its own numeric database id (`#pullrequestreview-<id>`), and plain
+    substring containment does not enforce a boundary at the end of that id: id `123` is itself a
+    substring of id `1234`, so a comment quoting only the longer permalink would also satisfy a
+    naive `review.url in comment_body` check for the shorter, unrelated review. Requiring the
+    character immediately after the match (if any) to not be a digit rules that out while still
+    matching the common case of the URL followed by punctuation, whitespace, or the end of the
+    comment.
+
+    Args:
+        comment_body: One PR-level comment's body text.
+        review_url: The specific review's own canonical permalink to look for.
+
+    Returns:
+        `True` when `review_url` appears in `comment_body` with no trailing digit immediately
+        after it.
+    """
+    return re.search(re.escape(review_url) + r"(?!\d)", comment_body) is not None
+
+
 def _unresponded_reviews(reviews_with_body: list[ReviewNode], own_comments: list[IssueComment]) -> list[ReviewNode]:
     """Which of `reviews_with_body` this workflow has not yet explicitly responded to.
 
     A review counts as responded only when at least one of this workflow's own PR-level comments
-    both quotes that review's own `url` (its canonical GitHub permalink) *and* postdates the
-    review's effective timestamp — the later of `submittedAt`/`lastEditedAt`, see
-    `_review_effective_timestamp`. Requiring an explicit reference, rather than inferring a match
-    purely from chronological order, prevents an unrelated administrative comment — e.g. a
-    cross-thread sequencing decision, explicitly sanctioned by the receiving-pr-reviews skill's own
-    workflow step 6 — from being mistaken for a response to whatever review happens to be newest at
-    the time it is posted. Requiring the reference to also postdate the review's effective
-    timestamp still catches an editor adding new feedback to an already-referenced review after the
-    fact. One comment referencing multiple reviews' URLs correctly clears all of them; no review is
-    limited to being "claimed" by only one comment. A review with no `submittedAt` (not yet actually
-    submitted) is excluded rather than treated as always-unresponded.
+    both quotes that review's own `url` (its canonical GitHub permalink, matched as a complete id —
+    see `_references_review`) *and* postdates the review's effective timestamp — the later of
+    `submittedAt`/`lastEditedAt`, see `_review_effective_timestamp`. Requiring an explicit
+    reference, rather than inferring a match purely from chronological order, prevents an unrelated
+    administrative comment — e.g. a cross-thread sequencing decision, explicitly sanctioned by the
+    receiving-pr-reviews skill's own workflow step 6 — from being mistaken for a response to
+    whatever review happens to be newest at the time it is posted. Requiring the reference to also
+    postdate the review's effective timestamp still catches an editor adding new feedback to an
+    already-referenced review after the fact. One comment referencing multiple reviews' URLs
+    correctly clears all of them; no review is limited to being "claimed" by only one comment. A
+    review with no `submittedAt` (not yet actually submitted) is excluded rather than treated as
+    always-unresponded.
 
     Args:
         reviews_with_body: Every review whose summary text is non-empty, in any order.
@@ -439,7 +463,7 @@ def _unresponded_reviews(reviews_with_body: list[ReviewNode], own_comments: list
         for review in reviews_with_body
         if review.submittedAt is not None
         and not any(
-            review.url in comment.body and comment.created_at >= _review_effective_timestamp(review)
+            _references_review(comment.body, review.url) and comment.created_at >= _review_effective_timestamp(review)
             for comment in own_comments
         )
     ]
