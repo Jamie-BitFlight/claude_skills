@@ -125,7 +125,7 @@ Language plugins like `python3-development` plug into the harness by telling it 
 
 Install name: `dh`
 
-**Skills include:** `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:groom-milestone`, `/dh:work-milestone`, `/dh:dispatch`, `/dh:backlog`, and more.
+**Skills include:** `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:groom-milestone`, `/dh:work-milestone`, `/dh:dispatch`, `/dh:work-backlog-item`, and more.
 
 **Agents include:** `@dh:swarm-task-planner`, `@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:feature-verifier`, `@dh:doc-drift-auditor`, and more.
 

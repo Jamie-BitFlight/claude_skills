@@ -34,6 +34,11 @@ For every placeholder in the form <key/>, substitute the value of that key from 
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
 </sam_cli>
 
+<mcp_server_scripts>
+SAM server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"
+Backlog server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py" --project-dir .
+</mcp_server_scripts>
+
 The `references/workflows/*.md` files loaded by this skill are plain files, not substituted — they show bare SAM CLI subcommands and args only (e.g. `backlog view --selector "..."`), never the invocation prefix. Prepend the command in <sam_cli/> above to every one of them.
 
 > [!IMPORTANT]
@@ -108,7 +113,7 @@ See the [Backlog Lifecycle reference](../../docs/backlog-lifecycle.md) for the c
 **SAM** — Stateless Agent Methodology. See [sam-definition.md](./references/workflows/work/sam-definition.md) for what SAM is and how to embody it. SAM lives in `../stateless-agent-methodology/` (or `bitflight-devops/stateless-agent-methodology` on GitHub).
 The configured backend is authoritative for its native work records. For Beads-backed projects, use `bd` directly for issue creation, inspection, status, dependencies, readiness, labels, notes, and metadata. Use MCP or the provider-neutral CLI for structured plans, dispatch, artifacts, validation, and handoffs that Beads does not provide. Do not describe MCP or CLI as an exclusive proxy layer.
 
-**MCP server availability**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](../backlog/references/mcp-connection-check.md) for troubleshooting.
+**MCP server availability**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md — its commands use the `<sam_cli/>` and `<mcp_server_scripts/>` values above.
 
 **To capture a new backlog item**: `/dh:work-backlog-item create -- "<what and why of the problem that triggered the need for a backlog issue>"`
 

@@ -898,11 +898,10 @@ Neither `implement-feature` nor `start-task` documents an explicit procedure for
 
 ## Related Documents
 
-- [Backlog Item Lifecycle (Draft — superseded by this document)](./backlog-lifecycle.draft.md)
 - [Workflow Architecture Diagram (SAM pipeline detail)](./workflow-architecture-diagram.md)
 - [Plan Artifact Lifecycle Policy](./plan-artifact-lifecycle.md)
-- [Default Development Flow (S1-S7 pipeline)](../skills/dh-meta-docs/references/default-development-flow.md)
-- [Artifact Conventions (naming, file layout)](../skills/dh-meta-docs/references/artifact-conventions.md)
+- For the S1-S7 pipeline and stage handoffs, or artifact naming and file layout — load
+  `dh:dh-meta-docs`, which routes to both.
 - [Domain model source (authoritative field definitions)](../sam_schema/core/models.py)
 - [Backend Providers](./backend-providers.md)
 - [ADR-9: Close/Resolve Semantics](./adr-9-close-resolve-semantics.md)

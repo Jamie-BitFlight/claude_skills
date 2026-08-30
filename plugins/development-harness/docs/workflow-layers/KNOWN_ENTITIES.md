@@ -59,8 +59,6 @@ Canonical names are the directory name under `skills/`. Referenced in source as
 add-new-feature
 analyze-test-failures
 api-state
-backlog
-backlog-tools-administrator
 clear-cove-task-design
 codebase-auditor
 codemod-runner
@@ -264,7 +262,7 @@ Written via `backlog_groom(section="{name}", content=...)`, read via
 
 ### Body sections defined in item schema
 
-Canonical top-level order from `skills/backlog/references/item-schema.md` / `skills/backlog/templates/item.md`:
+Canonical top-level order from `templates/backlog-item.md`:
 
 ```
 Description            ← not a `## ` section — creation-time template field, no sections[] key
@@ -353,7 +351,7 @@ artifact type from backlog items, parsed independently of `backlog_core`'s secti
 entirely. Kept, not removed, per the Living Document Protocol below — flagging provenance is
 required before removal, and legacy data may still reference these keys.
 
-Source: `skills/backlog/references/item-schema.md` (L54–73), `skills/backlog/templates/item.md`,
+Source: `templates/backlog-item.md`,
 `docs/backlog-item-groomed-schema.md` (L64–81), `agents/impact-analyst.md`,
 `agents/fact-checker.md`, `agents/classifier.md`, `agents/backlog-item-groomer.md`, `groom/finalize.md`,
 `backlog_core/rendering.py` `SECTION_HEADING` (full grep cross-check across doc `section=`/`sections[...]` usage).

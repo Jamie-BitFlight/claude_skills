@@ -31,13 +31,13 @@ uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # I
 For full uv/ty/ruff usage guidance beyond this repo's own overrides, load the `astral` plugin
 skills (`/astral:uv`, `/astral:ty`, `/astral:ruff`) if installed, or see `docs.astral.sh` directly.
 
+Run lint, format, and type checks through `prek` — it dispatches to ruff, ty, and every other
+configured hook, and skips hooks that don't apply to the given files.
+
 ```bash
-uv run ruff check --fix path/to/file.py    # Lint with auto-fix
-uv run ruff format path/to/file.py         # Format Python
-uv run ty check path/to/file.py            # Type check (Astral's ty)
 uv run prek run --files path/to/file.py    # Run ALL pre-commit hooks on specific files
 uv run prek run --all-files                # Run ALL hooks on all files (slow)
-uv run prek run ruff --files <file>        # Run single hook on specific files
+uv run prek run ruff --files <file>        # Run one hook by id (e.g. ruff, ty) on specific files
 uvx skilllint@latest check <path>          # Validate skill/agent/plugin frontmatter
 ```
 
@@ -177,11 +177,20 @@ description: Description with trigger conditions
 
 ### Documentation Convention
 
-Plugins commonly ship a `{plugin-name}-meta-docs` skill that dynamically lists the plugin's
-`docs/` directory at load time (e.g. `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' -type f | sort`)
-instead of hardcoding relative paths to another plugin's docs. When a skill needs another plugin's
-documentation, load that plugin's meta-docs skill rather than hardcoding a cross-plugin relative
-path — those break on every directory restructure.
+Plugins commonly ship a `{plugin-name}-meta-docs` skill so other skills can reach the plugin's
+`docs/` without hardcoding a cross-plugin relative path — those break on every directory
+restructure. When a skill needs another plugin's documentation, load that plugin's meta-docs skill
+instead.
+
+A bare path listing has no value on its own — an agent can already enumerate `docs/` itself with
+`Glob`/`find`. The value of a hand-maintained list is the annotation beside each path: a stated
+reason to read that file, which is what lets the agent skip everything else in the list with
+confidence. List only docs a real skill or agent hook actually depends on discovering through this
+index. Add an entry only when some skill or agent file's hook text depends on this index resolving
+it (e.g. "load `{plugin}-meta-docs` and read the X document it lists") — confirm that dependency
+exists before adding, give the entry a specific reason to read it, and drop the entry once nothing
+depends on it. Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
+correctly regardless of installation location.
 
 ## Code Conventions
 
@@ -328,9 +337,7 @@ commit and changed path.
 For full ty usage guidance beyond this repo's own overrides, load the `astral` plugin skill
 (`/astral:ty`) if installed, or see `docs.astral.sh` directly.
 
-This repository enforces **ty** (Astral) only: `uv run ty check .`. `mypy`,
-`pyright`, and `basedpyright` are not repository quality gates; references to
-them in plugin-facing documentation describe options for external plugin users.
+This repository enforces **ty** (Astral) only, run via `prek`.
 
 ### ty overrides and suppression policy
 
@@ -417,14 +424,6 @@ Rule files outside `.claude/rules/` that other harnesses read — not a full rul
 GitHub's coding agent reads `AGENTS.md` directly — `.github/copilot-instructions.md` (a subset of
 this file) was removed to avoid two files drifting out of sync.
 
-## MCP Configuration
-
-`.mcp.json` defines MCP servers. The project uses:
-
-- **Ref-local**: Documentation reference tools
-- **context7-local**: Context7 MCP
-- **octocode**: Code search
-
 ## Gotchas & Non-Obvious Patterns
 
 1. **prek not pre-commit**: This repo uses `prek` (Rust-based), not `pre-commit`. Same config, different binary.
@@ -461,16 +460,6 @@ this file) was removed to avoid two files drifting out of sync.
 | MCP servers | `.mcp.json` |
 | Session hooks | `.claude/hooks/` |
 | CI pipeline | `.github/workflows/code-quality.yml` |
-
-## Development Workflow
-
-1. **Start work**: Create a backlog item via MCP `backlog_add` (for multi-step tasks)
-2. **Plan**: Write architect/feature-context docs in `plan/`
-3. **Implement**: Write code following conventions above
-4. **Validate**: Run `uv run ruff check --fix && uv run ruff format && uv run ty check`
-5. **Test**: Run `uv run pytest` on affected areas
-6. **Pre-commit**: Run `uv run prek run --files <changed-files>` to verify hooks pass
-7. **Commit**: Use conventional commit format with required scope
 
 ## PR Review Protocol
 
@@ -535,8 +524,6 @@ bd close <id>         # Complete work
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->

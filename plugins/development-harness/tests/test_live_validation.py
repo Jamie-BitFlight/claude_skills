@@ -4,7 +4,7 @@ Suite 2: No mocks — calls go through real operations and GitHub API.
 Requires ``GITHUB_TOKEN`` environment variable.
 
 Marked with ``pytest.mark.e2e`` — excluded from default test runs.
-Run with: ``uv run pytest .claude/skills/backlog/tests/test_live_validation.py -m e2e -v``
+Run with: ``uv run pytest plugins/development-harness/tests/test_live_validation.py -m e2e -v``
 
 No ``@pytest.mark.asyncio`` decorators — global ``asyncio_mode = "auto"``.
 """
@@ -275,7 +275,8 @@ class TestLiveLifecycle:
 
         assert result["groomed_updated"] is True
 
-    async def test_l8_sync_push_groomed(self, live_items):
+    @pytest.mark.usefixtures("live_items")
+    async def test_l8_sync_push_groomed(self):
         """L8: backlog_sync pushes groomed content to GitHub issues."""
         result = await _call("backlog_sync")
 
@@ -283,7 +284,8 @@ class TestLiveLifecycle:
         assert isinstance(result["pushed"], int)
         assert isinstance(result["messages"], list)
 
-    async def test_l9_pull_refresh_from_github(self, live_items):
+    @pytest.mark.usefixtures("live_items")
+    async def test_l9_pull_refresh_from_github(self):
         """L9: backlog_pull refreshes local files from GitHub issue bodies."""
         result = await _call("backlog_pull")
 

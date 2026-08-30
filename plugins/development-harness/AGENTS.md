@@ -298,7 +298,6 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 **Backlog management:**
 
-- `/dh:backlog` - Backlog overview and operations reference
 - `/dh:create-backlog-item` - Create new backlog items
 - `/dh:work-backlog-item` - Work on a backlog item through its lifecycle
 - `/dh:groom-backlog-item` - Groom and prioritize backlog items

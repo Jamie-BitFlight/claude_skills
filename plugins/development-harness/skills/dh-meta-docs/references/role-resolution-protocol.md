@@ -8,7 +8,7 @@ How the development harness resolves abstract roles to concrete agents at runtim
 
 The harness defines abstract roles (architect, test-designer, code-reviewer, design-spec, linting). Language plugins provide manifests that map these roles to their specialist agents. At pipeline start, the harness detects the project language, finds the matching manifest, and resolves all roles before S1 begins.
 
-**Layer 0 gates apply before role resolution.** RT-ICA, human touchpoint model, artifact conventions, and verification protocol are enforced before the harness resolves language-specific roles. See [.claude/docs/sdlc-layers/layer-0/](../../../../.claude/docs/sdlc-layers/layer-0/).
+**Layer 0 gates apply before role resolution.** RT-ICA, human touchpoint model, artifact conventions, and verification protocol are enforced before the harness resolves language-specific roles. See [docs/sdlc-layers/layer-0/](../../../docs/sdlc-layers/layer-0/).
 
 ---
 

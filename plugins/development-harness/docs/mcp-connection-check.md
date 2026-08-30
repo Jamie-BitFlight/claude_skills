@@ -30,16 +30,13 @@ If a server shows as failed in `/mcp` or tool calls return connection errors:
 
 2. Restart the Claude Code session. Plugin MCP servers restart automatically.
 
-3. If the problem persists after a session restart, verify the servers can start
-   manually:
+3. If the problem persists after a session restart, verify the servers can start manually: run
+   both commands under `<mcp_server_scripts/>` in the skill that sent you here (this file cannot
+   resolve this plugin's installed root on its own).
 
-   ```bash
-   uv run --script scripts/run_sam_server.py
-   uv run --script scripts/run_backlog_server.py --project-dir .
-   ```
-
-   If either exits with `Error: missing dependencies`, ensure `uv` is installed
-   and run `uv sync` from the plugin root.
+   If either exits with `Error: missing dependencies`, each script resolves its own dependencies
+   on invocation (PEP 723 inline metadata) — run `uv self update` and retry rather than looking for
+   a separate install step.
 
 4. Check `MCP_TIMEOUT` — if set too low, Claude Code may abort the connection
    before the server finishes starting. The default is sufficient for these
@@ -47,10 +44,10 @@ If a server shows as failed in `/mcp` or tool calls return connection errors:
 
 ## Adapter Selection
 
-If the configured backend is Beads, use native `bd` first for CRUD, readiness, status, and dependencies; do not route those operations through an adapter. If a structured SAM operation is needed and the SAM server is unavailable, use the validated direct script-path CLI.
+If a structured SAM operation is needed and the SAM server is unavailable, use the validated direct script-path CLI.
 
-Using the SAM CLI (the invoking `backlog` skill's `<sam_cli/>` block already resolved the full
-command for this session — prefix each line below with it):
+Using the SAM CLI — prefix each line below with the `<sam_cli/>` value from the skill that sent you
+here (this file cannot resolve this plugin's installed root on its own):
 
 ```bash
 plan list
@@ -58,4 +55,4 @@ plan status --plan-address P{N}
 plan ready --plan-address P{N}
 ```
 
-Use named options for addresses and task data. Do not use the retired standalone console script, flat commands, positional addresses, or selectable output-format flags. The MCP composites remain MCP-only and should be called through their connected `mcp__plugin_dh_*` tools.
+Use named options for addresses and task data. Do not use the retired standalone console script, flat commands, or selectable output-format flags. The MCP composites remain MCP-only and should be called through their connected `mcp__plugin_dh_*` tools.

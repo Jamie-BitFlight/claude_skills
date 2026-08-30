@@ -139,9 +139,7 @@ def test_backlog_core_symbols_resolve_when_available() -> None:
     ``backlog_core`` is a sibling package of ``migrate_tasks_to_github.py``
     under ``plugins/development-harness/`` — the script's own ``_HARNESS_DIR``
     sys.path bootstrap guarantees it is importable, so these names must be the
-    real ``backlog_core`` objects (never ``None``) rather than the previous
-    "guarded, fell back to ``None``" behavior for a stale, no-longer-existent
-    ``.claude/skills/backlog/backlog_core`` path.
+    real ``backlog_core`` objects, never ``None``.
     """
     # Assert: bound to real callables/classes, not None sentinels.
     assert create_task_issue is not None
@@ -329,7 +327,7 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
 
     success_issue = _make_mock_issue(482)
 
-    def _side_effect(repo, parent, sam_task, **kwargs):
+    def _side_effect(_repo, _parent, sam_task, **_kwargs):
         if sam_task.task_id == "T1":
             msg = "GitHub API error"
             raise RuntimeError(msg)
@@ -358,7 +356,7 @@ def test_partial_failure_continues(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_writes_cache_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_writes_cache_file(tmp_path: Path) -> None:
     """After live migration, sam-tasks-{slug}.json cache is written."""
     # Arrange
     task_file = _make_task_file(tmp_path)

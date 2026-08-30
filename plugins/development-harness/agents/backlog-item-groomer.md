@@ -426,7 +426,8 @@ Do not accept criteria that only say the tool is implemented or documented.
 
 ## Output Format
 
-Produce groomed content matching [.claude/docs/backlog-item-groomed-schema.md](.claude/docs/backlog-item-groomed-schema.md).
+Produce groomed content matching the Backlog Item Groomed Schema — load `dh:dh-meta-docs` and read
+the schema document it lists.
 
 The orchestrator passes this output to `backlog_groom`, which stores it on the item under `## Groomed (YYYY-MM-DD)`.
 

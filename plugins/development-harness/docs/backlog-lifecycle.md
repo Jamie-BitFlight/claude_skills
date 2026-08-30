@@ -142,10 +142,6 @@ Action:     backlog_update(selector='{item_ref}', status='needs-grooming')
             re-enter in-progress
 ```
 
-SOURCE: `backlog/references/state-machine.md` (base diagram, accessed 2026-03-30).
-Additions verified against architect spec Issue #398, Section 8 (accessed 2026-03-30).
-Updated 2026-04-06 for skill consolidation, blocked disambiguation, and Ideas exception.
-
 ---
 
 ## 2. Pipeline Stages
@@ -381,9 +377,6 @@ closed           — terminal: milestone archived by complete-milestone
 `verified` exists as a cross-route signal applied by `complete-implementation` after quality
 gates pass. It is NOT a lifecycle state and has no entry/exit transitions in the state machine.
 
-SOURCE: `backlog/references/state-machine.md` (accessed 2026-03-30).
-Updated 2026-04-06 for route-based naming.
-
 ---
 
 ## 5. Priority and Auto-Mode Defaults
@@ -504,7 +497,7 @@ is newer than the RT-ICA date. Date comparisons use UTC calendar dates.
 ### Groomer Output Validation
 
 Before writing groomed sections, the groom stage runs a pre-write validation gate. Full
-procedure: [Groom Finalize](../skills/work-backlog-item/references/workflows/groom/finalize.md).
+procedure: load `dh:work-backlog-item` and follow the groom stage through to its finalize step.
 
 Retry model: haiku groomer (first attempt) → haiku groomer with targeted prompt (retry) →
 sonnet groomer (escalation) → `status:blocked` with explicit error. No silent failures.
@@ -562,12 +555,8 @@ SOURCE: Architect spec Issue #398, Section 9 (AC7 severity policy decision) (acc
 
 ## References
 
-- [Create Scope](../skills/work-backlog-item/references/workflows/create/scope.md) — Create stage scope boundary
-- [Create Workflow](../skills/work-backlog-item/references/workflows/create/start.md) — create stage procedure
-- [Work Scope](../skills/work-backlog-item/references/workflows/work/scope.md) — Work stage scope boundary
-- [Groom Workflow](../skills/work-backlog-item/references/workflows/groom/start.md) — groom stage index
-- [Groom Finalize](../skills/work-backlog-item/references/workflows/groom/finalize.md) — output validation and write procedure
+- For create/groom/work stage scope boundaries, procedures, and gates (create scope, create
+  workflow, groom index and finalize, work scope and feasibility gate) — load
+  `dh:work-backlog-item`, which routes to each by stage.
 - [Backend Providers](./backend-providers.md) — provider capabilities, configuration, and transport boundaries
-- [State Machine](../skills/backlog/references/state-machine.md) — canonical state DAG source
-- [Feasibility Gate](../skills/work-backlog-item/references/workflows/work/feasibility-gate.md) — work stage feasibility check
 - Architect Spec — access via `artifact_read(item_id="<provider-reference>", artifact_type="architect")` — authoritative design decisions

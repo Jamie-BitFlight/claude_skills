@@ -184,12 +184,6 @@ Grooms a backlog item: fact-checks claims, maps required resources, identifies g
 /dh:groom-backlog-item #42
 ```
 
-#### `/dh:backlog`
-
-Reference overview for selected structured backlog operations and MCP tools; provider-native operations remain on the configured backend.
-
----
-
 ### Milestone Management
 
 #### `/dh:groom-milestone`
@@ -375,7 +369,7 @@ The structured workflow transport. Exposes selected provider-neutral backlog ope
 | `backlog_list_comments` | List comments on a backend item |
 | `backlog_read_comment` | Read a specific backend comment body |
 
-The server also exposes `artifact_*` tools for plan artifact management and `dispatch_*` tools for milestone wave orchestration. See `/dh:backlog` for the full reference.
+The server also exposes `artifact_*` tools for plan artifact management and `dispatch_*` tools for milestone wave orchestration. Each tool's parameters and return shape are documented in its own MCP schema, visible via `ToolSearch` or `fastmcp list`.
 
 ### `plugin:dh:sam` — Stateless Agent Methodology (SAM)
 
@@ -391,7 +385,7 @@ Manages task plans and execution state for the `/dh:implement-feature` loop.
 
 Provides structured sequential reasoning for complex planning tasks.
 
-**Note**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](./skills/backlog/references/mcp-connection-check.md) for troubleshooting.
+**Note**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool remains unavailable, load `dh:work-backlog-item`, `dh:implement-feature`, or `dh:start-task` — each resolves the values its linked troubleshooting doc needs.
 
 ---
 

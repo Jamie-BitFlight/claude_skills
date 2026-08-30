@@ -1071,7 +1071,7 @@ def _startup_sync_enabled() -> bool:
 
 
 @contextlib.asynccontextmanager
-async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object], None]:
+async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object], None]:
     """FastMCP lifespan: launch the background sync task before serving tools.
 
     The background sync task starts immediately but does not block server
@@ -1079,7 +1079,7 @@ async def _backlog_lifespan(server: object) -> AsyncGenerator[dict[str, object],
     can be answered concurrently.
 
     Args:
-        server: The FastMCP server instance (not used directly).
+        _server: The FastMCP server instance (not used directly).
 
     Yields:
         Empty lifespan context dict.
@@ -1260,7 +1260,9 @@ async def backlog_add(
 
     Returns:
         Dict with file_path, title, priority, issue number (if created),
-        and output messages/warnings. On error, dict contains an error key.
+        and output messages/warnings. file_path is for reference only — use
+        backlog_update or backlog_groom for all modifications. On error, dict
+        contains an error key.
     """
     out = Output()
     try:
@@ -1331,9 +1333,7 @@ def _format_backend_status_message(status: _BackendStatus) -> str:
     Returns:
         Formatted status string.
     """
-    availability_label = (
-        status.availability.value if isinstance(status.availability, _BackendAvailability) else str(status.availability)
-    )
+    availability_label = status.availability.value
     if (
         status.availability == _BackendAvailability.REACHABLE
         and status.open_count is not None
@@ -2130,7 +2130,10 @@ async def backlog_view(
         When summary=True (default, no disclosure params): compact dict with issue_number,
         title, labels, status, plan_address, sections_index, _summary, _full_chars, and _hint.
         When summary=False: dict with title, priority, issue, plan, file_path, body,
-        sections metadata, and output messages/warnings.
+        sections metadata, and output messages/warnings. file_path is for reference
+        only — use backlog_update or backlog_groom for all modifications.
+        When navigate targets an ordinal that does not exist in the item: dict with
+        error, requested_ordinal, and valid_ordinals (every ordinal actually present).
         On error, dict contains an error key.
     """
     # ---- Progressive disclosure routing (architect spec §4.6) -----------------
@@ -2452,7 +2455,13 @@ async def backlog_update(
     plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
     status: Annotated[
         str | None,
-        Field(description="Set item status (e.g. 'in-progress'). Updates GitHub issue labels when applicable."),
+        Field(
+            description=(
+                "Set item status (e.g. 'in-progress') — the only supported way to change an "
+                "item's status labels. Updates GitHub issue labels when applicable, as a side "
+                "effect of this transition."
+            )
+        ),
     ] = None,
     section: Annotated[
         str | None, Field(description="Section name for groomed content update (use with content parameter)")
@@ -4242,8 +4251,6 @@ async def _run_spawn_item(
     """
     async with semaphore:
         cmd = _build_spawn_cmd(milestone, issue_num, item_title, model, phase, integration_branch, effort=effort)
-        pid = -1
-        result_file = ""
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
