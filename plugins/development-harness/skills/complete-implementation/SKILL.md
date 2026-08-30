@@ -5,16 +5,11 @@ user-invocable: true
 description: "Use when all tasks for a feature are marked COMPLETE — runs holistic quality gates including code review, feature verification, integration check, documentation drift audit and update, and context refinement. Creates follow-up plans when issues are found."
 compatibility: Python 3.11+
 metadata:
-  version: 2.1.0
-  last_updated: '2026-06-04'
+  version: 2.2.0
+  last_updated: '2026-08-30'
 ---
 
 # Complete Implementation (Quality Gates + Recursion)
-
-You MUST validate that the implemented feature meets its goals and quality gates. If follow-up plans
-are created, route them to backlog items first, then recurse only when the follow-up matches the
-current scope and priority (see Recursive Follow-up Handling section).
-
 
 <input>
 $ARGUMENTS
@@ -41,8 +36,6 @@ never the invocation prefix. Prepend the command in <sam_cli/> above to every on
 
 Parse `$ARGUMENTS` to determine the input type before proceeding. A plan address is an opaque
 logical identifier returned by `sam_plan`; pass it through unchanged.
-
-The following diagram is the authoritative procedure for Input Format Detection. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -84,8 +77,6 @@ Stop.
 **Step 2 -- Check for linked plan**:
 
 Read the `plan` field from the response.
-
-The following diagram is the authoritative procedure for Resolve Issue Step 2 linked plan check. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -189,11 +180,9 @@ dispatch loop.
 
 **Step 4 -- SAM dispatch loop**:
 
-Use the same SAM Dispatch Loop as the existing 7-phase flow (see "SAM Dispatch Loop (Phases T0-T6)" section). The loop operates identically — 5 tasks instead of 7 is the only structural difference. The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement) to stay proportional, but retains the T4/T5 documentation pass.
+Use the same SAM Dispatch Loop as the full-plan flow (see "SAM Dispatch Loop (Phases T0-T6)" section). The loop operates identically — 5 tasks instead of 7 is the only structural difference. The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement), but retains the T4/T5 documentation pass.
 
 **Phase-specific post-dispatch actions for proportional gates**:
-
-The following diagram is the authoritative procedure for Proportional Quality Gates phase-specific post-dispatch actions. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -213,49 +202,14 @@ flowchart TD
     T5Post --> Continue
 ```
 
-**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0` → skip T5. Drift = `Total findings` of 1 or more → dispatch T5. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift. This is the same drift-detection rule the full SAM path applies to its T4 phase.
+**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0` → skip T5. Drift = `Total findings` of 1 or more → dispatch T5. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift.
 
 **Step 5 -- Completion verification gate**:
 
-After the dispatch loop exits, verify all phases (defined by `build_quality_gate_plan` in `sam_schema/core/quality_gates.py`) reached terminal status:
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{pqg_plan_address}"
-```
-
-All 5 tasks must have `status == 'complete'`, with one exception: T5 (Documentation Update) may have `status == 'skipped'` when T4 found no drift. Any other task with `status == 'skipped'` is an unauthorized skip — treat as a failure. This skip whitelist matches the full SAM path's Completion Verification Gate.
-
-The following diagram is the authoritative procedure for Proportional Quality Gates completion verification. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-
-```mermaid
-flowchart TD
-    Status["sam_plan(plan='{pqg_plan_address}', config={action:'status'})"] --> Iter["Iterate over all 5 tasks"]
-    Iter --> Check{For each task:<br>check status}
-    Check -->|"status == 'complete'"| PassTask["Task passes"]
-    Check -->|"status == 'skipped' AND task_id == 'T5'"| PassTask
-    Check -->|"status == 'skipped' AND task_id != 'T5'"| FailUnauth["FAIL — unauthorized skip"]
-    Check -->|"any other status"| FailIncomplete["FAIL — task incomplete or blocked"]
-    PassTask --> AllPassed{All 5 tasks<br>passed?}
-    AllPassed -->|Yes| Proceed["Proceed to Step 6"]
-    AllPassed -->|No| Stop["STOP — report failures, do NOT apply label"]
-    FailUnauth --> AllPassed
-    FailIncomplete --> AllPassed
-```
-
-On verification failure:
-
-```text
-COMPLETION BLOCKED — Proportional Quality Gate Incomplete
-
-Failed tasks:
-  {task_id} ({phase_name}): status={status}
-  [repeat for each failing task]
-
-To resume: re-run /complete-implementation {item_ref}
-BLOCKED tasks will be reset to NOT_STARTED automatically.
-```
-
-Stop. Do not apply the `status:verified` label.
+Execute the shared procedure in
+[./references/completion-verification-gate.md](./references/completion-verification-gate.md) with
+`{plan_address}` = `{pqg_plan_address}`, `{gate_name}` = "Proportional Quality Gate Incomplete",
+`{resume_arg}` = `{item_ref}`, `{next_step}` = "Step 6".
 
 **Step 6 -- Apply status:verified label**:
 
@@ -284,7 +238,7 @@ Stop. Do not proceed to the Final Step commit.
 
 **Step 7 -- No recursive follow-up handling**:
 
-The issue-only path does not produce follow-up plans. Skip directly to "Final Step: Commit and Push Remaining Changes", then "Team Shutdown", then "Resolve the Issue".
+The issue-only path does not produce follow-up plans. Skip directly to "Final Step: Commit and Push Remaining Changes", then "Confirm All Workers Finished", then "Resolve the Issue".
 
 ---
 
@@ -309,8 +263,6 @@ The artifact content contains a list of per-criterion `BookendVerification` reco
 `acceptance-criteria-structured` entry. There is no top-level `verdict` field. Aggregate the verdict
 by scanning all records: the overall result is FAIL if any record has `status: regressed`;
 otherwise PASS.
-
-The following diagram is the authoritative procedure for Pre-Phase 1 TN Verification Check. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -396,8 +348,6 @@ Use the `{slug}` resolved from the implementation plan's `feature` field.
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "qg-{slug}"
 ```
 
-The following diagram is the authoritative procedure for Quality Gate Plan Creation Step 1 check for existing QG plan. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-
 ```mermaid
 flowchart TD
     List["sam_plan(config={action:'list', search:'qg-{slug}'})"] --> Found{QG plan found?}
@@ -473,15 +423,6 @@ This allows re-running `complete-implementation` to resume from the blocked phas
 | T5 | Documentation Update | service-docs-maintainer |
 | T6 | Context Refinement | context-refinement |
 
-### Team Setup
-
-Check for an existing implementation team before dispatching QG agents:
-
-- `team_name = "impl-{slug}"` (same team created by `implement-feature`)
-- If the team exists (config at `~/.claude/teams/impl-{slug}/config.json`), reuse it for QG agent dispatch
-- If no team exists, create one: `TeamCreate(team_name="impl-{slug}")`
-- Store `team_name` for use in agent dispatch and the Team Shutdown step below
-
 ### Dispatch Loop
 
 Repeat until `sam_plan(plan="{qg_plan_address}", config={"action": "ready"})` returns a
@@ -495,25 +436,57 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{qg_
 
 If the result is empty, exit the loop and proceed to Completion Verification Gate.
 
-**2. Load the start-task skill:**
+**2. Dispatch the task:**
 
-```text
-Skill(skill="start-task", args="{qg_plan_address} --task {task_id}")
+```mermaid
+flowchart TD
+    Ready["Next ready task_id"] --> IsT0{task_id == 'T0'?}
+    IsT0 -->|"Yes"| Direct["Run T0 directly — see below"]
+    IsT0 -->|"No"| Delegate["Run the start-task workflow<br>against {qg_plan_address} --task {task_id}"]
 ```
 
-Pass `team_name="{team_name}"` when spawning QG agents so they join the existing implementation team.
-
-`start-task` claims the task and marks it COMPLETE on finish via the SubagentStop hook. Do not call
+**T1-T6 — delegate:** run the `dh:start-task` workflow (name it in prose — a harness-specific
+invocation form reaches only the harness that defines it) against `{qg_plan_address} --task
+{task_id}`. `start-task` claims the task and marks it complete on finish. Do not call
 `sam_task(plan="{qg_plan_address}", task="{task_id}", config={"action": "claim"})` in the
 orchestrator before this step — claiming here causes a double-claim that causes `start-task` to
 receive `claimed: false` and stop without executing the task body.
+
+**T0 — run it directly, in your own context; do not delegate it.** Its agent is
+`dh:multi-perspective-review (orchestrated)` — a workflow that already dispatches its own
+reviewers, so a delegated worker would only add a hop to reach the same call.
+
+1. Commit any outstanding changes (`git add -A && git commit ...`).
+2. Read `sam_plan(plan="{plan_address}", config={"action": "read"}).context` for
+   `**Implementation base SHA**: <sha>` (`implement-feature`'s "Record the Implementation Base
+   SHA" step). If absent, or if `git cat-file -e "<sha>"` fails (the commit no longer resolves),
+   stop:
+
+   ```text
+   COMPLETION BLOCKED — No Implementation Base SHA
+
+   This plan has no recorded starting commit for T0's diff review. Every ref-based substitute
+   (a branch name, a merge-base) can silently miss commits once this plan's own work reaches
+   origin/main — falling back to one would report success without reviewing everything changed.
+
+   To resume: determine the correct starting commit and record it —
+   sam_plan(plan="{plan_address}", config={"action": "update", "context": "**Implementation
+   base SHA**: <sha>\n\n{existing context}"}) — then re-run /complete-implementation.
+   ```
+
+   Do not proceed to Step 1 (no QG plan is created); do not apply `status:verified`.
+3. Run the workflow (name it in prose) with `--diff "<sha>..HEAD"`, adding `--issue {item_ref}`
+   when known.
+
+There is no subagent here to claim or complete the task, so do that yourself:
+`sam_task(plan="{qg_plan_address}", task="T0", config={"action": "claim"})` before running the
+workflow, `sam_task(plan="{qg_plan_address}", task="T0", config={"action": "state", "status":
+"complete"})` after — then continue to Step 3 below exactly as for any other completed task.
 
 **3. Phase-specific post-dispatch actions:**
 
 After each dispatched phase completes, run the phase-specific processing before querying
 `sam_plan(plan="{qg_plan_address}", config={"action": "ready"})` again:
-
-The following diagram is the authoritative procedure for SAM Dispatch Loop phase-specific post-dispatch actions. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
@@ -534,55 +507,17 @@ flowchart TD
     StoreDiv --> Continue
 ```
 
-**Detecting drift in T4 output**: The `@dh:doc-drift-auditor` agent returns a `Total findings: {count}` line in its `ARTIFACTS` block and registers the full drift report as the `audit-report` artifact. No drift = `Total findings: 0`. Drift = `Total findings` of 1 or more. If the count line is absent, read the `audit-report` artifact and treat a non-empty `## Findings by Category` as drift.
+**Detecting drift in T4 output**: same rule as Proportional Quality Gates Step 4 above.
 
 ---
 
 ## Completion Verification Gate
 
-After the SAM dispatch loop exits, verify all phases reached terminal status before allowing label application.
-
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{qg_plan_address}"
-```
-
-The following diagram is the authoritative procedure for Completion Verification Gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-
-```mermaid
-flowchart TD
-    Status["sam_plan(plan='{qg_plan_address}', config={action:'status'})"] --> Iter["Iterate over all tasks in the plan"]
-    Iter --> Check{For each task:<br>check status}
-    Check -->|"status == 'complete'"| PassTask["Task passes"]
-    Check -->|"status == 'skipped' AND task_id == 'T5'"| PassTask
-    Check -->|"status == 'skipped' AND task_id != 'T5'"| FailUnauth["FAIL — unauthorized skip"]
-    Check -->|"status == 'not-started' OR 'in-progress'"| FailIncomplete["FAIL — incomplete phase"]
-    Check -->|"status == 'blocked'"| FailBlocked["FAIL — blocked phase"]
-    PassTask --> AllPassed{All tasks<br>passed?}
-    AllPassed -->|Yes| Proceed["Proceed to Recursive Follow-up Handling"]
-    AllPassed -->|No| Stop["STOP — report failures, do NOT apply label"]
-    FailUnauth --> AllPassed
-    FailIncomplete --> AllPassed
-    FailBlocked --> AllPassed
-```
-
-**Skip whitelist**: ONLY T5 (Documentation Update) may have `status: skipped`. Any other task with `status: skipped` is an unauthorized skip — treat as a failure.
-
-**On verification failure**, output:
-
-```text
-COMPLETION BLOCKED — Quality Gate Incomplete
-
-Failed tasks:
-  {task_id} ({phase_name}): status={status}
-  [repeat for each failing task]
-
-To resume: re-run /complete-implementation {plan_address}
-BLOCKED tasks will be reset to NOT_STARTED automatically.
-```
-
-Stop. Do not apply the `status:verified` label.
-
-**On verification success**, proceed to Recursive Follow-up Handling.
+After the SAM dispatch loop exits, execute the shared procedure in
+[./references/completion-verification-gate.md](./references/completion-verification-gate.md) with
+`{plan_address}` = `{qg_plan_address}`, `{gate_name}` = "Quality Gate Incomplete", `{resume_arg}` =
+`{plan_address}` (the original feature plan address), `{next_step}` = "Recursive Follow-up
+Handling".
 
 ---
 
@@ -604,7 +539,7 @@ If absent, no additional output is needed — the feature proceeds normally.
 
 ## Recursive Follow-up Handling
 
-## Constants
+### Constants
 
 `DH_RECURSIVE_REVIEW_TASK_DEPTH = 5`
 
@@ -732,23 +667,12 @@ Push after committing; skip if the working tree is clean.
 
 ---
 
-## Team Shutdown
+## Confirm All Workers Finished
 
-After commit+push, release the implementation team:
-
-```text
-TeamDelete(team_name="{team_name}")
-```
-
-Deleting the team releases every teammate in it. Delete it only once every task the team owns is
-terminal — read that through `sam_plan(config={"action": "status"})`, never by assuming a silent
-teammate has finished.
-
-`TeamDelete` is a release step, not a shutdown mechanism: it fails while any teammate is still
-active, and a teammate that finished its task stays alive and idle until something shuts it down.
-Shut each teammate down through the harness's teammate-shutdown mechanism first. This step runs
-after commit+push, so a failed release cannot cost committed work — treat it as a release that did
-not happen, wait for the named teammate, and retry.
+After commit+push, confirm every dispatched worker has reached a terminal state — read that
+through `sam_plan(config={"action": "status"})`, never by assuming a silent worker has finished.
+Each worker was dispatched independently and terminates on its own once its task completes; there
+is no shared group object to release.
 
 ---
 

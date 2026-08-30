@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Executes the SAM implementation loop when a task plan exists — dispatches ready tasks to specialist agents in parallel, manages bookend tasks (T0 baseline capture and TN verification), tracks concerns and contract violations per task, and relies on hooks to update task status. Use when the plan_ref returned by add-new-feature is provided. Manages task batches via sam_plan and sam_task MCP tools.
+description: Use when the plan_ref returned by add-new-feature is provided. Executes the SAM implementation loop — dispatches ready tasks to specialist agents in parallel, manages bookend tasks (T0 baseline capture and TN verification), tracks concerns and contract violations per task, and relies on hooks to update task status. Manages task batches via sam_plan and sam_task MCP tools.
 argument-hint: "<plan_ref>"
 user-invocable: true
 ---
@@ -33,6 +33,17 @@ Confirm the plan exists:
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
 ```
+
+## Record the Implementation Base SHA
+
+Read `sam_plan(plan="{plan_ref}", config={"action": "read"}).context`. If it already contains a
+line matching `**Implementation base SHA**: <sha>`, skip this step — a prior run already recorded
+it, and re-running this step now would capture a later commit instead of the true starting point.
+
+Otherwise, before the Progress Loop makes its first commit: run `git rev-parse HEAD` and prepend
+`**Implementation base SHA**: {sha}\n\n` to the existing context (do not replace it —
+`sam_plan(action='update', context=...)` overwrites the whole field), then write it back via
+`sam_plan(plan="{plan_ref}", config={"action": "update", "context": "{updated context}"})`.
 
 ---
 
@@ -70,10 +81,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{pla
 
 > **Call `mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="{plan_ref}")` (or
 > `backlog_get_ready_sam_tasks`) ONCE per batch.** Store the returned task list. Loop over the stored list
-> without fetching ready tasks again.
-> After all tasks in the current batch are dispatched and completed, use
-> `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` to check whether more tasks remain.
-> Fetch the next ready batch only after the previous batch is fully dispatched.
+> without fetching ready tasks again — step 5 below governs when the next batch is fetched.
 
 3. Dispatch based on `autonomy_mode`:
 
@@ -116,31 +124,11 @@ For each task being dispatched:
 
 ### Agent Health Check (While Waiting)
 
-After dispatching a batch, the orchestrator waits for completion messages. Trigger a health check when any of these occur:
-
-- No message received from any dispatched agent after ~10 minutes of silence
-- User asks about agent status
-- `git log` shows no new commits when implementation work should be in progress
-
-**Never read JSONL session files directly in the orchestrator context.** Session files can exceed 40K tokens. Always delegate to `agentskill-kaizen:transcript-analyst` with an empty context window.
-
-Session JSONL files are at `~/.claude/projects/{project-slug}/*.jsonl`, filterable by `agentId` field. The `{project-slug}` is the absolute project path with `/` replaced by `-` (e.g. `/home/user/repos/myproject` → `-home-user-repos-myproject`).
-
-```mermaid
-flowchart TD
-    Trigger([Health check triggered]) --> Spawn
-    Spawn["Task is session health summary<br>subagent_type='agentskill-kaizen:transcript-analyst'<br>Context: agent name or teammate ID to check,<br>JSONL dir ~/.claude/projects/{project-slug}/*.jsonl<br>Report: last turn timestamp, last tool call,<br>verdict of crashed / idle / active"]
-    Spawn --> Verdict{Analyst verdict}
-    Verdict -->|"Crashed — session ended abruptly<br>after sam_task(action=claim) with no further turns"| Confirm
-    Confirm["Confirm task state via sam_task read<br>using plan_ref + task_id<br>Verify task is still CLAIMED"] --> Respawn
-    Respawn["Re-spawn agent with the same plan_ref and task ID<br>SubagentStop hook updates status on completion"]
-    Verdict -->|"Idle — no tool calls for 5+ min<br>agent appears stuck mid-task"| Activity["Read the task via sam_task read<br>Note its last-activity timestamp<br>Wait 2 minutes and read it again"]
-    Activity --> ActCheck{last-activity advanced?}
-    ActCheck -->|"Yes — the agent is still writing task state"| Waiting
-    ActCheck -->|"No — task state is frozen"| Respawn
-    Verdict -->|"Active — tool calls within last 2–3 min"| Waiting
-    Waiting[Continue waiting] --> Later["Re-check after 5–10 min<br>if completion message still absent"]
-```
+After dispatching a batch, the orchestrator waits for completion messages. Trigger a health check
+when any of these occur: no message from any dispatched agent after ~10 minutes of silence, the
+user asks about agent status, or `git log` shows no new commits when implementation work should be
+in progress. Execute the full check — crash/idle/active branches and re-spawn logic — defined in
+[./references/agent-health-check.md](./references/agent-health-check.md).
 
 4. After each agent returns, check its output for a `<concerns>` block. If present, append each concern to the backlog item as a checklist entry:
 
