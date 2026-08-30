@@ -5,6 +5,9 @@
 #   "fastmcp>=3.0.0",
 #   "pydantic>=2.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Experiment Registry MCP Server.
 

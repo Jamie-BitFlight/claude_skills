@@ -6,6 +6,9 @@
 #     "python-frontmatter>=1.1.0",
 #     "typer>=0.21.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Normalize YAML frontmatter quoting across all component files.
 

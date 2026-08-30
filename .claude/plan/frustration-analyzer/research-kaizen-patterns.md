@@ -90,12 +90,7 @@ async def tool_name(glob_path: str, ..., *, context: Context) -> ReturnType:
 Two annotation sets defined as module-level constants:
 
 ```python
-_READONLY_ANNOTATIONS = {
-    "readOnlyHint": True,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": False,
-}
+_READONLY_ANNOTATIONS = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
 
 _DASHBOARD_ANNOTATIONS = {
     "readOnlyHint": False,
@@ -243,10 +238,10 @@ class ScoredMessage:
     session_id: str
     timestamp: str
     message_index: int
-    compound: float      # -1.0 to 1.0 overall sentiment
-    positive: float      # 0.0 to 1.0
-    negative: float      # 0.0 to 1.0
-    neutral: float       # 0.0 to 1.0
+    compound: float  # -1.0 to 1.0 overall sentiment
+    positive: float  # 0.0 to 1.0
+    negative: float  # 0.0 to 1.0
+    neutral: float  # 0.0 to 1.0
     message_length: int
     message_preview: str
     project_path: str
@@ -307,7 +302,7 @@ Frustration signals return flat records:
     "session_id": "abc123",
     "timestamp": "2026-02-18T...",
     "signal_type": "correction",
-    "message_text": "No, that's wrong. Use the Read tool instead."
+    "message_text": "No, that's wrong. Use the Read tool instead.",
 }
 ```
 

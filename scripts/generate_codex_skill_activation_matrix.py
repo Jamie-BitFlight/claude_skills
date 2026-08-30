@@ -5,6 +5,9 @@
 #     "ruamel.yaml>=0.18.0",
 #     "python-frontmatter>=1.1.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["../plugins/plugin-creator/scripts"]
 # ///
 """Generate the complete, deterministic Codex skill activation matrix scaffold."""
 

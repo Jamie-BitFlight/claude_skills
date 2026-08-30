@@ -46,34 +46,35 @@ import platform
 import sys
 from pathlib import Path
 
+
 def detect_platform() -> tuple[str, str]:
     """Return (os_key, arch_key) matching dasel asset naming convention."""
-    system = platform.system().lower()   # 'linux', 'darwin', 'windows'
-    machine = platform.machine().lower() # 'x86_64', 'aarch64', 'arm64', 'i386'
+    system = platform.system().lower()  # 'linux', 'darwin', 'windows'
+    machine = platform.machine().lower()  # 'x86_64', 'aarch64', 'arm64', 'i386'
 
     # Normalize architecture to dasel naming
     arch_map = {
-        'x86_64': 'amd64',
-        'amd64': 'amd64',
-        'aarch64': 'arm64',
-        'arm64': 'arm64',
-        'armv7l': 'arm32',
-        'i386': '386',
-        'i686': '386',
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+        "armv7l": "arm32",
+        "i386": "386",
+        "i686": "386",
     }
     arch = arch_map.get(machine, machine)
 
     # WSL2 detection: /proc/version contains "microsoft" on WSL2
     # WSL2 behaves as Linux for binary installation purposes
-    if system == 'linux':
+    if system == "linux":
         try:
-            proc_version = Path('/proc/version').read_text().lower()
-            is_wsl2 = 'microsoft' in proc_version
+            proc_version = Path("/proc/version").read_text().lower()
+            is_wsl2 = "microsoft" in proc_version
         except OSError:
             is_wsl2 = False
         # WSL2 uses linux binaries — no special handling needed for the binary
         # PATH setup differs (see WSL2 section below)
-        return 'linux', arch
+        return "linux", arch
 
     return system, arch
 ```
@@ -107,13 +108,13 @@ The API returns an `assets` array. Each asset has:
 def find_asset(assets: list[dict], os_key: str, arch: str) -> dict | None:
     """Find the matching asset from the API response."""
     # dasel naming: dasel_{os}_{arch} or dasel_{os}_{arch}.exe (Windows)
-    if os_key == 'windows':
+    if os_key == "windows":
         target_name = f"dasel_{os_key}_{arch}.exe"
     else:
         target_name = f"dasel_{os_key}_{arch}"
 
     for asset in assets:
-        if asset['name'] == target_name:
+        if asset["name"] == target_name:
             return asset
     return None
 ```
@@ -138,8 +139,8 @@ Prefer non-`.gz` assets for direct binary download (simpler install, no decompre
 **SHA256 digest field format**: `"sha256:<hex>"` — strip the `"sha256:"` prefix before comparison:
 
 ```python
-digest_field = asset.get('digest', '')
-expected_sha256 = digest_field.removeprefix('sha256:')
+digest_field = asset.get("digest", "")
+expected_sha256 = digest_field.removeprefix("sha256:")
 ```
 
 ---
@@ -148,6 +149,7 @@ expected_sha256 = digest_field.removeprefix('sha256:')
 
 ```python
 import hashlib
+
 
 def verify_sha256(data: bytes, expected_hex: str) -> bool:
     """Verify SHA256 of downloaded bytes against expected hex string."""
@@ -160,7 +162,7 @@ For streaming large downloads, use chunk-based hashing:
 ```python
 def verify_sha256_stream(path: Path, expected_hex: str) -> bool:
     sha256 = hashlib.sha256()
-    with path.open('rb') as f:
+    with path.open("rb") as f:
         while chunk := f.read(8192):
             sha256.update(chunk)
     return sha256.hexdigest() == expected_hex
@@ -175,8 +177,8 @@ def verify_sha256_stream(path: Path, expected_hex: str) -> bool:
 ### Linux and WSL2
 
 ```python
-install_dir = Path.home() / '.local' / 'bin'
-binary_name = 'dasel'
+install_dir = Path.home() / ".local" / "bin"
+binary_name = "dasel"
 install_path = install_dir / binary_name
 ```
 
@@ -186,12 +188,12 @@ install_path = install_dir / binary_name
 
 ```python
 # Primary: LOCALAPPDATA (e.g., C:\Users\user\AppData\Local)
-local_app_data = os.environ.get('LOCALAPPDATA')
+local_app_data = os.environ.get("LOCALAPPDATA")
 if local_app_data:
-    install_dir = Path(local_app_data) / 'Programs' / 'dasel'
+    install_dir = Path(local_app_data) / "Programs" / "dasel"
 else:
-    install_dir = Path.home() / 'AppData' / 'Local' / 'Programs' / 'dasel'
-binary_name = 'dasel.exe'
+    install_dir = Path.home() / "AppData" / "Local" / "Programs" / "dasel"
+binary_name = "dasel.exe"
 install_path = install_dir / binary_name
 ```
 
@@ -200,8 +202,8 @@ install_path = install_dir / binary_name
 ### macOS (for completeness)
 
 ```python
-install_dir = Path.home() / '.local' / 'bin'  # or /usr/local/bin with sudo
-binary_name = 'dasel'
+install_dir = Path.home() / ".local" / "bin"  # or /usr/local/bin with sudo
+binary_name = "dasel"
 ```
 
 ---
@@ -215,21 +217,23 @@ Check first; many distros pre-configure it:
 ```python
 import os
 
+
 def ensure_in_path(bin_dir: Path) -> bool:
     """Return True if already in PATH, False if profile update needed."""
-    path_dirs = os.environ.get('PATH', '').split(os.pathsep)
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
     return str(bin_dir) in path_dirs
+
 
 def add_to_shell_profile(bin_dir: Path) -> None:
     """Append PATH export to ~/.bashrc and ~/.zshrc if not present."""
     export_line = f'export PATH="{bin_dir}:$PATH"'
 
-    for profile in [Path.home() / '.bashrc', Path.home() / '.zshrc']:
+    for profile in [Path.home() / ".bashrc", Path.home() / ".zshrc"]:
         if profile.exists():
             content = profile.read_text()
             if str(bin_dir) not in content:
-                with profile.open('a') as f:
-                    f.write(f'\n# Added by dasel installer\n{export_line}\n')
+                with profile.open("a") as f:
+                    f.write(f"\n# Added by dasel installer\n{export_line}\n")
 ```
 
 ### Windows Native — `%LOCALAPPDATA%\Programs\dasel`
@@ -238,6 +242,7 @@ Use the Windows registry or PowerShell to add to user PATH (no `sudo` required):
 
 ```python
 import subprocess
+
 
 def add_to_windows_user_path(bin_dir: Path) -> None:
     """Add bin_dir to Windows user PATH via PowerShell registry edit."""
@@ -251,10 +256,7 @@ if ($path -notlike "*$new*") {{
     Write-Host "Already in PATH: $new"
 }}
 """
-    subprocess.run(
-        ['powershell', '-NoProfile', '-Command', ps_script],
-        check=True,
-    )
+    subprocess.run(["powershell", "-NoProfile", "-Command", ps_script], check=True)
 ```
 
 ### WSL2-Specific PATH Consideration
@@ -271,26 +273,23 @@ WSL2 auto-inherits Windows PATH (via `WSLENV` and WSL interop). If the user inst
 import subprocess
 from pathlib import Path
 
+
 def get_installed_version(binary_path: Path) -> str | None:
     """Return installed version string or None if not installed."""
     if not binary_path.exists():
         return None
     try:
-        result = subprocess.run(
-            [str(binary_path), '--version'],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        result = subprocess.run([str(binary_path), "--version"], capture_output=True, text=True, timeout=5)
         # Expected output: "dasel version v3.2.2"
         # Strip leading 'v' for comparison
         output = result.stdout.strip() or result.stderr.strip()
         for part in output.split():
-            if part.startswith('v') and part[1:].replace('.', '').isdigit():
-                return part.lstrip('v')
+            if part.startswith("v") and part[1:].replace(".", "").isdigit():
+                return part.lstrip("v")
         return output  # fallback: return raw output
     except (subprocess.SubprocessError, FileNotFoundError, OSError):
         return None
+
 
 def is_update_needed(installed: str | None, latest: str) -> bool:
     """Compare version tuples. latest is tag_name stripped of leading 'v'."""
@@ -298,7 +297,7 @@ def is_update_needed(installed: str | None, latest: str) -> bool:
         return True
 
     def to_tuple(v: str) -> tuple[int, ...]:
-        return tuple(int(x) for x in v.lstrip('v').split('.') if x.isdigit())
+        return tuple(int(x) for x in v.lstrip("v").split(".") if x.isdigit())
 
     return to_tuple(installed) < to_tuple(latest)
 ```
@@ -308,11 +307,12 @@ def is_update_needed(installed: str | None, latest: str) -> bool:
 ```python
 import httpx
 
+
 def fetch_latest_release() -> dict:
     """Fetch latest dasel release metadata from GitHub API."""
-    url = 'https://api.github.com/repos/TomWright/dasel/releases/latest'
+    url = "https://api.github.com/repos/TomWright/dasel/releases/latest"
     with httpx.Client(timeout=30.0) as client:
-        response = client.get(url, headers={'Accept': 'application/vnd.github+json'})
+        response = client.get(url, headers={"Accept": "application/vnd.github+json"})
         response.raise_for_status()
         return response.json()
 ```
@@ -327,7 +327,7 @@ Canonical pattern used by installers (e.g., Homebrew, Rustup, nvm):
 def is_wsl2() -> bool:
     """Detect WSL2 by checking /proc/version for 'microsoft'."""
     try:
-        return 'microsoft' in Path('/proc/version').read_text().lower()
+        return "microsoft" in Path("/proc/version").read_text().lower()
     except OSError:
         return False
 ```
@@ -345,6 +345,7 @@ On Linux/macOS/WSL2, downloaded binary must have execute bit set. Python `os.chm
 ```python
 import os
 import stat
+
 
 def make_executable(path: Path) -> None:
     """Set executable bit on downloaded binary."""
@@ -395,6 +396,7 @@ Supports: Linux x86_64/arm64, macOS amd64/arm64, Windows amd64, WSL2.
 Installs to user-space (~/.local/bin on Linux/WSL2/macOS, %LOCALAPPDATA%\Programs\dasel on Windows).
 Verifies SHA256 from GitHub API asset digest field.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -410,22 +412,23 @@ import httpx
 import typer
 from rich.console import Console
 
-GITHUB_API_URL = 'https://api.github.com/repos/TomWright/dasel/releases/latest'
+GITHUB_API_URL = "https://api.github.com/repos/TomWright/dasel/releases/latest"
 
 console = Console()
-error_console = Console(stderr=True, style='bold red')
+error_console = Console(stderr=True, style="bold red")
 
-app = typer.Typer(help='Install or update dasel binary')
+app = typer.Typer(help="Install or update dasel binary")
+
 
 @app.command()
 def main(
-    force: Annotated[bool, typer.Option('--force', help='Reinstall even if already at latest')] = False,
-    dry_run: Annotated[bool, typer.Option('--dry-run', help='Show what would happen without installing')] = False,
-    bin_dir: Annotated[Path | None, typer.Option('--bin-dir', help='Override install directory')] = None,
-) -> None:
-    ...
+    force: Annotated[bool, typer.Option("--force", help="Reinstall even if already at latest")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would happen without installing")] = False,
+    bin_dir: Annotated[Path | None, typer.Option("--bin-dir", help="Override install directory")] = None,
+) -> None: ...
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app()
 ```
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Verify plugin structure for uptake-ranked cross-harness MCP candidates.
 

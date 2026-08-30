@@ -5,6 +5,9 @@
 #   "gitpython>=3.1.0",
 #   "ruamel.yaml",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 """Migrate existing plan artifacts into the GitHub Issue artifact manifest system.
 

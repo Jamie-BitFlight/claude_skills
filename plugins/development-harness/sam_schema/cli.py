@@ -13,6 +13,9 @@
 #   "tomlkit>=0.15.1",
 #   "typer>=0.27.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 """Root Typer composer for the provider-neutral SAM CLI."""
 

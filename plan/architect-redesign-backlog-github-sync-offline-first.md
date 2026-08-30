@@ -192,6 +192,7 @@ New `StrEnum` (Python 3.11+ `StrEnum`, no import needed beyond `enum`):
 ```python
 from enum import StrEnum
 
+
 class DirtyState(StrEnum):
     """Dirty-flag state for a backlog item pending remote sync.
 
@@ -203,6 +204,7 @@ class DirtyState(StrEnum):
              SPECIAL RULE: if GitHub issue is deleted while pending_push==CLOSURE,
              treat as no-op (both sides agree the item is done).
     """
+
     CLEAN = ""
     CONTENT = "content"
     CLOSURE = "closure"
@@ -212,13 +214,13 @@ class DirtyState(StrEnum):
 
 ```python
 # BEFORE
-last_synced: str = ""      # line 718 — was unused, now: stored remote updatedAt watermark
-updated_at: str = ""       # line 719 — local metadata timestamp; NOT the remote watermark
+last_synced: str = ""  # line 718 — was unused, now: stored remote updatedAt watermark
+updated_at: str = ""  # line 719 — local metadata timestamp; NOT the remote watermark
 
 # AFTER (add pending_push; last_synced repurposed)
-last_synced: str = ""      # remote updatedAt from last successful push or pull (watermark)
-updated_at: str = ""       # local metadata timestamp — NOT the remote watermark
-pending_push: str = ""     # DirtyState value; serialised as "" | "content" | "closure"
+last_synced: str = ""  # remote updatedAt from last successful push or pull (watermark)
+updated_at: str = ""  # local metadata timestamp — NOT the remote watermark
+pending_push: str = ""  # DirtyState value; serialised as "" | "content" | "closure"
 ```
 
 **Clarification on `updated_at` vs `last_synced`:**
@@ -280,10 +282,7 @@ The existing `SyncState.lock: asyncio.Lock` serialises background sync workers. 
 
 ```python
 async def write_through_item(
-    item: BacklogItem,
-    *,
-    dirty_state: DirtyState = DirtyState.CONTENT,
-    timeout: float = 10.0,
+    item: BacklogItem, *, dirty_state: DirtyState = DirtyState.CONTENT, timeout: float = 10.0
 ) -> WriteResult:
     """Offline-first write: persist locally, then bounded push to GitHub.
 
@@ -340,12 +339,7 @@ Exact sequence:
 `_write_issue_node_to_cache` currently overwrites local unconditionally. New behaviour: add a `pending_push` check to protect dirty items in the read path. However, in the background reconcile Phase 2 (which calls this function), items reaching Phase 2 are already confirmed not-dirty (the filter `pending_push == ""` in Phase 2 ensures this). So the `pending_push` check in `_write_issue_node_to_cache` is a defensive guard; Phase 2 does not rely on it.
 
 ```python
-def _write_issue_node_to_cache(
-    filepath: Path,
-    node: IssueNode,
-    *,
-    force: bool = False,
-) -> None:
+def _write_issue_node_to_cache(filepath: Path, node: IssueNode, *, force: bool = False) -> None:
     """Write a GitHub issue node to the local cache (overwrite from remote).
 
     For non-dirty items (``pending_push == DirtyState.CLEAN``) this is a plain
@@ -406,10 +400,11 @@ Replace the current overwrite-then-push model with the watermark-incremental pus
 ```python
 class WriteResult(TypedDict):
     """Result of a write_through_item call."""
-    synced: bool          # True if remote push succeeded
-    watermark: str        # Remote updatedAt if synced; "" if offline/error
-    message: str          # Human-readable outcome description
-    dirty: bool           # True if item remains dirty (pending outbox retry)
+
+    synced: bool  # True if remote push succeeded
+    watermark: str  # Remote updatedAt if synced; "" if offline/error
+    message: str  # Human-readable outcome description
+    dirty: bool  # True if item remains dirty (pending outbox retry)
 ```
 
 ---
@@ -489,6 +484,7 @@ The captured value is `response["data"]["updateIssue"]["issue"]["updatedAt"]` fr
 ```python
 from enum import StrEnum
 
+
 class DirtyState(StrEnum):
     CLEAN = ""
     CONTENT = "content"
@@ -501,6 +497,7 @@ class DirtyState(StrEnum):
 
 ```python
 from typing import TypedDict
+
 
 class WriteResult(TypedDict):
     synced: bool

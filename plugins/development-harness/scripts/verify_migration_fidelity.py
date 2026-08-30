@@ -12,6 +12,9 @@
 #   "typing-extensions>=4.0.0",
 #   "marko>=2.0.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".", ".."]
 # ///
 """verify_migration_fidelity — compare .md.bak originals against migrated .yaml files.
 

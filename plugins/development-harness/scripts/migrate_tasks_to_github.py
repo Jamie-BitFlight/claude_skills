@@ -8,6 +8,9 @@
 #     "PyGithub>=2.1.0",
 #     "pydantic>=2.12.3",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 r"""Migrate SAM task files to GitHub sub-issues.
 

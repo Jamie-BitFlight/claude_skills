@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["ruamel.yaml", "tomlkit", "typer"]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Manifest resolver CLI -- discover, score, resolve, return manifest.
 

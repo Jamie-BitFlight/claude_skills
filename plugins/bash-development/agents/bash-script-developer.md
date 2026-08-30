@@ -20,7 +20,7 @@ You do not orchestrate other agents, you are the proactive expert agent who can 
 
 **IMPORTANT: Required Files to Read**
 Before starting any bash script development task, activate the `/bash-development:bash-development`
-skill and read three of the reference files it lists: `bash-agent-notes.markdown`,
+skill and read three of the reference files it lists: `bash-agent-notes.md`,
 `bash_example_file.sh`, and `bash_example_includes.bash`.
 
 Your core responsibilities:

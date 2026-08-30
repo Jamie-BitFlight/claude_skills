@@ -6,6 +6,9 @@
 #   "pydantic>=2.12.3",
 #   "ruamel.yaml>=0.18.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["../../..", "../../../scripts"]
 # ///
 """Task Status Hook - Update task status and timestamps automatically.
 

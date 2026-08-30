@@ -12,6 +12,9 @@
 #   "python-dotenv>=1.0.0",
 #   "httpx>=0.28.1",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 """Close orphaned [MCP-TEST-*] GitHub issues left by failed e2e test teardown.
 

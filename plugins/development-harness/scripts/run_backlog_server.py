@@ -13,6 +13,9 @@
 #   "typer>=0.21.2",
 #   "python-dotenv>=1.0.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".", ".."]
 # ///
 """PEP 723 wrapper for the backlog MCP server."""
 

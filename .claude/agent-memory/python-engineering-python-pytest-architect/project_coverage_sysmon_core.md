@@ -28,8 +28,10 @@ or programmatically:
 
 ```python
 import coverage
+
 c = coverage.Coverage()
-c.start(); c.stop()
+c.start()
+c.stop()
 type(c._collector.core.tracer_class)  # -> coverage.sysmon.SysMonitor when active
 ```
 

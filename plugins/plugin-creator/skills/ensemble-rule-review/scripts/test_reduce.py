@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["pytest"]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Tests for the ensemble-rule-review corroboration reducer.
 

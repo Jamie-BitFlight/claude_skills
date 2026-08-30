@@ -10,6 +10,9 @@
 #
 # [tool.uv.sources]
 # daily-releases-lib = { path = "daily_releases_lib", editable = true }
+#
+# [tool.ty.environment]
+# extra-paths = ["./daily_releases_lib"]
 # ///
 """Collect per-day dataset for the daily-releases chunked pipeline.
 

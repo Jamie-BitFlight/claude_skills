@@ -198,7 +198,7 @@ In the `include_content` branch (analogous fix):
 # BEFORE (schematic):
 if body:
     result.sections = _build_sections_metadata(body, show, since)
-    if item and item.sections:               # ← BUG: unconditional local prepend
+    if item and item.sections:  # ← BUG: unconditional local prepend
         index = _render_section_index(item)
         if index:
             result.body = index + "\n" + body
@@ -318,8 +318,8 @@ class ViewItemResult:
     priority: str = ""
     status: str = ""
     groomed: str = ""
-    sections_index: str = ""      # ← populated from live body when available
-    body: str = ""                # ← populated by view_enrich_from_github (live)
+    sections_index: str = ""  # ← populated from live body when available
+    body: str = ""  # ← populated by view_enrich_from_github (live)
     sections: dict[str, Section] = field(default_factory=dict)
     sections_metadata: list[SectionMeta] = field(default_factory=list)
     messages: list[str] = field(default_factory=list)
@@ -446,6 +446,7 @@ def _enrich_with_live_body(result, issue_num, repo=""):
     result.body = LIVE_BODY_WITH_ALL_SECTIONS
     result.number = 2452
     return True
+
 
 mock_github["view_enrich_from_github"].side_effect = _enrich_with_live_body
 ```

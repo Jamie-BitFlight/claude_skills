@@ -12,6 +12,9 @@
 #   "typing-extensions>=4.0.0",
 #   "marko>=2.0.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".", ".."]
 # ///
 """migrate_backlog_to_yaml — bulk migration of .md backlog files to .yaml format.
 

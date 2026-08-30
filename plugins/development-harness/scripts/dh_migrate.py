@@ -9,6 +9,9 @@
 #   "gitpython>=3.1.0",
 #   "marko>=2.0.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".", ".."]
 # ///
 """dh_migrate — migrate project state from legacy .claude/ layout to ~/.dh/.
 

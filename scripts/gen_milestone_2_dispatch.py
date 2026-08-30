@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["pydantic", "ruamel.yaml"]
+#
+# [tool.ty.environment]
+# extra-paths = ["../plugins/development-harness"]
 # ///
 """Generate plan/milestone-2-dispatch.yaml for milestone #2: dh-feedbackloop-meta-refactor."""
 

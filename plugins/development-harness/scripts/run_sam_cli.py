@@ -12,6 +12,9 @@
 #   "tiktoken>=0.12.0",
 #   "typer>=0.21.2",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 """PEP 723 wrapper for the SAM CLI."""
 
