@@ -385,7 +385,7 @@ Manages task plans and execution state for the `/dh:implement-feature` loop.
 
 Provides structured sequential reasoning for complex planning tasks.
 
-**Note**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see [mcp-connection-check.md](./docs/mcp-connection-check.md) for troubleshooting.
+**Note**: Both `plugin:dh:backlog` and `plugin:dh:sam` initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool remains unavailable, load `dh:work-backlog-item`, `dh:implement-feature`, or `dh:start-task` — each resolves the values its linked troubleshooting doc needs.
 
 ---
 
