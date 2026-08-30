@@ -2,7 +2,7 @@
 
 Every function here shells out to `gh` (GitHub CLI) rather than talking to the GitHub API
 directly, relying on `gh`'s own authentication. `build_fetch_result` is the one function the CLI
-layer (`pr_review_threads.py`) calls directly — it composes the six independent `gh` calls below
+layer (`pr_review_threads.py`) calls directly — it composes the seven independent `gh` calls below
 into one `FetchResult` snapshot, fresh every time it runs. `run_gh` is exported too: the CLI
 layer's `reply`/`resolve` commands call it directly for their own single-shot `gh` invocations.
 """
@@ -19,6 +19,7 @@ from pydantic import TypeAdapter
 
 from pr_review_models import (
     FetchResult,
+    ForcePushEvent,
     IssueComment,
     PullRequestCommit,
     Reaction,
@@ -71,6 +72,18 @@ mutation($threadId: ID!) {
 }
 """
 
+_LATEST_FORCE_PUSH_QUERY = """
+query($o: String!, $r: String!, $pr: Int!) {
+  repository(owner: $o, name: $r) {
+    pullRequest(number: $pr) {
+      timelineItems(last: 1, itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT]) {
+        nodes { ... on HeadRefForcePushedEvent { createdAt } }
+      }
+    }
+  }
+}
+"""
+
 # Absolute `gh` path, resolved once at import time — ruff's start-process-with-partial-path (S607)
 # requires a resolved path rather than a bare command name. Falls back to the literal "gh" when
 # `shutil.which` can't find it, so a missing binary still surfaces as a normal FileNotFoundError
@@ -85,9 +98,10 @@ _PR_COMMIT_ADAPTER: TypeAdapter[list[PullRequestCommit]] = TypeAdapter(list[Pull
 
 # GraphQL's `author.login` and the REST reactions API's `user.login` return this bot's account
 # name without a `[bot]` suffix and with one respectively (confirmed against this repo's own PR
-# #3318 and #3306 history — see `_fetch_pr_reactions`) — matching by prefix covers both shapes
-# without hardcoding either exact string.
-_CODEX_REACTOR_LOGIN_PREFIX = "chatgpt-codex-connector"
+# #3318 and #3306 history — see `_fetch_pr_reactions`) — an exact-match set covers both known
+# shapes without a prefix check, which would also match an unrelated account whose login merely
+# starts with the same text (e.g. a public PR's `chatgpt-codex-connector-imposter`).
+_CODEX_REACTOR_LOGINS = frozenset({"chatgpt-codex-connector", "chatgpt-codex-connector[bot]"})
 
 
 def run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
@@ -270,12 +284,14 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
     """Fetch the PR's current head commit's raw git committer date.
 
     `GET /repos/{owner}/{repo}/pulls/{pr}/commits` returns commits oldest-first, so the last
-    element in the fully-flattened, fully-paginated list is always the current head commit — this
-    is what `build_fetch_result` compares a Codex approval reaction's timestamp against, so a
-    reaction left on an earlier revision is never mistaken for approval of the current one. A
-    force-push (e.g. a rebase) updates each commit's committer date to the time of that push even
-    when the author date is preserved, which is exactly the "when was this revision pushed" signal
-    needed here.
+    element in the fully-flattened, fully-paginated list is always the current head commit.
+    `build_fetch_result` compares a Codex approval reaction's timestamp against the later of this
+    and `_fetch_latest_force_push_at`'s result — this call alone is not sufficient on its own: a
+    force-push that creates a brand-new commit (the overwhelmingly common case — a rebase or
+    amend) refreshes that commit's own committer date to the time of the push, but a force-push
+    that resets the branch back onto a pre-existing commit object (reusing its original, older
+    committer date) would not, which is exactly what `_fetch_latest_force_push_at`'s
+    server-recorded event timestamp covers instead.
 
     Args:
         owner: Repository owner login.
@@ -293,6 +309,46 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
     raw = run_gh(["api", f"repos/{owner}/{repo}/pulls/{pr}/commits", "--paginate", "--slurp"], timeout=gh_timeout)
     commits = [commit for page in json.loads(raw) for commit in _PR_COMMIT_ADAPTER.validate_python(page)]
     return commits[-1].commit.committer.date
+
+
+def _fetch_latest_force_push_at(
+    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
+) -> datetime | None:
+    """Fetch the timestamp of the PR's most recent force-push, if it has ever had one.
+
+    A `HeadRefForcePushedEvent` is a server-recorded timeline entry created at the moment of the
+    force-push itself, independent of any commit's own embedded author/committer metadata — the
+    signal `_fetch_latest_commit_date` cannot provide on its own for a force-push that resets the
+    branch back onto a pre-existing commit object (see that function's docstring).
+
+    Args:
+        owner: Repository owner login.
+        repo: Repository name.
+        pr: Pull request number.
+        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+
+    Returns:
+        The most recent force-push's timestamp, or `None` if this PR's head has never been
+        force-pushed.
+    """
+    raw = run_gh(
+        [
+            "api",
+            "graphql",
+            "-f",
+            f"query={_LATEST_FORCE_PUSH_QUERY}",
+            "-f",
+            f"o={owner}",
+            "-f",
+            f"r={repo}",
+            "-F",
+            f"pr={pr}",
+        ],
+        timeout=gh_timeout,
+    )
+    nodes = json.loads(raw)["data"]["repository"]["pullRequest"]["timelineItems"]["nodes"]
+    events = [ForcePushEvent.model_validate(node) for node in nodes]
+    return events[-1].createdAt if events else None
 
 
 def _review_effective_timestamp(review: ReviewNode) -> datetime:
@@ -330,12 +386,12 @@ def _is_codex_thumbs_up(reaction: Reaction) -> bool:
         reaction: One reaction fetched by `_fetch_pr_reactions`.
 
     Returns:
-        `True` when `reaction` is a thumbs-up left by a `chatgpt-codex-connector`-prefixed login.
+        `True` when `reaction` is a thumbs-up left by exactly the Codex bot's known login (either
+        GraphQL or REST shape — see `_CODEX_REACTOR_LOGINS`), not merely a login that starts with
+        the same text.
     """
     return (
-        reaction.content == "+1"
-        and reaction.user is not None
-        and reaction.user.login.lower().startswith(_CODEX_REACTOR_LOGIN_PREFIX)
+        reaction.content == "+1" and reaction.user is not None and reaction.user.login.lower() in _CODEX_REACTOR_LOGINS
     )
 
 
@@ -365,15 +421,16 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
 
     Shared by `fetch` (prints the result once, `deadline=None`) and `watch` (calls this repeatedly
     on a polling interval, passing its own deadline) so both subcommands assemble a `FetchResult`
-    identically. Makes six `gh` calls, each independently bounded by `gh_timeout_budget(deadline)`:
+    identically. Makes seven `gh` calls, each independently bounded by `gh_timeout_budget(deadline)`:
     the paginated review-threads query, the paginated reviews query, every PR-level issue comment
     (for `unresponded_reviews`), every reaction on the PR itself (for `codex_approved`), the
     currently-authenticated `gh` identity (also for `unresponded_reviews`), and the PR's head
-    commit date (also for `codex_approved`). Every one of the six is a fresh snapshot taken by this
-    call alone — nothing here is compared against an earlier call's result, which is what makes two
-    `watch` calls back to back, or a `watch` call issued right after a `fetch`, incapable of
-    missing or double-counting activity that happened in between (the failure mode a per-invocation
-    in-memory baseline used to have).
+    commit date plus its most recent force-push timestamp, if any (both also for `codex_approved`
+    — see `_fetch_latest_commit_date` and `_fetch_latest_force_push_at`). Every one of the seven is
+    a fresh snapshot taken by this call alone — nothing here is compared against an earlier call's
+    result, which is what makes two `watch` calls back to back, or a `watch` call issued right
+    after a `fetch`, incapable of missing or double-counting activity that happened in between (the
+    failure mode a per-invocation in-memory baseline used to have).
 
     `unresponded_reviews` is every `reviews_with_body` entry whose effective timestamp — the later
     of `submittedAt` and `lastEditedAt` (see `_review_effective_timestamp`) — is at or after the
@@ -389,18 +446,21 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
     responded-to. A review with no `submittedAt` (not yet actually submitted) is excluded rather
     than treated as always-unresponded.
 
-    `codex_approved` is `True` when a "+1" reaction from a `chatgpt-codex-connector`-prefixed login
-    exists on the PR itself at the moment of this call *and* that reaction's own timestamp is at or
-    after the PR's current head commit's date — see `_fetch_pr_reactions` and
-    `_fetch_latest_commit_date`. Without that comparison, a reaction left approving an earlier
-    revision would keep reporting as approval indefinitely, even after a later push the reaction
-    never actually saw.
+    `codex_approved` is `True` when a "+1" reaction from exactly the Codex bot's known login (not
+    merely one that starts with the same text — see `_CODEX_REACTOR_LOGINS`) exists on the PR
+    itself at the moment of this call *and* that reaction's own timestamp is at or after the later
+    of the PR's current head commit's date and its most recent force-push timestamp, if any — see
+    `_fetch_pr_reactions`, `_fetch_latest_commit_date`, and `_fetch_latest_force_push_at`. Neither
+    date alone is sufficient: a reaction left approving an earlier revision would otherwise keep
+    reporting as approval indefinitely, even after a later push the reaction never actually saw,
+    including a force-push that resets the branch back onto a pre-existing commit object whose own
+    embedded date predates the reaction.
 
     Args:
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        deadline: A `time.monotonic()` timestamp the caller wants this call's six `gh`
+        deadline: A `time.monotonic()` timestamp the caller wants this call's seven `gh`
             invocations to respect — see `gh_timeout_budget`. `None` means no deadline.
 
     Returns:
@@ -413,6 +473,8 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
     reactions = _fetch_pr_reactions(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
     authenticated_login = _fetch_authenticated_login(gh_timeout=gh_timeout_budget(deadline))
     latest_commit_date = _fetch_latest_commit_date(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
+    latest_force_push_at = _fetch_latest_force_push_at(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
+    latest_revision_at = max(latest_commit_date, latest_force_push_at or latest_commit_date)
 
     all_threads = [node for page in thread_pages for node in page.nodes]
     all_reviews = [node for page in review_pages for node in page.nodes]
@@ -443,7 +505,7 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
         and (latest_own_comment_at is None or latest_own_comment_at <= _review_effective_timestamp(review))
     ]
     codex_approved = any(
-        _is_codex_thumbs_up(reaction) and reaction.created_at >= latest_commit_date for reaction in reactions
+        _is_codex_thumbs_up(reaction) and reaction.created_at >= latest_revision_at for reaction in reactions
     )
 
     return FetchResult(

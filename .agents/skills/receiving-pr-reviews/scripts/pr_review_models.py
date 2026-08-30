@@ -18,6 +18,7 @@ __all__ = [
     "Author",
     "CommentNode",
     "FetchResult",
+    "ForcePushEvent",
     "GitCommit",
     "GitCommitter",
     "IssueComment",
@@ -191,6 +192,18 @@ class PullRequestCommit(BaseModel):
     """
 
     commit: GitCommit
+
+
+class ForcePushEvent(BaseModel):
+    """One `HeadRefForcePushedEvent` GraphQL timeline item.
+
+    `createdAt` is when GitHub's server recorded the force-push itself — independent of any
+    commit's own embedded author/committer dates, which is what makes it a reliable head-update
+    signal even when a force-push resets a PR's head back onto a pre-existing commit object whose
+    own dates predate it (see `pr_review_gh._fetch_latest_force_push_at`).
+    """
+
+    createdAt: datetime
 
 
 class FetchResult(BaseModel):

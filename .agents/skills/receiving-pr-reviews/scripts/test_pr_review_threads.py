@@ -134,14 +134,21 @@ def _empty_threads() -> list[pr_review_gh.ReviewThreadsConnection]:
 
 
 def _patch_identity_and_commit_date(
-    mocker: MockerFixture, *, login: str = _AGENT_LOGIN, commit_date: datetime = _OLD_COMMIT_DATE
+    mocker: MockerFixture,
+    *,
+    login: str = _AGENT_LOGIN,
+    commit_date: datetime = _OLD_COMMIT_DATE,
+    force_push_at: datetime | None = None,
 ) -> None:
-    """Stub the two `build_fetch_result` calls every matrix test below needs but does not itself
-    exercise — the authenticated identity (for `unresponded_reviews`) and the head commit date
-    (for `codex_approved`) — so each test's own `_fetch_*` mocks stay focused on what it covers.
+    """Stub the three `build_fetch_result` calls every matrix test below needs but does not itself
+    exercise — the authenticated identity (for `unresponded_reviews`), the head commit date, and
+    the latest force-push timestamp (both for `codex_approved`) — so each test's own `_fetch_*`
+    mocks stay focused on what it covers. `force_push_at` defaults to `None` (this PR has never
+    been force-pushed), matching most tests' scenarios.
     """
     mocker.patch.object(pr_review_gh, "_fetch_authenticated_login", return_value=login)
     mocker.patch.object(pr_review_gh, "_fetch_latest_commit_date", return_value=commit_date)
+    mocker.patch.object(pr_review_gh, "_fetch_latest_force_push_at", return_value=force_push_at)
 
 
 # --- fetch: full JSON-in/JSON-out pipeline -----------------------------------------------------
@@ -247,6 +254,8 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
         "created_at": "2026-01-03T00:00:00Z",
     })
     commits_raw = _rest_pages({"commit": {"committer": {"date": "2026-01-01T12:00:00Z"}}})
+    # No `HeadRefForcePushedEvent` has ever landed on this PR — an empty `timelineItems.nodes`.
+    force_push_raw = json.dumps({"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": []}}}}})
     mocker.patch.object(
         pr_review_gh,
         "run_gh",
@@ -257,6 +266,7 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
             reactions_raw,
             _AGENT_LOGIN,
             commits_raw,
+            force_push_raw,
         ],
     )
 
@@ -456,17 +466,96 @@ def test_build_fetch_result_codex_approved_false_when_reaction_predates_head_com
     assert result.codex_approved is False
 
 
+def test_build_fetch_result_codex_approved_false_when_reaction_predates_reused_commit_force_push(
+    mocker: MockerFixture,
+) -> None:
+    """`codex_approved` is `False` when a later force-push reset the branch onto a pre-existing
+    commit object whose own committer date is *older* than the reaction — the force-push's own
+    server-recorded timestamp, not the reused commit's stale metadata, must govern.
+
+    Regression coverage for a Codex review: comparing only the head commit's embedded committer
+    date is not sufficient, because a force-push that resets a branch back onto a commit object
+    that already existed (rather than creating a fresh commit) does not update that commit's own
+    dates — a `HeadRefForcePushedEvent` timeline entry is the reliable, server-recorded signal for
+    when the head actually changed instead.
+    """
+    reaction = Reaction(
+        content="+1", user=Author(login="chatgpt-codex-connector[bot]"), created_at=datetime(2026, 1, 2, tzinfo=UTC)
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[reaction])
+    # The reused commit's own committer date (2026-01-01) predates the reaction, but the
+    # force-push that made it head happened later (2026-01-03) — after the reaction.
+    _patch_identity_and_commit_date(
+        mocker, commit_date=datetime(2026, 1, 1, tzinfo=UTC), force_push_at=datetime(2026, 1, 3, tzinfo=UTC)
+    )
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.codex_approved is False
+
+
+def test_build_fetch_result_codex_approved_true_when_reaction_postdates_force_push(mocker: MockerFixture) -> None:
+    """`codex_approved` is `True` when the reaction postdates a force-push that reused an older
+    commit object, even though that commit's own committer date alone would say otherwise.
+    """
+    reaction = Reaction(
+        content="+1", user=Author(login="chatgpt-codex-connector[bot]"), created_at=datetime(2026, 1, 4, tzinfo=UTC)
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[reaction])
+    _patch_identity_and_commit_date(
+        mocker, commit_date=datetime(2026, 1, 1, tzinfo=UTC), force_push_at=datetime(2026, 1, 3, tzinfo=UTC)
+    )
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.codex_approved is True
+
+
+def test_fetch_latest_force_push_at_returns_none_when_never_force_pushed(mocker: MockerFixture) -> None:
+    """`_fetch_latest_force_push_at` returns `None` for a PR with no `HeadRefForcePushedEvent`."""
+    raw = json.dumps({"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": []}}}}})
+    mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
+
+    result = pr_review_gh._fetch_latest_force_push_at("o", "r", 1)
+
+    assert result is None
+
+
+def test_fetch_latest_force_push_at_returns_event_timestamp(mocker: MockerFixture) -> None:
+    """`_fetch_latest_force_push_at` returns the timeline event's `createdAt` when one exists."""
+    raw = json.dumps({
+        "data": {"repository": {"pullRequest": {"timelineItems": {"nodes": [{"createdAt": "2026-01-05T00:00:00Z"}]}}}}
+    })
+    mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
+
+    result = pr_review_gh._fetch_latest_force_push_at("o", "r", 1)
+
+    assert result == datetime(2026, 1, 5, tzinfo=UTC)
+
+
 @pytest.mark.parametrize(
     "reaction",
     [
         Reaction(content="heart", user=Author(login="chatgpt-codex-connector[bot]"), created_at=_OLD_COMMIT_DATE),
         Reaction(content="+1", user=Author(login="some-human"), created_at=_OLD_COMMIT_DATE),
         Reaction(content="+1", user=None, created_at=_OLD_COMMIT_DATE),
+        Reaction(content="+1", user=Author(login="chatgpt-codex-connector-imposter"), created_at=_OLD_COMMIT_DATE),
     ],
-    ids=["wrong-content", "wrong-user", "null-user"],
+    ids=["wrong-content", "wrong-user", "null-user", "prefix-only-impersonator"],
 )
 def test_is_codex_thumbs_up_false_for_non_matching_reactions(reaction: Reaction) -> None:
-    """Only a "+1" from a `chatgpt-codex-connector`-prefixed login counts as Codex's approval."""
+    """Only a "+1" from exactly the Codex bot's known login counts as Codex's approval.
+
+    The `prefix-only-impersonator` case is regression coverage for a Codex review: matching by
+    `.startswith()` on a public PR would also accept a "+1" from any account whose login merely
+    starts with the same text, letting an unrelated account spoof `codex_approved`.
+    """
     assert _is_codex_thumbs_up(reaction) is False
 
 
