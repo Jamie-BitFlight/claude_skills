@@ -1,5 +1,5 @@
 {
-  "description": "Development-harness plugin hooks — task completion reminders, session hygiene, and context write enforcement",
+  "description": "Development-harness plugin hooks — task completion reminders, session hygiene, context write enforcement, and writing-style context injection",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,22 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start-session-id.cjs\"",
+            "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-style-guide.cjs\"",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-style-guide.cjs\"",
             "timeout": 5000
           }
         ]
