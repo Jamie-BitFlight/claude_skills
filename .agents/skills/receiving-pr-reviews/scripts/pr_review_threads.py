@@ -98,6 +98,7 @@ def fetch(
 @app.command()
 def watch(
     pr: Annotated[int, typer.Option(help="Pull request number.")],
+    *,
     owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
     repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
     interval_seconds: Annotated[
