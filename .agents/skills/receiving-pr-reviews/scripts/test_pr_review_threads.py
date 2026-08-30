@@ -413,6 +413,50 @@ def test_build_fetch_result_unresponded_when_only_other_accounts_commented(mocke
     assert result.unresponded_reviews == [review]
 
 
+def test_build_fetch_result_older_review_stays_unresponded_when_only_newer_one_addressed(mocker: MockerFixture) -> None:
+    """Responding to only the newer of two concurrently-outstanding reviews does not also clear
+    the older one.
+
+    Regression coverage for a Codex review: comparing every review against a single whole-PR
+    "latest own comment" timestamp let one comment addressing only the newest review silently
+    mark every older, still-unaddressed review as responded too, since the newest comment
+    trivially postdates all of them. `_unresponded_reviews` instead pairs at most one comment to
+    one review, newest-first, so a comment can only clear the review it actually responds to.
+    """
+    older_review = _review("R1", body="first round of feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    newer_review = _review("R2", body="second round of feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
+    # One own comment, posted after both reviews — but it only actually addressed the newer one.
+    comment = IssueComment(created_at=datetime(2026, 1, 3, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([older_review, newer_review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [older_review]
+
+
+def test_build_fetch_result_both_reviews_responded_when_each_has_own_comment(mocker: MockerFixture) -> None:
+    """Two concurrently-outstanding reviews are both cleared when each has its own distinct
+    postdating comment.
+    """
+    older_review = _review("R1", body="first round of feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    newer_review = _review("R2", body="second round of feedback", submitted_at=datetime(2026, 1, 3, tzinfo=UTC))
+    comment_for_older = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    comment_for_newer = IssueComment(created_at=datetime(2026, 1, 4, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([older_review, newer_review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment_for_older, comment_for_newer])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == []
+
+
 def test_build_fetch_result_excludes_review_with_no_submitted_at(mocker: MockerFixture) -> None:
     """A review that has not actually been submitted yet is never unresponded."""
     review = _review("R1", body="feedback", submitted_at=None)

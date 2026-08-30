@@ -52,6 +52,8 @@ app = typer.Typer(help="GitHub PR review-thread operations (fetch/watch/reply/re
 # floor keeps one call's turn cached under every billing mode. Cover a longer watching window by
 # looping `watch` calls (receiving-pr-reviews SKILL.md step 7), not by raising `--timeout-seconds`.
 _DEFAULT_WATCH_INTERVAL_SECONDS = 90
+# 270 is deliberately under the 5-minute prompt-cache TTL (every Claude billing mode) — a
+# watch call blocking this long still returns before the caller's context falls out of cache.
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
 # `gh_timeout_budget` floors a near-zero remainder to 0.1s — enough to keep the return type
