@@ -42,7 +42,7 @@ flowchart TD
     GapCheck -->|"Gaps found"| ProposeAdd["Step 3a: Propose Additions<br>Action: Present gaps to user with<br>suggested new items or existing<br>backlog items to associate<br>Output: user decision per gap"]
     GapCheck -->|"No gaps"| GroomGate
 
-    ProposeAdd --> AddItems["Step 3b: Execute Additions<br>Action: create-backlog-item or<br>backlog_update to assign milestone<br>Output: updated milestone item list"]
+    ProposeAdd --> AddItems["Step 3b: Execute Additions<br>Action: create-backlog-item, then<br>github_project_setup.py issue set-milestone<br>to assign it (see MCP Tools Used)<br>Output: updated milestone item list"]
     AddItems --> GroomGate
 
     GroomGate{"Step 4: Groom Check<br>Any items with groomed=false?<br>Observable: groomed field in<br>backlog_list_issues response"}
@@ -86,7 +86,7 @@ flowchart TD
 - `backlog_list_issues(milestone=N)` — load milestone items and groomed status
 - `backlog_view(selector)` — read individual item Impact Radius and metadata
 - `backlog_groom(selector)` — trigger grooming for ungroomed items
-- `backlog_update(selector, ...)` — assign milestone, update item fields
+- `backlog_update(selector, ...)` — update item fields; has no `milestone` parameter — milestone assignment is done via `github_project_setup.py issue set-milestone` (see `/group-items-to-milestone`), not through this tool
 
 ## MCP Tools — Dispatch (Backlog Server)
 

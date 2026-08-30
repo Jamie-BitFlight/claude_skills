@@ -91,10 +91,10 @@ No graceful degradation. `blocked` is an explicit terminal state, not a fallback
 
 ### Post-Write Skip Signal Check
 
-After calling `backlog_groom(mark_groomed=True)`, inspect the response for `mark_groomed_skipped`:
+After calling `backlog_groom(mark_groomed=True)`, inspect the response for `mark_groomed_skipped` (see `backlog_groom`'s own docstring for when this field is set):
 
 - `mark_groomed_skipped` absent or `false` → status advanced normally, grooming complete
-- `mark_groomed_skipped: true` → re-lookup of the item by selector failed after content was written; status was NOT advanced
+- `mark_groomed_skipped: true` → status was NOT advanced
 
 When `mark_groomed_skipped` is `true`:
 1. Check `mark_groomed_skip_reason` in the response for the failing selector

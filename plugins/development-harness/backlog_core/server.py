@@ -2552,7 +2552,11 @@ async def backlog_groom(
     selector: Annotated[
         str,
         Field(
-            description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
+            description=(
+                "Item selector: GitHub issue URL, #N, bare number, or title substring, or beads "
+                "nanoid (e.g. bd-a3f8) — do not prefix a beads nanoid with '#'; only a bare "
+                "GitHub number takes that prefix, a '#'-prefixed nanoid resolves neither form"
+            )
         ),
     ],
     section: Annotated[
@@ -2624,6 +2628,10 @@ async def backlog_groom(
     Returns:
         Dict with groomed item title, synced status, and output
         messages/warnings. On error, dict contains an error key.
+        When mark_groomed=True and the post-write item re-lookup fails to resolve the
+        selector, the status advance is skipped and the dict additionally contains
+        mark_groomed_skipped=True and mark_groomed_skip_reason (str) explaining why —
+        callers checking mark_groomed's effect should test for this key.
     """
     out = Output()
     if sections is not None and any((section, content, entry_id, replace_section, reason, append)):

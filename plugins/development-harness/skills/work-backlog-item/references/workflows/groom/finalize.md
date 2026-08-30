@@ -286,7 +286,7 @@ backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt_ica_fina
 - Advances the item's status from `needs-grooming` to `groomed`
 - Safe to call multiple times — idempotent if already in `groomed` status
 
-**Check the result for `mark_groomed_skipped`**: After the batch write, verify the response dict does not contain `mark_groomed_skipped: true`. This field is set when the post-write item re-lookup returns `None` (the selector no longer resolves after content is written). When `mark_groomed_skipped` is present, the status advance did NOT happen — re-run `backlog_groom(selector='{item_ref}', mark_groomed=True)` once to retry the status transition:
+**Check the result for `mark_groomed_skipped`**: After the batch write, verify the response dict does not contain `mark_groomed_skipped: true` (see `backlog_groom`'s own docstring for when this field is set). When present, the status advance did NOT happen — re-run `backlog_groom(selector='{item_ref}', mark_groomed=True)` once to retry the status transition:
 
 ```text
 # Verify status advanced — if mark_groomed_skipped is present, retry once

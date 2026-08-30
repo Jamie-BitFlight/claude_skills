@@ -147,8 +147,7 @@ flowchart TD
 ```text
 mcp__plugin_dh_backlog__backlog_groom(
     selector="{issue}",  # {issue} is str | int — GitHub integer ID or beads string ID.
-                         # No '#' prefix: find_item resolves a bare GitHub number or a
-                         # bare beads nanoid, but a '#'-prefixed nanoid resolves neither.
+                         # See the tool's own selector parameter description for format rules.
     section="Concerns",
     content="- [ ] {concern text} (reported by {agent_name} on {task_id})",
     append=True
