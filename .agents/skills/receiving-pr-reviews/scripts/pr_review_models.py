@@ -19,10 +19,9 @@ __all__ = [
     "CommentNode",
     "FetchResult",
     "ForcePushEvent",
-    "GitCommit",
-    "GitCommitter",
+    "GitHubCommitDate",
+    "HeadCommitNode",
     "IssueComment",
-    "PullRequestCommit",
     "Reaction",
     "ReviewNode",
     "UnresolvedThread",
@@ -166,32 +165,22 @@ class Reaction(BaseModel):
     created_at: datetime
 
 
-class GitCommitter(BaseModel):
-    """The raw git `committer` identity on a commit, in the shape GitHub's REST API returns it.
+class GitHubCommitDate(BaseModel):
+    """The `committedDate` field of a GraphQL `Commit` object."""
 
-    Distinct from the GitHub account object REST also calls `committer` at the top level of a
-    commit list entry (which is `None` for a commit whose author has no linked GitHub account):
-    this is the git-native field nested under `commit`, always present because git itself requires
-    every commit to carry committer information.
+    committedDate: datetime
+
+
+class HeadCommitNode(BaseModel):
+    """One commit from GraphQL's `pullRequest.commits(last: 1)` connection.
+
+    Requesting `last: 1` asks the server directly for the tail element — GraphQL's connection
+    pagination has no equivalent of the REST `/pulls/{pr}/commits` endpoint's documented 250-commit
+    hard cap, which made that endpoint's last-paginated-element unreliable as "the current head" on
+    a PR with more commits than the cap (see `pr_review_gh._fetch_latest_commit_date`).
     """
 
-    date: datetime
-
-
-class GitCommit(BaseModel):
-    """The raw git commit object nested under one entry of the PR-commits REST endpoint."""
-
-    committer: GitCommitter
-
-
-class PullRequestCommit(BaseModel):
-    """One commit from `GET /repos/{owner}/{repo}/pulls/{pr}/commits`.
-
-    Commits are listed oldest-first per GitHub's REST API — the last element is always the PR's
-    current head commit.
-    """
-
-    commit: GitCommit
+    commit: GitHubCommitDate
 
 
 class ForcePushEvent(BaseModel):

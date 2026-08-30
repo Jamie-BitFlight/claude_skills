@@ -20,8 +20,8 @@ from pydantic import TypeAdapter
 from pr_review_models import (
     FetchResult,
     ForcePushEvent,
+    HeadCommitNode,
     IssueComment,
-    PullRequestCommit,
     Reaction,
     ReviewNode,
     ReviewsConnection,
@@ -84,6 +84,18 @@ query($o: String!, $r: String!, $pr: Int!) {
 }
 """
 
+_LATEST_HEAD_COMMIT_QUERY = """
+query($o: String!, $r: String!, $pr: Int!) {
+  repository(owner: $o, name: $r) {
+    pullRequest(number: $pr) {
+      commits(last: 1) {
+        nodes { commit { committedDate } }
+      }
+    }
+  }
+}
+"""
+
 # Absolute `gh` path, resolved once at import time — ruff's start-process-with-partial-path (S607)
 # requires a resolved path rather than a bare command name. Falls back to the literal "gh" when
 # `shutil.which` can't find it, so a missing binary still surfaces as a normal FileNotFoundError
@@ -94,7 +106,6 @@ _GH_TIMEOUT_SECONDS = 30
 
 _ISSUE_COMMENT_ADAPTER: TypeAdapter[list[IssueComment]] = TypeAdapter(list[IssueComment])
 _REACTION_ADAPTER: TypeAdapter[list[Reaction]] = TypeAdapter(list[Reaction])
-_PR_COMMIT_ADAPTER: TypeAdapter[list[PullRequestCommit]] = TypeAdapter(list[PullRequestCommit])
 
 # GraphQL's `author.login` and the REST reactions API's `user.login` return this bot's account
 # name without a `[bot]` suffix and with one respectively (confirmed against this repo's own PR
@@ -281,16 +292,21 @@ def _fetch_authenticated_login(*, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> st
 
 
 def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> datetime:
-    """Fetch the PR's current head commit's raw git committer date.
+    """Fetch the PR's current head commit's committed-date via GraphQL's `commits(last: 1)`.
 
-    `GET /repos/{owner}/{repo}/pulls/{pr}/commits` returns commits oldest-first, so the last
-    element in the fully-flattened, fully-paginated list is always the current head commit.
+    Deliberately GraphQL rather than the REST `GET /repos/{owner}/{repo}/pulls/{pr}/commits`
+    endpoint: that REST endpoint is documented as listing a maximum of 250 commits total,
+    regardless of pagination, so `--paginate` cannot retrieve a commit beyond that hard cap — on a
+    PR with more than 250 commits, its last element would not reliably be the actual head.
+    GraphQL's `commits` connection has no such flat cap; requesting `last: 1` asks the server
+    directly for the tail element regardless of how many commits the PR has.
+
     `build_fetch_result` compares a Codex approval reaction's timestamp against the later of this
     and `_fetch_latest_force_push_at`'s result — this call alone is not sufficient on its own: a
     force-push that creates a brand-new commit (the overwhelmingly common case — a rebase or
-    amend) refreshes that commit's own committer date to the time of the push, but a force-push
+    amend) refreshes that commit's own committed date to the time of the push, but a force-push
     that resets the branch back onto a pre-existing commit object (reusing its original, older
-    committer date) would not, which is exactly what `_fetch_latest_force_push_at`'s
+    committed date) would not, which is exactly what `_fetch_latest_force_push_at`'s
     server-recorded event timestamp covers instead.
 
     Args:
@@ -300,15 +316,30 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
         gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
 
     Returns:
-        The head commit's raw git committer date.
+        The head commit's committed date.
 
     Raises:
         IndexError: the PR has no commits at all — not possible for a real, open pull request, so
             this is an acceptable boundary failure for an invariant this script does not control.
     """
-    raw = run_gh(["api", f"repos/{owner}/{repo}/pulls/{pr}/commits", "--paginate", "--slurp"], timeout=gh_timeout)
-    commits = [commit for page in json.loads(raw) for commit in _PR_COMMIT_ADAPTER.validate_python(page)]
-    return commits[-1].commit.committer.date
+    raw = run_gh(
+        [
+            "api",
+            "graphql",
+            "-f",
+            f"query={_LATEST_HEAD_COMMIT_QUERY}",
+            "-f",
+            f"o={owner}",
+            "-f",
+            f"r={repo}",
+            "-F",
+            f"pr={pr}",
+        ],
+        timeout=gh_timeout,
+    )
+    nodes = json.loads(raw)["data"]["repository"]["pullRequest"]["commits"]["nodes"]
+    commits = [HeadCommitNode.model_validate(node) for node in nodes]
+    return commits[-1].commit.committedDate
 
 
 def _fetch_latest_force_push_at(

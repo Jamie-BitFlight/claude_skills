@@ -253,7 +253,13 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
         "user": {"login": "chatgpt-codex-connector[bot]"},
         "created_at": "2026-01-03T00:00:00Z",
     })
-    commits_raw = _rest_pages({"commit": {"committer": {"date": "2026-01-01T12:00:00Z"}}})
+    commits_raw = json.dumps({
+        "data": {
+            "repository": {
+                "pullRequest": {"commits": {"nodes": [{"commit": {"committedDate": "2026-01-01T12:00:00Z"}}]}}
+            }
+        }
+    })
     # No `HeadRefForcePushedEvent` has ever landed on this PR — an empty `timelineItems.nodes`.
     force_push_raw = json.dumps({"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": []}}}}})
     mocker.patch.object(
@@ -559,6 +565,28 @@ def test_build_fetch_result_codex_approved_true_when_reaction_postdates_force_pu
     result = build_fetch_result("o", "r", 1)
 
     assert result.codex_approved is True
+
+
+def test_fetch_latest_commit_date_reads_via_graphql_last_one(mocker: MockerFixture) -> None:
+    """`_fetch_latest_commit_date` reads the head commit's date from GraphQL's `commits(last: 1)`.
+
+    Regression coverage for a Codex review: the REST `/pulls/{pr}/commits` endpoint this used to
+    call is documented as listing a maximum of 250 commits total regardless of pagination, so on a
+    PR with more commits than that, its last element would not reliably be the actual head. GraphQL
+    connection pagination has no equivalent flat cap.
+    """
+    raw = json.dumps({
+        "data": {
+            "repository": {
+                "pullRequest": {"commits": {"nodes": [{"commit": {"committedDate": "2026-01-06T00:00:00Z"}}]}}
+            }
+        }
+    })
+    mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
+
+    result = pr_review_gh._fetch_latest_commit_date("o", "r", 1)
+
+    assert result == datetime(2026, 1, 6, tzinfo=UTC)
 
 
 def test_fetch_latest_force_push_at_returns_none_when_never_force_pushed(mocker: MockerFixture) -> None:
