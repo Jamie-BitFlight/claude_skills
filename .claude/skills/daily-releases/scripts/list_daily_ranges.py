@@ -10,6 +10,9 @@
 #
 # [tool.uv.sources]
 # daily-releases-lib = { path = "daily_releases_lib", editable = true }
+#
+# [tool.ty.environment]
+# extra-paths = ["./daily_releases_lib"]
 # ///
 """List daily commit ranges for the daily releases pipeline.
 

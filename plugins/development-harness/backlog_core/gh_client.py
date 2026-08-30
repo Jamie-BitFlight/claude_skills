@@ -851,7 +851,7 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
         IssueCommentNode with all fields populated.
     """
     raw_author = node.get("author")
-    author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""  # ty: ignore[invalid-argument-type]
+    author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
     return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),

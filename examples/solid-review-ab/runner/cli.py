@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["typer>=0.21", "ruamel.yaml>=0.18"]
+#
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 """SOLID judgement system runner CLI.
 
