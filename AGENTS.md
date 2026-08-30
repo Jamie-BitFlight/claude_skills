@@ -182,14 +182,21 @@ Plugins commonly ship a `{plugin-name}-meta-docs` skill so other skills can reac
 restructure. When a skill needs another plugin's documentation, load that plugin's meta-docs skill
 instead.
 
-List only docs a real skill or agent hook actually depends on discovering through this index —
-not every file under `docs/`. A `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' | sort` enumeration
-injects every doc's path into every load of the meta-docs skill regardless of whether anything ever
-reads it; a doc with its own direct hook elsewhere gains nothing from also being listed here, and a
-doc with no hook anywhere is pure load for no behavior. Add an entry only when some skill or agent
-file's hook text depends on this index resolving it (e.g. "load `{plugin}-meta-docs` and read the
-X document it lists") — confirm that dependency exists before adding, and drop an entry once nothing
-depends on it. Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
+A bare path listing has no value on its own — an agent can already enumerate `docs/` itself with
+`Glob`/`find` whenever it needs to. The reason a hand-maintained list belongs in a skill at all is
+the annotation beside each path: a stated reason to read that file, which is what lets the agent
+skip everything else in the list with confidence instead of reading through it to find out what's
+relevant. A `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' | sort` enumeration provides paths with
+no reason attached — indistinguishable in value from the agent running that command itself, except
+it now costs load on every skill invocation regardless of whether anything reads it.
+
+List only docs a real skill or agent hook actually depends on discovering through this index — not
+every file under `docs/`. A doc with its own direct hook elsewhere gains nothing from also being
+listed here; a doc with no hook anywhere is pure load for no behavior. Add an entry only when some
+skill or agent file's hook text depends on this index resolving it (e.g. "load `{plugin}-meta-docs`
+and read the X document it lists") — confirm that dependency exists before adding, give the entry a
+specific reason to read it (not a generic label), and drop the entry once nothing depends on it.
+Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
 correctly regardless of installation location.
 
 ## Code Conventions
