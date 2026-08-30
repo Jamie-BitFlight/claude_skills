@@ -98,4 +98,4 @@ SOURCE: Observed during GraphQL migration (issues #916, #1018, #1020), 2026-03-2
 - `backlog_core/operations.py` — callers of `sync_issues_graphql`
 - `backlog_core/server.py` — MCP tool wrappers
 - [backend-providers.md](./backend-providers.md) — GitHub backend architecture and ADR-004 reference
-- [backlog-lifecycle.draft.md](./backlog-lifecycle.draft.md) — full sync lifecycle and state machine
+- [backlog-lifecycle.md](./backlog-lifecycle.md) — full sync lifecycle and state machine
