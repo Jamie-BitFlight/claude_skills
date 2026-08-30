@@ -130,7 +130,7 @@ mcp__plugin_dh_backlog__artifact_register(
 
 ### task-plan
 
-`task-plan` is a valid `artifact_register` type, but it is written internally — `sam_plan(config={"action": "create", "issue": N, ...})` auto-registers it, making the plan readable via `artifact_read`/`artifact_list` for worktree-isolated agents. Never call `artifact_register(artifact_type="task-plan", ...)` directly; create plans with
+`task-plan` is a valid `artifact_register` type, but it is written internally — `sam_plan(config={"action": "create", "issue": N, ...})` auto-registers it, making the plan readable via `artifact_read`/`artifact_list` for worktree-isolated agents. Never register this type directly through `artifact_register`; create plans with
 `mcp__plugin_dh_sam__sam_plan(config={"action": "create", ...})` and retrieve them with
 `mcp__plugin_dh_sam__sam_plan(plan="{plan_ref}", config={"action": "read"})`.
 
