@@ -433,14 +433,6 @@ Rule files outside `.claude/rules/` that other harnesses read — not a full rul
 GitHub's coding agent reads `AGENTS.md` directly — `.github/copilot-instructions.md` (a subset of
 this file) was removed to avoid two files drifting out of sync.
 
-## MCP Configuration
-
-`.mcp.json` defines MCP servers. The project uses:
-
-- **Ref-local**: Documentation reference tools
-- **context7-local**: Context7 MCP
-- **octocode**: Code search
-
 ## Gotchas & Non-Obvious Patterns
 
 1. **prek not pre-commit**: This repo uses `prek` (Rust-based), not `pre-commit`. Same config, different binary.
@@ -477,16 +469,6 @@ this file) was removed to avoid two files drifting out of sync.
 | MCP servers | `.mcp.json` |
 | Session hooks | `.claude/hooks/` |
 | CI pipeline | `.github/workflows/code-quality.yml` |
-
-## Development Workflow
-
-1. **Start work**: Create a backlog item via MCP `backlog_add` (for multi-step tasks)
-2. **Plan**: Write architect/feature-context docs in `plan/`
-3. **Implement**: Write code following conventions above
-4. **Validate**: Run `uv run ruff check --fix && uv run ruff format && uv run ty check`
-5. **Test**: Run `uv run pytest` on affected areas
-6. **Pre-commit**: Run `uv run prek run --files <changed-files>` to verify hooks pass
-7. **Commit**: Use conventional commit format with required scope
 
 ## PR Review Protocol
 
@@ -551,8 +533,6 @@ bd close <id>         # Complete work
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
