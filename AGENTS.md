@@ -31,9 +31,8 @@ uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # I
 For full uv/ty/ruff usage guidance beyond this repo's own overrides, load the `astral` plugin
 skills (`/astral:uv`, `/astral:ty`, `/astral:ruff`) if installed, or see `docs.astral.sh` directly.
 
-`prek` aggregates ruff, ty, and every other configured hook — never run `ruff check`/`ruff
-format`/`ty check` standalone when `prek` is available; it dispatches to the same tools and skips
-hooks that don't apply to the given files.
+Run lint, format, and type checks through `prek` — it dispatches to ruff, ty, and every other
+configured hook, and skips hooks that don't apply to the given files.
 
 ```bash
 uv run prek run --files path/to/file.py    # Run ALL pre-commit hooks on specific files
@@ -184,20 +183,13 @@ restructure. When a skill needs another plugin's documentation, load that plugin
 instead.
 
 A bare path listing has no value on its own — an agent can already enumerate `docs/` itself with
-`Glob`/`find` whenever it needs to. The reason a hand-maintained list belongs in a skill at all is
-the annotation beside each path: a stated reason to read that file, which is what lets the agent
-skip everything else in the list with confidence instead of reading through it to find out what's
-relevant. A `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' | sort` enumeration provides paths with
-no reason attached — indistinguishable in value from the agent running that command itself, except
-it now costs load on every skill invocation regardless of whether anything reads it.
-
-List only docs a real skill or agent hook actually depends on discovering through this index — not
-every file under `docs/`. A doc with its own direct hook elsewhere gains nothing from also being
-listed here; a doc with no hook anywhere is pure load for no behavior. Add an entry only when some
-skill or agent file's hook text depends on this index resolving it (e.g. "load `{plugin}-meta-docs`
-and read the X document it lists") — confirm that dependency exists before adding, give the entry a
-specific reason to read it (not a generic label), and drop the entry once nothing depends on it.
-Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
+`Glob`/`find`. The value of a hand-maintained list is the annotation beside each path: a stated
+reason to read that file, which is what lets the agent skip everything else in the list with
+confidence. List only docs a real skill or agent hook actually depends on discovering through this
+index. Add an entry only when some skill or agent file's hook text depends on this index resolving
+it (e.g. "load `{plugin}-meta-docs` and read the X document it lists") — confirm that dependency
+exists before adding, give the entry a specific reason to read it, and drop the entry once nothing
+depends on it. Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
 correctly regardless of installation location.
 
 ## Code Conventions

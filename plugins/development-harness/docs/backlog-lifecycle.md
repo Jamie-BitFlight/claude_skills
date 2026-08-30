@@ -142,10 +142,6 @@ Action:     backlog_update(selector='{item_ref}', status='needs-grooming')
             re-enter in-progress
 ```
 
-SOURCE: `backlog/references/state-machine.md` (base diagram, accessed 2026-03-30).
-Additions verified against architect spec Issue #398, Section 8 (accessed 2026-03-30).
-Updated 2026-04-06 for skill consolidation, blocked disambiguation, and Ideas exception.
-
 ---
 
 ## 2. Pipeline Stages
@@ -381,7 +377,7 @@ closed           — terminal: milestone archived by complete-milestone
 `verified` exists as a cross-route signal applied by `complete-implementation` after quality
 gates pass. It is NOT a lifecycle state and has no entry/exit transitions in the state machine.
 
-SOURCE: `backlog/references/state-machine.md` (accessed 2026-03-30).
+SOURCE: `skills/backlog/references/state-machine.md` (now deleted; accessed 2026-03-30).
 Updated 2026-04-06 for route-based naming.
 
 ---
