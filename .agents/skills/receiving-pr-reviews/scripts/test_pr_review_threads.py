@@ -14,13 +14,14 @@ Covers: `pr_review_gh.build_fetch_result`'s multi-page flattening, resolved-thre
 `comments_truncated` derivation, `reviews_with_body` filtering (including a null `author`, which a
 deleted GitHub account produces), `unresponded_reviews` derivation against the currently-
 authenticated `gh` identity's own PR-level comments (and its exclusion of comments from any other
-account, including Codex or another bystander), and `codex_approved` reaction detection scoped to
-reactions that postdate the PR's current head commit — all as one JSON-in/JSON-out pipeline test
-plus a matrix of focused unit tests against `build_fetch_result` directly. Also covers
-`FetchResult.has_outstanding_work` (the single trigger rule `watch` polls for) and `watch`'s own
-loop: returning immediately when the first fetch is already actionable, polling until it becomes
-actionable, timing out when it never does, and the deadline-budget/transient-failure mechanics
-carried over from the pre-existing polling loop.
+account, including Codex or another bystander) using each review's effective timestamp — the later
+of `submittedAt` and `lastEditedAt`, so a post-response edit is not silently skipped forever — and
+`codex_approved` reaction detection scoped to reactions that postdate the PR's current head commit
+— all as one JSON-in/JSON-out pipeline test plus a matrix of focused unit tests against
+`build_fetch_result` directly. Also covers `FetchResult.has_outstanding_work` (the single trigger
+rule `watch` polls for) and `watch`'s own loop: returning immediately when the first fetch is
+already actionable, polling until it becomes actionable, timing out when it never does, and the
+deadline-budget/transient-failure mechanics carried over from the pre-existing polling loop.
 """
 
 from __future__ import annotations
@@ -87,8 +88,22 @@ def _rest_pages(*items: dict[str, object]) -> str:
     return json.dumps([list(items)])
 
 
-def _review(review_id: str, *, body: str, submitted_at: datetime | None, login: str = "codex") -> ReviewNode:
-    return ReviewNode(id=review_id, author=Author(login=login), state="COMMENTED", body=body, submittedAt=submitted_at)
+def _review(
+    review_id: str,
+    *,
+    body: str,
+    submitted_at: datetime | None,
+    login: str = "codex",
+    last_edited_at: datetime | None = None,
+) -> ReviewNode:
+    return ReviewNode(
+        id=review_id,
+        author=Author(login=login),
+        state="COMMENTED",
+        body=body,
+        submittedAt=submitted_at,
+        lastEditedAt=last_edited_at,
+    )
 
 
 def _state(
@@ -212,8 +227,16 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
                     "state": "COMMENTED",
                     "body": "Some feedback",
                     "submittedAt": "2026-01-01T00:00:00Z",
+                    "lastEditedAt": None,
                 },
-                {"id": "R2", "author": None, "state": "APPROVED", "body": "", "submittedAt": "2026-01-01T00:00:00Z"},
+                {
+                    "id": "R2",
+                    "author": None,
+                    "state": "APPROVED",
+                    "body": "",
+                    "submittedAt": "2026-01-01T00:00:00Z",
+                    "lastEditedAt": None,
+                },
             ],
         )
     ]
@@ -305,6 +328,55 @@ def test_build_fetch_result_unresponded_when_own_pr_comment_predates_review(mock
     result = build_fetch_result("o", "r", 1)
 
     assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_unresponded_when_review_edited_after_own_response(mocker: MockerFixture) -> None:
+    """A review edited after this workflow already responded is unresponded again — its edit
+    postdates the response even though its original `submittedAt` predates it.
+
+    Regression coverage for a Codex review: comparing only `submittedAt` let an editor add new
+    feedback to an already-submitted review after the workflow had already replied, and that new
+    feedback would then be skipped indefinitely, because the review's unchanged `submittedAt`
+    still predated the earlier response.
+    """
+    review = _review(
+        "R1",
+        body="updated feedback",
+        submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
+        last_edited_at=datetime(2026, 1, 3, tzinfo=UTC),
+    )
+    comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_responded_when_own_comment_postdates_review_edit(mocker: MockerFixture) -> None:
+    """A review is still responded-to when the workflow's own comment postdates its latest edit,
+    not just its original submission.
+    """
+    review = _review(
+        "R1",
+        body="updated feedback",
+        submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
+        last_edited_at=datetime(2026, 1, 2, tzinfo=UTC),
+    )
+    comment = IssueComment(created_at=datetime(2026, 1, 3, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == []
 
 
 def test_build_fetch_result_unresponded_when_only_other_accounts_commented(mocker: MockerFixture) -> None:

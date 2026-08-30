@@ -22,6 +22,7 @@ from pr_review_models import (
     IssueComment,
     PullRequestCommit,
     Reaction,
+    ReviewNode,
     ReviewsConnection,
     ReviewThreadsConnection,
     UnresolvedThread,
@@ -55,7 +56,7 @@ query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
       reviews(first: 100, after: $endCursor) {
         totalCount
         pageInfo { hasNextPage endCursor }
-        nodes { id author { login } state body submittedAt }
+        nodes { id author { login } state body submittedAt lastEditedAt }
       }
     }
   }
@@ -294,6 +295,34 @@ def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: flo
     return commits[-1].commit.committer.date
 
 
+def _review_effective_timestamp(review: ReviewNode) -> datetime:
+    """The timestamp representing the newest content this review's body currently carries.
+
+    A review's `submittedAt` never changes once set, but its `body` can be edited afterward —
+    GitHub's `lastEditedAt` reflects that edit. Whichever of the two is later is the review's
+    effective timestamp for `unresponded_reviews`'s "has this workflow responded since" comparison
+    in `build_fetch_result` — using `submittedAt` alone would let a post-response edit go unnoticed
+    forever, since the original submission time already predates the response.
+
+    Args:
+        review: A review already known to have been submitted (`submittedAt is not None`) — see
+            `build_fetch_result`, the only caller, which filters not-yet-submitted reviews first.
+
+    Returns:
+        The later of `submittedAt` and `lastEditedAt`.
+
+    Raises:
+        TypeError: `review.submittedAt` is `None` — the caller must exclude not-yet-submitted
+            reviews before calling this, since they have no meaningful timestamp to compare.
+    """
+    if review.submittedAt is None:
+        message = "_review_effective_timestamp requires an already-submitted review"
+        raise TypeError(message)
+    if review.lastEditedAt is None:
+        return review.submittedAt
+    return max(review.submittedAt, review.lastEditedAt)
+
+
 def _is_codex_thumbs_up(reaction: Reaction) -> bool:
     """Whether `reaction` is Codex's approval signal — a "+1" from its bot account.
 
@@ -346,14 +375,19 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
     missing or double-counting activity that happened in between (the failure mode a per-invocation
     in-memory baseline used to have).
 
-    `unresponded_reviews` is every `reviews_with_body` entry whose `submittedAt` is at or after the
+    `unresponded_reviews` is every `reviews_with_body` entry whose effective timestamp — the later
+    of `submittedAt` and `lastEditedAt` (see `_review_effective_timestamp`) — is at or after the
     most recent PR-level issue comment authored by the currently-authenticated `gh` identity across
     the whole PR (or every one of them, if that identity has posted no PR-level comment yet) — i.e.
-    this workflow has not posted anything on the PR since that review went up. Comments from any
-    other account are ignored for this purpose: an unrelated bystander, bot, or CI notification
-    commenting on the PR carries no evidence it addressed any specific review's feedback, and using
-    it as the cutover would silently mark that review as responded-to. A review with no
-    `submittedAt` (not yet actually submitted) is excluded rather than treated as always-unresponded.
+    this workflow has not posted anything on the PR since that review last changed. Using the later
+    of the two timestamps means a reviewer who edits an already-submitted review's body after this
+    workflow already responded is not silently skipped forever: a comment that postdates the
+    original `submittedAt` but predates the edit addressed content that did not exist yet when it
+    was posted. Comments from any other account are ignored for this purpose: an unrelated
+    bystander, bot, or CI notification commenting on the PR carries no evidence it addressed any
+    specific review's feedback, and using it as the cutover would silently mark that review as
+    responded-to. A review with no `submittedAt` (not yet actually submitted) is excluded rather
+    than treated as always-unresponded.
 
     `codex_approved` is `True` when a "+1" reaction from a `chatgpt-codex-connector`-prefixed login
     exists on the PR itself at the moment of this call *and* that reaction's own timestamp is at or
@@ -406,7 +440,7 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
         review
         for review in reviews_with_body
         if review.submittedAt is not None
-        and (latest_own_comment_at is None or latest_own_comment_at <= review.submittedAt)
+        and (latest_own_comment_at is None or latest_own_comment_at <= _review_effective_timestamp(review))
     ]
     codex_approved = any(
         _is_codex_thumbs_up(reaction) and reaction.created_at >= latest_commit_date for reaction in reactions

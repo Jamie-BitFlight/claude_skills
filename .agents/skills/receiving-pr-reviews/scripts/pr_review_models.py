@@ -100,7 +100,13 @@ class ReviewNode(BaseModel):
     node id for this review submission. `submittedAt` is `None` only for a review that has not
     actually been submitted yet (e.g. `PENDING` state, visible only to its own author) —
     `pr_review_gh.build_fetch_result` excludes those from `unresponded_reviews` rather than
-    treating an unsubmitted review as perpetually unanswered.
+    treating an unsubmitted review as perpetually unanswered. `lastEditedAt` is `None` when the
+    review's body has never been edited since submission, and otherwise the timestamp of its most
+    recent edit — `pr_review_gh.build_fetch_result` treats whichever of `submittedAt`/`lastEditedAt`
+    is later as the review's effective timestamp, so an editor who adds new feedback to an
+    already-submitted review after this workflow already responded is not silently skipped forever
+    (a PR-level comment that postdates the original `submittedAt` but predates the edit would
+    otherwise still count as having addressed content that did not exist yet when it was posted).
     """
 
     id: str
@@ -108,6 +114,7 @@ class ReviewNode(BaseModel):
     state: str
     body: str
     submittedAt: datetime | None
+    lastEditedAt: datetime | None
 
 
 class ReviewsConnection(BaseModel):
