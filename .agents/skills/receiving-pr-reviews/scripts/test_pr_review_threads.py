@@ -29,13 +29,16 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel, ValidationError
 from typer.testing import CliRunner
 
 import pr_review_gh
+import pr_review_models
 import pr_review_threads
 from pr_review_gh import _is_codex_thumbs_up, build_fetch_result
 from pr_review_models import Author, FetchResult, IssueComment, Reaction, ReviewNode, UnresolvedThread
@@ -676,7 +679,7 @@ def test_fetch_latest_commit_date_reads_via_graphql_last_one(mocker: MockerFixtu
     })
     mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
 
-    result = pr_review_gh._fetch_latest_commit_date("o", "r", 1)
+    result = pr_review_gh._fetch_latest_commit_date("o", "r", 1, gh_timeout=None)
 
     assert result == datetime(2026, 1, 6, tzinfo=UTC)
 
@@ -686,7 +689,7 @@ def test_fetch_latest_force_push_at_returns_none_when_never_force_pushed(mocker:
     raw = json.dumps({"data": {"repository": {"pullRequest": {"timelineItems": {"nodes": []}}}}})
     mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
 
-    result = pr_review_gh._fetch_latest_force_push_at("o", "r", 1)
+    result = pr_review_gh._fetch_latest_force_push_at("o", "r", 1, gh_timeout=None)
 
     assert result is None
 
@@ -698,7 +701,7 @@ def test_fetch_latest_force_push_at_returns_event_timestamp(mocker: MockerFixtur
     })
     mocker.patch.object(pr_review_gh, "run_gh", return_value=raw)
 
-    result = pr_review_gh._fetch_latest_force_push_at("o", "r", 1)
+    result = pr_review_gh._fetch_latest_force_push_at("o", "r", 1, gh_timeout=None)
 
     assert result == datetime(2026, 1, 5, tzinfo=UTC)
 
@@ -737,6 +740,54 @@ def test_is_codex_thumbs_up_true_regardless_of_bot_suffix() -> None:
         )
         is True
     )
+
+
+# --- strict ingress ------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("model", "payload"),
+    [
+        (pr_review_models.CommentNode, {"databaseId": "12", "body": "b", "line": 1, "originalLine": 1, "author": None}),
+        (pr_review_models.PageInfo, {"hasNextPage": "false"}),
+        (pr_review_models.ReviewThreadsConnection, {"totalCount": "3", "nodes": []}),
+    ],
+    ids=["int-as-string", "bool-as-string", "count-as-string"],
+)
+def test_ingress_models_reject_a_coerced_producer_shape(model: type[BaseModel], payload: dict[str, object]) -> None:
+    """A `gh` response whose scalar types do not match the schema fails at the boundary.
+
+    In lax mode `"3"` silently becomes `3` and `"false"` becomes `True` — a producer-shape change
+    would then reach review state looking valid. `_GitHubResponseModel` sets `strict=True` so it
+    raises here instead.
+    """
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+
+
+def test_ingress_models_still_parse_github_iso_timestamps() -> None:
+    """Strict mode does not break timestamps: GitHub sends ISO-8601 strings and that is correct.
+
+    These models are validated from `json.loads` output (Pydantic's Python mode), where a strict
+    `datetime` field would reject the string GitHub actually sends. `GitHubTimestamp` relaxes
+    strictness on exactly those fields and nothing else — so an unparseable value is still
+    rejected, while the other forms a lax `datetime` accepts (a Unix epoch number) remain accepted.
+    """
+    assert pr_review_models.GitHubCommitDate.model_validate({"committedDate": "2026-01-06T00:00:00Z"}) == (
+        pr_review_models.GitHubCommitDate(committedDate=datetime(2026, 1, 6, tzinfo=UTC))
+    )
+    with pytest.raises(ValidationError):
+        pr_review_models.GitHubCommitDate.model_validate({"committedDate": "not-a-timestamp"})
+
+
+def test_internal_result_models_are_not_strict() -> None:
+    """`FetchResult`/`WatchResult`/`UnresolvedThread` are output shapes, not ingress.
+
+    They are assembled from already-validated values, so they deliberately do not inherit
+    `_GitHubResponseModel` — see its docstring.
+    """
+    for model in (pr_review_models.FetchResult, pr_review_models.WatchResult, pr_review_models.UnresolvedThread):
+        assert model.model_config.get("strict") is not True
 
 
 # --- FetchResult.has_outstanding_work -----------------------------------------------------------
@@ -792,9 +843,9 @@ def test_watch_polls_until_thread_becomes_unresolved(mocker: MockerFixture) -> N
     mocker.patch.object(pr_review_threads, "build_fetch_result", side_effect=[_state(), _state(unresolved_count=1)])
     mocker.patch.object(pr_review_threads.time, "sleep")
 
-    # timeout-seconds must clear _MIN_POLL_BUDGET_SECONDS (20.0) with real headroom: with
-    # time.sleep mocked to a no-op, almost no wall-clock time elapses between polls, so a timeout
-    # too close to the guard threshold spuriously trips it before this test's second poll runs.
+    # timeout-seconds must exceed interval-seconds: the loop stops once less than one interval
+    # remains, and with time.sleep mocked to a no-op almost no wall-clock time elapses, so the
+    # first iteration must find a full interval's headroom for this test's second poll to run.
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "40"])
 
     assert result.exit_code == 0, result.output
@@ -814,31 +865,26 @@ def test_watch_times_out_when_nothing_outstanding(mocker: MockerFixture) -> None
     assert data["timed_out"] is True
 
 
-def test_watch_skips_final_poll_when_budget_too_low(mocker: MockerFixture) -> None:
-    """`watch` stops polling, without attempting a doomed call, once the budget remaining before
-    `deadline` drops below `_MIN_POLL_BUDGET_SECONDS`.
+def test_watch_stops_when_less_than_one_interval_remains(mocker: MockerFixture) -> None:
+    """`watch` stops without attempting a doomed call once under one interval remains.
 
-    Regression coverage: `gh_timeout_budget` floors an exhausted deadline to 0.1s — far too little
-    for a real `gh` call. Because `_DEFAULT_WATCH_TIMEOUT_SECONDS` is an exact multiple of
-    `_DEFAULT_WATCH_INTERVAL_SECONDS` (270 / 90 = 3), the loop's final sleep lands within a
-    fraction of a second of `deadline` on essentially every real run, so an unguarded poll there
-    reliably raised `TimeoutExpired` instead of returning a clean `timed_out` result. Mocks
-    `time.monotonic` to a fixed sequence matching the loop's real call order (deadline
-    computation, the loop condition, the sleep-duration calculation, the budget check) so the
-    near-deadline condition is reproduced without a real wait.
+    `gh_timeout_budget` bounds a poll to the time left before `deadline`, so once a sleep has
+    consumed the window there is nothing left to poll with. The cutoff is `deadline` itself rather
+    than an invented safety margin: with `--timeout-seconds 50` and `--interval-seconds 90` the
+    very first sleep covers the whole window, so no poll is attempted and the first fetch is
+    reported as an honest `timed_out: true`.
     """
     fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
     mocker.patch.object(pr_review_threads.time, "sleep")
-    # 0.0 (deadline = 0.0 + 100), 0.0 (loop condition), 0.0 (sleep-duration calc), 85.0 (budget
-    # check: 100.0 - 85.0 = 15.0 < _MIN_POLL_BUDGET_SECONDS's 20.0 — guard fires, loop breaks).
-    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 85.0])
+    # 0.0 (deadline = 0.0 + 50), 0.0 (remaining = 50, which is <= the 90s interval -> break).
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0])
 
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "100"])
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "50"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is True
-    # Only the first fetch happened — the guard prevented a second, doomed poll attempt.
+    # Only the first fetch happened — no second, doomed poll attempt.
     assert fetch_mock.call_count == 1
 
 
@@ -854,7 +900,7 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
 
-    # 40s clears the 20.0s `_MIN_POLL_BUDGET_SECONDS` guard with real headroom (see the comment on
+    # 40s leaves a full interval's headroom on the first iteration (see the comment on
     # `test_watch_polls_until_thread_becomes_unresolved` above).
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "40"])
 
@@ -872,9 +918,9 @@ def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None
     poll: silently returning `timed_out: true` here would claim a confirmed check found nothing
     outstanding, when no check after the first fetch ever succeeded — a caller trusting that
     signal would wrongly conclude the PR is clean instead of retrying. Mocks `time.monotonic` to a
-    fixed sequence for exactly two failed poll attempts (each iteration: loop condition,
-    sleep-duration calc, guard check) followed by the window naturally expiring, matching the real
-    function's call order the same way `test_watch_skips_final_poll_when_budget_too_low` does.
+    fixed sequence for exactly two failed poll attempts (one clock read per iteration, plus one in
+    the `TimeoutExpired` handler to tell a real failure from the window simply ending) followed by
+    the window naturally expiring.
     """
     mocker.patch.object(
         pr_review_threads,
@@ -886,10 +932,11 @@ def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None
         ],
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
-    # 0.0 (deadline = 0.0 + 100). Iter 1: 0.0 (loop cond), 0.0 (sleep calc), 10.0 (guard: 100-10=90
-    # ≥ 5.0, doesn't fire) → poll raises TimeoutExpired. Iter 2: 20.0, 20.0, 30.0 (guard: 70 ≥ 5.0)
-    # → poll raises CalledProcessError. Then 105.0 (loop cond: 105 ≥ 100 → loop ends naturally).
-    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 10.0, 20.0, 20.0, 30.0, 105.0])
+    # 0.0 (deadline = 0.0 + 100). Iter 1: 0.0 (remaining=100 > the 10s interval) → poll raises
+    # TimeoutExpired, whose handler reads 10.0 (< deadline → a real failure). Iter 2: 20.0
+    # (remaining=80) → poll raises CalledProcessError, whose handler reads no clock at all: a
+    # non-zero exit is never excused by the deadline. Then 105.0 → remaining negative, loop ends.
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 10.0, 20.0, 105.0])
 
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
 
@@ -900,39 +947,94 @@ def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None
         json.loads(result.output)
 
 
-def test_watch_polls_final_leg_instead_of_skipping_it(mocker: MockerFixture) -> None:
-    """`watch` attempts a final poll on a normal-length last leg instead of sleeping straight to
-    `deadline` and skipping it.
+def test_watch_treats_a_deadline_truncated_poll_as_an_honest_timeout(mocker: MockerFixture) -> None:
+    """A poll that times out once `deadline` has passed is the window ending, not an unconfirmed tail.
 
-    Regression coverage for a Codex review on the earlier fix: with `--timeout-seconds 115` and
-    `--interval-seconds 90`, after the first poll at t=90, `_MIN_POLL_BUDGET_SECONDS`'s 20.0s
-    reservation leaves only 5s for the second sleep — under the pre-fix sleep formula
-    (`min(interval_seconds, deadline - now)`), the second poll would instead sleep the full 90s
-    straight past `deadline` (capped at 25s, landing at t=115), where the guard's
-    `deadline - now < _MIN_POLL_BUDGET_SECONDS` (115-115=0 < 20) fires and skips it entirely,
-    leaving that whole final stretch unconfirmed even on total success. The fixed formula reserves
-    `_MIN_POLL_BUDGET_SECONDS`, sleeping only to t=95 (`min(90, 115-20-90)=5`), where `115-95=20`
-    does *not* trip the guard, so the second poll is attempted and finds the new activity it
-    otherwise would have missed for this call entirely.
+    Regression coverage for the Codex finding that replaced an invented safety reservation:
+    `gh_timeout_budget` deliberately shrinks each `gh` call to whatever time is left, so the last
+    poll of a window is *expected* to be cut short. Classifying that as a failure would exit
+    non-zero on ordinary runs; classifying a failure that lands with time still on the clock as
+    success would hide a genuine transient error. Only the clock distinguishes them.
     """
     fetch_mock = mocker.patch.object(
-        pr_review_threads, "build_fetch_result", side_effect=[_state(), _state(), _state(unresolved_count=1)]
+        pr_review_threads,
+        "build_fetch_result",
+        side_effect=[_state(), subprocess.TimeoutExpired(cmd=["gh"], timeout=30)],
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
-    # 0.0 (deadline=115). Iter 1: 0.0 (loop cond), 0.0 (sleep calc: min(90,95)=90), 90.0 (guard:
-    # 115-90=25 ≥ 20) → poll succeeds, nothing outstanding. Iter 2: 90.0 (loop cond), 90.0 (sleep
-    # calc: min(90, 115-20-90=5)=5 — the fixed reservation, not the interval), 95.0 (guard:
-    # 115-95=20, not < 20) → poll attempted (would have been skipped under the pre-fix formula) and
-    # finds the unresolved thread.
-    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 95.0])
+    # 0.0 (deadline=100). Iter 1: 0.0 (remaining=100 > the 10s interval) → poll raises; 100.0 in
+    # the handler (>= deadline → the window ended, not a failure). Iter 2: 100.0 → remaining 0.
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 100.0, 100.0])
 
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "115"])
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
 
     assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    assert data["timed_out"] is False
-    assert data["state"]["unresolved_count"] == 1
-    assert fetch_mock.call_count == 3
+    assert json.loads(result.output)["timed_out"] is True
+    assert fetch_mock.call_count == 2
+
+
+def test_watch_fails_loudly_on_a_nonzero_gh_exit_at_the_deadline(mocker: MockerFixture) -> None:
+    """A non-zero `gh` exit is a failed poll whatever the clock says.
+
+    The deadline-aware classification above applies to `TimeoutExpired` only. An authentication,
+    rate-limit, API or GraphQL error is not explained by the shrinking budget, so reporting
+    `timed_out: true` from stale state would tell a caller the PR is clean when nothing was checked.
+    """
+    mocker.patch.object(
+        pr_review_threads, "build_fetch_result", side_effect=[_state(), subprocess.CalledProcessError(1, ["gh"])]
+    )
+    mocker.patch.object(pr_review_threads.time, "sleep")
+    # Same clock as the test above — 100.0 would have excused a TimeoutExpired but must not excuse
+    # this. The handler reads no clock at all, so only four values are consumed.
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 100.0, 100.0])
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
+
+    assert result.exit_code != 0
+    assert "the last of 1 poll(s) this window failed" in result.output
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.output)
+
+
+def test_watch_rejects_a_non_positive_interval() -> None:
+    """`--interval-seconds 0` would busy-loop `gh` calls until the timeout; Typer must reject it."""
+    assert runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "0"]).exit_code != 0
+
+
+def test_watch_rejects_a_negative_timeout() -> None:
+    """`--timeout-seconds` is constrained to >= 0; 0 is the supported immediate-snapshot value."""
+    assert runner.invoke(app, ["watch", "--pr", "3208", "--timeout-seconds", "-1"]).exit_code != 0
+
+
+def test_watch_first_fetch_is_not_deadline_bounded(mocker: MockerFixture) -> None:
+    """`--timeout-seconds 0` returns an immediate snapshot rather than starving the first fetch.
+
+    Regression coverage for the Codex finding that an already-spent deadline was applied to the
+    mandatory first fetch, flooring its `gh` timeout and raising `TimeoutExpired` instead of
+    producing the documented snapshot. That fetch takes the caller's `--gh-timeout-seconds`
+    instead; only the polls race `deadline`.
+    """
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--timeout-seconds", "0"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["timed_out"] is True
+    assert fetch_mock.call_args.kwargs == {"gh_timeout": None}
+
+
+def test_gh_timeout_budget_without_a_deadline_uses_the_callers_bound() -> None:
+    """No deadline means the caller's `--gh-timeout-seconds` applies unchanged, `None` included."""
+    assert pr_review_gh.gh_timeout_budget(None, None) is None
+    assert pr_review_gh.gh_timeout_budget(None, 12.5) == pytest.approx(12.5)
+
+
+def test_gh_timeout_budget_with_a_deadline_uses_the_time_left() -> None:
+    """A poll's bound is the time left before `deadline`, floored at zero once it has passed."""
+    now = time.monotonic()
+
+    assert pr_review_gh.gh_timeout_budget(now + 30, None) == pytest.approx(30, abs=1)
+    assert pr_review_gh.gh_timeout_budget(now - 30, None) == pytest.approx(0.0)
 
 
 def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) -> None:
@@ -952,9 +1054,10 @@ def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) ->
         side_effect=[_state(), _state(), subprocess.TimeoutExpired(cmd=["gh"], timeout=30)],
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
-    # Same 8-call shape as the all-fail test above, but iter 1's poll succeeds this time (finding
-    # nothing outstanding, so the loop does not break) before iter 2's poll fails as the window ends.
-    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 10.0, 20.0, 20.0, 30.0, 105.0])
+    # 0.0 (deadline=100). Iter 1: 0.0 (remaining=100) → poll succeeds, so the handler reads no
+    # clock. Iter 2: 20.0 (remaining=80) → poll raises, handler reads 30.0 (< deadline → a real
+    # failure, not the window ending). Then 105.0 → remaining negative, loop ends.
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 20.0, 30.0, 105.0])
 
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
 
