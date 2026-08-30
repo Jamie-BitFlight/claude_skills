@@ -86,7 +86,7 @@ flowchart TD
 - `backlog_list_issues(milestone=N)` — load milestone items and groomed status
 - `backlog_view(selector)` — read individual item Impact Radius and metadata
 - `backlog_groom(selector)` — trigger grooming for ungroomed items
-- `backlog_update(selector, ...)` — update item fields (status, title, description, plan, etc.); has no `milestone` parameter — milestone assignment is done via `github_project_setup.py issue set-milestone` (see `/group-items-to-milestone`), not through this tool
+- `backlog_update(selector, ...)` — update item fields; has no `milestone` parameter — milestone assignment is done via `github_project_setup.py issue set-milestone` (see `/group-items-to-milestone`), not through this tool
 
 ## MCP Tools — Dispatch (Backlog Server)
 
