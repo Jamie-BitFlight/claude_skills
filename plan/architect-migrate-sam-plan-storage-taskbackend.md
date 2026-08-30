@@ -187,13 +187,7 @@ class TaskBackend(Protocol):
         """
         ...
 
-    def list_plans(
-        self,
-        *,
-        search: str | None = None,
-        offset: int = 0,
-        limit: int | None = None,
-    ) -> list[PlanSummary]:
+    def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return summary metadata for plans visible to this backend.
 
         For remote backends, fetches from the authoritative remote store.
@@ -258,9 +252,7 @@ class TaskBackend(Protocol):
         """
         ...
 
-    def update_task_status(
-        self, plan_id: str, task_id: str, status: str
-    ) -> None:
+    def update_task_status(self, plan_id: str, task_id: str, status: str) -> None:
         """Update the status of a task.
 
         Valid statuses: not-started, in-progress, complete, blocked,
@@ -279,12 +271,7 @@ class TaskBackend(Protocol):
         """
         ...
 
-    def update_task_fields(
-        self,
-        plan_id: str,
-        task_id: str,
-        fields: dict[str, str | int | list[str]],
-    ) -> None:
+    def update_task_fields(self, plan_id: str, task_id: str, fields: dict[str, str | int | list[str]]) -> None:
         """Update arbitrary fields on a task.
 
         Args:
@@ -299,11 +286,7 @@ class TaskBackend(Protocol):
         ...
 
     def update_plan_fields(
-        self,
-        plan_id: str,
-        *,
-        context: str | None = None,
-        set_fields: dict[str, str | int | list[str]] | None = None,
+        self, plan_id: str, *, context: str | None = None, set_fields: dict[str, str | int | list[str]] | None = None
     ) -> None:
         """Update plan-level fields.
 
@@ -317,9 +300,7 @@ class TaskBackend(Protocol):
         """
         ...
 
-    def append_task_section(
-        self, plan_id: str, task_id: str, section_name: str, content: str
-    ) -> None:
+    def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
         """Append a named markdown section to a task's body.
 
         Args:
@@ -379,14 +360,7 @@ class TaskBackend(Protocol):
     # ------------------------------------------------------------------
 
     def store_document(
-        self,
-        plan_id: str,
-        task_id: str | None,
-        stage: str,
-        doc_type: str,
-        title: str,
-        content: str,
-        fmt: str = "md",
+        self, plan_id: str, task_id: str | None, stage: str, doc_type: str, title: str, content: str, fmt: str = "md"
     ) -> DocumentHandle:
         """Store a document associated with a plan or task.
 
@@ -455,13 +429,13 @@ from typing_extensions import TypedDict
 class TaskDefinition(TypedDict):
     """Input type for creating a task. Matches Task model required fields."""
 
-    id: str                          # Pattern: ^[A-Za-z]?\d+(\.\d+)?$
-    title: str                       # min_length=1, max_length=200
-    status: str                      # TaskStatus value
+    id: str  # Pattern: ^[A-Za-z]?\d+(\.\d+)?$
+    title: str  # min_length=1, max_length=200
+    status: str  # TaskStatus value
     agent: NotRequired[str | None]
     dependencies: NotRequired[list[str]]
-    priority: NotRequired[int]       # Priority IntEnum value (1-5)
-    complexity: NotRequired[str]     # "low" | "medium" | "high"
+    priority: NotRequired[int]  # Priority IntEnum value (1-5)
+    complexity: NotRequired[str]  # "low" | "medium" | "high"
     skills: NotRequired[list[str]]
     body: NotRequired[str]
     description: NotRequired[str]
@@ -524,19 +498,19 @@ class TaskData(TypedDict):
 class PlanData(TypedDict):
     """Full plan data returned from backend operations."""
 
-    plan_id: str                     # Backend-assigned identifier (e.g., "P001")
+    plan_id: str  # Backend-assigned identifier (e.g., "P001")
     feature: str
     version: str
     description: str
     goal: str | None
     context: str | None
     acceptance_criteria: str | None
-    issue: str | None                # GitHub issue number as string
+    issue: str | None  # GitHub issue number as string
     architecture: NotRequired[str | None]
     feature_context: NotRequired[str | None]
     codebase_patterns: NotRequired[str | None]
     tasks: list[TaskData]
-    source_path: str | None          # Filesystem path (local backend only)
+    source_path: str | None  # Filesystem path (local backend only)
     backend_ref: NotRequired[str | None]  # Backend-native reference
 
 
@@ -556,13 +530,13 @@ class PlanSummary(TypedDict):
 class DocumentHandle(TypedDict):
     """Opaque handle for document retrieval."""
 
-    content_ref: str                 # Backend-opaque identifier
-    owner_type: str                  # "work_item" | "sub_item"
-    owner_id: str                    # Plan ID or task ID
-    stage: str                       # S1-S7
-    doc_type: str                    # discovery, design, context, etc.
+    content_ref: str  # Backend-opaque identifier
+    owner_type: str  # "work_item" | "sub_item"
+    owner_id: str  # Plan ID or task ID
+    stage: str  # S1-S7
+    doc_type: str  # discovery, design, context, etc.
     title: str
-    fmt: str                         # md, yaml, json
+    fmt: str  # md, yaml, json
     version: NotRequired[int]
 
 
@@ -571,7 +545,7 @@ class DocumentData(TypedDict):
 
     content_ref: str
     title: str
-    content: str                     # Full document body
+    content: str  # Full document body
     fmt: str
     version: int
     owner_type: str
@@ -623,13 +597,13 @@ server.py:sam_list() dir scan  -> list_plans()
 
 ```python
 # LocalYamlTaskProvider uses these existing modules internally:
-from sam_schema.readers.detect import read_plan      # Format detection + YAML parse
+from sam_schema.readers.detect import read_plan  # Format detection + YAML parse
 from sam_schema.readers.normalize import normalize_plan  # Raw dict -> Pydantic
 from sam_schema.writers.yaml_writer import (
-    create_plan_file,   # Atomic plan creation
-    update_fields,       # Field-level YAML updates
-    append_section,      # Body section appending
-    _atomic_write,       # Atomic file write primitive
+    create_plan_file,  # Atomic plan creation
+    update_fields,  # Field-level YAML updates
+    append_section,  # Body section appending
+    _atomic_write,  # Atomic file write primitive
 )
 from sam_schema.core.dependencies import DependencyGraph  # Readiness queries
 ```
@@ -687,11 +661,7 @@ class GitHubTaskProvider:
         doc_backend: DocumentBackend instance for artifact storage.
     """
 
-    def __init__(
-        self,
-        issue_backend: IssueBackend,
-        doc_backend: DocumentBackend,
-    ) -> None: ...
+    def __init__(self, issue_backend: IssueBackend, doc_backend: DocumentBackend) -> None: ...
 ```
 
 ### Key Design Points
@@ -752,12 +722,16 @@ The refactor introduces a `TaskConfig` dataclass (mirroring `BacklogConfig`) tha
 from dataclasses import dataclass
 from sam_schema.core.task_backend import TaskBackend
 
+
 @dataclass
 class TaskConfig:
     """Container for the active TaskBackend instance."""
+
     backend: TaskBackend
 
+
 _active_config: TaskConfig | None = None
+
 
 def get_task_config() -> TaskConfig: ...
 def set_task_config(config: TaskConfig) -> None: ...
@@ -792,8 +766,7 @@ def sam_claim(
 ```python
 @mcp.tool
 def sam_claim(
-    plan: Annotated[str, Field(description="Plan address")],
-    task: Annotated[str, Field(description="Task ID to claim")],
+    plan: Annotated[str, Field(description="Plan address")], task: Annotated[str, Field(description="Task ID to claim")]
 ) -> dict:
     try:
         backend = get_task_config().backend
@@ -905,9 +878,7 @@ Add `backend_ref` to the `Plan` model in `sam_schema/core/models.py`:
 class Plan(BaseModel):
     # ... existing fields ...
     backend_ref: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("backend-ref", "backend_ref"),
-        serialization_alias="backend-ref",
+        default=None, validation_alias=AliasChoices("backend-ref", "backend_ref"), serialization_alias="backend-ref"
     )
 ```
 
@@ -951,6 +922,7 @@ plan_dir = ""  # empty = use dh_paths.plan_dir() default
 _VALID_TASK_BACKENDS: tuple[str, ...] = ("local", "github", "memory")
 _TASKBACKEND_TOML_FILENAME = "taskbackend.toml"
 
+
 def create_task_backend(name: str | None = None) -> TaskBackend:
     """Instantiate a TaskBackend by name.
 
@@ -977,16 +949,16 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
 ```python
 # When task has associated documents, include handles (not content):
 {
-    "task": { ... },  # TaskData fields
+    "task": {...},  # TaskData fields
     "documents": [
         {
             "content_ref": "gist://abc123",
             "stage": "S1",
             "doc_type": "feature-context",
             "title": "Feature Context: Auth System",
-            "fmt": "md"
+            "fmt": "md",
         }
-    ]
+    ],
 }
 ```
 
@@ -1110,10 +1082,12 @@ A single parametrized test suite that runs against every TaskBackend implementat
 import pytest
 from sam_schema.core.task_backend import TaskBackend
 
+
 @pytest.fixture(params=["local_yaml", "memory", "github_mock"])
 def backend(request, tmp_path) -> TaskBackend:
     """Parametrized fixture providing each backend implementation."""
     ...
+
 
 class TestTaskBackendConformance:
     """Protocol conformance tests — every backend must pass all of these."""

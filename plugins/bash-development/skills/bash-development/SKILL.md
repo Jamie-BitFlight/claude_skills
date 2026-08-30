@@ -181,7 +181,7 @@ For detailed patterns and examples:
 
 - **[bash_example_file.sh](./references/bash_example_file.sh)** - Complete script template
 - **[bash_example_includes.bash](./references/bash_example_includes.bash)** - Reusable utility functions
-- **[bash-agent-notes.markdown](./references/bash-agent-notes.markdown)** - Context-aware review guidance
+- **[bash-agent-notes.md](./references/bash-agent-notes.md)** - Context-aware review guidance
 - **[pure-bash-bible-strings.md](./references/pure-bash-bible-strings.md)** - String manipulation patterns
 - **[pure-bash-bible-arrays.md](./references/pure-bash-bible-arrays.md)** - Array operations
 - **[pure-bash-bible-files.md](./references/pure-bash-bible-files.md)** - File handling patterns

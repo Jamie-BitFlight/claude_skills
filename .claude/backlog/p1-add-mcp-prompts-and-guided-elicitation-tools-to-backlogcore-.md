@@ -180,6 +180,7 @@ For `backlog_add_guided`, structured elicitation dataclass:
 from dataclasses import dataclass
 from typing import Literal
 
+
 @dataclass
 class AddItemRequest:
     title: str

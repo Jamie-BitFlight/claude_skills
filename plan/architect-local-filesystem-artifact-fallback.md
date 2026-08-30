@@ -288,11 +288,7 @@ class LocalFilesystemArtifactProvider:
             Defaults to state_root() / "artifacts".
     """
 
-    def __init__(
-        self,
-        root_worktree: Path,
-        manifest_dir: Path | None = None,
-    ) -> None: ...
+    def __init__(self, root_worktree: Path, manifest_dir: Path | None = None) -> None: ...
 
     # ------------------------------------------------------------------
     # ArtifactBackend protocol — required methods
@@ -350,13 +346,7 @@ class LocalFilesystemArtifactProvider:
         """
         ...
 
-    def store_artifact_content(
-        self,
-        issue_number: int,
-        artifact_type: str,
-        path: str,
-        content: str,
-    ) -> None:
+    def store_artifact_content(self, issue_number: int, artifact_type: str, path: str, content: str) -> None:
         """Store artifact content on the local filesystem.
 
         Writes content to {root_worktree}/{path} only if the file does
@@ -376,12 +366,7 @@ class LocalFilesystemArtifactProvider:
         """
         ...
 
-    def read_artifact_content_from_remote(
-        self,
-        issue_number: int,
-        artifact_type: str,
-        path: str,
-    ) -> str | None:
+    def read_artifact_content_from_remote(self, issue_number: int, artifact_type: str, path: str) -> str | None:
         """Attempt to read artifact content from the local filesystem.
 
         For the local provider, "remote" is the local disk. This method
@@ -412,10 +397,7 @@ class LocalFilesystemArtifactProvider:
     # Sync stub (future capability)
     # ------------------------------------------------------------------
 
-    def sync_to_remote(
-        self,
-        backend: ArtifactBackend | None = None,
-    ) -> dict[str, str]:
+    def sync_to_remote(self, backend: ArtifactBackend | None = None) -> dict[str, str]:
         """Sync locally-stored artifacts to a remote backend.
 
         Not implemented. Returns a deferred-status dict so callers can
@@ -460,12 +442,13 @@ Add `local = "local"` to the existing `StrEnum`. No other changes to the enum.
 ```python
 class BackendName(StrEnum):
     """Canonical identifiers for pluggable artifact storage backends."""
+
     github = "github"
     linear = "linear"
     gitlab = "gitlab"
     sqlite = "sqlite"
     memory = "memory"
-    local = "local"   # NEW
+    local = "local"  # NEW
 ```
 
 **Change 2 — `create_artifact_provider()` (line ~1264):**
@@ -475,9 +458,7 @@ Add one routing branch before the `sqlite`/`memory` rejection block:
 ```python
 # Interface addition — not implementation
 def create_artifact_provider(
-    backend_name: str | None = None,
-    repo: str | None = None,
-    root_worktree: Path | None = None,
+    backend_name: str | None = None, repo: str | None = None, root_worktree: Path | None = None
 ) -> ArtifactBackend:
     resolved = backend_name or os.environ.get("BACKLOG_BACKEND") or "github"
     # ... existing github / linear / gitlab branches ...
@@ -541,13 +522,13 @@ the existing project root entry and the `~/.dh/` user-home entry.
 
 ```python
 # Before (two entries):
-search_paths.append(project_root / _BACKEND_TOML_FILENAME)          # {project_root}/backend.toml
-search_paths.append(Path.home() / ".dh" / _BACKEND_TOML_FILENAME)   # ~/.dh/backend.toml
+search_paths.append(project_root / _BACKEND_TOML_FILENAME)  # {project_root}/backend.toml
+search_paths.append(Path.home() / ".dh" / _BACKEND_TOML_FILENAME)  # ~/.dh/backend.toml
 
 # After (three entries):
-search_paths.append(project_root / _BACKEND_TOML_FILENAME)           # {project_root}/backend.toml
-search_paths.append(project_root / ".dh" / _BACKEND_TOML_FILENAME)   # {project_root}/.dh/backend.toml  NEW
-search_paths.append(Path.home() / ".dh" / _BACKEND_TOML_FILENAME)    # ~/.dh/backend.toml
+search_paths.append(project_root / _BACKEND_TOML_FILENAME)  # {project_root}/backend.toml
+search_paths.append(project_root / ".dh" / _BACKEND_TOML_FILENAME)  # {project_root}/.dh/backend.toml  NEW
+search_paths.append(Path.home() / ".dh" / _BACKEND_TOML_FILENAME)  # ~/.dh/backend.toml
 ```
 
 ### 4.5 Modified: `sam_schema/core/task_config.py`
@@ -862,12 +843,14 @@ discovers `backend.toml` / `taskbackend.toml` when placed in `{project_root}/.dh
 
 ```python
 # pytest parametrize pattern (interface only — not implementation)
-@pytest.mark.parametrize("subpath", [
-    "backend.toml",           # project root level (existing)
-    ".dh/backend.toml",       # new: Tier 1 committed config location
-])
-def test_load_backend_toml_name_search_order(tmp_path, subpath):
-    ...
+@pytest.mark.parametrize(
+    "subpath",
+    [
+        "backend.toml",  # project root level (existing)
+        ".dh/backend.toml",  # new: Tier 1 committed config location
+    ],
+)
+def test_load_backend_toml_name_search_order(tmp_path, subpath): ...
 ```
 
 #### Concurrency Tests
@@ -884,6 +867,7 @@ manifest (one of the 10 payloads, not a corrupt intermediate state).
 def test_concurrent_set_manifest_no_corruption(tmp_path):
     """10 concurrent writers — final state is a valid manifest."""
     import threading
+
     ...
 ```
 

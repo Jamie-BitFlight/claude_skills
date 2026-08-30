@@ -77,9 +77,7 @@ invocation: "uv run {script} --file {target}"
 
 **Actual script** (`plugins/gitlab-skill/skills/gitlab-skill/scripts/validate_glfm.py`, line 128-130):
 ```python
-input_group.add_argument(
-    "--file", "-f", type=Path, help="Path to markdown file to validate"
-)
+input_group.add_argument("--file", "-f", type=Path, help="Path to markdown file to validate")
 ```
 
 **Verdict: VERBATIM** — `--file` is the correct flag. The script's argparse definition at line 128 confirms `--file` (with short alias `-f`). The invocation in validators.yaml matches the actual CLI interface exactly.
