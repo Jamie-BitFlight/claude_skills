@@ -177,11 +177,20 @@ description: Description with trigger conditions
 
 ### Documentation Convention
 
-Plugins commonly ship a `{plugin-name}-meta-docs` skill that dynamically lists the plugin's
-`docs/` directory at load time (e.g. `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' -type f | sort`)
-instead of hardcoding relative paths to another plugin's docs. When a skill needs another plugin's
-documentation, load that plugin's meta-docs skill rather than hardcoding a cross-plugin relative
-path — those break on every directory restructure.
+Plugins commonly ship a `{plugin-name}-meta-docs` skill so other skills can reach the plugin's
+`docs/` without hardcoding a cross-plugin relative path — those break on every directory
+restructure. When a skill needs another plugin's documentation, load that plugin's meta-docs skill
+instead.
+
+List only docs a real skill or agent hook actually depends on discovering through this index —
+not every file under `docs/`. A `find ${CLAUDE_PLUGIN_ROOT}/docs -name '*.md' | sort` enumeration
+injects every doc's path into every load of the meta-docs skill regardless of whether anything ever
+reads it; a doc with its own direct hook elsewhere gains nothing from also being listed here, and a
+doc with no hook anywhere is pure load for no behavior. Add an entry only when some skill or agent
+file's hook text depends on this index resolving it (e.g. "load `{plugin}-meta-docs` and read the
+X document it lists") — confirm that dependency exists before adding, and drop an entry once nothing
+depends on it. Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
+correctly regardless of installation location.
 
 ## Code Conventions
 
