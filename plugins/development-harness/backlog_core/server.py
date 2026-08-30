@@ -1260,9 +1260,9 @@ async def backlog_add(
 
     Returns:
         Dict with file_path, title, priority, issue number (if created),
-        and output messages/warnings. file_path is for reference only — do not
-        edit it directly. Use backlog_update or backlog_groom for all
-        modifications. On error, dict contains an error key.
+        and output messages/warnings. file_path is for reference only — use
+        backlog_update or backlog_groom for all modifications. On error, dict
+        contains an error key.
     """
     out = Output()
     try:
@@ -2131,8 +2131,7 @@ async def backlog_view(
         title, labels, status, plan_address, sections_index, _summary, _full_chars, and _hint.
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings. file_path is for reference
-        only — do not edit it directly. Use backlog_update or backlog_groom for all
-        modifications.
+        only — use backlog_update or backlog_groom for all modifications.
         When navigate targets an ordinal that does not exist in the item: dict with
         error, requested_ordinal, and valid_ordinals (every ordinal actually present).
         On error, dict contains an error key.
@@ -2458,9 +2457,9 @@ async def backlog_update(
         str | None,
         Field(
             description=(
-                "Set item status (e.g. 'in-progress'). Updates GitHub issue labels when "
-                "applicable — do not set status labels directly with `gh label`; they are "
-                "owned by this transition."
+                "Set item status (e.g. 'in-progress') — the only supported way to change an "
+                "item's status labels. Updates GitHub issue labels when applicable, as a side "
+                "effect of this transition."
             )
         ),
     ] = None,
