@@ -31,7 +31,7 @@ import time
 from typing import Annotated
 
 import typer
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # This checkout's own owner/repo — override with --owner/--repo to target any other repository;
 # every `gh` call below takes them as explicit query variables, so nothing here is repo-specific.
@@ -84,11 +84,24 @@ mutation($threadId: ID!) {
 """
 
 
-class _Author(BaseModel):
+class _GitHubResponseModel(BaseModel):
+    """Base for every model that ingests a raw GitHub GraphQL response.
+
+    `strict=True` so a producer-shape mismatch — GitHub or `gh` returning a string where the
+    schema declares an integer or a boolean — is rejected at ingress instead of being coerced
+    into apparently valid review state. Models this script builds itself from already-validated
+    values (`UnresolvedThread`, `FetchResult`, `WatchResult`) are not ingress and do not inherit
+    this: no untrusted input reaches them.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+
+class _Author(_GitHubResponseModel):
     login: str
 
 
-class CommentNode(BaseModel):
+class CommentNode(_GitHubResponseModel):
     """A single review comment, in the shape GitHub's GraphQL API returns it.
 
     Field names mirror the GraphQL schema exactly (`databaseId`, not
@@ -106,24 +119,24 @@ class CommentNode(BaseModel):
     author: _Author | None
 
 
-class _PageInfo(BaseModel):
+class _PageInfo(_GitHubResponseModel):
     hasNextPage: bool
 
 
-class _CommentsConnection(BaseModel):
+class _CommentsConnection(_GitHubResponseModel):
     totalCount: int
     pageInfo: _PageInfo
     nodes: list[CommentNode]
 
 
-class _ReviewThreadNode(BaseModel):
+class _ReviewThreadNode(_GitHubResponseModel):
     id: str
     isResolved: bool
     path: str
     comments: _CommentsConnection
 
 
-class _ReviewThreadsConnection(BaseModel):
+class _ReviewThreadsConnection(_GitHubResponseModel):
     """One page's `reviewThreads` connection, already unwrapped from `data.repository.pullRequest`.
 
     `_fetch_pages` pulls this dict straight out of each slurped page by subscripting the fixed
@@ -137,7 +150,7 @@ class _ReviewThreadsConnection(BaseModel):
     nodes: list[_ReviewThreadNode]
 
 
-class ReviewNode(BaseModel):
+class ReviewNode(_GitHubResponseModel):
     """A top-level review submission, in the shape GitHub's GraphQL API returns it.
 
     Distinct from a review *comment* (`CommentNode`): this is the review object itself —
@@ -156,7 +169,7 @@ class ReviewNode(BaseModel):
     body: str
 
 
-class _ReviewsConnection(BaseModel):
+class _ReviewsConnection(_GitHubResponseModel):
     """One page's `reviews` connection, already unwrapped — see `_ReviewThreadsConnection`."""
 
     totalCount: int
@@ -164,11 +177,18 @@ class _ReviewsConnection(BaseModel):
 
 
 class UnresolvedThread(BaseModel):
-    """One unresolved review thread and its full comment history, as emitted to the caller."""
+    """One unresolved review thread and its comment history, as emitted to the caller.
+
+    `comments_total` is the thread's own `comments.totalCount`, which is *not* capped by the
+    query's `comments(first: 100)` page size. `watch` diffs on it as well as on the comment ids,
+    so a reply added to a thread that already had 100 comments — where the id list cannot
+    change — is still detected as activity.
+    """
 
     id: str
     path: str
     comments: list[CommentNode]
+    comments_total: int
     comments_truncated: bool
 
 
@@ -188,6 +208,10 @@ class WatchResult(BaseModel):
     `timed_out` is `False` exactly when `new_thread_ids` or `new_reviews_with_body` is non-empty —
     the loop breaks on the first poll that finds either, and returns `True` only once
     `timeout_seconds` elapses with neither ever appearing.
+
+    `new_thread_ids` means "threads with activity this window", not "threads absent from the
+    baseline": a reply added to a thread the baseline already listed keeps that thread's id, so
+    an id-only diff would miss it.
     """
 
     timed_out: bool
@@ -202,7 +226,12 @@ class WatchResult(BaseModel):
 # from the exec call itself rather than a custom error path.
 _GH = shutil.which("gh") or "gh"
 
-_GH_TIMEOUT_SECONDS = 30
+# `gh` calls are bounded by the caller, not by a constant here. `gh api --paginate` requests
+# every page sequentially inside one subprocess, so any fixed cap would have to cover a whole
+# pagination run on an arbitrarily large PR over an arbitrarily slow link — a number this
+# repository has no source for (CLAUDE.md, "No invented constraints"). `fetch` and `watch`
+# therefore expose `--gh-timeout-seconds`, unbounded by default, and `watch` additionally
+# bounds each *poll* by its own `--timeout-seconds` deadline, which the caller chose.
 
 # Anthropic's raw prompt-cache API defaults to a 5-minute TTL in every billing mode; a 1-hour TTL
 # is opt-in only (https://platform.claude.com/docs/en/build-with-claude/prompt-caching, accessed
@@ -214,22 +243,8 @@ _GH_TIMEOUT_SECONDS = 30
 _DEFAULT_WATCH_INTERVAL_SECONDS = 90
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 
-# `_gh_timeout_budget` floors a near-zero remainder to 0.1s — enough to keep the return type
-# positive, not enough for a real `gh api graphql` round trip. `_DEFAULT_WATCH_TIMEOUT_SECONDS`
-# being an exact multiple of `_DEFAULT_WATCH_INTERVAL_SECONDS` (270 / 90 = 3) means the loop's
-# final sleep lands within a fraction of a second of `deadline` on essentially every run, so an
-# unguarded poll there is starved to that floor and reliably raises `TimeoutExpired` — not a
-# flaky network failure. `watch`'s loop skips a poll once the remaining budget drops below this,
-# rather than attempting one that is near-certain to fail.
-# ponytail: 5.0 is an unmeasured heuristic, not a proven-sufficient margin for two sequential `gh
-# api graphql` round trips — `_build_fetch_result` makes two such calls, and if the first eats
-# most of this budget the second can still be starved. The exception handler around the poll in
-# `watch` is the real backstop for that case, not this guard alone; raise this value if starvation
-# is observed in practice with the guard already in place.
-_MIN_POLL_BUDGET_SECONDS = 5.0
 
-
-def _run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
+def _run_gh(args: list[str], *, timeout: float | None = None) -> str:
     """Run a `gh` command and return its captured stdout.
 
     `gh` spawns no child processes of its own, so a plain timeout is enough to bound it — no
@@ -237,9 +252,9 @@ def _run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
 
     Args:
         args: Full `gh` argv, excluding the executable itself (e.g. `["api", "graphql", ...]`).
-        timeout: Seconds to allow before killing the process. Defaults to `_GH_TIMEOUT_SECONDS`;
-            `watch` passes a smaller value as its own deadline approaches so one slow call near
-            the end of a poll window can't push the whole command past `--timeout-seconds`.
+        timeout: Seconds to allow before killing the process, or `None` for no bound. `watch`
+            passes the time left before its own deadline so one slow call near the end of a poll
+            window can't push the whole command past `--timeout-seconds`.
 
     Returns:
         The command's stdout, decoded as text.
@@ -254,9 +269,7 @@ def _run_gh(args: list[str], *, timeout: float = _GH_TIMEOUT_SECONDS) -> str:
     return result.stdout
 
 
-def _fetch_pages(
-    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
-) -> list[_ReviewThreadsConnection]:
+def _fetch_pages(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[_ReviewThreadsConnection]:
     """Fetch and validate every paginated page of a PR's review threads.
 
     Args:
@@ -291,9 +304,7 @@ def _fetch_pages(
     ]
 
 
-def _fetch_review_pages(
-    owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
-) -> list[_ReviewsConnection]:
+def _fetch_review_pages(owner: str, repo: str, pr: int, *, gh_timeout: float | None) -> list[_ReviewsConnection]:
     """Fetch and validate every paginated page of a PR's top-level reviews.
 
     A separate `gh` invocation from `_fetch_pages`: `gh api graphql --paginate` follows exactly
@@ -332,28 +343,48 @@ def _fetch_review_pages(
     ]
 
 
-def _gh_timeout_budget(deadline: float | None) -> float:
-    """Bound a `gh` call to whatever time remains before `deadline`, capped at `_GH_TIMEOUT_SECONDS`.
+def _thread_activity_key(thread: UnresolvedThread) -> tuple[int, tuple[tuple[int, str], ...]]:
+    """Return a value that changes whenever a thread's comments change.
 
-    `deadline` is `None` for a plain `fetch` (no overall time budget to respect — use the full
-    default). For `watch`, passing its own `deadline` here means each of `_build_fetch_result`'s
-    two `gh` calls is bounded by whatever is actually left, not by a fixed worst-case reservation
-    subtracted from every poll regardless of how fast GitHub responds — a call made with plenty of
-    time left still gets the full `_GH_TIMEOUT_SECONDS`, and only a call made close to `deadline`
-    is tightened.
+    Three kinds of change have to register, and no single component catches all three:
+    a reply adds an id; an *edit* to an existing comment changes neither its `databaseId`
+    nor the count, so the body is needed; and a reply past the query's
+    `comments(first: 100)` page cannot change the id/body tuple at all, so the untruncated
+    `comments_total` is needed.
+
+    Args:
+        thread: An unresolved thread from a `fetch` snapshot.
+
+    Returns:
+        `(comments_total, ((databaseId, body), ...))`.
+    """
+    return thread.comments_total, tuple((comment.databaseId, comment.body) for comment in thread.comments)
+
+
+def _gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float | None:
+    """Choose the timeout for one `gh` call.
+
+    `deadline` is `None` for a plain `fetch` and for `watch`'s mandatory baseline: neither has a
+    window to respect, so the caller's `--gh-timeout-seconds` applies unchanged (`None` = no
+    bound). `watch` passes its own `deadline` for each *poll*, so both of
+    `_build_fetch_result`'s `gh` calls are bounded by whatever is actually left rather than by a
+    fixed reservation subtracted from every poll regardless of how fast GitHub responds.
 
     Args:
         deadline: A `time.monotonic()` timestamp to respect, or `None` for no deadline.
+        gh_timeout: The caller's own per-call bound, used when there is no deadline.
 
     Returns:
-        Seconds to pass as `_run_gh`'s `timeout`, always positive.
+        Seconds to pass as `_run_gh`'s `timeout`, or `None` for no bound.
     """
     if deadline is None:
-        return _GH_TIMEOUT_SECONDS
-    return max(0.1, min(_GH_TIMEOUT_SECONDS, deadline - time.monotonic()))
+        return gh_timeout
+    return max(0.0, deadline - time.monotonic())
 
 
-def _build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None = None) -> FetchResult:
+def _build_fetch_result(
+    owner: str, repo: str, pr: int, *, deadline: float | None = None, gh_timeout: float | None = None
+) -> FetchResult:
     """Fetch and assemble one PR's unresolved review threads and top-level review state.
 
     Shared by `fetch` (prints the result once, `deadline=None`) and `watch` (calls this
@@ -366,12 +397,13 @@ def _build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | Non
         pr: Pull request number.
         deadline: A `time.monotonic()` timestamp the caller wants this call's two `gh`
             invocations to respect — see `_gh_timeout_budget`. `None` means no deadline.
+        gh_timeout: Per-call bound applied when `deadline` is `None`; `None` means no bound.
 
     Returns:
         Totals plus every currently-unresolved thread.
     """
-    thread_pages = _fetch_pages(owner, repo, pr, gh_timeout=_gh_timeout_budget(deadline))
-    review_pages = _fetch_review_pages(owner, repo, pr, gh_timeout=_gh_timeout_budget(deadline))
+    thread_pages = _fetch_pages(owner, repo, pr, gh_timeout=_gh_timeout_budget(deadline, gh_timeout))
+    review_pages = _fetch_review_pages(owner, repo, pr, gh_timeout=_gh_timeout_budget(deadline, gh_timeout))
     all_threads = [node for page in thread_pages for node in page.nodes]
     all_reviews = [node for page in review_pages for node in page.nodes]
     unresolved = [
@@ -379,6 +411,7 @@ def _build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | Non
             id=node.id,
             path=node.path,
             comments=node.comments.nodes,
+            comments_total=node.comments.totalCount,
             comments_truncated=node.comments.pageInfo.hasNextPage,
         )
         for node in all_threads
@@ -398,6 +431,9 @@ def fetch(
     pr: Annotated[int, typer.Option(help="Pull request number.")],
     owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
     repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
+    gh_timeout_seconds: Annotated[
+        float | None, typer.Option(min=0, help="Seconds to bound each `gh` call to. Unbounded by default.")
+    ] = None,
 ) -> None:
     """Fetch a PR's unresolved review threads, auto-paginated so none is silently truncated.
 
@@ -416,7 +452,7 @@ def fetch(
     have no thread at all and would otherwise be invisible even when `unresolved_count` is 0;
     treat each as actionable input too.
     """
-    result = _build_fetch_result(owner, repo, pr)
+    result = _build_fetch_result(owner, repo, pr, gh_timeout=gh_timeout_seconds)
     typer.echo(result.model_dump_json())
 
 
@@ -426,11 +462,22 @@ def watch(
     owner: Annotated[str, typer.Option(help="Repository owner.")] = DEFAULT_OWNER,
     repo: Annotated[str, typer.Option(help="Repository name.")] = DEFAULT_REPO,
     interval_seconds: Annotated[
-        int, typer.Option(help="Seconds to sleep between polls.")
+        int, typer.Option(min=1, help="Seconds to sleep between polls. Must be positive.")
     ] = _DEFAULT_WATCH_INTERVAL_SECONDS,
     timeout_seconds: Annotated[
-        int, typer.Option(help="Stop polling and return the current state after this many seconds.")
+        int,
+        typer.Option(
+            min=0,
+            help="Stop polling and return the current state after this many seconds. 0 takes the baseline snapshot and returns.",
+        ),
     ] = _DEFAULT_WATCH_TIMEOUT_SECONDS,
+    gh_timeout_seconds: Annotated[
+        float | None,
+        typer.Option(
+            min=0,
+            help="Seconds to bound the baseline `gh` calls to. Unbounded by default; polls are bounded by --timeout-seconds.",
+        ),
+    ] = None,
 ) -> None:
     """Poll `fetch` until new PR review activity appears, or a timeout elapses.
 
@@ -447,12 +494,13 @@ def watch(
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`,
     `new_thread_ids`, and `new_reviews_with_body`.
 
-    Reserves `_MIN_POLL_BUDGET_SECONDS` before `deadline` (shortening the final sleep rather than
-    sleeping all the way to `deadline`), so a normal-length last leg still gets a real final poll
-    instead of being silently skipped — under the default interval/timeout, the whole window
-    through shortly before `deadline` gets checked, not just up through the second-to-last
-    interval. Only a pathologically short `--timeout-seconds`, or a poll that overruns its own
-    interval, leaves no room for that final attempt.
+    `deadline` is the only cutoff. The loop polls while a full `interval_seconds` still fits
+    before it and stops once less than that remains — the point past which `_gh_timeout_budget`
+    would starve the call to its 0.1s floor anyway. No fixed safety margin is reserved: this
+    repository has no source for how long a `gh api graphql` round trip takes, and inventing one
+    would be a guess (CLAUDE.md, "No invented constraints"). The final sub-interval stretch of a
+    window is therefore left unpolled by design — the next `watch` call's baseline fetch covers
+    it, which is exactly why the loop pattern above is documented as back-to-back calls.
 
     Exits non-zero, with nothing printed to stdout, if the *last* re-poll attempted this window
     failed (a transient `gh` failure — see the exception handling inside the loop). An earlier
@@ -464,8 +512,14 @@ def watch(
     honest "nothing to report," not a failure.
     """
     deadline = time.monotonic() + timeout_seconds
-    baseline = _build_fetch_result(owner, repo, pr, deadline=deadline)
-    baseline_thread_ids = {thread.id for thread in baseline.unresolved}
+    # The baseline is mandatory and is *not* deadline-bounded: with `--timeout-seconds 0` the
+    # deadline is already spent, and starving this call would turn the documented immediate
+    # snapshot into a `TimeoutExpired`. Only the polls below race the deadline.
+    baseline = _build_fetch_result(owner, repo, pr, gh_timeout=gh_timeout_seconds)
+    # Keyed by comment identity rather than a plain thread-id set: a reviewer replying to a
+    # thread the baseline already listed leaves that thread's id unchanged, so an id-only diff
+    # would report `timed_out: true` while unread review activity sits in `unresolved`.
+    baseline_thread_activity = {thread.id: _thread_activity_key(thread) for thread in baseline.unresolved}
     # Keyed by review id rather than a plain id set, so a review whose body or state changes
     # after this baseline is taken — same id, different content — is still detected as activity
     # below, not just a review with an id the baseline never saw at all.
@@ -479,44 +533,48 @@ def watch(
     # baseline fetch above already succeeded (its own errors propagate uncaught, before the
     # loop), so "no poll attempted since" is itself a confirmed state, not an unknown one.
     last_poll_ok = True
-    while time.monotonic() < deadline:
-        # Sleep only up to `deadline - _MIN_POLL_BUDGET_SECONDS`, not all the way to `deadline`
-        # itself — reserving that much time means the final poll below is attempted with a real
-        # chance to complete, rather than skipped. Sleeping the full remainder on a normal-length
-        # last leg (the un-reserved version of this line) would otherwise leave the final
-        # `interval_seconds`-ish stretch of every watch call structurally unconfirmed even when
-        # nothing ever fails — a caller that stops after one `timed_out: true` would miss activity
-        # that arrived in that stretch, not just on a transient error.
-        time.sleep(max(0.0, min(interval_seconds, deadline - _MIN_POLL_BUDGET_SECONDS - time.monotonic())))
-        if deadline - time.monotonic() < _MIN_POLL_BUDGET_SECONDS:
-            # Only reached when there wasn't even `_MIN_POLL_BUDGET_SECONDS` left at the start of
-            # this iteration (a pathologically short `--timeout-seconds`, or a previous poll that
-            # ran long) — the sleep above already couldn't reserve it. `_gh_timeout_budget` would
-            # otherwise starve a call here to a floor too small to succeed; stop polling and
-            # report the last successfully-fetched state instead of attempting a call that cannot
-            # complete.
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             break
-        # `_build_fetch_result`'s two `gh` calls are each bounded to whatever's left before
-        # `deadline` (see `_gh_timeout_budget`) rather than a static reservation subtracted from
-        # every poll — a call made with time to spare still gets the full `_GH_TIMEOUT_SECONDS`.
+        time.sleep(min(interval_seconds, remaining))
+        if remaining <= interval_seconds:
+            # That sleep consumed the rest of the window. `_gh_timeout_budget` would bound a poll
+            # here to its 0.1s floor, too little for a `gh api graphql` round trip, so stop and
+            # report the last successfully-fetched state rather than spawn a doomed call.
+            break
+        # Each of `_build_fetch_result`'s two `gh` calls is bounded to whatever's left before
+        # `deadline` (see `_gh_timeout_budget`), re-measured between them rather than split from
+        # a fixed reservation.
         poll_attempts += 1
+        # `watch` is meant to run unattended, often backgrounded (see the receiving-pr-reviews
+        # skill's own gotchas on polling a backgrounded call for its own result); crashing on a
+        # single bad poll loses the whole call's result. Both handlers below record the outcome
+        # and let the loop continue toward `deadline` on its own schedule.
         try:
             current = _build_fetch_result(owner, repo, pr, deadline=deadline)
             last_poll_ok = True
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
-            last_poll_ok = False
-            # Two distinct causes land here, not one: a genuine transient `gh` failure mid-window
-            # (network hiccup, momentary GitHub error), and the guard above not being a complete
-            # fix on its own — `_build_fetch_result` makes two sequential `gh` calls, each
-            # re-budgeted from whatever's left, so a slow first call can still starve the second
-            # even though the guard passed. This handler is that starved-second-call case's real
-            # backstop, not a belt-and-suspenders duplicate of the guard.
-            # `watch` is meant to run unattended, often backgrounded (see the receiving-pr-reviews
-            # skill's own gotchas on polling a backgrounded call for its own result); crashing
-            # here loses the whole call's result instead of just this one poll. Treat it as no
-            # fresh data this poll and let the loop continue toward `deadline` on its own schedule.
+        except subprocess.TimeoutExpired:
+            # A timeout is the one failure the clock can explain: `_gh_timeout_budget`
+            # deliberately shrinks each call to the time left, so the last poll of a window is
+            # *expected* to be cut short. At or past `deadline` that is the same honest "no time
+            # left to check again" this command reports when it stops before polling at all.
+            # With time still on the clock it is a real network stall and leaves the tail
+            # unconfirmed.
+            last_poll_ok = time.monotonic() >= deadline
             continue
-        new_thread_ids = {thread.id for thread in current.unresolved} - baseline_thread_ids
+        except subprocess.CalledProcessError:
+            # A non-zero exit is an authentication, rate-limit, API or GraphQL error. The
+            # deadline cannot cause it and cannot excuse it, so it is a failed poll whatever the
+            # clock says — reporting `timed_out: true` off stale state here would tell a caller
+            # the PR is clean when nothing was actually checked.
+            last_poll_ok = False
+            continue
+        new_thread_ids = {
+            thread.id
+            for thread in current.unresolved
+            if baseline_thread_activity.get(thread.id) != _thread_activity_key(thread)
+        }
         new_reviews = [
             review
             for review in current.reviews_with_body
