@@ -2,7 +2,7 @@
 
 Every function here shells out to `gh` (GitHub CLI) rather than talking to the GitHub API
 directly, relying on `gh`'s own authentication. `build_fetch_result` is the one function the CLI
-layer (`pr_review_threads.py`) calls directly — it composes the four independent `gh` calls below
+layer (`pr_review_threads.py`) calls directly — it composes the six independent `gh` calls below
 into one `FetchResult` snapshot, fresh every time it runs. `run_gh` is exported too: the CLI
 layer's `reply`/`resolve` commands call it directly for their own single-shot `gh` invocations.
 """
@@ -13,12 +13,14 @@ import json
 import shutil
 import subprocess
 import time
+from datetime import datetime
 
 from pydantic import TypeAdapter
 
 from pr_review_models import (
     FetchResult,
     IssueComment,
+    PullRequestCommit,
     Reaction,
     ReviewsConnection,
     ReviewThreadsConnection,
@@ -78,6 +80,7 @@ _GH_TIMEOUT_SECONDS = 30
 
 _ISSUE_COMMENT_ADAPTER: TypeAdapter[list[IssueComment]] = TypeAdapter(list[IssueComment])
 _REACTION_ADAPTER: TypeAdapter[list[Reaction]] = TypeAdapter(list[Reaction])
+_PR_COMMIT_ADAPTER: TypeAdapter[list[PullRequestCommit]] = TypeAdapter(list[PullRequestCommit])
 
 # GraphQL's `author.login` and the REST reactions API's `user.login` return this bot's account
 # name without a `[bot]` suffix and with one respectively (confirmed against this repo's own PR
@@ -192,14 +195,16 @@ def _fetch_review_pages(
 def _fetch_issue_comments(
     owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS
 ) -> list[IssueComment]:
-    """Fetch every PR-level (issue) comment's timestamp, auto-paginated and flattened.
+    """Fetch every PR-level (issue) comment's timestamp and author, auto-paginated and flattened.
 
     A PR-level comment — `gh pr comment`, or any comment posted through the Issues REST API
     rather than as an inline review comment — is the mechanism the receiving-pr-reviews skill's
     own workflow already uses to answer a `reviews_with_body` entry (SKILL.md step 6: "A decision
-    spanning threads... goes on the PR itself via `gh pr comment`"). The newest one of these is
+    spanning threads... goes on the PR itself via `gh pr comment`"). The newest one of these
+    authored by the currently-authenticated `gh` identity (see `_fetch_authenticated_login`) is
     exactly the signal `build_fetch_result` needs to tell whether a review's top-level feedback
-    has since been followed up on.
+    has since been followed up on by this workflow — not by an unrelated bystander, bot, or CI
+    notification also commenting on the PR in the meantime.
 
     Args:
         owner: Repository owner login.
@@ -244,6 +249,51 @@ def _fetch_pr_reactions(owner: str, repo: str, pr: int, *, gh_timeout: float = _
     return [reaction for page in json.loads(raw) for reaction in _REACTION_ADAPTER.validate_python(page)]
 
 
+def _fetch_authenticated_login(*, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> str:
+    """Fetch the GitHub login `gh` is currently authenticated as.
+
+    Repo-independent (unlike every other `_fetch_*` helper here): the authenticated identity is
+    the same regardless of which PR or repository is being watched, so this call takes no
+    `owner`/`repo`/`pr` arguments.
+
+    Args:
+        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+
+    Returns:
+        The authenticated user's login, e.g. `"jane-doe"`.
+    """
+    return run_gh(["api", "user", "--jq", ".login"], timeout=gh_timeout).strip()
+
+
+def _fetch_latest_commit_date(owner: str, repo: str, pr: int, *, gh_timeout: float = _GH_TIMEOUT_SECONDS) -> datetime:
+    """Fetch the PR's current head commit's raw git committer date.
+
+    `GET /repos/{owner}/{repo}/pulls/{pr}/commits` returns commits oldest-first, so the last
+    element in the fully-flattened, fully-paginated list is always the current head commit — this
+    is what `build_fetch_result` compares a Codex approval reaction's timestamp against, so a
+    reaction left on an earlier revision is never mistaken for approval of the current one. A
+    force-push (e.g. a rebase) updates each commit's committer date to the time of that push even
+    when the author date is preserved, which is exactly the "when was this revision pushed" signal
+    needed here.
+
+    Args:
+        owner: Repository owner login.
+        repo: Repository name.
+        pr: Pull request number.
+        gh_timeout: Seconds to bound the underlying `gh` call to — see `run_gh`.
+
+    Returns:
+        The head commit's raw git committer date.
+
+    Raises:
+        IndexError: the PR has no commits at all — not possible for a real, open pull request, so
+            this is an acceptable boundary failure for an invariant this script does not control.
+    """
+    raw = run_gh(["api", f"repos/{owner}/{repo}/pulls/{pr}/commits", "--paginate", "--slurp"], timeout=gh_timeout)
+    commits = [commit for page in json.loads(raw) for commit in _PR_COMMIT_ADAPTER.validate_python(page)]
+    return commits[-1].commit.committer.date
+
+
 def _is_codex_thumbs_up(reaction: Reaction) -> bool:
     """Whether `reaction` is Codex's approval signal — a "+1" from its bot account.
 
@@ -265,7 +315,7 @@ def gh_timeout_budget(deadline: float | None) -> float:
 
     `deadline` is `None` for a plain `fetch` (no overall time budget to respect — use the full
     default). For `watch`, passing its own `deadline` here means each of `build_fetch_result`'s
-    four `gh` calls is bounded by whatever is actually left, not by a fixed worst-case reservation
+    `gh` calls is bounded by whatever is actually left, not by a fixed worst-case reservation
     subtracted from every poll regardless of how fast GitHub responds — a call made with plenty of
     time left still gets the full `_GH_TIMEOUT_SECONDS`, and only a call made close to `deadline`
     is tightened.
@@ -286,40 +336,49 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
 
     Shared by `fetch` (prints the result once, `deadline=None`) and `watch` (calls this repeatedly
     on a polling interval, passing its own deadline) so both subcommands assemble a `FetchResult`
-    identically. Makes four `gh` calls, each independently bounded by `gh_timeout_budget(deadline)`:
+    identically. Makes six `gh` calls, each independently bounded by `gh_timeout_budget(deadline)`:
     the paginated review-threads query, the paginated reviews query, every PR-level issue comment
-    (for `unresponded_reviews`), and every reaction on the PR itself (for `codex_approved`). Every
-    one of the four is a fresh snapshot taken by this call alone — nothing here is compared against
-    an earlier call's result, which is what makes two `watch` calls back to back, or a `watch` call
-    issued right after a `fetch`, incapable of missing or double-counting activity that happened in
-    between (the failure mode a per-invocation in-memory baseline used to have).
+    (for `unresponded_reviews`), every reaction on the PR itself (for `codex_approved`), the
+    currently-authenticated `gh` identity (also for `unresponded_reviews`), and the PR's head
+    commit date (also for `codex_approved`). Every one of the six is a fresh snapshot taken by this
+    call alone — nothing here is compared against an earlier call's result, which is what makes two
+    `watch` calls back to back, or a `watch` call issued right after a `fetch`, incapable of
+    missing or double-counting activity that happened in between (the failure mode a per-invocation
+    in-memory baseline used to have).
 
     `unresponded_reviews` is every `reviews_with_body` entry whose `submittedAt` is at or after the
-    most recent PR-level issue comment across the whole PR (or every one of them, if no PR-level
-    comment exists yet) — i.e. nothing has been posted on the PR since that review went up, using
-    the single most recent comment as the cutover point rather than comparing each review against
-    every comment individually (if the newest comment postdates a review, some comment necessarily
-    does; if it doesn't, none can). A review with no `submittedAt` (not yet actually submitted) is
-    excluded rather than treated as always-unresponded.
+    most recent PR-level issue comment authored by the currently-authenticated `gh` identity across
+    the whole PR (or every one of them, if that identity has posted no PR-level comment yet) — i.e.
+    this workflow has not posted anything on the PR since that review went up. Comments from any
+    other account are ignored for this purpose: an unrelated bystander, bot, or CI notification
+    commenting on the PR carries no evidence it addressed any specific review's feedback, and using
+    it as the cutover would silently mark that review as responded-to. A review with no
+    `submittedAt` (not yet actually submitted) is excluded rather than treated as always-unresponded.
 
     `codex_approved` is `True` when a "+1" reaction from a `chatgpt-codex-connector`-prefixed login
-    exists on the PR itself at the moment of this call — see `_fetch_pr_reactions`.
+    exists on the PR itself at the moment of this call *and* that reaction's own timestamp is at or
+    after the PR's current head commit's date — see `_fetch_pr_reactions` and
+    `_fetch_latest_commit_date`. Without that comparison, a reaction left approving an earlier
+    revision would keep reporting as approval indefinitely, even after a later push the reaction
+    never actually saw.
 
     Args:
         owner: Repository owner login.
         repo: Repository name.
         pr: Pull request number.
-        deadline: A `time.monotonic()` timestamp the caller wants this call's four `gh`
+        deadline: A `time.monotonic()` timestamp the caller wants this call's six `gh`
             invocations to respect — see `gh_timeout_budget`. `None` means no deadline.
 
     Returns:
         Totals plus every currently-unresolved thread, every unresponded review, and whether
-        Codex's approval reaction is present right now.
+        Codex's approval reaction is present right now for the current revision.
     """
     thread_pages = _fetch_pages(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
     review_pages = _fetch_review_pages(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
     issue_comments = _fetch_issue_comments(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
     reactions = _fetch_pr_reactions(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
+    authenticated_login = _fetch_authenticated_login(gh_timeout=gh_timeout_budget(deadline))
+    latest_commit_date = _fetch_latest_commit_date(owner, repo, pr, gh_timeout=gh_timeout_budget(deadline))
 
     all_threads = [node for page in thread_pages for node in page.nodes]
     all_reviews = [node for page in review_pages for node in page.nodes]
@@ -335,13 +394,23 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
     ]
     reviews_with_body = [review for review in all_reviews if review.body.strip()]
 
-    latest_comment_at = max((comment.created_at for comment in issue_comments), default=None)
+    latest_own_comment_at = max(
+        (
+            comment.created_at
+            for comment in issue_comments
+            if comment.user is not None and comment.user.login == authenticated_login
+        ),
+        default=None,
+    )
     unresponded_reviews = [
         review
         for review in reviews_with_body
-        if review.submittedAt is not None and (latest_comment_at is None or latest_comment_at <= review.submittedAt)
+        if review.submittedAt is not None
+        and (latest_own_comment_at is None or latest_own_comment_at <= review.submittedAt)
     ]
-    codex_approved = any(_is_codex_thumbs_up(reaction) for reaction in reactions)
+    codex_approved = any(
+        _is_codex_thumbs_up(reaction) and reaction.created_at >= latest_commit_date for reaction in reactions
+    )
 
     return FetchResult(
         reviews_count=review_pages[0].totalCount,

@@ -14,7 +14,19 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-__all__ = ["CommentNode", "FetchResult", "IssueComment", "Reaction", "ReviewNode", "UnresolvedThread", "WatchResult"]
+__all__ = [
+    "Author",
+    "CommentNode",
+    "FetchResult",
+    "GitCommit",
+    "GitCommitter",
+    "IssueComment",
+    "PullRequestCommit",
+    "Reaction",
+    "ReviewNode",
+    "UnresolvedThread",
+    "WatchResult",
+]
 
 
 class Author(BaseModel):
@@ -117,23 +129,61 @@ class UnresolvedThread(BaseModel):
 class IssueComment(BaseModel):
     """One PR-level (issue) comment, in the shape GitHub's REST API returns it.
 
-    Only `created_at` is needed: `pr_review_gh.build_fetch_result` uses the most recent of these
-    across the whole PR as the "has anyone followed up since this review posted" signal for
-    `unresponded_reviews` — see that function's docstring.
+    `created_at` and `user` are the only fields needed: `pr_review_gh.build_fetch_result` uses the
+    most recent comment authored by the currently-authenticated `gh` identity — not any comment
+    from any account — as the "the running workflow has since followed up on this review" signal
+    for `unresponded_reviews`. Restricting to that one identity matters: a PR-level comment from an
+    unrelated bystander, bot, or CI notification carries no evidence it addressed any specific
+    review's feedback, and without an author to filter on, any such comment would silently mark
+    every earlier bodied review as responded-to. `user` is `None` for a comment left by an account
+    that has since been deleted, same null pattern as `CommentNode.author`.
     """
 
     created_at: datetime
+    user: Author | None
 
 
 class Reaction(BaseModel):
     """One reaction left on the PR itself, in the shape GitHub's REST reactions API returns it.
 
     `user` is `None` for a reaction left by an account that has since been deleted, same null
-    pattern as `CommentNode.author` and `ReviewNode.author`.
+    pattern as `CommentNode.author` and `ReviewNode.author`. `created_at` lets
+    `pr_review_gh.build_fetch_result` require Codex's approval reaction to postdate the PR's latest
+    commit — a reaction left on an earlier revision is stale and must not be reported as approval
+    of the current one.
     """
 
     content: str
     user: Author | None
+    created_at: datetime
+
+
+class GitCommitter(BaseModel):
+    """The raw git `committer` identity on a commit, in the shape GitHub's REST API returns it.
+
+    Distinct from the GitHub account object REST also calls `committer` at the top level of a
+    commit list entry (which is `None` for a commit whose author has no linked GitHub account):
+    this is the git-native field nested under `commit`, always present because git itself requires
+    every commit to carry committer information.
+    """
+
+    date: datetime
+
+
+class GitCommit(BaseModel):
+    """The raw git commit object nested under one entry of the PR-commits REST endpoint."""
+
+    committer: GitCommitter
+
+
+class PullRequestCommit(BaseModel):
+    """One commit from `GET /repos/{owner}/{repo}/pulls/{pr}/commits`.
+
+    Commits are listed oldest-first per GitHub's REST API — the last element is always the PR's
+    current head commit.
+    """
+
+    commit: GitCommit
 
 
 class FetchResult(BaseModel):

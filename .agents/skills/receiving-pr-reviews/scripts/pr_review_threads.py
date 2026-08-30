@@ -61,8 +61,8 @@ _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 # unguarded poll there is starved to that floor and reliably raises `TimeoutExpired` — not a
 # flaky network failure. `watch`'s loop skips a poll once the remaining budget drops below this,
 # rather than attempting one that is near-certain to fail.
-# ponytail: 5.0 is an unmeasured heuristic, not a proven-sufficient margin for four sequential `gh
-# api` round trips — `build_fetch_result` makes four such calls, and if the earlier ones eat most
+# ponytail: 5.0 is an unmeasured heuristic, not a proven-sufficient margin for six sequential `gh
+# api` round trips — `build_fetch_result` makes six such calls, and if the earlier ones eat most
 # of this budget the last can still be starved. The exception handler around the poll in `watch`
 # is the real backstop for that case, not this guard alone; raise this value if starvation is
 # observed in practice with the guard already in place.

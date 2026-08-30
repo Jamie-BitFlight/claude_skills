@@ -12,9 +12,11 @@
 
 Covers: `pr_review_gh.build_fetch_result`'s multi-page flattening, resolved-thread filtering,
 `comments_truncated` derivation, `reviews_with_body` filtering (including a null `author`, which a
-deleted GitHub account produces), `unresponded_reviews` derivation against PR-level comment
-timing, and `codex_approved` reaction detection — all as one JSON-in/JSON-out pipeline test plus a
-matrix of focused unit tests against `build_fetch_result` directly. Also covers
+deleted GitHub account produces), `unresponded_reviews` derivation against the currently-
+authenticated `gh` identity's own PR-level comments (and its exclusion of comments from any other
+account, including Codex or another bystander), and `codex_approved` reaction detection scoped to
+reactions that postdate the PR's current head commit — all as one JSON-in/JSON-out pipeline test
+plus a matrix of focused unit tests against `build_fetch_result` directly. Also covers
 `FetchResult.has_outstanding_work` (the single trigger rule `watch` polls for) and `watch`'s own
 loop: returning immediately when the first fetch is already actionable, polling until it becomes
 actionable, timing out when it never does, and the deadline-budget/transient-failure mechanics
@@ -41,6 +43,9 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 runner = CliRunner()
+
+_AGENT_LOGIN = "reviewing-agent"
+_OLD_COMMIT_DATE = datetime(2025, 12, 1, tzinfo=UTC)
 
 
 def _thread_page(*, has_next_page: bool, nodes: list[dict[str, object]], total_count: int) -> dict[str, object]:
@@ -113,20 +118,32 @@ def _empty_threads() -> list[pr_review_gh.ReviewThreadsConnection]:
     return [pr_review_gh.ReviewThreadsConnection(totalCount=0, nodes=[])]
 
 
+def _patch_identity_and_commit_date(
+    mocker: MockerFixture, *, login: str = _AGENT_LOGIN, commit_date: datetime = _OLD_COMMIT_DATE
+) -> None:
+    """Stub the two `build_fetch_result` calls every matrix test below needs but does not itself
+    exercise — the authenticated identity (for `unresponded_reviews`) and the head commit date
+    (for `codex_approved`) — so each test's own `_fetch_*` mocks stay focused on what it covers.
+    """
+    mocker.patch.object(pr_review_gh, "_fetch_authenticated_login", return_value=login)
+    mocker.patch.object(pr_review_gh, "_fetch_latest_commit_date", return_value=commit_date)
+
+
 # --- fetch: full JSON-in/JSON-out pipeline -----------------------------------------------------
 
 
 def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: MockerFixture) -> None:
     """`fetch` flattens multi-page thread results, dropping resolved threads and counting right,
-    and derives `unresponded_reviews` and `codex_approved` from the issue-comments and reactions
-    calls in the same pipeline.
+    and derives `unresponded_reviews` and `codex_approved` from the issue-comments, reactions,
+    authenticated-identity, and head-commit-date calls in the same pipeline.
 
     Two thread pages are fed to `run_gh` (page 1 has a resolved and an unresolved thread; page
     2's lone thread has `comments.pageInfo.hasNextPage: true`). One reviews page has a review with
     a null `author` (a deleted account) alongside an empty-body review — both must be parsed
     without error, and only the non-empty-body review must survive into `reviews_with_body`. One
-    PR-level comment postdates the review, so it must NOT appear in `unresponded_reviews`. One
-    reaction is Codex's "+1", so `codex_approved` must be `True`.
+    PR-level comment, authored by the same identity `gh` is authenticated as, postdates the
+    review, so it must NOT appear in `unresponded_reviews`. One reaction is Codex's "+1", and it
+    postdates the PR's head commit, so `codex_approved` must be `True`.
     """
     thread_pages = [
         _thread_page(
@@ -200,12 +217,24 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
             ],
         )
     ]
-    issue_comments_raw = _rest_pages({"created_at": "2026-01-02T00:00:00Z"})
-    reactions_raw = _rest_pages({"content": "+1", "user": {"login": "chatgpt-codex-connector[bot]"}})
+    issue_comments_raw = _rest_pages({"created_at": "2026-01-02T00:00:00Z", "user": {"login": _AGENT_LOGIN}})
+    reactions_raw = _rest_pages({
+        "content": "+1",
+        "user": {"login": "chatgpt-codex-connector[bot]"},
+        "created_at": "2026-01-03T00:00:00Z",
+    })
+    commits_raw = _rest_pages({"commit": {"committer": {"date": "2026-01-01T12:00:00Z"}}})
     mocker.patch.object(
         pr_review_gh,
         "run_gh",
-        side_effect=[json.dumps(thread_pages), json.dumps(reviews_pages), issue_comments_raw, reactions_raw],
+        side_effect=[
+            json.dumps(thread_pages),
+            json.dumps(reviews_pages),
+            issue_comments_raw,
+            reactions_raw,
+            _AGENT_LOGIN,
+            commits_raw,
+        ],
     )
 
     result = runner.invoke(app, ["fetch", "--pr", "3208"])
@@ -221,8 +250,9 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
     assert data["reviews_count"] == 2
     assert len(data["reviews_with_body"]) == 1
     assert data["reviews_with_body"][0]["author"]["login"] == "codex"
-    # The PR-level comment (2026-01-02) postdates R1's review (2026-01-01) — already followed up.
+    # The agent's own PR-level comment (2026-01-02) postdates R1's review (2026-01-01) — followed up.
     assert data["unresponded_reviews"] == []
+    # Codex's "+1" (2026-01-03) postdates the head commit (2026-01-01T12:00) — a live approval.
     assert data["codex_approved"] is True
 
 
@@ -236,34 +266,65 @@ def test_build_fetch_result_unresponded_when_no_pr_comments_exist(mocker: Mocker
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
     mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
 
     result = build_fetch_result("o", "r", 1)
 
     assert result.unresponded_reviews == [review]
 
 
-def test_build_fetch_result_responded_when_pr_comment_postdates_review(mocker: MockerFixture) -> None:
-    """A review is excluded from `unresponded_reviews` once a PR-level comment postdates it."""
+def test_build_fetch_result_responded_when_own_pr_comment_postdates_review(mocker: MockerFixture) -> None:
+    """A review is excluded from `unresponded_reviews` once the authenticated identity's own
+    PR-level comment postdates it.
+    """
     review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
-    comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC))
+    comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
     mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
 
     result = build_fetch_result("o", "r", 1)
 
     assert result.unresponded_reviews == []
 
 
-def test_build_fetch_result_unresponded_when_pr_comment_predates_review(mocker: MockerFixture) -> None:
-    """A review submitted after the newest PR-level comment is still unresponded."""
+def test_build_fetch_result_unresponded_when_own_pr_comment_predates_review(mocker: MockerFixture) -> None:
+    """A review submitted after the newest of the authenticated identity's own PR-level comments
+    is still unresponded.
+    """
     review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
-    comment = IssueComment(created_at=datetime(2026, 1, 1, tzinfo=UTC))
+    comment = IssueComment(created_at=datetime(2026, 1, 1, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
     mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_unresponded_when_only_other_accounts_commented(mocker: MockerFixture) -> None:
+    """A review stays unresponded when a PR-level comment postdates it but was authored by an
+    account other than the currently-authenticated `gh` identity.
+
+    Regression coverage for a Codex review on the previous design: any PR-level comment at all —
+    an unrelated bystander, a bot, a CI notification — used to silence the review even though
+    nothing evidenced that comment actually addressed the review's feedback.
+    """
+    review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    unrelated_comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login="a-bystander"))
+    deleted_account_comment = IssueComment(created_at=datetime(2026, 1, 3, tzinfo=UTC), user=None)
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(
+        pr_review_gh, "_fetch_issue_comments", return_value=[unrelated_comment, deleted_account_comment]
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
 
     result = build_fetch_result("o", "r", 1)
 
@@ -277,31 +338,58 @@ def test_build_fetch_result_excludes_review_with_no_submitted_at(mocker: MockerF
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
     mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
 
     result = build_fetch_result("o", "r", 1)
 
     assert result.unresponded_reviews == []
 
 
-def test_build_fetch_result_codex_approved_true_for_bot_thumbs_up(mocker: MockerFixture) -> None:
-    """`codex_approved` is `True` when the bot's "+1" reaction is present on the PR."""
-    reaction = Reaction(content="+1", user=Author(login="chatgpt-codex-connector[bot]"))
+def test_build_fetch_result_codex_approved_true_when_reaction_postdates_head_commit(mocker: MockerFixture) -> None:
+    """`codex_approved` is `True` when the bot's "+1" reaction postdates the PR's head commit."""
+    reaction = Reaction(
+        content="+1", user=Author(login="chatgpt-codex-connector[bot]"), created_at=datetime(2026, 1, 2, tzinfo=UTC)
+    )
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
     mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[reaction])
+    _patch_identity_and_commit_date(mocker, commit_date=datetime(2026, 1, 1, tzinfo=UTC))
 
     result = build_fetch_result("o", "r", 1)
 
     assert result.codex_approved is True
 
 
+def test_build_fetch_result_codex_approved_false_when_reaction_predates_head_commit(mocker: MockerFixture) -> None:
+    """`codex_approved` is `False` when Codex's "+1" reaction predates the PR's current head
+    commit — a stale approval left on an earlier revision must not be reported as current.
+
+    Regression coverage for a Codex review flagging that the pre-fix design never compared a
+    reaction's timestamp against anything: once Codex approved once, the reaction persisted and
+    every later revision — including ones Codex never actually looked at — kept reporting as
+    approved.
+    """
+    reaction = Reaction(
+        content="+1", user=Author(login="chatgpt-codex-connector[bot]"), created_at=datetime(2026, 1, 1, tzinfo=UTC)
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[reaction])
+    _patch_identity_and_commit_date(mocker, commit_date=datetime(2026, 1, 2, tzinfo=UTC))
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.codex_approved is False
+
+
 @pytest.mark.parametrize(
     "reaction",
     [
-        Reaction(content="heart", user=Author(login="chatgpt-codex-connector[bot]")),
-        Reaction(content="+1", user=Author(login="some-human")),
-        Reaction(content="+1", user=None),
+        Reaction(content="heart", user=Author(login="chatgpt-codex-connector[bot]"), created_at=_OLD_COMMIT_DATE),
+        Reaction(content="+1", user=Author(login="some-human"), created_at=_OLD_COMMIT_DATE),
+        Reaction(content="+1", user=None, created_at=_OLD_COMMIT_DATE),
     ],
     ids=["wrong-content", "wrong-user", "null-user"],
 )
@@ -312,8 +400,18 @@ def test_is_codex_thumbs_up_false_for_non_matching_reactions(reaction: Reaction)
 
 def test_is_codex_thumbs_up_true_regardless_of_bot_suffix() -> None:
     """Matches both the GraphQL-style login (no `[bot]`) and REST-style login (`[bot]` suffix)."""
-    assert _is_codex_thumbs_up(Reaction(content="+1", user=Author(login="chatgpt-codex-connector"))) is True
-    assert _is_codex_thumbs_up(Reaction(content="+1", user=Author(login="chatgpt-codex-connector[bot]"))) is True
+    assert (
+        _is_codex_thumbs_up(
+            Reaction(content="+1", user=Author(login="chatgpt-codex-connector"), created_at=_OLD_COMMIT_DATE)
+        )
+        is True
+    )
+    assert (
+        _is_codex_thumbs_up(
+            Reaction(content="+1", user=Author(login="chatgpt-codex-connector[bot]"), created_at=_OLD_COMMIT_DATE)
+        )
+        is True
+    )
 
 
 # --- FetchResult.has_outstanding_work -----------------------------------------------------------
