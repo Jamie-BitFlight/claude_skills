@@ -63,12 +63,15 @@ _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
 # unguarded poll there is starved to that floor and reliably raises `TimeoutExpired` — not a
 # flaky network failure. `watch`'s loop skips a poll once the remaining budget drops below this,
 # rather than attempting one that is near-certain to fail.
-# ponytail: 5.0 is an unmeasured heuristic, not a proven-sufficient margin for seven sequential `gh
-# api` round trips — `build_fetch_result` makes seven such calls, and if the earlier ones eat most
-# of this budget the last can still be starved. The exception handler around the poll in `watch`
-# is the real backstop for that case, not this guard alone; raise this value if starvation is
-# observed in practice with the guard already in place.
-_MIN_POLL_BUDGET_SECONDS = 5.0
+# `build_fetch_result` makes seven sequential `gh api` round trips per poll — 20.0 budgets a
+# conservative ~2.85s each, comfortably above typical single-digit-hundred-millisecond latency
+# but not a measured worst case. This was 5.0 when `build_fetch_result` made two calls; a Codex
+# review caught that it was never raised when the call count grew to seven, which would starve a
+# real final poll (see the exception handler note below for why that guard alone isn't enough).
+# ponytail: still an unmeasured heuristic, not a proven-sufficient margin — the exception handler
+# around the poll in `watch` is the real backstop, not this guard alone; raise this value further
+# if starvation is observed in practice with the guard already in place.
+_MIN_POLL_BUDGET_SECONDS = 20.0
 
 
 @app.command()

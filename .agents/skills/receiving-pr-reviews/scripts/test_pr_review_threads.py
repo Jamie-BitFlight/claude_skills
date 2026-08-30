@@ -13,15 +13,16 @@
 Covers: `pr_review_gh.build_fetch_result`'s multi-page flattening, resolved-thread filtering,
 `comments_truncated` derivation, `reviews_with_body` filtering (including a null `author`, which a
 deleted GitHub account produces), `unresponded_reviews` derivation against the currently-
-authenticated `gh` identity's own PR-level comments (and its exclusion of comments from any other
-account, including Codex or another bystander) using each review's effective timestamp — the later
-of `submittedAt` and `lastEditedAt`, so a post-response edit is not silently skipped forever — and
-`codex_approved` reaction detection scoped to reactions that postdate the PR's current head commit
-— all as one JSON-in/JSON-out pipeline test plus a matrix of focused unit tests against
-`build_fetch_result` directly. Also covers `FetchResult.has_outstanding_work` (the single trigger
-rule `watch` polls for) and `watch`'s own loop: returning immediately when the first fetch is
-already actionable, polling until it becomes actionable, timing out when it never does, and the
-deadline-budget/transient-failure mechanics carried over from the pre-existing polling loop.
+authenticated `gh` identity's own PR-level comments — requiring each comment to explicitly quote a
+review's own `url` and postdate its effective timestamp (the later of `submittedAt`/`lastEditedAt`)
+before it counts as a response to that specific review, not merely inferred from chronological
+order or excluded only by author — and `codex_approved` reaction detection scoped to reactions that
+postdate the PR's current head commit — all as one JSON-in/JSON-out pipeline test plus a matrix of
+focused unit tests against `build_fetch_result` directly. Also covers `FetchResult.has_outstanding_work`
+(the single trigger rule `watch` polls for) and `watch`'s own loop: returning immediately when the
+first fetch is already actionable, polling until it becomes actionable, timing out when it never
+does, and the deadline-budget/transient-failure mechanics carried over from the pre-existing polling
+loop.
 """
 
 from __future__ import annotations
@@ -88,6 +89,11 @@ def _rest_pages(*items: dict[str, object]) -> str:
     return json.dumps([list(items)])
 
 
+def _review_url(review_id: str) -> str:
+    """A review's canonical GitHub permalink, derived from its id for test fixtures only."""
+    return f"https://github.com/o/r/pull/1#pullrequestreview-{review_id}"
+
+
 def _review(
     review_id: str,
     *,
@@ -103,7 +109,16 @@ def _review(
         body=body,
         submittedAt=submitted_at,
         lastEditedAt=last_edited_at,
+        url=_review_url(review_id),
     )
+
+
+def _own_comment(
+    created_at: datetime, *, references: ReviewNode | None = None, login: str = _AGENT_LOGIN
+) -> IssueComment:
+    """Build an own PR-level comment, optionally quoting a specific review's `url`."""
+    body = f"Addressed {references.url}." if references is not None else "An unrelated administrative note."
+    return IssueComment(created_at=created_at, user=Author(login=login), body=body)
 
 
 def _state(
@@ -163,9 +178,9 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
     2's lone thread has `comments.pageInfo.hasNextPage: true`). One reviews page has a review with
     a null `author` (a deleted account) alongside an empty-body review — both must be parsed
     without error, and only the non-empty-body review must survive into `reviews_with_body`. One
-    PR-level comment, authored by the same identity `gh` is authenticated as, postdates the
-    review, so it must NOT appear in `unresponded_reviews`. One reaction is Codex's "+1", and it
-    postdates the PR's head commit, so `codex_approved` must be `True`.
+    PR-level comment, authored by the same identity `gh` is authenticated as and quoting R1's own
+    `url`, postdates the review, so it must NOT appear in `unresponded_reviews`. One reaction is
+    Codex's "+1", and it postdates the PR's head commit, so `codex_approved` must be `True`.
     """
     thread_pages = [
         _thread_page(
@@ -224,6 +239,7 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
             ],
         ),
     ]
+    r1_url = _review_url("R1")
     reviews_pages = [
         _reviews_page(
             total_count=2,
@@ -235,6 +251,7 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
                     "body": "Some feedback",
                     "submittedAt": "2026-01-01T00:00:00Z",
                     "lastEditedAt": None,
+                    "url": r1_url,
                 },
                 {
                     "id": "R2",
@@ -243,11 +260,16 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
                     "body": "",
                     "submittedAt": "2026-01-01T00:00:00Z",
                     "lastEditedAt": None,
+                    "url": _review_url("R2"),
                 },
             ],
         )
     ]
-    issue_comments_raw = _rest_pages({"created_at": "2026-01-02T00:00:00Z", "user": {"login": _AGENT_LOGIN}})
+    issue_comments_raw = _rest_pages({
+        "created_at": "2026-01-02T00:00:00Z",
+        "user": {"login": _AGENT_LOGIN},
+        "body": f"Addressed {r1_url}.",
+    })
     reactions_raw = _rest_pages({
         "content": "+1",
         "user": {"login": "chatgpt-codex-connector[bot]"},
@@ -312,12 +334,34 @@ def test_build_fetch_result_unresponded_when_no_pr_comments_exist(mocker: Mocker
     assert result.unresponded_reviews == [review]
 
 
-def test_build_fetch_result_responded_when_own_pr_comment_postdates_review(mocker: MockerFixture) -> None:
-    """A review is excluded from `unresponded_reviews` once the authenticated identity's own
-    PR-level comment postdates it.
+def test_build_fetch_result_unresponded_when_own_comment_does_not_reference_it(mocker: MockerFixture) -> None:
+    """A review stays unresponded when the authenticated identity's own comment postdates it but
+    never actually references it.
+
+    Regression coverage for a Codex review with fresh evidence from this very PR: an unrelated
+    administrative comment this workflow posts — e.g. the cross-thread sequencing/summary comment
+    its own SKILL.md step 6 sanctions — happens to postdate a review, but chronological order alone
+    cannot distinguish that from a comment that actually engaged with the review's feedback.
     """
     review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
-    comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    unrelated_own_comment = _own_comment(datetime(2026, 1, 2, tzinfo=UTC))
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[unrelated_own_comment])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_responded_when_own_pr_comment_postdates_review(mocker: MockerFixture) -> None:
+    """A review is excluded from `unresponded_reviews` once the authenticated identity's own
+    PR-level comment postdates it and explicitly quotes its `url`.
+    """
+    review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
+    comment = _own_comment(datetime(2026, 1, 2, tzinfo=UTC), references=review)
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
@@ -330,11 +374,11 @@ def test_build_fetch_result_responded_when_own_pr_comment_postdates_review(mocke
 
 
 def test_build_fetch_result_unresponded_when_own_pr_comment_predates_review(mocker: MockerFixture) -> None:
-    """A review submitted after the newest of the authenticated identity's own PR-level comments
-    is still unresponded.
+    """A review submitted after the newest of the authenticated identity's own referencing
+    PR-level comments is still unresponded.
     """
     review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
-    comment = IssueComment(created_at=datetime(2026, 1, 1, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    comment = _own_comment(datetime(2026, 1, 1, tzinfo=UTC), references=review)
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
@@ -348,7 +392,7 @@ def test_build_fetch_result_unresponded_when_own_pr_comment_predates_review(mock
 
 def test_build_fetch_result_unresponded_when_review_edited_after_own_response(mocker: MockerFixture) -> None:
     """A review edited after this workflow already responded is unresponded again — its edit
-    postdates the response even though its original `submittedAt` predates it.
+    postdates the referencing response even though its original `submittedAt` predates it.
 
     Regression coverage for a Codex review: comparing only `submittedAt` let an editor add new
     feedback to an already-submitted review after the workflow had already replied, and that new
@@ -361,7 +405,7 @@ def test_build_fetch_result_unresponded_when_review_edited_after_own_response(mo
         submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
         last_edited_at=datetime(2026, 1, 3, tzinfo=UTC),
     )
-    comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    comment = _own_comment(datetime(2026, 1, 2, tzinfo=UTC), references=review)
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
@@ -374,8 +418,8 @@ def test_build_fetch_result_unresponded_when_review_edited_after_own_response(mo
 
 
 def test_build_fetch_result_responded_when_own_comment_postdates_review_edit(mocker: MockerFixture) -> None:
-    """A review is still responded-to when the workflow's own comment postdates its latest edit,
-    not just its original submission.
+    """A review is still responded-to when the workflow's own referencing comment postdates its
+    latest edit, not just its original submission.
     """
     review = _review(
         "R1",
@@ -383,7 +427,7 @@ def test_build_fetch_result_responded_when_own_comment_postdates_review_edit(moc
         submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
         last_edited_at=datetime(2026, 1, 2, tzinfo=UTC),
     )
-    comment = IssueComment(created_at=datetime(2026, 1, 3, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    comment = _own_comment(datetime(2026, 1, 3, tzinfo=UTC), references=review)
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
@@ -396,16 +440,20 @@ def test_build_fetch_result_responded_when_own_comment_postdates_review_edit(moc
 
 
 def test_build_fetch_result_unresponded_when_only_other_accounts_commented(mocker: MockerFixture) -> None:
-    """A review stays unresponded when a PR-level comment postdates it but was authored by an
-    account other than the currently-authenticated `gh` identity.
+    """A review stays unresponded when a PR-level comment postdates it and references its `url`
+    but was authored by an account other than the currently-authenticated `gh` identity.
 
     Regression coverage for a Codex review on the previous design: any PR-level comment at all —
     an unrelated bystander, a bot, a CI notification — used to silence the review even though
     nothing evidenced that comment actually addressed the review's feedback.
     """
     review = _review("R1", body="feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
-    unrelated_comment = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login="a-bystander"))
-    deleted_account_comment = IssueComment(created_at=datetime(2026, 1, 3, tzinfo=UTC), user=None)
+    unrelated_comment = IssueComment(
+        created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login="a-bystander"), body=f"Addressed {review.url}."
+    )
+    deleted_account_comment = IssueComment(
+        created_at=datetime(2026, 1, 3, tzinfo=UTC), user=None, body=f"Addressed {review.url}."
+    )
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
     mocker.patch.object(
@@ -419,20 +467,19 @@ def test_build_fetch_result_unresponded_when_only_other_accounts_commented(mocke
     assert result.unresponded_reviews == [review]
 
 
-def test_build_fetch_result_older_review_stays_unresponded_when_only_newer_one_addressed(mocker: MockerFixture) -> None:
-    """Responding to only the newer of two concurrently-outstanding reviews does not also clear
-    the older one.
+def test_build_fetch_result_older_review_stays_unresponded_when_only_newer_one_referenced(
+    mocker: MockerFixture,
+) -> None:
+    """A comment that quotes only the newer of two concurrently-outstanding reviews' URLs does not
+    also clear the older one, even though it postdates both.
 
-    Regression coverage for a Codex review: comparing every review against a single whole-PR
-    "latest own comment" timestamp let one comment addressing only the newest review silently
-    mark every older, still-unaddressed review as responded too, since the newest comment
-    trivially postdates all of them. `_unresponded_reviews` instead pairs at most one comment to
-    one review, newest-first, so a comment can only clear the review it actually responds to.
+    Regression coverage for a Codex review: a count-only "one comment per review" pairing based on
+    chronological order alone could still misattribute a comment to the wrong review; requiring an
+    explicit `url` reference ties a comment to the specific review it names instead.
     """
     older_review = _review("R1", body="first round of feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
     newer_review = _review("R2", body="second round of feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
-    # One own comment, posted after both reviews — but it only actually addressed the newer one.
-    comment = IssueComment(created_at=datetime(2026, 1, 3, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    comment = _own_comment(datetime(2026, 1, 3, tzinfo=UTC), references=newer_review)
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([older_review, newer_review])])
     mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
@@ -444,17 +491,20 @@ def test_build_fetch_result_older_review_stays_unresponded_when_only_newer_one_a
     assert result.unresponded_reviews == [older_review]
 
 
-def test_build_fetch_result_both_reviews_responded_when_each_has_own_comment(mocker: MockerFixture) -> None:
-    """Two concurrently-outstanding reviews are both cleared when each has its own distinct
-    postdating comment.
+def test_build_fetch_result_both_reviews_responded_when_one_comment_references_both(mocker: MockerFixture) -> None:
+    """One comment that quotes both reviews' URLs clears both — a review is not limited to being
+    addressed by only one comment.
     """
     older_review = _review("R1", body="first round of feedback", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))
-    newer_review = _review("R2", body="second round of feedback", submitted_at=datetime(2026, 1, 3, tzinfo=UTC))
-    comment_for_older = IssueComment(created_at=datetime(2026, 1, 2, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
-    comment_for_newer = IssueComment(created_at=datetime(2026, 1, 4, tzinfo=UTC), user=Author(login=_AGENT_LOGIN))
+    newer_review = _review("R2", body="second round of feedback", submitted_at=datetime(2026, 1, 2, tzinfo=UTC))
+    comment = IssueComment(
+        created_at=datetime(2026, 1, 3, tzinfo=UTC),
+        user=Author(login=_AGENT_LOGIN),
+        body=f"Addressed both {older_review.url} and {newer_review.url}.",
+    )
     mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
     mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([older_review, newer_review])])
-    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment_for_older, comment_for_newer])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[comment])
     mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
     _patch_identity_and_commit_date(mocker)
 
@@ -700,10 +750,10 @@ def test_watch_polls_until_thread_becomes_unresolved(mocker: MockerFixture) -> N
     mocker.patch.object(pr_review_threads, "build_fetch_result", side_effect=[_state(), _state(unresolved_count=1)])
     mocker.patch.object(pr_review_threads.time, "sleep")
 
-    # timeout-seconds must clear _MIN_POLL_BUDGET_SECONDS with real headroom: with time.sleep
-    # mocked to a no-op, almost no wall-clock time elapses between polls, so a timeout right at
-    # (or below) the guard threshold spuriously trips it before this test's second poll runs.
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "20"])
+    # timeout-seconds must clear _MIN_POLL_BUDGET_SECONDS (20.0) with real headroom: with
+    # time.sleep mocked to a no-op, almost no wall-clock time elapses between polls, so a timeout
+    # too close to the guard threshold spuriously trips it before this test's second poll runs.
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "40"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -737,9 +787,9 @@ def test_watch_skips_final_poll_when_budget_too_low(mocker: MockerFixture) -> No
     """
     fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
     mocker.patch.object(pr_review_threads.time, "sleep")
-    # 0.0 (deadline = 0.0 + 100), 0.0 (loop condition), 0.0 (sleep-duration calc), 96.0 (budget
-    # check: 100.0 - 96.0 = 4.0 < _MIN_POLL_BUDGET_SECONDS's 5.0 — guard fires, loop breaks).
-    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 96.0])
+    # 0.0 (deadline = 0.0 + 100), 0.0 (loop condition), 0.0 (sleep-duration calc), 85.0 (budget
+    # check: 100.0 - 85.0 = 15.0 < _MIN_POLL_BUDGET_SECONDS's 20.0 — guard fires, loop breaks).
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 85.0])
 
     result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "100"])
 
@@ -762,7 +812,9 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
 
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "20"])
+    # 40s clears the 20.0s `_MIN_POLL_BUDGET_SECONDS` guard with real headroom (see the comment on
+    # `test_watch_polls_until_thread_becomes_unresolved` above).
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "40"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
@@ -810,27 +862,29 @@ def test_watch_polls_final_leg_instead_of_skipping_it(mocker: MockerFixture) -> 
     """`watch` attempts a final poll on a normal-length last leg instead of sleeping straight to
     `deadline` and skipping it.
 
-    Regression coverage for a Codex review on the earlier fix: with `--timeout-seconds 100` and
-    `--interval-seconds 90`, after the first poll at t=90 only 10s remain — under the pre-fix
-    sleep formula (`min(interval_seconds, deadline - now)`), the second poll would sleep the full
-    10s straight to `deadline` (t=100), where the guard's `deadline - now < _MIN_POLL_BUDGET_SECONDS`
-    (100-100=0 < 5) fires and skips it entirely, leaving that whole final stretch unconfirmed even
-    on total success. The fixed formula reserves `_MIN_POLL_BUDGET_SECONDS`, sleeping only to
-    t=95 (`min(90, 100-5-90)=5`), where `100-95=5` does *not* trip the guard, so the second poll
-    is attempted and finds the new activity it otherwise would have missed for this call entirely.
+    Regression coverage for a Codex review on the earlier fix: with `--timeout-seconds 115` and
+    `--interval-seconds 90`, after the first poll at t=90, `_MIN_POLL_BUDGET_SECONDS`'s 20.0s
+    reservation leaves only 5s for the second sleep — under the pre-fix sleep formula
+    (`min(interval_seconds, deadline - now)`), the second poll would instead sleep the full 90s
+    straight past `deadline` (capped at 25s, landing at t=115), where the guard's
+    `deadline - now < _MIN_POLL_BUDGET_SECONDS` (115-115=0 < 20) fires and skips it entirely,
+    leaving that whole final stretch unconfirmed even on total success. The fixed formula reserves
+    `_MIN_POLL_BUDGET_SECONDS`, sleeping only to t=95 (`min(90, 115-20-90)=5`), where `115-95=20`
+    does *not* trip the guard, so the second poll is attempted and finds the new activity it
+    otherwise would have missed for this call entirely.
     """
     fetch_mock = mocker.patch.object(
         pr_review_threads, "build_fetch_result", side_effect=[_state(), _state(), _state(unresolved_count=1)]
     )
     mocker.patch.object(pr_review_threads.time, "sleep")
-    # 0.0 (deadline=100). Iter 1: 0.0 (loop cond), 0.0 (sleep calc: min(90,95)=90), 90.0 (guard:
-    # 100-90=10 ≥ 5) → poll succeeds, nothing outstanding. Iter 2: 90.0 (loop cond), 90.0 (sleep
-    # calc: min(90, 100-5-90=5)=5 — the fixed reservation, not the interval), 95.0 (guard:
-    # 100-95=5, not < 5) → poll attempted (would have been skipped under the pre-fix formula) and
+    # 0.0 (deadline=115). Iter 1: 0.0 (loop cond), 0.0 (sleep calc: min(90,95)=90), 90.0 (guard:
+    # 115-90=25 ≥ 20) → poll succeeds, nothing outstanding. Iter 2: 90.0 (loop cond), 90.0 (sleep
+    # calc: min(90, 115-20-90=5)=5 — the fixed reservation, not the interval), 95.0 (guard:
+    # 115-95=20, not < 20) → poll attempted (would have been skipped under the pre-fix formula) and
     # finds the unresolved thread.
     mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 0.0, 90.0, 90.0, 90.0, 95.0])
 
-    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "100"])
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "90", "--timeout-seconds", "115"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)

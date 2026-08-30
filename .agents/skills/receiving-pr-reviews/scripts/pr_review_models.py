@@ -107,6 +107,11 @@ class ReviewNode(BaseModel):
     already-submitted review after this workflow already responded is not silently skipped forever
     (a PR-level comment that postdates the original `submittedAt` but predates the edit would
     otherwise still count as having addressed content that did not exist yet when it was posted).
+    `url` is this review's canonical GitHub permalink — `pr_review_gh._unresponded_reviews` treats
+    an own PR-level comment quoting this URL as explicit evidence that comment addresses this
+    specific review, rather than inferring it purely from chronological order (which cannot
+    distinguish a comment that engaged with a review's feedback from an unrelated administrative
+    comment, e.g. a cross-thread sequencing decision, that merely happens to postdate it).
     """
 
     id: str
@@ -115,6 +120,7 @@ class ReviewNode(BaseModel):
     body: str
     submittedAt: datetime | None
     lastEditedAt: datetime | None
+    url: str
 
 
 class ReviewsConnection(BaseModel):
@@ -136,18 +142,17 @@ class UnresolvedThread(BaseModel):
 class IssueComment(BaseModel):
     """One PR-level (issue) comment, in the shape GitHub's REST API returns it.
 
-    `created_at` and `user` are the only fields needed: `pr_review_gh.build_fetch_result` uses the
-    most recent comment authored by the currently-authenticated `gh` identity — not any comment
-    from any account — as the "the running workflow has since followed up on this review" signal
-    for `unresponded_reviews`. Restricting to that one identity matters: a PR-level comment from an
-    unrelated bystander, bot, or CI notification carries no evidence it addressed any specific
-    review's feedback, and without an author to filter on, any such comment would silently mark
-    every earlier bodied review as responded-to. `user` is `None` for a comment left by an account
-    that has since been deleted, same null pattern as `CommentNode.author`.
+    `pr_review_gh._unresponded_reviews` treats a comment authored by the currently-authenticated
+    `gh` identity as evidence a specific review was addressed only when `body` quotes that review's
+    `ReviewNode.url` — restricting by author matters for the same reason as `CommentNode.author`
+    filtering elsewhere: a PR-level comment from an unrelated bystander, bot, or CI notification
+    carries no evidence it addressed any specific review's feedback. `user` is `None` for a comment
+    left by an account that has since been deleted, same null pattern as `CommentNode.author`.
     """
 
     created_at: datetime
     user: Author | None
+    body: str
 
 
 class Reaction(BaseModel):

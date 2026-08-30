@@ -57,7 +57,7 @@ query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
       reviews(first: 100, after: $endCursor) {
         totalCount
         pageInfo { hasNextPage endCursor }
-        nodes { id author { login } state body submittedAt lastEditedAt }
+        nodes { id author { login } state body submittedAt lastEditedAt url }
       }
     }
   }
@@ -410,43 +410,39 @@ def _review_effective_timestamp(review: ReviewNode) -> datetime:
     return max(review.submittedAt, review.lastEditedAt)
 
 
-def _unresponded_reviews(reviews_with_body: list[ReviewNode], own_comment_dates: list[datetime]) -> list[ReviewNode]:
-    """Which of `reviews_with_body` this workflow has not yet responded to.
+def _unresponded_reviews(reviews_with_body: list[ReviewNode], own_comments: list[IssueComment]) -> list[ReviewNode]:
+    """Which of `reviews_with_body` this workflow has not yet explicitly responded to.
 
-    Matches this workflow's own PR-level comments to bodied, already-submitted reviews newest
-    first, pairing at most one comment to each review: a single comment can only ever clear the
-    one review it is matched to, never every earlier still-outstanding review at once. Without
-    that pairing, one comment addressing only the newest of several concurrently-outstanding
-    reviews would satisfy a single whole-PR "latest comment" cutover and silently mark every
-    older, still-unaddressed review as responded too. A comment matched to a review is not
-    reusable for an older one; a comment older than the newest unmatched review is left for an
-    even older review it might still legitimately postdate. A review with no `submittedAt` (not
-    yet actually submitted) is excluded rather than treated as always-unresponded.
+    A review counts as responded only when at least one of this workflow's own PR-level comments
+    both quotes that review's own `url` (its canonical GitHub permalink) *and* postdates the
+    review's effective timestamp — the later of `submittedAt`/`lastEditedAt`, see
+    `_review_effective_timestamp`. Requiring an explicit reference, rather than inferring a match
+    purely from chronological order, prevents an unrelated administrative comment — e.g. a
+    cross-thread sequencing decision, explicitly sanctioned by the receiving-pr-reviews skill's own
+    workflow step 6 — from being mistaken for a response to whatever review happens to be newest at
+    the time it is posted. Requiring the reference to also postdate the review's effective
+    timestamp still catches an editor adding new feedback to an already-referenced review after the
+    fact. One comment referencing multiple reviews' URLs correctly clears all of them; no review is
+    limited to being "claimed" by only one comment. A review with no `submittedAt` (not yet actually
+    submitted) is excluded rather than treated as always-unresponded.
 
     Args:
         reviews_with_body: Every review whose summary text is non-empty, in any order.
-        own_comment_dates: Every PR-level comment timestamp authored by the currently-authenticated
-            `gh` identity, in any order.
+        own_comments: Every PR-level comment authored by the currently-authenticated `gh` identity,
+            in any order.
 
     Returns:
-        Every unresponded review, oldest first.
+        Every unresponded review, in `reviews_with_body`'s original order.
     """
-    submitted_newest_first = sorted(
-        (review for review in reviews_with_body if review.submittedAt is not None),
-        key=_review_effective_timestamp,
-        reverse=True,
-    )
-    comments_newest_first = sorted(own_comment_dates, reverse=True)
-    unresponded_newest_first: list[ReviewNode] = []
-    comment_index = 0
-    for review in submitted_newest_first:
-        if comment_index < len(comments_newest_first) and comments_newest_first[
-            comment_index
-        ] >= _review_effective_timestamp(review):
-            comment_index += 1
-        else:
-            unresponded_newest_first.append(review)
-    return list(reversed(unresponded_newest_first))
+    return [
+        review
+        for review in reviews_with_body
+        if review.submittedAt is not None
+        and not any(
+            review.url in comment.body and comment.created_at >= _review_effective_timestamp(review)
+            for comment in own_comments
+        )
+    ]
 
 
 def _is_codex_thumbs_up(reaction: Reaction) -> bool:
@@ -502,20 +498,16 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
     after a `fetch`, incapable of missing or double-counting activity that happened in between (the
     failure mode a per-invocation in-memory baseline used to have).
 
-    `unresponded_reviews` is every `reviews_with_body` entry (using each review's effective
-    timestamp — the later of `submittedAt` and `lastEditedAt`, see `_review_effective_timestamp`)
-    that `_unresponded_reviews` cannot pair with a distinct PR-level comment authored by the
-    currently-authenticated `gh` identity — see that function for the newest-first, one-comment-
-    per-review matching this uses instead of a single whole-PR "latest comment" cutover, which
-    would let one comment addressing only the newest of several concurrently-outstanding reviews
-    silently mark every older one as responded too. Using each review's *effective* timestamp
-    means a reviewer who edits an already-submitted review's body after this workflow already
-    responded is not silently skipped forever: a comment that postdates the original `submittedAt`
-    but predates the edit addressed content that did not exist yet when it was posted. Comments
-    from any other account are ignored for this purpose: an unrelated bystander, bot, or CI
-    notification commenting on the PR carries no evidence it addressed any specific review's
-    feedback. A review with no `submittedAt` (not yet actually submitted) is excluded rather than
-    treated as always-unresponded.
+    `unresponded_reviews` is every `reviews_with_body` entry `_unresponded_reviews` cannot find an
+    explicit, postdating reference to among the currently-authenticated `gh` identity's own
+    PR-level comments — see that function for why a review's own `url` must be quoted in a comment
+    that postdates the review's effective timestamp (the later of `submittedAt`/`lastEditedAt`),
+    rather than inferring a match purely from chronological order: an unrelated administrative
+    comment that merely postdates a review (e.g. a cross-thread sequencing decision this skill's
+    own workflow sanctions) is not evidence it addressed that review's feedback, and a plain
+    chronological cutover cannot tell the two apart. Comments from any other account are ignored
+    for the same reason a comment without any reference is. A review with no `submittedAt` (not
+    yet actually submitted) is excluded rather than treated as always-unresponded.
 
     `codex_approved` is `True` when a "+1" reaction from exactly the Codex bot's known login (not
     merely one that starts with the same text — see `_CODEX_REACTOR_LOGINS`) exists on the PR
@@ -561,12 +553,10 @@ def build_fetch_result(owner: str, repo: str, pr: int, *, deadline: float | None
     ]
     reviews_with_body = [review for review in all_reviews if review.body.strip()]
 
-    own_comment_dates = [
-        comment.created_at
-        for comment in issue_comments
-        if comment.user is not None and comment.user.login == authenticated_login
+    own_comments = [
+        comment for comment in issue_comments if comment.user is not None and comment.user.login == authenticated_login
     ]
-    unresponded_reviews = _unresponded_reviews(reviews_with_body, own_comment_dates)
+    unresponded_reviews = _unresponded_reviews(reviews_with_body, own_comments)
     codex_approved = any(
         _is_codex_thumbs_up(reaction) and reaction.created_at >= latest_revision_at for reaction in reactions
     )
