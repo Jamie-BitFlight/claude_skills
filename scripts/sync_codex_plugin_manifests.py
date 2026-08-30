@@ -1,6 +1,9 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Synchronize Codex plugin manifests from their Claude plugin metadata."""
 

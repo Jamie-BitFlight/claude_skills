@@ -6,6 +6,9 @@
 #     "prefixspan>=0.5.2",
 #     "pydantic>=2.12.5",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Kaizen Analysis MCP Server.
 

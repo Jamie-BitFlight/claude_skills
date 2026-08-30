@@ -6,6 +6,9 @@
 #   "httpx>=0.28.1",
 #   "ruamel.yaml>=0.18.0",
 # ]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Tests for setup_gh.py — verifies --detect-only exit codes."""
 

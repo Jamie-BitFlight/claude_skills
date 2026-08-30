@@ -1,6 +1,9 @@
 #!/usr/bin/env -S uv --quiet run --active --script
 # /// script
 # requires-python = ">=3.11"
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Kage-bunshin session monitor — detects interactive states in child Claude Code sessions.
 

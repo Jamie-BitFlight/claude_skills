@@ -1,6 +1,9 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
 # ///
 """Validate explicit, cache-provenanced Codex skill activation without MCP."""
 
