@@ -262,8 +262,7 @@ Written via `backlog_groom(section="{name}", content=...)`, read via
 
 ### Body sections defined in item schema
 
-Canonical top-level order from `templates/backlog-item.md` (`skills/backlog/references/item-schema.md`
-was deleted in #3329 — confirmed drifted from `backlog_core/models.py` with no salvageable content):
+Canonical top-level order from `templates/backlog-item.md`:
 
 ```
 Description            ← not a `## ` section — creation-time template field, no sections[] key
@@ -352,8 +351,7 @@ artifact type from backlog items, parsed independently of `backlog_core`'s secti
 entirely. Kept, not removed, per the Living Document Protocol below — flagging provenance is
 required before removal, and legacy data may still reference these keys.
 
-Source: `templates/backlog-item.md` (`skills/backlog/references/item-schema.md`, formerly cited
-here for L54-73, was deleted in #3329 with no salvageable content),
+Source: `templates/backlog-item.md`,
 `docs/backlog-item-groomed-schema.md` (L64–81), `agents/impact-analyst.md`,
 `agents/fact-checker.md`, `agents/classifier.md`, `agents/backlog-item-groomer.md`, `groom/finalize.md`,
 `backlog_core/rendering.py` `SECTION_HEADING` (full grep cross-check across doc `section=`/`sections[...]` usage).
