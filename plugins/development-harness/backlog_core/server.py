@@ -1,4 +1,14 @@
-"""FastMCP 3.x server exposing all backlog operations as MCP tools."""
+"""FastMCP 3.x server exposing all backlog operations as MCP tools.
+
+Exists to guarantee what raw file or API access cannot:
+1. Correct, audit-preserving backlog state across whichever backend is
+   configured, under concurrent writers — durable for every backend except
+   the in-memory one, an intentionally non-durable test double.
+2. A structured, resource-bounded interface for the calling agent — safety
+   annotations, typed errors, token-budget-aware pagination — in place of
+   CLI/stderr parsing or unbounded reads.
+3. Crash-safe tracking of multi-agent dispatch, wave, and task execution state.
+"""
 
 from __future__ import annotations
 
@@ -1115,9 +1125,11 @@ async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object]
 mcp = FastMCP(
     "backlog",
     instructions=(
-        "Backlog management server. Manages per-item markdown files in ~/.dh/projects/{slug}/backlog/, "
-        "syncs with GitHub Issues (source of truth), and provides CRUD operations for "
-        "backlog items including add, list, view, update, groom, close, resolve, and sync."
+        "Backlog management server. The configured backend is the source of truth; backends that "
+        "support offline queuing keep a local cache that syncs with it, others read and write it "
+        "directly. Always use these tools for backlog CRUD (add, list, view, update, groom, close, "
+        "resolve, sync) — never read or edit backlog files directly, even if a tool call fails; "
+        "report the failure instead."
     ),
     version="0.1.0",
     lifespan=_backlog_lifespan,
@@ -1250,13 +1262,10 @@ async def backlog_add(
 ) -> dict:
     """Add a new item through the configured backend and optionally create its native issue.
 
-    Use priority P0 for must-have, P1 for should-have, P2 for could-have,
-    or Ideas for exploratory items.
-
     For guided creation with classification and research support, use
     /dh:work-backlog-item create instead of calling this tool directly — it applies
-    the same description template below plus duplicate detection (also enforced
-    here unconditionally) and item-type classification.
+    the same description template below plus item-type classification. Duplicate
+    detection here runs unless force=True.
 
     Returns:
         Dict with file_path, title, priority, issue number (if created),
@@ -1650,35 +1659,19 @@ async def backlog_list(
 ) -> dict:
     """List all open backlog items.
 
-    Use refresh=true to refresh the local cache from the backend before listing.
-    Use label to filter items by a specific GitHub label.
-    Use section to filter by priority section (P0, P1, P2, Ideas).
-    Use status to filter by status value (e.g. needs-grooming, status:in-progress).
-    Use title to filter by title substring (case-insensitive).
-    Use type_ to filter by metadata.type exact match (e.g. Bug, Feature).
-    Use topic to filter by metadata.topic substring match.
-    Use include_closed=true to include items with terminal status (done, resolved, closed).
-    Use search for full-text search across the complete item content (title, section, topic,
-    type, description, and all section body text including acceptance criteria and impact radius).
-    Search supports OR/AND/NOT operators (e.g. 'auth OR deploy', 'backlog NOT quality'),
-    parenthetical grouping ((auth OR deploy) AND quality), regex (/pattern/ or regex:pattern),
-    field-specific syntax (title:auth, type:bug, topic:devops, body:sdlc-layers), and plain substring matching.
-    Use count_only=true to return only {"count": N} without fetching item content.
-    Use offset and limit to paginate results. When limit=0, auto-pagination keeps the
-    response under 4400 tokens (cl100k_base encoding). When has_more=true, call again
-    with the offset shown in next_call.
     When match_context=True, use page/tokens_per_page/page_token_limit to control
-    token-based pagination of match output. When match_pages.paginated=true, use
+    token-based pagination of match output; when match_pages.paginated=true, use
     page=2..N to retrieve subsequent pages.
 
     Returns:
         Dict with items list, count, pagination object, and output messages/warnings.
-        Each item includes state (open/closed) and status (workflow status from status:* labels).
+        Each item includes status (workflow status from status:* labels).
         pagination contains offset, limit, total, and has_more. When has_more=true,
         next_call provides the suggested follow-up call string.
         When match_context=True, match_pages contains current_page, total_pages,
         tokens_per_page, total_match_tokens, and paginated flag.
-        When count_only=True, returns only {"count": N}.
+        When count_only=True, the count key is present; a running background sync
+        may add sync_state/warnings alongside it.
         On error, dict contains an error key.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
@@ -1985,7 +1978,12 @@ async def backlog_view(
     limit: Annotated[int, Field(ge=0, description="Show at most N entry blocks (0 = all, no truncation)")] = 0,
     show: Annotated[
         str | None,
-        Field(description="Entry filter: 'all', 'last', 'first', 'struck', or integer N (first N active entries)"),
+        Field(
+            description=(
+                "Entry filter: 'all', 'last', 'first', 'struck', integer N (first N active "
+                "entries), or negative integer -N (last N active entries)"
+            )
+        ),
     ] = None,
     since: Annotated[
         str | None,
@@ -2003,7 +2001,8 @@ async def backlog_view(
         str | None,
         Field(
             description=(
-                "Section filter for YAML items (no effect on GitHub-only items with a raw body). "
+                "Section filter, matched against ## / ### headings — works on raw GitHub issue "
+                "bodies too, not just structured YAML items. "
                 "Accepts: numeric index '2', comma-separated indices '0,2,4', "
                 "regex '/impact.*/', or substring match 'RT-ICA'. "
                 "When provided, body and sections in the response reflect only the matched section(s)."
@@ -2030,8 +2029,8 @@ async def backlog_view(
             description=(
                 "When True, returns a flat ordinal dot-path map of the item's structure. "
                 "Each line shows an ordinal (e.g. '4.0'), section title, estimated token count, "
-                "and a content preview. Response is always under 2,000 tokens regardless of item size. "
-                "Mutually exclusive with navigate. Use this first to discover valid ordinals."
+                "and a content preview. Mutually exclusive with navigate. Use this first to "
+                "discover valid ordinals."
             )
         ),
     ] = False,
@@ -2076,49 +2075,16 @@ async def backlog_view(
 ) -> dict:
     r"""View a single backlog item or GitHub issue in detail.
 
-    Accepts a GitHub issue URL, #N, bare number, or title substring as selector.
-    Use offset and limit to paginate long issue bodies.
-    Use show and since to filter entry blocks within sections.
-    Use include_content=False to get a compact response with section names and
-    entry counts only, omitting the full body and entry content.
-    Use summary=False to receive the full response; summary=True (default) returns
-    a compact routing manifest that always includes sections_index so callers know
-    exactly which sections exist before deciding what to load.
-    Use section to filter the response to specific sections by index, title, or regex.
-    Use sections=[...] to return only the named sections plus identity fields
-    (number, title, status, type, priority).
-    Use map=True to see the item's ordinal structure (always under 2,000 tokens).
-    Use navigate=<ordinal> to fetch the full content at a specific ordinal.
-    Use navigate=<ordinal> + head=N to extract a token-bounded window (EXTRACT mode);
-    iterate using the next_call hint until truncated=False.
     Ordinal format: ^\d+(\.\d+)*(\.code\.\d+)?$. Examples:
         "4.0"        — section entry (level-2)
         "4.0.1"      — sub-heading within an entry (level-3+)
         "4.0.code.0" — first code fence in an entry's direct body
 
-    Pagination parameter distinction (architect spec §5.7):
-        offset — entry-block index: skip N entry blocks from the start of the body.
-        skip_tokens — within-content token offset for EXTRACT mode pagination only.
-        These are distinct concerns; do not substitute one for the other.
-
-    Progressive disclosure pattern (new, three-layer):
-        Step 1 — call with map=True to see ordinal structure.
-        Step 2 — call with navigate=<ordinal> to fetch a section or entry.
-            navigate="4.0.1" fetches a sub-heading within that entry.
-            navigate="4.0.code.0" fetches the first code fence in that entry.
-        Step 3 — if truncated, page through large content using the next_call hint:
-            backlog_view(selector="...", navigate="4.0", head=4000)
-            backlog_view(selector="...", navigate="4.0", head=4000, skip_tokens=4000)
-
-    Progressive disclosure pattern (legacy, still supported):
-        Step 1 — call with summary=True (default) to get sections_index and metadata.
-        Step 2 — load only the sections needed:
-            backlog_view(selector="...", summary=False, section="Fact-Check")
-            backlog_view(selector="...", summary=False, section="0,1,3")
-            backlog_view(selector="...", summary=False, section="/acceptance|plan/")
+    To page through large content: navigate=<ordinal>, head=4000, then repeat with
+    skip_tokens set from the returned next_call hint until truncated=False.
 
     Returns:
-        When map=True: dict with map_text (ordinal structure, <2,000 tokens), selector,
+        When map=True: dict with map_text (ordinal structure), selector,
         total_sections, total_est_tokens, over_budget flag, and struck_ordinals (every
         struck/retracted ordinal in the map).
         When navigate=<ordinal> (no head): dict with ordinal, title, content,
@@ -2317,7 +2283,7 @@ async def backlog_list_followups(
         Field(
             description=(
                 "Logical ID of the originating plan or task (e.g. 'P1', 'P1/T3'). "
-                "Returns all backlog items whose followup_to matches this value."
+                "Returns backlog items whose followup_to matches this value, excluding skipped items."
             )
         ),
     ],
@@ -2345,7 +2311,12 @@ async def backlog_list_followups(
     )
 )
 async def backlog_close(
-    selector: Annotated[str, Field(description="Item selector: GitHub issue URL, #N, bare number, or title substring")],
+    selector: Annotated[
+        str,
+        Field(
+            description="Item selector: GitHub issue URL, #N, bare number, title substring, or beads nanoid (e.g. bd-a3f8)"
+        ),
+    ],
     reason: Annotated[
         str,
         Field(
@@ -2356,12 +2327,10 @@ async def backlog_close(
         str, Field(description="Related item reference: #N, URL, or title of the item this duplicates/is superseded by")
     ] = "",
     comment: Annotated[str, Field(description="Additional context about why this item is being closed")] = "",
-    cleanup: Annotated[
-        bool, Field(description="Remove local file after close; index link becomes GitHub issue URL")
-    ] = False,
+    cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Close even if open PRs reference the issue")] = False,
 ) -> dict:
-    """Dismiss a backlog item without completing it and close its GitHub issue.
+    """Dismiss a backlog item without completing it and close it on the configured backend.
 
     Use for items that are duplicates, out of scope, superseded, wontfix,
     or permanently blocked. For completed work, use backlog_resolve instead.
@@ -2405,14 +2374,14 @@ async def backlog_resolve(
     notes: Annotated[str | None, Field(description="Problems found, surprises, or other comments")] = None,
     follow_ups: Annotated[str | None, Field(description="Created follow-up tickets (comma-separated refs)")] = None,
     findings: Annotated[str | None, Field(description="Retrospective learnings from this work")] = None,
-    cleanup: Annotated[
-        bool, Field(description="Remove local file after resolve; index link becomes GitHub issue URL")
-    ] = False,
+    cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Resolve even if open PRs reference the issue")] = False,
 ) -> dict:
-    """Mark a backlog item as DONE (completed) and close its GitHub issue.
+    """Mark a backlog item as DONE (completed) and close it on the configured backend.
 
-    Creates a structured completion record as an audit/retrospective trail.
+    plan/method/notes/follow_ups/findings become a structured completion comment
+    on the GitHub backend; other backends forward only summary (as the close
+    reason) or discard these fields — they are not persisted to local item state.
     Only summary is required — for trivial items a one-liner suffices.
     For dismissals (duplicate, out of scope, etc.), use backlog_close instead.
 
@@ -2455,13 +2424,7 @@ async def backlog_update(
     plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
     status: Annotated[
         str | None,
-        Field(
-            description=(
-                "Set item status (e.g. 'in-progress') — the only supported way to change an "
-                "item's status labels. Updates GitHub issue labels when applicable, as a side "
-                "effect of this transition."
-            )
-        ),
+        Field(description="Set item status (e.g. 'in-progress'). Updates the backend's status labels when applicable."),
     ] = None,
     section: Annotated[
         str | None, Field(description="Section name for groomed content update (use with content parameter)")
@@ -2502,19 +2465,13 @@ async def backlog_update(
         Field(
             description="Mark the linked work item as verified. "
             "Signals that /complete-implementation quality gates have passed. "
-            "Auto-creates the label if absent. No-op when item has no issue number."
+            "May be a no-op depending on the active backend — check the returned messages."
         ),
     ] = False,
 ) -> dict:
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
-    For groomed content, provide section + content for section updates.
-    Use entry_id to replace a specific entry, or replace_section=True to
-    strike all entries and append new content. Groomed content is synced
-    to the linked work item when the item has one.
-
-    Use verified=True after /complete-implementation quality gates pass to
-    mark the linked work item as verified.
+    Groomed content is synced to the linked work item when the item has one.
 
     Returns:
         Dict with updated item title, applied changes, and output
@@ -2609,19 +2566,14 @@ async def backlog_groom(
         Field(
             description=(
                 "When True, advance item status to groomed after content is written: set local frontmatter "
-                "status to 'groomed', remove status:needs-grooming label (idempotent), and add status:groomed "
-                "label (created if absent). Default False preserves existing behavior."
+                "status to 'groomed' and update the backend's status labels. No effect on backends without "
+                "a groomed lifecycle state — check the returned messages."
             )
         ),
     ] = False,
 ) -> dict:
     """Write groomed content through the configured backend and sync its linked GitHub issue.
 
-    Provide section + content for section updates. Use entry_id to replace
-    a specific entry, or replace_section=True to strike all entries and
-    append new content. Set append=True to add content after existing section
-    text without entry-block wrapping. Use sections for atomic multi-section
-    writes in a single call — mutually exclusive with section/content/etc.
     When the item has a GitHub issue, the groomed content is synced there
     automatically.
 
@@ -2677,9 +2629,6 @@ async def backlog_normalize(
 ) -> dict:
     """Normalize all work items through the configured backend.
 
-    This is a one-off maintenance operation. Use dry_run=true to preview
-    what would change.
-
     Returns:
         Dict with count of normalized files and output messages/warnings.
         On error, dict contains an error key.
@@ -2690,7 +2639,7 @@ async def backlog_normalize(
         result = await asyncio.to_thread(operations.normalize_items, dry_run=dry_run, output=out)
         for w in out.warnings:
             await ctx.warning(w)
-        updated = result.get("updated", 0)
+        updated = result.get("normalized", 0)
         suffix = " (dry-run)" if dry_run else ""
         await ctx.info(f"Normalized {updated} file(s){suffix}")
         return {**result, **out.to_dict()}
@@ -2717,15 +2666,13 @@ async def backlog_pull(
     ] = False,
     diff: Annotated[bool, Field(description="Include entry-level diff output showing local vs remote changes")] = False,
 ) -> dict:
-    """Reconcile linked issue content through the configured sync backend.
+    """Reconcile linked issue content.
 
-    When selector is provided, pulls a single issue by #N, bare number,
-    GitHub URL, or title substring. When omitted, pulls all issues.
+    Only backends that support reconciliation act on this — on other backends
+    this is a no-op; check the returned messages.
 
     Auto-migrates P0/P1 items lacking GitHub Issues by creating them.
-    Merges by section using entry-aware merge (keeps longer entries,
-    preserves strikes). Use dry_run=true to preview changes.
-    Use diff=true to include entry-level diff output.
+    Merges by section using entry-aware merge (keeps longer entries, preserves strikes).
 
     Returns:
         Dict with count of pulled items (bulk) or file_path (single) and
@@ -2773,10 +2720,9 @@ async def backlog_create_sam_task(
 ) -> dict:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
-    Use to bootstrap GitHub visibility for a task when starting a new feature plan.
-
     Returns:
-        Dict with issue_number, title, url, and output messages. On error, returns error key.
+        Dict with issue_number, title, url (always empty), and output messages.
+        On error, returns error key.
     """
     out = Output()
     try:
@@ -2936,15 +2882,14 @@ async def artifact_register(
     artifact_id already exists it is updated in-place (status, agent, timestamp).
     If only the type matches but the artifact_id differs, a new row is added.
 
-    Content is written under the selected backend's logical artifact-content
-    reference before its revision-safe manifest entry is registered.
-
     Returns:
         Dict with registered (bool), artifact_count (int), action (str),
         content_stored (bool), and output messages/warnings.
 
-    Raises:
-        BacklogError: The selected backend could not store the artifact or its manifest.
+    A dict with an ``error`` key is returned for a ``BacklogError``. A
+    ``ContentUnavailableError`` or ``ContentConflictError`` (the backend could
+    not store the artifact or its manifest) is not caught here and surfaces as
+    a tool call error, not a dict.
     """
     out = Output()
     try:
@@ -2989,8 +2934,7 @@ async def artifact_list(
 ) -> dict:
     """Return all artifacts registered for a backlog item.
 
-    Optionally filter by artifact type. Returns an empty list when no
-    manifest section exists yet — this is not an error.
+    Returns an empty list when no manifest section exists yet — this is not an error.
 
     Returns:
         Dict with artifacts (list of dicts), count (int), and output
@@ -2998,7 +2942,9 @@ async def artifact_list(
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
-        BacklogError: The selected backend could not resolve the manifest.
+        ContentUnavailableError: The selected backend could not resolve the
+            manifest. Not caught here — surfaces as a tool call error, not
+            the documented error dict.
     """
     out = Output()
     try:
@@ -3045,9 +2991,7 @@ async def artifact_get(
     """Return metadata for artifacts registered on a backlog item under one type.
 
     Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
-    codebase-analysis files). Supplying it returns the single addressed entry, matching
-    ``dh_core.operations.artifact_get`` and the ``artifact get --artifact-id`` CLI option,
-    so both surfaces can address an artifact the same way.
+    codebase-analysis files). Supplying it returns the single addressed entry.
 
     Returns:
         Dict with artifacts (list of dicts), count (int), and output
@@ -3057,7 +3001,9 @@ async def artifact_get(
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
-        BacklogError: The selected backend could not resolve the manifest.
+        ContentUnavailableError: The selected backend could not resolve the
+            manifest. Not caught here — surfaces as a tool call error, not
+            the documented error dict.
     """
     out = Output()
     try:
@@ -3110,9 +3056,7 @@ async def artifact_read(
     logical identifier. This layer does not access local artifact files.
 
     Omitting ``artifact_id`` returns the most recently registered entry of the type.
-    Supplying it addresses one specific entry, matching
-    ``dh_core.operations.artifact_read`` and the ``artifact read --artifact-id`` CLI
-    option, so both surfaces can address an artifact the same way.
+    Supplying it addresses one specific entry.
 
     Returns:
         Dict with type (str), path (str), content (str), status (str), and
@@ -3122,7 +3066,9 @@ async def artifact_read(
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
-        BacklogError: The selected backend could not resolve the manifest.
+        ContentUnavailableError: The selected backend could not resolve the
+            manifest. Not caught here — surfaces as a tool call error, not
+            the documented error dict.
     """
     out = Output()
     try:
@@ -3167,15 +3113,13 @@ async def artifact_read(
     )
 )
 async def backlog_get_ready_sam_tasks(
-    parent_issue_number: Annotated[int, Field(description="Parent story issue number (GitHub issue integer)")],
+    parent_issue_number: Annotated[int, Field(description="Parent story issue number (native reference)")],
 ) -> dict:
-    """Return SAM tasks ready for execution from GitHub sub-issues.
+    """Return SAM tasks whose status is not-started and all dependencies are terminal.
 
-    Fetches sub-issues, resolves dependency graph locally, returns tasks whose
-    status is not-started and all dependencies are terminal.
-    Output shape matches implementation_manager.py ready-tasks JSON:
-    feature, ready_tasks, count. Each ready_task includes id, name, agent, skills, issue_number.
-    Falls back to local cache if GitHub is unavailable.
+    Returns:
+        Dict with feature (slug), ready_tasks (list), count. Each ready_task
+        contains id, name, agent, skills, issue_number.
     """
     out = Output()
     try:
@@ -3240,13 +3184,11 @@ async def backlog_strike_entry(
     )
 )
 async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum labels to return")] = 100) -> dict:
-    """List repository labels (read-only).
+    """List repository labels. Requires a backend with label support — errors otherwise.
 
-    Returns all labels defined on the repository, up to ``limit``.
-    This tool is read-only. Status labels change as a side effect of
-    ``backlog_update``, ``backlog_groom``, ``backlog_resolve``, or
-    ``backlog_close`` changing an item's status — there is no separate
-    label-mutation tool to call directly.
+    Returns all labels defined on the repository, up to ``limit``. There is no
+    separate label-mutation tool; labels change as a side effect of ``backlog_update``,
+    ``backlog_groom``, ``backlog_resolve``, or ``backlog_close`` changing an item's status.
 
     Returns:
         Dict with ``labels`` (list of dicts with ``name``, ``color``, ``description``),
@@ -3279,7 +3221,7 @@ async def backlog_list_merged_prs(
     ] = None,
     limit: Annotated[int, Field(description="Maximum number of PRs to return")] = 20,
 ) -> dict:
-    """List merged pull requests, optionally filtered by a search query.
+    """List merged pull requests. Requires a backend with PR support — errors otherwise.
 
     Only PRs that were actually merged (not just closed) are returned.
     Use ``search`` to filter by issue reference (e.g. ``'#42'``) or any
@@ -3309,7 +3251,8 @@ async def backlog_list_milestones(
 ) -> dict:
     """List repository milestones filtered by state.
 
-    Returns milestones with their issue counts and optional due dates.
+    Requires a backend with milestone support — errors otherwise. Returns
+    milestones with their issue counts and optional due dates.
 
     Returns:
         Dict with ``milestones`` (list of dicts with ``number``, ``title``,
@@ -3333,7 +3276,8 @@ async def backlog_list_milestones(
 async def backlog_get_soonest_milestone() -> dict:
     """Return the open milestone with the earliest due date.
 
-    Milestones without a due date are excluded. If all open milestones
+    Requires a backend with milestone support — errors otherwise. Milestones
+    without a due date are excluded. If all open milestones
     lack a due date, the first one by GitHub's default ordering is returned
     with a warning.
 
@@ -3366,6 +3310,8 @@ async def backlog_create_milestone(
     ] = None,
 ) -> dict:
     """Create a new milestone on the repository.
+
+    Requires a backend with milestone support — errors otherwise.
 
     Returns:
         Dict with ``milestone`` containing ``number``, ``title``, ``state``,
@@ -3422,8 +3368,10 @@ async def backlog_comment_issue(
     """Add a comment to a GitHub issue.
 
     Returns:
-        Dict with issue_number, comment_id, comment_url, and output messages/warnings.
-        On error, dict contains an error key.
+        Dict with issue_number, comment_id (a GraphQL node ID — not usable as
+        backlog_read_comment's comment_id, which requires a REST integer ID),
+        comment_url (always empty), and output messages/warnings. On error,
+        dict contains an error key.
     """
     out = Output()
     try:
@@ -3470,7 +3418,11 @@ async def backlog_read_comment(
     comment_id: Annotated[
         int,
         Field(
-            description="REST comment database ID (integer). Use the GitHub REST API or issue comment list to obtain this ID."
+            description=(
+                "REST comment database ID (integer) — obtain it from the GitHub REST API. Not "
+                "the value backlog_list_comments/backlog_comment_issue return; those are GraphQL "
+                "node IDs and will not work here."
+            )
         ),
     ],
 ) -> dict:
@@ -3584,8 +3536,8 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
 async def dispatch_read(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
     """Read a dispatch plan for the given milestone.
 
-    Loads and returns the full plan as a dict. Returns an error dict if
-    the plan file does not exist or fails YAML/schema validation.
+    Returns an error dict if no plan is stored for this milestone or it
+    fails schema validation.
 
     Returns:
         Dict with ``milestone_number`` and ``plan`` (full plan
@@ -3643,9 +3595,10 @@ async def dispatch_stale_check(
 ) -> dict:
     """Check whether a dispatch plan is stale relative to the current milestone.
 
-    Fetches open issues assigned to the milestone from GitHub, compares
-    their issue numbers against those in the plan, and returns a stale/fresh
-    indicator with added/removed issue lists.
+    Requires a backend with milestone support — errors otherwise. Fetches the
+    milestone's issues (open and closed), compares their issue
+    numbers against those in the plan, and returns a stale/fresh indicator
+    with added/removed issue lists.
 
     Returns:
         Dict with ``is_stale`` (bool), ``added_issues`` (list[int]),
@@ -3694,8 +3647,8 @@ async def dispatch_create_plan(
         bool,
         Field(
             description=(
-                "Allow overwriting an existing plan file. When False (default), returns an error "
-                "if plan/milestone-{N}-dispatch.yaml already exists."
+                "Allow overwriting an existing stored plan. When False (default), returns an "
+                "error if a plan for this milestone already exists."
             )
         ),
     ] = False,
@@ -3718,22 +3671,12 @@ async def dispatch_create_plan(
         ),
     ] = None,
 ) -> dict:
-    """Create or overwrite a dispatch plan YAML file for a milestone.
+    """Create or overwrite a stored dispatch plan for a milestone.
 
-    Accepts a typed ``DispatchPlan`` model, writes it atomically to
-    ``plan/milestone-{N}-dispatch.yaml``, and optionally validates structural
-    integrity after writing.
-
-    Args:
-        milestone_number: GitHub milestone number.
-        plan: The dispatch plan for this milestone. ``plan.milestone.number``
-            must match ``milestone_number``.
-        overwrite: When ``False`` (default) returns an error if the plan file
-            already exists.
-        validate: When ``True`` (default) runs ``validate_plan_integrity`` after
-            writing and includes the result in the response.
-        issue: Optional GitHub issue number.  When provided, auto-registers the
-            plan file as a ``dispatch-plan`` artifact (best-effort).
+    Accepts a typed ``DispatchPlan`` model, stores it atomically through the
+    configured content backend, and optionally validates structural integrity
+    after writing. On the GitHub backend, writing a genuinely new plan (not
+    byte-identical to what's stored) is unsupported and returns an error.
 
     Returns:
         Success dict with ``milestone_number``, ``wave_count``,
@@ -3798,9 +3741,9 @@ async def dispatch_create_plan(
         "wave_count": wave_count,
         "item_count": item_count,
         "is_valid": is_valid,
+        **out.to_dict(),
         "errors": val_errors,
         "warnings": val_warnings,
-        **out.to_dict(),
     }
 
 
@@ -3932,12 +3875,15 @@ async def dispatch_wave_start(
         and ``messages``/``warnings``. Returns ``error`` if the wave already
         exists or if an item entry is malformed.
     """
-    item_records = [
-        _DispatchItemRecord(
-            milestone=milestone, wave_num=wave_num, issue=int(str(item["issue"])), title=str(item.get("title", ""))
-        )
-        for item in items
-    ]
+    try:
+        item_records = [
+            _DispatchItemRecord(
+                milestone=milestone, wave_num=wave_num, issue=int(str(item["issue"])), title=str(item.get("title", ""))
+            )
+            for item in items
+        ]
+    except (KeyError, ValueError) as exc:
+        return {"error": f"Malformed item entry: {exc}", "milestone": milestone, "wave_num": wave_num}
     try:
         wave: _DispatchWaveRecord = await asyncio.to_thread(
             _dispatch_state_manager().create_wave, milestone, wave_num, item_records
@@ -3983,7 +3929,8 @@ async def dispatch_item_status(
 
     Returns:
         Dict with ``milestone``, ``issue``, ``wave_num``, ``status``,
-        ``messages``/``warnings``. Returns ``error`` key if item not found.
+        ``messages``/``warnings``. Returns ``error`` key if item not found
+        or ``status`` is not one of complete/failed/skipped.
     """
     mgr = _dispatch_state_manager()
 
@@ -4043,13 +3990,16 @@ async def dispatch_wave_status(
 ) -> dict:
     """Query the current status of a dispatch wave.
 
-    Returns item-level detail grouped by status, with elapsed time and
-    progress counts. Checks PIDs for in-progress items and marks dead
-    ones as failed before returning.
+    Returns items as a flat list (in issue order) plus per-status counts and
+    elapsed time. Before querying, checks PIDs for ALL in-progress items across
+    every milestone/wave and marks dead ones as failed — this can mutate waves
+    other than the one requested; only stale items in the requested wave are
+    reported in the returned warnings.
 
     Returns:
         Dict with :class:`~backlog_core.models.DispatchWaveSummary` fields,
-        or ``error`` if wave not found.
+        or ``error`` if wave not found. accumulated_usage is currently always
+        zero (not yet wired up).
     """
     mgr = _dispatch_state_manager()
     warnings: list[str] = []
@@ -4082,9 +4032,7 @@ async def dispatch_wave_status(
             end = _datetime.fromisoformat(wave.completed_at) if wave.completed_at else _datetime.now(UTC)
             elapsed = (end - start).total_seconds()
 
-    # Usage accumulation is deferred to item completion time (dispatch_item_status)
-    # and stored in wave/item records. Reading JSONL on every wave query is a
-    # hot-path bloat issue; accumulated_usage is returned from stored dispatch state.
+    # TODO: not yet wired to stored dispatch state — always zero. See docstring.
     accumulated_usage = {
         "input_tokens": 0,
         "output_tokens": 0,

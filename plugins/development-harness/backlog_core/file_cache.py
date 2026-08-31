@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
-import json
 import os
 import tempfile
 import warnings
@@ -20,9 +18,13 @@ from .file_cache_state import (
     ReplayAcknowledgement,
     _CacheState,
     _CacheStateStore,
+    _content_mutation_key,
+    _CorruptQueueEntry,
     _PendingWorkItemMutation,
     _ProviderSnapshotCheckpoint,
     _RejectedMutation,
+    _RejectedWorkItemMutation,
+    _work_item_mutation_key,
 )
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
 from .yaml_io import load_item, load_item_text, save_item
@@ -150,8 +152,7 @@ class FileCache:
                     "expected_revision": prior.write.expected_revision if prior is not None else write.expected_revision
                 }
             )
-            payload = json.dumps(rebased.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-            mutation = PendingMutation(idempotency_key=hashlib.sha256(payload.encode()).hexdigest(), write=rebased)
+            mutation = PendingMutation(idempotency_key=_content_mutation_key(rebased), write=rebased)
             pending: list[PendingMutation] = []
             inserted = False
             for entry in state.pending:
@@ -252,10 +253,7 @@ class FileCache:
         self._state.transaction(reject)
 
     def _queue_work_item(self, key: str, item: BacklogItem) -> _PendingWorkItemMutation:
-        payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-        mutation = _PendingWorkItemMutation(
-            idempotency_key=hashlib.sha256(f"{key}:{payload}".encode()).hexdigest(), key=key, item=item
-        )
+        mutation = _PendingWorkItemMutation(idempotency_key=_work_item_mutation_key(key, item), key=key, item=item)
         return self._state.transaction(
             lambda state: (
                 state.model_copy(
@@ -272,6 +270,24 @@ class FileCache:
 
     def _pending_work_item_mutations(self) -> list[_PendingWorkItemMutation]:
         return list(self._load_state().pending_work_items)
+
+    def _rejected_work_item_mutations(self) -> list[_RejectedWorkItemMutation]:
+        """Return work-item mutations dead-lettered for a key/content mismatch.
+
+        See :meth:`_CacheStateStore._verify_queue_keys` -- a mismatch here is
+        not proof of a hand-edit; a legitimate entry from a newer plugin
+        version can trip it too, so these are preserved for inspection rather
+        than replayed or discarded.
+        """
+        return list(self._load_state().rejected_work_items)
+
+    def _corrupt_queue_entries(self) -> list[_CorruptQueueEntry]:
+        """Return pending/pending_work_items entries that failed schema validation on load.
+
+        See :meth:`_CacheStateStore._salvage_queue_list` -- stored as raw
+        payloads for manual recovery, since they never became typed models.
+        """
+        return list(self._load_state().corrupt_queue_entries)
 
     def _acknowledge_work_items(self, idempotency_keys: set[str]) -> None:
         if not idempotency_keys:
@@ -454,7 +470,15 @@ class FileCache:
         return destination
 
     def _load_state(self) -> _CacheState:
-        return self._state.load()
+        # load_after_migration(), not migrate-then-load as two calls: a
+        # legacy-recreated cache.yaml (an older plugin copy queuing new
+        # offline writes into a fresh file of its own) otherwise stays
+        # invisible to every read accessor -- pending_mutations(),
+        # get_content(), reconciliation's load_records() -- until some
+        # unrelated transaction() happens to run and trigger migration as a
+        # side effect. One lock acquisition also closes the race where a
+        # second recreation lands in the gap between two separate calls.
+        return self._state.load_after_migration()
 
     @staticmethod
     def _replace_record(records: list[ContentRecord], replacement: ContentRecord) -> list[ContentRecord]:

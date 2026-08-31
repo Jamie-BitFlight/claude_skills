@@ -487,6 +487,10 @@ class BacklogError(Exception):
     """General backlog operation error."""
 
 
+class CacheStateCorruptError(BacklogError):
+    """Raised when a provider-private cache state file is neither valid JSON nor YAML."""
+
+
 class ContentProviderError(Exception):
     """Base error for logical content capability failures."""
 
