@@ -10,7 +10,6 @@
 #   "markdown-it-py>=3.0.0",
 #   "ruamel.yaml>=0.18.0",
 #   "tiktoken>=0.12.0",
-#   "typer>=0.21.2",
 #   "python-dotenv>=1.0.0",
 # ]
 #
