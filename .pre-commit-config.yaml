@@ -230,3 +230,4 @@ repos:
 # Configuration for specific hooks
 default_language_version:
   python: python3
+  node: 24.16.0
