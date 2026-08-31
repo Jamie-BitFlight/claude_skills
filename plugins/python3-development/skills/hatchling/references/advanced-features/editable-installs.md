@@ -220,7 +220,7 @@ Compiled extensions require recompilation after changes. They don't benefit from
 #!/bin/bash
 # development-setup.sh
 python -m pip install -e ".[dev,docs]"
-pre-commit install
+prek install       # or: pre-commit install
 ```
 
 - Verify entry points work by reinstalling periodically

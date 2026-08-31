@@ -497,14 +497,14 @@ repos:
 **Usage**:
 
 ```bash
-# Install pre-commit
-pip install pre-commit
+# Install prek (or pre-commit)
+uv tool install prek       # or: pip install pre-commit
 
 # Install hooks
-pre-commit install
+prek install       # or: pre-commit install
 
 # Run manually
-pre-commit run skilllint --all-files
+prek run skilllint --all-files       # or: pre-commit run skilllint --all-files
 ```
 
 ### CI/CD Pipeline Integration

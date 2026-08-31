@@ -21,7 +21,7 @@ graph TD
     ReviewPass -->|Yes| QualityGates[Phase 3: Quality Gates]
     ReviewPass -->|No| Architect
 
-    QualityGates --> PreCommit[uv run pre-commit]
+    QualityGates --> PreCommit[uv run prek]
     PreCommit --> Ruff[ruff format + ruff check]
     Ruff --> TypeCheck[mypy + pyright]
 
@@ -248,7 +248,7 @@ Execute sequentially (each gates the next):
 1. Format: `ruff format`
 2. Lint: `ruff check`
 3. Type check: `mypy`, `pyright`
-4. Pre-commit: `uv run pre-commit run --files scripts/sync_gitlab_docs.py`
+4. Git hooks: `uv run prek run --files scripts/sync_gitlab_docs.py` (or `uv run pre-commit run --files scripts/sync_gitlab_docs.py`)
 
 **Rationale for ordering**: Format first prevents lint errors on whitespace. Type checking validates after style compliance.
 

@@ -237,10 +237,10 @@ repos:
 
 ```bash
 # Install hooks
-pre-commit install
+pre-commit install       # or: prek install
 
 # Run on all files
-pre-commit run --all-files
+pre-commit run --all-files       # or: prek run --all-files
 
 # Run specific hook
 pre-commit run shellcheck --all-files
