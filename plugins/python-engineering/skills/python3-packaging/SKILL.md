@@ -350,7 +350,7 @@ plugin2 = "my_package.plugins.plugin2:Plugin2"
 
 ## Git Hook Configuration (prek)
 
-prek reads this file unchanged — `Skill(skill: "python-engineering:pre-commit")` covers install and usage.
+prek reads this file unchanged — see `python-engineering:pre-commit` for install and usage.
 
 **.pre-commit-config.yaml**:
 

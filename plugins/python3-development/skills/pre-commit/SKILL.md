@@ -194,11 +194,12 @@ cat /tmp/test-msg
 ## Skipping hooks
 
 ```bash
-prek run --skip hook-id     # skip one hook for this run
-git commit --no-verify      # bypass all hooks (git-level, works with either tool)
+SKIP=hook-id git commit -m "message"   # skip one hook during a real commit
+prek run --skip hook-id                # skip one hook for a manual run
+git commit --no-verify                 # bypass all hooks (git-level, works with either tool)
 ```
 
-pre-commit's `SKIP=hook-id git commit` environment variable is not confirmed to work under prek — use `--skip`.
+`--skip` only applies to `prek run`; git's automatic invocation never sees it. Use `SKIP=hook-id` for that instead — prek honors it exactly like pre-commit (verified against 0.4.11: it errors out if `SKIP` filters out every hook in the config, so never use it to skip an entire single-hook setup).
 
 ## Cache
 
