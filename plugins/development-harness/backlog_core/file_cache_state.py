@@ -419,36 +419,47 @@ class _CacheStateStore:
         it fails earlier, in :meth:`_parse_relaxed`, with a typed error, because
         per-entry salvage cannot help when the document itself doesn't parse.
 
-        Schema-invalid pending/pending_work_items entries are different from
-        the other four fields: those are pure cache, safely dropped and
-        logged (:meth:`_salvage_list`). Losing a pending entry is losing a
-        user's unreplayed offline write, so :meth:`_salvage_queue_list`
-        preserves its raw payload in ``corrupt_queue_entries`` instead.
+        records/checkpoints are different from the other four fields: those
+        are pure cache, safely dropped and logged (:meth:`_salvage_list`).
+        pending/pending_work_items/rejected/rejected_work_items are all
+        precious -- a schema-invalid entry there is more likely a legitimate
+        write this version can't parse yet (schema evolution) than genuine
+        corruption, including in the two terminal dead-letter buckets
+        themselves (a stored ``rejected``/``rejected_work_items`` entry is
+        the only recovery record for whatever it holds; losing it too on a
+        later load would be worse than the mismatch that put it there).
+        :meth:`_salvage_queue_list` preserves each one's raw payload in
+        ``corrupt_queue_entries`` instead of dropping it. That field is the
+        terminal fallback and isn't routed through the same path itself:
+        its ``raw: Any`` member can't fail model validation, so there's
+        nothing further to preserve it from.
 
         Returns:
             A state built only from entries that validated; malformed
-            non-queue entries are logged and dropped, malformed queue
-            entries are preserved in ``corrupt_queue_entries``.
+            records/checkpoints entries are logged and dropped, malformed
+            entries in the four precious fields are preserved in
+            ``corrupt_queue_entries``.
         """
-        # Runtime shape is guaranteed by _salvage_list's own model.model_validate()
-        # call; the casts below narrow it back for the type checker, which can't
-        # express that generically without an overload per field.
+        # Runtime shape is guaranteed by _salvage_list's/_salvage_queue_list's own
+        # model.model_validate() calls; the casts below narrow the result back
+        # for the type checker, which can't express that generically without an
+        # overload per field. Driven by a loop rather than one named pair of
+        # locals per field, to stay under ruff's too-many-locals limit.
         records = cast("list[ContentRecord]", self._salvage_list(raw, "records", ContentRecord, path))
         checkpoints = cast("list[CacheCheckpoint]", self._salvage_list(raw, "checkpoints", CacheCheckpoint, path))
-        rejected = cast("list[_RejectedMutation]", self._salvage_list(raw, "rejected", _RejectedMutation, path))
-        rejected_work_items = cast(
-            "list[_RejectedWorkItemMutation]",
-            self._salvage_list(raw, "rejected_work_items", _RejectedWorkItemMutation, path),
-        )
-        existing_corrupt = cast(
+        corrupt = cast(
             "list[_CorruptQueueEntry]", self._salvage_list(raw, "corrupt_queue_entries", _CorruptQueueEntry, path)
         )
-        pending_raw, corrupt_pending = self._salvage_queue_list(raw, "pending", PendingMutation, path)
-        pending = cast("list[PendingMutation]", pending_raw)
-        work_items_raw, corrupt_work_items = self._salvage_queue_list(
-            raw, "pending_work_items", _PendingWorkItemMutation, path
-        )
-        pending_work_items = cast("list[_PendingWorkItemMutation]", work_items_raw)
+        survivors: dict[str, list[BaseModel]] = {}
+        for field_name, model in (
+            ("pending", PendingMutation),
+            ("pending_work_items", _PendingWorkItemMutation),
+            ("rejected", _RejectedMutation),
+            ("rejected_work_items", _RejectedWorkItemMutation),
+        ):
+            entries, bad = self._salvage_queue_list(raw, field_name, model, path)
+            survivors[field_name] = entries
+            corrupt.extend(bad)
         # Idempotency-key self-consistency is checked once, uniformly, in
         # _verify_queue_keys -- not here, so it also runs on states that took
         # the model_validate_json fast path (see _read).
@@ -456,11 +467,11 @@ class _CacheStateStore:
         return _CacheState(
             records=records,
             checkpoints=checkpoints,
-            pending=pending,
-            rejected=rejected,
-            pending_work_items=pending_work_items,
-            rejected_work_items=rejected_work_items,
-            corrupt_queue_entries=[*existing_corrupt, *corrupt_pending, *corrupt_work_items],
+            pending=cast("list[PendingMutation]", survivors["pending"]),
+            rejected=cast("list[_RejectedMutation]", survivors["rejected"]),
+            pending_work_items=cast("list[_PendingWorkItemMutation]", survivors["pending_work_items"]),
+            rejected_work_items=cast("list[_RejectedWorkItemMutation]", survivors["rejected_work_items"]),
+            corrupt_queue_entries=corrupt,
             snapshot_checkpoint=checkpoint,
         )
 
@@ -489,17 +500,24 @@ class _CacheStateStore:
     def _salvage_queue_list(
         raw: dict[str, object], field_name: str, model: type[BaseModel], path: Path
     ) -> tuple[list[BaseModel], list[_CorruptQueueEntry]]:
-        """Validate each entry of pending/pending_work_items, preserving failures instead of dropping them.
+        """Validate each entry of a precious field, preserving failures instead of dropping them.
+
+        Used for pending/pending_work_items/rejected/rejected_work_items --
+        every field where losing an entry outright would discard something
+        no longer recoverable elsewhere.
 
         Returns:
-            The entries that validated, and the raw payload of each one that
-            didn't (see :class:`_CorruptQueueEntry` for why the raw form,
-            not a typed model, is what gets preserved here).
+            The entries that validated, and a :class:`_CorruptQueueEntry` for
+            each one that didn't -- or, if ``field_name`` itself isn't a
+            list, a single entry preserving the whole raw value, rather than
+            silently discarding the entire field.
         """
         value = raw.get(field_name, [])
         if not isinstance(value, list):
-            _log.error("Cache state %s: %r is not a list (%r) -- dropping all entries", path, field_name, value)
-            return [], []
+            _log.error(
+                "Cache state %s: %r is not a list (%r) -- preserving as a single corrupt entry", path, field_name, value
+            )
+            return [], [_CorruptQueueEntry(field=field_name, raw=value, reason="value is not a list")]
         survivors: list[BaseModel] = []
         corrupt: list[_CorruptQueueEntry] = []
         for entry in value:

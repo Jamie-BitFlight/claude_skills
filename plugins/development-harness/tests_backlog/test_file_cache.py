@@ -869,6 +869,46 @@ def test_load_dead_letters_pending_entry_from_version_skew_not_just_hand_edits(t
     assert loaded.rejected[0].write.content == "from a newer version"
 
 
+def test_load_preserves_a_stored_rejected_entry_that_fails_schema_validation(tmp_path: Path) -> None:
+    # Given: a stored rejected entry (already the terminal recovery record for
+    # a prior key mismatch) that itself fails schema validation on this load
+    # -- e.g. its nested ContentWrite gained a required field on a later
+    # version. Routed through _salvage_list before this fix, it would have
+    # been silently dropped -- losing the only remaining copy of what it held.
+    good_state = _populated_cache_state()
+    raw = json.loads(good_state.model_dump_json())
+    raw["rejected"] = [{"idempotency_key": "whatever", "write": {"reference": {}}}]  # missing "reason", malformed ref
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: not silently lost -- preserved as a corrupt_queue_entries record
+    assert loaded.rejected == []
+    corrupt = [entry for entry in loaded.corrupt_queue_entries if entry.field == "rejected"]
+    assert len(corrupt) == 1
+    assert corrupt[0].raw == raw["rejected"][0]
+
+
+def test_load_preserves_a_malformed_non_list_queue_field_as_a_single_corrupt_entry(tmp_path: Path) -> None:
+    # Given: pending_work_items itself is not a list at all (e.g. corrupted to
+    # a bare string) -- a coarser failure than one bad entry within the list
+    store = _CacheStateStore(tmp_path)
+    raw = json.loads(_CacheState().model_dump_json())
+    raw["pending_work_items"] = "not-a-list-at-all"
+    store._state_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: the whole raw value is preserved, not silently discarded
+    assert loaded.pending_work_items == []
+    corrupt = [entry for entry in loaded.corrupt_queue_entries if entry.field == "pending_work_items"]
+    assert len(corrupt) == 1
+    assert corrupt[0].raw == "not-a-list-at-all"
+
+
 def test_load_does_not_key_check_rejected_entries(tmp_path: Path) -> None:
     # Given: a rejected entry with a stale key from before its mutation was
     # queue_write-superseded -- rejected entries are inert inspection records,

@@ -8,7 +8,7 @@ from backlog_core.backends import github_work_items
 from backlog_core.backends._github_work_item_versions import root_revision
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
 from backlog_core.file_cache import FileCache, _ProviderSnapshotCheckpoint
-from backlog_core.file_cache_state import _CacheState, _RejectedWorkItemMutation
+from backlog_core.file_cache_state import _CacheState, _CorruptQueueEntry, _RejectedWorkItemMutation
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
@@ -72,6 +72,30 @@ def test_github_reconcile_result_counts_dead_lettered_work_item_rejections(tmp_p
     # Then: the work-item rejection is counted, not just the content-side one
     # (reconcile() previously summed only cache.rejected_mutations(), missing
     # _rejected_work_item_mutations() entirely)
+    assert result.rejected_mutations == 1
+
+
+def test_github_reconcile_result_counts_corrupt_queue_entries_as_rejected(tmp_path: Path) -> None:
+    # Given: a cache with one schema-invalid entry dead-lettered into
+    # corrupt_queue_entries (e.g. from schema evolution -- see
+    # _CacheStateStore._salvage_queue_list) and no other rejections
+    cache = FileCache(tmp_path)
+    cache._state._save(
+        _CacheState(
+            corrupt_queue_entries=[
+                _CorruptQueueEntry(field="pending", raw={"whatever": "shape"}, reason="test fixture")
+            ]
+        )
+    )
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
+    )
+
+    # When: reconcile runs
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    # Then: it's counted -- previously invisible in both pending and rejected
     assert result.rejected_mutations == 1
 
 
