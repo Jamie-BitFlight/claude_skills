@@ -655,6 +655,34 @@ def test_transaction_merge_keeps_one_pending_work_item_per_key_on_collision(tmp_
     assert any(entry.idempotency_key == legacy_work_item.idempotency_key for entry in loaded.rejected_work_items)
 
 
+def test_transaction_merge_lets_a_terminal_entry_win_over_a_still_pending_copy(tmp_path: Path) -> None:
+    # Given: cache.json still has an entry queued in pending, but a legacy
+    # file recreated by older code already classified that exact entry
+    # (same idempotency_key) as rejected -- e.g. it replayed and got a
+    # permanent conflict before this process ever saw cache.yaml. The two
+    # per-field merges (pending-vs-pending, rejected-vs-rejected) don't
+    # cross-check against each other, so without the final cleanup pass the
+    # merged state would hold the same key in both pending and rejected.
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+    shared_key = current_state.pending[0].idempotency_key
+
+    legacy_rejected = _RejectedMutation(
+        idempotency_key=shared_key, write=current_state.pending[0].write, reason="conflicted during legacy replay"
+    )
+    _write_legacy_yaml(store._legacy_state_path, _CacheState(rejected=[legacy_rejected]))
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: the terminal classification wins -- the key is in rejected, not
+    # also still sitting in pending waiting to be replayed again
+    loaded = store.load()
+    assert shared_key not in {entry.idempotency_key for entry in loaded.pending}
+    assert shared_key in {entry.idempotency_key for entry in loaded.rejected}
+
+
 def test_transaction_merges_dead_lettered_entries_from_a_recreated_legacy_file(tmp_path: Path) -> None:
     # Given: cache.json exists, and a legacy cache.yaml recreated by older
     # code holds not just a new pending write but also entries that the

@@ -370,7 +370,11 @@ class _CacheStateStore:
         `replay_pending()` applying a stale entry after a newer one landed.
         current's entry wins on a shared reference/key; legacy's superseded
         entry is dead-lettered into rejected/rejected_work_items, not
-        silently dropped.
+        silently dropped. A final cross-check then removes any key left in
+        both a pending list and its own terminal counterpart (current.pending
+        holding a key legacy.rejected already has, or vice versa) -- the two
+        per-field merges above only dedupe within one field, not across a
+        queue and its terminal state, so the terminal classification wins.
 
         Returns:
             ``current``, with each of the five fields extended by whatever
@@ -388,15 +392,30 @@ class _CacheStateStore:
         pending_work_items, superseded_work_items = _CacheStateStore._merge_pending_work_items_by_key(
             current.pending_work_items, legacy.pending_work_items
         )
+        rejected = [*merged_by_key(current.rejected, legacy.rejected), *superseded_pending]
+        rejected_work_items = [
+            *merged_by_key(current.rejected_work_items, legacy.rejected_work_items),
+            *superseded_work_items,
+        ]
+        # A key can end up in both a pending list and its own terminal
+        # counterpart: current.pending might hold a key legacy.rejected
+        # already has (or vice versa) -- the two per-field merges above don't
+        # cross-check between a queue and its own terminal state, only
+        # within each one. The terminal state wins: replaying an entry
+        # already classified terminal elsewhere risks a second, redundant
+        # rejection once verification catches up.
+        rejected_keys = {entry.idempotency_key for entry in rejected}
+        pending = [entry for entry in pending if entry.idempotency_key not in rejected_keys]
+        rejected_work_item_keys = {entry.idempotency_key for entry in rejected_work_items}
+        pending_work_items = [
+            entry for entry in pending_work_items if entry.idempotency_key not in rejected_work_item_keys
+        ]
         return current.model_copy(
             update={
                 "pending": pending,
                 "pending_work_items": pending_work_items,
-                "rejected": [*merged_by_key(current.rejected, legacy.rejected), *superseded_pending],
-                "rejected_work_items": [
-                    *merged_by_key(current.rejected_work_items, legacy.rejected_work_items),
-                    *superseded_work_items,
-                ],
+                "rejected": rejected,
+                "rejected_work_items": rejected_work_items,
                 "corrupt_queue_entries": [
                     *current.corrupt_queue_entries,
                     *(entry for entry in legacy.corrupt_queue_entries if entry not in current.corrupt_queue_entries),
