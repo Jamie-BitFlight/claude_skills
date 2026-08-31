@@ -1,4 +1,13 @@
-"""FastMCP 3.x server exposing all backlog operations as MCP tools."""
+"""FastMCP 3.x server exposing all backlog operations as MCP tools.
+
+Exists to guarantee what raw file or API access cannot:
+1. Correct, durable, audit-preserving backlog state across whichever backend is
+   configured, under concurrent writers.
+2. A structured, resource-bounded interface for the calling agent — safety
+   annotations, typed errors, token-budget-aware pagination — in place of
+   CLI/stderr parsing or unbounded reads.
+3. Crash-safe tracking of multi-agent dispatch, wave, and task execution state.
+"""
 
 from __future__ import annotations
 
@@ -1115,9 +1124,10 @@ async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object]
 mcp = FastMCP(
     "backlog",
     instructions=(
-        "Backlog management server. Manages per-item markdown files in ~/.dh/projects/{slug}/backlog/, "
-        "syncs with GitHub Issues (source of truth), and provides CRUD operations for "
-        "backlog items including add, list, view, update, groom, close, resolve, and sync."
+        "Backlog management server. The configured backend is the source of truth; this server keeps "
+        "a local cache that syncs with it. Always use these tools for backlog CRUD (add, list, view, "
+        "update, groom, close, resolve, sync) — never read or edit backlog files directly, even if a "
+        "tool call fails; report the failure instead."
     ),
     version="0.1.0",
     lifespan=_backlog_lifespan,
