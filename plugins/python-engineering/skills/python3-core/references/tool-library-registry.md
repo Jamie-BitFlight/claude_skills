@@ -136,7 +136,7 @@ purpose: "Extremely fast Python linter and formatter replacing flake8, black, is
 mandatory: true
 scenarios:
   - All Python code validation
-  - Pre-commit hooks
+  - git hooks (prek)
   - CI/CD pipelines
   - Linting error investigation
 alternatives:
@@ -149,7 +149,7 @@ alternatives:
 
 - MANDATORY for all Python code before delivery
 - Layer 2 of validation pipeline
-- Pre-commit hook integration
+- prek hook integration
 - CI/CD quality gates
 
 **Basic Usage**:
@@ -173,7 +173,7 @@ uv run ruff check path/to/file.py
 
 **Integration with Other Tools**:
 
-- Pre-commit: Automatic linting on git commits
+- prek: Automatic linting on git commits
 - Linting-root-cause-resolver: Uses `ruff rule {CODE}` for investigation
 - Mypy/Pyright: Complementary type checking
 - pytest: Can check test code
@@ -321,7 +321,7 @@ scenarios:
   - All Python code type validation
   - Layer 3 of validation pipeline
   - CI/CD type safety gates
-  - Pre-commit hooks
+  - git hooks (prek)
 alternatives:
   - pyright (Microsoft, also recommended)
   - pyre (Facebook, less common)
@@ -349,7 +349,7 @@ uv run mypy --html-report mypy-report .
 - Ruff: Complementary linting
 - Pyright: Run both for comprehensive checking
 - pytest: Type-check test code
-- Pre-commit: Automatic type checking
+- prek: Automatic type checking
 
 **Configuration**:
 
@@ -460,7 +460,7 @@ uv run pyright .
 - basedpyright: Fork with native CI output formats (GitLab, GitHub)
 - Mypy: Run both for best coverage
 - Ruff: Complementary linting
-- Pre-commit: Automatic type checking
+- prek: Automatic type checking
 
 **Configuration** (pyproject.toml - basedpyright):
 
@@ -490,13 +490,13 @@ venv = ".venv"
 
 ---
 
-### 2.5 pre-commit (Git Hooks)
+### 2.5 prek (Git Hooks)
 
 ```yaml
-tool_name: pre-commit
+tool_name: prek
 category: development
 python_versions: [3.11, 3.12, 3.13, 3.14]
-installation: "uv add --dev pre-commit"
+installation: "uv add --dev prek"
 purpose: "Git hook framework for running quality checks before commits"
 mandatory: true
 scenarios:
@@ -505,6 +505,7 @@ scenarios:
   - CI/CD pre-flight checks
   - Team quality enforcement
 alternatives:
+  - pre-commit (Python original — same config, slower)
   - Manual script execution (NOT recommended)
   - Custom git hooks (harder to maintain)
 ```
@@ -513,26 +514,26 @@ alternatives:
 
 - MANDATORY for all Python projects
 - Layer 6 of validation pipeline
-- Install hooks: `pre-commit install`
-- Run before commits: `pre-commit run --files <files>`
+- Install hooks: `prek install`
+- Run before commits: `prek run --files <files>`
 
 **Basic Usage**:
 
 ```bash
 # Install hooks
-uv run pre-commit install
+uv run prek install
 
 # Run on staged files (preferred - scoped operation)
-uv run pre-commit run
+uv run prek run
 
 # Run on specific files (scoped operation)
-uv run pre-commit run --files path/to/file.py
+uv run prek run --files path/to/file.py
 
 # Update hook versions
-uv run pre-commit autoupdate
+uv run prek update
 ```
 
-**Important**: Always scope operations to changed files using `pre-commit run` (staged files) or `--files <paths>`. Avoid `--all-files` unless explicitly requested by user, as it formats unrelated code causing diff pollution and merge conflicts.
+**Important**: Always scope operations to changed files using `prek run` (staged files) or `--files <paths>`. Avoid `--all-files` unless explicitly requested by user, as it formats unrelated code causing diff pollution and merge conflicts.
 
 **Integration with Other Tools**:
 
@@ -584,11 +585,11 @@ repos:
 ```bash
 # Standard workflow
 git add file.py
-uv run pre-commit run --files file.py  # Run checks
+uv run prek run --files file.py  # Run checks
 git commit -m "Add feature"  # Auto-runs hooks
 
 # Fix issues on specific files
-uv run pre-commit run --files file.py other.py
+uv run prek run --files file.py other.py
 ```
 
 **Note**: Hooks run automatically on staged files during commit. Manual invocation is typically only needed for verification before staging. Avoid `--all-files` to prevent formatting code outside your current branch.
@@ -732,7 +733,7 @@ bandit -r packages/ -ll  # Low confidence + Low severity
 **Integration with Other Tools**:
 
 - Ruff: Some overlap with flake8-bandit rules
-- Pre-commit: Security scanning before commit
+- prek: Security scanning before commit
 - CI/CD: Fail pipeline on high-severity issues
 
 **Configuration**:
@@ -3639,10 +3640,10 @@ graph TD
 
     typer --> rich[Rich - bundled]
 
-    pre-commit --> ruff
-    pre-commit --> mypy
-    pre-commit --> pyright
-    pre-commit --> pytest
+    prek --> ruff
+    prek --> mypy
+    prek --> pyright
+    prek --> pytest
 
     hatchling --> uv
 
@@ -3652,7 +3653,7 @@ graph TD
     style pytest fill:#87CEEB
     style ruff fill:#FFD700
     style typer fill:#DDA0DD
-    style pre-commit fill:#F0E68C
+    style prek fill:#F0E68C
 ```
 
 ---
@@ -3671,7 +3672,7 @@ graph TD
 # ///
 
 # Development dependencies
-uv add --dev pytest pytest-mock pytest-cov mypy ruff pyright pre-commit
+uv add --dev pytest pytest-mock pytest-cov mypy ruff pyright prek
 ```
 
 **Use Case**: Interactive CLI tools for humans with Rich output
@@ -3702,7 +3703,7 @@ uv add --dev pytest pytest-mock pytest-cov
 uv add --dev pytest-asyncio pytest-bdd pytest-benchmark hypothesis mutmut
 
 # Quality tools
-uv add --dev mypy ruff pyright pre-commit
+uv add --dev mypy ruff pyright prek
 ```
 
 **Use Case**: Comprehensive testing setup
@@ -3733,7 +3734,7 @@ uv add typer pydantic requests
 uv add --dev pytest pytest-mock pytest-cov hypothesis mutmut
 
 # Quality
-uv add --dev ruff mypy pyright pre-commit bandit
+uv add --dev ruff mypy pyright prek bandit
 
 # Optional
 uv add --dev pytest-asyncio pytest-bdd robotframework
@@ -3748,11 +3749,11 @@ uv add --dev pytest-asyncio pytest-bdd robotframework
 ### 14.1 Validation Pipeline Integration
 
 ```bash
-# Preferred: Use pre-commit on staged files (runs all layers in correct order)
-uv run pre-commit run
+# Preferred: Use prek on staged files (runs all layers in correct order)
+uv run prek run
 
 # Or on specific files
-uv run pre-commit run --files src/module.py tests/test_module.py
+uv run prek run --files src/module.py tests/test_module.py
 
 # Individual layers for targeted validation:
 
@@ -3772,7 +3773,7 @@ uv run pytest
 /python-engineering:shebangpython script.py
 ```
 
-**Important - Scoped Operations**: Pre-commit runs on staged files by default, preventing formatting changes to unrelated code. Avoid `--all-files` unless explicitly requested by user for repository-wide cleanup, as it causes diff pollution and merge conflicts.
+**Important - Scoped Operations**: prek runs on staged files by default, preventing formatting changes to unrelated code. Avoid `--all-files` unless explicitly requested by user for repository-wide cleanup, as it causes diff pollution and merge conflicts.
 
 **Pattern**: Sequential validation gates
 
@@ -3809,7 +3810,7 @@ uv run pytest --benchmark-only tests/benchmarks/
 
 ---
 
-### 14.3 Pre-commit Hook Integration
+### 14.3 prek Hook Integration
 
 ```yaml
 # .pre-commit-config.yaml
@@ -3894,7 +3895,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "mypy>=1.11.0",
     "ruff>=0.6.0",
-    "pre-commit>=3.8.0",
+    "prek>=0.4",
 ]
 
 [project.scripts]
@@ -4160,7 +4161,7 @@ Coverage thresholds configured in `pyproject.toml` (95%+ for critical code like 
 2. **Code Writing**: typer/argparse, pydantic, httpx/requests
 3. **Testing**: pytest, pytest-mock, pytest-cov, hypothesis
 4. **Quality**: ruff, mypy, pyright, bandit
-5. **Pre-commit**: pre-commit, validate_pep723.py
+5. **prek**: prek, validate_pep723.py
 6. **Building**: uv build (hatchling backend)
 7. **Publishing**: uv publish
 
@@ -4642,7 +4643,7 @@ Or provide your email address: ___
 
 **Coverage Summary**:
 
-- Development Tools: 7 (uv, ruff, mypy, pyright, pre-commit, prospector, bandit)
+- Development Tools: 7 (uv, ruff, mypy, pyright, prek, prospector, bandit)
 - Testing Tools: 9 (pytest, pytest-mock, pytest-cov, hypothesis, mutmut, robotframework, pytest-asyncio, pytest-bdd, pytest-benchmark)
 - CLI Frameworks: 4 (typer, rich, argparse, textual)
 - Data Libraries: 5 (datasette, arrow, httpx, requests, pydantic)
