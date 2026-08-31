@@ -197,10 +197,12 @@ cat /tmp/test-msg
 ```bash
 SKIP=hook-id git commit -m "message"   # skip one hook during a real commit
 prek run --skip hook-id                # skip one hook for a manual run
-git commit --no-verify                 # bypass all hooks (git-level, works with either tool)
+git commit --no-verify                 # bypass pre-commit and commit-msg stage hooks only
 ```
 
 `--skip` only applies to `prek run`; git's automatic invocation never sees it. Use `SKIP=hook-id` for that instead — prek honors it exactly like pre-commit (verified against 0.4.11: it errors out if `SKIP` filters out every hook in the config, so never use it to skip an entire single-hook setup).
+
+`--no-verify` does not bypass `prepare-commit-msg` — git only wires it to the `pre-commit` and `commit-msg` stages (verified against `git commit -h` and by reproducing a live `prepare-commit-msg` hook run with the flag set), so a message-rewriting hook still fires. Some repos forbid `--no-verify` outright (fix the failing hook instead) — check the project's own contribution docs before reaching for it.
 
 ## Cache
 
