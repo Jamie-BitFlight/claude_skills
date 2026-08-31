@@ -76,6 +76,26 @@ class _RejectedMutation(BaseModel):
     reason: str
 
 
+class _RejectedWorkItemMutation(BaseModel):
+    """Durable work-item mutation whose idempotency_key doesn't match its own content.
+
+    Mirrors :class:`_RejectedMutation` for the work-item queue -- inspectable
+    and never replayed, but not destroyed. A mismatch is not proof of a
+    hand-edit: an older plugin version reading an entry a newer version wrote
+    silently drops any field it doesn't recognize (pydantic's default
+    ``extra="ignore"``), which changes the recomputed hash for a perfectly
+    legitimate entry too. Dropping outright would be silent data loss for
+    that case; dead-lettering here keeps the entry recoverable either way.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    idempotency_key: str
+    key: str
+    item: BacklogItem
+    reason: str
+
+
 class ReplayAcknowledgement(BaseModel):
     """Applied provider mutation and its resulting checkpoint."""
 
@@ -94,6 +114,7 @@ class _CacheState(BaseModel):
     pending: list[PendingMutation] = Field(default_factory=list)
     rejected: list[_RejectedMutation] = Field(default_factory=list)
     pending_work_items: list[_PendingWorkItemMutation] = Field(default_factory=list)
+    rejected_work_items: list[_RejectedWorkItemMutation] = Field(default_factory=list)
     snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
 
 
@@ -300,6 +321,10 @@ class _CacheStateStore:
             "list[_PendingWorkItemMutation]",
             self._salvage_list(raw, "pending_work_items", _PendingWorkItemMutation, path),
         )
+        rejected_work_items = cast(
+            "list[_RejectedWorkItemMutation]",
+            self._salvage_list(raw, "rejected_work_items", _RejectedWorkItemMutation, path),
+        )
         # Idempotency-key self-consistency is checked once, uniformly, in
         # _verify_queue_keys -- not here, so it also runs on states that took
         # the model_validate_json fast path (see _read).
@@ -310,6 +335,7 @@ class _CacheStateStore:
             pending=pending,
             rejected=rejected,
             pending_work_items=pending_work_items,
+            rejected_work_items=rejected_work_items,
             snapshot_checkpoint=checkpoint,
         )
 
@@ -343,47 +369,81 @@ class _CacheStateStore:
 
     @staticmethod
     def _verify_queue_keys(state: _CacheState, path: Path) -> _CacheState:
-        """Drop any pending/pending_work_items entry whose key doesn't match its content.
+        """Dead-letter any pending/pending_work_items entry whose key doesn't match its content.
 
         Runs on every load (both the model_validate_json fast path and the
         _salvage path) and during migration, before a legacy file's converted
         content is saved -- not folded into _salvage, because a structurally
         complete but forged entry never fails schema validation and would
-        otherwise skip this check entirely. rejected entries are exempt: they're
-        inert inspection records, never replayed, so a stale key there is
-        harmless.
+        otherwise skip this check entirely. rejected/rejected_work_items entries
+        are exempt from the check themselves: they're inert inspection records,
+        never replayed, so a stale key there is harmless.
+
+        A mismatch moves the entry to rejected/rejected_work_items instead of
+        deleting it -- it is not proof of a hand-edit. An older plugin version
+        reading an entry a newer version wrote silently drops any field it
+        doesn't recognize (pydantic's default extra="ignore"), which changes
+        the recomputed hash for a perfectly legitimate entry too. Dropping
+        outright would be silent data loss for that case; dead-lettering keeps
+        the entry recoverable and inspectable either way.
 
         Returns:
-            ``state``, or a copy with the inconsistent entries dropped.
+            ``state``, or a copy with the inconsistent entries moved to the
+            corresponding rejected list.
         """
-        pending = [
-            entry
-            for entry in state.pending
-            if _CacheStateStore._key_is_consistent(
-                path, "pending", entry.idempotency_key, _content_mutation_key(entry.write)
-            )
-        ]
-        pending_work_items = [
-            entry
-            for entry in state.pending_work_items
-            if _CacheStateStore._key_is_consistent(
-                path, "pending_work_items", entry.idempotency_key, _work_item_mutation_key(entry.key, entry.item)
-            )
-        ]
-        if pending == state.pending and pending_work_items == state.pending_work_items:
+        pending: list[PendingMutation] = []
+        rejected = list(state.rejected)
+        for entry in state.pending:
+            expected = _content_mutation_key(entry.write)
+            if _CacheStateStore._key_is_consistent(path, "pending", entry.idempotency_key, expected):
+                pending.append(entry)
+            else:
+                rejected.append(
+                    _RejectedMutation(
+                        idempotency_key=entry.idempotency_key,
+                        write=entry.write,
+                        reason="idempotency_key does not match its content",
+                    )
+                )
+        pending_work_items: list[_PendingWorkItemMutation] = []
+        rejected_work_items = list(state.rejected_work_items)
+        for wi_entry in state.pending_work_items:
+            expected = _work_item_mutation_key(wi_entry.key, wi_entry.item)
+            if _CacheStateStore._key_is_consistent(path, "pending_work_items", wi_entry.idempotency_key, expected):
+                pending_work_items.append(wi_entry)
+            else:
+                rejected_work_items.append(
+                    _RejectedWorkItemMutation(
+                        idempotency_key=wi_entry.idempotency_key,
+                        key=wi_entry.key,
+                        item=wi_entry.item,
+                        reason="idempotency_key does not match its content",
+                    )
+                )
+        if (
+            pending == state.pending
+            and pending_work_items == state.pending_work_items
+            and rejected == state.rejected
+            and rejected_work_items == state.rejected_work_items
+        ):
             return state
-        return state.model_copy(update={"pending": pending, "pending_work_items": pending_work_items})
+        return state.model_copy(
+            update={
+                "pending": pending,
+                "pending_work_items": pending_work_items,
+                "rejected": rejected,
+                "rejected_work_items": rejected_work_items,
+            }
+        )
 
     @staticmethod
     def _key_is_consistent(path: Path, field_name: str, stored_key: str, expected_key: str) -> bool:
         """Self-consistency check: does a queue entry's key match its own content?
 
-        A key mismatch means the entry didn't come from this store's own
-        `queue_write`/`_queue_work_item` -- most plausibly a hand-edit, since
-        those are the only two places an idempotency_key is ever assigned. This
-        is not tamper-proofing (anyone reading this code can compute the hash);
-        it only guards against the accident/confusion case, which is the actual
-        threat model here.
+        A key mismatch does not by itself prove a hand-edit -- see
+        :meth:`_verify_queue_keys` for why a legitimate, version-skewed entry
+        can trip this too. Either way the entry is dead-lettered, not trusted
+        for replay, by the caller.
 
         Returns:
             True if the entry's key matches its own content, False otherwise
@@ -392,7 +452,7 @@ class _CacheStateStore:
         if stored_key == expected_key:
             return True
         _log.error(
-            "Cache state %s: dropping %s entry %s -- idempotency_key does not match its content",
+            "Cache state %s: dead-lettering %s entry %s -- idempotency_key does not match its content",
             path,
             field_name,
             stored_key,

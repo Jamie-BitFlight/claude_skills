@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import get_context
@@ -703,8 +704,41 @@ def test_load_dead_letters_pending_entry_with_mismatched_idempotency_key(tmp_pat
     # When: the store loads it
     loaded = store.load()
 
-    # Then: the forged entry is dropped, the legitimate one survives
+    # Then: the forged entry is dead-lettered (not deleted, not replayed), the
+    # legitimate one survives untouched
     assert loaded.pending_work_items == [good_entry]
+    assert len(loaded.rejected_work_items) == 1
+    dead_lettered = loaded.rejected_work_items[0]
+    assert dead_lettered.idempotency_key == "not-the-real-hash"
+    assert dead_lettered.key == "#2"
+    assert dead_lettered.reason == "idempotency_key does not match its content"
+
+
+def test_load_dead_letters_pending_entry_from_version_skew_not_just_hand_edits(tmp_path: Path) -> None:
+    # Given: a pending entry whose key was computed by a NEWER plugin version
+    # that included a field this version's ContentWrite model doesn't know
+    # about -- pydantic's default extra="ignore" silently drops that field on
+    # load, so re-deriving the key from the (now-lossy) parsed model produces
+    # a different hash than the writer's, even though the entry is legitimate
+    reference = _reference("#1")
+    write = ContentWrite(reference=reference, content="from a newer version", expected_revision="rev-1")
+    raw_write = json.loads(write.model_dump_json())
+    raw_write["field_added_by_a_future_version"] = "unknown to this reader"
+    payload = json.dumps(raw_write, sort_keys=True, separators=(",", ":"))
+    key_from_newer_version = hashlib.sha256(payload.encode()).hexdigest()
+    raw_state = json.loads(_CacheState().model_dump_json())
+    raw_state["pending"] = [{"idempotency_key": key_from_newer_version, "write": raw_write}]
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text(json.dumps(raw_state), encoding="utf-8")
+
+    # When: this (older) version loads it
+    loaded = store.load()
+
+    # Then: not silently lost -- dead-lettered for inspection, not deleted
+    assert loaded.pending == []
+    assert len(loaded.rejected) == 1
+    assert loaded.rejected[0].idempotency_key == key_from_newer_version
+    assert loaded.rejected[0].write.content == "from a newer version"
 
 
 def test_load_does_not_key_check_rejected_entries(tmp_path: Path) -> None:

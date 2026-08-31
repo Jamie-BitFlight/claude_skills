@@ -22,6 +22,7 @@ from .file_cache_state import (
     _PendingWorkItemMutation,
     _ProviderSnapshotCheckpoint,
     _RejectedMutation,
+    _RejectedWorkItemMutation,
     _work_item_mutation_key,
 )
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
@@ -268,6 +269,16 @@ class FileCache:
 
     def _pending_work_item_mutations(self) -> list[_PendingWorkItemMutation]:
         return list(self._load_state().pending_work_items)
+
+    def _rejected_work_item_mutations(self) -> list[_RejectedWorkItemMutation]:
+        """Return work-item mutations dead-lettered for a key/content mismatch.
+
+        See :meth:`_CacheStateStore._verify_queue_keys` -- a mismatch here is
+        not proof of a hand-edit; a legitimate entry from a newer plugin
+        version can trip it too, so these are preserved for inspection rather
+        than replayed or discarded.
+        """
+        return list(self._load_state().rejected_work_items)
 
     def _acknowledge_work_items(self, idempotency_keys: set[str]) -> None:
         if not idempotency_keys:
