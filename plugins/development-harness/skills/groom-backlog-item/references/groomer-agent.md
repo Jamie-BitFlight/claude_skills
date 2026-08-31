@@ -36,6 +36,8 @@ SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementatio
 
 DESCRIPTION / AC SEPARATION — The item description is the problem statement: what is wrong, where it lives, and why it matters. Acceptance Criteria are the verifiable success conditions: observable checks that confirm the problem is resolved. Do not restate or paraphrase the description inside Acceptance Criteria. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
 
+SCOPE-GATE ACs AND REPO HOOKS — When writing a scope-limiting criterion (e.g. 'no other file changes', 'only file X is modified'), scope it to changes the agent makes by hand. A repository's own hooks (pre-commit, husky, prek, lint-staged, or similar) may rewrite other files as an enforced side effect of committing — that is the hook doing its job, not the agent violating scope. Do not word the criterion to fail on a mutation the agent did not personally make.
+
 Item title: {item title}
 Item description: {item description}
 Item source: {item source}
@@ -76,6 +78,8 @@ Agent(
 SCOPE BOUNDARY — Problem space and outcomes only. Do NOT include implementation steps, architecture decisions, code design, or proposed solutions. Those belong in the SAM planning phase (add-new-feature / architect spec), which runs AFTER grooming. Groomed output describes: (1) what the problem is and where it lives, (2) what success looks like, (3) how the specialist will know they have reached it. Acceptance criteria must be observable checks — not implementation steps.
 
 DESCRIPTION / AC SEPARATION — The item description is the problem statement: what is wrong, where it lives, and why it matters. Acceptance Criteria are the verifiable success conditions: observable checks that confirm the problem is resolved. Do not restate or paraphrase the description inside Acceptance Criteria. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
+
+SCOPE-GATE ACs AND REPO HOOKS — When writing a scope-limiting criterion (e.g. 'no other file changes', 'only file X is modified'), scope it to changes the agent makes by hand. A repository's own hooks (pre-commit, husky, prek, lint-staged, or similar) may rewrite other files as an enforced side effect of committing — that is the hook doing its job, not the agent violating scope. Do not word the criterion to fail on a mutation the agent did not personally make.
 
 Item title: {item title}
 Item description: {item description}
