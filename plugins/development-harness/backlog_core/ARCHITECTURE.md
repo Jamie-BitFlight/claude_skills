@@ -475,6 +475,14 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 - Last acknowledged provider revision and synchronization fingerprint
 - Pending mutations created while the provider is unreachable
 
+**On-disk layout**, under the cache root (`<state_root>/github-cache/` for the GitHub backend):
+
+- `cache.json` — the durable state above, as JSON (`_CacheStateStore` in `file_cache_state.py`). A
+  legacy `cache.yaml` from before this file was renamed is migrated automatically on first write.
+- `cache.lock` — cross-process/cross-version mutual exclusion for the state file; never renamed.
+- `items/**/*.yaml` — per-item provider snapshots, written by `yaml_io.py`. These genuinely are
+  YAML, unlike `cache.json` — don't confuse the two when reasoning about this cache's format.
+
 **Offline behavior**:
 
 - Reads return the latest cached value with explicit stale-state metadata.

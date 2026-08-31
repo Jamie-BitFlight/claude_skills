@@ -2666,8 +2666,8 @@ async def backlog_pull(
 ) -> dict:
     """Reconcile linked issue content.
 
-    Only backends that support reconciliation act on this (currently GitHub) —
-    on other backends this is a no-op; check the returned messages.
+    Only backends that support reconciliation act on this — on other backends
+    this is a no-op; check the returned messages.
 
     Auto-migrates P0/P1 items lacking GitHub Issues by creating them.
     Merges by section using entry-aware merge (keeps longer entries, preserves strikes).

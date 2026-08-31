@@ -8,7 +8,6 @@ from pathlib import Path
 from threading import Barrier, Thread
 from unittest.mock import MagicMock
 
-import pydantic
 import pytest
 from backlog_core import file_cache
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
@@ -16,11 +15,14 @@ from backlog_core.file_cache_state import (
     PendingMutation,
     _CacheState,
     _CacheStateStore,
+    _content_mutation_key,
     _PendingWorkItemMutation,
     _RejectedMutation,
+    _work_item_mutation_key,
 )
 from backlog_core.models import (
     BacklogItem,
+    CacheStateCorruptError,
     ContentKind,
     ContentRecord,
     ContentRef,
@@ -432,23 +434,23 @@ def test_get_content_surfaces_the_rejection_reason_for_a_rejected_reference(tmp_
 
 
 def _populated_cache_state() -> _CacheState:
-    # A realistic mix of the nested models actually persisted to cache.yaml.
+    # A realistic mix of the nested models actually persisted to cache.json.
+    # pending/pending_work_items keys are derived through the real formula
+    # (not hardcoded) so they pass the idempotency-key self-consistency check
+    # on load -- a hardcoded fake key would be dead-lettered as a hand-edit.
     artifact_ref = _reference("#1")
     plan_ref = ContentRef(kind=ContentKind.PLAN, name="P12.yaml")
+    pending_write = ContentWrite(reference=artifact_ref, content="updated", expected_revision="rev-1")
+    work_item = BacklogItem(title="Offline edit")
     return _CacheState(
         records=[
             _record(artifact_ref, "artifact body"),
             ContentRecord(reference=plan_ref, owner_reference="", content="plan body", revision="rev-2", stale=True),
         ],
         checkpoints=[CacheCheckpoint(reference=artifact_ref, revision="rev-1", fingerprint="fp-1")],
-        pending=[
-            PendingMutation(
-                idempotency_key="key-1",
-                write=ContentWrite(reference=artifact_ref, content="updated", expected_revision="rev-1"),
-            )
-        ],
+        pending=[PendingMutation(idempotency_key=_content_mutation_key(pending_write), write=pending_write)],
         pending_work_items=[
-            _PendingWorkItemMutation(idempotency_key="key-2", key="#1", item=BacklogItem(title="Offline edit"))
+            _PendingWorkItemMutation(idempotency_key=_work_item_mutation_key("#1", work_item), key="#1", item=work_item)
         ],
         snapshot_checkpoint=_ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z"),
     )
@@ -466,20 +468,22 @@ def _write_new_json(path: Path, state: _CacheState) -> None:
 
 
 def test_load_reads_legacy_yaml_cache_file_with_full_fidelity(tmp_path: Path) -> None:
-    # Given: a cache.yaml written the way every process writes it today
+    # Given: a cache.yaml written the way every process wrote it before the
+    # cache.json rename -- the legacy path, not the (now cache.json) accessor
     state = _populated_cache_state()
     store = _CacheStateStore(tmp_path)
-    _write_legacy_yaml(store._state_path, state)
+    _write_legacy_yaml(store._legacy_state_path, state)
 
-    # When: the store loads it
+    # When: the store loads it (read-only -- no migration, no write)
     loaded = store.load()
 
     # Then: every record, checkpoint, pending mutation, and snapshot survives intact
     assert loaded == state
+    assert not store._state_path.exists()
 
 
 def test_load_reads_new_json_cache_file_with_full_fidelity(tmp_path: Path) -> None:
-    # Given: a cache.yaml written by a process that already has the JSON-codec fix
+    # Given: a cache.json written by the store's own save path
     state = _populated_cache_state()
     store = _CacheStateStore(tmp_path)
     _write_new_json(store._state_path, state)
@@ -491,20 +495,118 @@ def test_load_reads_new_json_cache_file_with_full_fidelity(tmp_path: Path) -> No
     assert loaded == state
 
 
-def test_yaml_safe_load_already_parses_json_written_cache_files(tmp_path: Path) -> None:
-    # Given: a cache.yaml written by a process running the new JSON-codec fix
+def test_load_performs_no_writes(tmp_path: Path) -> None:
+    # Given: a legacy-only root -- regression guard for the deadlock fix: load()
+    # must never migrate or write, only transaction() may (see file_cache_state.py
+    # _migrate_legacy_state_file's docstring for why doing it in load() deadlocks)
     state = _populated_cache_state()
-    path = tmp_path / "cache.yaml"
-    _write_new_json(path, state)
+    store = _CacheStateStore(tmp_path)
+    _write_legacy_yaml(store._legacy_state_path, state)
+    before = sorted(p.name for p in tmp_path.iterdir())
 
-    # When: an old-code process reads it using only its current YAML-safe-load logic
-    yaml = YAML(typ="safe")
-    with path.open(encoding="utf-8") as stream:
-        loaded = _CacheState.model_validate(yaml.load(stream))
+    # When: the store loads it
+    store.load()
 
-    # Then: it round-trips correctly, because JSON is valid YAML -- this is the
-    # backward-compatibility property the migration depends on
-    assert loaded == state
+    # Then: the directory is untouched -- no cache.json, no cache.lock
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+
+
+def test_transaction_migrates_legacy_yaml_to_json(tmp_path: Path) -> None:
+    # Given: a genuine legacy YAML cache.yaml (not JSON wearing the extension)
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_legacy_yaml(store._legacy_state_path, state)
+
+    # When: a transaction runs (the only path that migrates)
+    result = store.transaction(lambda s: (s, None))
+
+    # Then: cache.json exists with identical content, cache.yaml is gone (superseded,
+    # not deleted), and the transaction's own read saw the migrated state
+    assert result is None
+    assert store._state_path.exists()
+    assert not store._legacy_state_path.exists()
+    assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
+    assert store.load() == state
+
+
+def test_transaction_renames_already_json_legacy_file_without_rewriting(tmp_path: Path) -> None:
+    # Given: a cache.yaml that's already JSON (written by code after the format
+    # fix but before the rename) -- the json.loads-succeeds discriminator path
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_new_json(store._legacy_state_path, state)
+    original_bytes = store._legacy_state_path.read_bytes()
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: renamed byte-for-byte, no ".superseded" leftover (nothing to supersede
+    # -- the rename consumed the only copy), no rewrite occurred
+    assert store._state_path.read_bytes() == original_bytes
+    assert not store._legacy_state_path.exists()
+    assert not store._legacy_state_path.with_name("cache.yaml.superseded").exists()
+
+
+def test_transaction_prefers_json_when_both_legacy_and_new_files_exist(tmp_path: Path) -> None:
+    # Given: both cache.json and a stale cache.yaml present (e.g. post-downgrade-
+    # then-upgrade)
+    current_state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_new_json(store._state_path, current_state)
+    stale_state = _CacheState()
+    _write_legacy_yaml(store._legacy_state_path, stale_state)
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: cache.json (the real current state) wins; the stale cache.yaml is
+    # superseded, not destroyed
+    assert store.load() == current_state
+    assert not store._legacy_state_path.exists()
+    assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
+
+
+def test_migration_leaves_lock_and_snapshot_items_untouched(tmp_path: Path) -> None:
+    # Given: a legacy cache.yaml alongside the lock file and a per-item snapshot
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_legacy_yaml(store._legacy_state_path, state)
+    (tmp_path / "cache.lock").touch()
+    items_dir = tmp_path / "items"
+    items_dir.mkdir()
+    (items_dir / "issues" / "12.yaml").parent.mkdir(parents=True)
+    (items_dir / "issues" / "12.yaml").write_text("title: kept\n", encoding="utf-8")
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: the lock file is never renamed (it's what gives old and new plugin
+    # copies mutual exclusion) and per-item snapshots are untouched
+    assert (tmp_path / "cache.lock").exists()
+    assert (items_dir / "issues" / "12.yaml").read_text(encoding="utf-8") == "title: kept\n"
+
+
+def test_migration_is_serialized_across_threads(tmp_path: Path) -> None:
+    # Given: a legacy cache.yaml and several threads racing to be the one that migrates it
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_legacy_yaml(store._legacy_state_path, state)
+    start = Barrier(5)
+
+    def run() -> None:
+        start.wait()
+        store.transaction(lambda s: (s, None))
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(run) for _ in range(4)]
+        start.wait()
+        for future in futures:
+            future.result()
+
+    # Then: exactly one migration happened -- no data lost, no leftover legacy file
+    assert store.load() == state
+    assert not store._legacy_state_path.exists()
+    assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
 
 
 def test_save_writes_content_parseable_as_plain_json(tmp_path: Path) -> None:
@@ -513,10 +615,11 @@ def test_save_writes_content_parseable_as_plain_json(tmp_path: Path) -> None:
     store = _CacheStateStore(tmp_path)
     store._save(state)
 
-    # When: the raw bytes on disk are parsed as plain JSON (not YAML)
+    # Then: the state file is actually named cache.json now (the direct
+    # regression guard for the rename -- nothing else in this suite asserts
+    # the filename), and its raw bytes parse as plain JSON, not YAML
+    assert store._state_path.name == "cache.json"
     raw_text = store._state_path.read_text(encoding="utf-8")
-
-    # Then: json.loads succeeds directly, proving the on-disk format is JSON
     json.loads(raw_text)
 
 
@@ -534,7 +637,7 @@ def test_empty_state_round_trips_through_save_and_load(tmp_path: Path) -> None:
 
 
 def test_load_returns_empty_state_when_file_is_missing(tmp_path: Path) -> None:
-    # Given: a cache root with no cache.yaml written yet
+    # Given: a cache root with neither cache.json nor cache.yaml written yet
     store = _CacheStateStore(tmp_path)
 
     # When: the store loads it
@@ -544,14 +647,83 @@ def test_load_returns_empty_state_when_file_is_missing(tmp_path: Path) -> None:
     assert loaded == _CacheState()
 
 
-def test_load_raises_instead_of_silently_returning_empty_state_for_corrupt_file(tmp_path: Path) -> None:
-    # Given: a cache.yaml that exists but is neither valid JSON nor a valid _CacheState
+def test_load_raises_typed_error_for_file_that_is_neither_json_nor_yaml(tmp_path: Path) -> None:
+    # Given: a cache.json that parses as neither JSON nor YAML
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text("{[", encoding="utf-8")
+
+    # When/Then: loading raises the typed error, not a raw ruamel.yaml.YAMLError
+    with pytest.raises(CacheStateCorruptError):
+        store.load()
+
+
+def test_load_raises_typed_error_for_file_that_parses_to_a_non_mapping(tmp_path: Path) -> None:
+    # Given: a cache.json that's valid YAML (a plain scalar) but not a mapping
     store = _CacheStateStore(tmp_path)
     store._state_path.write_text("just a garbage string, not a mapping", encoding="utf-8")
 
     # When/Then: loading raises rather than silently discarding the on-disk state
-    with pytest.raises(pydantic.ValidationError):
+    with pytest.raises(CacheStateCorruptError):
         store.load()
+
+
+def test_load_salvages_valid_entries_when_one_pending_work_item_is_malformed(tmp_path: Path) -> None:
+    # Given: a state dict with one schema-valid pending_work_items entry and one
+    # that's missing a required field
+    state = _populated_cache_state()
+    good_entry = state.pending_work_items[0]
+    raw = json.loads(state.model_dump_json())
+    raw["pending_work_items"].append({"idempotency_key": "whatever", "key": "#2"})  # missing "item"
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: the malformed entry is dropped, the valid one survives, nothing raises
+    assert loaded.pending_work_items == [good_entry]
+
+
+def test_load_dead_letters_pending_entry_with_mismatched_idempotency_key(tmp_path: Path) -> None:
+    # Given: a state dict with one legitimate pending_work_items entry and one
+    # that's schema-valid but whose idempotency_key doesn't match its own
+    # content -- the shape of the hand-edit incident this check exists for
+    state = _populated_cache_state()
+    good_entry = state.pending_work_items[0]
+    forged_item = BacklogItem(title="Hand-edited entry")
+    raw = json.loads(state.model_dump_json())
+    raw["pending_work_items"].append({
+        "idempotency_key": "not-the-real-hash",
+        "key": "#2",
+        "item": json.loads(forged_item.model_dump_json()),
+    })
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: the forged entry is dropped, the legitimate one survives
+    assert loaded.pending_work_items == [good_entry]
+
+
+def test_load_does_not_key_check_rejected_entries(tmp_path: Path) -> None:
+    # Given: a rejected entry with a stale key from before its mutation was
+    # queue_write-superseded -- rejected entries are inert inspection records,
+    # never replayed, so they're exempt from the self-consistency check
+    reference = _reference("#1")
+    write = ContentWrite(reference=reference, content="rejected", expected_revision="rev-1")
+    state = _CacheState(
+        rejected=[_RejectedMutation(idempotency_key="stale-key", write=write, reason="revision no longer matches")]
+    )
+    store = _CacheStateStore(tmp_path)
+    store._save(state)
+
+    # When: the store loads it
+    loaded = store.load()
+
+    # Then: the rejected entry survives despite the mismatched key
+    assert loaded == state
 
 
 def test_file_cache_serializes_process_writers(tmp_path: Path) -> None:
