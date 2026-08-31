@@ -19,6 +19,7 @@ from .file_cache_state import (
     _CacheState,
     _CacheStateStore,
     _content_mutation_key,
+    _CorruptQueueEntry,
     _PendingWorkItemMutation,
     _ProviderSnapshotCheckpoint,
     _RejectedMutation,
@@ -279,6 +280,14 @@ class FileCache:
         than replayed or discarded.
         """
         return list(self._load_state().rejected_work_items)
+
+    def _corrupt_queue_entries(self) -> list[_CorruptQueueEntry]:
+        """Return pending/pending_work_items entries that failed schema validation on load.
+
+        See :meth:`_CacheStateStore._salvage_queue_list` -- stored as raw
+        payloads for manual recovery, since they never became typed models.
+        """
+        return list(self._load_state().corrupt_queue_entries)
 
     def _acknowledge_work_items(self, idempotency_keys: set[str]) -> None:
         if not idempotency_keys:

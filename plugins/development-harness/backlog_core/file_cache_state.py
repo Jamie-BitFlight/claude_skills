@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from threading import Lock
-from typing import Final, TypeVar, cast
+from typing import Any, Final, TypeVar, cast
 
 import pydantic
 from pydantic import BaseModel, ConfigDict, Field
@@ -96,6 +96,25 @@ class _RejectedWorkItemMutation(BaseModel):
     reason: str
 
 
+class _CorruptQueueEntry(BaseModel):
+    """A pending/pending_work_items entry that failed schema validation on load.
+
+    Stored as its raw, unvalidated payload -- unlike a key mismatch, a
+    schema-invalid entry never became a typed model, so there is no
+    well-formed object to preserve otherwise. The most likely cause is
+    schema evolution (a model gaining a required field invalidates entries
+    an older plugin version queued), not corruption, so the payload is very
+    likely a perfectly good write that this version just can't parse yet --
+    kept for manual recovery rather than silently discarded.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    field: str
+    raw: Any
+    reason: str
+
+
 class ReplayAcknowledgement(BaseModel):
     """Applied provider mutation and its resulting checkpoint."""
 
@@ -115,13 +134,8 @@ class _CacheState(BaseModel):
     rejected: list[_RejectedMutation] = Field(default_factory=list)
     pending_work_items: list[_PendingWorkItemMutation] = Field(default_factory=list)
     rejected_work_items: list[_RejectedWorkItemMutation] = Field(default_factory=list)
+    corrupt_queue_entries: list[_CorruptQueueEntry] = Field(default_factory=list)
     snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
-
-
-# Fields whose loss discards a user's unreplayed offline write (logged at error,
-# not warning) -- distinct from the other three fields, which are pure cache and
-# regenerable from the provider.
-_QUEUE_FIELDS: Final = frozenset({"pending", "pending_work_items"})
 
 
 def _content_mutation_key(write: ContentWrite) -> str:
@@ -226,24 +240,22 @@ class _CacheStateStore:
         leaves ``cache.yaml`` in place, which :meth:`load` still reads, and the
         next transaction retries.
 
-        ponytail: accepts a narrow, deliberate loss -- an older plugin copy that
-        never observes this migration (a sequential downgrade, or two plugin
-        versions sharing one ``~/.dh`` root concurrently) sees no ``cache.yaml``,
-        takes ``cache.lock`` (never renamed, so both versions still exclude each
-        other), and durably writes a fresh empty state. ``records``/``checkpoints``
-        just cost a full resync; the real loss is any unreplayed
-        ``pending``/``pending_work_items`` queued before that point. Upgrade to a
-        signed/versioned handoff if this is ever observed in practice.
+        ponytail: an older plugin copy that never observes this migration (a
+        sequential downgrade, or two plugin versions sharing one ``~/.dh`` root
+        concurrently) sees no ``cache.yaml``, takes ``cache.lock`` (never
+        renamed, so both versions still exclude each other), and durably
+        writes a fresh ``cache.yaml`` containing just its own new offline
+        writes. The "both present" branch below merges that recreated file's
+        pending/pending_work_items into cache.json's before superseding it, so
+        that queued intent survives; records/checkpoints/snapshot_checkpoint
+        from the legacy copy are still discarded on that path -- regenerable,
+        so an accepted, narrower loss than before. Upgrade to a
+        signed/versioned handoff if even that is ever observed as a problem.
         """
         if not self._legacy_state_path.exists():
             return
         if self._state_path.exists():
-            # Both present (e.g. post-downgrade-then-upgrade): cache.json is
-            # authoritative -- load() already prefers it. Supersede the stale
-            # legacy file so it stops looking like something safe to hand-edit,
-            # without reading or altering its content.
-            superseded = self._legacy_state_path.with_name(self._legacy_state_path.name + ".superseded")
-            self._legacy_state_path.replace(superseded)
+            self._merge_legacy_queue_entries_and_supersede()
             return
         text = self._legacy_state_path.read_text(encoding="utf-8")
         try:
@@ -263,6 +275,52 @@ class _CacheStateStore:
             # parse-and-rewrite would silently drop any field a newer plugin
             # version wrote that this version doesn't know about yet.
             self._legacy_state_path.replace(self._state_path)
+
+    def _merge_legacy_queue_entries_and_supersede(self) -> None:
+        """Merge a recreated legacy file's queue entries into cache.json, then supersede it.
+
+        Called when both files exist. cache.json is authoritative for
+        records/checkpoints/snapshot_checkpoint -- load() already prefers it,
+        and the legacy copy's version of those is discarded here as
+        regenerable. pending/pending_work_items are different: an older
+        plugin copy unaware of the rename could have written new offline
+        mutations into a fresh cache.yaml of its own (see the ponytail note on
+        :meth:`_migrate_legacy_state_file`), and those are real, unreplayed
+        user intent -- merged in by idempotency_key rather than discarded.
+        """
+        try:
+            text = self._legacy_state_path.read_text(encoding="utf-8")
+            raw = self._parse_relaxed(text, self._legacy_state_path)
+            legacy_state = self._verify_queue_keys(self._salvage(raw, self._legacy_state_path), self._legacy_state_path)
+        except CacheStateCorruptError as exc:
+            _log.error(
+                "Cache state %s: could not read for merge before superseding, any queued writes in it are lost: %s",
+                self._legacy_state_path,
+                exc,
+            )
+        else:
+            if legacy_state.pending or legacy_state.pending_work_items:
+                current = self.load()
+                existing_pending_keys = {entry.idempotency_key for entry in current.pending}
+                merged_pending = [
+                    *current.pending,
+                    *(entry for entry in legacy_state.pending if entry.idempotency_key not in existing_pending_keys),
+                ]
+                existing_work_item_keys = {entry.idempotency_key for entry in current.pending_work_items}
+                merged_work_items = [
+                    *current.pending_work_items,
+                    *(
+                        entry
+                        for entry in legacy_state.pending_work_items
+                        if entry.idempotency_key not in existing_work_item_keys
+                    ),
+                ]
+                if merged_pending != current.pending or merged_work_items != current.pending_work_items:
+                    self._save(
+                        current.model_copy(update={"pending": merged_pending, "pending_work_items": merged_work_items})
+                    )
+        superseded = self._legacy_state_path.with_name(self._legacy_state_path.name + ".superseded")
+        self._legacy_state_path.replace(superseded)
 
     @staticmethod
     def _parse_yaml(text: str, path: Path) -> dict[str, object]:
@@ -306,25 +364,36 @@ class _CacheStateStore:
         it fails earlier, in :meth:`_parse_relaxed`, with a typed error, because
         per-entry salvage cannot help when the document itself doesn't parse.
 
+        Schema-invalid pending/pending_work_items entries are different from
+        the other four fields: those are pure cache, safely dropped and
+        logged (:meth:`_salvage_list`). Losing a pending entry is losing a
+        user's unreplayed offline write, so :meth:`_salvage_queue_list`
+        preserves its raw payload in ``corrupt_queue_entries`` instead.
+
         Returns:
-            A state built only from entries that validated; malformed ones are
-            logged and dropped.
+            A state built only from entries that validated; malformed
+            non-queue entries are logged and dropped, malformed queue
+            entries are preserved in ``corrupt_queue_entries``.
         """
         # Runtime shape is guaranteed by _salvage_list's own model.model_validate()
         # call; the casts below narrow it back for the type checker, which can't
         # express that generically without an overload per field.
         records = cast("list[ContentRecord]", self._salvage_list(raw, "records", ContentRecord, path))
         checkpoints = cast("list[CacheCheckpoint]", self._salvage_list(raw, "checkpoints", CacheCheckpoint, path))
-        pending = cast("list[PendingMutation]", self._salvage_list(raw, "pending", PendingMutation, path))
         rejected = cast("list[_RejectedMutation]", self._salvage_list(raw, "rejected", _RejectedMutation, path))
-        pending_work_items = cast(
-            "list[_PendingWorkItemMutation]",
-            self._salvage_list(raw, "pending_work_items", _PendingWorkItemMutation, path),
-        )
         rejected_work_items = cast(
             "list[_RejectedWorkItemMutation]",
             self._salvage_list(raw, "rejected_work_items", _RejectedWorkItemMutation, path),
         )
+        existing_corrupt = cast(
+            "list[_CorruptQueueEntry]", self._salvage_list(raw, "corrupt_queue_entries", _CorruptQueueEntry, path)
+        )
+        pending_raw, corrupt_pending = self._salvage_queue_list(raw, "pending", PendingMutation, path)
+        pending = cast("list[PendingMutation]", pending_raw)
+        work_items_raw, corrupt_work_items = self._salvage_queue_list(
+            raw, "pending_work_items", _PendingWorkItemMutation, path
+        )
+        pending_work_items = cast("list[_PendingWorkItemMutation]", work_items_raw)
         # Idempotency-key self-consistency is checked once, uniformly, in
         # _verify_queue_keys -- not here, so it also runs on states that took
         # the model_validate_json fast path (see _read).
@@ -336,23 +405,60 @@ class _CacheStateStore:
             rejected=rejected,
             pending_work_items=pending_work_items,
             rejected_work_items=rejected_work_items,
+            corrupt_queue_entries=[*existing_corrupt, *corrupt_pending, *corrupt_work_items],
             snapshot_checkpoint=checkpoint,
         )
 
     @staticmethod
     def _salvage_list(raw: dict[str, object], field_name: str, model: type[BaseModel], path: Path) -> list[BaseModel]:
+        """Validate each entry of one non-queue field independently, dropping failures.
+
+        Not used for pending/pending_work_items -- see :meth:`_salvage_queue_list`.
+
+        Returns:
+            The entries that validated; malformed ones are logged and dropped.
+        """
         value = raw.get(field_name, [])
-        log = _log.error if field_name in _QUEUE_FIELDS else _log.warning
         if not isinstance(value, list):
-            log("Cache state %s: %r is not a list (%r) -- dropping all entries", path, field_name, value)
+            _log.warning("Cache state %s: %r is not a list (%r) -- dropping all entries", path, field_name, value)
             return []
         survivors: list[BaseModel] = []
         for entry in value:
             try:
                 survivors.append(model.model_validate(entry))
             except pydantic.ValidationError as exc:
-                log("Cache state %s: dropping malformed %s entry: %s", path, field_name, exc)
+                _log.warning("Cache state %s: dropping malformed %s entry: %s", path, field_name, exc)
         return survivors
+
+    @staticmethod
+    def _salvage_queue_list(
+        raw: dict[str, object], field_name: str, model: type[BaseModel], path: Path
+    ) -> tuple[list[BaseModel], list[_CorruptQueueEntry]]:
+        """Validate each entry of pending/pending_work_items, preserving failures instead of dropping them.
+
+        Returns:
+            The entries that validated, and the raw payload of each one that
+            didn't (see :class:`_CorruptQueueEntry` for why the raw form,
+            not a typed model, is what gets preserved here).
+        """
+        value = raw.get(field_name, [])
+        if not isinstance(value, list):
+            _log.error("Cache state %s: %r is not a list (%r) -- dropping all entries", path, field_name, value)
+            return [], []
+        survivors: list[BaseModel] = []
+        corrupt: list[_CorruptQueueEntry] = []
+        for entry in value:
+            try:
+                survivors.append(model.model_validate(entry))
+            except pydantic.ValidationError as exc:
+                _log.error(
+                    "Cache state %s: dead-lettering malformed %s entry (raw payload preserved): %s",
+                    path,
+                    field_name,
+                    exc,
+                )
+                corrupt.append(_CorruptQueueEntry(field=field_name, raw=entry, reason=str(exc)))
+        return survivors, corrupt
 
     @staticmethod
     def _salvage_checkpoint(raw: dict[str, object], path: Path) -> _ProviderSnapshotCheckpoint | None:

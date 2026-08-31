@@ -567,6 +567,38 @@ def test_transaction_prefers_json_when_both_legacy_and_new_files_exist(tmp_path:
     assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
 
 
+def test_transaction_merges_queue_entries_from_a_legacy_file_recreated_by_older_code(tmp_path: Path) -> None:
+    # Given: cache.json already exists (a newer version migrated once), but an
+    # older plugin copy unaware of the rename later ran and wrote its own new
+    # offline mutation into a fresh cache.yaml -- the concurrent-mixed-version
+    # scenario named in _migrate_legacy_state_file's ponytail note
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+
+    older_ref = _reference("#9")
+    older_write = ContentWrite(reference=older_ref, content="queued by older code", expected_revision="rev-1")
+    older_pending = PendingMutation(idempotency_key=_content_mutation_key(older_write), write=older_write)
+    older_item = BacklogItem(title="Queued by older code")
+    older_work_item = _PendingWorkItemMutation(
+        idempotency_key=_work_item_mutation_key("#9", older_item), key="#9", item=older_item
+    )
+    legacy_state = _CacheState(pending=[older_pending], pending_work_items=[older_work_item])
+    _write_legacy_yaml(store._legacy_state_path, legacy_state)
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: the older code's queued writes survive, merged into cache.json's
+    # existing queue -- not silently discarded when cache.yaml is superseded
+    loaded = store.load()
+    assert older_pending in loaded.pending
+    assert older_work_item in loaded.pending_work_items
+    assert all(entry in loaded.pending for entry in current_state.pending)
+    assert not store._legacy_state_path.exists()
+    assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
+
+
 def test_migration_leaves_lock_and_snapshot_items_untouched(tmp_path: Path) -> None:
     # Given: a legacy cache.yaml alongside the lock file and a per-item snapshot
     state = _populated_cache_state()
@@ -681,8 +713,44 @@ def test_load_salvages_valid_entries_when_one_pending_work_item_is_malformed(tmp
     # When: the store loads it
     loaded = store.load()
 
-    # Then: the malformed entry is dropped, the valid one survives, nothing raises
+    # Then: the malformed entry is removed from pending_work_items (it never
+    # became a valid model), the valid one survives, nothing raises -- and the
+    # malformed entry's raw payload is preserved in corrupt_queue_entries
+    # rather than silently lost (see the version-skew test below for why:
+    # "missing a required field" is exactly what schema evolution looks like)
     assert loaded.pending_work_items == [good_entry]
+    assert len(loaded.corrupt_queue_entries) == 1
+    preserved = loaded.corrupt_queue_entries[0]
+    assert preserved.field == "pending_work_items"
+    assert preserved.raw == {"idempotency_key": "whatever", "key": "#2"}
+
+
+def test_load_preserves_raw_payload_when_a_newer_version_adds_a_required_field(tmp_path: Path) -> None:
+    # Given: a pending entry written by a newer plugin version whose schema
+    # gained a required field this version's PendingMutation doesn't have --
+    # the strongest real justification for per-entry salvage in the first
+    # place. Missing-required-field is indistinguishable at validation time
+    # from any other malformed entry, so this exercises the same code path
+    # as a hand-edit -- the point is that it's preserved either way.
+    store = _CacheStateStore(tmp_path)
+    raw = json.loads(_CacheState().model_dump_json())
+    raw["pending"] = [
+        {
+            "idempotency_key": "whatever-the-newer-version-computed",
+            "write": {"reference": {"kind": "plan", "namespace": "", "artifact_type": "", "name": "P1.yaml"}},
+            "a_required_field_from_a_future_version": "unknown to this reader",
+        }
+    ]
+    store._state_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    # When: this (older) version loads it
+    loaded = store.load()
+
+    # Then: not silently lost -- the raw entry survives for manual recovery
+    assert loaded.pending == []
+    assert len(loaded.corrupt_queue_entries) == 1
+    assert loaded.corrupt_queue_entries[0].field == "pending"
+    assert loaded.corrupt_queue_entries[0].raw == raw["pending"][0]
 
 
 def test_load_dead_letters_pending_entry_with_mismatched_idempotency_key(tmp_path: Path) -> None:
