@@ -5,20 +5,18 @@ and backend implementations. Pydantic models remain the canonical validation
 layer; conversion happens in the query layer, not in the backends.
 
 All types follow the pattern established in backlog_core/backend_protocol.py:
-- ``from __future__ import annotations`` for deferred evaluation
+- no ``from __future__ import annotations``: PEP 563 stringifies annotations,
+  which stops ``NotRequired`` from being recognised at class creation
 - ``typing_extensions.TypedDict`` for consistency with existing codebase
 - ``NotRequired`` for optional fields that may be absent in input payloads
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Annotated, Any, NotRequired, TypeAlias
+from typing import Annotated, Any, NotRequired, TypeAlias
 
 from pydantic import AliasChoices, Field
 from typing_extensions import TypedDict
 
-if TYPE_CHECKING:
-    from sam_schema.core.models import PlanState
+from sam_schema.core.models import PlanState
 
 __all__ = [
     "DocumentData",

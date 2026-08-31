@@ -5,19 +5,19 @@ dicts. Each public function accepts an optional ``output: Output | None``
 parameter and returns ``{...result, **out.to_dict()}``.
 """
 
-from __future__ import annotations
-
 import operator
 import re
 import sys
 from collections import defaultdict
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, NotRequired, TypeGuard
+from typing import Any, Final, NotRequired, TypeGuard
 
 from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
-from github import GithubException, GithubObject  # GithubObject used only by create_milestone (ADR-004)
+from github import GithubException, GithubObject
+from github.Repository import Repository  # GithubObject used only by create_milestone (ADR-004)
 from ruamel.yaml.error import YAMLError
 from sam_schema.core.backends.content import parse_plan_content
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
@@ -107,12 +107,6 @@ class _SamTaskLookupResult(TypedDict):
     messages: list[str]
     warnings: list[str]
     errors: list[str]
-
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
-
-    from github.Repository import Repository
 
 
 # ---------------------------------------------------------------------------
@@ -5239,6 +5233,23 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
     return paths
 
 
+class ImpactRadiusItem(TypedDict, total=False):
+    """Typed structure for items passed to :func:`analyze_impact_radius_conflicts`.
+
+    Attributes:
+        title: Item title used in ConflictGroup.items list.
+        issue: GitHub issue number (present but unused in conflict output).
+        impact_radius: Markdown section body containing file paths, one per
+            line, optionally prefixed with bullet markers (``-`` / ``*``).
+            Items without this key, or with an empty/whitespace-only value,
+            are excluded from conflict analysis.
+    """
+
+    title: str
+    issue: int
+    impact_radius: str
+
+
 def _collect_items_with_paths(items: list[ImpactRadiusItem]) -> tuple[list[str], list[set[str]]]:
     """Filter items to those with a non-empty impact_radius and parse their paths.
 
@@ -5309,23 +5320,6 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
         group_id += 1
 
     return conflict_groups
-
-
-class ImpactRadiusItem(TypedDict, total=False):
-    """Typed structure for items passed to :func:`analyze_impact_radius_conflicts`.
-
-    Attributes:
-        title: Item title used in ConflictGroup.items list.
-        issue: GitHub issue number (present but unused in conflict output).
-        impact_radius: Markdown section body containing file paths, one per
-            line, optionally prefixed with bullet markers (``-`` / ``*``).
-            Items without this key, or with an empty/whitespace-only value,
-            are excluded from conflict analysis.
-    """
-
-    title: str
-    issue: int
-    impact_radius: str
 
 
 def analyze_impact_radius_conflicts(items: list[ImpactRadiusItem]) -> list[ConflictGroup]:

@@ -379,7 +379,12 @@ max-complexity = 12
 ]
 # operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
-"**/backlog_core/operations.py" = ["private-member-access"]
+# I002 — PEP 563 stringifies annotations, so TypedDict cannot classify NotRequired at
+# class creation and __optional_keys__ comes back empty. This module defines TypedDicts.
+"**/backlog_core/operations.py" = [
+    "missing-required-import",
+    "private-member-access",
+]
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
 # SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
 # underscore prefix marks it as a background-task entry point, not a user-facing tool
@@ -400,6 +405,8 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
+# I002 — same PEP 563 / NotRequired problem: this module is entirely TypedDict declarations
+"**/sam_schema/core/task_backend_types.py" = ["missing-required-import"]
 # FastMCP @mcp.tool uses get_type_hints() at decoration time to build tool schemas — annotated
 # parameter types (PlanActionConfig, TaskActionConfig, ActiveTaskActionConfig, etc.) must be
 # present in the module's global namespace even with `from __future__ import annotations`.
