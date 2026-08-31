@@ -69,7 +69,7 @@ repos:
 
   # TOML sorting and formatting
   - repo: https://github.com/bitflight-devops/pyproject-fmt
-    rev: v1.1.11
+    rev: v1.1.12
     hooks:
       - id: pypfmt
         name: Sort and format pyproject.toml with pypfmt
