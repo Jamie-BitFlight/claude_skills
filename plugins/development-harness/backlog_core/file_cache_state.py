@@ -355,9 +355,22 @@ class _CacheStateStore:
     def _merge_queue_state(current: _CacheState, legacy: _CacheState) -> _CacheState:
         """Union all five queue/dead-letter fields from ``legacy`` into ``current``.
 
-        ``current``'s copy of an entry wins on a shared ``idempotency_key``.
-        ``corrupt_queue_entries`` has no key to dedupe by -- its entries never
-        became typed models -- so full-entry equality is used instead.
+        ``rejected``/``rejected_work_items``/``corrupt_queue_entries`` are
+        pure accumulated history -- duplicates across sources are harmless,
+        so those three just union (deduped by ``idempotency_key``, or full
+        equality for ``corrupt_queue_entries``, which has no key). pending
+        and pending_work_items are different: ``queue_write()``/
+        ``_queue_work_item()`` each maintain "at most one entry per
+        reference/key" as an invariant, coalescing on every call within one
+        process -- but that invariant says nothing about two *different*
+        writes for the *same* reference arriving from two independently-
+        evolved sources (current vs. a legacy file recreated by older code).
+        Deduping only by ``idempotency_key`` would let both survive,
+        breaking the invariant every other code path relies on and risking
+        `replay_pending()` applying a stale entry after a newer one landed.
+        current's entry wins on a shared reference/key; legacy's superseded
+        entry is dead-lettered into rejected/rejected_work_items, not
+        silently dropped.
 
         Returns:
             ``current``, with each of the five fields extended by whatever
@@ -371,18 +384,90 @@ class _CacheStateStore:
                 *(entry for entry in legacy_entries if entry.idempotency_key not in existing_keys),
             ]
 
+        pending, superseded_pending = _CacheStateStore._merge_pending_by_reference(current.pending, legacy.pending)
+        pending_work_items, superseded_work_items = _CacheStateStore._merge_pending_work_items_by_key(
+            current.pending_work_items, legacy.pending_work_items
+        )
         return current.model_copy(
             update={
-                "pending": merged_by_key(current.pending, legacy.pending),
-                "pending_work_items": merged_by_key(current.pending_work_items, legacy.pending_work_items),
-                "rejected": merged_by_key(current.rejected, legacy.rejected),
-                "rejected_work_items": merged_by_key(current.rejected_work_items, legacy.rejected_work_items),
+                "pending": pending,
+                "pending_work_items": pending_work_items,
+                "rejected": [*merged_by_key(current.rejected, legacy.rejected), *superseded_pending],
+                "rejected_work_items": [
+                    *merged_by_key(current.rejected_work_items, legacy.rejected_work_items),
+                    *superseded_work_items,
+                ],
                 "corrupt_queue_entries": [
                     *current.corrupt_queue_entries,
                     *(entry for entry in legacy.corrupt_queue_entries if entry not in current.corrupt_queue_entries),
                 ],
             }
         )
+
+    @staticmethod
+    def _merge_pending_by_reference(
+        current: list[PendingMutation], legacy: list[PendingMutation]
+    ) -> tuple[list[PendingMutation], list[_RejectedMutation]]:
+        """Union two pending-write queues, keeping at most one entry per reference.
+
+        Returns:
+            The merged queue (current's entries plus legacy's that don't
+            collide by reference or idempotency_key), and a dead-lettered
+            _RejectedMutation for each legacy entry superseded by a
+            same-reference entry current already has.
+        """
+        existing_keys = {entry.idempotency_key for entry in current}
+        # ContentRef isn't hashable (nested fields), so this stays a list
+        # membership check rather than a set, unlike existing_keys above.
+        existing_references = [entry.write.reference for entry in current]
+        survivors = list(current)
+        superseded: list[_RejectedMutation] = []
+        for entry in legacy:
+            if entry.idempotency_key in existing_keys:
+                continue
+            if entry.write.reference in existing_references:
+                superseded.append(
+                    _RejectedMutation(
+                        idempotency_key=entry.idempotency_key,
+                        write=entry.write,
+                        reason="superseded by cache.json's entry for the same reference during legacy-file merge",
+                    )
+                )
+                continue
+            survivors.append(entry)
+        return survivors, superseded
+
+    @staticmethod
+    def _merge_pending_work_items_by_key(
+        current: list[_PendingWorkItemMutation], legacy: list[_PendingWorkItemMutation]
+    ) -> tuple[list[_PendingWorkItemMutation], list[_RejectedWorkItemMutation]]:
+        """Union two pending-work-item queues, keeping at most one entry per ``key``.
+
+        Returns:
+            The merged queue, and a dead-lettered _RejectedWorkItemMutation
+            for each legacy entry superseded by a same-key entry current
+            already has -- see :meth:`_merge_pending_by_reference` for why
+            idempotency_key alone isn't enough here.
+        """
+        existing_keys = {entry.idempotency_key for entry in current}
+        existing_work_keys = {entry.key for entry in current}
+        survivors = list(current)
+        superseded: list[_RejectedWorkItemMutation] = []
+        for entry in legacy:
+            if entry.idempotency_key in existing_keys:
+                continue
+            if entry.key in existing_work_keys:
+                superseded.append(
+                    _RejectedWorkItemMutation(
+                        idempotency_key=entry.idempotency_key,
+                        key=entry.key,
+                        item=entry.item,
+                        reason="superseded by cache.json's entry for the same key during legacy-file merge",
+                    )
+                )
+                continue
+            survivors.append(entry)
+        return survivors, superseded
 
     @staticmethod
     def _parse_yaml(text: str, path: Path) -> dict[str, object]:

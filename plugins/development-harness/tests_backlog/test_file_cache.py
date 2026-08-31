@@ -601,6 +601,60 @@ def test_transaction_merges_queue_entries_from_a_legacy_file_recreated_by_older_
     assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
 
 
+def test_transaction_merge_keeps_one_pending_entry_per_reference_on_collision(tmp_path: Path) -> None:
+    # Given: cache.json already has a pending write for a reference, and a
+    # legacy file recreated by older code has a *different* write for that
+    # *same* reference (different content -> different idempotency_key, so
+    # a merge-by-key-only approach would keep both, breaking queue_write()'s
+    # one-entry-per-reference invariant)
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+    colliding_reference = current_state.pending[0].write.reference
+
+    legacy_write = ContentWrite(
+        reference=colliding_reference, content="a different write for the same reference", expected_revision="rev-1"
+    )
+    legacy_pending = PendingMutation(idempotency_key=_content_mutation_key(legacy_write), write=legacy_write)
+    _write_legacy_yaml(store._legacy_state_path, _CacheState(pending=[legacy_pending]))
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: still exactly one pending entry for that reference -- current's,
+    # not both -- and the superseded legacy entry is dead-lettered, not
+    # silently dropped
+    loaded = store.load()
+    matching = [entry for entry in loaded.pending if entry.write.reference == colliding_reference]
+    assert matching == [current_state.pending[0]]
+    assert any(entry.idempotency_key == legacy_pending.idempotency_key for entry in loaded.rejected)
+
+
+def test_transaction_merge_keeps_one_pending_work_item_per_key_on_collision(tmp_path: Path) -> None:
+    # Given: the same collision scenario as above, for pending_work_items --
+    # a legacy entry for a key cache.json already has queued, with different
+    # content (so a different idempotency_key)
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+    colliding_key = current_state.pending_work_items[0].key
+
+    legacy_item = BacklogItem(title="A different item for the same key")
+    legacy_work_item = _PendingWorkItemMutation(
+        idempotency_key=_work_item_mutation_key(colliding_key, legacy_item), key=colliding_key, item=legacy_item
+    )
+    _write_legacy_yaml(store._legacy_state_path, _CacheState(pending_work_items=[legacy_work_item]))
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: still exactly one pending_work_items entry for that key
+    loaded = store.load()
+    matching = [entry for entry in loaded.pending_work_items if entry.key == colliding_key]
+    assert matching == [current_state.pending_work_items[0]]
+    assert any(entry.idempotency_key == legacy_work_item.idempotency_key for entry in loaded.rejected_work_items)
+
+
 def test_transaction_merges_dead_lettered_entries_from_a_recreated_legacy_file(tmp_path: Path) -> None:
     # Given: cache.json exists, and a legacy cache.yaml recreated by older
     # code holds not just a new pending write but also entries that the
