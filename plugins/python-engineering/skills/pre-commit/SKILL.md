@@ -153,6 +153,7 @@ commit-polish = "commit_polish.hook:main"
 ```yaml
 # .pre-commit-hooks.yaml
 - id: commit-polish
+  name: Polish Commit Message
   entry: commit-polish
   language: python
   stages: [prepare-commit-msg]

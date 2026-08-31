@@ -3749,7 +3749,7 @@ uv add --dev pytest-asyncio pytest-bdd robotframework
 ### 14.1 Validation Pipeline Integration
 
 ```bash
-# Preferred: Use prek on staged files (runs all layers in correct order)
+# Preferred: Use prek on staged files (single pass over configured hooks)
 uv run prek run
 
 # Or on specific files
@@ -3774,6 +3774,8 @@ uv run pytest
 ```
 
 **Important - Scoped Operations**: prek runs on staged files by default, preventing formatting changes to unrelated code. Avoid `--all-files` unless explicitly requested by user for repository-wide cleanup, as it causes diff pollution and merge conflicts.
+
+**Important - Ordering**: hooks in different repository entries may run in parallel, so `prek run` does not guarantee Layer 1 finishes before Layer 3 starts. List order-dependent hooks under one `repo: local` entry, or set `require_serial: true` on the later hook, if a type checker or test must see a formatter's output.
 
 **Pattern**: Sequential validation gates
 
