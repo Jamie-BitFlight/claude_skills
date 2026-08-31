@@ -2015,7 +2015,7 @@ async def test_backlog_groom_ctx_warning_surfaces_output_warnings():
 
 async def test_backlog_normalize_ctx_info_start_message():
     """backlog_normalize emits ctx.info with start message before operation."""
-    op_result = {"updated": 3}
+    op_result = {"normalized": 3}
     with (
         patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
@@ -2028,7 +2028,7 @@ async def test_backlog_normalize_ctx_info_start_message():
 
 async def test_backlog_normalize_ctx_info_start_message_dry_run():
     """backlog_normalize emits ctx.info with '(dry-run)' suffix when dry_run=True."""
-    op_result = {"updated": 0}
+    op_result = {"normalized": 0}
     with (
         patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
@@ -2041,7 +2041,7 @@ async def test_backlog_normalize_ctx_info_start_message_dry_run():
 
 async def test_backlog_normalize_ctx_info_completion_message():
     """backlog_normalize emits ctx.info with 'Normalized N file(s)' after operation."""
-    op_result = {"updated": 7}
+    op_result = {"normalized": 7}
     with (
         patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
@@ -2054,7 +2054,7 @@ async def test_backlog_normalize_ctx_info_completion_message():
 
 async def test_backlog_normalize_ctx_info_completion_message_dry_run():
     """backlog_normalize completion message includes '(dry-run)' suffix."""
-    op_result = {"updated": 2}
+    op_result = {"normalized": 2}
     with (
         patch("dh_core.operations.normalize_items", return_value=op_result),
         patch("fastmcp.server.context.Context.log", new_callable=AsyncMock) as mock_log,
