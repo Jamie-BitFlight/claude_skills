@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import tempfile
+import time as _time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from threading import Lock
@@ -207,18 +208,28 @@ class _CacheStateStore:
             self._save(state)
         return result
 
-    def ensure_migrated(self) -> None:
-        """Run the legacy-file migration if needed, without a state transform.
+    def load_after_migration(self) -> _CacheState:
+        """Migrate the legacy file if needed, then load -- one lock acquisition, not two.
 
         ``load()`` itself stays read-only (see :meth:`_migrate_legacy_state_file`
         for why running migration there would deadlock), so a read accessor
         that enumerates the queue -- replay, reconciliation -- would otherwise
         see a legacy-recreated ``cache.yaml``'s entries only after some
-        unrelated :meth:`transaction` happens to run first. Call this before
-        that kind of read.
+        unrelated :meth:`transaction` happens to run first. Call this instead
+        of :meth:`load` for that kind of read.
+
+        Migration and the read that follows share one lock acquisition
+        deliberately, not two separate calls: another process recreating
+        ``cache.yaml`` in the gap between a migrate-then-release and a
+        separate later load would be invisible to that load, the same race
+        :meth:`transaction` already avoids by holding the lock across both.
+
+        Returns:
+            The state after any pending migration has been applied.
         """
         with self._lock():
             self._migrate_legacy_state_file()
+            return self.load()
 
     @contextlib.contextmanager
     def _lock(self) -> Iterator[None]:
@@ -304,18 +315,27 @@ class _CacheStateStore:
         Superseding the file has a fixed target name -- a second occurrence
         of this scenario would silently overwrite the first ``.superseded``
         copy, so anything worth keeping has to be merged into cache.json now,
-        not left for someone to notice the file before that happens.
+        not left for someone to notice the file before that happens. A legacy
+        file too corrupt to parse at all can't be merged this way -- it gets
+        a uniquely-named backup instead of the fixed ``.superseded`` name, so
+        a second corrupt-legacy-file occurrence doesn't overwrite the first.
         """
         try:
             text = self._legacy_state_path.read_text(encoding="utf-8")
             raw = self._parse_relaxed(text, self._legacy_state_path)
             legacy_state = self._verify_queue_keys(self._salvage(raw, self._legacy_state_path), self._legacy_state_path)
         except CacheStateCorruptError as exc:
+            unparsable_backup = self._legacy_state_path.with_name(
+                f"{self._legacy_state_path.name}.corrupt.{_time.time_ns()}"
+            )
             _log.error(
-                "Cache state %s: could not read for merge before superseding, any queued writes in it are lost: %s",
+                "Cache state %s: could not read for merge before superseding, preserving as %s instead: %s",
                 self._legacy_state_path,
+                unparsable_backup,
                 exc,
             )
+            self._legacy_state_path.replace(unparsable_backup)
+            return
         else:
             if (
                 legacy_state.pending
@@ -325,57 +345,44 @@ class _CacheStateStore:
                 or legacy_state.corrupt_queue_entries
             ):
                 current = self.load()
-                existing_pending_keys = {entry.idempotency_key for entry in current.pending}
-                merged_pending = [
-                    *current.pending,
-                    *(entry for entry in legacy_state.pending if entry.idempotency_key not in existing_pending_keys),
-                ]
-                existing_work_item_keys = {entry.idempotency_key for entry in current.pending_work_items}
-                merged_work_items = [
-                    *current.pending_work_items,
-                    *(
-                        entry
-                        for entry in legacy_state.pending_work_items
-                        if entry.idempotency_key not in existing_work_item_keys
-                    ),
-                ]
-                existing_rejected_keys = {entry.idempotency_key for entry in current.rejected}
-                merged_rejected = [
-                    *current.rejected,
-                    *(entry for entry in legacy_state.rejected if entry.idempotency_key not in existing_rejected_keys),
-                ]
-                existing_rejected_work_item_keys = {entry.idempotency_key for entry in current.rejected_work_items}
-                merged_rejected_work_items = [
-                    *current.rejected_work_items,
-                    *(
-                        entry
-                        for entry in legacy_state.rejected_work_items
-                        if entry.idempotency_key not in existing_rejected_work_item_keys
-                    ),
-                ]
-                # No idempotency_key to dedupe by -- these never became typed
-                # models -- so fall back to full-entry equality.
-                merged_corrupt = [
-                    *current.corrupt_queue_entries,
-                    *(
-                        entry
-                        for entry in legacy_state.corrupt_queue_entries
-                        if entry not in current.corrupt_queue_entries
-                    ),
-                ]
-                merged = current.model_copy(
-                    update={
-                        "pending": merged_pending,
-                        "pending_work_items": merged_work_items,
-                        "rejected": merged_rejected,
-                        "rejected_work_items": merged_rejected_work_items,
-                        "corrupt_queue_entries": merged_corrupt,
-                    }
-                )
+                merged = self._merge_queue_state(current, legacy_state)
                 if merged != current:
                     self._save(merged)
         superseded = self._legacy_state_path.with_name(self._legacy_state_path.name + ".superseded")
         self._legacy_state_path.replace(superseded)
+
+    @staticmethod
+    def _merge_queue_state(current: _CacheState, legacy: _CacheState) -> _CacheState:
+        """Union all five queue/dead-letter fields from ``legacy`` into ``current``.
+
+        ``current``'s copy of an entry wins on a shared ``idempotency_key``.
+        ``corrupt_queue_entries`` has no key to dedupe by -- its entries never
+        became typed models -- so full-entry equality is used instead.
+
+        Returns:
+            ``current``, with each of the five fields extended by whatever
+            ``legacy`` holds that ``current`` doesn't already have.
+        """
+
+        def merged_by_key(current_entries: list[Any], legacy_entries: list[Any]) -> list[Any]:
+            existing_keys = {entry.idempotency_key for entry in current_entries}
+            return [
+                *current_entries,
+                *(entry for entry in legacy_entries if entry.idempotency_key not in existing_keys),
+            ]
+
+        return current.model_copy(
+            update={
+                "pending": merged_by_key(current.pending, legacy.pending),
+                "pending_work_items": merged_by_key(current.pending_work_items, legacy.pending_work_items),
+                "rejected": merged_by_key(current.rejected, legacy.rejected),
+                "rejected_work_items": merged_by_key(current.rejected_work_items, legacy.rejected_work_items),
+                "corrupt_queue_entries": [
+                    *current.corrupt_queue_entries,
+                    *(entry for entry in legacy.corrupt_queue_entries if entry not in current.corrupt_queue_entries),
+                ],
+            }
+        )
 
     @staticmethod
     def _parse_yaml(text: str, path: Path) -> dict[str, object]:

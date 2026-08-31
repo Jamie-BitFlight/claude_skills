@@ -1,8 +1,9 @@
 """FastMCP 3.x server exposing all backlog operations as MCP tools.
 
 Exists to guarantee what raw file or API access cannot:
-1. Correct, durable, audit-preserving backlog state across whichever backend is
-   configured, under concurrent writers.
+1. Correct, audit-preserving backlog state across whichever backend is
+   configured, under concurrent writers — durable for every backend except
+   the in-memory one, an intentionally non-durable test double.
 2. A structured, resource-bounded interface for the calling agent — safety
    annotations, typed errors, token-budget-aware pagination — in place of
    CLI/stderr parsing or unbounded reads.

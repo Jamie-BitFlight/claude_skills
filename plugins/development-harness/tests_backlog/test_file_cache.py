@@ -659,6 +659,66 @@ def test_pending_mutations_sees_a_legacy_file_recreated_by_older_code_without_a_
     assert not cache_store._legacy_state_path.exists()
 
 
+def test_load_after_migration_migrates_and_reads_under_one_lock_acquisition(tmp_path: Path) -> None:
+    # Given: a legacy-only root -- direct test of the combined method
+    # FileCache._load_state() now uses instead of two separate calls
+    # (ensure_migrated() then load()), which left a race window between them
+    state = _populated_cache_state()
+    store = _CacheStateStore(tmp_path)
+    _write_legacy_yaml(store._legacy_state_path, state)
+
+    # When: load_after_migration runs
+    loaded = store.load_after_migration()
+
+    # Then: migration happened and the returned state already reflects it --
+    # a single call, not migrate-then-a-separate-read
+    assert loaded == state
+    assert store._state_path.exists()
+    assert not store._legacy_state_path.exists()
+
+
+def test_unparsable_legacy_file_gets_a_unique_backup_not_the_shared_superseded_name(tmp_path: Path) -> None:
+    # Given: cache.json exists, and cache.yaml is neither valid JSON nor YAML
+    # -- can't be read to merge its queued writes, unlike the other
+    # both-files-present tests above
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+    store._legacy_state_path.write_text("{[", encoding="utf-8")
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: preserved under a unique name, not the fixed .superseded target
+    assert not store._legacy_state_path.exists()
+    assert not store._legacy_state_path.with_name("cache.yaml.superseded").exists()
+    backups = list(tmp_path.glob("cache.yaml.corrupt.*"))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding="utf-8") == "{["
+
+
+def test_a_second_unparsable_legacy_file_does_not_overwrite_the_first_backup(tmp_path: Path) -> None:
+    # Given: one unparsable legacy file already migrated (backed up) once
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+    store._legacy_state_path.write_text("{[ first corrupt file", encoding="utf-8")
+    store.transaction(lambda s: (s, None))
+    first_backups = list(tmp_path.glob("cache.yaml.corrupt.*"))
+    assert len(first_backups) == 1
+
+    # When: an older process recreates cache.yaml, itself unparsable, and a
+    # second transaction migrates it
+    store._legacy_state_path.write_text("{[ second corrupt file", encoding="utf-8")
+    store.transaction(lambda s: (s, None))
+
+    # Then: both backups survive -- the second didn't overwrite the first
+    backups = {path: path.read_text(encoding="utf-8") for path in tmp_path.glob("cache.yaml.corrupt.*")}
+    assert len(backups) == 2
+    assert "{[ first corrupt file" in backups.values()
+    assert "{[ second corrupt file" in backups.values()
+
+
 def test_migration_leaves_lock_and_snapshot_items_untouched(tmp_path: Path) -> None:
     # Given: a legacy cache.yaml alongside the lock file and a per-item snapshot
     state = _populated_cache_state()
