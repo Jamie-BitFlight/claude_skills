@@ -23,7 +23,7 @@ The following template files are available in the skill's `assets/` directory fo
 | `version.py`              | Dual-mode version management (hatch-vcs + fallback)  | Copy to `packages/{package_name}/version.py`          |
 | `hatch_build.py`          | Build hook for binary/asset handling                 | Copy to `scripts/hatch_build.py`                      |
 | `.markdownlint.json`      | Markdown linting configuration (most rules disabled) | Copy to project root                                  |
-| `.pre-commit-config.yaml` | Standard pre-commit hooks configuration              | Copy to project root, run `uv run pre-commit install` |
+| `.pre-commit-config.yaml` | Standard git hooks configuration (prek)               | Copy to project root, run `uv run prek install`       |
 | `.editorconfig`           | Editor formatting settings                           | Copy to project root                                  |
 
 The model MUST copy these files when creating new Python projects to ensure consistency with established conventions documented below.
@@ -721,7 +721,7 @@ dev = [
     "hatch-vcs>=0.5.0",
     "hatchling>=1.14.0",
     "mypy>=1.18.2",
-    "pre-commit>=4.3.0",
+    "prek>=0.4",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=6.0.0",
@@ -732,7 +732,7 @@ dev = [
 ]
 ```
 
-**Common Pattern**: All projects include mypy, basedpyright, ruff, pytest, pre-commit, hatchling tools.
+**Common Pattern**: All projects include mypy, basedpyright, ruff, pytest, prek (or pre-commit), hatchling tools.
 
 **Evidence**: All 5 projects have dev dependency groups with these core tools.
 

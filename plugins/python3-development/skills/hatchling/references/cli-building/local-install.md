@@ -272,8 +272,8 @@ pip install --upgrade pip
 # Install in editable mode with dev dependencies
 pip install -e ".[dev]"
 
-# Install pre-commit hooks
-pre-commit install
+# Install git hooks
+prek install       # or: pre-commit install
 ```
 
 ### Project Structure

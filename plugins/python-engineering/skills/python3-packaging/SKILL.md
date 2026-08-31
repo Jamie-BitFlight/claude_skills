@@ -348,7 +348,9 @@ plugin2 = "my_package.plugins.plugin2:Plugin2"
 
 ---
 
-## Pre-commit Configuration
+## Git Hook Configuration (prek)
+
+prek reads this file unchanged — see `python-engineering:pre-commit` for install and usage.
 
 **.pre-commit-config.yaml**:
 
