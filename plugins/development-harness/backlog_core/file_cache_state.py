@@ -493,6 +493,18 @@ class _CacheStateStore:
         outright would be silent data loss for that case; dead-lettering keeps
         the entry recoverable and inspectable either way.
 
+        Known limitation, deliberately not fixed here: this is a one-way,
+        permanent move. Once dead-lettered, an entry is never re-verified or
+        automatically promoted back to pending/pending_work_items, even by a
+        later load from a plugin version that could have recomputed a matching
+        key. A false-positive version-skew entry is therefore preserved but
+        not automatically delivered to the backend -- recoverable by manual
+        inspection of rejected/rejected_work_items, not by anything automatic.
+        Building real self-healing (re-verify on every load, with the
+        version-detection and backoff that needs to not thrash) is the kind
+        of provenance/recovery machinery already called out as deferred scope
+        on backlog #2287, not a rider on this fix.
+
         Returns:
             ``state``, or a copy with the inconsistent entries moved to the
             corresponding rejected list.

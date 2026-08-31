@@ -526,9 +526,13 @@ class _GitHubReconciliation:
                 and mutation.item.metadata.issue not in failed_cache_references
                 and (patch_statuses.get(mutation.item.metadata.issue, "no_patch") in {"no_patch", "applied"})
             })
-        pending_mutations = len(self._cache.pending_mutations()) + len(self._cache._pending_work_item_mutations())
         return outcome.result.model_copy(
-            update={"pending_mutations": pending_mutations, "rejected_mutations": len(self._cache.rejected_mutations())}
+            update={
+                "pending_mutations": len(self._cache.pending_mutations())
+                + len(self._cache._pending_work_item_mutations()),
+                "rejected_mutations": len(self._cache.rejected_mutations())
+                + len(self._cache._rejected_work_item_mutations()),
+            }
         )
 
     def load_records(

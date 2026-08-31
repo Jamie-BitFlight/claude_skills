@@ -51,6 +51,9 @@ Unreachable from code paths (keys are content-derived, one entry per reference).
 uv run pytest plugins/development-harness/tests_backlog/test_file_cache.py -q --no-cov
 ```
 
-25 tests, ~7s. `test_file_cache.py:434-554` already covers the JSON/YAML dual-read
-matrix (legacy YAML read, new JSON read, JSON-is-valid-YAML forward compat,
-save-emits-JSON, missing file, corrupt file raises).
+`test_file_cache.py` already covers the JSON/YAML dual-read matrix (legacy YAML
+read, new JSON read, JSON-is-valid-YAML forward compat, save-emits-JSON,
+missing file, corrupt file raises), plus migration, dead-letter, and
+idempotency-key-consistency coverage added since this note was written --
+check the file directly for current test names and counts rather than trusting
+a count here.
