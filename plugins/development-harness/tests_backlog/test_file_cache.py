@@ -17,8 +17,10 @@ from backlog_core.file_cache_state import (
     _CacheState,
     _CacheStateStore,
     _content_mutation_key,
+    _CorruptQueueEntry,
     _PendingWorkItemMutation,
     _RejectedMutation,
+    _RejectedWorkItemMutation,
     _work_item_mutation_key,
 )
 from backlog_core.models import (
@@ -597,6 +599,64 @@ def test_transaction_merges_queue_entries_from_a_legacy_file_recreated_by_older_
     assert all(entry in loaded.pending for entry in current_state.pending)
     assert not store._legacy_state_path.exists()
     assert store._legacy_state_path.with_name("cache.yaml.superseded").exists()
+
+
+def test_transaction_merges_dead_lettered_entries_from_a_recreated_legacy_file(tmp_path: Path) -> None:
+    # Given: cache.json exists, and a legacy cache.yaml recreated by older
+    # code holds not just a new pending write but also entries that the
+    # legacy file's own load-time checks (_verify_queue_keys/_salvage) would
+    # dead-letter -- a key mismatch, a schema failure. Superseding the file
+    # unread would silently strand these in an inert renamed backup that a
+    # second occurrence of this scenario could later overwrite.
+    store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(store._state_path, current_state)
+
+    write = ContentWrite(reference=_reference("#9"), content="rejected on the legacy side", expected_revision="rev-1")
+    legacy_rejected = _RejectedMutation(idempotency_key="stale-key-1", write=write, reason="revision no longer matches")
+    legacy_item = BacklogItem(title="Rejected on the legacy side")
+    legacy_rejected_work_item = _RejectedWorkItemMutation(
+        idempotency_key="stale-key-2", key="#9", item=legacy_item, reason="idempotency_key does not match its content"
+    )
+    legacy_corrupt = _CorruptQueueEntry(field="pending", raw={"idempotency_key": "x"}, reason="missing 'write'")
+    legacy_state = _CacheState(
+        rejected=[legacy_rejected],
+        rejected_work_items=[legacy_rejected_work_item],
+        corrupt_queue_entries=[legacy_corrupt],
+    )
+    _write_legacy_yaml(store._legacy_state_path, legacy_state)
+
+    # When: a transaction runs
+    store.transaction(lambda s: (s, None))
+
+    # Then: all three dead-letter collections survive, merged into cache.json
+    loaded = store.load()
+    assert legacy_rejected in loaded.rejected
+    assert legacy_rejected_work_item in loaded.rejected_work_items
+    assert legacy_corrupt in loaded.corrupt_queue_entries
+    assert all(entry in loaded.rejected for entry in current_state.rejected)
+
+
+def test_pending_mutations_sees_a_legacy_file_recreated_by_older_code_without_a_prior_write(tmp_path: Path) -> None:
+    # Given: cache.json exists, and a legacy cache.yaml recreated by older
+    # code holds a new offline write -- but no write of our own has happened
+    # yet to trigger transaction()'s migration as a side effect
+    cache_store = _CacheStateStore(tmp_path)
+    current_state = _populated_cache_state()
+    _write_new_json(cache_store._state_path, current_state)
+    older_write = ContentWrite(reference=_reference("#9"), content="queued by older code", expected_revision="rev-1")
+    older_pending = PendingMutation(idempotency_key=_content_mutation_key(older_write), write=older_write)
+    _write_legacy_yaml(cache_store._legacy_state_path, _CacheState(pending=[older_pending]))
+
+    # When: a plain read accessor is called first -- the shape of what
+    # replay_pending()/reconcile() do before ever writing anything
+    cache = FileCache(tmp_path)
+    pending = cache.pending_mutations()
+
+    # Then: the legacy entry is visible immediately, not only after some
+    # unrelated write happens to trigger transaction()'s migration
+    assert older_pending in pending
+    assert not cache_store._legacy_state_path.exists()
 
 
 def test_migration_leaves_lock_and_snapshot_items_untouched(tmp_path: Path) -> None:

@@ -1124,10 +1124,11 @@ async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object]
 mcp = FastMCP(
     "backlog",
     instructions=(
-        "Backlog management server. The configured backend is the source of truth; this server keeps "
-        "a local cache that syncs with it. Always use these tools for backlog CRUD (add, list, view, "
-        "update, groom, close, resolve, sync) — never read or edit backlog files directly, even if a "
-        "tool call fails; report the failure instead."
+        "Backlog management server. The configured backend is the source of truth; backends that "
+        "support offline queuing keep a local cache that syncs with it, others read and write it "
+        "directly. Always use these tools for backlog CRUD (add, list, view, update, groom, close, "
+        "resolve, sync) — never read or edit backlog files directly, even if a tool call fails; "
+        "report the failure instead."
     ),
     version="0.1.0",
     lifespan=_backlog_lifespan,

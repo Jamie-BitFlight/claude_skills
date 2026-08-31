@@ -470,6 +470,14 @@ class FileCache:
         return destination
 
     def _load_state(self) -> _CacheState:
+        # ensure_migrated() first: a legacy-recreated cache.yaml (an older
+        # plugin copy queuing new offline writes into a fresh file of its own)
+        # otherwise stays invisible to every read accessor -- pending_mutations(),
+        # get_content(), reconciliation's load_records() -- until some
+        # unrelated transaction() happens to run and trigger migration as a
+        # side effect. Not just replay_pending()'s concern; every reader here
+        # needs current state, so the check lives once, at the shared root.
+        self._state.ensure_migrated()
         return self._state.load()
 
     @staticmethod

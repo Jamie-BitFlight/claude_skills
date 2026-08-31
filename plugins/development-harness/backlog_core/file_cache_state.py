@@ -207,6 +207,19 @@ class _CacheStateStore:
             self._save(state)
         return result
 
+    def ensure_migrated(self) -> None:
+        """Run the legacy-file migration if needed, without a state transform.
+
+        ``load()`` itself stays read-only (see :meth:`_migrate_legacy_state_file`
+        for why running migration there would deadlock), so a read accessor
+        that enumerates the queue -- replay, reconciliation -- would otherwise
+        see a legacy-recreated ``cache.yaml``'s entries only after some
+        unrelated :meth:`transaction` happens to run first. Call this before
+        that kind of read.
+        """
+        with self._lock():
+            self._migrate_legacy_state_file()
+
     @contextlib.contextmanager
     def _lock(self) -> Iterator[None]:
         self._root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -277,16 +290,21 @@ class _CacheStateStore:
             self._legacy_state_path.replace(self._state_path)
 
     def _merge_legacy_queue_entries_and_supersede(self) -> None:
-        """Merge a recreated legacy file's queue entries into cache.json, then supersede it.
+        """Merge a recreated legacy file's queue and dead-letter entries into cache.json, then supersede it.
 
         Called when both files exist. cache.json is authoritative for
         records/checkpoints/snapshot_checkpoint -- load() already prefers it,
         and the legacy copy's version of those is discarded here as
-        regenerable. pending/pending_work_items are different: an older
-        plugin copy unaware of the rename could have written new offline
-        mutations into a fresh cache.yaml of its own (see the ponytail note on
-        :meth:`_migrate_legacy_state_file`), and those are real, unreplayed
-        user intent -- merged in by idempotency_key rather than discarded.
+        regenerable. The five queue/dead-letter fields are different: an
+        older plugin copy unaware of the rename could have written new
+        offline mutations into a fresh cache.yaml of its own (see the
+        ponytail note on :meth:`_migrate_legacy_state_file`), or its own read
+        of that file could have dead-lettered an entry via the same
+        :meth:`_verify_queue_keys`/:meth:`_salvage` this method itself calls.
+        Superseding the file has a fixed target name -- a second occurrence
+        of this scenario would silently overwrite the first ``.superseded``
+        copy, so anything worth keeping has to be merged into cache.json now,
+        not left for someone to notice the file before that happens.
         """
         try:
             text = self._legacy_state_path.read_text(encoding="utf-8")
@@ -299,7 +317,13 @@ class _CacheStateStore:
                 exc,
             )
         else:
-            if legacy_state.pending or legacy_state.pending_work_items:
+            if (
+                legacy_state.pending
+                or legacy_state.pending_work_items
+                or legacy_state.rejected
+                or legacy_state.rejected_work_items
+                or legacy_state.corrupt_queue_entries
+            ):
                 current = self.load()
                 existing_pending_keys = {entry.idempotency_key for entry in current.pending}
                 merged_pending = [
@@ -315,10 +339,41 @@ class _CacheStateStore:
                         if entry.idempotency_key not in existing_work_item_keys
                     ),
                 ]
-                if merged_pending != current.pending or merged_work_items != current.pending_work_items:
-                    self._save(
-                        current.model_copy(update={"pending": merged_pending, "pending_work_items": merged_work_items})
-                    )
+                existing_rejected_keys = {entry.idempotency_key for entry in current.rejected}
+                merged_rejected = [
+                    *current.rejected,
+                    *(entry for entry in legacy_state.rejected if entry.idempotency_key not in existing_rejected_keys),
+                ]
+                existing_rejected_work_item_keys = {entry.idempotency_key for entry in current.rejected_work_items}
+                merged_rejected_work_items = [
+                    *current.rejected_work_items,
+                    *(
+                        entry
+                        for entry in legacy_state.rejected_work_items
+                        if entry.idempotency_key not in existing_rejected_work_item_keys
+                    ),
+                ]
+                # No idempotency_key to dedupe by -- these never became typed
+                # models -- so fall back to full-entry equality.
+                merged_corrupt = [
+                    *current.corrupt_queue_entries,
+                    *(
+                        entry
+                        for entry in legacy_state.corrupt_queue_entries
+                        if entry not in current.corrupt_queue_entries
+                    ),
+                ]
+                merged = current.model_copy(
+                    update={
+                        "pending": merged_pending,
+                        "pending_work_items": merged_work_items,
+                        "rejected": merged_rejected,
+                        "rejected_work_items": merged_rejected_work_items,
+                        "corrupt_queue_entries": merged_corrupt,
+                    }
+                )
+                if merged != current:
+                    self._save(merged)
         superseded = self._legacy_state_path.with_name(self._legacy_state_path.name + ".superseded")
         self._legacy_state_path.replace(superseded)
 
