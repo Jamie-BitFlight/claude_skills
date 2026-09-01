@@ -305,3 +305,7 @@ class TestGitHubExtrasCapabilityContract:
 
         assert exc_info.value.protocol_mismatch is True
         assert "backend bug" in str(exc_info.value)
+        assert "GitHubExtras" in str(exc_info.value), (
+            "message should name the actual Protocol class, not just the opaque "
+            "capability flag string 'github_extras' — raised in code review on PR #3360"
+        )

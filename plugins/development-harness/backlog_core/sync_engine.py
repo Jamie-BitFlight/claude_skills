@@ -175,7 +175,9 @@ async def _attempt_sync(state: SyncState, attempt: int, full_refresh: bool) -> b
             # raise (the set classify_sync_error handles — BacklogError covers its
             # BackendUnavailableError subclass; ContentProviderError is a separate
             # exception tree, not a BacklogError subclass, so it needs its own entry
-            # here or classify_sync_error's NON_RETRYABLE branch for it is unreachable).
+            # here or classify_sync_error never runs on it at all). classify_sync_error
+            # then decides RETRYABLE vs NON_RETRYABLE per exception, inspecting a
+            # ContentProviderError's wrapped cause for a transient GithubException.
             # Any other exception is a programming bug and propagates to the task
             # done-callback (_log_sync_task_exc), which logs it — never silently masked
             # as OFFLINE.

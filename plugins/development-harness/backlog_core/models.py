@@ -613,6 +613,15 @@ class GitHubUnavailableError(BackendUnavailableError):
     """Raised when GITHUB_TOKEN is missing or the GitHub API is unreachable."""
 
 
+# Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
+# UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
+# doesn't tell a reader which Protocol class the backend failed to satisfy.
+_CAPABILITY_PROTOCOL_NAMES: dict[str, str] = {
+    "github_extras": "GitHubExtras",
+    "branches": "BranchBackend",
+}
+
+
 class UnsupportedBackendCapabilityError(BacklogError):
     """Raised when the active backend does not implement an optional capability.
 
@@ -643,9 +652,10 @@ class UnsupportedBackendCapabilityError(BacklogError):
         self.operation = operation
         self.protocol_mismatch = protocol_mismatch
         if protocol_mismatch:
+            protocol_name = _CAPABILITY_PROTOCOL_NAMES.get(capability, capability)
             msg = (
                 f"{backend}: {operation} — backend declares supports_{capability}=True but does not "
-                f"structurally implement the {capability} protocol. This is a backend bug, not an "
+                f"structurally implement the {protocol_name} protocol. This is a backend bug, not an "
                 "unsupported capability."
             )
         else:
