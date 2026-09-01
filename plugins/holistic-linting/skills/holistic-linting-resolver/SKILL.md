@@ -36,7 +36,10 @@ Skill(skill: "python3-development:python3-development")
 Before implementing any fix, verify it is a code change — not suppression. Each category below is an immediate STOP:
 
 **Inline suppression comments:**
-- Adding `# noqa`, `# type: ignore`, `# pyright: ignore`, `# pylint: disable`, or any suppression comment
+- Adding `# noqa`, `# type: ignore`, `# ty: ignore`, `# pyright: ignore`, `# pylint: disable`,
+  `# ruff: ignore[<rule>]`, or any suppression comment — including the rule-specific form ruff's own
+  `--fix` produces when `[tool.ruff.lint] preview = true` rewrites a plain `# noqa: <RULE>` into
+  `# ruff: ignore[<rule-name>]`; grepping only for `# noqa` misses it
 
 **Configuration-level suppression (equally forbidden):**
 - Adding a rule to `[tool.ruff.lint] ignore = [...]` in `pyproject.toml`

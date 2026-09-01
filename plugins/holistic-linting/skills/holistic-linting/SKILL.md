@@ -396,7 +396,7 @@ When uncertain whether an issue is blocking: treat it as blocking and fix it.
 3. **Format before linting (Sub-Agents only)** - Formatters auto-fix trivial issues (end-of-file, whitespace)
 4. **Run linters concurrently (Sub-Agents only)** - Use parallel execution for multiple files or multiple linters
 5. **Use the rules knowledge base** - Reference official rule documentation when investigating
-6. **Never suppress** - Agents must not add `# type: ignore`, `# noqa`, suppression comments, or modify linter config to reduce rule severity. If a code change cannot resolve the issue, escalate as UNRESOLVED with documentation of what was tried
+6. **Never suppress** - Agents must not add `# type: ignore`, `# noqa`, `# ruff: ignore[...]`, or any suppression comment, or modify linter config to reduce rule severity. If a fix cannot resolve the issue, escalate as UNRESOLVED with documentation of what was tried
 7. **Never delete to fix** - Removing a function, test, or class to eliminate a linting error is prohibited. Document it as a cleanup recommendation instead
 8. **Record pre-existing issues** - Every linting issue discovered — whether in files you touched or not — gets recorded. Apply the Pre-Existing Issues Protocol
 9. **Orchestrators delegate, sub-agents execute** - Orchestrators launch agents and read reports. Sub-agents run formatters, linters, and resolve issues.

@@ -11,9 +11,12 @@ Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this r
 `docs.astral.sh` / the `astral:` plugin skills are authoritative on tool facts. Load alongside
 `astral:uv`/`:ty`/`:ruff` for tool mechanics; this file is only the overrides.
 
-- **Suppressions**: never add `# ty: ignore`, `# type: ignore`, or `# noqa` — including when asked
-  — fix the error or escalate. `# noqa` requires explicit user approval as the sole exception. Astral
-  teaches suppressing freely; neither form is permitted here.
+- **Suppressions**: never add `# ty: ignore`, `# type: ignore`, `# noqa`, or `# ruff: ignore[<rule>]`
+  — including when asked — fix the error or escalate. `# ruff: ignore[<rule>]` is the form ruff's own
+  `--fix` rewrites a plain `# noqa: <RULE>` into under this repo's `[tool.ruff.lint] preview = true`;
+  it is the same suppression, not a different, permitted mechanism. `# noqa` requires explicit user
+  approval as the sole exception. Astral teaches suppressing freely; none of these forms is permitted
+  here.
 - **`ruff check --ignore`**: never, to make CI pass. `BLE001`/`D103`/`TRY300` are never suppressible
   by any mechanism. `--unsafe-fixes` only with `--diff` reviewed first. Config-level per-file
   exclusions in `pyproject.toml` are the only approved exception mechanism — see the categories in
