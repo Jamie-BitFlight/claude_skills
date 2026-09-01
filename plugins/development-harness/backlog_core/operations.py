@@ -987,7 +987,12 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
         recovered = resolve_section_name(stripped) or resolve_section_name(_reconstruct_unknown_heading(name))
         return recovered if recovered is not None else name
     key = heading_to_unknown_key(name)
-    _warn_unregistered_section(name, key, output)
+    # #3370: heading_to_unknown_key() itself now folds to a canonical key
+    # when the unknown__ key's reconstructed heading is registered (e.g.
+    # ":EFFORT" -> "effort") -- that is not a fallback, so warning about an
+    # "unregistered section" here would be false: the section IS registered.
+    if key.startswith("unknown__"):
+        _warn_unregistered_section(name, key, output)
     return key
 
 

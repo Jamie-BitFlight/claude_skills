@@ -846,15 +846,19 @@ class BacklogUpdateSamTaskStatusResponse(FallibleToolResponse):
 # section models -- measured cost: 1,904 tokens flattened vs. 2,636 with the
 # real models, against a 700-token-per-tool budget already overridden once
 # for this tool (see test_tool_output_schemas.py's _PER_TOOL_SCHEMA_OVERRIDES).
-# ponytail: nested section models flattened to fit the schema budget; restore
-# them (import SectionEntryMetadata/GroomedSectionMetadata/SectionMeta from
-# .models) if the per-tool cap is ever raised past ~2,600.
+# Deliberate simplification: nested section models flattened to
+# dict[str, object] to fit the schema budget, rather than reusing
+# ViewItemResult's real SectionEntryMetadata/GroomedSectionMetadata/
+# SectionMeta models (import them from .models to restore full fidelity
+# if the per-tool cap is ever raised past ~2,600).
 #
 # Five fields carry a leading underscore on the wire (`_summary`,
-# `_full_chars`, `_hint`, `_over_budget`, `_usage`) -- not valid Python
-# identifiers, so each is declared under a plain field name with an `alias`,
-# and `serialize_by_alias=True` makes `model_dump(exclude_none=True)` (the
-# call pattern every tool uses, with no explicit `by_alias=True`) emit the
+# `_full_chars`, `_hint`, `_over_budget`, `_usage`). A leading underscore is
+# a valid Python identifier, but Pydantic treats such a field name as a
+# private attribute rather than a model field by default, so each is
+# declared under a plain field name with an `alias` instead, and
+# `serialize_by_alias=True` makes `model_dump(exclude_none=True)` (the call
+# pattern every tool uses, with no explicit `by_alias=True`) emit the
 # underscored key. `populate_by_name=True` lets `model_validate()` accept
 # either spelling.
 class BacklogViewResponse(BaseModel):
