@@ -1,29 +1,40 @@
 {
+  "claudeMdExcludes": [
+    "**/.claude/worktrees/**/.claude/CLAUDE.md",
+    "**/.claude/worktrees/**/.claude/rules/**",
+    "**/.claude/worktrees/**/CLAUDE.md",
+    "**/.claude/worktrees/**/CLAUDE.local.md"
+  ],
+  "enabledPlugins": {
+    "astral@jamie-bitflight-skills": true
+  },
   "env": {
     "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
-  "hooks": {
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "command": "bd prime",
-            "type": "command"
-          }
-        ],
-        "matcher": ""
+  "extraKnownMarketplaces": {
+    "jamie-bitflight-skills": {
+      "source": {
+        "path": ".",
+        "source": "directory"
       }
-    ],
+    }
+  },
+  "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
-            "command": "bd prime",
-            "type": "command"
-          },
-          {
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/session-init.sh\"",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "command": "bd prime --hook-json",
             "type": "command"
           }
         ],
@@ -42,26 +53,6 @@
       }
     ]
   },
-  "worktree": {
-    "baseRef": "head"
-  },
-  "extraKnownMarketplaces": {
-    "jamie-bitflight-skills": {
-      "source": {
-        "source": "directory",
-        "path": "."
-      }
-    }
-  },
-  "enabledPlugins": {
-    "astral@jamie-bitflight-skills": true
-  },
-  "claudeMdExcludes": [
-    "**/.claude/worktrees/**/.claude/CLAUDE.md",
-    "**/.claude/worktrees/**/.claude/rules/**",
-    "**/.claude/worktrees/**/CLAUDE.md",
-    "**/.claude/worktrees/**/CLAUDE.local.md"
-  ],
   "permissions": {
     "allow": [
       "Bash(gh issue list:*)",
@@ -89,5 +80,8 @@
       "mcp__claude-in-chrome__read_console_messages"
     ],
     "deny": []
+  },
+  "worktree": {
+    "baseRef": "head"
   }
 }
