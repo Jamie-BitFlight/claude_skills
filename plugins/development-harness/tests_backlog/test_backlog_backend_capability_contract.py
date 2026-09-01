@@ -313,13 +313,12 @@ class TestGitHubExtrasCapabilityContract:
             supports_github_extras = True
 
         with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
-            require_github_extras(_LyingBackend(), "get_github")  # type: ignore[arg-type]
+            require_github_extras(_LyingBackend(), "get_github")  # ty: ignore[invalid-argument-type]
 
         assert exc_info.value.protocol_mismatch is True
         assert "backend bug" in str(exc_info.value)
         assert "GitHubExtras" in str(exc_info.value), (
-            "message should name the actual Protocol class, not just the opaque "
-            "capability flag string 'github_extras'"
+            "message should name the actual Protocol class, not just the opaque capability flag string 'github_extras'"
         )
 
 
@@ -401,7 +400,7 @@ class TestBranchSupportCapabilityContract:
             supports_branches = True
 
         with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
-            require_branch_support(_LyingBackend(), "create_integration_branch")  # type: ignore[arg-type]
+            require_branch_support(_LyingBackend(), "create_integration_branch")  # ty: ignore[invalid-argument-type]
 
         assert exc_info.value.protocol_mismatch is True
         assert "backend bug" in str(exc_info.value)

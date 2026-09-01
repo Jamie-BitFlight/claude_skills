@@ -616,10 +616,7 @@ class GitHubUnavailableError(BackendUnavailableError):
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
 # UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
 # doesn't tell a reader which Protocol class the backend failed to satisfy.
-_CAPABILITY_PROTOCOL_NAMES: dict[str, str] = {
-    "github_extras": "GitHubExtras",
-    "branches": "BranchBackend",
-}
+_CAPABILITY_PROTOCOL_NAMES: dict[str, str] = {"github_extras": "GitHubExtras", "branches": "BranchBackend"}
 
 
 class UnsupportedBackendCapabilityError(BacklogError):
