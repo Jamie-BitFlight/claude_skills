@@ -131,6 +131,17 @@ _REACTION_ADAPTER: TypeAdapter[list[Reaction]] = TypeAdapter(list[Reaction])
 # starts with the same text (e.g. a public PR's `chatgpt-codex-connector-imposter`).
 _CODEX_REACTOR_LOGINS = frozenset({"chatgpt-codex-connector", "chatgpt-codex-connector[bot]"})
 
+# Matches only the variable slot of Codex's own top-level review body when it found nothing to
+# say: fixed boilerplate text, then the reviewed commit's short sha, then nothing but whitespace
+# before Codex's own "About Codex in GitHub" `<details>` footer starts. Verified byte-for-byte
+# against this repo's own PR #3318/#3306 history (see `_is_codex_empty_review`): a review that
+# *does* carry findings keeps the identical header and footer but replaces this exact text with
+# the finding itself, so this regex does not match it.
+_CODEX_EMPTY_REVIEW_BODY = re.compile(
+    r"Here are some automated review suggestions for this pull request\.\s*"
+    r"\*\*Reviewed commit:\*\*\s*`[0-9a-f]+`\s*(?=<details>)"
+)
+
 
 def run_gh(args: list[str], *, timeout: float | None = None) -> str:
     """Run a `gh` command and return its captured stdout.
@@ -513,8 +524,39 @@ def _references_review(comment_body: str, review_url: str) -> bool:
     return re.search(re.escape(review_url) + r"(?!\d)", comment_body) is not None
 
 
+def _is_codex_empty_review(review: ReviewNode) -> bool:
+    """Whether `review` is Codex's fixed no-findings wrapper, carrying no feedback of its own.
+
+    Codex posts a review with this same boilerplate body on every push regardless of what it
+    finds — real findings, when present, arrive separately as inline thread comments already
+    tracked through `unresolved`/`resolve`, never in this top-level review's own body. Requiring
+    the reaction phrase in addition to the regex match on `_CODEX_EMPTY_REVIEW_BODY` guards against
+    matching some unrelated review whose body happens to contain a reviewed-commit line.
+
+    Args:
+        review: A review whose body is non-empty (`reviews_with_body`).
+
+    Returns:
+        `True` only when `review` is authored by the Codex bot (see `_CODEX_REACTOR_LOGINS`) and
+        its body is exactly the boilerplate no-findings template — not merely a review that
+        contains the template text somewhere alongside real findings.
+    """
+    return (
+        review.author is not None
+        and review.author.login.lower() in _CODEX_REACTOR_LOGINS
+        and "will react with 👍" in review.body
+        and _CODEX_EMPTY_REVIEW_BODY.search(review.body) is not None
+    )
+
+
 def _unresponded_reviews(reviews_with_body: list[ReviewNode], own_comments: list[IssueComment]) -> list[ReviewNode]:
     """Which of `reviews_with_body` this workflow has not yet explicitly responded to.
+
+    A Codex review whose entire body is its own fixed no-findings boilerplate (see
+    `_is_codex_empty_review`) is excluded up front — every push posts a fresh one regardless of
+    findings, and responding to it is pure busywork with no informational value. A Codex review
+    that carries real content beyond that template is not excluded and follows the same rule as
+    any other review below.
 
     A review counts as responded only when at least one of this workflow's own PR-level comments
     both quotes that review's own `url` (its canonical GitHub permalink, matched as a complete id —
@@ -542,6 +584,7 @@ def _unresponded_reviews(reviews_with_body: list[ReviewNode], own_comments: list
         review
         for review in reviews_with_body
         if review.submittedAt is not None
+        and not _is_codex_empty_review(review)
         and not any(
             _references_review(comment.body, review.url) and comment.created_at >= _review_effective_timestamp(review)
             for comment in own_comments
@@ -614,7 +657,10 @@ def build_fetch_result(
     own workflow sanctions) is not evidence it addressed that review's feedback, and a plain
     chronological cutover cannot tell the two apart. Comments from any other account are ignored
     for the same reason a comment without any reference is. A review with no `submittedAt` (not
-    yet actually submitted) is excluded rather than treated as always-unresponded.
+    yet actually submitted) is excluded rather than treated as always-unresponded. A Codex review
+    whose entire body is its own fixed no-findings boilerplate is excluded up front, before any of
+    the above — see `_is_codex_empty_review` — since every push posts a fresh one regardless of
+    findings and responding to it has no informational value.
 
     `codex_approved` is `True` when a "+1" reaction from exactly the Codex bot's known login (not
     merely one that starts with the same text — see `_CODEX_REACTOR_LOGINS`) exists on the PR
