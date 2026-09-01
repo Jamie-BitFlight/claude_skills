@@ -48,6 +48,24 @@ if TYPE_CHECKING:
 
 
 class ProviderMemoryBackend(InMemoryBackend):
+    """Default per-test backend: an InMemoryBackend that also simulates GitHub.
+
+    Dozens of operation-layer tests across ``tests/test_github_tools_*.py``
+    patch only ``operations.get_github`` and then exercise the real
+    ``GitHubExtras`` delegate methods (``sync_issues_graphql``,
+    ``_fetch_milestones_graphql``, ``_projects_v2_list_query``, ...) that
+    ``InMemoryBackend`` implements as local simulations. Those tests are
+    deliberately simulating a GitHub-shaped backend, so ``supports_github_extras``
+    is ``True`` here even though the base ``InMemoryBackend`` declares it
+    ``False`` (see ``backends/memory_backend.py`` — a plain in-memory backend
+    cannot return a real ``Repository``). Setting it centrally here, rather
+    than in every individual test fixture, is the honest fix for the whole
+    class of tests that use this double via the autouse ``_isolated_backend``
+    fixture below.
+    """
+
+    supports_github_extras: bool = True
+
     def __init__(self) -> None:
         super().__init__()
         self.reconcile_requests: list[ReconcileRequest] = []

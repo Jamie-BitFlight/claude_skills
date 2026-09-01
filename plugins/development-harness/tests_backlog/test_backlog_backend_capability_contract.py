@@ -35,7 +35,8 @@ from typing import TYPE_CHECKING
 
 import backlog_core.backend_protocol as _bp
 import pytest
-from backlog_core.backend_protocol import create_backend
+from backlog_core.backend_protocol import create_backend, require_github_extras
+from backlog_core.models import UnsupportedBackendCapabilityError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -207,3 +208,72 @@ class TestBacklogBackendCapabilityContract:
             + ("did NOT raise" if flag is False else "raised")
             + " NotImplementedError — flag and behaviour are inconsistent"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestGitHubExtrasCapabilityContract
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestGitHubExtrasCapabilityContract:
+    """Parametrized contract suite for the ``supports_github_extras`` flag.
+
+    Mirrors ``TestBacklogBackendCapabilityContract``'s Contract 1/Contract 2
+    pair above, for the ``GitHubExtras`` capability gate
+    (``require_github_extras``, re-exported from ``backend_protocol.py``)
+    instead of ``supports_batch_status_fetch``. Every backend in
+    ``_bp._VALID_BACKENDS`` is enrolled automatically.
+
+    Unlike ``supports_batch_status_fetch``, the ``GitHubExtras`` gate is not
+    self-checked inside the backend's own ``get_github()`` — it is enforced by
+    the caller-side ``require_github_extras()`` helper (this is precisely the
+    defect backlog #2287 reports: ``isinstance(backend, GitHubExtras)`` alone
+    lets a structurally-compliant backend reach its own bare ``RuntimeError``
+    stub). These tests therefore exercise ``require_github_extras()`` rather
+    than the backend method directly.
+    """
+
+    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    def test_false_flag_raises_unsupported_capability(self, name: str) -> None:
+        """Backends declaring ``supports_github_extras == False`` MUST raise.
+
+        Contract: When ``supports_github_extras`` is ``False``,
+        ``require_github_extras(backend, ...)`` MUST raise
+        ``UnsupportedBackendCapabilityError``. This is the regression target
+        for backlog #2287: before the fix, ``SQLiteBackend`` and
+        ``InMemoryBackend`` structurally satisfied the old
+        ``isinstance(backend, GitHubExtras)`` gate and reached a bare
+        ``RuntimeError`` stub instead.
+        """
+        backend = create_backend(name)
+
+        if not backend.supports_github_extras:
+            with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+                require_github_extras(backend, "get_github")
+            assert exc_info.value.capability == "github_extras"
+            assert exc_info.value.backend == type(backend).__name__
+
+    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    def test_true_flag_does_not_raise_unsupported_capability(self, name: str) -> None:
+        """Backends declaring ``supports_github_extras == True`` MUST NOT raise it.
+
+        Contract: When ``supports_github_extras`` is ``True``,
+        ``require_github_extras(backend, ...)`` must not raise
+        ``UnsupportedBackendCapabilityError`` and must return the backend
+        unchanged. The gate is checked without calling ``get_github()`` itself,
+        so no network or credential dependency is required even for
+        ``GitHubBackend``.
+        """
+        backend = create_backend(name)
+
+        if backend.supports_github_extras:
+            try:
+                narrowed = require_github_extras(backend, "get_github")
+            except UnsupportedBackendCapabilityError as exc:
+                pytest.fail(
+                    f"{type(backend).__name__}.supports_github_extras is True but "
+                    f"require_github_extras() raised UnsupportedBackendCapabilityError: {exc}"
+                )
+            else:
+                assert narrowed is backend

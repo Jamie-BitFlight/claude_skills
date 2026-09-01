@@ -25,8 +25,9 @@ from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
 
 from . import models as _models
+from ._capability_gates import require_github_extras
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, GitHubExtras, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
@@ -127,9 +128,7 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
         Authenticated Repository object.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("get_github requires a GitHub-backed backend")
-    return backend.get_github(repo, timeout)
+    return require_github_extras(backend, "get_github").get_github(repo, timeout)
 
 
 def try_get_github(repo: str = "") -> Repository | None:
@@ -178,9 +177,7 @@ def sync_issues_graphql(
         List of IssueNode objects matching the query.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("sync_issues_graphql requires a GitHub-backed backend")
-    return backend.sync_issues_graphql(
+    return require_github_extras(backend, "sync_issues_graphql").sync_issues_graphql(
         repo,
         owner,
         repo_name,
@@ -305,9 +302,9 @@ def create_task_issue(
         IssueNode for the created child issue, or None on failure.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("create_task_issue requires a GitHub-backed backend")
-    return backend.create_task_issue(repo, parent_issue_number, task, description, acceptance_criteria, labels, output)
+    return require_github_extras(backend, "create_task_issue").create_task_issue(
+        repo, parent_issue_number, task, description, acceptance_criteria, labels, output
+    )
 
 
 def get_task_issues(repo: Repository, parent_issue_number: int, output: Output | None = None) -> list[IssueNode]:
@@ -317,9 +314,7 @@ def get_task_issues(repo: Repository, parent_issue_number: int, output: Output |
         List of IssueNode objects for child task issues.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("get_task_issues requires a GitHub-backed backend")
-    return backend.get_task_issues(repo, parent_issue_number, output)
+    return require_github_extras(backend, "get_task_issues").get_task_issues(repo, parent_issue_number, output)
 
 
 def update_task_status(repo: Repository, issue_number: int, new_status: str, output: Output | None = None) -> bool:
@@ -329,9 +324,9 @@ def update_task_status(repo: Repository, issue_number: int, new_status: str, out
         True if the status was updated, False otherwise.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("update_task_status requires a GitHub-backed backend")
-    return backend.update_task_status(repo, issue_number, new_status, output)
+    return require_github_extras(backend, "update_task_status").update_task_status(
+        repo, issue_number, new_status, output
+    )
 
 
 def _fetch_issue_graphql(repo: Repository, owner: str, repo_name: str, issue_number: int) -> IssueNode:
@@ -341,9 +336,9 @@ def _fetch_issue_graphql(repo: Repository, owner: str, repo_name: str, issue_num
         IssueNode for the requested issue.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_fetch_issue_graphql requires a GitHub-backed backend")
-    return backend._fetch_issue_graphql(repo, owner, repo_name, issue_number)
+    return require_github_extras(backend, "_fetch_issue_graphql")._fetch_issue_graphql(
+        repo, owner, repo_name, issue_number
+    )
 
 
 def _update_issue_graphql(
@@ -358,9 +353,7 @@ def _update_issue_graphql(
 ) -> None:
     """Update an issue's mutable fields via the active backend."""
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_update_issue_graphql requires a GitHub-backed backend")
-    backend._update_issue_graphql(
+    require_github_extras(backend, "_update_issue_graphql")._update_issue_graphql(
         repo, issue_node_id, state=state, body=body, title=title, label_ids=label_ids, milestone_id=milestone_id
     )
 
@@ -373,9 +366,7 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
     = False`` raise :exc:`NotImplementedError`.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_update_issues_graphql_batch requires a GitHub-backed backend")
-    backend._update_issues_graphql_batch(repo, updates)
+    require_github_extras(backend, "_update_issues_graphql_batch")._update_issues_graphql_batch(repo, updates)
 
 
 def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
@@ -385,9 +376,7 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
         GraphQL node ID of the newly created comment.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_add_comment_graphql requires a GitHub-backed backend")
-    return backend._add_comment_graphql(repo, issue_node_id, body)
+    return require_github_extras(backend, "_add_comment_graphql")._add_comment_graphql(repo, issue_node_id, body)
 
 
 def _fetch_issue_comments_graphql(
@@ -399,9 +388,9 @@ def _fetch_issue_comments_graphql(
         List of IssueCommentNode objects for the issue.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_fetch_issue_comments_graphql requires a GitHub-backed backend")
-    return backend._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number)
+    return require_github_extras(backend, "_fetch_issue_comments_graphql")._fetch_issue_comments_graphql(
+        repo, owner, repo_name, issue_number
+    )
 
 
 def _fetch_comment_by_id_graphql(repo: Repository, comment_node_id: str) -> IssueCommentNode:
@@ -411,9 +400,9 @@ def _fetch_comment_by_id_graphql(repo: Repository, comment_node_id: str) -> Issu
         IssueCommentNode for the requested comment.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_fetch_comment_by_id_graphql requires a GitHub-backed backend")
-    return backend._fetch_comment_by_id_graphql(repo, comment_node_id)
+    return require_github_extras(backend, "_fetch_comment_by_id_graphql")._fetch_comment_by_id_graphql(
+        repo, comment_node_id
+    )
 
 
 def _fetch_milestones_graphql(
@@ -425,9 +414,9 @@ def _fetch_milestones_graphql(
         List of MilestoneFullNode objects.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_fetch_milestones_graphql requires a GitHub-backed backend")
-    return backend._fetch_milestones_graphql(repo, owner, repo_name, states)
+    return require_github_extras(backend, "_fetch_milestones_graphql")._fetch_milestones_graphql(
+        repo, owner, repo_name, states
+    )
 
 
 def _graphql_request(repo: Repository, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
@@ -437,9 +426,7 @@ def _graphql_request(repo: Repository, query: str, variables: dict[str, object] 
         Parsed JSON response dict from the GraphQL endpoint.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_graphql_request requires a GitHub-backed backend")
-    return backend._graphql_request(repo, query, variables)
+    return require_github_extras(backend, "_graphql_request")._graphql_request(repo, query, variables)
 
 
 def _projects_v2_list_query(owner: str, limit: int = 20) -> tuple[str, dict[str, object]]:
@@ -449,9 +436,7 @@ def _projects_v2_list_query(owner: str, limit: int = 20) -> tuple[str, dict[str,
         Tuple of (query_string, variables_dict).
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_projects_v2_list_query requires a GitHub-backed backend")
-    return backend._projects_v2_list_query(owner, limit)
+    return require_github_extras(backend, "_projects_v2_list_query")._projects_v2_list_query(owner, limit)
 
 
 def _projects_v2_create_mutation(owner_id: str, title: str) -> tuple[str, dict[str, object]]:
@@ -461,9 +446,7 @@ def _projects_v2_create_mutation(owner_id: str, title: str) -> tuple[str, dict[s
         Tuple of (mutation_string, variables_dict).
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        raise BacklogError("_projects_v2_create_mutation requires a GitHub-backed backend")
-    return backend._projects_v2_create_mutation(owner_id, title)
+    return require_github_extras(backend, "_projects_v2_create_mutation")._projects_v2_create_mutation(owner_id, title)
 
 
 # github_sync delegates — original alias names preserved for test patchability

@@ -613,6 +613,33 @@ class GitHubUnavailableError(BackendUnavailableError):
     """Raised when GITHUB_TOKEN is missing or the GitHub API is unreachable."""
 
 
+class UnsupportedBackendCapabilityError(BacklogError):
+    """Raised when the active backend does not implement an optional capability.
+
+    Pick this class for any ``BacklogError``-tree call site (``operations.py``,
+    the ~30 ``except BacklogError`` handlers in ``server.py``). Pick
+    ``ContentProviderError``'s sibling ``UnsupportedCapabilityError`` (below)
+    for ``ContentProvider``-tree call sites instead — the two trees are
+    deliberately not unified. Carries structured fields (rather than prose
+    only) so callers can render a specific remediation.
+    """
+
+    def __init__(self, capability: str, backend: str, operation: str) -> None:
+        """Initialize with the missing capability, backend name, and attempted operation.
+
+        Args:
+            capability: Name of the missing capability flag (e.g. "github_extras").
+            backend: ``type(backend).__name__`` of the active backend.
+            operation: Name of the operation the caller attempted.
+        """
+        self.capability = capability
+        self.backend = backend
+        self.operation = operation
+        super().__init__(
+            f"{backend}: {operation} requires the {capability} capability, which this backend does not support."
+        )
+
+
 class ValidationError(BacklogError):
     """Raised on input validation failure."""
 

@@ -104,12 +104,17 @@ class InMemoryBackend:
     - ``supports_branches = True`` — in-memory branch CRUD is fully
       implemented (create/get/list/delete/merge) for test-double coverage
       of the ``BranchBackend`` protocol.
+    - ``supports_github_extras = False`` — this backend implements the
+      ``GitHubExtras`` methods as local simulations for internal delegation,
+      but ``get_github()`` cannot return a real ``Repository``, so the
+      capability is absent regardless of which methods exist.
     """
 
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
+    supports_github_extras: bool = False
 
     def __init__(self) -> None:
         """Initialise empty in-memory storage for all backend state."""

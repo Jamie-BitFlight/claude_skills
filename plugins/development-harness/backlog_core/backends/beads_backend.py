@@ -247,6 +247,10 @@ class BeadsBackend:
       title is used as the selector.
     - ``supports_branches = False`` — beads does not manage git branches;
       callers must check this flag before invoking ``BranchBackend`` methods.
+    - ``supports_github_extras = False`` — beads implements none of the
+      ``GitHubExtras`` methods (see ``backend_types.py`` for the protocol);
+      this is the one backend the old ``isinstance``-only gate actually
+      caught correctly.
 
     Parameters
     ----------
@@ -261,6 +265,7 @@ class BeadsBackend:
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "string"
     supports_branches: bool = False
+    supports_github_extras: bool = False
 
     def __init__(self, runner: _BdRunnerLike | None = None) -> None:
         """Store the runner; do not touch the filesystem or spawn processes."""
