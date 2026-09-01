@@ -117,8 +117,8 @@ _GH = shutil.which("gh") or "gh"
 # cover a whole `gh api --paginate` run — every page requested sequentially inside one subprocess —
 # on an arbitrarily large PR over an arbitrarily slow link, and `build_fetch_result` now makes
 # seven such calls per snapshot rather than the two it made when the old 30-second cap was written.
-# This repository has no source for that number (CLAUDE.md, "No invented constraints"), so `fetch`
-# and `watch` expose `--gh-timeout-seconds` instead, unbounded by default, and `watch` additionally
+# This repository has no source for that number, so `fetch` and `watch` expose
+# `--gh-timeout-seconds` instead, unbounded by default, and `watch` additionally
 # bounds each *poll* by its own `--timeout-seconds` deadline, which the caller chose.
 
 _ISSUE_COMMENT_ADAPTER: TypeAdapter[list[IssueComment]] = TypeAdapter(list[IssueComment])
@@ -191,7 +191,7 @@ def detect_repo_identity(*, gh_timeout: float | None = None) -> tuple[str, str]:
     Relies entirely on `gh`'s own remote resolution (the same one `gh pr view`, `gh pr comment`
     etc. use for this checkout) -- this function adds no guessing of its own. A wrong owner/repo
     would send a reply to the wrong repository, so a caller unable to detect must stop rather than
-    fall back to a default (CLAUDE.md, "No invented constraints").
+    fall back to a default.
 
     Args:
         gh_timeout: Seconds to bound the `gh` call to, or `None` for no bound -- see `run_gh`.

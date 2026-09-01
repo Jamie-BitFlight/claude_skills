@@ -196,6 +196,15 @@ def _state(
     )
 
 
+def _validation_error() -> ValidationError:
+    """A real `ValidationError` instance, for use as a mock `side_effect`."""
+    try:
+        pr_review_models.GitHubCommitDate.model_validate({"committedDate": "not-a-timestamp"})
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("expected ValidationError")
+
+
 def _reviews_conn(nodes: list[ReviewNode]) -> pr_review_gh.ReviewsConnection:
     return pr_review_gh.ReviewsConnection(totalCount=len(nodes), nodes=nodes)
 
@@ -1026,14 +1035,22 @@ def test_fetch_uses_detected_github_when_not_overridden(mocker: MockerFixture) -
     assert fetch_mock.call_args.args[:2] == ("detected-owner", "detected-repo")
 
 
-def test_fetch_exits_nonzero_and_names_github_flag_when_detection_fails(mocker: MockerFixture) -> None:
+@pytest.mark.parametrize(
+    "detection_error",
+    [subprocess.CalledProcessError(1, ["gh"]), subprocess.TimeoutExpired(cmd=["gh"], timeout=30)],
+    ids=["called-process-error", "timeout-expired"],
+)
+def test_fetch_exits_nonzero_and_names_github_flag_when_detection_fails(
+    detection_error: Exception, mocker: MockerFixture
+) -> None:
     """When autodetection fails, `fetch` exits non-zero and names `--github` as the way out.
 
     A wrong owner/repo would send a reply to the wrong repository, so a failed detection must stop
-    the command rather than fall back to a guess (CLAUDE.md, "No invented constraints" — the same
-    principle rules out silently guessing an identity here).
+    the command rather than fall back to a guess. Regression coverage for `TimeoutExpired`: a
+    `--gh-timeout-seconds`-bounded `gh repo view` call that exceeds it must produce this same clean
+    exit rather than an unhandled exception.
     """
-    mocker.patch.object(pr_review_threads, "detect_repo_identity", side_effect=subprocess.CalledProcessError(1, ["gh"]))
+    mocker.patch.object(pr_review_threads, "detect_repo_identity", side_effect=detection_error)
     fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result")
 
     result = runner.invoke(app, ["fetch", "--pr", "3208"])
@@ -1280,6 +1297,42 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     data = json.loads(result.output)
     assert data["timed_out"] is False
     assert data["state"]["unresolved_count"] == 1
+
+
+def test_watch_survives_a_validation_error_mid_window(mocker: MockerFixture) -> None:
+    """A malformed `gh` API response mid-window (`build_fetch_result`'s own `.model_validate()`
+    rejecting it) does not crash `watch` — it counts as no fresh data for that one poll, the same
+    as a `CalledProcessError`, and the loop continues toward `deadline` on its own schedule.
+    """
+    mocker.patch.object(
+        pr_review_threads, "build_fetch_result", side_effect=[_state(), _validation_error(), _state(unresolved_count=1)]
+    )
+    mocker.patch.object(pr_review_threads.time, "sleep")
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "1", "--timeout-seconds", "40"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["timed_out"] is False
+    assert data["state"]["unresolved_count"] == 1
+
+
+def test_watch_fails_loudly_on_a_validation_error_at_the_deadline(mocker: MockerFixture) -> None:
+    """A `ValidationError` from the last poll of a window is a failed poll, the same as a
+    non-zero `gh` exit — it is not explained or excused by the deadline, so reporting
+    `timed_out: true` off stale state here would tell a caller the PR is clean when the last check
+    actually raised.
+    """
+    mocker.patch.object(pr_review_threads, "build_fetch_result", side_effect=[_state(), _validation_error()])
+    mocker.patch.object(pr_review_threads.time, "sleep")
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 100.0, 100.0])
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--interval-seconds", "10", "--timeout-seconds", "100"])
+
+    assert result.exit_code != 0
+    assert "the last of 1 poll(s) this window failed" in result.output
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(result.output)
 
 
 def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None:

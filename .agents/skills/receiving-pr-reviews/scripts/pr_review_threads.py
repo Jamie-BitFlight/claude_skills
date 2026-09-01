@@ -107,8 +107,7 @@ def _owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, s
 
     Detection relies entirely on `gh repo view`'s own remote resolution for this checkout -- see
     `pr_review_gh.detect_repo_identity`. A wrong owner/repo would send a reply to the wrong
-    repository, so a failed detection stops the command rather than falling back to a guess
-    (CLAUDE.md, "No invented constraints").
+    repository, so a failed detection stops the command rather than falling back to a guess.
 
     Args:
         github: The `--github` value, already format-validated by `_validate_github_option`, or
@@ -120,15 +119,15 @@ def _owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, s
 
     Raises:
         typer.Exit: Autodetection was attempted (no `--github` given) and failed -- `gh` is
-            missing, unauthenticated, or this checkout has no GitHub remote `gh` recognizes.
-            Exits with code 1; nothing else is printed to stdout.
+            missing, unauthenticated, timed out, or this checkout has no GitHub remote `gh`
+            recognizes. Exits with code 1; nothing else is printed to stdout.
     """
     if github is not None:
         owner, repo = github.split("/", 1)
         return owner, repo
     try:
         return detect_repo_identity(gh_timeout=gh_timeout)
-    except (FileNotFoundError, subprocess.CalledProcessError, ValidationError) as exc:
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValidationError) as exc:
         typer.echo(
             f"Could not detect this checkout's GitHub repository via `gh repo view` ({exc}). "
             "Pass --github owner/repo to specify it explicitly.",
@@ -468,9 +467,9 @@ def watch(
     it and stops once less than that remains — the point past which `gh_timeout_budget` would
     starve the call to nothing anyway. No fixed safety margin is reserved: this repository has no
     source for how long seven sequential `gh api` round trips take, and inventing one would be a
-    guess (CLAUDE.md, "No invented constraints"). The final sub-interval stretch of a window is
-    therefore left unpolled by design — the next `watch` call's own first fetch covers it, which is
-    exactly why the loop pattern above is documented as back-to-back calls.
+    guess. The final sub-interval stretch of a window is therefore left unpolled by design — the
+    next `watch` call's own first fetch covers it, which is exactly why the loop pattern above is
+    documented as back-to-back calls.
 
     Exits non-zero, with nothing printed to stdout, if the *last* re-poll attempted this window
     failed (a transient `gh` failure — see the exception handling inside the loop). An earlier
@@ -523,11 +522,13 @@ def watch(
             # the clock it is a real network stall and leaves the tail unconfirmed.
             last_poll_ok = time.monotonic() >= deadline
             continue
-        except subprocess.CalledProcessError:
-            # A non-zero exit is an authentication, rate-limit, API or GraphQL error. The deadline
-            # cannot cause it and cannot excuse it, so it is a failed poll whatever the clock says
-            # — reporting `timed_out: true` off stale state here would tell a caller the PR is
-            # clean when nothing was actually checked.
+        except (subprocess.CalledProcessError, ValidationError):
+            # A non-zero exit is an authentication, rate-limit, API or GraphQL error; a
+            # `ValidationError` is `build_fetch_result`'s own `.model_validate()` rejecting a
+            # malformed or unexpected response shape. Neither is something the deadline caused or
+            # excuses, so it is a failed poll whatever the clock says — reporting `timed_out: true`
+            # off stale state here would tell a caller the PR is clean when nothing was actually
+            # checked.
             last_poll_ok = False
             continue
     if poll_attempts and not last_poll_ok:
