@@ -813,6 +813,12 @@ class MilestoneEchoError(BaseModel):
     error: str | None = None
     """Error message; ``None`` on success."""
 
+    unsupported_capability: str | None = None
+    """Missing capability flag name, set only on an ``UnsupportedBackendCapabilityError`` arm."""
+
+    backend: str | None = None
+    """Active backend's class name, set only on an ``UnsupportedBackendCapabilityError`` arm."""
+
 
 # conflict_groups reuses dispatch_schema.core.models.ConflictGroup directly
 # (rather than redeclaring an equivalent shape here) because

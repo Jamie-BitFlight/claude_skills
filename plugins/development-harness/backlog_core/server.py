@@ -3781,7 +3781,9 @@ async def dispatch_stale_check(
     try:
         current_numbers = await asyncio.to_thread(_fetch_milestone_issue_numbers)
     except UnsupportedBackendCapabilityError as exc:
-        return exc.to_response(milestone_number)
+        return DispatchStaleCheckResponse.model_validate(exc.to_response(milestone_number)).model_dump(
+            exclude_none=True
+        )
     except GitHubUnavailableError as exc:
         return DispatchStaleCheckResponse.model_validate({
             "error": str(exc),
@@ -3967,7 +3969,7 @@ async def dispatch_conflicts(
     try:
         items = await asyncio.to_thread(_fetch_items_with_impact_radius)
     except UnsupportedBackendCapabilityError as exc:
-        return exc.to_response(milestone_number)
+        return DispatchConflictsResponse.model_validate(exc.to_response(milestone_number)).model_dump(exclude_none=True)
     except GitHubUnavailableError as exc:
         return DispatchConflictsResponse.model_validate({
             "error": str(exc),
