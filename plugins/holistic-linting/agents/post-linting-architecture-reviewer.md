@@ -47,7 +47,10 @@ Keep the full alternation above, including `# ruff: ignore[<rule>]` and `# ruff:
 why) that a `# noqa`-only grep would silently miss. `file-ignore` suppresses an entire file, not one
 line — confirm the whole file's rule set is actually clean before treating a match as resolved.
 
-Cross-reference matches against `git diff` to confirm they appear in modified lines.
+Cross-reference matches against `git diff` to confirm they appear in modified lines. A match inside
+a string literal or fixture — code whose entire purpose is exercising suppression syntax itself, not
+suppressing a real violation — is not a failure; check the matched line's actual syntax (a live
+comment starts the token at column position after real code, not inside quotes) before reporting one.
 
 Failure report: "SUPPRESSION DETECTED in `<file>:<line>` — resolver added `<comment>` instead of resolving root cause."
 

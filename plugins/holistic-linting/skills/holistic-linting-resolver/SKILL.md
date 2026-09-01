@@ -205,8 +205,16 @@ All incidentally modified files must also produce zero errors before resolution 
    grep -rn "<CODE>" "${CLAUDE_PLUGIN_ROOT}/skills/holistic-linting/references/rules/mypy/"
    ```
 
-   If the code isn't covered there, fetch mypy's own official documentation — it enumerates every
-   code and stays current with the installed mypy version, which a vendored copy cannot:
+   The curated docs cover the common codes, not every one mypy defines. If the code isn't there,
+   check the full vendored code list before falling back to the network — it works offline and needs
+   no network access:
+
+   ```bash
+   grep -n "\[<CODE>\]" "${CLAUDE_PLUGIN_ROOT}/skills/holistic-linting/references/mypy-docs/"*.rst
+   ```
+
+   If the code isn't in either local source, fetch mypy's own official documentation — it stays
+   current with the installed mypy version, which a vendored copy cannot:
 
    - Default-enabled codes: `https://mypy.readthedocs.io/en/stable/error_code_list.html`
    - Optional-check codes: `https://mypy.readthedocs.io/en/stable/error_code_list2.html`
