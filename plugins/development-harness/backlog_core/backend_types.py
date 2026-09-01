@@ -131,15 +131,7 @@ class WorkItemBackend(Protocol):
     - ``supports_batch_issue_update`` — batch GraphQL update implemented.
     - ``issue_id_type`` — integer vs string issue IDs.
     - ``supports_branches`` — whether ``BranchBackend`` is implemented.
-    - ``supports_github_extras`` — whether ``GitHubExtras`` is implemented.
-      Gate on this flag first (via ``require_github_extras`` in
-      ``_capability_gates.py``), and treat ``isinstance(backend,
-      GitHubExtras)`` only as a secondary structural assertion:
-      ``GitHubExtras`` is ``runtime_checkable``, which checks attribute
-      names only, so a backend that structurally implements every method as
-      a local simulation still satisfies ``isinstance`` while this flag is
-      ``False`` because the simulation has no real GitHub connection behind
-      it.
+    - ``supports_github_extras`` — whether ``GitHubExtras`` is implemented; gate via ``require_github_extras()`` (see ``GitHubExtras``'s docstring for why ``isinstance`` alone is insufficient).
     """
 
     supports_batch_status_fetch: bool

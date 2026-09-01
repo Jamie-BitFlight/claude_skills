@@ -240,11 +240,7 @@ class TestGitHubExtrasCapabilityContract:
 
         Contract: When ``supports_github_extras`` is ``False``,
         ``require_github_extras(backend, ...)`` MUST raise
-        ``UnsupportedBackendCapabilityError``. This is the regression target
-        for backlog #2287: before the fix, ``SQLiteBackend`` and
-        ``InMemoryBackend`` structurally satisfied the old
-        ``isinstance(backend, GitHubExtras)`` gate and reached a bare
-        ``RuntimeError`` stub instead.
+        ``UnsupportedBackendCapabilityError``.
         """
         backend = create_backend(name)
 

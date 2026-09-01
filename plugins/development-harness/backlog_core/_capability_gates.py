@@ -62,12 +62,8 @@ def require_branch_support(backend: WorkItemBackend, operation: str) -> BranchBa
     """Return ``backend`` narrowed to ``BranchBackend``, or raise if unsupported.
 
     Args:
-        backend: The active backend instance to check. Passed in by the
-            caller (rather than fetched here) so callers keep patching
-            ``get_config()`` directly in tests, and so static type checkers
-            narrow the return value at the call site.
-        operation: Name of the operation the caller is attempting, recorded
-            on the raised error for a specific remediation message.
+        backend: The active backend instance to check (see require_github_extras's Args for why this is a parameter rather than fetched internally).
+        operation: See require_github_extras.
 
     Returns:
         The same backend instance, statically narrowed to ``BranchBackend``.

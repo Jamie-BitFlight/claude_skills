@@ -104,10 +104,7 @@ class InMemoryBackend:
     - ``supports_branches = True`` — in-memory branch CRUD is fully
       implemented (create/get/list/delete/merge) for test-double coverage
       of the ``BranchBackend`` protocol.
-    - ``supports_github_extras = False`` — this backend implements the
-      ``GitHubExtras`` methods as local simulations for internal delegation,
-      but ``get_github()`` cannot return a real ``Repository``, so the
-      capability is absent regardless of which methods exist.
+    - ``supports_github_extras = False`` — same reason as ``SQLiteBackend``: methods are local simulations, ``get_github()`` can't return a real ``Repository``.
     """
 
     supports_batch_status_fetch: bool = True

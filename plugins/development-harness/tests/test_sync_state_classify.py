@@ -30,12 +30,7 @@ def _raise_content_unavailable_from(cause: GithubException) -> None:
 
 
 def _raise_double_wrapped_content_unavailable_from(github_exc: GithubException) -> None:
-    """Raise ContentUnavailableError wrapping a BacklogError wrapping github_exc.
-
-    Mirrors _fetch_blobs_graphql()'s actual double-wrap shape: gh_client._graphql_request()
-    wraps GithubException in BacklogError, then _fetch_blobs_graphql() wraps that
-    BacklogError in ContentUnavailableError.
-    """
+    """Mirrors _fetch_blobs_graphql()'s actual double-wrap shape (see module docstring)."""
     try:
         try:
             raise github_exc

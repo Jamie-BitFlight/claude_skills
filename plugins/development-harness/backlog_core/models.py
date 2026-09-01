@@ -639,7 +639,7 @@ class UnsupportedBackendCapabilityError(BacklogError):
         Args:
             capability: Name of the missing capability flag (e.g. "github_extras").
             backend: ``type(backend).__name__`` of the active backend.
-            operation: Name of the operation the caller attempted.
+            operation: Name of the operation the caller attempted, echoed into the raised error's message.
             protocol_mismatch: True when the backend declared the capability flag
                 ``True`` but does not structurally satisfy the corresponding
                 ``runtime_checkable`` Protocol — a backend implementation bug, not
