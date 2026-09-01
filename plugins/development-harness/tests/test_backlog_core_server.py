@@ -1347,7 +1347,7 @@ async def test_backlog_resolve_backlog_error_returns_error_key():
 
 async def test_backlog_update_success_with_plan():
     """backlog_update calls operations.update_item and merges result."""
-    op_result = {"title": "Feature", "changes": ["plan attached"]}
+    op_result = {"title": "Feature", "changes": {"plan": "plan/tasks-feature.md"}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         response = await _call("backlog_update", {"selector": "Feature", "plan": "plan/tasks-feature.md"})
 
@@ -1363,7 +1363,7 @@ async def test_backlog_update_success_with_plan():
 
 async def test_backlog_update_passes_status():
     """backlog_update forwards status to operations."""
-    op_result = {"title": "Item", "changes": ["status updated"]}
+    op_result = {"title": "Item", "changes": {"status": "in-progress"}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "status": "in-progress"})
 
@@ -1373,7 +1373,7 @@ async def test_backlog_update_passes_status():
 
 async def test_backlog_update_passes_section_content():
     """backlog_update forwards section and content for groomed update."""
-    op_result = {"title": "Item", "changes": ["groomed"]}
+    op_result = {"title": "Item", "changes": {}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "section": "Acceptance Criteria", "content": "some content"})
 
@@ -1384,7 +1384,7 @@ async def test_backlog_update_passes_section_content():
 
 async def test_backlog_update_passes_section_and_content():
     """backlog_update forwards section and content for incremental update."""
-    op_result = {"title": "Item", "changes": ["section updated"]}
+    op_result = {"title": "Item", "changes": {}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "section": "Acceptance Criteria", "content": "- [ ] Done"})
 

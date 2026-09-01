@@ -116,9 +116,22 @@ from .tool_responses import (
     BacklogPullResponse,
     BacklogReadCommentResponse,
     BacklogResolveResponse,
+    BacklogStrikeEntryResponse,
+    BacklogSyncResponse,
+    BacklogUpdateResponse,
+    BacklogUpdateSamTaskStatusResponse,
+    DispatchConflictsResponse,
+    DispatchCreatePlanResponse,
+    DispatchItemStatusResponse,
+    DispatchReadResponse,
     DispatchSpawnResponse,
+    DispatchStaleCheckResponse,
+    DispatchValidateResponse,
+    DispatchWaveStartResponse,
     DispatchWaveStatusResponse,
     SamTaskLookupResult,
+    SyncNowResponse,
+    SyncStatusResponse,
 )
 
 if TYPE_CHECKING:
@@ -1172,27 +1185,24 @@ mcp = FastMCP(
         title="Backlog Sync Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 )
-async def sync_status() -> dict[str, object]:
+async def sync_status() -> SyncStatusResponse:
     """Return the current background sync state.
 
     Returns:
-        Dict with fields:
-            status (str): One of "idle", "running", "offline", "error".
-            started_at (str | None): ISO 8601 UTC timestamp of current/last sync start.
-            completed_at (str | None): ISO 8601 UTC timestamp of last sync completion.
-            last_success_at (str | None): ISO 8601 UTC timestamp of last successful sync.
-            items_done (int): Issues written to cache in the current/last run.
-            items_total (int | None): Total issues expected; None when unknown.
-            percent (int | None): Completion percentage 0-100; None when total unknown.
-            last_error (str): Error message from last failed sync, or empty string.
-            offline_reason (str): Why server entered offline mode, or empty string.
-            pending_mutations (int): Offline-queue depth as of the last completed
-                sync. Not a live read; updates only when a sync finishes.
-            rejected_mutations (int): Dead-lettered mutation count (key
-                mismatches plus schema-invalid entries) as of the last
-                completed sync. Same not-live caveat as pending_mutations.
+        :class:`~backlog_core.tool_responses.SyncStatusResponse` with
+        status, started_at, completed_at, items_done, items_total,
+        last_error, last_success_at, retry_count, offline_reason, percent,
+        pending_mutations, and rejected_mutations.
     """
-    return get_sync_state().to_dict()
+    # No exclude_none here (unlike every other tool in this module): every
+    # field is unconditionally present in SyncState.to_dict() -- some
+    # legitimately null (e.g. started_at before any sync has run) -- and
+    # there is no BacklogError arm ever needing to hide a field, so the
+    # rationale for exclude_none=True (rule 5's "not unconditionally
+    # present on every path" widening) doesn't apply. Dropping null keys
+    # here would be a wire-format regression against the pre-existing
+    # contract that every key is always present.
+    return SyncStatusResponse.model_validate(get_sync_state().to_dict()).model_dump()
 
 
 @mcp.tool(
@@ -1208,7 +1218,7 @@ async def sync_now(
     full_refresh: Annotated[
         bool, Field(description="Ignore the provider checkpoint and perform a full reconciliation")
     ] = False,
-) -> dict[str, object]:
+) -> SyncNowResponse:
     """Trigger an immediate background sync or return progress of an in-flight sync.
 
     If a sync is already in progress, returns the current progress without
@@ -1222,18 +1232,16 @@ async def sync_now(
             full reconciliation.
 
     Returns:
-        Dict with fields:
-            triggered (bool): True if a new sync was started; False if one was already running.
-            sync_state (dict): Current sync state (same fields as sync_status()).
-            messages (list[str]): Informational messages about the action taken.
+        :class:`~backlog_core.tool_responses.SyncNowResponse` with
+        triggered, sync_state (same fields as sync_status()), and messages.
     """
     state = get_sync_state()
     if not isinstance(_get_config().backend, SyncProvider):
-        return {
+        return SyncNowResponse.model_validate({
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["Active backend does not support reconciliation."],
-        }
+        }).model_dump()
 
     # Reset terminal states so the new attempt starts fresh.  Done before the
     # claim so the returned snapshot reflects the fresh RUNNING state, not the
@@ -1248,15 +1256,19 @@ async def sync_now(
     # concurrent sync_now calls — or a sync_now racing the startup loop — each launch
     # a duplicate sync worker.
     if not state.try_start():
-        return {
+        return SyncNowResponse.model_validate({
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["A sync is already in progress. Returning current progress."],
-        }
+        }).model_dump()
 
     bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
     _register_bg_task(bg_sync_task)
-    return {"triggered": True, "sync_state": state.to_dict(), "messages": ["Background sync triggered."]}
+    return SyncNowResponse.model_validate({
+        "triggered": True,
+        "sync_state": state.to_dict(),
+        "messages": ["Background sync triggered."],
+    }).model_dump()
 
 
 @mcp.tool(
@@ -2251,14 +2263,15 @@ async def backlog_view(
 async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
-) -> dict:
+) -> BacklogSyncResponse:
     """Sync backlog items with the configured backend: create missing work items and push groomed content.
 
     Use dry_run=true to preview changes without modifying anything.
 
     Returns:
-        Dict with created and pushed counts and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogSyncResponse` with
+        created and pushed counts, dry_run, and output messages/warnings.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2269,9 +2282,9 @@ async def backlog_sync(
         created = result.get("created", 0)
         pushed = result.get("pushed", 0)
         await ctx.info(f"Sync complete: {created} issue(s) created, {pushed} item(s) pushed")
-        return {**result, **out.to_dict()}
+        return BacklogSyncResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogSyncResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2518,14 +2531,18 @@ async def backlog_update(
             "May be a no-op depending on the active backend — check the returned messages."
         ),
     ] = False,
-) -> dict:
+) -> BacklogUpdateResponse:
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
     Groomed content is synced to the linked work item when the item has one.
 
     Returns:
-        Dict with updated item title, applied changes, and output
-        messages/warnings. On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogUpdateResponse` with the
+        updated item's title and whichever change fields apply (renamed_to,
+        description_updated, plan, issue_num, status, verified, changes on
+        the non-groomed path; groomed_updated, sections_written on the
+        groomed path), plus output messages/warnings. On error, or on a
+        non-fatal per-field failure, ``error`` is set.
     """
     out = Output()
     try:
@@ -2544,9 +2561,9 @@ async def backlog_update(
             reason=reason,
             verified=verified,
         )
-        return {**result, **out.to_dict()}
+        return BacklogUpdateResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogUpdateResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2843,23 +2860,28 @@ async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (GitHub issue integer)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> dict:
+) -> BacklogUpdateSamTaskStatusResponse:
     """Update the status field in a SAM task sub-issue.
 
     Patches the sam:task YAML block in the issue body. No-op if status already matches.
 
     Returns:
-        Dict with updated (bool), issue_number, new_status, and output messages.
-        On error, returns error key.
+        :class:`~backlog_core.tool_responses.BacklogUpdateSamTaskStatusResponse`
+        with updated (bool), issue_number, new_status, and output messages.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.update_sam_task_status, issue_number=issue_number, new_status=new_status, repo=repo, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogUpdateSamTaskStatusResponse.model_validate({**result, **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogUpdateSamTaskStatusResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -3233,7 +3255,7 @@ async def backlog_strike_entry(
     ],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
-) -> dict:
+) -> BacklogStrikeEntryResponse:
     """Strike (retract) an entry block within a backlog item.
 
     Wraps the entry in a collapsed details block with the reason,
@@ -3241,17 +3263,20 @@ async def backlog_strike_entry(
     if the item has one.
 
     Returns:
-        Dict with strike results and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogStrikeEntryResponse`
+        with title, entry_id, struck, and output messages/warnings. On
+        error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.strike_entry, selector=selector, entry_id=entry_id, reason=reason, section=section, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogStrikeEntryResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogStrikeEntryResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3639,23 +3664,35 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
         title="Read Dispatch Plan", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 )
-async def dispatch_read(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
+async def dispatch_read(
+    milestone_number: Annotated[int, Field(description="GitHub milestone number")],
+) -> DispatchReadResponse:
     """Read a dispatch plan for the given milestone.
 
-    Returns an error dict if no plan is stored for this milestone or it
+    Returns an error response if no plan is stored for this milestone or it
     fails schema validation.
 
     Returns:
-        Dict with ``milestone_number`` and ``plan`` (full plan
-        as a nested dict), or ``error`` on failure.
+        :class:`~backlog_core.tool_responses.DispatchReadResponse` with
+        ``milestone_number`` and ``plan`` (the full dispatch plan), or
+        ``error`` on failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except ContentUnavailableError:
-        return {"error": "Dispatch plan not found", "milestone_number": milestone_number}
+        return DispatchReadResponse.model_validate({
+            "error": "Dispatch plan not found",
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     except ValueError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
-    return {"milestone_number": milestone_number, "plan": plan.model_dump()}
+        return DispatchReadResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
+    return DispatchReadResponse.model_validate({
+        "milestone_number": milestone_number,
+        "plan": plan.model_dump(),
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3667,7 +3704,9 @@ async def dispatch_read(milestone_number: Annotated[int, Field(description="GitH
         openWorldHint=False,
     )
 )
-async def dispatch_validate(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
+async def dispatch_validate(
+    milestone_number: Annotated[int, Field(description="GitHub milestone number")],
+) -> DispatchValidateResponse:
     """Validate an existing dispatch plan's structural integrity.
 
     Reads the plan file then runs five structural checks: duplicate issues,
@@ -3675,15 +3714,22 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
     conflict group wave placement.
 
     Returns:
-        Dict with ``is_valid`` (bool), ``errors`` (list[str]), and
-        ``warnings`` (list[str]), or ``error`` on file/parse failure.
+        :class:`~backlog_core.tool_responses.DispatchValidateResponse` with
+        ``is_valid``, ``errors``, and ``warnings``, or ``error`` on
+        file/parse failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchValidateResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
-    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
+    return DispatchValidateResponse.model_validate({
+        "milestone_number": milestone_number,
+        **dataclasses.asdict(result),
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3698,7 +3744,7 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
 async def dispatch_stale_check(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> dict:
+) -> DispatchStaleCheckResponse:
     """Check whether a dispatch plan is stale relative to the current milestone.
 
     Requires a backend with milestone support — errors otherwise. Fetches the
@@ -3707,14 +3753,17 @@ async def dispatch_stale_check(
     with added/removed issue lists.
 
     Returns:
-        Dict with ``is_stale`` (bool), ``added_issues`` (list[int]),
-        ``removed_issues`` (list[int]), and ``message`` (str).
-        Returns ``error`` on file/parse or GitHub failure.
+        :class:`~backlog_core.tool_responses.DispatchStaleCheckResponse`
+        with ``is_stale``, ``added_issues``, ``removed_issues``, and
+        ``message``. Returns ``error`` on file/parse or GitHub failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchStaleCheckResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
 
     def _fetch_milestone_issue_numbers() -> list[int]:
         backend = _get_config().backend
@@ -3734,12 +3783,21 @@ async def dispatch_stale_check(
     except UnsupportedBackendCapabilityError as exc:
         return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchStaleCheckResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     except (BacklogError, _GithubException) as exc:
-        return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
+        return DispatchStaleCheckResponse.model_validate({
+            "error": f"GitHub API error: {exc}",
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
 
     result = await asyncio.to_thread(_ds.detect_stale_plan, plan, current_numbers)
-    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
+    return DispatchStaleCheckResponse.model_validate({
+        "milestone_number": milestone_number,
+        **dataclasses.asdict(result),
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3777,7 +3835,7 @@ async def dispatch_create_plan(
             )
         ),
     ] = None,
-) -> dict:
+) -> DispatchCreatePlanResponse:
     """Create or overwrite a stored dispatch plan for a milestone.
 
     Accepts a typed ``DispatchPlan`` model, stores it atomically through the
@@ -3786,21 +3844,23 @@ async def dispatch_create_plan(
     byte-identical to what's stored) is unsupported and returns an error.
 
     Returns:
-        Success dict with ``milestone_number``, ``wave_count``,
-        ``item_count``, ``is_valid``, ``errors``, ``warnings``, and ``messages``.
-        Error dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.DispatchCreatePlanResponse`
+        with ``milestone_number``, ``wave_count``, ``item_count``,
+        ``is_valid``, and output messages/warnings/errors (the latter two
+        holding validation results, not Output's). On error, ``error`` is
+        set; ``milestone_number`` is absent on the already-exists path.
     """
     out = Output()
     # Verify plan.milestone.number matches the milestone_number parameter
     if plan.milestone.number != milestone_number:
-        return {
+        return DispatchCreatePlanResponse.model_validate({
             "error": (
                 f"Milestone number mismatch: parameter is {milestone_number} "
                 f"but plan.milestone.number is {plan.milestone.number}"
             ),
             "milestone_number": milestone_number,
             **out.to_dict(),
-        }
+        }).model_dump(exclude_none=True)
 
     try:
         current = _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
@@ -3810,7 +3870,10 @@ async def dispatch_create_plan(
         )
     else:
         if not overwrite:
-            return {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()}
+            return DispatchCreatePlanResponse.model_validate({
+                "error": "Dispatch plan already exists. Pass overwrite=True to replace it.",
+                **out.to_dict(),
+            }).model_dump(exclude_none=True)
         write = ContentWrite(
             reference=_dispatch_reference(milestone_number),
             content=plan.model_dump_json(),
@@ -3822,7 +3885,11 @@ async def dispatch_create_plan(
     try:
         await asyncio.to_thread(_get_artifact_provider().put_content, write)
     except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
+        return DispatchCreatePlanResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
 
     out.info(f"Stored dispatch plan {milestone_number}")
 
@@ -3843,7 +3910,7 @@ async def dispatch_create_plan(
     wave_count = len(plan.waves)
     item_count = sum(len(wave.items) for wave in plan.waves)
 
-    return {
+    return DispatchCreatePlanResponse.model_validate({
         "milestone_number": milestone_number,
         "wave_count": wave_count,
         "item_count": item_count,
@@ -3851,7 +3918,7 @@ async def dispatch_create_plan(
         **out.to_dict(),
         "errors": val_errors,
         "warnings": val_warnings,
-    }
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3866,7 +3933,7 @@ async def dispatch_create_plan(
 async def dispatch_conflicts(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> dict:
+) -> DispatchConflictsResponse:
     """Analyze Impact Radius conflicts for items in a milestone.
 
     Fetches open issues for the milestone from GitHub, extracts the
@@ -3874,9 +3941,10 @@ async def dispatch_conflicts(
     to find items that share file paths.
 
     Returns:
-        Dict with ``conflict_groups`` (list of group dicts with group_id,
-        reason, and items), ``count`` (int), and ``milestone_number``.
-        Returns ``error`` on GitHub failure.
+        :class:`~backlog_core.tool_responses.DispatchConflictsResponse`
+        with ``conflict_groups`` (each with group_id, reason, and items),
+        ``count``, and ``milestone_number``. Returns ``error`` on GitHub
+        failure.
     """
 
     def _fetch_items_with_impact_radius() -> list[_ImpactRadiusItem]:
@@ -3901,16 +3969,22 @@ async def dispatch_conflicts(
     except UnsupportedBackendCapabilityError as exc:
         return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchConflictsResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     except (BacklogError, _GithubException) as exc:
-        return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
+        return DispatchConflictsResponse.model_validate({
+            "error": f"GitHub API error: {exc}",
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
 
     conflict_groups = await asyncio.to_thread(operations.analyze_impact_radius_conflicts, items)
-    return {
+    return DispatchConflictsResponse.model_validate({
         "milestone_number": milestone_number,
         "conflict_groups": [cg.model_dump() for cg in conflict_groups],
         "count": len(conflict_groups),
-    }
+    }).model_dump(exclude_none=True)
 
 
 # ---------------------------------------------------------------------------
@@ -3971,7 +4045,7 @@ async def dispatch_wave_start(
     items: Annotated[
         list[dict[str, object]], Field(description="List of items, each with 'issue' (int) and 'title' (str) keys")
     ],
-) -> dict:
+) -> DispatchWaveStartResponse:
     """Record the start of a dispatch wave.
 
     Creates wave and item entries in the state database. Items are
@@ -3979,9 +4053,10 @@ async def dispatch_wave_start(
     processes for a wave.
 
     Returns:
-        Dict with ``milestone``, ``wave_num``, ``items_count``, ``status``,
-        and ``messages``/``warnings``. Returns ``error`` if the wave already
-        exists or if an item entry is malformed.
+        :class:`~backlog_core.tool_responses.DispatchWaveStartResponse`
+        with ``milestone``, ``wave_num``, ``items_count``, ``status``, and
+        ``messages``/``warnings``/``errors``. Returns ``error`` if the wave
+        already exists or if an item entry is malformed.
     """
     try:
         item_records = [
@@ -3991,18 +4066,22 @@ async def dispatch_wave_start(
             for item in items
         ]
     except (KeyError, ValueError) as exc:
-        return {"error": f"Malformed item entry: {exc}", "milestone": milestone, "wave_num": wave_num}
+        return DispatchWaveStartResponse.model_validate({
+            "error": f"Malformed item entry: {exc}",
+            "milestone": milestone,
+            "wave_num": wave_num,
+        }).model_dump(exclude_none=True)
     try:
         wave: _DispatchWaveRecord = await asyncio.to_thread(
             _dispatch_state_manager().create_wave, milestone, wave_num, item_records
         )
     except sqlite3.IntegrityError:
-        return {
+        return DispatchWaveStartResponse.model_validate({
             "error": f"Wave {wave_num} already exists for milestone {milestone}",
             "milestone": milestone,
             "wave_num": wave_num,
-        }
-    return {
+        }).model_dump(exclude_none=True)
+    return DispatchWaveStartResponse.model_validate({
         "milestone": wave.milestone,
         "wave_num": wave.wave_num,
         "items_count": len(wave.items),
@@ -4010,7 +4089,7 @@ async def dispatch_wave_start(
         "messages": [f"Wave {wave_num} created with {len(wave.items)} items"],
         "warnings": [],
         "errors": [],
-    }
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -4029,20 +4108,21 @@ async def dispatch_item_status(
     result: Annotated[str, Field(description="Result summary or JSON from result file")] = "",
     error: Annotated[str, Field(description="Error details on failure")] = "",
     cost: Annotated[float | None, Field(description="USD cost if available from claude output")] = None,
-) -> dict:
+) -> DispatchItemStatusResponse:
     """Record completion or failure of a dispatch item.
 
     Looks up the item by milestone + issue across all waves. Updates
     status, result/error data, and completion timestamp.
 
     Returns:
-        Dict with ``milestone``, ``issue``, ``wave_num``, ``status``,
-        ``messages``/``warnings``. Returns ``error`` key if item not found
-        or ``status`` is not one of complete/failed/skipped.
+        :class:`~backlog_core.tool_responses.DispatchItemStatusResponse`
+        with ``milestone``, ``issue``, ``wave_num``, ``status``, and
+        ``messages``/``warnings``/``errors``. Returns ``error`` if the item
+        was not found or ``status`` is not one of complete/failed/skipped.
     """
     mgr = _dispatch_state_manager()
 
-    def _find_and_update() -> dict:
+    def _find_and_update() -> dict[str, object]:
         waves = mgr.get_all_waves(milestone)
         for wave in waves:
             for item in wave.items:
@@ -4080,7 +4160,8 @@ async def dispatch_item_status(
             "issue": issue,
         }
 
-    return await asyncio.to_thread(_find_and_update)
+    result_dict = await asyncio.to_thread(_find_and_update)
+    return DispatchItemStatusResponse.model_validate(result_dict).model_dump(exclude_none=True)
 
 
 @mcp.tool(

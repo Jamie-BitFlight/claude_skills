@@ -40,20 +40,7 @@ def _schema_tokens(schema: dict[str, object]) -> int:
 
 
 TOOLS_NOT_YET_TYPED = {
-    "backlog_strike_entry",
-    "backlog_sync",
-    "backlog_update",
-    "backlog_update_sam_task_status",
-    "backlog_view",
-    "dispatch_conflicts",
-    "dispatch_create_plan",
-    "dispatch_item_status",
-    "dispatch_read",
-    "dispatch_stale_check",
-    "dispatch_validate",
-    "dispatch_wave_start",
-    "sync_now",
-    "sync_status",
+    "backlog_view"  # deferred to commit 4/4 -- deliberately complex disclosure-mode shape
 }
 
 

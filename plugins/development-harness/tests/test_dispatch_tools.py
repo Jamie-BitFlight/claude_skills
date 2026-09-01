@@ -213,7 +213,7 @@ class TestDispatchWaveStart:
             result = await client.call_tool("dispatch_wave_start", {"milestone": 10, "wave_num": 1, "items": items})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert data["milestone"] == 10
         assert data["wave_num"] == 1
         assert data["items_count"] == 2
@@ -240,7 +240,7 @@ class TestDispatchWaveStart:
             result = await client.call_tool("dispatch_wave_start", {"milestone": 10, "wave_num": 1, "items": items})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "10" in data["error"] or "Wave 1" in data["error"]
 
@@ -281,7 +281,7 @@ class TestDispatchWaveStart:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert isinstance(data.get("messages"), list)
         assert isinstance(data.get("warnings"), list)
 
@@ -318,7 +318,7 @@ class TestDispatchItemStatus:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert data["milestone"] == 10
         assert data["issue"] == 101
         assert data["status"] == "complete"
@@ -346,7 +346,7 @@ class TestDispatchItemStatus:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert data["status"] == "failed"
         assert "error" not in data  # no lookup error
 
@@ -374,7 +374,7 @@ class TestDispatchItemStatus:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert data["status"] == "skipped"
         assert "error" not in data
 
@@ -395,7 +395,7 @@ class TestDispatchItemStatus:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "999" in data["error"]
 
@@ -416,7 +416,7 @@ class TestDispatchItemStatus:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "running" in data["error"]
 
@@ -785,7 +785,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["milestone_number"] == 10
         assert data["wave_count"] == 1
@@ -810,7 +810,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
 
         # Then: create_only rejects the stale create and preserves the winner.
-        assert "error" in result.data
+        assert "error" in result.structured_content
         assert (
             patch_create_plan_path.get_content(
                 ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
@@ -839,7 +839,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": plan_dict})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["wave_count"] == 1
         assert _has_dispatch_plan(patch_create_plan_path)
@@ -865,7 +865,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": plan_dict})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["item_count"] == 1
         assert _has_dispatch_plan(patch_create_plan_path)
@@ -876,10 +876,11 @@ class TestDispatchCreatePlan:
         """dispatch_create_plan skips integrity validation when validate=False.
 
         Tests: dispatch_create_plan — validate=False path
-        How: Call with validate=False and a valid plan dict. Verify is_valid is None in
-             the response and the file is still written.
+        How: Call with validate=False and a valid plan dict. Verify is_valid is
+             absent from the response (dropped by exclude_none=True) and the
+             file is still written.
         Why: Callers that have already validated externally can skip the post-write
-             check for performance; is_valid=None signals validation was not run.
+             check for performance; an absent is_valid signals validation was not run.
         """
         # Arrange
         target = patch_create_plan_path
@@ -891,9 +892,9 @@ class TestDispatchCreatePlan:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
-        assert data["is_valid"] is None
+        assert "is_valid" not in data
         assert _has_dispatch_plan(target)
 
     async def test_create_plan_overwrite_existing(self, existing_plan_file: InMemoryBackend) -> None:
@@ -927,7 +928,7 @@ class TestDispatchCreatePlan:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["item_count"] == 2
         assert _has_dispatch_plan(existing_plan_file)
@@ -957,7 +958,7 @@ class TestDispatchCreatePlan:
             )
 
         # Then: the stale update conflicts and cannot replace the concurrent content.
-        assert "error" in result.data
+        assert "error" in result.structured_content
         assert (
             existing_plan_file.get_content(
                 ContentRef(kind=ContentKind.DISPATCH_PLAN, name="dispatch-milestone-10")
@@ -986,7 +987,7 @@ class TestDispatchCreatePlan:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         register_mock.assert_called_once_with(
             42, "dispatch-milestone-10", DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
@@ -1001,7 +1002,7 @@ class TestDispatchCreatePlan:
             )
             artifact = await client.call_tool("artifact_read", {"item_id": 42, "artifact_type": "dispatch-plan"})
 
-        assert "error" not in result.data
+        assert "error" not in result.structured_content
         assert artifact.structured_content["content"] == DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
 
     async def test_create_plan_artifact_content_failure_does_not_register_manifest(
@@ -1021,7 +1022,7 @@ class TestDispatchCreatePlan:
                 "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
             )
 
-        assert "error" not in result.data
+        assert "error" not in result.structured_content
         assert patch_create_plan_path.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST)) == []
 
     async def test_create_plan_issue_manifest_unavailable_is_best_effort(
@@ -1046,7 +1047,7 @@ class TestDispatchCreatePlan:
                     "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
                 )
 
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert _has_dispatch_plan(unavailable_backend)
         assert [call.args[0].reference.kind for call in put_spy.call_args_list] == [
@@ -1063,7 +1064,7 @@ class TestDispatchCreatePlan:
                 {"milestone_number": 11, "plan": _make_valid_plan_dict(milestone=11), "issue": 42},
             )
 
-        data = result.data
+        data = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         manifests = confirmed_missing_backend.list_content(ContentQuery(kind=ContentKind.ARTIFACT_MANIFEST))
         assert len(manifests) == 1
@@ -1093,7 +1094,7 @@ class TestDispatchCreatePlan:
                     "dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict, "issue": 42}
                 )
 
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert _has_dispatch_plan(backend)
         assert any("manifest revision conflict" in record.message for record in caplog.records)
@@ -1200,7 +1201,7 @@ class TestDispatchCreatePlan:
             )
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "already exists" in data["error"] or str(existing_plan_file) in data["error"]
 
@@ -1239,7 +1240,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": mismatched_plan})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "mismatch" in data["error"].lower() or "10" in data["error"]
 
@@ -1261,7 +1262,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "provider rejected write" in data["error"]
 
@@ -1277,8 +1278,8 @@ class TestDispatchCreatePlan:
         async with Client(mcp) as client:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": valid_plan_dict})
 
-        assert "error" in result.data
-        assert "dispatch writes are not supported" in result.data["error"]
+        assert "error" in result.structured_content
+        assert "dispatch writes are not supported" in result.structured_content["error"]
         put_content.assert_called_once()
         assert not _has_dispatch_plan(patch_create_plan_path)
 
@@ -1322,7 +1323,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": duplicate_plan})
 
         # Assert — file is written and integrity check reports failure
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected tool error: {data.get('error')}"
         assert data["is_valid"] is False
         assert _has_dispatch_plan(patch_create_plan_path)
@@ -1355,7 +1356,7 @@ class TestDispatchCreatePlan:
             result = await client.call_tool("dispatch_create_plan", {"milestone_number": 10, "plan": broken_deps_plan})
 
         # Assert — file is written and integrity check reports failure
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected tool error: {data.get('error')}"
         assert data["is_valid"] is False
         assert _has_dispatch_plan(patch_create_plan_path)

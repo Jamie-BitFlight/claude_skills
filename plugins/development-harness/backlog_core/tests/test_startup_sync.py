@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -213,7 +213,7 @@ class TestInFlightSyncGuard:
 
         gate.set()  # unblock the stalled loop so teardown completes cleanly
 
-        second_data = second_response.data if hasattr(second_response, "data") else second_response
+        second_data = second_response.structured_content
 
         assert second_data.get("triggered") is False, (
             "sync_now while a sync is RUNNING must return triggered=False. "
@@ -663,7 +663,7 @@ class TestSyncStatusTool:
         async with Client(mcp) as client:
             response = await client.call_tool("sync_status", {})
 
-        data = response.data if hasattr(response, "data") else response
+        data = response.structured_content
 
         required_fields = {
             "status",
@@ -701,7 +701,7 @@ class TestSyncStatusTool:
             await asyncio.sleep(0.05)  # let background task complete
             response = await client.call_tool("sync_status", {})
 
-        data = response.data if hasattr(response, "data") else response
+        data = response.structured_content
         assert data["status"] == "idle", f"After successful sync, status must be 'idle'. Got {data['status']!r}."
 
     @pytest.mark.allow_startup_sync
@@ -729,7 +729,7 @@ class TestSyncStatusTool:
             await asyncio.sleep(0.1)  # let background loop fail and set OFFLINE
             response = await client.call_tool("sync_status", {})
 
-        data = response.data if hasattr(response, "data") else response
+        data = response.structured_content
         assert data["status"] == "offline", (
             f"After GitHubUnavailableError, sync_status must return 'offline'. Got {data['status']!r}."
         )
@@ -1260,8 +1260,20 @@ class TestKillSwitch:
 
         from backlog_core.server import _backlog_lifespan, sync_now
 
+        # sync_now's return-type annotation is SyncNowResponse (needed for
+        # FastMCP's outputSchema derivation), but its body always returns a
+        # plain dict via model_dump() -- ty statically trusts the declared
+        # annotation, not the runtime value, so a direct call's result
+        # types as a non-subscriptable SyncNowResponse. Routing through
+        # Client(mcp) would exercise the real MCP boundary instead (see
+        # test_sync_status_returns_all_required_fields for that pattern),
+        # but this test must call sync_now() in-process: Client(mcp)'s
+        # transport itself relies on the real asyncio.create_task, which
+        # the mock above replaces module-wide, and would hang. cast()
+        # documents the known-true runtime shape at this boundary instead
+        # of suppressing the diagnostic.
         async with _backlog_lifespan(object()):
-            result = await sync_now()
+            result = cast("dict[str, object]", await sync_now())
 
         create_task.assert_not_called()
         assert result["triggered"] is False

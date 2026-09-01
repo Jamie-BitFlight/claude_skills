@@ -34,6 +34,7 @@ from __future__ import annotations
 
 from typing import Literal
 
+from dispatch_schema import ConflictGroup
 from pydantic import BaseModel, Field
 
 from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
@@ -65,8 +66,19 @@ __all__ = [
     "BacklogPullResponse",
     "BacklogReadCommentResponse",
     "BacklogResolveResponse",
+    "BacklogStrikeEntryResponse",
+    "BacklogSyncResponse",
+    "BacklogUpdateResponse",
+    "BacklogUpdateSamTaskStatusResponse",
     "CommentEntry",
+    "DispatchConflictsResponse",
+    "DispatchCreatePlanResponse",
+    "DispatchItemStatusResponse",
+    "DispatchReadResponse",
     "DispatchSpawnResponse",
+    "DispatchStaleCheckResponse",
+    "DispatchValidateResponse",
+    "DispatchWaveStartResponse",
     "DispatchWaveStatusResponse",
     "FallibleToolResponse",
     "FollowupItem",
@@ -74,10 +86,14 @@ __all__ = [
     "LabelEntry",
     "MergedPullRequestEntry",
     "Milestone",
+    "MilestoneEchoError",
     "ProjectEntry",
     "SamTaskLookupResult",
     "SamTaskRow",
+    "SyncNowResponse",
+    "SyncStatusResponse",
     "ToolResponse",
+    "WaveEchoError",
 ]
 
 
@@ -682,3 +698,333 @@ class BacklogResolveResponse(FallibleToolResponse):
 
     summary: str | None = None
     """Completion summary, present only on the normal (non-already-resolved) path."""
+
+
+# operations.strike_entry's only failure paths raise (ItemNotFoundError,
+# EntryNotFoundError, or the unreachable no-reference BacklogError), so the
+# tool's BacklogError arm never has a title/entry_id/struck triple to
+# report -- all three are widened to optional.
+class BacklogStrikeEntryResponse(FallibleToolResponse):
+    """Response for ``backlog_strike_entry``."""
+
+    title: str | None = None
+    """Title of the item the entry was struck in."""
+
+    entry_id: str | None = None
+    """ID of the struck entry, echoed back from the request."""
+
+    struck: bool | None = None
+    """``True`` when the entry was successfully struck."""
+
+
+# operations.sync_items always returns created/pushed/dry_run on both its
+# SyncProvider and non-SyncProvider paths, but the tool's BacklogError arm
+# (raised only by the underlying GraphQL/reconcile call) reports just error
+# plus the Output triad, so all three are widened to optional.
+class BacklogSyncResponse(FallibleToolResponse):
+    """Response for ``backlog_sync``."""
+
+    created: int | None = None
+    """Count of new GitHub issues created for previously unlinked items."""
+
+    pushed: int | None = None
+    """Count of items whose groomed content was pushed/reconciled to the backend."""
+
+    dry_run: bool | None = None
+    """``True`` when this was a preview run."""
+
+
+# operations.update_item has two structurally disjoint success branches
+# selected by whether groomed content is being written (see
+# _apply_groomed_update vs. the plan/status/verified tail of update_item):
+# the groomed branch never sets plan/issue_num/status/verified/changes, and
+# the non-groomed branch never sets groomed_updated/sections_written. Both
+# branches always start from {"title": item.title}, but the tool's
+# BacklogError arm (item not found, or the unreachable no-reference error)
+# reports only error plus the Output triad, so title is widened to optional
+# too. ``error`` here also covers a *non-fatal* soft error that
+# _apply_non_in_progress_status/_apply_issue_status_labels can set on an
+# otherwise-successful non-groomed call (e.g. an unrecognized status value,
+# or a GitHub label-apply failure) -- sharing FallibleToolResponse.error is
+# correct because the two meanings are mutually exclusive in practice (a
+# fatal BacklogError never reaches the point where the soft error is set)
+# and both mean "something about this call didn't fully succeed". ``changes``
+# stays ``dict[str, object]`` -- fixed key domain (renamed_to/description_
+# updated/plan/status/issue_num) but heterogeneous value types (str | int |
+# bool) make a nested model more trouble than it is worth for a summary dict.
+class BacklogUpdateResponse(FallibleToolResponse):
+    """Response for ``backlog_update``."""
+
+    title: str | None = None
+    """Title of the updated item."""
+
+    renamed_to: str | None = None
+    """New title, present only when ``title=`` was applied."""
+
+    description_updated: bool | None = None
+    """``True`` when ``description=`` was applied."""
+
+    plan: str | None = None
+    """Plan string applied, present only on the non-groomed path with ``plan=``."""
+
+    issue_num: int | None = None
+    """Newly created backend issue number, present only when one was auto-created."""
+
+    status: str | None = None
+    """Status value applied, present only on the non-groomed path with ``status=``."""
+
+    verified: bool | None = None
+    """``True`` when the verified label was applied (or would be a no-op)."""
+
+    changes: dict[str, object] | None = None
+    """Summary of applied field changes, present only on the non-groomed path."""
+
+    groomed_updated: bool | None = None
+    """``True`` when groomed content was written, present only on the groomed path."""
+
+    sections_written: list[str] | None = None
+    """Section names written, present only for batch (``sections=``) groomed writes."""
+
+
+class BacklogUpdateSamTaskStatusResponse(FallibleToolResponse):
+    """Response for ``backlog_update_sam_task_status``."""
+
+    updated: bool | None = None
+    """``True`` when the status field was changed; ``False`` if it already matched."""
+
+    issue_number: int | None = None
+    """Task sub-issue number, echoed back from the request."""
+
+    new_status: str | None = None
+    """Status value that was applied, echoed back from the request."""
+
+
+# Shared error-arm shape for dispatch_* tools keyed by a GitHub milestone
+# number: dispatch_read, dispatch_validate, dispatch_stale_check, and
+# dispatch_conflicts all return exactly {"error": ..., "milestone_number":
+# ...} on every failure path, with no Output triad. milestone_number is
+# required -- every success path echoes it back too.
+class MilestoneEchoError(BaseModel):
+    """Shared ``{error, milestone_number}`` error-arm field set for milestone-keyed dispatch tools."""
+
+    milestone_number: int
+    """GitHub milestone number, echoed back on both success and error."""
+
+    error: str | None = None
+    """Error message; ``None`` on success."""
+
+
+# conflict_groups reuses dispatch_schema.core.models.ConflictGroup directly
+# (rather than redeclaring an equivalent shape here) because
+# operations.analyze_impact_radius_conflicts already returns that exact
+# type -- model_dump() on it produces the group_id/reason/items dict the
+# tool has always returned.
+class DispatchConflictsResponse(MilestoneEchoError):
+    """Response for ``dispatch_conflicts``."""
+
+    conflict_groups: list[ConflictGroup] | None = None
+    """Groups of items whose Impact Radii share a file path."""
+
+    count: int | None = None
+    """Number of conflict groups found."""
+
+
+# dispatch_create_plan spreads Output (messages/warnings/errors/error via
+# FallibleToolResponse) but then overwrites warnings/errors with
+# validate_plan_integrity's result lists rather than Output's own -- same
+# field names and list[str] type, so no redeclaration is needed, just this
+# note. Three arms: success (all fields present, is_valid only when
+# validate=True), a milestone-mismatch/write-failure error (error +
+# milestone_number + Output triad), and an already-exists error (error +
+# Output triad only, no milestone_number) -- so milestone_number is
+# widened to optional alongside the plan-summary fields.
+class DispatchCreatePlanResponse(FallibleToolResponse):
+    """Response for ``dispatch_create_plan``."""
+
+    milestone_number: int | None = None
+    """GitHub milestone number, absent only on the already-exists error path."""
+
+    wave_count: int | None = None
+    """Number of waves in the stored plan."""
+
+    item_count: int | None = None
+    """Total items across all waves in the stored plan."""
+
+    is_valid: bool | None = None
+    """Structural validity of the plan; ``None`` when ``validate=False``."""
+
+
+# Hand-rolled, not an Output spread -- messages/warnings/errors are literal
+# lists on the success arm only. Both error arms (invalid status value, item
+# not found) share the same {"error", "milestone", "issue"} shape, distinct
+# from MilestoneEchoError's "milestone_number" key, so declared directly
+# rather than via a shared base (no other tool reuses this exact pairing).
+class DispatchItemStatusResponse(BaseModel):
+    """Response for ``dispatch_item_status``."""
+
+    milestone: int
+    """GitHub milestone number, echoed back on both success and error."""
+
+    issue: int
+    """Issue number of the item, echoed back on both success and error."""
+
+    wave_num: int | None = None
+    """Wave number the item was found in."""
+
+    status: str | None = None
+    """Status that was recorded: complete, failed, or skipped."""
+
+    messages: list[str] | None = None
+    """Informational messages about the action taken."""
+
+    warnings: list[str] | None = None
+    """Always empty -- reserved for future use, present only on success."""
+
+    errors: list[str] | None = None
+    """Always empty -- reserved for future use, present only on success."""
+
+    error: str | None = None
+    """Error message; ``None`` on success."""
+
+
+# plan is measured over the single-tool schema token budget (697 tokens vs
+# the 600 cap) when nested as dispatch_schema.core.models.DispatchPlan --
+# that model's five layers of Field(description=...) strings alone account
+# for the overage. Falls back to dict[str, object] per this module's
+# budget policy; callers get the field names from DispatchPlan's own
+# docstrings and dispatch_read's docstring below.
+class DispatchReadResponse(MilestoneEchoError):
+    """Response for ``dispatch_read``."""
+
+    plan: dict[str, object] | None = None
+    """Full dispatch plan for the milestone (milestone/conflict_groups/waves/quality_gates)."""
+
+
+class DispatchStaleCheckResponse(MilestoneEchoError):
+    """Response for ``dispatch_stale_check``."""
+
+    is_stale: bool | None = None
+    """``True`` when the milestone's issues differ from the stored plan."""
+
+    added_issues: list[int] | None = None
+    """Issue numbers present in the milestone but absent from the plan."""
+
+    removed_issues: list[int] | None = None
+    """Issue numbers present in the plan but absent from the milestone."""
+
+    message: str | None = None
+    """Human-readable summary of the staleness state."""
+
+
+class DispatchValidateResponse(MilestoneEchoError):
+    """Response for ``dispatch_validate``."""
+
+    is_valid: bool | None = None
+    """``True`` when the plan passes every structural integrity check."""
+
+    errors: list[str] | None = None
+    """Fatal integrity violations found in the plan."""
+
+    warnings: list[str] | None = None
+    """Non-fatal issues found in the plan."""
+
+
+# Shared error-arm shape for dispatch_wave_start: both its failure paths
+# (malformed item entry, wave already exists) return exactly {"error": ...,
+# "milestone": ..., "wave_num": ...}, with no Output triad.
+class WaveEchoError(BaseModel):
+    """Shared ``{error, milestone, wave_num}`` error-arm field set for wave-keyed dispatch tools."""
+
+    milestone: int
+    """GitHub milestone number, echoed back on both success and error."""
+
+    wave_num: int
+    """Wave number, echoed back on both success and error."""
+
+    error: str | None = None
+    """Error message; ``None`` on success."""
+
+
+class DispatchWaveStartResponse(WaveEchoError):
+    """Response for ``dispatch_wave_start``."""
+
+    items_count: int | None = None
+    """Number of items recorded for the wave."""
+
+    status: str | None = None
+    """Wave status after creation, e.g. ``"pending"``."""
+
+    messages: list[str] | None = None
+    """Informational messages about the action taken."""
+
+    warnings: list[str] | None = None
+    """Always empty -- reserved for future use, present only on success."""
+
+    errors: list[str] | None = None
+    """Always empty -- reserved for future use, present only on success."""
+
+
+# Plain BaseModel, not Output/ToolResponse -- sync_status has no
+# messages/warnings/errors triad, just SyncState.to_dict()'s 12 fields
+# verbatim. Reused as-is for SyncNowResponse.sync_state below, since both
+# report the identical snapshot shape. Unlike every other tool in this
+# module, sync_status/sync_now dump with plain model_dump() (no
+# exclude_none=True) at the call site: every field here is unconditionally
+# present in SyncState.to_dict() (some legitimately null) and neither tool
+# has a BacklogError arm ever needing to hide a field, so dropping null
+# keys would only regress the pre-existing all-keys-always-present
+# contract without solving any problem exclude_none=True exists to fix.
+class SyncStatusResponse(BaseModel):
+    """Response for ``sync_status``; also nested as ``SyncNowResponse.sync_state``."""
+
+    status: str
+    """Sync lifecycle state: idle, running, offline, or error."""
+
+    started_at: str | None = None
+    """ISO 8601 UTC timestamp of current/last sync start."""
+
+    completed_at: str | None = None
+    """ISO 8601 UTC timestamp of last sync completion."""
+
+    items_done: int
+    """Issues written to cache in the current/last run."""
+
+    items_total: int | None = None
+    """Total issues expected; ``None`` when unknown."""
+
+    last_error: str
+    """Error message from last failed sync, or empty string."""
+
+    last_success_at: str | None = None
+    """ISO 8601 UTC timestamp of last successful sync."""
+
+    retry_count: int
+    """Consecutive failed attempts in the current cycle."""
+
+    offline_reason: str
+    """Why the server entered offline mode, or empty string."""
+
+    percent: int | None = None
+    """Completion percentage 0-100; ``None`` when total is unknown."""
+
+    pending_mutations: int
+    """Offline-queue depth as of the last completed sync."""
+
+    rejected_mutations: int
+    """Dead-lettered mutation count as of the last completed sync."""
+
+
+# No Output spread and no BacklogError arm (sync_now never raises) -- all
+# three return sites always populate triggered/sync_state/messages, so
+# nothing here is optional.
+class SyncNowResponse(BaseModel):
+    """Response for ``sync_now``."""
+
+    triggered: bool
+    """``True`` if a new sync was started; ``False`` if one was already running."""
+
+    sync_state: SyncStatusResponse
+    """Current sync state snapshot."""
+
+    messages: list[str]
+    """Informational messages about the action taken."""
