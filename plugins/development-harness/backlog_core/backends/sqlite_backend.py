@@ -210,6 +210,9 @@ class SQLiteBackend:
         columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}
         if "milestone_number" not in columns:
             self._conn.execute("ALTER TABLE items ADD COLUMN milestone_number INTEGER REFERENCES milestones(number)")
+        # Runs after the column above is guaranteed present, so this is safe on
+        # both a fresh database and a durable one migrated by this method.
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_items_milestone_number ON items(milestone_number)")
         legacy_table = self._conn.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
         ).fetchone()
@@ -548,9 +551,15 @@ class SQLiteBackend:
             List of ``IssueNode`` TypedDicts.
         """
         db_status = "open" if state.upper() == "OPEN" else "closed"
-        rows = self._conn.execute(
-            "SELECT * FROM items WHERE status = ? ORDER BY issue_number LIMIT ?", (db_status, first)
-        ).fetchall()
+        if milestone_number is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM items WHERE status = ? AND milestone_number = ? ORDER BY issue_number LIMIT ?",
+                (db_status, milestone_number, first),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM items WHERE status = ? ORDER BY issue_number LIMIT ?", (db_status, first)
+            ).fetchall()
 
         milestones_by_number = {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
         nodes = [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
@@ -558,15 +567,6 @@ class SQLiteBackend:
         if labels:
             label_set = set(labels)
             nodes = [n for n in nodes if any(lbl["name"] in label_set for lbl in n["labels"])]
-
-        if milestone_number is not None:
-            milestone_numbers = {
-                int(r["issue_number"])
-                for r in self._conn.execute(
-                    "SELECT issue_number FROM items WHERE milestone_number = ?", (milestone_number,)
-                ).fetchall()
-            }
-            nodes = [n for n in nodes if n["number"] in milestone_numbers]
 
         return nodes
 

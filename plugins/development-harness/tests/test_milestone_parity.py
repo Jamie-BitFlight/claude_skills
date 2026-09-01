@@ -143,7 +143,7 @@ def test_write_read_round_trip(backend: WorkItemBackend) -> None:
 
 
 def test_state_filter_excludes_closed_includes_all(backend: WorkItemBackend) -> None:
-    """state='closed' excludes an open milestone; state='all' includes both regardless of case."""
+    """state='closed' excludes an open milestone; state='all' includes both."""
     open_ms = cast("dict[str, object]", operations.create_milestone(title="open one")["milestone"])
     closed_ms = cast("dict[str, object]", operations.create_milestone(title="closed one")["milestone"])
     _force_milestone_closed(backend, cast("int", closed_ms["number"]))
