@@ -375,12 +375,21 @@ class SQLiteBackend:
         row = self._conn.execute("SELECT COALESCE(MAX(number), 0) + 1 FROM projects").fetchone()
         return int(row[0])
 
-    def _row_to_issue_node(self, row: sqlite3.Row, tags: list[str] | None = None) -> IssueNode:
+    def _row_to_issue_node(
+        self,
+        row: sqlite3.Row,
+        tags: list[str] | None = None,
+        milestones_by_number: dict[int, sqlite3.Row] | None = None,
+    ) -> IssueNode:
         """Convert a database row from ``items`` to an ``IssueNode``.
 
         Args:
             row: Row from the ``items`` table.
             tags: Pre-fetched tag list for this issue, or ``None`` to fetch now.
+            milestones_by_number: Pre-fetched ``milestones`` rows keyed by
+                ``number``, or ``None`` to fetch this row's milestone
+                individually. Callers converting many rows at once should
+                pass this to avoid one extra query per row.
 
         Returns:
             ``IssueNode`` TypedDict populated from the row.
@@ -394,7 +403,11 @@ class SQLiteBackend:
         milestone: MilestoneNode | None = None
         milestone_number = row["milestone_number"]
         if milestone_number is not None:
-            ms_row = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+            ms_row = (
+                milestones_by_number.get(int(milestone_number))
+                if milestones_by_number is not None
+                else self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+            )
             if ms_row is not None:
                 milestone = MilestoneNode(
                     id=f"sqlite-milestone-{milestone_number}",
@@ -539,7 +552,8 @@ class SQLiteBackend:
             "SELECT * FROM items WHERE status = ? ORDER BY issue_number LIMIT ?", (db_status, first)
         ).fetchall()
 
-        nodes = [self._row_to_issue_node(r) for r in rows]
+        milestones_by_number = {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
+        nodes = [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
 
         if labels:
             label_set = set(labels)
@@ -1231,7 +1245,8 @@ class SQLiteBackend:
             All stored issue nodes.
         """
         rows = self._conn.execute("SELECT * FROM items ORDER BY issue_number").fetchall()
-        return [self._row_to_issue_node(r) for r in rows]
+        milestones_by_number = {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
+        return [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
 
     @_serialized_connection_operation
     def update_task_status(
