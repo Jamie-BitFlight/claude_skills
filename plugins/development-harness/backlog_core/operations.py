@@ -1355,9 +1355,14 @@ def _classify_duplicate_check(
     Checks the local cache first. When nothing matches locally and the active
     backend is a ``SyncProvider``, performs one bounded incremental refresh and
     re-checks — absence of a local match alone does not prove no duplicate
-    exists for backends fed by an external provider. A refresh failure never
-    blocks item creation: it downgrades the result to ``COULD_NOT_VERIFY`` and
-    records a warning on *out*.
+    exists for backends fed by an external provider whose local cache can lag
+    the remote. A refresh failure never blocks item creation: it downgrades
+    the result to ``COULD_NOT_VERIFY`` and records a warning on *out*.
+
+    Non-``SyncProvider`` backends (SQLite, Memory, Beads) query their own
+    native storage directly in ``_duplicate_candidates()`` — there is no
+    external cache to lag, so a local miss there is already authoritative and
+    returns ``NO_DUPLICATE``, not a downgrade.
 
     Args:
         title: Title of the new item.
@@ -1374,8 +1379,7 @@ def _classify_duplicate_check(
     if matches:
         return DuplicateCheckStatus.DUPLICATE_FOUND, matches
     if not isinstance(backend, SyncProvider):
-        out.warn("  WARNING: Could not verify duplicate status: active backend does not support reconciliation")
-        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
+        return DuplicateCheckStatus.NO_DUPLICATE, []
     try:
         refresh = refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
     except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
@@ -3840,8 +3844,12 @@ def strike_entry(
     out.info(f"Struck entry {entry_id} in {item.reference}")
     if item.issue:
         if isinstance(backend, SyncProvider):
-            backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-            out.info(f"  Reconciled strike for {item.issue}")
+            try:
+                backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+            except BackendUnavailableError:
+                out.info(f"  Queued {item.issue} for provider reconciliation.")
+            else:
+                out.info(f"  Reconciled strike for {item.issue}")
         else:
             out.info("  Active backend does not support reconciliation.")
 

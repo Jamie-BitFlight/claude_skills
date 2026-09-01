@@ -625,15 +625,20 @@ class BeadsBackend:
             follow_ups: Ignored for the beads backend.
             findings: Ignored for the beads backend.
             repo: Ignored for the beads backend.
-            output: Ignored for the beads backend.
+            output: Records a warning naming any ignored fields, if provided.
         """
-        dropped = {
-            k: v
-            for k, v in {"method": method, "notes": notes, "follow_ups": follow_ups, "findings": findings}.items()
-            if v
-        }
-        if dropped:
-            _log.warning("resolve_github_issue: beads does not support %s — dropping: %r", ", ".join(dropped), dropped)
+        dropped = [
+            name
+            for name, value in (
+                ("method", method),
+                ("notes", notes),
+                ("follow_ups", follow_ups),
+                ("findings", findings),
+            )
+            if value
+        ]
+        if dropped and output is not None:
+            output.warn(f"beads backend does not support structured resolution fields — dropping: {', '.join(dropped)}")
         argv = ["close", issue_ref]
         if summary:
             argv.extend(["--reason", summary])
