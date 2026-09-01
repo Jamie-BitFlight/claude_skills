@@ -173,29 +173,42 @@ def _truncate_body(body: str, max_body: int | None) -> str:
 
 
 def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> dict[str, object]:
-    """Reduce one unresolved thread to the fields `--summary` needs: ids plus its opening comment.
+    """Reduce one unresolved thread to the fields `--summary` needs.
 
-    `comment_id`/`author`/`body` come from the thread's *first* comment -- the one that opened it,
-    and the one `reply`'s `--comment-id` must target (see the receiving-pr-reviews skill's own
-    gotchas: GitHub rejects a reply targeted at another reply). The full comment history, including
-    any later reply, stays available via a plain (non-`--summary`) `fetch`.
+    Ids, its opening comment, and -- when the thread has follow-ups -- its latest comment too.
+    `comment_id`/`author`/`body` always come from the thread's *first* comment -- the one that
+    opened it, and the one `reply`'s `--comment-id` must target regardless of how the discussion
+    continued (GitHub rejects a reply targeted at another reply). But the opening comment alone can
+    be stale: a reviewer's later reply in the same thread can clarify or renew an objection the
+    opening comment never carried, and reading only the opener risks answering and resolving a
+    thread against feedback that has since moved on. `comment_count` names how many comments the
+    thread actually has; `latest_author`/`latest_body` are added only when it is more than one, so
+    a single-comment thread (the common case) costs nothing extra. The full comment history stays
+    available via a plain (non-`--summary`) `fetch`.
 
     Args:
         thread: One entry from `FetchResult.unresolved`.
         max_body: Forwarded to `_truncate_body`.
 
     Returns:
-        A dict with `thread_id`, `comment_id`, `path`, `line`, `author`, `body`.
+        A dict with `thread_id`, `comment_id`, `path`, `line`, `comment_count`, `author`, `body`,
+        plus `latest_author`/`latest_body` when `comment_count > 1`.
     """
     first = thread.comments[0]
-    return {
+    summary: dict[str, object] = {
         "thread_id": thread.id,
         "comment_id": first.databaseId,
         "path": thread.path,
         "line": first.line,
+        "comment_count": len(thread.comments),
         "author": first.author.login if first.author is not None else None,
         "body": _truncate_body(first.body, max_body),
     }
+    if len(thread.comments) > 1:
+        latest = thread.comments[-1]
+        summary["latest_author"] = latest.author.login if latest.author is not None else None
+        summary["latest_body"] = _truncate_body(latest.body, max_body)
+    return summary
 
 
 def _summarize_review(review: ReviewNode, *, max_body: int | None) -> dict[str, object]:
@@ -249,24 +262,35 @@ def _summarize(result: FetchResult, *, pr: int, max_body: int | None) -> dict[st
     }
 
 
-def _board_line(pr: int, result: FetchResult) -> str:
-    """One-line status for `pr` -- the default output for each PR in a multi-`--pr` `fetch`.
+def _board_entry(pr: int, result: FetchResult) -> dict[str, object]:
+    """One PR's status entry for the multi-`--pr` `fetch` board.
 
-    Tab-separated rather than column-aligned: every consumer of this output is an agent parsing
-    fields, not a human scanning aligned columns, and a fixed column width breaks the moment a PR
-    number or a blockers list grows past it.
+    The default output when several PRs are checked without `--summary`. A dict, not a formatted
+    string: this repository's own CLI-output policy (AGENTS.md, "CLI and
+    script output — agent-only, never human-facing") requires structured output to be JSON with an
+    explicit repeated key per value, not a text table or a hand-built `key=value` line, since only
+    an agent ever reads this. `mergeable`/`merge_state_status` are included alongside `blockers`
+    because `blockers` alone doesn't say whether a PR is landable -- it can be empty (reviews
+    aren't blocked) while the PR is still unresolved or otherwise unmergeable, which is the
+    difference between "quiet" and "ready".
 
     Args:
-        pr: The PR number this line is for.
+        pr: The PR number this entry is for.
         result: Its fresh `FetchResult` snapshot.
 
     Returns:
-        One tab-separated line: pr, unresolved, unresponded, codex_approved, blockers.
+        A dict with `pr`, `unresolved`, `unresponded`, `codex_approved`, `mergeable`,
+        `merge_state_status`, `blockers`.
     """
-    return (
-        f"{pr}\tunresolved={result.unresolved_count}\tunresponded={len(result.unresponded_reviews)}\t"
-        f"codex_approved={str(result.codex_approved).lower()}\tblockers={result.reviewability.blockers}"
-    )
+    return {
+        "pr": pr,
+        "unresolved": result.unresolved_count,
+        "unresponded": len(result.unresponded_reviews),
+        "codex_approved": result.codex_approved,
+        "mergeable": result.reviewability.mergeable,
+        "merge_state_status": result.reviewability.merge_state_status,
+        "blockers": result.reviewability.blockers,
+    }
 
 
 SummaryOption = Annotated[
@@ -326,12 +350,15 @@ def fetch(
 
     `--pr` takes a single number or a comma-separated list (`--pr 41,42,44`) to check several PRs
     in one call, in the order given. With one `--pr` number, `--summary` prints the reduced-field
-    JSON described on `_summarize` instead of the full result above; without it, one tab-separated
-    board line per PR (see `_board_line`) — `--summary` with several PRs still gets the full
-    per-PR JSON, one compact-JSON line per PR.
+    JSON described on `_summarize` instead of the full result above; without it, one compact-JSON
+    board entry per PR (see `_board_entry`) — `--summary` with several PRs still gets the full
+    per-PR summary JSON, one compact-JSON line per PR.
     """
-    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
+    # Parsed before `_owner_repo` resolves the repository: a malformed `--pr` must be rejected
+    # before any `gh` call is attempted (including autodetection's `gh repo view`), the same
+    # reject-before-any-`gh`-call rule `_validate_github_option`'s callback already follows.
     pr_numbers = _parse_pr_list(pr)
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
     if len(pr_numbers) == 1 and not summary:
         result = build_fetch_result(owner, repo, pr_numbers[0], gh_timeout=gh_timeout_seconds)
         typer.echo(result.model_dump_json())
@@ -341,7 +368,7 @@ def fetch(
         if summary:
             typer.echo(json.dumps(_summarize(result, pr=number, max_body=max_body)))
         else:
-            typer.echo(_board_line(number, result))
+            typer.echo(json.dumps(_board_entry(number, result)))
 
 
 @app.command()
