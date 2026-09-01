@@ -607,6 +607,116 @@ def test_build_fetch_result_shorter_review_stays_unresponded_when_only_longer_id
     assert result.unresponded_reviews == [shorter_review]
 
 
+_CODEX_EMPTY_REVIEW_BODY = (
+    "\n### 💡 Codex Review\n\n"
+    "Here are some automated review suggestions for this pull request.\n\n"
+    "**Reviewed commit:** `a4929550cb`\n    \n\n"
+    "<details> <summary>\N{INFORMATION SOURCE}\N{VARIATION SELECTOR-16} About Codex in GitHub</summary>\n<br/>\n\n"
+    "[Your team has set up Codex to review pull requests in this repo]"
+    "(https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n"
+    "- Open a pull request for review\n"
+    "- Mark a draft as ready\n"
+    '- Comment "@codex review".\n\n'
+    "If Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\n"
+    'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".\n            \n'
+    "</details>"
+)
+
+
+def test_build_fetch_result_codex_empty_review_is_not_unresponded(mocker: MockerFixture) -> None:
+    """A Codex review whose entire body is its own fixed no-findings boilerplate is excluded from
+    `unresponded_reviews` without needing a reply — every push posts one regardless of findings.
+
+    Body captured verbatim from this repo's own PR history (#3318, #3306).
+    """
+    review = _review(
+        "R1",
+        body=_CODEX_EMPTY_REVIEW_BODY,
+        submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
+        login="chatgpt-codex-connector[bot]",
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == []
+    assert result.reviews_with_body == [review]
+
+
+def test_build_fetch_result_codex_review_with_real_findings_still_unresponded(mocker: MockerFixture) -> None:
+    """A Codex review carrying the same wrapper plus an actual finding still requires a response —
+    only the all-boilerplate body is excluded, not every review from Codex.
+    """
+    body_with_finding = _CODEX_EMPTY_REVIEW_BODY.replace(
+        "Here are some automated review suggestions for this pull request.\n\n"
+        "**Reviewed commit:** `a4929550cb`\n    \n\n",
+        "**P1** Share the outer timeout across both CLI calls.\n    \n\n",
+    )
+    review = _review(
+        "R1",
+        body=body_with_finding,
+        submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
+        login="chatgpt-codex-connector[bot]",
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_codex_review_with_finding_after_footer_still_unresponded(mocker: MockerFixture) -> None:
+    """A Codex review that appends a real finding after the fixed footer's closing `</details>`
+    tag still requires a response.
+
+    Regression coverage: `_is_codex_empty_review` must reject the whole body via `fullmatch`, not
+    merely find the fixed template pieces present via `.search()` — a search would still match the
+    fixed prefix and footer and silently miss a finding tacked on after them.
+    """
+    body_with_trailing_finding = _CODEX_EMPTY_REVIEW_BODY + "\n\nP.S. Also consider extracting this into a helper."
+    review = _review(
+        "R1",
+        body=body_with_trailing_finding,
+        submitted_at=datetime(2026, 1, 1, tzinfo=UTC),
+        login="chatgpt-codex-connector[bot]",
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
+def test_build_fetch_result_non_codex_boilerplate_lookalike_still_unresponded(mocker: MockerFixture) -> None:
+    """A review from a different author whose body happens to match Codex's boilerplate text is
+    not exempted — only the Codex bot's own login is excluded.
+    """
+    review = _review(
+        "R1", body=_CODEX_EMPTY_REVIEW_BODY, submitted_at=datetime(2026, 1, 1, tzinfo=UTC), login="a-human-reviewer"
+    )
+    mocker.patch.object(pr_review_gh, "_fetch_pages", return_value=_empty_threads())
+    mocker.patch.object(pr_review_gh, "_fetch_review_pages", return_value=[_reviews_conn([review])])
+    mocker.patch.object(pr_review_gh, "_fetch_issue_comments", return_value=[])
+    mocker.patch.object(pr_review_gh, "_fetch_pr_reactions", return_value=[])
+    _patch_identity_and_commit_date(mocker)
+
+    result = build_fetch_result("o", "r", 1)
+
+    assert result.unresponded_reviews == [review]
+
+
 @pytest.mark.parametrize(
     ("comment_body", "expected"),
     [
