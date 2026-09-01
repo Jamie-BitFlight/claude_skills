@@ -196,7 +196,31 @@ class SQLiteBackend:
         self._conn.row_factory = sqlite3.Row
         self._content_lock = RLock()
         self._conn.executescript(_SCHEMA_SQL)
+        self._migrate_schema()
         self._conn.commit()
+
+    def _migrate_schema(self) -> None:
+        """Add columns introduced after a durable database's original schema.
+
+        ``CREATE TABLE IF NOT EXISTS`` is a no-op on a table that already
+        exists, so a pre-existing durable ``items`` table never gains new
+        columns on its own. Backfills from the legacy ``item_milestones``
+        join table when present, then drops it.
+        """
+        columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}
+        if "milestone_number" not in columns:
+            self._conn.execute("ALTER TABLE items ADD COLUMN milestone_number INTEGER REFERENCES milestones(number)")
+        legacy_table = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
+        ).fetchone()
+        if legacy_table is not None:
+            self._conn.execute(
+                "UPDATE items SET milestone_number = ("
+                "  SELECT milestone_number FROM item_milestones"
+                "  WHERE item_milestones.issue_number = items.issue_number LIMIT 1"
+                ") WHERE issue_number IN (SELECT issue_number FROM item_milestones)"
+            )
+            self._conn.execute("DROP TABLE item_milestones")
 
     @_serialized_connection_operation
     def list_work_items(self) -> list[BacklogItem]:
@@ -1086,7 +1110,20 @@ class SQLiteBackend:
             issue_number: Item to assign.
             milestone_number: Milestone to assign it to.
             repo: Ignored — SQLite has no GitHub connection.
+
+        Raises:
+            KeyError: When ``issue_number`` or ``milestone_number`` is unknown.
+                SQLite foreign keys are never enforced (``PRAGMA foreign_keys``
+                defaults off), so an unchecked ``UPDATE`` would silently accept
+                a nonexistent milestone or update zero rows for an unknown
+                issue.
         """
+        if self._conn.execute("SELECT 1 FROM items WHERE issue_number = ?", (issue_number,)).fetchone() is None:
+            msg = f"SQLiteBackend: issue #{issue_number} not found"
+            raise KeyError(msg)
+        if self._conn.execute("SELECT 1 FROM milestones WHERE number = ?", (milestone_number,)).fetchone() is None:
+            msg = f"SQLiteBackend: milestone #{milestone_number} not found"
+            raise KeyError(msg)
         self._conn.execute(
             "UPDATE items SET milestone_number = ? WHERE issue_number = ?", (milestone_number, issue_number)
         )
