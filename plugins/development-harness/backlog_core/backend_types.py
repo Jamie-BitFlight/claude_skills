@@ -145,7 +145,7 @@ class WorkItemBackend(Protocol):
       ``WorkItemBackend`` and every backend must define them (raising
       ``NotImplementedError`` and setting the flag ``False`` is the
       documented escape hatch for a backend whose native ID type cannot
-      satisfy the ``int`` signature below — see ``BeadsBackend``'s ADR-002).
+      satisfy the ``int`` signature below — see ``BeadsBackend``'s ADR-003).
     """
 
     supports_batch_status_fetch: bool

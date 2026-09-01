@@ -4497,6 +4497,8 @@ def list_milestones(
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         ValidationError: If ``state`` is not one of ``open``, ``closed``, ``all``.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
+            set or GitHub is unreachable.
     """
     out = output or Output()
     valid_states = {"open", "closed", "all"}
@@ -4529,6 +4531,8 @@ def get_soonest_milestone(repo: str = "", output: Output | None = None) -> dict[
 
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
+            set or GitHub is unreachable.
     """
     out = output or Output()
     backend = require_milestone_support(get_config().backend, "get_soonest_milestone")
@@ -4568,6 +4572,8 @@ def create_milestone(
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         ValidationError: If ``title`` is empty or ``due_on`` cannot be parsed.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
+            set or GitHub is unreachable.
     """
     out = output or Output()
     if not title.strip():

@@ -61,6 +61,7 @@ from backlog_core.backends.bd_runner import (
     JsonValue,
 )
 from backlog_core.backends.beads_models import (
+    BeadsIssueRaw,
     BeadsIssueType,
     BeadsStatus,
     parse_issue,
@@ -246,6 +247,11 @@ def _normalize_due_at(due_at: str | None) -> str | None:
         parsed = datetime.fromisoformat(due_at)
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        # A date-only or offset-less value has no timezone to convert from;
+        # treat it as already UTC rather than silently reinterpreting it
+        # through the host process's local timezone.
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -840,9 +846,13 @@ class BeadsBackend:
         if states:
             state_set = {s.upper() for s in states}
             milestones = [m for m in milestones if _collapse_beads_status(m.status) in state_set]
+        children_by_parent: dict[str, list[BeadsIssueRaw]] = {}
+        for i in issues:
+            if i.parent is not None:
+                children_by_parent.setdefault(i.parent, []).append(i)
         result: list[dict[str, object]] = []
         for m in milestones:
-            children = [i for i in issues if i.parent == m.id]
+            children = children_by_parent.get(m.id, [])
             open_count = sum(1 for c in children if _collapse_beads_status(c.status) == "OPEN")
             closed_count = sum(1 for c in children if _collapse_beads_status(c.status) == "CLOSED")
             result.append({
@@ -873,9 +883,6 @@ class BeadsBackend:
             Beads nanoid string of the created milestone, or ``None`` when
             ``bd`` is unavailable or creation fails.
         """
-        from backlog_core.models import Output  # ruff: ignore[import-outside-top-level]
-
-        out = Output()
         argv = ["create", title, "--type", BeadsIssueType.MILESTONE]
         if description:
             argv.extend(["--description", description])
@@ -888,11 +895,9 @@ class BeadsBackend:
             parsed = parse_issue(raw)
         except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
             _log.debug("create_beads_milestone: bd invocation failed: %s", exc)
-            out.warn(f"  WARNING: bd create --type milestone failed: {exc}")
             return None
         except ValidationError as exc:
             _log.debug("create_beads_milestone: bd create output validation failed: %s", exc)
-            out.warn(f"  WARNING: bd create output did not match expected schema: {exc}")
             return None
         else:
             return parsed.id or None
