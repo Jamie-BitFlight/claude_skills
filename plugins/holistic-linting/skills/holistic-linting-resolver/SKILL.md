@@ -37,9 +37,10 @@ Before implementing any fix, verify it is a code change — not suppression. Eac
 
 **Inline suppression comments:**
 - Adding `# noqa`, `# type: ignore`, `# ty: ignore`, `# pyright: ignore`, `# pylint: disable`,
-  `# ruff: ignore[<rule>]`, or any suppression comment — including the rule-specific form ruff's own
-  `--fix` produces when `[tool.ruff.lint] preview = true` rewrites a plain `# noqa: <RULE>` into
-  `# ruff: ignore[<rule-name>]`; grepping only for `# noqa` misses it
+  `# ruff: ignore[<rule>]`, `# ruff: file-ignore[<rules>]` (suppresses the whole file, not one line),
+  or any suppression comment — including the rule-specific form ruff's own `--fix` produces when
+  `[tool.ruff.lint] preview = true` rewrites a plain `# noqa: <RULE>` into `# ruff: ignore[<rule-name>]`;
+  grepping only for `# noqa` misses it
 
 **Configuration-level suppression (equally forbidden):**
 - Adding a rule to `[tool.ruff.lint] ignore = [...]` in `pyproject.toml`
@@ -197,10 +198,11 @@ All incidentally modified files must also produce zero errors before resolution 
 
    Mypy errors contain error codes in brackets like `[attr-defined]` or `[arg-type]`.
 
-   Look up the error code in this plugin's curated rule docs first:
+   Look up the error code in this plugin's curated rule docs first — `${CLAUDE_PLUGIN_ROOT}` keeps
+   this resolvable regardless of the target repository's working directory:
 
    ```bash
-   grep -rl "{CODE}" ../holistic-linting/references/rules/mypy/
+   grep -rn "<CODE>" "${CLAUDE_PLUGIN_ROOT}/skills/holistic-linting/references/rules/mypy/"
    ```
 
    If the code isn't covered there, fetch mypy's own official documentation — it enumerates every

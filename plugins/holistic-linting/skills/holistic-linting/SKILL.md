@@ -242,7 +242,7 @@ When uncertain whether an issue is blocking: treat it as blocking and fix it.
 ## Best Practices
 
 1. **Run linters concurrently (Sub-Agents only)** - Use parallel execution for multiple files or multiple linters
-2. **Never suppress** - Agents must not add `# type: ignore`, `# noqa`, `# ruff: ignore[...]`, or any suppression comment, or modify linter config to reduce rule severity. If a fix cannot resolve the issue, escalate as UNRESOLVED with documentation of what was tried
+2. **Never suppress** - Agents must not add `# type: ignore`, `# noqa`, `# ruff: ignore[<rule>]`, `# ruff: file-ignore[<rules>]`, or any suppression comment, or modify linter config to reduce rule severity. If a fix cannot resolve the issue, escalate as UNRESOLVED with documentation of what was tried
 3. **Never delete to fix** - Removing a function, test, or class to eliminate a linting error is prohibited. Document it as a cleanup recommendation instead
 4. **Record pre-existing issues** - Every linting issue discovered — whether in files you touched or not — gets recorded. Apply the Pre-Existing Issues Protocol
 5. **Orchestrators delegate, sub-agents execute** - Orchestrators launch agents and read reports. Sub-agents run formatters, linters, and resolve issues.

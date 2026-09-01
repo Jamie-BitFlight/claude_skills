@@ -39,12 +39,13 @@ Four sub-checks run in sequence. Any failure stops the review and returns a fail
 **2a. Inline suppression scan** — run on every source file listed in the resolution summary:
 
 ```bash
-grep -nE "# ?noqa|# ?type: *ignore|# ?ty: *ignore|# ?pyright: *ignore|# ?pylint: *disable|# ?ruff: *(ignore|noqa)" <file>
+grep -nE "# ?noqa|# ?type: *ignore|# ?ty: *ignore|# ?pyright: *ignore|# ?pylint: *disable|# ?ruff: *(ignore|noqa|file-ignore)" <file>
 ```
 
-Keep the full alternation above, including `# ruff: ignore[<rule>]` — a live, distinct suppression
-form (see the `holistic-linting-resolver` skill's Suppression Gate for why) that a `# noqa`-only grep
-would silently miss.
+Keep the full alternation above, including `# ruff: ignore[<rule>]` and `# ruff: file-ignore[<rules>]`
+— live, distinct suppression forms (see the `holistic-linting-resolver` skill's Suppression Gate for
+why) that a `# noqa`-only grep would silently miss. `file-ignore` suppresses an entire file, not one
+line — confirm the whole file's rule set is actually clean before treating a match as resolved.
 
 Cross-reference matches against `git diff` to confirm they appear in modified lines.
 
