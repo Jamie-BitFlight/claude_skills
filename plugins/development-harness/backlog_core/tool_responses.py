@@ -8,10 +8,16 @@ must return a flat Pydantic model shape instead -- never a ``Union`` of
 models, which FastMCP's schema introspection does not recognise and silently
 wraps the result (``x-fastmcp-wrap-result``), a wire-protocol change.
 
-Tools build a response model and return ``response.model_dump(exclude_none=True)``
-(a plain dict), not the model instance itself -- ``convert_result()`` serialises
-either identically, and returning a dict keeps existing runtime assertions
-(e.g. ``"error" not in response``) unchanged.
+Most tools build a response model and return
+``response.model_dump(exclude_none=True)`` (a plain dict), not the model
+instance itself -- ``convert_result()`` serialises either identically, and
+returning a dict keeps existing runtime assertions (e.g.
+``"error" not in response``) unchanged when a field is conditionally absent.
+The exception is a tool with no ``exclude_none=True`` at its call site (every
+field unconditionally present, nothing to drop) -- see ``sync_status``/
+``sync_now`` below -- where returning the model instance directly is
+wire-identical and keeps the declared return type accurate for in-process
+callers too.
 
 FastMCP enforces a tool's advertised ``outputSchema`` at call time (verified
 empirically, not just documented): a returned payload missing a property the
@@ -990,12 +996,13 @@ class DispatchWaveStartResponse(WaveEchoError):
 # messages/warnings/errors triad, just SyncState.to_dict()'s 12 fields
 # verbatim. Reused as-is for SyncNowResponse.sync_state below, since both
 # report the identical snapshot shape. Unlike every other tool in this
-# module, sync_status/sync_now dump with plain model_dump() (no
-# exclude_none=True) at the call site: every field here is unconditionally
-# present in SyncState.to_dict() (some legitimately null) and neither tool
-# has a BacklogError arm ever needing to hide a field, so dropping null
-# keys would only regress the pre-existing all-keys-always-present
-# contract without solving any problem exclude_none=True exists to fix.
+# module, sync_status/sync_now return the model instance directly at the
+# call site (no exclude_none=True, no model_dump()): every field here is
+# unconditionally present in SyncState.to_dict() (some legitimately null)
+# and neither tool has a BacklogError arm ever needing to hide a field, so
+# there is nothing exclude_none=True would need to drop -- returning the
+# instance is wire-identical to dumping one and keeps the declared return
+# type accurate for in-process callers too.
 class SyncStatusResponse(BaseModel):
     """Response for ``sync_status``; also nested as ``SyncNowResponse.sync_state``."""
 
