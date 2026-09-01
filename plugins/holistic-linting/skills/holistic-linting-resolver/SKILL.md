@@ -197,18 +197,17 @@ All incidentally modified files must also produce zero errors before resolution 
 
    Mypy errors contain error codes in brackets like `[attr-defined]` or `[arg-type]`.
 
-   Look up the error code in locally-cached documentation:
-
-   ```claude
-   Read("./references/mypy-docs/error_code_list.rst")
-   Read("./references/mypy-docs/error_code_list2.rst")
-   ```
-
-   Search for the error code:
+   Look up the error code in this plugin's curated rule docs first:
 
    ```bash
-   grep -n "error-code-{CODE}" ./references/mypy-docs/*.rst
+   grep -rl "{CODE}" ../holistic-linting/references/rules/mypy/
    ```
+
+   If the code isn't covered there, fetch mypy's own official documentation — it enumerates every
+   code and stays current with the installed mypy version, which a vendored copy cannot:
+
+   - Default-enabled codes: `https://mypy.readthedocs.io/en/stable/error_code_list.html`
+   - Optional-check codes: `https://mypy.readthedocs.io/en/stable/error_code_list2.html`
 
    **Motivation**: Mypy error codes map to specific type safety principles. Understanding the principle prevents misunderstanding type relationships.
 
