@@ -1254,12 +1254,7 @@ def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any
         )
         current_numbers = [issue["number"] for issue in open_issues + closed_issues]
     except UnsupportedBackendCapabilityError as exc:
-        return {
-            "error": str(exc),
-            "unsupported_capability": exc.capability,
-            "backend": exc.backend,
-            "milestone_number": milestone_number,
-        }
+        return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     except (BacklogError, GithubException) as exc:
@@ -1369,12 +1364,7 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
     except UnsupportedBackendCapabilityError as exc:
-        return {
-            "error": str(exc),
-            "unsupported_capability": exc.capability,
-            "backend": exc.backend,
-            "milestone_number": milestone_number,
-        }
+        return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     except (BacklogError, GithubException) as exc:

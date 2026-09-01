@@ -639,6 +639,24 @@ class UnsupportedBackendCapabilityError(BacklogError):
             f"{backend}: {operation} requires the {capability} capability, which this backend does not support."
         )
 
+    def to_response(self, milestone_number: int) -> dict[str, str | int]:
+        """Build the dispatch-tool error payload for this capability gap.
+
+        Shared by ``dispatch_stale_check``/``dispatch_conflicts`` in both
+        ``server.py`` and ``dh_core/operations.py`` so the four call sites
+        don't each hand-build the same dict.
+
+        Returns:
+            Dict with ``error``, ``unsupported_capability``, ``backend``, and
+            ``milestone_number`` fields for the caller to return directly.
+        """
+        return {
+            "error": str(self),
+            "unsupported_capability": self.capability,
+            "backend": self.backend,
+            "milestone_number": milestone_number,
+        }
+
 
 class ValidationError(BacklogError):
     """Raised on input validation failure."""

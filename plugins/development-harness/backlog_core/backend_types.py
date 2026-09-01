@@ -344,9 +344,12 @@ class BranchBackend(Protocol):
 
     Backends that do not support Git branch operations set
     ``supports_branches = False`` and are NOT required to implement this
-    protocol.  Callers branch on ``supports_branches`` (or
-    ``isinstance(backend, BranchBackend)``) before invoking these methods;
-    they must not rely on catching :exc:`RuntimeError` from a stub.
+    protocol. ``BranchBackend`` is ``runtime_checkable``, which means
+    ``isinstance(backend, BranchBackend)`` checks attribute names only, so
+    callers MUST gate on the ``supports_branches`` flag first — via
+    ``require_branch_support()`` in ``_capability_gates.py`` — and must not
+    rely on catching :exc:`RuntimeError` from a stub; the gate raises
+    ``UnsupportedBackendCapabilityError`` instead.
     """
 
     def create_integration_branch(

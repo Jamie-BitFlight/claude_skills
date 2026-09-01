@@ -3628,12 +3628,7 @@ async def dispatch_stale_check(
     try:
         current_numbers = await asyncio.to_thread(_fetch_milestone_issue_numbers)
     except UnsupportedBackendCapabilityError as exc:
-        return {
-            "error": str(exc),
-            "unsupported_capability": exc.capability,
-            "backend": exc.backend,
-            "milestone_number": milestone_number,
-        }
+        return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     except (BacklogError, _GithubException) as exc:
@@ -3800,12 +3795,7 @@ async def dispatch_conflicts(
     try:
         items = await asyncio.to_thread(_fetch_items_with_impact_radius)
     except UnsupportedBackendCapabilityError as exc:
-        return {
-            "error": str(exc),
-            "unsupported_capability": exc.capability,
-            "backend": exc.backend,
-            "milestone_number": milestone_number,
-        }
+        return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     except (BacklogError, _GithubException) as exc:

@@ -44,9 +44,7 @@ def require_github_extras(backend: WorkItemBackend, operation: str) -> GitHubExt
             is falsy, or the backend does not structurally satisfy
             ``GitHubExtras`` despite declaring the flag.
     """
-    if not getattr(backend, "supports_github_extras", False):
-        raise UnsupportedBackendCapabilityError("github_extras", type(backend).__name__, operation)
-    if not isinstance(backend, GitHubExtras):
+    if not getattr(backend, "supports_github_extras", False) or not isinstance(backend, GitHubExtras):
         raise UnsupportedBackendCapabilityError("github_extras", type(backend).__name__, operation)
     return backend
 
@@ -70,8 +68,6 @@ def require_branch_support(backend: WorkItemBackend, operation: str) -> BranchBa
             is falsy, or the backend does not structurally satisfy
             ``BranchBackend`` despite declaring the flag.
     """
-    if not getattr(backend, "supports_branches", False):
-        raise UnsupportedBackendCapabilityError("branches", type(backend).__name__, operation)
-    if not isinstance(backend, BranchBackend):
+    if not getattr(backend, "supports_branches", False) or not isinstance(backend, BranchBackend):
         raise UnsupportedBackendCapabilityError("branches", type(backend).__name__, operation)
     return backend
