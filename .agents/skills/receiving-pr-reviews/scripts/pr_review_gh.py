@@ -131,15 +131,32 @@ _REACTION_ADAPTER: TypeAdapter[list[Reaction]] = TypeAdapter(list[Reaction])
 # starts with the same text (e.g. a public PR's `chatgpt-codex-connector-imposter`).
 _CODEX_REACTOR_LOGINS = frozenset({"chatgpt-codex-connector", "chatgpt-codex-connector[bot]"})
 
-# Matches only the variable slot of Codex's own top-level review body when it found nothing to
-# say: fixed boilerplate text, then the reviewed commit's short sha, then nothing but whitespace
-# before Codex's own "About Codex in GitHub" `<details>` footer starts. Verified byte-for-byte
-# against this repo's own PR #3318/#3306 history (see `_is_codex_empty_review`): a review that
-# *does* carry findings keeps the identical header and footer but replaces this exact text with
-# the finding itself, so this regex does not match it.
+# Codex's own "About Codex in GitHub" `<details>` footer, present byte-for-byte on every Codex
+# review regardless of findings — confirmed against this repo's own PR #3318/#3306 history: a
+# review that *does* carry a finding keeps this exact footer, only the text ahead of it differs.
+_CODEX_EMPTY_REVIEW_FOOTER = (
+    "<details> <summary>\N{INFORMATION SOURCE}\N{VARIATION SELECTOR-16} About Codex in GitHub</summary>\n<br/>\n\n"
+    "[Your team has set up Codex to review pull requests in this repo]"
+    "(https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n"
+    "- Open a pull request for review\n"
+    "- Mark a draft as ready\n"
+    '- Comment "@codex review".\n\n'
+    "If Codex has suggestions, it will comment; otherwise it will react with \N{THUMBS UP SIGN}.\n\n\n\n\n"
+    'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".\n            \n'
+    "</details>"
+)
+
+# Matches Codex's own top-level review body only when it found nothing to say: the fixed header,
+# fixed boilerplate text, the reviewed commit's short sha, then the footer above — and nothing
+# else, in either direction. `_is_codex_empty_review` runs this as a `fullmatch` against the whole
+# (stripped) body rather than a `.search()`: a bare search only anchors the fixed pieces and would
+# still match a review that tucks a real finding somewhere the regex isn't looking, e.g. appended
+# after the footer's closing `</details>` tag — `fullmatch` requires the entire body to consist of
+# exactly this template, so any such addition breaks the match instead of being silently missed.
 _CODEX_EMPTY_REVIEW_BODY = re.compile(
+    r"### 💡 Codex Review\s*"
     r"Here are some automated review suggestions for this pull request\.\s*"
-    r"\*\*Reviewed commit:\*\*\s*`[0-9a-f]+`\s*(?=<details>)"
+    r"\*\*Reviewed commit:\*\*\s*`[0-9a-f]+`\s*" + re.escape(_CODEX_EMPTY_REVIEW_FOOTER)
 )
 
 
@@ -529,9 +546,11 @@ def _is_codex_empty_review(review: ReviewNode) -> bool:
 
     Codex posts a review with this same boilerplate body on every push regardless of what it
     finds — real findings, when present, arrive separately as inline thread comments already
-    tracked through `unresolved`/`resolve`, never in this top-level review's own body. Requiring
-    the reaction phrase in addition to the regex match on `_CODEX_EMPTY_REVIEW_BODY` guards against
-    matching some unrelated review whose body happens to contain a reviewed-commit line.
+    tracked through `unresolved`/`resolve`, never in this top-level review's own body. Matching
+    with `fullmatch` against the whole stripped body (not `.search()`) is what rejects a review
+    that tucks a real finding anywhere outside the template's own variable slot — including after
+    the fixed footer's closing `</details>` tag, where a `.search()` for the fixed pieces alone
+    would still match and silently miss the addition — see `_CODEX_EMPTY_REVIEW_BODY`.
 
     Args:
         review: A review whose body is non-empty (`reviews_with_body`).
@@ -544,8 +563,7 @@ def _is_codex_empty_review(review: ReviewNode) -> bool:
     return (
         review.author is not None
         and review.author.login.lower() in _CODEX_REACTOR_LOGINS
-        and "will react with 👍" in review.body
-        and _CODEX_EMPTY_REVIEW_BODY.search(review.body) is not None
+        and _CODEX_EMPTY_REVIEW_BODY.fullmatch(review.body.strip()) is not None
     )
 
 
