@@ -627,6 +627,13 @@ class BeadsBackend:
             repo: Ignored for the beads backend.
             output: Ignored for the beads backend.
         """
+        dropped = {
+            k: v
+            for k, v in {"method": method, "notes": notes, "follow_ups": follow_ups, "findings": findings}.items()
+            if v
+        }
+        if dropped:
+            _log.warning("resolve_github_issue: beads does not support %s — dropping: %r", ", ".join(dropped), dropped)
         argv = ["close", issue_ref]
         if summary:
             argv.extend(["--reason", summary])

@@ -1143,8 +1143,11 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
 
 
 def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
+    if not item.issue:
+        return
     backend = get_config().backend
-    if not item.issue or not isinstance(backend, SyncProvider):
+    if not isinstance(backend, SyncProvider):
+        output.info("Active backend does not support reconciliation.")
         return
     try:
         result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
@@ -1371,7 +1374,8 @@ def _classify_duplicate_check(
     if matches:
         return DuplicateCheckStatus.DUPLICATE_FOUND, matches
     if not isinstance(backend, SyncProvider):
-        return DuplicateCheckStatus.NO_DUPLICATE, []
+        out.warn("  WARNING: Could not verify duplicate status: active backend does not support reconciliation")
+        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
     try:
         refresh = refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
     except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
@@ -3834,9 +3838,12 @@ def strike_entry(
     backend = get_config().backend
     backend.put_work_item(item)
     out.info(f"Struck entry {entry_id} in {item.reference}")
-    if item.issue and isinstance(backend, SyncProvider):
-        backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-        out.info(f"  Reconciled strike for {item.issue}")
+    if item.issue:
+        if isinstance(backend, SyncProvider):
+            backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+            out.info(f"  Reconciled strike for {item.issue}")
+        else:
+            out.info("  Active backend does not support reconciliation.")
 
     return {"title": item.title, "entry_id": entry_id, "struck": True, **out.to_dict()}
 
