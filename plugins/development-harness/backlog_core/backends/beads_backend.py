@@ -615,7 +615,7 @@ class BeadsBackend:
         """Resolve a beads issue via ``bd close --reason``.
 
         Only ``summary`` is forwarded — beads does not support structured
-        resolution fields (method, findings, follow_ups).
+        resolution fields (method, notes, follow_ups, findings).
 
         Args:
             issue_ref: Beads issue ID or selector string.
