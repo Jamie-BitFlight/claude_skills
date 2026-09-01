@@ -68,7 +68,6 @@ from .models import (
     ContentUnavailableError,
     ContentWrite,
     DispatchItemRecord as _DispatchItemRecord,
-    DispatchSpawnSummary as _DispatchSpawnSummary,
     DispatchWaveRecord as _DispatchWaveRecord,
     DispatchWaveSummary as _DispatchWaveSummary,
     GitHubUnavailableError,
@@ -91,6 +90,50 @@ from .search import (
     tokenize_search as _tokenize_search,
 )
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
+from .tool_responses import (
+    AccumulatedUsage,
+    ArtifactReadResponse,
+    ArtifactRegisterResponse,
+    ArtifactsListResponse,
+    BacklogAddResponse,
+    BacklogCloseResponse,
+    BacklogCommentIssueResponse,
+    BacklogCreateMilestoneResponse,
+    BacklogCreateProjectResponse,
+    BacklogCreateSamTaskResponse,
+    BacklogGetReadySamTasksResponse,
+    BacklogGetSoonestMilestoneResponse,
+    BacklogGroomResponse,
+    BacklogLinkFollowupResponse,
+    BacklogListCommentsResponse,
+    BacklogListFollowupsResponse,
+    BacklogListIssuesResponse,
+    BacklogListLabelsResponse,
+    BacklogListMergedPrsResponse,
+    BacklogListMilestonesResponse,
+    BacklogListProjectsResponse,
+    BacklogListResponse,
+    BacklogNormalizeResponse,
+    BacklogPullResponse,
+    BacklogReadCommentResponse,
+    BacklogResolveResponse,
+    BacklogStrikeEntryResponse,
+    BacklogSyncResponse,
+    BacklogUpdateResponse,
+    BacklogUpdateSamTaskStatusResponse,
+    DispatchConflictsResponse,
+    DispatchCreatePlanResponse,
+    DispatchItemStatusResponse,
+    DispatchReadResponse,
+    DispatchSpawnResponse,
+    DispatchStaleCheckResponse,
+    DispatchValidateResponse,
+    DispatchWaveStartResponse,
+    DispatchWaveStatusResponse,
+    SamTaskLookupResult,
+    SyncNowResponse,
+    SyncStatusResponse,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
@@ -1143,27 +1186,29 @@ mcp = FastMCP(
         title="Backlog Sync Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 )
-async def sync_status() -> dict[str, object]:
+async def sync_status() -> SyncStatusResponse:
     """Return the current background sync state.
 
     Returns:
-        Dict with fields:
-            status (str): One of "idle", "running", "offline", "error".
-            started_at (str | None): ISO 8601 UTC timestamp of current/last sync start.
-            completed_at (str | None): ISO 8601 UTC timestamp of last sync completion.
-            last_success_at (str | None): ISO 8601 UTC timestamp of last successful sync.
-            items_done (int): Issues written to cache in the current/last run.
-            items_total (int | None): Total issues expected; None when unknown.
-            percent (int | None): Completion percentage 0-100; None when total unknown.
-            last_error (str): Error message from last failed sync, or empty string.
-            offline_reason (str): Why server entered offline mode, or empty string.
-            pending_mutations (int): Offline-queue depth as of the last completed
-                sync. Not a live read; updates only when a sync finishes.
-            rejected_mutations (int): Dead-lettered mutation count (key
-                mismatches plus schema-invalid entries) as of the last
-                completed sync. Same not-live caveat as pending_mutations.
+        :class:`~backlog_core.tool_responses.SyncStatusResponse` with
+        status, started_at, completed_at, items_done, items_total,
+        last_error, last_success_at, retry_count, offline_reason, percent,
+        pending_mutations, and rejected_mutations.
     """
-    return get_sync_state().to_dict()
+    # No exclude_none here (unlike every other tool in this module): every
+    # field is unconditionally present in SyncState.to_dict() -- some
+    # legitimately null (e.g. started_at before any sync has run) -- and
+    # there is no BacklogError arm ever needing to hide a field, so the
+    # rationale for exclude_none=True (rule 5's "not unconditionally
+    # present on every path" widening) doesn't apply. Dropping null keys
+    # here would be a wire-format regression against the pre-existing
+    # contract that every key is always present.
+    #
+    # Returning the model instance (not .model_dump()) keeps the declared
+    # SyncStatusResponse return type accurate for in-process callers; FastMCP
+    # serializes it identically at the wire boundary since no exclude_none is
+    # applied here either way.
+    return SyncStatusResponse.model_validate(get_sync_state().to_dict())
 
 
 @mcp.tool(
@@ -1179,7 +1224,7 @@ async def sync_now(
     full_refresh: Annotated[
         bool, Field(description="Ignore the provider checkpoint and perform a full reconciliation")
     ] = False,
-) -> dict[str, object]:
+) -> SyncNowResponse:
     """Trigger an immediate background sync or return progress of an in-flight sync.
 
     If a sync is already in progress, returns the current progress without
@@ -1193,18 +1238,16 @@ async def sync_now(
             full reconciliation.
 
     Returns:
-        Dict with fields:
-            triggered (bool): True if a new sync was started; False if one was already running.
-            sync_state (dict): Current sync state (same fields as sync_status()).
-            messages (list[str]): Informational messages about the action taken.
+        :class:`~backlog_core.tool_responses.SyncNowResponse` with
+        triggered, sync_state (same fields as sync_status()), and messages.
     """
     state = get_sync_state()
     if not isinstance(_get_config().backend, SyncProvider):
-        return {
+        return SyncNowResponse.model_validate({
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["Active backend does not support reconciliation."],
-        }
+        })
 
     # Reset terminal states so the new attempt starts fresh.  Done before the
     # claim so the returned snapshot reflects the fresh RUNNING state, not the
@@ -1219,15 +1262,19 @@ async def sync_now(
     # concurrent sync_now calls — or a sync_now racing the startup loop — each launch
     # a duplicate sync worker.
     if not state.try_start():
-        return {
+        return SyncNowResponse.model_validate({
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["A sync is already in progress. Returning current progress."],
-        }
+        })
 
     bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
     _register_bg_task(bg_sync_task)
-    return {"triggered": True, "sync_state": state.to_dict(), "messages": ["Background sync triggered."]}
+    return SyncNowResponse.model_validate({
+        "triggered": True,
+        "sync_state": state.to_dict(),
+        "messages": ["Background sync triggered."],
+    })
 
 
 @mcp.tool(
@@ -1266,7 +1313,7 @@ async def backlog_add(
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
     force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
-) -> dict:
+) -> BacklogAddResponse:
     """Add a new item through the configured backend and optionally create its native issue.
 
     For guided creation with classification and research support, use
@@ -1275,10 +1322,10 @@ async def backlog_add(
     detection here runs unless force=True.
 
     Returns:
-        Dict with file_path, title, priority, issue number (if created),
-        and output messages/warnings. file_path is for reference only — use
-        backlog_update or backlog_groom for all modifications. On error, dict
-        contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogAddResponse` with
+        file_path, title, priority, item_ref, and output messages/warnings.
+        file_path is for reference only — use backlog_update or backlog_groom
+        for all modifications. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -1292,9 +1339,9 @@ async def backlog_add(
             force=force,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogAddResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogAddResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 def _assert_config() -> None:
@@ -1663,7 +1710,7 @@ async def backlog_list(
             )
         ),
     ] = None,
-) -> dict:
+) -> BacklogListResponse:
     """List all open backlog items.
 
     When match_context=True, use page/tokens_per_page/page_token_limit to control
@@ -1671,15 +1718,16 @@ async def backlog_list(
     page=2..N to retrieve subsequent pages.
 
     Returns:
-        Dict with items list, count, pagination object, and output messages/warnings.
+        :class:`~backlog_core.tool_responses.BacklogListResponse` with items
+        list, count, pagination object, and output messages/warnings.
         Each item includes status (workflow status from status:* labels).
         pagination contains offset, limit, total, and has_more. When has_more=true,
         next_call provides the suggested follow-up call string.
         When match_context=True, match_pages contains current_page, total_pages,
         tokens_per_page, total_match_tokens, and paginated flag.
-        When count_only=True, the count key is present; a running background sync
-        may add sync_state/warnings alongside it.
-        On error, dict contains an error key.
+        When count_only=True, only the count key (and, when a background sync
+        is running, sync_state/warnings) is present.
+        On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
     """
@@ -1705,7 +1753,11 @@ async def backlog_list(
         )
     except BacklogError as e:
         backend_status = await asyncio.to_thread(_probe_backend_status)
-        return {"error": str(e), "backend": backend_status.model_dump(), **out.to_dict()}
+        return BacklogListResponse.model_validate({
+            "error": str(e),
+            "backend": backend_status.model_dump(),
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
@@ -1730,10 +1782,14 @@ async def backlog_list(
 
     # count_only short-circuit: return only the item count without page content.
     # Carries sync_state + warnings when the sync is not IDLE (silent-failure prevention).
+    # exclude_defaults=True (not exclude_none=True): BacklogListResponse inherits
+    # Output's messages/warnings/errors, whose Field(default_factory=list) default
+    # is [] rather than None, so exclude_none alone would leave them in the
+    # response and contradict this branch's documented minimal shape.
     if count_only:
         count_resp: dict[str, object] = {"count": total}
         _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
-        return count_resp
+        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
@@ -1780,7 +1836,7 @@ async def backlog_list(
     if match_pages is not None:
         response["match_pages"] = match_pages
         _maybe_add_pagination_notice(match_pages, out, response)
-    return response
+    return BacklogListResponse.model_validate(response).model_dump(exclude_none=True)
 
 
 def _build_compact_manifest(
@@ -2217,14 +2273,15 @@ async def backlog_view(
 async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
-) -> dict:
+) -> BacklogSyncResponse:
     """Sync backlog items with the configured backend: create missing work items and push groomed content.
 
     Use dry_run=true to preview changes without modifying anything.
 
     Returns:
-        Dict with created and pushed counts and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogSyncResponse` with
+        created and pushed counts, dry_run, and output messages/warnings.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2235,9 +2292,9 @@ async def backlog_sync(
         created = result.get("created", 0)
         pushed = result.get("pushed", 0)
         await ctx.info(f"Sync complete: {created} issue(s) created, {pushed} item(s) pushed")
-        return {**result, **out.to_dict()}
+        return BacklogSyncResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogSyncResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2259,24 +2316,27 @@ async def backlog_link_followup(
             )
         ),
     ],
-) -> dict:
+) -> BacklogLinkFollowupResponse:
     """Link a follow-up backlog item to its originating plan or task.
 
     Records the origin's logical ID on the item's ``followup_to`` metadata
     field so the relationship is queryable via ``backlog_list_followups``.
 
     Returns:
-        Dict with title, followup_to, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogLinkFollowupResponse`
+        with title, followup_to, and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.link_followup, selector=selector, followup_to=followup_to, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogLinkFollowupResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogLinkFollowupResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -2294,22 +2354,25 @@ async def backlog_list_followups(
             )
         ),
     ],
-) -> dict:
+) -> BacklogListFollowupsResponse:
     """List backlog items linked as follow-ups to the given origin.
 
     Returns all items whose ``metadata.followup_to`` exactly matches the
     given logical ID.
 
     Returns:
-        Dict with items list (each with title, section, issue, followup_to),
-        count, and output messages/warnings.
+        :class:`~backlog_core.tool_responses.BacklogListFollowupsResponse`
+        with items (each with title, section, issue, followup_to), count,
+        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_followups, followup_to=followup_to, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListFollowupsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListFollowupsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -2336,15 +2399,16 @@ async def backlog_close(
     comment: Annotated[str, Field(description="Additional context about why this item is being closed")] = "",
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Close even if open PRs reference the issue")] = False,
-) -> dict:
+) -> BacklogCloseResponse:
     """Dismiss a backlog item without completing it and close it on the configured backend.
 
     Use for items that are duplicates, out of scope, superseded, wontfix,
     or permanently blocked. For completed work, use backlog_resolve instead.
 
     Returns:
-        Dict with closed item title, reason, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogCloseResponse` with the
+        closed item's title, either ``already_closed`` or ``closed``/``reason``,
+        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2358,9 +2422,9 @@ async def backlog_close(
             force=force,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogCloseResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCloseResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2383,7 +2447,7 @@ async def backlog_resolve(
     findings: Annotated[str | None, Field(description="Retrospective learnings from this work")] = None,
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Resolve even if open PRs reference the issue")] = False,
-) -> dict:
+) -> BacklogResolveResponse:
     """Mark a backlog item as DONE (completed) and close it on the configured backend.
 
     plan/method/notes/follow_ups/findings become a structured completion comment
@@ -2393,8 +2457,10 @@ async def backlog_resolve(
     For dismissals (duplicate, out of scope, etc.), use backlog_close instead.
 
     Returns:
-        Dict with resolved item title, summary, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogResolveResponse` with the
+        resolved item's title, either ``already_resolved`` or
+        ``resolved``/``summary``, and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
@@ -2411,9 +2477,9 @@ async def backlog_resolve(
             force=force,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogResolveResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogResolveResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2475,14 +2541,18 @@ async def backlog_update(
             "May be a no-op depending on the active backend — check the returned messages."
         ),
     ] = False,
-) -> dict:
+) -> BacklogUpdateResponse:
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
     Groomed content is synced to the linked work item when the item has one.
 
     Returns:
-        Dict with updated item title, applied changes, and output
-        messages/warnings. On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogUpdateResponse` with the
+        updated item's title and whichever change fields apply (renamed_to,
+        description_updated, plan, issue_num, status, verified, changes on
+        the non-groomed path; groomed_updated, sections_written on the
+        groomed path), plus output messages/warnings. On error, or on a
+        non-fatal per-field failure, ``error`` is set.
     """
     out = Output()
     try:
@@ -2501,9 +2571,9 @@ async def backlog_update(
             reason=reason,
             verified=verified,
         )
-        return {**result, **out.to_dict()}
+        return BacklogUpdateResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogUpdateResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2578,25 +2648,26 @@ async def backlog_groom(
             )
         ),
     ] = False,
-) -> dict:
+) -> BacklogGroomResponse:
     """Write groomed content through the configured backend and sync its linked GitHub issue.
 
     When the item has a GitHub issue, the groomed content is synced there
     automatically.
 
     Returns:
-        Dict with groomed item title, synced status, and output
-        messages/warnings. On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogGroomResponse` with the
+        groomed item's ``title``, ``groomed_updated`` (true when content was
+        written), and output messages/warnings. On error, ``error`` is set.
         When mark_groomed=True and the post-write item re-lookup fails to resolve the
-        selector, the status advance is skipped and the dict additionally contains
+        selector, the status advance is skipped and the response additionally has
         mark_groomed_skipped=True and mark_groomed_skip_reason (str) explaining why —
-        callers checking mark_groomed's effect should test for this key.
+        callers checking mark_groomed's effect should test for this field.
     """
     out = Output()
     if sections is not None and any((section, content, entry_id, replace_section, reason, append)):
-        return {
-            "error": "sections is mutually exclusive with section, content, entry_id, replace_section, reason, and append"
-        }
+        return BacklogGroomResponse(
+            error="sections is mutually exclusive with section, content, entry_id, replace_section, reason, and append"
+        ).model_dump(exclude_none=True)
     try:
         await ctx.info(f"Grooming item: {selector}")
         result = await asyncio.to_thread(
@@ -2616,9 +2687,9 @@ async def backlog_groom(
             await ctx.warning(w)
         title = result.get("title", selector)
         await ctx.info(f"Groomed: {title}")
-        return {**result, **out.to_dict()}
+        return BacklogGroomResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogGroomResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2633,12 +2704,13 @@ async def backlog_groom(
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
-) -> dict:
+) -> BacklogNormalizeResponse:
     """Normalize all work items through the configured backend.
 
     Returns:
-        Dict with count of normalized files and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogNormalizeResponse` with
+        the count of normalized files and output messages/warnings. On
+        error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2649,9 +2721,9 @@ async def backlog_normalize(
         updated = result.get("normalized", 0)
         suffix = " (dry-run)" if dry_run else ""
         await ctx.info(f"Normalized {updated} file(s){suffix}")
-        return {**result, **out.to_dict()}
+        return BacklogNormalizeResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogNormalizeResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2672,7 +2744,7 @@ async def backlog_pull(
         bool, Field(description="Overwrite local content even if local version is newer or longer")
     ] = False,
     diff: Annotated[bool, Field(description="Include entry-level diff output showing local vs remote changes")] = False,
-) -> dict:
+) -> BacklogPullResponse:
     """Reconcile linked issue content.
 
     Only backends that support reconciliation act on this — on other backends
@@ -2682,8 +2754,9 @@ async def backlog_pull(
     Merges by section using entry-aware merge (keeps longer entries, preserves strikes).
 
     Returns:
-        Dict with count of pulled items (bulk) or file_path (single) and
-        output messages/warnings. On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogPullResponse` with count
+        of pulled items (bulk path) or file_path (single-selector path), and
+        output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2694,16 +2767,24 @@ async def backlog_pull(
                 await ctx.warning(w)
             file_path = result.get("file_path")
             await ctx.info(f"Pulled: {file_path}" if file_path else "Nothing pulled")
-            return {**result, **out.to_dict()}
+            response = BacklogPullResponse.model_validate({**result, **out.to_dict()})
+            dump = response.model_dump(exclude_none=True)
+            # file_path is a meaningful, documented null on this path's no-op
+            # success shape (e.g. the backend lacks reconciliation support) --
+            # exclude_none=True would otherwise drop the key entirely. Not
+            # applied on the bulk (no-selector) path below, where file_path
+            # genuinely doesn't apply and should stay absent.
+            dump["file_path"] = response.file_path
+            return dump
         await ctx.info("Starting bulk pull from GitHub" + (" (dry-run)" if dry_run else ""))
         result = await asyncio.to_thread(operations.pull_items, dry_run=dry_run, force=force, diff=diff, output=out)
         for w in out.warnings:
             await ctx.warning(w)
         pulled = result.get("pulled", 0)
         await ctx.info(f"Pull complete: {pulled} item(s) pulled")
-        return {**result, **out.to_dict()}
+        return BacklogPullResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogPullResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2724,12 +2805,13 @@ async def backlog_create_sam_task(
     acceptance_criteria: Annotated[list[str] | None, Field(description="Acceptance criteria strings")] = None,
     labels: Annotated[list[str] | None, Field(description="GitHub label names to apply")] = None,
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> dict:
+) -> BacklogCreateSamTaskResponse:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
     Returns:
-        Dict with issue_number, title, url (always empty), and output messages.
-        On error, returns error key.
+        :class:`~backlog_core.tool_responses.BacklogCreateSamTaskResponse`
+        with issue_number, title, url (always empty), and output messages.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2749,9 +2831,11 @@ async def backlog_create_sam_task(
             labels=labels,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogCreateSamTaskResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCreateSamTaskResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -2766,7 +2850,7 @@ async def backlog_get_sam_tasks(
     refresh_cache: Annotated[
         bool, Field(description="Compatibility flag; the configured provider owns refresh")
     ] = True,
-) -> dict:
+) -> SamTaskLookupResult:
     """Return SAM tasks owned by a configured-backend work item.
 
     Returns tasks plus explicit provider freshness and availability state.
@@ -2776,9 +2860,9 @@ async def backlog_get_sam_tasks(
         result = await asyncio.to_thread(
             operations.get_sam_tasks, parent_issue_number=parent_issue_number, refresh_cache=refresh_cache, output=out
         )
-        return {**result, **out.to_dict()}
+        return SamTaskLookupResult.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return SamTaskLookupResult.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2794,23 +2878,28 @@ async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (GitHub issue integer)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> dict:
+) -> BacklogUpdateSamTaskStatusResponse:
     """Update the status field in a SAM task sub-issue.
 
     Patches the sam:task YAML block in the issue body. No-op if status already matches.
 
     Returns:
-        Dict with updated (bool), issue_number, new_status, and output messages.
-        On error, returns error key.
+        :class:`~backlog_core.tool_responses.BacklogUpdateSamTaskStatusResponse`
+        with updated (bool), issue_number, new_status, and output messages.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.update_sam_task_status, issue_number=issue_number, new_status=new_status, repo=repo, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogUpdateSamTaskStatusResponse.model_validate({**result, **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogUpdateSamTaskStatusResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2882,7 +2971,7 @@ async def artifact_register(
     ],
     status: Annotated[ArtifactStatus, Field(description="Lifecycle status of the artifact")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, Field(description="Name of the producing agent")] = "",
-) -> dict:
+) -> ArtifactRegisterResponse:
     """Upsert an artifact entry in provider-owned logical content.
 
     Idempotent by (artifact_type, artifact_id). If an entry with the same type and
@@ -2890,13 +2979,14 @@ async def artifact_register(
     If only the type matches but the artifact_id differs, a new row is added.
 
     Returns:
-        Dict with registered (bool), artifact_count (int), action (str),
-        content_stored (bool), and output messages/warnings.
+        :class:`~backlog_core.tool_responses.ArtifactRegisterResponse` with
+        registered (bool), artifact_count (int), action (str), content_stored
+        (bool), and output messages/warnings.
 
-    A dict with an ``error`` key is returned for a ``BacklogError``. A
-    ``ContentUnavailableError`` or ``ContentConflictError`` (the backend could
-    not store the artifact or its manifest) is not caught here and surfaces as
-    a tool call error, not a dict.
+    A response with only ``error`` and the output triad set is returned for a
+    ``BacklogError``. A ``ContentUnavailableError`` or ``ContentConflictError``
+    (the backend could not store the artifact or its manifest) is not caught
+    here and surfaces as a tool call error, not a response.
     """
     out = Output()
     try:
@@ -2920,9 +3010,14 @@ async def artifact_register(
             )
 
         result = await asyncio.to_thread(_run)
-        return {**result.model_dump(), **out.to_dict()}
+        response = ArtifactRegisterResponse(
+            **result.model_dump(), messages=out.messages, warnings=out.warnings, errors=out.errors
+        )
+        return response.model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactRegisterResponse(
+            error=str(e), messages=out.messages, warnings=out.warnings, errors=out.errors
+        ).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2938,14 +3033,14 @@ async def artifact_list(
         ),
     ],
     artifact_type: Annotated[str | None, Field(description="Filter by artifact type (optional)")] = None,
-) -> dict:
+) -> ArtifactsListResponse:
     """Return all artifacts registered for a backlog item.
 
     Returns an empty list when no manifest section exists yet — this is not an error.
 
     Returns:
-        Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings.
+        :class:`~backlog_core.tool_responses.ArtifactsListResponse` with
+        artifacts, count (int), and output messages/warnings.
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
@@ -2967,9 +3062,13 @@ async def artifact_list(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({
+            "artifacts": artifacts,
+            "count": len(artifacts),
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2994,16 +3093,17 @@ async def artifact_get(
             )
         ),
     ] = None,
-) -> dict:
+) -> ArtifactsListResponse:
     """Return metadata for artifacts registered on a backlog item under one type.
 
     Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
     codebase-analysis files). Supplying it returns the single addressed entry.
 
     Returns:
-        Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings. Returns error key when the type is not found, or when a supplied
-        ``artifact_id`` matches no entry of that type — an absent artifact is data, not a
+        :class:`~backlog_core.tool_responses.ArtifactsListResponse` with
+        artifacts, count (int), and output messages/warnings. ``error`` is
+        set when the type is not found, or when a supplied ``artifact_id``
+        matches no entry of that type — an absent artifact is data, not a
         failed call.
 
     Raises:
@@ -3029,9 +3129,13 @@ async def artifact_get(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({
+            "artifacts": artifacts,
+            "count": len(artifacts),
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3056,7 +3160,7 @@ async def artifact_read(
             )
         ),
     ] = None,
-) -> dict:
+) -> ArtifactReadResponse:
     """Read provider-owned logical content for a registered artifact.
 
     The selected ContentProvider resolves the artifact by owner, type, and
@@ -3066,10 +3170,10 @@ async def artifact_read(
     Supplying it addresses one specific entry.
 
     Returns:
-        Dict with type (str), path (str), content (str), status (str), and
-        output messages/warnings. Returns error key on type-not-found or when
-        the selected provider has no matching content — an absent artifact is
-        data, not a failed call.
+        :class:`~backlog_core.tool_responses.ArtifactReadResponse` with
+        artifact_type, path, content, status, and output messages/warnings.
+        ``error`` is set on type-not-found or when the selected provider has
+        no matching content — an absent artifact is data, not a failed call.
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
@@ -3109,9 +3213,11 @@ async def artifact_read(
             )
 
         result = await asyncio.to_thread(_run)
-        return {**result.model_dump(mode="json"), **out.to_dict()}
+        return ArtifactReadResponse.model_validate({**result.model_dump(mode="json"), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactReadResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3121,11 +3227,12 @@ async def artifact_read(
 )
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (native reference)")],
-) -> dict:
+) -> BacklogGetReadySamTasksResponse:
     """Return SAM tasks whose status is not-started and all dependencies are terminal.
 
     Returns:
-        Dict with feature (slug), ready_tasks (list), count. Each ready_task
+        :class:`~backlog_core.tool_responses.BacklogGetReadySamTasksResponse`
+        with feature (slug), ready_tasks (list), count. Each ready_task dict
         contains id, name, agent, skills, issue_number.
     """
     out = Output()
@@ -3133,9 +3240,11 @@ async def backlog_get_ready_sam_tasks(
         result = await asyncio.to_thread(
             operations.get_ready_sam_tasks, parent_issue_number=parent_issue_number, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogGetReadySamTasksResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogGetReadySamTasksResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3164,7 +3273,7 @@ async def backlog_strike_entry(
     ],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
-) -> dict:
+) -> BacklogStrikeEntryResponse:
     """Strike (retract) an entry block within a backlog item.
 
     Wraps the entry in a collapsed details block with the reason,
@@ -3172,17 +3281,20 @@ async def backlog_strike_entry(
     if the item has one.
 
     Returns:
-        Dict with strike results and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogStrikeEntryResponse`
+        with title, entry_id, struck, and output messages/warnings. On
+        error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.strike_entry, selector=selector, entry_id=entry_id, reason=reason, section=section, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogStrikeEntryResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogStrikeEntryResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3190,7 +3302,9 @@ async def backlog_strike_entry(
         title="List Labels", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )
-async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum labels to return")] = 100) -> dict:
+async def backlog_list_labels(
+    limit: Annotated[int, Field(description="Maximum labels to return")] = 100,
+) -> BacklogListLabelsResponse:
     """List repository labels. Requires a backend with label support — errors otherwise.
 
     Returns all labels defined on the repository, up to ``limit``. There is no
@@ -3198,16 +3312,18 @@ async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum l
     ``backlog_groom``, ``backlog_resolve``, or ``backlog_close`` changing an item's status.
 
     Returns:
-        Dict with ``labels`` (list of dicts with ``name``, ``color``, ``description``),
-        ``count``, and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogListLabelsResponse` with
+        ``labels`` (each with ``name``, ``color``, ``description``), ``count``,
+        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_labels, limit=limit, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListLabelsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListLabelsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3227,7 +3343,7 @@ async def backlog_list_merged_prs(
         ),
     ] = None,
     limit: Annotated[int, Field(description="Maximum number of PRs to return")] = 20,
-) -> dict:
+) -> BacklogListMergedPrsResponse:
     """List merged pull requests. Requires a backend with PR support — errors otherwise.
 
     Only PRs that were actually merged (not just closed) are returned.
@@ -3235,17 +3351,19 @@ async def backlog_list_merged_prs(
     keyword present in the PR title or body.
 
     Returns:
-        Dict with ``pull_requests`` (list of dicts with ``number``,
-        ``title``, ``merged_at``, ``author``, ``url``, ``head_branch``),
-        ``count``, and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogListMergedPrsResponse`
+        with ``pull_requests`` (each with ``number``, ``title``, ``merged_at``,
+        ``author``, ``url``, ``head_branch``), ``count``, and output
+        messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_merged_prs, search=search, limit=limit, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListMergedPrsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListMergedPrsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3255,24 +3373,35 @@ async def backlog_list_merged_prs(
 )
 async def backlog_list_milestones(
     state: Annotated[str, Field(description="Milestone state filter: open | closed | all")] = "open",
-) -> dict:
+) -> BacklogListMilestonesResponse:
     """List repository milestones filtered by state.
 
     Requires a backend with milestone support — errors otherwise. Returns
     milestones with their issue counts and optional due dates.
 
     Returns:
-        Dict with ``milestones`` (list of dicts with ``number``, ``title``,
-        ``state``, ``description``, ``due_on``, ``open_issues``,
-        ``closed_issues``), ``count``, and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogListMilestonesResponse`
+        with ``milestones`` (each with ``number``, ``title``, ``state``,
+        ``description``, ``due_on``, ``open_issues``, ``closed_issues``),
+        ``count``, and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_milestones, state=state, output=out)
-        return {**result, **out.to_dict()}
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListMilestonesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
+    response = BacklogListMilestonesResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    # due_on is a meaningful, documented null per milestone (no due date set) --
+    # exclude_none=True's recursive drop would otherwise remove the key from
+    # any milestone lacking one. response.milestones is always a real list
+    # here (never None): the operations.list_milestones result this branch
+    # validated from always supplies it.
+    if response.milestones is not None:
+        dump["milestones"] = [m.model_dump() for m in response.milestones]
+    return dump
 
 
 @mcp.tool(
@@ -3280,7 +3409,7 @@ async def backlog_list_milestones(
         title="Get Soonest Milestone", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )
-async def backlog_get_soonest_milestone() -> dict:
+async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
     """Return the open milestone with the earliest due date.
 
     Requires a backend with milestone support — errors otherwise. Milestones
@@ -3289,18 +3418,26 @@ async def backlog_get_soonest_milestone() -> dict:
     returned with a warning.
 
     Returns:
-        Dict with ``milestone`` (dict or None) containing ``number``, ``title``,
-        ``state``, ``description``, ``due_on``, ``open_issues``,
-        ``closed_issues``, and output messages/warnings.
+        :class:`~backlog_core.tool_responses.BacklogGetSoonestMilestoneResponse`
+        with ``milestone`` (or ``None``) and output messages/warnings.
         ``milestone`` is ``None`` when no open milestones exist.
-        On error, dict contains an ``error`` key.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.get_soonest_milestone, output=out)
-        return {**result, **out.to_dict()}
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogGetSoonestMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
+    response = BacklogGetSoonestMilestoneResponse.model_validate({**result, **out.to_dict()})
+    # milestone=None is a meaningful, documented success value (no open
+    # milestones exist), not an absent-on-this-branch field like `error` --
+    # exclude_none=True would otherwise drop the key entirely, which the
+    # docstring's "milestone (or None)" contract does not allow.
+    dump = response.model_dump(exclude_none=True)
+    dump["milestone"] = response.milestone.model_dump() if response.milestone is not None else None
+    return dump
 
 
 @mcp.tool(
@@ -3315,25 +3452,33 @@ async def backlog_create_milestone(
         str | None,
         Field(description="Optional due date as ISO 8601 string, e.g. '2026-06-30' or '2026-06-30T00:00:00Z'"),
     ] = None,
-) -> dict:
+) -> BacklogCreateMilestoneResponse:
     """Create a new milestone on the repository.
 
     Requires a backend with milestone support — errors otherwise.
 
     Returns:
-        Dict with ``milestone`` containing ``number``, ``title``, ``state``,
-        ``description``, ``due_on``, ``open_issues``, ``closed_issues``,
-        and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogCreateMilestoneResponse`
+        with ``milestone`` and output messages/warnings.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.create_milestone, title=title, description=description, due_on=due_on, output=out
         )
-        return {**result, **out.to_dict()}
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCreateMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
+    response = BacklogCreateMilestoneResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    # due_on is a meaningful, legitimate null (caller can create a milestone
+    # without a due date) -- exclude_none=True's recursive drop would
+    # otherwise remove the key from the nested milestone.
+    if response.milestone is not None:
+        dump["milestone"] = response.milestone.model_dump()
+    return dump
 
 
 @mcp.tool(
@@ -3346,21 +3491,33 @@ async def backlog_list_issues(
     labels: Annotated[str | None, Field(description="Comma-separated label names to filter by")] = None,
     state: Annotated[str, Field(description="Issue state: open, closed, or all")] = "open",
     limit: Annotated[int, Field(description="Maximum issues to return")] = 30,
-) -> dict:
+) -> BacklogListIssuesResponse:
     """List GitHub issues with optional milestone, label, and state filters.
 
     Returns:
-        Dict with issues list, count, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogListIssuesResponse` with
+        issues list, count, and output messages/warnings. On error, ``error``
+        is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.list_issues, milestone=milestone, labels=labels, state=state, limit=limit, output=out
         )
-        return {**result, **out.to_dict()}
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListIssuesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
+    response = BacklogListIssuesResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    # milestone is a meaningful, documented null per issue (no milestone
+    # assigned) -- exclude_none=True's recursive drop would otherwise remove
+    # the key from any issue without one. response.issues is always a real
+    # list here (never None): the operations.list_issues result this branch
+    # validated from always supplies it.
+    if response.issues is not None:
+        dump["issues"] = [i.model_dump() for i in response.issues]
+    return dump
 
 
 @mcp.tool(
@@ -3371,21 +3528,24 @@ async def backlog_list_issues(
 async def backlog_comment_issue(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     body: Annotated[str, Field(description="Comment body (Markdown)")],
-) -> dict:
+) -> BacklogCommentIssueResponse:
     """Add a comment to a GitHub issue.
 
     Returns:
-        Dict with issue_number, comment_id (a GraphQL node ID — not usable as
+        :class:`~backlog_core.tool_responses.BacklogCommentIssueResponse` with
+        issue_number, comment_id (a GraphQL node ID — not usable as
         backlog_read_comment's comment_id, which requires a REST integer ID),
         comment_url (always empty), and output messages/warnings. On error,
-        dict contains an error key.
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.comment_issue, issue_number=issue_number, body=body, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogCommentIssueResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCommentIssueResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3397,22 +3557,25 @@ async def backlog_list_comments(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     limit: Annotated[int, Field(description="Maximum comments to return")] = 20,
     offset: Annotated[int, Field(description="Number of comments to skip")] = 0,
-) -> dict:
+) -> BacklogListCommentsResponse:
     """List comments on a GitHub issue.
 
     Returns:
-        Dict with comments (list of {id, author, created_at, updated_at, preview}),
-        count, has_more, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogListCommentsResponse`
+        with comments (each with id, author, created_at, updated_at, preview),
+        count, has_more, and output messages/warnings. On error, ``error``
+        is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.list_comments, issue_number=issue_number, limit=limit, offset=offset, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogListCommentsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListCommentsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3432,22 +3595,25 @@ async def backlog_read_comment(
             )
         ),
     ],
-) -> dict:
+) -> BacklogReadCommentResponse:
     """Read the full body of a single comment on a GitHub issue.
 
     Returns:
-        Dict with id (GraphQL node ID), author, created_at, updated_at,
-        body (full Markdown — no truncation), and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogReadCommentResponse` with
+        id (GraphQL node ID), author, created_at, updated_at, body (full
+        Markdown — no truncation), and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.read_comment, issue_number=issue_number, comment_id=comment_id, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogReadCommentResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogReadCommentResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3458,19 +3624,22 @@ async def backlog_read_comment(
 async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
-) -> dict:
+) -> BacklogListProjectsResponse:
     """List Projects V2 for the repository owner via GraphQL.
 
     Returns:
-        Dict with projects list, count, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogListProjectsResponse`
+        with projects list, count, and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_projects, owner=owner, limit=limit, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListProjectsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListProjectsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3481,21 +3650,24 @@ async def backlog_list_projects(
 async def backlog_create_project(
     title: Annotated[str, Field(description="Project title")],
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
-) -> dict:
+) -> BacklogCreateProjectResponse:
     """Create a Projects V2 project under the repository owner.
 
     Resolves the owner node ID then runs the createProjectV2 GraphQL mutation.
 
     Returns:
-        Dict with project_id, title, url, number, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogCreateProjectResponse` with
+        project_id, title, url, number, and output messages/warnings.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.create_project, title=title, owner=owner, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogCreateProjectResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCreateProjectResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 def _dispatch_reference(milestone_number: int) -> ContentRef:
@@ -3540,23 +3712,35 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
         title="Read Dispatch Plan", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 )
-async def dispatch_read(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
+async def dispatch_read(
+    milestone_number: Annotated[int, Field(description="GitHub milestone number")],
+) -> DispatchReadResponse:
     """Read a dispatch plan for the given milestone.
 
-    Returns an error dict if no plan is stored for this milestone or it
+    Returns an error response if no plan is stored for this milestone or it
     fails schema validation.
 
     Returns:
-        Dict with ``milestone_number`` and ``plan`` (full plan
-        as a nested dict), or ``error`` on failure.
+        :class:`~backlog_core.tool_responses.DispatchReadResponse` with
+        ``milestone_number`` and ``plan`` (the full dispatch plan), or
+        ``error`` on failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except ContentUnavailableError:
-        return {"error": "Dispatch plan not found", "milestone_number": milestone_number}
+        return DispatchReadResponse.model_validate({
+            "error": "Dispatch plan not found",
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     except ValueError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
-    return {"milestone_number": milestone_number, "plan": plan.model_dump()}
+        return DispatchReadResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
+    return DispatchReadResponse.model_validate({
+        "milestone_number": milestone_number,
+        "plan": plan.model_dump(),
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3568,7 +3752,9 @@ async def dispatch_read(milestone_number: Annotated[int, Field(description="GitH
         openWorldHint=False,
     )
 )
-async def dispatch_validate(milestone_number: Annotated[int, Field(description="GitHub milestone number")]) -> dict:
+async def dispatch_validate(
+    milestone_number: Annotated[int, Field(description="GitHub milestone number")],
+) -> DispatchValidateResponse:
     """Validate an existing dispatch plan's structural integrity.
 
     Reads the plan file then runs five structural checks: duplicate issues,
@@ -3576,15 +3762,22 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
     conflict group wave placement.
 
     Returns:
-        Dict with ``is_valid`` (bool), ``errors`` (list[str]), and
-        ``warnings`` (list[str]), or ``error`` on file/parse failure.
+        :class:`~backlog_core.tool_responses.DispatchValidateResponse` with
+        ``is_valid``, ``errors``, and ``warnings``, or ``error`` on
+        file/parse failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchValidateResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
-    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
+    return DispatchValidateResponse.model_validate({
+        "milestone_number": milestone_number,
+        **dataclasses.asdict(result),
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3599,7 +3792,7 @@ async def dispatch_validate(milestone_number: Annotated[int, Field(description="
 async def dispatch_stale_check(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> dict:
+) -> DispatchStaleCheckResponse:
     """Check whether a dispatch plan is stale relative to the current milestone.
 
     Requires a backend with milestone support — errors otherwise. Fetches the
@@ -3608,14 +3801,17 @@ async def dispatch_stale_check(
     with added/removed issue lists.
 
     Returns:
-        Dict with ``is_stale`` (bool), ``added_issues`` (list[int]),
-        ``removed_issues`` (list[int]), and ``message`` (str).
-        Returns ``error`` on file/parse or GitHub failure.
+        :class:`~backlog_core.tool_responses.DispatchStaleCheckResponse`
+        with ``is_stale``, ``added_issues``, ``removed_issues``, and
+        ``message``. Returns ``error`` on file/parse or GitHub failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchStaleCheckResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
 
     def _fetch_milestone_issue_numbers() -> list[int]:
         backend = _get_config().backend
@@ -3633,14 +3829,25 @@ async def dispatch_stale_check(
     try:
         current_numbers = await asyncio.to_thread(_fetch_milestone_issue_numbers)
     except UnsupportedBackendCapabilityError as exc:
-        return exc.to_response(milestone_number)
+        return DispatchStaleCheckResponse.model_validate(exc.to_response(milestone_number)).model_dump(
+            exclude_none=True
+        )
     except GitHubUnavailableError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchStaleCheckResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     except (BacklogError, _GithubException) as exc:
-        return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
+        return DispatchStaleCheckResponse.model_validate({
+            "error": f"GitHub API error: {exc}",
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
 
     result = await asyncio.to_thread(_ds.detect_stale_plan, plan, current_numbers)
-    return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
+    return DispatchStaleCheckResponse.model_validate({
+        "milestone_number": milestone_number,
+        **dataclasses.asdict(result),
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3678,7 +3885,7 @@ async def dispatch_create_plan(
             )
         ),
     ] = None,
-) -> dict:
+) -> DispatchCreatePlanResponse:
     """Create or overwrite a stored dispatch plan for a milestone.
 
     Accepts a typed ``DispatchPlan`` model, stores it atomically through the
@@ -3687,21 +3894,23 @@ async def dispatch_create_plan(
     byte-identical to what's stored) is unsupported and returns an error.
 
     Returns:
-        Success dict with ``milestone_number``, ``wave_count``,
-        ``item_count``, ``is_valid``, ``errors``, ``warnings``, and ``messages``.
-        Error dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.DispatchCreatePlanResponse`
+        with ``milestone_number``, ``wave_count``, ``item_count``,
+        ``is_valid``, and output messages/warnings/errors (the latter two
+        holding validation results, not Output's). On error, ``error`` is
+        set; ``milestone_number`` is absent on the already-exists path.
     """
     out = Output()
     # Verify plan.milestone.number matches the milestone_number parameter
     if plan.milestone.number != milestone_number:
-        return {
+        return DispatchCreatePlanResponse.model_validate({
             "error": (
                 f"Milestone number mismatch: parameter is {milestone_number} "
                 f"but plan.milestone.number is {plan.milestone.number}"
             ),
             "milestone_number": milestone_number,
             **out.to_dict(),
-        }
+        }).model_dump(exclude_none=True)
 
     try:
         current = _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
@@ -3711,7 +3920,10 @@ async def dispatch_create_plan(
         )
     else:
         if not overwrite:
-            return {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()}
+            return DispatchCreatePlanResponse.model_validate({
+                "error": "Dispatch plan already exists. Pass overwrite=True to replace it.",
+                **out.to_dict(),
+            }).model_dump(exclude_none=True)
         write = ContentWrite(
             reference=_dispatch_reference(milestone_number),
             content=plan.model_dump_json(),
@@ -3723,7 +3935,11 @@ async def dispatch_create_plan(
     try:
         await asyncio.to_thread(_get_artifact_provider().put_content, write)
     except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
-        return {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
+        return DispatchCreatePlanResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
 
     out.info(f"Stored dispatch plan {milestone_number}")
 
@@ -3744,7 +3960,7 @@ async def dispatch_create_plan(
     wave_count = len(plan.waves)
     item_count = sum(len(wave.items) for wave in plan.waves)
 
-    return {
+    response = DispatchCreatePlanResponse.model_validate({
         "milestone_number": milestone_number,
         "wave_count": wave_count,
         "item_count": item_count,
@@ -3752,7 +3968,10 @@ async def dispatch_create_plan(
         **out.to_dict(),
         "errors": val_errors,
         "warnings": val_warnings,
-    }
+    })
+    dump = response.model_dump(exclude_none=True)
+    dump["is_valid"] = response.is_valid
+    return dump
 
 
 @mcp.tool(
@@ -3767,7 +3986,7 @@ async def dispatch_create_plan(
 async def dispatch_conflicts(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> dict:
+) -> DispatchConflictsResponse:
     """Analyze Impact Radius conflicts for items in a milestone.
 
     Fetches open issues for the milestone from GitHub, extracts the
@@ -3775,9 +3994,10 @@ async def dispatch_conflicts(
     to find items that share file paths.
 
     Returns:
-        Dict with ``conflict_groups`` (list of group dicts with group_id,
-        reason, and items), ``count`` (int), and ``milestone_number``.
-        Returns ``error`` on GitHub failure.
+        :class:`~backlog_core.tool_responses.DispatchConflictsResponse`
+        with ``conflict_groups`` (each with group_id, reason, and items),
+        ``count``, and ``milestone_number``. Returns ``error`` on GitHub
+        failure.
     """
 
     def _fetch_items_with_impact_radius() -> list[_ImpactRadiusItem]:
@@ -3800,18 +4020,24 @@ async def dispatch_conflicts(
     try:
         items = await asyncio.to_thread(_fetch_items_with_impact_radius)
     except UnsupportedBackendCapabilityError as exc:
-        return exc.to_response(milestone_number)
+        return DispatchConflictsResponse.model_validate(exc.to_response(milestone_number)).model_dump(exclude_none=True)
     except GitHubUnavailableError as exc:
-        return {"error": str(exc), "milestone_number": milestone_number}
+        return DispatchConflictsResponse.model_validate({
+            "error": str(exc),
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
     except (BacklogError, _GithubException) as exc:
-        return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
+        return DispatchConflictsResponse.model_validate({
+            "error": f"GitHub API error: {exc}",
+            "milestone_number": milestone_number,
+        }).model_dump(exclude_none=True)
 
     conflict_groups = await asyncio.to_thread(operations.analyze_impact_radius_conflicts, items)
-    return {
+    return DispatchConflictsResponse.model_validate({
         "milestone_number": milestone_number,
         "conflict_groups": [cg.model_dump() for cg in conflict_groups],
         "count": len(conflict_groups),
-    }
+    }).model_dump(exclude_none=True)
 
 
 # ---------------------------------------------------------------------------
@@ -3872,7 +4098,7 @@ async def dispatch_wave_start(
     items: Annotated[
         list[dict[str, object]], Field(description="List of items, each with 'issue' (int) and 'title' (str) keys")
     ],
-) -> dict:
+) -> DispatchWaveStartResponse:
     """Record the start of a dispatch wave.
 
     Creates wave and item entries in the state database. Items are
@@ -3880,9 +4106,10 @@ async def dispatch_wave_start(
     processes for a wave.
 
     Returns:
-        Dict with ``milestone``, ``wave_num``, ``items_count``, ``status``,
-        and ``messages``/``warnings``. Returns ``error`` if the wave already
-        exists or if an item entry is malformed.
+        :class:`~backlog_core.tool_responses.DispatchWaveStartResponse`
+        with ``milestone``, ``wave_num``, ``items_count``, ``status``, and
+        ``messages``/``warnings``/``errors``. Returns ``error`` if the wave
+        already exists or if an item entry is malformed.
     """
     try:
         item_records = [
@@ -3892,18 +4119,22 @@ async def dispatch_wave_start(
             for item in items
         ]
     except (KeyError, ValueError) as exc:
-        return {"error": f"Malformed item entry: {exc}", "milestone": milestone, "wave_num": wave_num}
+        return DispatchWaveStartResponse.model_validate({
+            "error": f"Malformed item entry: {exc}",
+            "milestone": milestone,
+            "wave_num": wave_num,
+        }).model_dump(exclude_none=True)
     try:
         wave: _DispatchWaveRecord = await asyncio.to_thread(
             _dispatch_state_manager().create_wave, milestone, wave_num, item_records
         )
     except sqlite3.IntegrityError:
-        return {
+        return DispatchWaveStartResponse.model_validate({
             "error": f"Wave {wave_num} already exists for milestone {milestone}",
             "milestone": milestone,
             "wave_num": wave_num,
-        }
-    return {
+        }).model_dump(exclude_none=True)
+    return DispatchWaveStartResponse.model_validate({
         "milestone": wave.milestone,
         "wave_num": wave.wave_num,
         "items_count": len(wave.items),
@@ -3911,7 +4142,7 @@ async def dispatch_wave_start(
         "messages": [f"Wave {wave_num} created with {len(wave.items)} items"],
         "warnings": [],
         "errors": [],
-    }
+    }).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3930,20 +4161,21 @@ async def dispatch_item_status(
     result: Annotated[str, Field(description="Result summary or JSON from result file")] = "",
     error: Annotated[str, Field(description="Error details on failure")] = "",
     cost: Annotated[float | None, Field(description="USD cost if available from claude output")] = None,
-) -> dict:
+) -> DispatchItemStatusResponse:
     """Record completion or failure of a dispatch item.
 
     Looks up the item by milestone + issue across all waves. Updates
     status, result/error data, and completion timestamp.
 
     Returns:
-        Dict with ``milestone``, ``issue``, ``wave_num``, ``status``,
-        ``messages``/``warnings``. Returns ``error`` key if item not found
-        or ``status`` is not one of complete/failed/skipped.
+        :class:`~backlog_core.tool_responses.DispatchItemStatusResponse`
+        with ``milestone``, ``issue``, ``wave_num``, ``status``, and
+        ``messages``/``warnings``/``errors``. Returns ``error`` if the item
+        was not found or ``status`` is not one of complete/failed/skipped.
     """
     mgr = _dispatch_state_manager()
 
-    def _find_and_update() -> dict:
+    def _find_and_update() -> dict[str, object]:
         waves = mgr.get_all_waves(milestone)
         for wave in waves:
             for item in wave.items:
@@ -3981,7 +4213,8 @@ async def dispatch_item_status(
             "issue": issue,
         }
 
-    return await asyncio.to_thread(_find_and_update)
+    result_dict = await asyncio.to_thread(_find_and_update)
+    return DispatchItemStatusResponse.model_validate(result_dict).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3996,7 +4229,7 @@ async def dispatch_item_status(
 async def dispatch_wave_status(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[int, Field(description="Wave number to query (1-based)")],
-) -> dict:
+) -> DispatchWaveStatusResponse:
     """Query the current status of a dispatch wave.
 
     Returns items as a flat list (in issue order) plus per-status counts and
@@ -4006,9 +4239,9 @@ async def dispatch_wave_status(
     reported in the returned warnings.
 
     Returns:
-        Dict with :class:`~backlog_core.models.DispatchWaveSummary` fields,
-        or ``error`` if wave not found. accumulated_usage is currently always
-        zero (not yet wired up).
+        :class:`~backlog_core.tool_responses.DispatchWaveStatusResponse` with
+        wave-status fields, or ``error`` if wave not found. accumulated_usage
+        is currently always zero (not yet wired up).
     """
     mgr = _dispatch_state_manager()
     warnings: list[str] = []
@@ -4025,11 +4258,9 @@ async def dispatch_wave_status(
     wave = await asyncio.to_thread(_check_and_query)
 
     if wave is None:
-        return {
-            "error": f"Wave {wave_num} not found for milestone {milestone}",
-            "milestone": milestone,
-            "wave_num": wave_num,
-        }
+        return DispatchWaveStatusResponse(
+            error=f"Wave {wave_num} not found for milestone {milestone}", milestone=milestone, wave_num=wave_num
+        ).model_dump(exclude_none=True)
 
     items = wave.items
     status_counts = collections.Counter(i.status for i in items)
@@ -4051,7 +4282,7 @@ async def dispatch_wave_status(
         "events_with_usage": 0,
     }
 
-    summary = _DispatchWaveSummary(
+    summary = DispatchWaveStatusResponse(
         milestone=milestone,
         wave_num=wave_num,
         status=wave.status,
@@ -4064,15 +4295,16 @@ async def dispatch_wave_status(
         started_at=wave.started_at,
         completed_at=wave.completed_at,
         elapsed_seconds=elapsed,
-        items=items,
+        items=[i.model_dump(mode="json") for i in items],
+        warnings=warnings,
+        accumulated_usage=AccumulatedUsage.model_validate(accumulated_usage),
     )
-    return {
-        **summary.model_dump(),
-        "messages": [],
-        "warnings": warnings,
-        "errors": [],
-        "accumulated_usage": accumulated_usage,
-    }
+    dump = summary.model_dump(exclude_none=True)
+    # elapsed_seconds is a meaningful, documented null for a pending wave that
+    # hasn't started yet -- exclude_none=True would otherwise drop the key
+    # entirely instead of keeping it explicit.
+    dump["elapsed_seconds"] = summary.elapsed_seconds
+    return dump
 
 
 @dataclasses.dataclass
@@ -4294,7 +4526,7 @@ async def dispatch_spawn(
             )
         ),
     ] = None,
-) -> dict:
+) -> DispatchSpawnResponse:
     """Spawn and monitor kage-bunshin sessions for a dispatch wave.
 
     Runs as a background task (``task=True``). Returns a task ID immediately.
@@ -4322,15 +4554,19 @@ async def dispatch_spawn(
             omits the flag and lets the model default apply.
 
     Returns:
-        Dict with :class:`~backlog_core.models.DispatchSpawnSummary` fields
-        on completion, or ``error`` on failure.
+        :class:`~backlog_core.tool_responses.DispatchSpawnResponse` with
+        dispatch-run fields on completion, or ``error`` on failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone)
     except ContentUnavailableError:
-        return {"error": f"Dispatch plan not found for milestone {milestone}", "milestone": milestone}
+        return DispatchSpawnResponse(
+            error=f"Dispatch plan not found for milestone {milestone}", milestone=milestone
+        ).model_dump(exclude_none=True)
     except ValueError as exc:
-        return {"error": f"Invalid dispatch plan: {exc}", "milestone": milestone}
+        return DispatchSpawnResponse(error=f"Invalid dispatch plan: {exc}", milestone=milestone).model_dump(
+            exclude_none=True
+        )
 
     mgr = _dispatch_state_manager()
     await asyncio.to_thread(mgr.check_stale_pids)
@@ -4396,31 +4632,31 @@ async def dispatch_spawn(
             )
         )
 
-    elapsed_seconds = _time.monotonic() - start_time
-
     def _sum_costs() -> float | None:
         all_w = mgr.get_all_waves(milestone)
         costs = [i.cost for w in all_w if w.wave_num >= wave_num for i in w.items if i.cost is not None]
         return sum(costs) if costs else None
 
     total_cost = await asyncio.to_thread(_sum_costs)
-    summary = _DispatchSpawnSummary(
+    summary = DispatchSpawnResponse(
         milestone=milestone,
         waves_executed=len(all_waves),
         total_items=total_items,
         completed=overall.completed,
         failed=overall.failed,
         skipped=overall.skipped,
-        elapsed_seconds=elapsed_seconds,
-        per_wave=per_wave_summaries,
+        elapsed_seconds=_time.monotonic() - start_time,
+        per_wave=[w.model_dump(mode="json") for w in per_wave_summaries],
         total_cost=total_cost,
+        messages=[f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
+        warnings=warnings,
     )
-    return {
-        **summary.model_dump(),
-        "messages": [f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
-        "warnings": warnings,
-        "errors": [],
-    }
+    dump = summary.model_dump(exclude_none=True)
+    # total_cost is a meaningful, documented null when no dispatched item
+    # reported a cost -- exclude_none=True would otherwise drop the key
+    # entirely instead of keeping it explicit.
+    dump["total_cost"] = summary.total_cost
+    return dump
 
 
 from agent_profile import mcp as _agent_profile_mcp

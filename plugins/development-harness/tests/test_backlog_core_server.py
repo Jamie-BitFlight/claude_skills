@@ -1347,7 +1347,7 @@ async def test_backlog_resolve_backlog_error_returns_error_key():
 
 async def test_backlog_update_success_with_plan():
     """backlog_update calls operations.update_item and merges result."""
-    op_result = {"title": "Feature", "changes": ["plan attached"]}
+    op_result = {"title": "Feature", "changes": {"plan": "plan/tasks-feature.md"}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         response = await _call("backlog_update", {"selector": "Feature", "plan": "plan/tasks-feature.md"})
 
@@ -1363,7 +1363,7 @@ async def test_backlog_update_success_with_plan():
 
 async def test_backlog_update_passes_status():
     """backlog_update forwards status to operations."""
-    op_result = {"title": "Item", "changes": ["status updated"]}
+    op_result = {"title": "Item", "changes": {"status": "in-progress"}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "status": "in-progress"})
 
@@ -1373,7 +1373,7 @@ async def test_backlog_update_passes_status():
 
 async def test_backlog_update_passes_section_content():
     """backlog_update forwards section and content for groomed update."""
-    op_result = {"title": "Item", "changes": ["groomed"]}
+    op_result = {"title": "Item", "changes": {}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "section": "Acceptance Criteria", "content": "some content"})
 
@@ -1384,7 +1384,7 @@ async def test_backlog_update_passes_section_content():
 
 async def test_backlog_update_passes_section_and_content():
     """backlog_update forwards section and content for incremental update."""
-    op_result = {"title": "Item", "changes": ["section updated"]}
+    op_result = {"title": "Item", "changes": {}}
     with patch("dh_core.operations.update_item", return_value=op_result) as mock_update:
         await _call("backlog_update", {"selector": "Item", "section": "Acceptance Criteria", "content": "- [ ] Done"})
 
@@ -1428,7 +1428,7 @@ async def test_backlog_update_backlog_error_returns_error_key():
 
 async def test_backlog_groom_success_with_section_content():
     """backlog_groom calls operations.groom_item with section and content."""
-    op_result = {"title": "Feature", "synced": True}
+    op_result = {"title": "Feature", "groomed_updated": True}
     with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         response = await _call(
             "backlog_groom", {"selector": "Feature", "section": "Acceptance Criteria", "content": "- [ ] Pass tests"}
@@ -1440,7 +1440,7 @@ async def test_backlog_groom_success_with_section_content():
     assert call_kwargs["section"] == "Acceptance Criteria"
     assert call_kwargs["content"] == "- [ ] Pass tests"
     assert response["title"] == "Feature"
-    assert response["synced"] is True
+    assert response["groomed_updated"] is True
 
 
 async def test_backlog_groom_passes_section_and_content():
@@ -2407,6 +2407,8 @@ async def test_backlog_list_count_only_returns_count_key():
     assert response["count"] == 2
     assert "items" not in response, "count_only response must not include 'items' key"
     assert "pagination" not in response, "count_only response must not include 'pagination' key"
+    assert "messages" not in response, "count_only response must not leak Output's default empty messages list"
+    assert "errors" not in response, "count_only response must not leak Output's default empty errors list"
 
 
 async def test_backlog_list_count_only_respects_search_filter():

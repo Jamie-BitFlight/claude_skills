@@ -480,8 +480,8 @@ async def test_backlog_comment_issue_success_returns_comment_fields() -> None:
     # Arrange
     fake_result = {
         "issue_number": 42,
-        "comment_id": 999,
-        "comment_url": "https://github.com/owner/repo/issues/42#issuecomment-999",
+        "comment_id": "IC_kwDOtest999",
+        "comment_url": "",  # real implementation never resolves this -- see BacklogCommentIssueResponse.comment_url
         "messages": ["  Comment added to issue #42"],
         "warnings": [],
     }
@@ -492,7 +492,7 @@ async def test_backlog_comment_issue_success_returns_comment_fields() -> None:
 
     # Assert
     assert result["issue_number"] == 42
-    assert result["comment_id"] == 999
+    assert result["comment_id"] == "IC_kwDOtest999"
     assert "comment_url" in result
     assert "messages" in result
 
@@ -510,7 +510,13 @@ async def test_backlog_comment_issue_forwards_params() -> None:
     def fake_comment(repo: str = "", issue_number: int = 0, body: str = "", output: object = None) -> dict:
         captured["issue_number"] = issue_number
         captured["body"] = body
-        return {"issue_number": issue_number, "comment_id": 1, "comment_url": "", "messages": [], "warnings": []}
+        return {
+            "issue_number": issue_number,
+            "comment_id": "IC_test1",
+            "comment_url": "",
+            "messages": [],
+            "warnings": [],
+        }
 
     with patch("dh_core.operations.comment_issue", side_effect=fake_comment):
         # Act

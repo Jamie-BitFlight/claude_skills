@@ -852,7 +852,7 @@ class TestMCPToolArtifactRegister:
             )
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["registered"] is True
         assert data["action"] == "added"
         assert data["artifact_count"] == 1
@@ -897,7 +897,7 @@ class TestMCPToolArtifactRegister:
             )
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["registered"] is True
         assert data["action"] == "updated"
         assert data["artifact_count"] == 1  # Still one entry
@@ -985,7 +985,7 @@ class TestMCPToolArtifactList:
             result = await client.call_tool("artifact_list", {"item_id": 965})
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["count"] == 2
         assert len(data["artifacts"]) == 2
 
@@ -1016,7 +1016,7 @@ class TestMCPToolArtifactList:
             result = await client.call_tool("artifact_list", {"item_id": 10, "artifact_type": "architect"})
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["count"] == 1
         assert data["artifacts"][0]["artifact_type"] == "architect"
 
@@ -1036,7 +1036,7 @@ class TestMCPToolArtifactList:
             result = await client.call_tool("artifact_list", {"item_id": 999})
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["count"] == 0
         assert data["artifacts"] == []
         assert "error" not in data
@@ -1075,7 +1075,7 @@ class TestMCPToolArtifactGet:
             result = await client.call_tool("artifact_get", {"item_id": 50, "artifact_type": "architect"})
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["count"] == 1
         assert data["artifacts"][0]["artifact_id"] == "plan/architect-bar.md"
 
@@ -1103,7 +1103,7 @@ class TestMCPToolArtifactGet:
             result = await client.call_tool("artifact_get", {"item_id": 51, "artifact_type": "task-plan"})
 
         # Assert
-        assert "error" in result.data
+        assert "error" in result.structured_content
 
 
 class TestMCPToolArtifactRead:
@@ -1141,7 +1141,7 @@ class TestMCPToolArtifactRead:
             result = await client.call_tool("artifact_read", {"item_id": 200, "artifact_type": "feature-context"})
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert "content" in data
         assert "# Feature Context" in data["content"]
         assert data["path"] == "plan/feature-context-test.md"  # ArtifactContent.path maps to ArtifactEntry.artifact_id
@@ -1164,7 +1164,7 @@ class TestMCPToolArtifactRead:
             result = await client.call_tool("artifact_read", {"item_id": 300, "artifact_type": "architect"})
 
         # Assert
-        assert "error" in result.data
+        assert "error" in result.structured_content
 
     async def test_artifact_read_raises_tool_error_on_file_not_found(
         self, patched_mcp_server: Any, in_memory_backend: _InMemoryArtifactBackend

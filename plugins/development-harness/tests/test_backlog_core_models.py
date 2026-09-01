@@ -284,21 +284,21 @@ class TestOutputWarn:
 
 
 class TestOutputError:
-    """Output.error() appends to errors list only."""
+    """Output.record_error() appends to errors list only."""
 
     def test_error_appends_to_errors(self) -> None:
         out = Output()
-        out.error("boom")
+        out.record_error("boom")
         assert out.errors == ["boom"]
 
     def test_error_does_not_append_to_messages(self) -> None:
         out = Output()
-        out.error("boom")
+        out.record_error("boom")
         assert out.messages == []
 
     def test_error_does_not_append_to_warnings(self) -> None:
         out = Output()
-        out.error("boom")
+        out.record_error("boom")
         assert out.warnings == []
 
 
@@ -309,7 +309,7 @@ class TestOutputToDict:
         out = Output()
         out.info("msg")
         out.warn("warn")
-        out.error("err")
+        out.record_error("err")
         assert out.to_dict() == out.model_dump()
 
     def test_to_dict_contains_messages_key(self) -> None:

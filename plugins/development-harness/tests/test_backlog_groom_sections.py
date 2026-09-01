@@ -266,14 +266,16 @@ async def test_backlog_groom_sections_mutual_exclusion_error_message() -> None:
 
 
 async def test_backlog_groom_sections_mutual_exclusion_no_output_keys() -> None:
-    """backlog_groom mutual exclusion error response omits messages/warnings keys.
+    """backlog_groom mutual exclusion error response carries only error plus an empty Output triad.
 
     Tests: backlog_groom mutual exclusion response shape
-    How: Call with conflicting sections + section. Assert only "error" key is present
-         (no "messages", "warnings" from Output — those are not merged on early return).
-    Why: The early-return path at line 774 returns {\"error\": \"...\"} without
-         calling out.to_dict(). Tests confirm the exact shape so callers can rely
-         on the absence of spurious keys.
+    How: Call with conflicting sections + section. Assert "error" is set and
+         messages/warnings/errors are present but empty.
+    Why: The early-return path constructs BacklogGroomResponse(error=...) without
+         calling out.to_dict(), but messages/warnings/errors default to [] on the
+         Output base class, so the typed response always carries them (as empty
+         lists, not omitted) -- unlike the pre-typing raw dict, which omitted them
+         entirely. Tests confirm the exact shape so callers can rely on it.
     """
     # Act
     with patch("dh_core.operations.groom_item"):
@@ -282,4 +284,7 @@ async def test_backlog_groom_sections_mutual_exclusion_no_output_keys() -> None:
         )
 
     # Assert
-    assert set(response.keys()) == {"error"}
+    assert set(response.keys()) == {"error", "messages", "warnings", "errors"}
+    assert response["messages"] == []
+    assert response["warnings"] == []
+    assert response["errors"] == []

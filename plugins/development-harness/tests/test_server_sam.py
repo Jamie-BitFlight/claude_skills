@@ -125,7 +125,11 @@ async def test_backlog_get_sam_tasks_shape() -> None:
         "status": "not-started",
         "agent": "some-agent",
         "priority": 2,
+        "skills": [],
+        "dependencies": [],
         "issue_number": 99,
+        "issue_url": "",
+        "title": "My Task",
     }
     op_result = {
         "tasks": [task_dict],

@@ -213,7 +213,7 @@ class TestInFlightSyncGuard:
 
         gate.set()  # unblock the stalled loop so teardown completes cleanly
 
-        second_data = second_response.data if hasattr(second_response, "data") else second_response
+        second_data = second_response.structured_content
 
         assert second_data.get("triggered") is False, (
             "sync_now while a sync is RUNNING must return triggered=False. "
@@ -663,7 +663,7 @@ class TestSyncStatusTool:
         async with Client(mcp) as client:
             response = await client.call_tool("sync_status", {})
 
-        data = response.data if hasattr(response, "data") else response
+        data = response.structured_content
 
         required_fields = {
             "status",
@@ -701,7 +701,7 @@ class TestSyncStatusTool:
             await asyncio.sleep(0.05)  # let background task complete
             response = await client.call_tool("sync_status", {})
 
-        data = response.data if hasattr(response, "data") else response
+        data = response.structured_content
         assert data["status"] == "idle", f"After successful sync, status must be 'idle'. Got {data['status']!r}."
 
     @pytest.mark.allow_startup_sync
@@ -729,7 +729,7 @@ class TestSyncStatusTool:
             await asyncio.sleep(0.1)  # let background loop fail and set OFFLINE
             response = await client.call_tool("sync_status", {})
 
-        data = response.data if hasattr(response, "data") else response
+        data = response.structured_content
         assert data["status"] == "offline", (
             f"After GitHubUnavailableError, sync_status must return 'offline'. Got {data['status']!r}."
         )
@@ -1260,12 +1260,18 @@ class TestKillSwitch:
 
         from backlog_core.server import _backlog_lifespan, sync_now
 
+        # sync_now returns the SyncNowResponse instance directly (no
+        # exclude_none/model_dump()), so its declared return type is accurate
+        # for in-process callers too -- this test must call sync_now()
+        # in-process rather than through Client(mcp) since that transport
+        # relies on the real asyncio.create_task, which the mock above
+        # replaces module-wide, and would hang.
         async with _backlog_lifespan(object()):
             result = await sync_now()
 
         create_task.assert_not_called()
-        assert result["triggered"] is False
-        assert result["messages"] == ["Active backend does not support reconciliation."]
+        assert result.triggered is False
+        assert result.messages == ["Active backend does not support reconciliation."]
 
     async def test_sync_runs_when_kill_switch_enabled(self, mocker: MockerFixture) -> None:
         """startup sync IS launched when the kill-switch is true (default)."""
