@@ -224,7 +224,8 @@ class SQLiteBackend:
                 "  SELECT milestone_number FROM item_milestones"
                 "  WHERE item_milestones.issue_number = items.issue_number"
                 "  ORDER BY milestone_number LIMIT 1"
-                ") WHERE issue_number IN (SELECT issue_number FROM item_milestones)"
+                ") WHERE milestone_number IS NULL"
+                "  AND issue_number IN (SELECT issue_number FROM item_milestones)"
             )
             self._conn.execute("DROP TABLE item_milestones")
 
