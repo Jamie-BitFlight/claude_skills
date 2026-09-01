@@ -1155,6 +1155,11 @@ async def sync_status() -> dict[str, object]:
             percent (int | None): Completion percentage 0-100; None when total unknown.
             last_error (str): Error message from last failed sync, or empty string.
             offline_reason (str): Why server entered offline mode, or empty string.
+            pending_mutations (int): Offline-queue depth as of the last completed
+                sync. Not a live read; updates only when a sync finishes.
+            rejected_mutations (int): Dead-lettered mutation count (key
+                mismatches plus schema-invalid entries) as of the last
+                completed sync. Same not-live caveat as pending_mutations.
     """
     return get_sync_state().to_dict()
 

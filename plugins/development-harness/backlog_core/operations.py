@@ -1656,14 +1656,16 @@ def refresh_local_cache_from_github(
             reconciled. Receives ``(items_done, items_total)``.
 
     Returns:
-        Dict with count of refreshed (open) issues and count of reconciled
-        (closed) issues.
+        Dict with count of refreshed (open) issues, count of reconciled
+        (closed) issues, and the offline queue's pending/rejected mutation
+        counts (see ``_reconcile_groomed_item`` for the same counts on the
+        per-item grooming path).
     """
     out = output or Output()
     backend = get_config().backend
     if not isinstance(backend, SyncProvider):
         out.info("Active backend does not support reconciliation.")
-        return {"refreshed": 0, "reconciled": 0, **out.to_dict()}
+        return {"refreshed": 0, "reconciled": 0, "pending_mutations": 0, "rejected_mutations": 0, **out.to_dict()}
     scope = ReconcileScope.INITIAL if full_refresh else ReconcileScope.INCREMENTAL
     references = (
         []
@@ -1675,12 +1677,15 @@ def refresh_local_cache_from_github(
         progress_callback(result.fetched_items, result.fetched_items)
     out.info(
         f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
-        f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures."
+        f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures, "
+        f"{result.pending_mutations} pending mutation(s), {result.rejected_mutations} rejected mutation(s)."
     )
     return {
         "refreshed": result.local_updates,
         "reconciled": result.deleted_provider_items,
         "failures": result.failures,
+        "pending_mutations": result.pending_mutations,
+        "rejected_mutations": result.rejected_mutations,
         **out.to_dict(),
     }
 

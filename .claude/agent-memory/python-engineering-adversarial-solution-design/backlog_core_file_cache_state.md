@@ -11,7 +11,7 @@ legacy `cache.yaml` (real YAML, or JSON still wearing the old extension) is
 migrated to `cache.json` inside `transaction()`, under the lock; `load()` stays
 read-only and never migrates (doing it there self-deadlocks — see
 `_migrate_legacy_state_file`'s docstring). `FileCache._load_state()` also calls
-`_CacheStateStore.ensure_migrated()` first, so every read accessor
+`_CacheStateStore.load_after_migration()` first, so every read accessor
 (`pending_mutations`, `get_content`, reconciliation's `load_records`, ...) sees
 migrated state immediately, not only after some unrelated `transaction()`
 happens to run. Both files present (e.g. an older plugin copy recreating
@@ -53,12 +53,21 @@ resolve it correctly.
 Schema-invalid entries (fails `model_validate`, not just a key mismatch) are
 handled the same way, one level further: `pending`/`pending_work_items`/
 `rejected`/`rejected_work_items` are all routed through
-`_salvage_queue_list`, which preserves the raw, unvalidated payload in
-`corrupt_queue_entries` (a `raw: Any` field — never itself fails validation,
-so it's the terminal fallback with nothing further to preserve it from) rather
-than dropping the entry. `reconcile()`'s `rejected_mutations` count includes
-`corrupt_queue_entries` alongside both rejected buckets, so a dead-lettered
-entry is never invisible in sync output.
+`_salvage_field(..., preserve=True)` (merged with the non-queue-field
+`preserve=False` path into one function; see the `_salvage` docstring),
+which preserves the raw, unvalidated payload in `corrupt_queue_entries` (a
+`raw: Any` field — never itself fails validation, so it's the terminal
+fallback with nothing further to preserve it from) rather than dropping the
+entry. `reconcile()`'s `rejected_mutations` count includes
+`corrupt_queue_entries` alongside both rejected buckets
+(`github_work_items.py:529-541`). That count now reaches a user on both
+paths: `_reconcile_groomed_item` (`operations.py:1170-1174`, per-item
+grooming) and `refresh_local_cache_from_github` (`operations.py:1676-1685`,
+the main sync path — dropped both mutation counts before this fix), and
+`sync_status()`/`sync_now()` (`server.py`) report the same two counts as of
+the last completed background sync via `SyncState.pending_mutations`/
+`.rejected_mutations` (`sync_state.py`, populated in
+`sync_engine._run_single_sync`).
 
 Latent (tamper-only) bug, still present, unrelated to the above: `acknowledge_replay`
 does `remaining = [e for e in state.pending if e.idempotency_key not in acknowledged_keys]`

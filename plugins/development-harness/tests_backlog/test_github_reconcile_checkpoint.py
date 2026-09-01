@@ -78,7 +78,7 @@ def test_github_reconcile_result_counts_dead_lettered_work_item_rejections(tmp_p
 def test_github_reconcile_result_counts_corrupt_queue_entries_as_rejected(tmp_path: Path) -> None:
     # Given: a cache with one schema-invalid entry dead-lettered into
     # corrupt_queue_entries (e.g. from schema evolution -- see
-    # _CacheStateStore._salvage_queue_list) and no other rejections
+    # _CacheStateStore._salvage_field with preserve=True) and no other rejections
     cache = FileCache(tmp_path)
     cache._state._save(
         _CacheState(
