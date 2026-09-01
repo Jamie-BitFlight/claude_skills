@@ -15,15 +15,33 @@ typed, structured ``UnsupportedBackendCapabilityError`` instead.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import pytest
 from backlog_core import operations
-from backlog_core.backend_protocol import set_config
+from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import UnsupportedBackendCapabilityError
 
 
-def test_list_milestones_under_sqlite_backend_raises_typed_capability_error() -> None:
+@pytest.fixture
+def sqlite_backend() -> Iterator[SQLiteBackend]:
+    """Configure an in-memory SQLiteBackend as the active backend, then tear it down.
+
+    Closes the backend's sqlite3.Connection and resets the config singleton on
+    teardown — a bare `SQLiteBackend()` with no cleanup leaves its connection
+    open, which fails this repo's strict warning-as-error validation policy
+    (AGENTS.md #18) with a ResourceWarning/PytestUnraisableExceptionWarning.
+    """
+    backend = SQLiteBackend()
+    set_config(BacklogConfig(backend=backend))
+    yield backend
+    reset_config()
+    backend._conn.close()
+
+
+def test_list_milestones_under_sqlite_backend_raises_typed_capability_error(sqlite_backend: SQLiteBackend) -> None:
     """list_milestones() under SQLiteBackend raises UnsupportedBackendCapabilityError.
 
     Tests: the GitHubExtras capability gate (require_github_extras)
@@ -36,9 +54,6 @@ def test_list_milestones_under_sqlite_backend_raises_typed_capability_error() ->
         test fails on pre-fix code with RuntimeError instead of
         UnsupportedBackendCapabilityError.
     """
-    # Arrange
-    set_config(BacklogConfig(backend=SQLiteBackend()))
-
     # Act / Assert
     with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
         operations.list_milestones()
@@ -48,7 +63,9 @@ def test_list_milestones_under_sqlite_backend_raises_typed_capability_error() ->
     assert exc_info.value.operation == "get_github"
 
 
-def test_list_issues_under_sqlite_backend_raises_typed_capability_error_not_wrapped() -> None:
+def test_list_issues_under_sqlite_backend_raises_typed_capability_error_not_wrapped(
+    sqlite_backend: SQLiteBackend,
+) -> None:
     """list_issues() under SQLiteBackend raises UnsupportedBackendCapabilityError, not a generic BacklogError.
 
     Tests: list_issues()'s ``except (GithubException, BacklogError)`` handler
@@ -65,9 +82,6 @@ def test_list_issues_under_sqlite_backend_raises_typed_capability_error_not_wrap
         ``except UnsupportedBackendCapabilityError: raise`` guard preceding
         that generic handler.
     """
-    # Arrange
-    set_config(BacklogConfig(backend=SQLiteBackend()))
-
     # Act / Assert
     with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
         operations.list_issues()
