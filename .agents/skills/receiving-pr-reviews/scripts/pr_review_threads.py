@@ -41,6 +41,7 @@ from pydantic import ValidationError
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_models import (
     BoardEntry,
+    CommentSummary,
     FetchResult,
     FetchSummary,
     ReviewNode,
@@ -194,19 +195,19 @@ def _truncate_body(body: str, max_body: int | None) -> str:
 def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> ThreadSummary:
     """Reduce one unresolved thread to the fields `--summary` needs.
 
-    Ids, its opening comment, and -- when there is one to report -- its latest comment too.
-    `comment_id`/`author`/`body` always come from the thread's *first* comment -- the one that
-    opened it, and the one `reply`'s `--comment-id` must target regardless of how the discussion
-    continued (GitHub rejects a reply targeted at another reply). But the opening comment alone can
-    be stale: a reviewer's later reply in the same thread can clarify or renew an objection the
-    opening comment never carried, and reading only the opener risks answering and resolving a
-    thread against feedback that has since moved on. `latest_author`/`latest_body` are `None` when
-    there is nothing to add (`comment_count == 1`) *and* when `thread.comments_truncated` is
-    `True`: a truncated thread's fetched page ends wherever GitHub's 100-comment page limit did,
-    not necessarily at the newest comment, so its last fetched item is not reliably "latest" --
-    `comments_truncated` is carried through instead so a caller knows to page the thread's own
-    `comments` connection before trusting anything about it. The full comment history stays
-    available via a plain (non-`--summary`) `fetch`.
+    Ids, its opening comment, and every comment after it. `comment_id`/`author`/`body` always come
+    from the thread's *first* comment -- the one that opened it, and the one `reply`'s
+    `--comment-id` must target regardless of how the discussion continued (GitHub rejects a reply
+    targeted at another reply). But the opening comment alone can be stale: a reviewer's later
+    reply in the same thread can clarify or renew an objection the opening comment never carried,
+    and reporting only the *newest* reply is not enough either -- a middle reply can carry the
+    actual clarification while the last one is just an unrelated closing note, and dropping it
+    would hide exactly the content that matters most before resolving the thread. `replies` (see
+    `pr_review_models.ThreadSummary`) therefore carries every comment after the first, in order.
+    `comments_truncated` says whether GitHub's 100-comment page limit cut the fetched page short;
+    `replies` reports whatever was actually fetched either way, truncated or not, rather than
+    guessing at what a caller should trust. The full comment history stays available via a plain
+    (non-`--summary`) `fetch` regardless.
 
     Args:
         thread: One entry from `FetchResult.unresolved`.
@@ -228,12 +229,13 @@ def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> Thre
         )
         raise typer.Exit(code=1)
     first = thread.comments[0]
-    latest_author: str | None = None
-    latest_body: str | None = None
-    if len(thread.comments) > 1 and not thread.comments_truncated:
-        latest = thread.comments[-1]
-        latest_author = latest.author.login if latest.author is not None else None
-        latest_body = _truncate_body(latest.body, max_body)
+    replies = [
+        CommentSummary(
+            author=comment.author.login if comment.author is not None else None,
+            body=_truncate_body(comment.body, max_body),
+        )
+        for comment in thread.comments[1:]
+    ]
     return ThreadSummary(
         thread_id=thread.id,
         comment_id=first.databaseId,
@@ -246,8 +248,7 @@ def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> Thre
         comments_truncated=thread.comments_truncated,
         author=first.author.login if first.author is not None else None,
         body=_truncate_body(first.body, max_body),
-        latest_author=latest_author,
-        latest_body=latest_body,
+        replies=replies,
     )
 
 
@@ -388,10 +389,11 @@ def fetch(
     concluding a PR is clean. An empty `blockers` means reviews can proceed.
 
     `--pr` takes a single number or a comma-separated list (`--pr 41,42,44`) to check several PRs
-    in one call, in the order given. With one `--pr` number, `--summary` prints the reduced-field
-    JSON described on `_summarize` instead of the full result above; without it, one compact-JSON
-    board entry per PR (see `_board_entry`) — `--summary` with several PRs still gets the full
-    per-PR summary JSON, one compact-JSON line per PR.
+    in one call, in the order given. A single `--pr` number with no `--summary` prints the full
+    result above, unchanged. Add `--summary` (with one PR number or several) for the reduced-field
+    JSON described on `_summarize` instead -- one compact-JSON line per PR when several are given.
+    Several PR numbers with no `--summary` print one compact-JSON `BoardEntry` per PR instead (see
+    `_board_entry`), never the full result -- checking many PRs at once is meant to stay light.
     """
     # Parsed before `_owner_repo` resolves the repository: a malformed `--pr` must be rejected
     # before any `gh` call is attempted (including autodetection's `gh repo view`), the same

@@ -53,7 +53,7 @@ description: Work through every unresolved review thread on a PR to completion �
 - Every check inside `watch` is a fresh `gh` snapshot with no baseline, so a call whose first fetch already has outstanding work returns immediately. Calling `watch` right after a `resolve` or a plain `fetch` is safe.
 - `reviewability` is read fresh on every poll, so a `timed_out: true` result carries it too — check `state.reviewability.blockers` before issuing another `watch` rather than waiting out a window for reviews that cannot arrive. `mergeable: "UNKNOWN"` is never a blocker: GitHub computes mergeability in a background job, and it resolves on a later check.
 - `watch` exits non-zero with nothing on stdout when the last re-poll of a window failed. Retry the call rather than reading it as "nothing new."
-- `--summary` (step 1) also works on `watch`; `timed_out` sits alongside the summary fields there instead of nested under `state`. Add `--max-body N` to cut long bodies, visibly marked when cut; unlimited by default.
+- `--summary` (step 1) also works on `watch`; `timed_out` sits alongside the summary fields there instead of nested under `state`. Add `--max-body N` to cut long bodies, visibly marked when cut; unlimited by default. Step 7's `state.X` field names (`state.unresolved_count`, `state.unresponded_reviews`, `state.codex_approved`, `state.reviewability.blockers`) describe the full (non-`--summary`) form only — with `--summary`, read the same signals without the `state.` prefix, and read `blockers` at the top level rather than under `reviewability`.
 - Comma-separated `--pr` is `fetch`-only — `watch` polls one PR at a time.
 
 </gotchas>

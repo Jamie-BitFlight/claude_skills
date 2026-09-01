@@ -1523,8 +1523,7 @@ def test_fetch_summary_reduces_to_the_documented_fields(mocker: MockerFixture) -
             "comments_truncated": False,
             "author": "reviewer",
             "body": "fix this",
-            "latest_author": None,
-            "latest_body": None,
+            "replies": [],
         }
     ]
     assert data["unresponded_reviews"] == [
@@ -1533,8 +1532,8 @@ def test_fetch_summary_reduces_to_the_documented_fields(mocker: MockerFixture) -
     assert "reviews_with_body" not in data
 
 
-def test_fetch_summary_thread_exposes_latest_comment_when_it_has_replies(mocker: MockerFixture) -> None:
-    """A thread with follow-up comments carries `comment_count` and the *latest* comment too --
+def test_fetch_summary_thread_exposes_a_single_follow_up_comment(mocker: MockerFixture) -> None:
+    """A thread with one follow-up carries `comment_count` and that reply in `replies` --
     reading only the opener risks acting on stale feedback a later reply already moved past."""
     thread = UnresolvedThread(
         id="T1",
@@ -1556,12 +1555,43 @@ def test_fetch_summary_thread_exposes_latest_comment_when_it_has_replies(mocker:
     assert entry["comment_id"] == 42  # reply still targets the *opening* comment
     assert entry["comment_count"] == 2
     assert entry["body"] == "fix this"
-    assert entry["latest_author"] == "reviewer"
-    assert entry["latest_body"] == "actually never mind"
+    assert entry["replies"] == [{"author": "reviewer", "body": "actually never mind"}]
 
 
-def test_fetch_summary_thread_omits_latest_fields_when_no_replies(mocker: MockerFixture) -> None:
-    """A single-comment thread carries `comment_count: 1` and null `latest_*` fields -- nothing to
+def test_fetch_summary_thread_preserves_a_middle_comment_not_just_the_last(mocker: MockerFixture) -> None:
+    """A thread with three-plus comments preserves *every* follow-up, in order -- reporting only
+    the newest one would hide a middle clarification behind an unrelated closing note."""
+    thread = UnresolvedThread(
+        id="T1",
+        path="x.py",
+        comments=[
+            CommentNode(databaseId=1, body="opening finding", line=10, originalLine=10, author=Author(login="bot")),
+            CommentNode(
+                databaseId=2,
+                body="clarification: actually X not Y",
+                line=10,
+                originalLine=10,
+                author=Author(login="bot"),
+            ),
+            CommentNode(databaseId=3, body="thanks, got it", line=10, originalLine=10, author=Author(login="dev")),
+        ],
+        comments_truncated=False,
+    )
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result(unresolved=[thread]))
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    entry = json.loads(result.output)["unresolved"][0]
+    assert entry["comment_count"] == 3
+    assert entry["replies"] == [
+        {"author": "bot", "body": "clarification: actually X not Y"},
+        {"author": "dev", "body": "thanks, got it"},
+    ]
+
+
+def test_fetch_summary_thread_empty_replies_when_no_follow_ups(mocker: MockerFixture) -> None:
+    """A single-comment thread carries `comment_count: 1` and an empty `replies` list -- nothing to
     report beyond what `body`/`author` already carry."""
     state = _fetch_result(unresolved=[_thread_with_comment()])
     mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
@@ -1571,14 +1601,12 @@ def test_fetch_summary_thread_omits_latest_fields_when_no_replies(mocker: Mocker
     assert result.exit_code == 0, result.output
     entry = json.loads(result.output)["unresolved"][0]
     assert entry["comment_count"] == 1
-    assert entry["latest_author"] is None
-    assert entry["latest_body"] is None
+    assert entry["replies"] == []
 
 
-def test_fetch_summary_thread_omits_latest_when_truncated(mocker: MockerFixture) -> None:
-    """A truncated thread's fetched page may not actually end at the newest comment, so its last
-    fetched item must not be reported as `latest_*` even though it has more than one comment --
-    `comments_truncated` is carried through instead, signalling the caller to page it directly."""
+def test_fetch_summary_thread_reports_replies_when_truncated_too(mocker: MockerFixture) -> None:
+    """A truncated thread still reports whatever replies were actually fetched -- `comments_truncated`
+    says more may exist beyond the fetched page, but it does not make the fetched replies untrue."""
     thread = UnresolvedThread(
         id="T1",
         path="x.py",
@@ -1602,8 +1630,7 @@ def test_fetch_summary_thread_omits_latest_when_truncated(mocker: MockerFixture)
     entry = json.loads(result.output)["unresolved"][0]
     assert entry["comment_count"] == 2
     assert entry["comments_truncated"] is True
-    assert entry["latest_author"] is None
-    assert entry["latest_body"] is None
+    assert entry["replies"] == [{"author": "reviewer", "body": "reply within the fetched page"}]
 
 
 def test_fetch_summary_thread_falls_back_to_original_line_when_line_is_null(mocker: MockerFixture) -> None:

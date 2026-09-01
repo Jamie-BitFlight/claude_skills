@@ -19,6 +19,7 @@ __all__ = [
     "Author",
     "BoardEntry",
     "CommentNode",
+    "CommentSummary",
     "FetchResult",
     "FetchSummary",
     "ForcePushEvent",
@@ -361,17 +362,29 @@ class WatchResult(BaseModel):
     state: FetchResult
 
 
+class CommentSummary(BaseModel):
+    """One follow-up comment on an unresolved thread, beyond its opening comment.
+
+    See `ThreadSummary.replies` — one of these per comment after the first, in the order GitHub
+    returned them.
+    """
+
+    author: str | None
+    body: str
+
+
 class ThreadSummary(BaseModel):
     """One unresolved thread's reduced fields for `--summary`.
 
     Assembled by `pr_review_threads._summarize_thread`, the only assembler.
     `comment_id`/`author`/`body` always describe the thread's *first* comment — the one `reply`'s
-    `--comment-id` must target, regardless of how the discussion continued. `latest_author`/
-    `latest_body` describe its newest comment instead, present only when there is one to report:
-    `None` when the thread has no follow-ups (`comment_count == 1`) or when `comments_truncated` is
-    `True` — a truncated thread's fetched page ends at whatever GitHub returned first, not
-    necessarily the newest comment, so presenting its tail as "latest" would misreport which
-    comment is actually current.
+    `--comment-id` must target, regardless of how the discussion continued. `replies` carries every
+    comment after the first, in order — not just the newest one: a thread can have a reviewer's
+    clarification in the middle followed by an unrelated closing note, and reporting only the last
+    comment would hide exactly the content an agent most needs before resolving the thread.
+    `comments_truncated` (from `UnresolvedThread`) says whether GitHub's 100-comment page limit cut
+    the fetched page short — `replies` still reports whatever was actually fetched either way; it
+    is never padded or trimmed to imply completeness it doesn't have.
     """
 
     thread_id: str
@@ -382,8 +395,7 @@ class ThreadSummary(BaseModel):
     comments_truncated: bool
     author: str | None
     body: str
-    latest_author: str | None = None
-    latest_body: str | None = None
+    replies: list[CommentSummary] = []
 
 
 class ReviewSummary(BaseModel):
