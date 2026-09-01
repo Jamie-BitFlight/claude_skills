@@ -104,14 +104,30 @@ def heading_to_unknown_key(heading_text: str) -> str:
     key (``"unknown__files_"`` vs. ``"unknown__files"``) reproduces the exact
     write-path/parse-path key divergence this function exists to prevent.
 
+    Guards against a second divergence (#3370): the ``unknown__`` key this
+    function returns gets rendered back into a heading by
+    :func:`unknown_key_to_heading` (lower/strip/title-case). For a name like
+    ``":EFFORT"``, that reconstructed heading is ``"Effort"`` — which IS a
+    registered :data:`SECTION_HEADING` display heading. Re-parsing that
+    rendered heading then resolves to the canonical ``effort`` key, leaving
+    the item with two keys (``unknown__effort`` and ``effort``) for one
+    logical section — the same live data-loss shape #2956 fixed, since
+    :func:`github_sync.extract_sections` is last-heading-wins on reparse. So
+    before returning the ``unknown__`` key, check whether its own
+    reconstructed heading is itself registered; if so, return the canonical
+    key instead, matching what the parse leg would produce anyway.
+
     Args:
         heading_text: Raw heading or section display name.
 
     Returns:
-        Storage key such as ``"unknown__custom_analysis"``.
+        Storage key such as ``"unknown__custom_analysis"``, or the canonical
+        :class:`~.section_registry.SectionKey` value when the reconstructed
+        heading for the unknown key is itself registered.
     """
     normalised = _NON_ALNUM_RE.sub("_", heading_text.strip().lower()).strip("_")
-    return f"unknown__{normalised}"
+    key = f"unknown__{normalised}"
+    return resolve_section_name(unknown_key_to_heading(key)) or key
 
 
 def merge_entries(local_entries: list[Entry], remote_entries: list[Entry]) -> list[Entry]:

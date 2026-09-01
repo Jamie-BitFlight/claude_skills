@@ -15,7 +15,7 @@ from backlog_core.github_sync import merge_item, parse_issue_body, render_issue_
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
 from backlog_core.operations import _normalize_section_key
 from backlog_core.parsing import extract_sections
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import HealthCheck, example, given, settings, strategies as st
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -1115,6 +1115,10 @@ class TestSectionRoundTripProperty:
 
     @given(section_name=_section_name_strategy, content=_content_strategy)
     @settings(max_examples=200, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    # #3370 regression pin: ":EFFORT" -> "unknown__effort" -> heading "Effort"
+    # -> re-resolves to canonical "effort" on reparse, duplicating the key.
+    # Hypothesis doesn't reliably draw this case on its own; pin it explicitly.
+    @example(section_name=":EFFORT", content="## Fake Heading Inside Content")
     def test_write_render_parse_round_trip_is_lossless(self, section_name: str, content: str) -> None:
         """A section written locally survives a GitHub render -> parse -> merge cycle intact.
 
