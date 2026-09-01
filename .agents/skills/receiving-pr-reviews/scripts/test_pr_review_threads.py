@@ -1030,8 +1030,7 @@ def test_fetch_exits_nonzero_and_names_github_flag_when_detection_fails(mocker: 
     """When autodetection fails, `fetch` exits non-zero and names `--github` as the way out.
 
     A wrong owner/repo would send a reply to the wrong repository, so a failed detection must stop
-    the command rather than fall back to a guess (CLAUDE.md, "No invented constraints" — the same
-    principle rules out silently guessing an identity here).
+    the command rather than fall back to a guess.
     """
     mocker.patch.object(pr_review_threads, "detect_repo_identity", side_effect=subprocess.CalledProcessError(1, ["gh"]))
     fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result")
