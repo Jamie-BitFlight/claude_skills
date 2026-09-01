@@ -1572,6 +1572,20 @@ def test_fetch_summary_thread_omits_latest_fields_when_no_replies(mocker: Mocker
     assert "latest_body" not in entry
 
 
+def test_fetch_summary_fails_clean_on_a_thread_with_no_comments(mocker: MockerFixture) -> None:
+    """An unresolved thread with an empty `comments` list -- an API shape this script has no
+    source is possible, since a review thread is always created by a comment -- exits non-zero
+    with a message naming the thread, rather than crashing with a bare `IndexError`."""
+    thread = UnresolvedThread(id="T-empty", path="x.py", comments=[], comments_truncated=False)
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result(unresolved=[thread]))
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary"])
+
+    assert result.exit_code != 0
+    assert not isinstance(result.exception, IndexError)
+    assert "T-empty" in result.output
+
+
 def test_fetch_summary_prints_blockers_even_when_empty(mocker: MockerFixture) -> None:
     """`blockers` is always present in the summary, empty or not -- an empty `unresolved` with a
     non-empty `blockers` means something different from a clean PR."""

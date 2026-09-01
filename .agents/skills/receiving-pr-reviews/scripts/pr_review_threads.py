@@ -193,7 +193,19 @@ def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> dict
     Returns:
         A dict with `thread_id`, `comment_id`, `path`, `line`, `comment_count`, `author`, `body`,
         plus `latest_author`/`latest_body` when `comment_count > 1`.
+
+    Raises:
+        typer.Exit: `thread.comments` is empty -- an unexpected API shape this script has no
+            source is possible for a real review thread (one is always created by a comment). Fails
+            clean with a named thread id and a way out, rather than an unexplained `IndexError`.
     """
+    if not thread.comments:
+        typer.echo(
+            f"fetch --summary: thread {thread.id} has no comments (unexpected API shape) -- "
+            "re-run without --summary to inspect it directly.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     first = thread.comments[0]
     summary: dict[str, object] = {
         "thread_id": thread.id,
