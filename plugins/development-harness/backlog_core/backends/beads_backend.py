@@ -43,6 +43,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import uuid
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
@@ -102,7 +103,7 @@ _CONTENT_LOCK_FILE: Final[str] = "dh-content.lock"
 _THREAD_LOCKS: Final[dict[Path, Lock]] = {}
 _THREAD_LOCKS_GUARD: Final = Lock()
 
-if os.name == "nt":
+if sys.platform == "win32":
     import msvcrt
 else:
     import fcntl
@@ -138,7 +139,7 @@ def _beads_content_lock(runner: _BdRunnerLike) -> Iterator[None]:
             raise ContentUnavailableError("Beads content store is unavailable") from exc
         try:
             try:
-                if os.name == "nt":
+                if sys.platform == "win32":
                     msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
                 else:
                     fcntl.flock(lock_fd, fcntl.LOCK_EX)
@@ -147,7 +148,7 @@ def _beads_content_lock(runner: _BdRunnerLike) -> Iterator[None]:
             try:
                 yield
             finally:
-                if os.name == "nt":
+                if sys.platform == "win32":
                     msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
                 else:
                     fcntl.flock(lock_fd, fcntl.LOCK_UN)
@@ -494,6 +495,7 @@ class BeadsBackend:
 
     def try_get_github(self, repo: str = "") -> Repository | None:
         """Return None — beads does not use PyGithub Repository."""
+        _ = repo
         return None  # type: ignore[return-value]
 
     def probe_backend_status(self, repo: str = "") -> BackendStatus:
@@ -510,6 +512,7 @@ class BeadsBackend:
         Returns:
             BackendStatus describing availability.
         """
+        _ = repo
         if self._runner.is_available():
             return BackendStatus(name="Beads", availability=BackendAvailability.REACHABLE)
         return BackendStatus(
@@ -595,6 +598,7 @@ class BeadsBackend:
             repo: Ignored for the beads backend.
             output: Ignored for the beads backend.
         """
+        _ = reference, comment, repo, output
         argv = ["close", issue_ref]
         if reason:
             argv.extend(["--reason", reason])
@@ -615,18 +619,41 @@ class BeadsBackend:
         """Resolve a beads issue via ``bd close --reason``.
 
         Only ``summary`` is forwarded — beads does not support structured
-        resolution fields (method, findings, follow_ups).
+        resolution fields (method, notes, follow_ups, findings).
 
         Args:
             issue_ref: Beads issue ID or selector string.
             summary: Resolution summary forwarded as ``--reason``.
-            method: Ignored for the beads backend.
-            notes: Ignored for the beads backend.
-            follow_ups: Ignored for the beads backend.
-            findings: Ignored for the beads backend.
-            repo: Ignored for the beads backend.
-            output: Ignored for the beads backend.
+            method: Dropped structured resolution content; see ``output``.
+            notes: Dropped structured resolution content; see ``output``.
+            follow_ups: Dropped structured resolution content; see ``output``.
+            findings: Dropped structured resolution content; see ``output``.
+            repo: Ignored for the beads backend, like every other method here
+                (no repo-scoped routing concept for a local ``bd`` workspace) —
+                not part of the dropped-content warning below.
+            output: Records a warning naming any dropped structured resolution
+                fields (method/notes/follow_ups/findings), if provided.
         """
+        _ = repo
+        dropped = [
+            name
+            for name, value in (
+                ("method", method),
+                ("notes", notes),
+                ("follow_ups", follow_ups),
+                ("findings", findings),
+            )
+            if value
+        ]
+        if dropped:
+            message = f"beads backend does not support structured resolution fields — dropping: {', '.join(dropped)}"
+            if output is not None:
+                output.warn(message)
+            else:
+                # No Output channel to surface this on — a caller-visible signal is the
+                # point of this warning, so fall back to the forensic log rather than
+                # discard the fields with zero trace anywhere.
+                _log.warning("resolve_github_issue: %s", message)
         argv = ["close", issue_ref]
         if summary:
             argv.extend(["--reason", summary])
@@ -681,6 +708,7 @@ class BeadsBackend:
         Returns:
             Always an empty list.
         """
+        _ = issue_num, repo
         return []
 
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
@@ -720,6 +748,7 @@ class BeadsBackend:
             BdInvocationError: When ``bd show`` exits non-zero.
             pydantic.ValidationError: When the JSON response does not match the expected schema.
         """
+        _ = repo, output
         issue_ref = item.issue or item.title
         raw = self._runner.run_json(["show", issue_ref])
         parsed = parse_show_issue(raw)
@@ -742,6 +771,7 @@ class BeadsBackend:
         Returns:
             True if enrichment succeeded, False otherwise.
         """
+        _ = repo
         try:
             raw = self._runner.run_json(["show", issue_num])
             parsed = parse_show_issue(raw)
@@ -927,6 +957,7 @@ class BeadsBackend:
             repo: Ignored for the beads backend.
             output: Ignored for the beads backend.
         """
+        _ = repo, output
         issue_ref = item.issue or item.title
         self._runner.run_text(["update", issue_ref, "--claim"])
 
@@ -938,6 +969,7 @@ class BeadsBackend:
             repo: Ignored.
             output: Ignored.
         """
+        _ = item, repo, output
 
     def apply_status_groomed(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """No-op — beads has no dedicated groomed lifecycle state.
@@ -947,6 +979,7 @@ class BeadsBackend:
             repo: Ignored.
             output: Ignored.
         """
+        _ = item, repo, output
 
     def apply_status_blocked(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
         """No-op — string-ID backends get blocked status written locally.
@@ -959,6 +992,7 @@ class BeadsBackend:
             repo: Ignored.
             output: Ignored.
         """
+        _ = item, repo, output
 
     # ------------------------------------------------------------------
     # Sync / serialisation

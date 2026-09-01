@@ -45,6 +45,7 @@ from backlog_core.models import (
     ContentRecord,
     ContentRef,
     ContentWrite,
+    Output,
     ViewItemResult,
 )
 
@@ -666,6 +667,46 @@ def test_resolve_github_issue_calls_bd_close_with_summary_as_reason() -> None:
     backend = BeadsBackend(runner=runner)
 
     backend.resolve_github_issue("bd-a3f8", summary="Authentication fixed")
+
+    runner.run_text.assert_called_once_with(["close", "bd-a3f8", "--reason", "Authentication fixed"])
+
+
+@pytest.mark.unit
+def test_resolve_github_issue_warns_on_output_when_dropping_structured_fields() -> None:
+    """resolve_github_issue records a warning on Output naming the dropped fields.
+
+    Why: beads discards method/notes/follow_ups/findings — the caller (e.g.
+         backlog_resolve, which returns Output.warnings in its response) must
+         be able to see that structured resolution content was not persisted,
+         not just get a clean success response.
+    """
+    runner = _make_runner()
+    backend = BeadsBackend(runner=runner)
+    output = Output()
+
+    backend.resolve_github_issue(
+        "bd-a3f8", summary="Authentication fixed", method="manual-fix", findings="root cause X", output=output
+    )
+
+    assert len(output.warnings) == 1
+    assert "method" in output.warnings[0]
+    assert "findings" in output.warnings[0]
+    assert "notes" not in output.warnings[0]
+    assert "follow_ups" not in output.warnings[0]
+
+
+@pytest.mark.unit
+def test_resolve_github_issue_drops_silently_when_no_output_given() -> None:
+    """resolve_github_issue still succeeds with output=None (its documented default).
+
+    Why: pins the current, intentional fallback — without an Output channel to
+         write to there is nowhere caller-visible to put the warning; this
+         documents that gap as a known contract rather than an untested one.
+    """
+    runner = _make_runner()
+    backend = BeadsBackend(runner=runner)
+
+    backend.resolve_github_issue("bd-a3f8", summary="Authentication fixed", method="manual-fix")
 
     runner.run_text.assert_called_once_with(["close", "bd-a3f8", "--reason", "Authentication fixed"])
 

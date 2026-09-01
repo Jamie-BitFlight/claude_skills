@@ -34,9 +34,9 @@ from .models import (
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
     VALID_NEW_ITEM_PRIORITIES,
-    BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    CacheStateCorruptError,
     ContentKind,
     ContentQuery,
     ContentUnavailableError,
@@ -1143,12 +1143,23 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
 
 
 def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
+    if not item.issue:
+        return
     backend = get_config().backend
-    if not item.issue or not isinstance(backend, SyncProvider):
+    if not isinstance(backend, SyncProvider):
+        output.info("Active backend does not support reconciliation.")
         return
     try:
         result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-    except BackendUnavailableError:
+    except CacheStateCorruptError:
+        # A corrupted local cache state file needs operator attention — never
+        # degrade it to a routine "queued" message alongside the two cases below.
+        raise
+    except BacklogError:
+        # BackendUnavailableError (auth/config) and a bare BacklogError (e.g. a
+        # transient GraphQL failure inside reconcile()) both mean this attempt
+        # didn't reconcile — item.metadata is already saved via put_work_item()
+        # upstream, so degrade to "queued" rather than crash the caller.
         output.info(f"Queued {item.issue} for provider reconciliation.")
         return
     output.info(
@@ -1352,9 +1363,14 @@ def _classify_duplicate_check(
     Checks the local cache first. When nothing matches locally and the active
     backend is a ``SyncProvider``, performs one bounded incremental refresh and
     re-checks — absence of a local match alone does not prove no duplicate
-    exists for backends fed by an external provider. A refresh failure never
-    blocks item creation: it downgrades the result to ``COULD_NOT_VERIFY`` and
-    records a warning on *out*.
+    exists for backends fed by an external provider whose local cache can lag
+    the remote. A refresh failure never blocks item creation: it downgrades
+    the result to ``COULD_NOT_VERIFY`` and records a warning on *out*.
+
+    Non-``SyncProvider`` backends (SQLite, Memory, Beads) query their own
+    native storage directly in ``_duplicate_candidates()`` — there is no
+    external cache to lag, so a local miss there is already authoritative and
+    returns ``NO_DUPLICATE``, not a downgrade.
 
     Args:
         title: Title of the new item.
@@ -3834,9 +3850,24 @@ def strike_entry(
     backend = get_config().backend
     backend.put_work_item(item)
     out.info(f"Struck entry {entry_id} in {item.reference}")
-    if item.issue and isinstance(backend, SyncProvider):
-        backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-        out.info(f"  Reconciled strike for {item.issue}")
+    if item.issue:
+        if isinstance(backend, SyncProvider):
+            try:
+                backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+            except CacheStateCorruptError:
+                # A corrupted local cache state file needs operator attention — never
+                # degrade it to a routine "queued" message alongside the case below.
+                raise
+            except BacklogError:
+                # Mirrors _reconcile_groomed_item: BackendUnavailableError and a bare
+                # BacklogError (e.g. a transient GraphQL failure) both mean this
+                # attempt didn't reconcile, not that the strike itself failed — the
+                # strike is already saved via put_work_item() above.
+                out.info(f"  Queued {item.issue} for provider reconciliation.")
+            else:
+                out.info(f"  Reconciled strike for {item.issue}")
+        else:
+            out.info("  Active backend does not support reconciliation.")
 
     return {"title": item.title, "entry_id": entry_id, "struck": True, **out.to_dict()}
 

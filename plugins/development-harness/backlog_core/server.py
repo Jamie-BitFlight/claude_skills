@@ -40,7 +40,6 @@ from pydantic import Field
 from ruamel.yaml import YAML as _YAML
 
 from . import models as _models, sync_engine as _sync_engine
-from ._capability_gates import require_github_extras
 from .artifact_manifest_store import (
     artifact_content_reference,
     load_manifest as _load_manifest_record,
@@ -48,7 +47,7 @@ from .artifact_manifest_store import (
 )
 from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
-from .backend_types import ContentProvider, IssueNode as _IssueNode, SyncProvider
+from .backend_types import ContentProvider, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
@@ -70,10 +69,8 @@ from .models import (
     DispatchItemRecord as _DispatchItemRecord,
     DispatchWaveRecord as _DispatchWaveRecord,
     DispatchWaveSummary as _DispatchWaveSummary,
-    GitHubUnavailableError,
     Output,
     RegisterResult,
-    UnsupportedBackendCapabilityError,
     UnsupportedCapabilityError,
     init as _init_models,
 )
@@ -137,8 +134,6 @@ from .tool_responses import (
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
-
-    from .operations import ImpactRadiusItem as _ImpactRadiusItem
 
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 ItemId: TypeAlias = int | str
@@ -3800,54 +3795,16 @@ async def dispatch_stale_check(
     numbers against those in the plan, and returns a stale/fresh indicator
     with added/removed issue lists.
 
+    Delegates to ``dh_core.operations.dispatch_stale_check`` — the MCP tool and
+    the CLI-facing function share one implementation.
+
     Returns:
         :class:`~backlog_core.tool_responses.DispatchStaleCheckResponse`
         with ``is_stale``, ``added_issues``, ``removed_issues``, and
         ``message``. Returns ``error`` on file/parse or GitHub failure.
     """
-    try:
-        plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
-    except (ContentUnavailableError, ValueError) as exc:
-        return DispatchStaleCheckResponse.model_validate({
-            "error": str(exc),
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
-
-    def _fetch_milestone_issue_numbers() -> list[int]:
-        backend = _get_config().backend
-        github_backend = require_github_extras(backend, "get_github")
-        gh_repo = github_backend.get_github(repo)
-        owner, repo_name = gh_repo.full_name.split("/", 1)
-        open_issues = github_backend.sync_issues_graphql(
-            gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
-        )
-        closed_issues = github_backend.sync_issues_graphql(
-            gh_repo, owner, repo_name, state="CLOSED", milestone_number=milestone_number
-        )
-        return [issue["number"] for issue in open_issues + closed_issues]
-
-    try:
-        current_numbers = await asyncio.to_thread(_fetch_milestone_issue_numbers)
-    except UnsupportedBackendCapabilityError as exc:
-        return DispatchStaleCheckResponse.model_validate(exc.to_response(milestone_number)).model_dump(
-            exclude_none=True
-        )
-    except GitHubUnavailableError as exc:
-        return DispatchStaleCheckResponse.model_validate({
-            "error": str(exc),
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
-    except (BacklogError, _GithubException) as exc:
-        return DispatchStaleCheckResponse.model_validate({
-            "error": f"GitHub API error: {exc}",
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
-
-    result = await asyncio.to_thread(_ds.detect_stale_plan, plan, current_numbers)
-    return DispatchStaleCheckResponse.model_validate({
-        "milestone_number": milestone_number,
-        **dataclasses.asdict(result),
-    }).model_dump(exclude_none=True)
+    result = await asyncio.to_thread(operations.dispatch_stale_check, milestone_number, repo)
+    return DispatchStaleCheckResponse.model_validate(result).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3993,51 +3950,17 @@ async def dispatch_conflicts(
     Impact Radius section from each issue body, then runs conflict analysis
     to find items that share file paths.
 
+    Delegates to ``dh_core.operations.dispatch_conflicts`` — the MCP tool and
+    the CLI-facing function share one implementation.
+
     Returns:
         :class:`~backlog_core.tool_responses.DispatchConflictsResponse`
         with ``conflict_groups`` (each with group_id, reason, and items),
         ``count``, and ``milestone_number``. Returns ``error`` on GitHub
         failure.
     """
-
-    def _fetch_items_with_impact_radius() -> list[_ImpactRadiusItem]:
-        backend = _get_config().backend
-        github_backend = require_github_extras(backend, "get_github")
-        gh_repo = github_backend.get_github(repo)
-        owner, repo_name = gh_repo.full_name.split("/", 1)
-        issue_nodes: list[_IssueNode] = github_backend.sync_issues_graphql(
-            gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
-        )
-        items: list[_ImpactRadiusItem] = []
-        ir_re = _re.compile(r"##\s+Impact\s+Radius\b(.*?)(?=\n##|\Z)", _re.IGNORECASE | _re.DOTALL)
-        for issue in issue_nodes:
-            body = issue["body"] or ""
-            match = ir_re.search(body)
-            impact_radius = match.group(1).strip() if match else ""
-            items.append({"title": issue["title"], "issue": issue["number"], "impact_radius": impact_radius})
-        return items
-
-    try:
-        items = await asyncio.to_thread(_fetch_items_with_impact_radius)
-    except UnsupportedBackendCapabilityError as exc:
-        return DispatchConflictsResponse.model_validate(exc.to_response(milestone_number)).model_dump(exclude_none=True)
-    except GitHubUnavailableError as exc:
-        return DispatchConflictsResponse.model_validate({
-            "error": str(exc),
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
-    except (BacklogError, _GithubException) as exc:
-        return DispatchConflictsResponse.model_validate({
-            "error": f"GitHub API error: {exc}",
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
-
-    conflict_groups = await asyncio.to_thread(operations.analyze_impact_radius_conflicts, items)
-    return DispatchConflictsResponse.model_validate({
-        "milestone_number": milestone_number,
-        "conflict_groups": [cg.model_dump() for cg in conflict_groups],
-        "count": len(conflict_groups),
-    }).model_dump(exclude_none=True)
+    result = await asyncio.to_thread(operations.dispatch_conflicts, milestone_number, repo)
+    return DispatchConflictsResponse.model_validate(result).model_dump(exclude_none=True)
 
 
 # ---------------------------------------------------------------------------
