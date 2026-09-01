@@ -27,7 +27,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, TypeVar
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -36,7 +36,7 @@ from dh_core import operations
 from fastmcp import Context, FastMCP
 from github import GithubException as _GithubException
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 from ruamel.yaml import YAML as _YAML
 
 from . import models as _models, sync_engine as _sync_engine
@@ -119,6 +119,7 @@ from .tool_responses import (
     BacklogSyncResponse,
     BacklogUpdateResponse,
     BacklogUpdateSamTaskStatusResponse,
+    BacklogViewResponse,
     DispatchConflictsResponse,
     DispatchCreatePlanResponse,
     DispatchItemStatusResponse,
@@ -138,6 +139,57 @@ if TYPE_CHECKING:
 
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 ItemId: TypeAlias = int | str
+
+_ResponseModel = TypeVar("_ResponseModel", bound=BaseModel)
+
+
+def _respond(
+    cls: type[_ResponseModel], payload: Mapping[str, object], *, exclude_none: bool = True, exclude_unset: bool = False
+) -> _ResponseModel:
+    """Validate a tool payload and return its wire dict (#3369).
+
+    Every ``@mcp.tool`` function is annotated ``-> SomeResponse`` but actually
+    returns ``response.model_dump(...)`` (a plain dict) -- ``ty`` accepts that
+    mismatch when the ``model_validate(...).model_dump(...)`` chain appears
+    directly in a ``return`` statement, but rejects it the moment the same
+    chain is wrapped in a helper annotated ``-> dict[str, object]`` (or
+    ``-> dict[str, Any]``). Declaring this helper ``-> _ResponseModel`` (a
+    TypeVar bound to ``BaseModel``, matching the class passed in) is what
+    keeps every call site's declared return type checkable.
+
+    ``exclude_none`` defaults to ``True`` -- the pattern nearly all ~70+
+    standard call sites use -- so a tool that legitimately needs a
+    load-bearing ``None`` to survive onto the wire (see ``sync_status``'s
+    docstring for why that tool bypasses this helper entirely) must pass
+    ``exclude_none=False`` explicitly, making the decision a visible,
+    searchable keyword rather than a convention a future call site has to
+    remember to deviate from.
+
+    ``exclude_unset`` defaults to ``False``. ``backlog_view`` (#3368) is the
+    one caller that needs it ``True``, paired with ``exclude_none=False``:
+    each of its branches builds a small, precise payload dict against
+    ``BacklogViewResponse``'s ~55 possible fields, and several legitimately
+    set a key to ``None`` (e.g. ``plan_address`` when an item has no plan,
+    ``issue_number`` when a selector has none) that must still appear on the
+    wire -- the exact "load-bearing None" case ``exclude_none=True`` cannot
+    represent. ``exclude_unset=True`` keeps exactly the keys each branch put
+    in *payload* (None or not) and drops the ~45 fields that branch never
+    mentioned, reproducing what the pre-#3368 code did by returning a plain
+    dict with no model in between.
+
+    Args:
+        cls: The Pydantic response model class for this tool.
+        payload: Raw fields to validate into ``cls``.
+        exclude_none: Forwarded to ``model_dump()``. Defaults to ``True``.
+        exclude_unset: Forwarded to ``model_dump()``. Defaults to ``False``.
+
+    Returns:
+        The validated model's dumped dict, typed as ``cls`` for the
+        annotation-checking caller (FastMCP serializes the dict identically
+        to the model instance at the wire boundary either way).
+    """
+    return cls.model_validate(payload).model_dump(exclude_none=exclude_none, exclude_unset=exclude_unset)
+
 
 # Module-level logger for done-callback exception reporting.
 # Named _sync_task_log so tests can patch backlog_core.server._sync_task_log.
@@ -1335,9 +1387,9 @@ async def backlog_add(
             force=force,
             output=out,
         )
-        return BacklogAddResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogAddResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogAddResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogAddResponse, {"error": str(e), **out.to_dict()})
 
 
 def _assert_config() -> None:
@@ -1749,11 +1801,7 @@ async def backlog_list(
         )
     except BacklogError as e:
         backend_status = await asyncio.to_thread(_probe_backend_status)
-        return BacklogListResponse.model_validate({
-            "error": str(e),
-            "backend": backend_status.model_dump(),
-            **out.to_dict(),
-        }).model_dump(exclude_none=True)
+        return _respond(BacklogListResponse, {"error": str(e), "backend": backend_status.model_dump(), **out.to_dict()})
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
@@ -1832,7 +1880,7 @@ async def backlog_list(
     if match_pages is not None:
         response["match_pages"] = match_pages
         _maybe_add_pagination_notice(match_pages, out, response)
-    return BacklogListResponse.model_validate(response).model_dump(exclude_none=True)
+    return _respond(BacklogListResponse, response)
 
 
 def _build_compact_manifest(
@@ -2131,7 +2179,7 @@ async def backlog_view(
             ),
         ),
     ] = 0,
-) -> dict:
+) -> BacklogViewResponse:
     r"""View a single backlog item or GitHub issue in detail.
 
     Ordinal format: ^\d+(\.\d+)*(\.code\.\d+)?$. Examples:
@@ -2174,7 +2222,7 @@ async def backlog_view(
         disclosure_result = {"error": str(exc), "invalid_params": exc.invalid_params}
 
     if disclosure_result is not None:
-        return disclosure_result
+        return _respond(BacklogViewResponse, disclosure_result, exclude_none=False, exclude_unset=True)
     # ---- PASSTHROUGH: falls through to legacy code below -----------------------
 
     out = Output()
@@ -2218,7 +2266,12 @@ async def backlog_view(
             # response.  ``section_filter_miss`` is retained for backward compatibility.
             if result.section_filter_miss:
                 filter_expr = section if section is not None else ", ".join(sections or [])
-                return _build_section_miss_error(filter_expr, result.section_filter_valid_names, out)
+                return _respond(
+                    BacklogViewResponse,
+                    _build_section_miss_error(filter_expr, result.section_filter_valid_names, out),
+                    exclude_none=False,
+                    exclude_unset=True,
+                )
             # Auto-compact: when the response exceeds the token budget return a compact
             # section-directory form so the caller can request only what it needs.
             #
@@ -2254,11 +2307,21 @@ async def backlog_view(
             # serialised char length of the full payload the caller would receive.
             serialised = _json.dumps(full_response)
             if _view_payload_token_count(full_response) > _VIEW_TOKEN_BUDGET:
-                return _build_over_budget_view(result, len(serialised), selector)
-            return full_response
-        return _build_compact_manifest(result, full_response, selector)
+                return _respond(
+                    BacklogViewResponse,
+                    _build_over_budget_view(result, len(serialised), selector),
+                    exclude_none=False,
+                    exclude_unset=True,
+                )
+            return _respond(BacklogViewResponse, full_response, exclude_none=False, exclude_unset=True)
+        return _respond(
+            BacklogViewResponse,
+            _build_compact_manifest(result, full_response, selector),
+            exclude_none=False,
+            exclude_unset=True,
+        )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return _respond(BacklogViewResponse, {"error": str(e), **out.to_dict()}, exclude_none=False, exclude_unset=True)
 
 
 @mcp.tool(
@@ -2288,9 +2351,9 @@ async def backlog_sync(
         created = result.get("created", 0)
         pushed = result.get("pushed", 0)
         await ctx.info(f"Sync complete: {created} issue(s) created, {pushed} item(s) pushed")
-        return BacklogSyncResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogSyncResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogSyncResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogSyncResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2328,11 +2391,9 @@ async def backlog_link_followup(
         result = await asyncio.to_thread(
             operations.link_followup, selector=selector, followup_to=followup_to, output=out
         )
-        return BacklogLinkFollowupResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogLinkFollowupResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogLinkFollowupResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogLinkFollowupResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2364,11 +2425,9 @@ async def backlog_list_followups(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_followups, followup_to=followup_to, output=out)
-        return BacklogListFollowupsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogListFollowupsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogListFollowupsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListFollowupsResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2418,9 +2477,9 @@ async def backlog_close(
             force=force,
             output=out,
         )
-        return BacklogCloseResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogCloseResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogCloseResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogCloseResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2473,9 +2532,9 @@ async def backlog_resolve(
             force=force,
             output=out,
         )
-        return BacklogResolveResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogResolveResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogResolveResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogResolveResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2567,9 +2626,9 @@ async def backlog_update(
             reason=reason,
             verified=verified,
         )
-        return BacklogUpdateResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogUpdateResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogUpdateResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogUpdateResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2683,9 +2742,9 @@ async def backlog_groom(
             await ctx.warning(w)
         title = result.get("title", selector)
         await ctx.info(f"Groomed: {title}")
-        return BacklogGroomResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogGroomResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogGroomResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogGroomResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2717,9 +2776,9 @@ async def backlog_normalize(
         updated = result.get("normalized", 0)
         suffix = " (dry-run)" if dry_run else ""
         await ctx.info(f"Normalized {updated} file(s){suffix}")
-        return BacklogNormalizeResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogNormalizeResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogNormalizeResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogNormalizeResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2778,9 +2837,9 @@ async def backlog_pull(
             await ctx.warning(w)
         pulled = result.get("pulled", 0)
         await ctx.info(f"Pull complete: {pulled} item(s) pulled")
-        return BacklogPullResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogPullResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogPullResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogPullResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2827,11 +2886,9 @@ async def backlog_create_sam_task(
             labels=labels,
             output=out,
         )
-        return BacklogCreateSamTaskResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogCreateSamTaskResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogCreateSamTaskResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogCreateSamTaskResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2856,9 +2913,9 @@ async def backlog_get_sam_tasks(
         result = await asyncio.to_thread(
             operations.get_sam_tasks, parent_issue_number=parent_issue_number, refresh_cache=refresh_cache, output=out
         )
-        return SamTaskLookupResult.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(SamTaskLookupResult, {**result, **out.to_dict()})
     except BacklogError as e:
-        return SamTaskLookupResult.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(SamTaskLookupResult, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -2889,13 +2946,9 @@ async def backlog_update_sam_task_status(
         result = await asyncio.to_thread(
             operations.update_sam_task_status, issue_number=issue_number, new_status=new_status, repo=repo, output=out
         )
-        return BacklogUpdateSamTaskStatusResponse.model_validate({**result, **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogUpdateSamTaskStatusResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogUpdateSamTaskStatusResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogUpdateSamTaskStatusResponse, {"error": str(e), **out.to_dict()})
 
 
 # ---------------------------------------------------------------------------
@@ -3058,13 +3111,9 @@ async def artifact_list(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return ArtifactsListResponse.model_validate({
-            "artifacts": artifacts,
-            "count": len(artifacts),
-            **out.to_dict(),
-        }).model_dump(exclude_none=True)
+        return _respond(ArtifactsListResponse, {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
     except BacklogError as e:
-        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(ArtifactsListResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3125,13 +3174,9 @@ async def artifact_get(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return ArtifactsListResponse.model_validate({
-            "artifacts": artifacts,
-            "count": len(artifacts),
-            **out.to_dict(),
-        }).model_dump(exclude_none=True)
+        return _respond(ArtifactsListResponse, {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
     except BacklogError as e:
-        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(ArtifactsListResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3209,11 +3254,9 @@ async def artifact_read(
             )
 
         result = await asyncio.to_thread(_run)
-        return ArtifactReadResponse.model_validate({**result.model_dump(mode="json"), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(ArtifactReadResponse, {**result.model_dump(mode="json"), **out.to_dict()})
     except BacklogError as e:
-        return ArtifactReadResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(ArtifactReadResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3236,11 +3279,9 @@ async def backlog_get_ready_sam_tasks(
         result = await asyncio.to_thread(
             operations.get_ready_sam_tasks, parent_issue_number=parent_issue_number, output=out
         )
-        return BacklogGetReadySamTasksResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogGetReadySamTasksResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogGetReadySamTasksResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogGetReadySamTasksResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3286,11 +3327,9 @@ async def backlog_strike_entry(
         result = await asyncio.to_thread(
             operations.strike_entry, selector=selector, entry_id=entry_id, reason=reason, section=section, output=out
         )
-        return BacklogStrikeEntryResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogStrikeEntryResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogStrikeEntryResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogStrikeEntryResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3315,11 +3354,9 @@ async def backlog_list_labels(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_labels, limit=limit, output=out)
-        return BacklogListLabelsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogListLabelsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogListLabelsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListLabelsResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3355,11 +3392,9 @@ async def backlog_list_merged_prs(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_merged_prs, search=search, limit=limit, output=out)
-        return BacklogListMergedPrsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogListMergedPrsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogListMergedPrsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListMergedPrsResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3385,9 +3420,7 @@ async def backlog_list_milestones(
     try:
         result = await asyncio.to_thread(operations.list_milestones, state=state, output=out)
     except BacklogError as e:
-        return BacklogListMilestonesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListMilestonesResponse, {"error": str(e), **out.to_dict()})
     response = BacklogListMilestonesResponse.model_validate({**result, **out.to_dict()})
     dump = response.model_dump(exclude_none=True)
     # due_on is a meaningful, documented null per milestone (no due date set) --
@@ -3423,9 +3456,7 @@ async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
     try:
         result = await asyncio.to_thread(operations.get_soonest_milestone, output=out)
     except BacklogError as e:
-        return BacklogGetSoonestMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogGetSoonestMilestoneResponse, {"error": str(e), **out.to_dict()})
     response = BacklogGetSoonestMilestoneResponse.model_validate({**result, **out.to_dict()})
     # milestone=None is a meaningful, documented success value (no open
     # milestones exist), not an absent-on-this-branch field like `error` --
@@ -3464,9 +3495,7 @@ async def backlog_create_milestone(
             operations.create_milestone, title=title, description=description, due_on=due_on, output=out
         )
     except BacklogError as e:
-        return BacklogCreateMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogCreateMilestoneResponse, {"error": str(e), **out.to_dict()})
     response = BacklogCreateMilestoneResponse.model_validate({**result, **out.to_dict()})
     dump = response.model_dump(exclude_none=True)
     # due_on is a meaningful, legitimate null (caller can create a milestone
@@ -3540,9 +3569,7 @@ async def backlog_list_issues(
             operations.list_issues, milestone=milestone, labels=labels, state=state, limit=limit, output=out
         )
     except BacklogError as e:
-        return BacklogListIssuesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListIssuesResponse, {"error": str(e), **out.to_dict()})
     response = BacklogListIssuesResponse.model_validate({**result, **out.to_dict()})
     dump = response.model_dump(exclude_none=True)
     # milestone is a meaningful, documented null per issue (no milestone
@@ -3576,11 +3603,9 @@ async def backlog_comment_issue(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.comment_issue, issue_number=issue_number, body=body, output=out)
-        return BacklogCommentIssueResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogCommentIssueResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogCommentIssueResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogCommentIssueResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3606,11 +3631,9 @@ async def backlog_list_comments(
         result = await asyncio.to_thread(
             operations.list_comments, issue_number=issue_number, limit=limit, offset=offset, output=out
         )
-        return BacklogListCommentsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogListCommentsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogListCommentsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListCommentsResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3644,11 +3667,9 @@ async def backlog_read_comment(
         result = await asyncio.to_thread(
             operations.read_comment, issue_number=issue_number, comment_id=comment_id, output=out
         )
-        return BacklogReadCommentResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogReadCommentResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogReadCommentResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogReadCommentResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3670,11 +3691,9 @@ async def backlog_list_projects(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_projects, owner=owner, limit=limit, output=out)
-        return BacklogListProjectsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogListProjectsResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogListProjectsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogListProjectsResponse, {"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3698,11 +3717,9 @@ async def backlog_create_project(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.create_project, title=title, owner=owner, output=out)
-        return BacklogCreateProjectResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+        return _respond(BacklogCreateProjectResponse, {**result, **out.to_dict()})
     except BacklogError as e:
-        return BacklogCreateProjectResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
+        return _respond(BacklogCreateProjectResponse, {"error": str(e), **out.to_dict()})
 
 
 def _dispatch_reference(milestone_number: int) -> ContentRef:
@@ -3763,19 +3780,12 @@ async def dispatch_read(
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except ContentUnavailableError:
-        return DispatchReadResponse.model_validate({
-            "error": "Dispatch plan not found",
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
+        return _respond(
+            DispatchReadResponse, {"error": "Dispatch plan not found", "milestone_number": milestone_number}
+        )
     except ValueError as exc:
-        return DispatchReadResponse.model_validate({
-            "error": str(exc),
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
-    return DispatchReadResponse.model_validate({
-        "milestone_number": milestone_number,
-        "plan": plan.model_dump(),
-    }).model_dump(exclude_none=True)
+        return _respond(DispatchReadResponse, {"error": str(exc), "milestone_number": milestone_number})
+    return _respond(DispatchReadResponse, {"milestone_number": milestone_number, "plan": plan.model_dump()})
 
 
 @mcp.tool(
@@ -3804,15 +3814,9 @@ async def dispatch_validate(
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
-        return DispatchValidateResponse.model_validate({
-            "error": str(exc),
-            "milestone_number": milestone_number,
-        }).model_dump(exclude_none=True)
+        return _respond(DispatchValidateResponse, {"error": str(exc), "milestone_number": milestone_number})
     result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
-    return DispatchValidateResponse.model_validate({
-        "milestone_number": milestone_number,
-        **dataclasses.asdict(result),
-    }).model_dump(exclude_none=True)
+    return _respond(DispatchValidateResponse, {"milestone_number": milestone_number, **dataclasses.asdict(result)})
 
 
 @mcp.tool(
@@ -3844,7 +3848,7 @@ async def dispatch_stale_check(
         ``message``. Returns ``error`` on file/parse or GitHub failure.
     """
     result = await asyncio.to_thread(operations.dispatch_stale_check, milestone_number, repo)
-    return DispatchStaleCheckResponse.model_validate(result).model_dump(exclude_none=True)
+    return _respond(DispatchStaleCheckResponse, result)
 
 
 @mcp.tool(
@@ -3900,14 +3904,17 @@ async def dispatch_create_plan(
     out = Output()
     # Verify plan.milestone.number matches the milestone_number parameter
     if plan.milestone.number != milestone_number:
-        return DispatchCreatePlanResponse.model_validate({
-            "error": (
-                f"Milestone number mismatch: parameter is {milestone_number} "
-                f"but plan.milestone.number is {plan.milestone.number}"
-            ),
-            "milestone_number": milestone_number,
-            **out.to_dict(),
-        }).model_dump(exclude_none=True)
+        return _respond(
+            DispatchCreatePlanResponse,
+            {
+                "error": (
+                    f"Milestone number mismatch: parameter is {milestone_number} "
+                    f"but plan.milestone.number is {plan.milestone.number}"
+                ),
+                "milestone_number": milestone_number,
+                **out.to_dict(),
+            },
+        )
 
     try:
         current = _get_artifact_provider().get_content(_dispatch_reference(milestone_number))
@@ -3917,10 +3924,10 @@ async def dispatch_create_plan(
         )
     else:
         if not overwrite:
-            return DispatchCreatePlanResponse.model_validate({
-                "error": "Dispatch plan already exists. Pass overwrite=True to replace it.",
-                **out.to_dict(),
-            }).model_dump(exclude_none=True)
+            return _respond(
+                DispatchCreatePlanResponse,
+                {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()},
+            )
         write = ContentWrite(
             reference=_dispatch_reference(milestone_number),
             content=plan.model_dump_json(),
@@ -3932,11 +3939,9 @@ async def dispatch_create_plan(
     try:
         await asyncio.to_thread(_get_artifact_provider().put_content, write)
     except (BacklogError, ContentConflictError, UnsupportedCapabilityError) as exc:
-        return DispatchCreatePlanResponse.model_validate({
-            "error": str(exc),
-            "milestone_number": milestone_number,
-            **out.to_dict(),
-        }).model_dump(exclude_none=True)
+        return _respond(
+            DispatchCreatePlanResponse, {"error": str(exc), "milestone_number": milestone_number, **out.to_dict()}
+        )
 
     out.info(f"Stored dispatch plan {milestone_number}")
 
@@ -4000,7 +4005,7 @@ async def dispatch_conflicts(
         failure.
     """
     result = await asyncio.to_thread(operations.dispatch_conflicts, milestone_number, repo)
-    return DispatchConflictsResponse.model_validate(result).model_dump(exclude_none=True)
+    return _respond(DispatchConflictsResponse, result)
 
 
 # ---------------------------------------------------------------------------
@@ -4082,30 +4087,35 @@ async def dispatch_wave_start(
             for item in items
         ]
     except (KeyError, ValueError) as exc:
-        return DispatchWaveStartResponse.model_validate({
-            "error": f"Malformed item entry: {exc}",
-            "milestone": milestone,
-            "wave_num": wave_num,
-        }).model_dump(exclude_none=True)
+        return _respond(
+            DispatchWaveStartResponse,
+            {"error": f"Malformed item entry: {exc}", "milestone": milestone, "wave_num": wave_num},
+        )
     try:
         wave: _DispatchWaveRecord = await asyncio.to_thread(
             _dispatch_state_manager().create_wave, milestone, wave_num, item_records
         )
     except sqlite3.IntegrityError:
-        return DispatchWaveStartResponse.model_validate({
-            "error": f"Wave {wave_num} already exists for milestone {milestone}",
-            "milestone": milestone,
-            "wave_num": wave_num,
-        }).model_dump(exclude_none=True)
-    return DispatchWaveStartResponse.model_validate({
-        "milestone": wave.milestone,
-        "wave_num": wave.wave_num,
-        "items_count": len(wave.items),
-        "status": wave.status,
-        "messages": [f"Wave {wave_num} created with {len(wave.items)} items"],
-        "warnings": [],
-        "errors": [],
-    }).model_dump(exclude_none=True)
+        return _respond(
+            DispatchWaveStartResponse,
+            {
+                "error": f"Wave {wave_num} already exists for milestone {milestone}",
+                "milestone": milestone,
+                "wave_num": wave_num,
+            },
+        )
+    return _respond(
+        DispatchWaveStartResponse,
+        {
+            "milestone": wave.milestone,
+            "wave_num": wave.wave_num,
+            "items_count": len(wave.items),
+            "status": wave.status,
+            "messages": [f"Wave {wave_num} created with {len(wave.items)} items"],
+            "warnings": [],
+            "errors": [],
+        },
+    )
 
 
 @mcp.tool(
@@ -4177,7 +4187,7 @@ async def dispatch_item_status(
         }
 
     result_dict = await asyncio.to_thread(_find_and_update)
-    return DispatchItemStatusResponse.model_validate(result_dict).model_dump(exclude_none=True)
+    return _respond(DispatchItemStatusResponse, result_dict)
 
 
 @mcp.tool(

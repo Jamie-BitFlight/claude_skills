@@ -1,9 +1,7 @@
 """Asserts every backlog_core MCP tool advertises a real output schema, not
 an unconstrained object. See plugins/development-harness/backlog_core/tool_responses.py.
 
-TOOLS_NOT_YET_TYPED tracks tools whose return-type annotation hasn't been
-migrated to a Pydantic model yet -- shrinks across the rollout's commits.
-Once empty, delete this set and the skip branch below.
+All 43 tools are typed as of #3368 (backlog_view, the last holdout).
 """
 
 from __future__ import annotations
@@ -39,16 +37,19 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # sam_plan's per-tool cost.
 _MAX_TOTAL_SCHEMA_TOKENS = 13000
 _MAX_SINGLE_TOOL_SCHEMA_TOKENS = 700
+
+# backlog_view (#3368) is the deliberate multi-mode outlier: one tool
+# advertising seven response shapes (map/navigate/extract/summary/
+# over-budget/full-detail/error) behind a single flat, all-Optional model --
+# see BacklogViewResponse in tool_responses.py. Measured at 1,904 tokens.
+# Held to its own explicit ceiling so the 700-token cap keeps its teeth for
+# the other 42 tools rather than being raised 3x for all of them.
+_PER_TOOL_SCHEMA_OVERRIDES = {"backlog_view": 2000}
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 def _schema_tokens(schema: dict[str, object]) -> int:
     return len(_ENCODING.encode(json.dumps(schema, sort_keys=True)))
-
-
-TOOLS_NOT_YET_TYPED = {
-    "backlog_view"  # deferred to commit 4/4 -- deliberately complex disclosure-mode shape
-}
 
 
 async def _tool_schemas() -> dict[str, dict[str, object]]:
@@ -59,25 +60,21 @@ async def _tool_schemas() -> dict[str, dict[str, object]]:
 async def test_all_typed_tools_advertise_a_real_output_schema() -> None:
     schemas = await _tool_schemas()
     for name, schema in schemas.items():
-        if name in TOOLS_NOT_YET_TYPED:
-            continue
         assert schema.get("properties"), f"{name}: no properties in output schema"
         assert schema.get("additionalProperties") is not True, f"{name}: still unconstrained object"
         assert "x-fastmcp-wrap-result" not in schema, f"{name}: Union return type wrapped the result -- wire regression"
-
-
-async def test_every_registered_tool_is_accounted_for() -> None:
-    # Catches a renamed/added/removed tool falling through the cracks of TOOLS_NOT_YET_TYPED.
-    schemas = await _tool_schemas()
-    assert set(schemas) >= TOOLS_NOT_YET_TYPED, "TOOLS_NOT_YET_TYPED references a tool that no longer exists"
 
 
 async def test_output_schemas_stay_within_token_budget() -> None:
     schemas = await _tool_schemas()
     per_tool = {name: _schema_tokens(schema) for name, schema in schemas.items()}
     total = sum(per_tool.values())
-    over_budget = {name: n for name, n in per_tool.items() if n > _MAX_SINGLE_TOOL_SCHEMA_TOKENS}
-    assert not over_budget, f"Tool(s) exceed {_MAX_SINGLE_TOOL_SCHEMA_TOKENS}-token schema budget: {over_budget}"
+    over_budget = {
+        name: n
+        for name, n in per_tool.items()
+        if n > _PER_TOOL_SCHEMA_OVERRIDES.get(name, _MAX_SINGLE_TOOL_SCHEMA_TOKENS)
+    }
+    assert not over_budget, f"Tool(s) exceed their per-tool schema budget: {over_budget}"
     assert total <= _MAX_TOTAL_SCHEMA_TOKENS, (
         f"Total outputSchema tokens across all tools ({total}) exceeds budget of {_MAX_TOTAL_SCHEMA_TOKENS}"
     )
