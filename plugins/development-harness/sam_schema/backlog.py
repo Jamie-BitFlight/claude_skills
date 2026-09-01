@@ -399,6 +399,23 @@ def create_milestone(
     _emit(result, output)
 
 
+@app.command("assign-milestone")
+def assign_milestone(
+    issue_number: Annotated[int, typer.Option("--issue-number", help="Issue number to assign")],
+    milestone_number: Annotated[int, typer.Option("--milestone-number", help="Milestone number to assign to")],
+    repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",
+) -> None:
+    """Assign a backlog item to a milestone."""
+    output = Output()
+    try:
+        result = operations.assign_item_to_milestone(
+            issue_number=issue_number, milestone_number=milestone_number, repo=repo, output=output
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc)})
+    _emit(result, output)
+
+
 @app.command("issues")
 def issues(
     repo: Annotated[str, typer.Option("--repo", help="Repository (owner/name)")] = "",

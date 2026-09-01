@@ -29,7 +29,14 @@ from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig, WorkItemBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
-from backlog_core.models import BacklogItem, BacklogItemMetadata, UnsupportedBackendCapabilityError, ValidationError
+from backlog_core.models import (
+    BacklogError,
+    BacklogItem,
+    BacklogItemMetadata,
+    UnsupportedBackendCapabilityError,
+    ValidationError,
+)
+from github import GithubException
 from github.Repository import Repository as GithubRepository
 
 _MOCK_REPO: GithubRepository = MagicMock(spec=GithubRepository)
@@ -235,7 +242,18 @@ def test_create_milestone_empty_title_raises_validation_error_before_dispatch(ba
 # ---------------------------------------------------------------------------
 
 
-def test_unsupported_backend_raises_typed_capability_error() -> None:
+@pytest.mark.parametrize(
+    ("op_name", "kwargs"),
+    [
+        pytest.param("list_milestones", {}, id="list_milestones"),
+        pytest.param("get_soonest_milestone", {}, id="get_soonest_milestone"),
+        pytest.param("create_milestone", {"title": "x"}, id="create_milestone"),
+        pytest.param(
+            "assign_item_to_milestone", {"issue_number": 1, "milestone_number": 1}, id="assign_item_to_milestone"
+        ),
+    ],
+)
+def test_unsupported_backend_raises_typed_capability_error(op_name: str, kwargs: dict[str, object]) -> None:
     """A backend with supports_milestones=False raises UnsupportedBackendCapabilityError with populated fields."""
     from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -243,13 +261,13 @@ def test_unsupported_backend_raises_typed_capability_error() -> None:
     set_config(BacklogConfig(backend=beads))
     try:
         with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
-            operations.list_milestones()
+            getattr(operations, op_name)(**kwargs)
     finally:
         reset_config()
 
     assert exc_info.value.capability == "milestones"
     assert exc_info.value.backend == "BeadsBackend"
-    assert exc_info.value.operation == "list_milestones"
+    assert exc_info.value.operation == op_name
 
 
 # ---------------------------------------------------------------------------
@@ -273,11 +291,70 @@ def test_membership_counts_after_assign_and_close(backend: WorkItemBackend) -> N
     assert num_a is not None
     assert num_b is not None
 
-    backend.assign_item_to_milestone(num_a, ms_number)
-    backend.assign_item_to_milestone(num_b, ms_number)
+    operations.assign_item_to_milestone(issue_number=num_a, milestone_number=ms_number)
+    operations.assign_item_to_milestone(issue_number=num_b, milestone_number=ms_number)
     backend.close_github_issue(str(num_a), "done")
 
     listed = cast("list[dict[str, object]]", operations.list_milestones(state="all")["milestones"])
     match = next(m for m in listed if m["number"] == ms_number)
     assert match["open_issues"] == 1
     assert match["closed_issues"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 10. assign_item_to_milestone via operations
+# ---------------------------------------------------------------------------
+
+
+def test_assign_item_to_milestone_via_operations(backend: WorkItemBackend) -> None:
+    """operations.assign_item_to_milestone assigns an item, reflected in list_milestones open_issues."""
+    ms = cast("dict[str, object]", operations.create_milestone(title="Sprint 1")["milestone"])
+    ms_number = cast("int", ms["number"])
+    item = _make_item("Item A")
+    repo = _repo_for_create_issue(backend)
+    num = backend.create_issue_for_item(repo, item)
+    assert num is not None
+
+    operations.assign_item_to_milestone(issue_number=num, milestone_number=ms_number)
+
+    listed = cast("list[dict[str, object]]", operations.list_milestones(state="all")["milestones"])
+    match = next(m for m in listed if m["number"] == ms_number)
+    assert match["open_issues"] == 1
+
+
+def test_assign_unknown_issue_raises_backlog_error(backend: WorkItemBackend) -> None:
+    """operations.assign_item_to_milestone raises BacklogError (not KeyError) for an unknown issue."""
+    _skip_github_shared_state(backend)
+    ms = cast("dict[str, object]", operations.create_milestone(title="Sprint 1")["milestone"])
+    ms_number = cast("int", ms["number"])
+
+    with pytest.raises(BacklogError) as exc_info:
+        operations.assign_item_to_milestone(issue_number=999999, milestone_number=ms_number)
+
+    assert "not found" in str(exc_info.value)
+
+
+def test_assign_item_to_milestone_normalizes_github_exception() -> None:
+    """A GithubException from the backend (e.g. GitHubBackend's unknown issue/milestone 404) is
+    normalized to BacklogError, not left to escape as a raw PyGithub exception.
+
+    KeyError-raising backends (Memory/SQLite) are covered by
+    test_assign_unknown_issue_raises_backlog_error above; GitHubBackend's
+    assign_item_to_milestone raises GithubException instead (PyGithub's
+    get_issue/get_milestone), which is a distinct code path in the
+    operations.py wrapper.
+    """
+
+    class _FakeGitHubLikeBackend:
+        supports_milestones = True
+
+        def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+            raise GithubException(404, {"message": "Not Found"}, None)
+
+    set_config(BacklogConfig(backend=cast("WorkItemBackend", _FakeGitHubLikeBackend())))
+    try:
+        with pytest.raises(BacklogError) as exc_info:
+            operations.assign_item_to_milestone(issue_number=1, milestone_number=1)
+        assert "GitHub API error" in str(exc_info.value)
+    finally:
+        reset_config()

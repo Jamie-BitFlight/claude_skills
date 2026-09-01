@@ -915,7 +915,13 @@ class BeadsBackend:
 
         Returns:
             Beads nanoid string of the created milestone, or ``None`` when
-            ``bd`` is unavailable or creation fails.
+            ``bd`` returned a record without an id.
+
+        Raises:
+            BdNotInstalledError: When ``bd`` is not on ``PATH``.
+            BdInvocationError: When ``bd create`` exits non-zero.
+            BdJsonDecodeError: When ``bd`` stdout is not valid JSON.
+            ValidationError: When the JSON response does not match the expected schema.
         """
         argv = ["create", title, "--type", BeadsIssueType.MILESTONE]
         if description:
@@ -924,17 +930,7 @@ class BeadsBackend:
             argv.extend(["--due", due_on])
         if parent:
             argv.extend(["--parent", parent])
-        try:
-            raw = self._runner.run_json(argv)
-            parsed = parse_issue(raw)
-        except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
-            _log.debug("create_beads_milestone: bd invocation failed: %s", exc)
-            return None
-        except ValidationError as exc:
-            _log.debug("create_beads_milestone: bd create output validation failed: %s", exc)
-            return None
-        else:
-            return parsed.id or None
+        return parse_issue(self._runner.run_json(argv)).id or None
 
     def assign_beads_item_to_milestone(self, issue_id: str, milestone_id: str) -> None:
         """Assign a beads issue to a milestone via ``bd link --type parent-child``.

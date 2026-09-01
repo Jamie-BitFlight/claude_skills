@@ -4626,6 +4626,41 @@ def create_milestone(
     return {"milestone": _milestone_dict(ms), **out.to_dict()}
 
 
+def assign_item_to_milestone(
+    issue_number: int, milestone_number: int, repo: str = "", output: Output | None = None
+) -> dict[str, object]:
+    """Assign a backlog item to a milestone on the active backend.
+
+    Args:
+        issue_number: Issue number to assign.
+        milestone_number: Milestone number to assign the issue to.
+        repo: Repository slug (``owner/name``). Ignored by non-GitHub backends.
+        output: Optional Output collector.
+
+    Returns:
+        Dict with ``issue_number``, ``milestone_number``, and output
+        messages/warnings.
+
+    Raises:
+        UnsupportedBackendCapabilityError: If the active backend does not support milestones.
+        BacklogError: If ``issue_number`` or ``milestone_number`` is unknown to the
+            backend, or on other GitHub API failures.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
+            set or GitHub is unreachable.
+    """
+    out = output or Output()
+    backend = require_milestone_support(get_config().backend, "assign_item_to_milestone")
+    try:
+        backend.assign_item_to_milestone(issue_number, milestone_number, repo=repo)
+    except KeyError as e:
+        raise BacklogError(str(e.args[0])) from e
+    except GithubException as e:
+        msg = f"GitHub API error assigning issue to milestone: {e}"
+        raise BacklogError(msg) from e
+    out.info(f"Assigned issue #{issue_number} to milestone #{milestone_number}")
+    return {"issue_number": issue_number, "milestone_number": milestone_number, **out.to_dict()}
+
+
 # ---------------------------------------------------------------------------
 # Issues (ancillary listing + commenting)
 # ---------------------------------------------------------------------------

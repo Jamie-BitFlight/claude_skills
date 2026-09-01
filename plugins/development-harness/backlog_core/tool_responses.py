@@ -52,6 +52,7 @@ __all__ = [
     "ArtifactRegisterResponse",
     "ArtifactsListResponse",
     "BacklogAddResponse",
+    "BacklogAssignItemToMilestoneResponse",
     "BacklogCloseResponse",
     "BacklogCommentIssueResponse",
     "BacklogCreateMilestoneResponse",
@@ -224,6 +225,16 @@ class BacklogAddResponse(FallibleToolResponse):
 
     item_ref: str | None = None
     """Backend issue ref, or ``""`` when creation failed or was skipped."""
+
+
+class BacklogAssignItemToMilestoneResponse(FallibleToolResponse):
+    """Response for ``backlog_assign_item_to_milestone``."""
+
+    issue_number: int | None = None
+    """Issue number that was assigned. Absent only on the ``BacklogError`` arm."""
+
+    milestone_number: int | None = None
+    """Milestone number the issue was assigned to. Absent only on the ``BacklogError`` arm."""
 
 
 # operations.close_item has two distinct success shapes: an already-closed
