@@ -31,6 +31,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import subprocess
 import time
 from typing import Annotated
@@ -39,7 +40,7 @@ import typer
 from pydantic import ValidationError
 
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
-from pr_review_models import WatchResult
+from pr_review_models import FetchResult, ReviewNode, UnresolvedThread, WatchResult
 
 app = typer.Typer(help="GitHub PR review-thread operations (fetch/watch/reply/resolve) via gh.")
 
@@ -126,10 +127,174 @@ def _owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, s
         raise typer.Exit(code=1) from exc
 
 
+def _parse_pr_list(value: str) -> list[int]:
+    """Parse a `--pr` value into pull request numbers, in the order given.
+
+    Args:
+        value: Raw `--pr` argument, e.g. `"3208"` or `"41,42,44"`. Whitespace around each
+            comma-separated part is stripped, so `"41, 42"` works too.
+
+    Returns:
+        Every PR number, in the order given. Duplicates are kept as-is -- a caller who typed one
+        twice presumably wants it reported twice, and deduping would be an unrequested guess about
+        intent.
+
+    Raises:
+        typer.BadParameter: `value` is empty, or any comma-separated part is not a plain integer.
+    """
+    parts = [part.strip() for part in value.split(",")]
+    if not all(parts):
+        message = "must be one or more PR numbers, comma-separated (e.g. '41,42,44')"
+        raise typer.BadParameter(message)
+    try:
+        return [int(part) for part in parts]
+    except ValueError as exc:
+        raise typer.BadParameter(f"not a valid PR number: {exc}") from exc
+
+
+def _truncate_body(body: str, max_body: int | None) -> str:
+    """Cut `body` to `max_body` characters, marking the cut visibly rather than silently.
+
+    `max_body=None` (the default) returns `body` unchanged. Unlimited-by-default matters here: a
+    silently truncated body forces re-verifying separately that nothing load-bearing (e.g. Codex's
+    own trailing footer) fell past the cut before trusting the summary at all.
+
+    Args:
+        body: The raw comment/review body text.
+        max_body: The character limit, or `None` for no limit.
+
+    Returns:
+        `body` unchanged, or its first `max_body` characters followed by a visible
+        `"...[truncated, showing N/M chars]"` marker.
+    """
+    if max_body is None or len(body) <= max_body:
+        return body
+    return f"{body[:max_body]}...[truncated, showing {max_body}/{len(body)} chars]"
+
+
+def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> dict[str, object]:
+    """Reduce one unresolved thread to the fields `--summary` needs: ids plus its opening comment.
+
+    `comment_id`/`author`/`body` come from the thread's *first* comment -- the one that opened it,
+    and the one `reply`'s `--comment-id` must target (see the receiving-pr-reviews skill's own
+    gotchas: GitHub rejects a reply targeted at another reply). The full comment history, including
+    any later reply, stays available via a plain (non-`--summary`) `fetch`.
+
+    Args:
+        thread: One entry from `FetchResult.unresolved`.
+        max_body: Forwarded to `_truncate_body`.
+
+    Returns:
+        A dict with `thread_id`, `comment_id`, `path`, `line`, `author`, `body`.
+    """
+    first = thread.comments[0]
+    return {
+        "thread_id": thread.id,
+        "comment_id": first.databaseId,
+        "path": thread.path,
+        "line": first.line,
+        "author": first.author.login if first.author is not None else None,
+        "body": _truncate_body(first.body, max_body),
+    }
+
+
+def _summarize_review(review: ReviewNode, *, max_body: int | None) -> dict[str, object]:
+    """Reduce one unresponded review to the fields `--summary` needs.
+
+    Args:
+        review: One entry from `FetchResult.unresponded_reviews`.
+        max_body: Forwarded to `_truncate_body`.
+
+    Returns:
+        A dict with `author`, `state`, `url`, `body`.
+    """
+    return {
+        "author": review.author.login if review.author is not None else None,
+        "state": review.state,
+        "url": review.url,
+        "body": _truncate_body(review.body, max_body),
+    }
+
+
+def _summarize(result: FetchResult, *, pr: int, max_body: int | None) -> dict[str, object]:
+    """Build the reduced-field dict `--summary` prints for one `FetchResult` snapshot.
+
+    Carries exactly what the receiving-pr-reviews workflow reads on every call instead of the full
+    JSON `fetch` prints by default: the outcome counts, `reviewability.blockers` (always present,
+    even empty -- an empty `unresolved` with a non-empty `blockers` means something different from
+    a clean PR, see `fetch`'s own docstring), every unresolved thread's id/first-comment
+    id/path/line/author/body, and every unresponded review's author/state/url/body. Thread and
+    comment ids are kept rather than replaced by a human-readable digest -- `reply` and `resolve`
+    need them, and omitting them would force a second full `fetch` to recover them.
+
+    Args:
+        result: A fresh `FetchResult` (or `WatchResult.state`) to reduce.
+        pr: The PR number this snapshot is for, stamped onto the summary so multi-`--pr` output is
+            self-describing per block.
+        max_body: Forwarded to `_truncate_body`.
+
+    Returns:
+        A JSON-serializable dict with the reduced fields.
+    """
+    return {
+        "pr": pr,
+        "reviews_count": result.reviews_count,
+        "threads_count": result.threads_count,
+        "unresolved_count": result.unresolved_count,
+        "unresponded_count": len(result.unresponded_reviews),
+        "codex_approved": result.codex_approved,
+        "blockers": result.reviewability.blockers,
+        "unresolved": [_summarize_thread(thread, max_body=max_body) for thread in result.unresolved],
+        "unresponded_reviews": [_summarize_review(review, max_body=max_body) for review in result.unresponded_reviews],
+    }
+
+
+def _board_line(pr: int, result: FetchResult) -> str:
+    """One-line status for `pr` -- the default output for each PR in a multi-`--pr` `fetch`.
+
+    Tab-separated rather than column-aligned: every consumer of this output is an agent parsing
+    fields, not a human scanning aligned columns, and a fixed column width breaks the moment a PR
+    number or a blockers list grows past it.
+
+    Args:
+        pr: The PR number this line is for.
+        result: Its fresh `FetchResult` snapshot.
+
+    Returns:
+        One tab-separated line: pr, unresolved, unresponded, codex_approved, blockers.
+    """
+    return (
+        f"{pr}\tunresolved={result.unresolved_count}\tunresponded={len(result.unresponded_reviews)}\t"
+        f"codex_approved={str(result.codex_approved).lower()}\tblockers={result.reviewability.blockers}"
+    )
+
+
+SummaryOption = Annotated[
+    bool,
+    typer.Option(
+        "--summary",
+        help=(
+            "Print only the counts, blockers, and per-thread/per-review fields an agent actually "
+            "acts on, instead of the full JSON."
+        ),
+    ),
+]
+MaxBodyOption = Annotated[
+    int | None,
+    typer.Option(
+        "--max-body",
+        min=1,
+        help="With --summary, cut each printed body to this many characters (visibly marked). Unlimited by default.",
+    ),
+]
+
+
 @app.command()
 def fetch(
-    pr: Annotated[int, typer.Option(help="Pull request number.")],
+    pr: Annotated[str, typer.Option(help="Pull request number(s). Comma-separated for multiple, e.g. 41,42,44.")],
     github: GithubOption = None,
+    summary: SummaryOption = False,
+    max_body: MaxBodyOption = None,
     gh_timeout_seconds: Annotated[
         float | None, typer.Option(min=0, help="Seconds to bound each `gh` call to. Unbounded by default.")
     ] = None,
@@ -158,17 +323,34 @@ def fetch(
     gets no reviewers requested and a conflicting branch gets no review runs, so an empty
     `unresolved` array there means "nothing can happen yet", not "nothing to do". Read it before
     concluding a PR is clean. An empty `blockers` means reviews can proceed.
+
+    `--pr` takes a single number or a comma-separated list (`--pr 41,42,44`) to check several PRs
+    in one call, in the order given. With one `--pr` number, `--summary` prints the reduced-field
+    JSON described on `_summarize` instead of the full result above; without it, one tab-separated
+    board line per PR (see `_board_line`) — `--summary` with several PRs still gets the full
+    per-PR JSON, one compact-JSON line per PR.
     """
     owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
-    result = build_fetch_result(owner, repo, pr, gh_timeout=gh_timeout_seconds)
-    typer.echo(result.model_dump_json())
+    pr_numbers = _parse_pr_list(pr)
+    if len(pr_numbers) == 1 and not summary:
+        result = build_fetch_result(owner, repo, pr_numbers[0], gh_timeout=gh_timeout_seconds)
+        typer.echo(result.model_dump_json())
+        return
+    for number in pr_numbers:
+        result = build_fetch_result(owner, repo, number, gh_timeout=gh_timeout_seconds)
+        if summary:
+            typer.echo(json.dumps(_summarize(result, pr=number, max_body=max_body)))
+        else:
+            typer.echo(_board_line(number, result))
 
 
 @app.command()
 def watch(
-    pr: Annotated[int, typer.Option(help="Pull request number.")],
+    pr: Annotated[int, typer.Option(help="Pull request number. Single PR only -- watch polls one target.")],
     *,
     github: GithubOption = None,
+    summary: SummaryOption = False,
+    max_body: MaxBodyOption = None,
     interval_seconds: Annotated[
         int, typer.Option(min=1, help="Seconds to sleep between polls. Must be positive.")
     ] = _DEFAULT_WATCH_INTERVAL_SECONDS,
@@ -209,6 +391,10 @@ def watch(
     `state.reviewability.blockers` on a `timed_out: true` result before issuing another call:
     waiting out another window for reviews that cannot arrive — the PR is a draft, or conflicting —
     is pure waste, and the fix is on the PR rather than in the review queue.
+
+    `--summary` prints the same reduced fields `fetch --summary` does (see `_summarize`), with
+    `timed_out` and every summary field flattened at the top level rather than nested under `state`
+    — `fetch`'s and `watch`'s summaries are the same shape, so one parser handles either.
 
     `deadline` is the only cutoff. The loop polls while a full `interval_seconds` still fits before
     it and stops once less than that remains — the point past which `gh_timeout_budget` would
@@ -288,7 +474,13 @@ def watch(
             err=True,
         )
         raise typer.Exit(code=1)
-    result = WatchResult(timed_out=not current.has_outstanding_work(), state=current)
+    timed_out = not current.has_outstanding_work()
+    if summary:
+        payload = _summarize(current, pr=pr, max_body=max_body)
+        payload["timed_out"] = timed_out
+        typer.echo(json.dumps(payload))
+        return
+    result = WatchResult(timed_out=timed_out, state=current)
     typer.echo(result.model_dump_json())
 
 

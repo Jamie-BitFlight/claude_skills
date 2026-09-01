@@ -41,6 +41,7 @@ loop.
 from __future__ import annotations
 
 import json
+import string
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -56,6 +57,7 @@ import pr_review_threads
 from pr_review_gh import _is_codex_thumbs_up, build_fetch_result
 from pr_review_models import (
     Author,
+    CommentNode,
     FetchResult,
     IssueComment,
     PullRequestHeadState,
@@ -1435,3 +1437,221 @@ def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) ->
     assert "the last of 2 poll(s) this window failed" in result.output
     with pytest.raises(json.JSONDecodeError):
         json.loads(result.output)
+
+
+# --- --summary -------------------------------------------------------------------------------
+
+
+def _thread_with_comment(
+    thread_id: str = "T1",
+    *,
+    path: str = "x.py",
+    body: str = "look at this",
+    line: int | None = 10,
+    login: str | None = "reviewer",
+) -> UnresolvedThread:
+    """Build an `UnresolvedThread` carrying one real comment -- `_state()`'s threads have none,
+    which `_summarize_thread` (reading the first comment) cannot summarize."""
+    return UnresolvedThread(
+        id=thread_id,
+        path=path,
+        comments=[
+            CommentNode(
+                databaseId=42,
+                body=body,
+                line=line,
+                originalLine=line,
+                author=Author(login=login) if login is not None else None,
+            )
+        ],
+        comments_truncated=False,
+    )
+
+
+def _fetch_result(
+    *,
+    unresolved: list[UnresolvedThread] | None = None,
+    unresponded_reviews: list[ReviewNode] | None = None,
+    blockers: list[str] | None = None,
+    codex_approved: bool = False,
+) -> FetchResult:
+    unresolved = unresolved or []
+    unresponded_reviews = unresponded_reviews or []
+    return FetchResult(
+        reviews_count=len(unresponded_reviews),
+        reviews_with_body=unresponded_reviews,
+        unresponded_reviews=unresponded_reviews,
+        threads_count=len(unresolved),
+        unresolved=unresolved,
+        unresolved_count=len(unresolved),
+        codex_approved=codex_approved,
+        reviewability=Reviewability(
+            is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=blockers or []
+        ),
+    )
+
+
+def test_fetch_summary_reduces_to_the_documented_fields(mocker: MockerFixture) -> None:
+    """`fetch --summary` prints counts, blockers, and per-thread/per-review ids and content --
+    not the full `FetchResult` JSON."""
+    state = _fetch_result(
+        unresolved=[_thread_with_comment(body="fix this")],
+        unresponded_reviews=[_review("R1", body="ship it", submitted_at=datetime(2026, 1, 1, tzinfo=UTC))],
+        blockers=["draft: reviewers are not requested until the PR is marked ready for review"],
+        codex_approved=True,
+    )
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["pr"] == 3208
+    assert data["unresolved_count"] == 1
+    assert data["unresponded_count"] == 1
+    assert data["codex_approved"] is True
+    assert data["blockers"] == ["draft: reviewers are not requested until the PR is marked ready for review"]
+    assert data["unresolved"] == [
+        {"thread_id": "T1", "comment_id": 42, "path": "x.py", "line": 10, "author": "reviewer", "body": "fix this"}
+    ]
+    assert data["unresponded_reviews"] == [
+        {"author": "codex", "state": "COMMENTED", "url": _review_url("R1"), "body": "ship it"}
+    ]
+    assert "reviews_with_body" not in data
+
+
+def test_fetch_summary_prints_blockers_even_when_empty(mocker: MockerFixture) -> None:
+    """`blockers` is always present in the summary, empty or not -- an empty `unresolved` with a
+    non-empty `blockers` means something different from a clean PR."""
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result())
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["blockers"] == []
+
+
+def test_fetch_summary_max_body_truncates_and_marks_it_visibly(mocker: MockerFixture) -> None:
+    """`--max-body` cuts a printed body and leaves a visible marker rather than a silent cut."""
+    state = _fetch_result(unresolved=[_thread_with_comment(body=string.digits)])
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary", "--max-body", "4"])
+
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["unresolved"][0]["body"]
+    assert body == "0123...[truncated, showing 4/10 chars]"
+
+
+def test_fetch_summary_max_body_leaves_short_bodies_untouched(mocker: MockerFixture) -> None:
+    """A body at or under `--max-body` is printed unchanged, with no truncation marker."""
+    state = _fetch_result(unresolved=[_thread_with_comment(body="short")])
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary", "--max-body", "100"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["unresolved"][0]["body"] == "short"
+
+
+def test_fetch_without_summary_still_prints_the_full_result_by_default(mocker: MockerFixture) -> None:
+    """A single `--pr` with no `--summary` is unchanged: the full `FetchResult` JSON."""
+    state = _fetch_result(unresolved=[_thread_with_comment()])
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == json.loads(state.model_dump_json())
+
+
+def test_watch_summary_flattens_timed_out_instead_of_nesting_under_state(mocker: MockerFixture) -> None:
+    """`watch --summary` normalizes `fetch`'s and `watch`'s summary shapes: `timed_out` sits
+    alongside the summary fields, not nested under a separate `state` key."""
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result())
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--timeout-seconds", "0", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["timed_out"] is True
+    assert data["pr"] == 3208
+    assert "state" not in data
+
+
+def test_watch_summary_honors_max_body(mocker: MockerFixture) -> None:
+    """`watch --summary --max-body` truncates the same way `fetch --summary` does."""
+    state = _fetch_result(unresolved=[_thread_with_comment(body=string.digits)])
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--timeout-seconds", "0", "--summary", "--max-body", "4"])
+
+    assert result.exit_code == 0, result.output
+    body = json.loads(result.output)["unresolved"][0]["body"]
+    assert body == "0123...[truncated, showing 4/10 chars]"
+
+
+# --- multi-PR --pr ----------------------------------------------------------------------------
+
+
+def test_fetch_multi_pr_prints_one_board_line_per_pr_in_order(mocker: MockerFixture) -> None:
+    """`--pr 41,42,44` without `--summary` prints one tab-separated status line per PR, in order,
+    rather than the (potentially enormous) full JSON for each."""
+    states = {
+        41: _fetch_result(unresolved=[_thread_with_comment()]),
+        42: _fetch_result(),
+        44: _fetch_result(codex_approved=True),
+    }
+    fetch_mock = mocker.patch.object(
+        pr_review_threads, "build_fetch_result", side_effect=lambda _o, _r, pr, **_kw: states[pr]
+    )
+
+    result = runner.invoke(app, ["fetch", "--pr", "41,42,44"])
+
+    assert result.exit_code == 0, result.output
+    lines = result.output.strip("\n").split("\n")
+    assert len(lines) == 3
+    assert lines[0] == "41\tunresolved=1\tunresponded=0\tcodex_approved=false\tblockers=[]"
+    assert lines[1] == "42\tunresolved=0\tunresponded=0\tcodex_approved=false\tblockers=[]"
+    assert lines[2] == "44\tunresolved=0\tunresponded=0\tcodex_approved=true\tblockers=[]"
+    assert [call.args[2] for call in fetch_mock.call_args_list] == [41, 42, 44]
+
+
+def test_fetch_multi_pr_with_summary_prints_one_json_line_per_pr(mocker: MockerFixture) -> None:
+    """`--pr 41,42` with `--summary` prints one summary JSON block per PR, each self-describing
+    via its own `pr` field, ordered as given."""
+    states = {41: _fetch_result(unresolved=[_thread_with_comment()]), 42: _fetch_result()}
+    mocker.patch.object(pr_review_threads, "build_fetch_result", side_effect=lambda _o, _r, pr, **_kw: states[pr])
+
+    result = runner.invoke(app, ["fetch", "--pr", "41,42", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    lines = [json.loads(line) for line in result.output.strip("\n").split("\n")]
+    assert [line["pr"] for line in lines] == [41, 42]
+    assert lines[0]["unresolved_count"] == 1
+    assert lines[1]["unresolved_count"] == 0
+
+
+def test_fetch_multi_pr_tolerates_whitespace_around_entries(mocker: MockerFixture) -> None:
+    """`--pr "41, 42"` (with a space after the comma) parses the same as `--pr 41,42`."""
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result())
+
+    result = runner.invoke(app, ["fetch", "--pr", "41, 42"])
+
+    assert result.exit_code == 0, result.output
+    assert [call.args[2] for call in fetch_mock.call_args_list] == [41, 42]
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "abc", "41,", "41,,42", "41, abc"],
+    ids=["empty", "non-numeric", "trailing-comma", "empty-part", "mixed"],
+)
+def test_fetch_rejects_a_malformed_pr_list(value: str, mocker: MockerFixture) -> None:
+    """A malformed `--pr` value is rejected before any `gh` call is attempted."""
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result")
+
+    result = runner.invoke(app, ["fetch", "--pr", value])
+
+    assert result.exit_code != 0
+    fetch_mock.assert_not_called()

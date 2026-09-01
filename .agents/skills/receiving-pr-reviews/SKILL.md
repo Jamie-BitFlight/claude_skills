@@ -7,15 +7,15 @@ description: Work through every unresolved review thread on a PR to completion �
 
 <workflow>
 
-1. Fetch every unresolved thread, every unresponded review, and Codex's approval state:
+1. Fetch every unresolved thread, every unresponded review, and Codex's approval state. Prefer `--summary` — it already carries every id step 4/5 needs; drop it only when you need `reviews_with_body`'s full list or a thread's complete comment history:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch --pr <N>
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch --pr <N> --summary
    ```
 
-   Read `reviews_count`, `threads_count`, `unresolved_count` and `reviewability.blockers` together — never treat an empty `unresolved` array on its own as "nothing to do". A `threads_count` of 0 means no *inline* thread landed, not that no review landed: a top-level approval or `COMMENTED` review surfaces only through `reviews_with_body`. A non-empty `blockers` means the empty result set is expected and the fix is on the PR itself — undraft it, resolve the conflicts — not in the review queue.
+   Read `reviews_count`, `threads_count`, `unresolved_count`, `unresponded_count`, and `blockers` together — never treat an empty `unresolved` array on its own as "nothing to do". A `threads_count` of 0 means no *inline* thread landed, not that no review landed. A non-empty `blockers` means the empty result set is expected and the fix is on the PR itself — undraft it, resolve the conflicts — not in the review queue. (Dropping `--summary` gets the same fields under `reviewability.blockers` instead of top-level `blockers`, plus the full `reviews_with_body` and each thread's complete `comments` list — a thread's `comments_truncated: true` there means it has passed 100 comments; page its `comments` connection directly before concluding anything about it.)
 
-   `reviews_with_body` is every review whose feedback lives in the review's own summary text rather than an inline comment. `unresponded_reviews` narrows that to the ones this run has not answered yet; treat every entry as actionable input. A thread's `comments_truncated: true` means that one thread has passed 100 comments — page its `comments` connection directly before concluding anything about it. For `codex_approved`, see step 7.
+   `unresolved`/`unresponded_reviews` entries are this run's actionable input; treat every one as something to address. For `codex_approved`, see step 7. Checking several PRs at once: `--pr 41,42,44` prints one line (or, with `--summary`, one JSON block) per PR instead of one call each.
 
 2. For each unresolved thread or unresponded review: read it, validate the claim locally, assess against the change goal and repository instructions.
 3. Implement, commit, and push a fix only when it improves the product — push before replying, so the SHA named in the reply is inspectable and resolving the thread never outruns what is actually on the remote.
@@ -53,5 +53,7 @@ description: Work through every unresolved review thread on a PR to completion �
 - Every check inside `watch` is a fresh `gh` snapshot with no baseline, so a call whose first fetch already has outstanding work returns immediately. Calling `watch` right after a `resolve` or a plain `fetch` is safe.
 - `reviewability` is read fresh on every poll, so a `timed_out: true` result carries it too — check `state.reviewability.blockers` before issuing another `watch` rather than waiting out a window for reviews that cannot arrive. `mergeable: "UNKNOWN"` is never a blocker: GitHub computes mergeability in a background job, and it resolves on a later check.
 - `watch` exits non-zero with nothing on stdout when the last re-poll of a window failed. Retry the call rather than reading it as "nothing new."
+- `--summary` (step 1) also works on `watch`; `timed_out` sits alongside the summary fields there instead of nested under `state`. Add `--max-body N` to cut long bodies, visibly marked when cut; unlimited by default.
+- Comma-separated `--pr` is `fetch`-only — `watch` polls one PR at a time.
 
 </gotchas>
