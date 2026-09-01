@@ -38,9 +38,10 @@ Before implementing any fix, verify it is a code change — not suppression. Eac
 **Inline suppression comments:**
 - Adding `# noqa`, `# type: ignore`, `# ty: ignore`, `# pyright: ignore`, `# pylint: disable`,
   `# ruff: ignore[<rule>]`, `# ruff: file-ignore[<rules>]` (suppresses the whole file, not one line),
-  or any suppression comment — including the rule-specific form ruff's own `--fix` produces when
-  `[tool.ruff.lint] preview = true` rewrites a plain `# noqa: <RULE>` into `# ruff: ignore[<rule-name>]`;
-  grepping only for `# noqa` misses it
+  or any suppression comment — `# ruff: ignore[<rule-name>]` is what `ruff check --add-ignore`
+  generates (verified: `--fix` alone does not add it); grepping only for `# noqa` misses it
+- Running `ruff check --add-ignore` — it exists to auto-generate suppression comments, which this
+  gate forbids regardless of how they're added
 
 **Configuration-level suppression (equally forbidden):**
 - Adding a rule to `[tool.ruff.lint] ignore = [...]` in `pyproject.toml`

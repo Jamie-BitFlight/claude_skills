@@ -14,10 +14,11 @@ Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this r
 - **Suppressions**: never add `# ty: ignore`, `# type: ignore`, `# noqa`, `# ruff: ignore[<rule>]`, or
   `# ruff: file-ignore[<rules>]` — including when asked — fix the error or escalate. `# noqa` requires
   explicit user approval as the sole exception; none of the other forms is.
-- **`ruff check --ignore`**: never, to make CI pass. `BLE001`/`D103`/`TRY300` are never suppressible
-  by any mechanism. `--unsafe-fixes` only with `--diff` reviewed first. Config-level per-file
-  exclusions in `pyproject.toml` are the only approved exception mechanism — see the categories in
-  `linting-exceptions.md`.
+- **`ruff check --ignore`**: never, to make CI pass. **`--add-ignore`**: never — it auto-generates
+  `# ruff: ignore[<rule>]` comments, which the Suppressions rule above already forbids. `BLE001`/
+  `D103`/`TRY300` are never suppressible by any mechanism. `--unsafe-fixes` only with `--diff`
+  reviewed first. Config-level per-file exclusions in `pyproject.toml` are the only approved
+  exception mechanism — see the categories in `linting-exceptions.md`.
 - **Formatting scope**: format every Python file you touch, in full — `ruff-format` is a prek hook
   and an `--all-files` CI gate here, so partial formatting fails the build. Astral's "scope fixes to
   files you're editing" advice is for repos that haven't adopted ruff formatting; this one has.
