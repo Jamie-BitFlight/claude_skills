@@ -481,7 +481,7 @@ async def test_backlog_comment_issue_success_returns_comment_fields() -> None:
     fake_result = {
         "issue_number": 42,
         "comment_id": "IC_kwDOtest999",
-        "comment_url": "https://github.com/owner/repo/issues/42#issuecomment-999",
+        "comment_url": "",  # real implementation never resolves this -- see BacklogCommentIssueResponse.comment_url
         "messages": ["  Comment added to issue #42"],
         "warnings": [],
     }

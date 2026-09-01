@@ -2407,6 +2407,8 @@ async def test_backlog_list_count_only_returns_count_key():
     assert response["count"] == 2
     assert "items" not in response, "count_only response must not include 'items' key"
     assert "pagination" not in response, "count_only response must not include 'pagination' key"
+    assert "messages" not in response, "count_only response must not leak Output's default empty messages list"
+    assert "errors" not in response, "count_only response must not leak Output's default empty errors list"
 
 
 async def test_backlog_list_count_only_respects_search_filter():

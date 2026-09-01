@@ -1777,10 +1777,14 @@ async def backlog_list(
 
     # count_only short-circuit: return only the item count without page content.
     # Carries sync_state + warnings when the sync is not IDLE (silent-failure prevention).
+    # exclude_defaults=True (not exclude_none=True): BacklogListResponse inherits
+    # Output's messages/warnings/errors, whose Field(default_factory=list) default
+    # is [] rather than None, so exclude_none alone would leave them in the
+    # response and contradict this branch's documented minimal shape.
     if count_only:
         count_resp: dict[str, object] = {"count": total}
         _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
-        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_none=True)
+        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
