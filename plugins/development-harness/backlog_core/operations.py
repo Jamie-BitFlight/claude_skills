@@ -36,6 +36,7 @@ from .models import (
     VALID_NEW_ITEM_PRIORITIES,
     BacklogError,
     BacklogItem,
+    CacheStateCorruptError,
     ContentKind,
     ContentQuery,
     ContentUnavailableError,
@@ -1150,6 +1151,10 @@ def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
         return
     try:
         result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+    except CacheStateCorruptError:
+        # A corrupted local cache state file needs operator attention — never
+        # degrade it to a routine "queued" message alongside the two cases below.
+        raise
     except BacklogError:
         # BackendUnavailableError (auth/config) and a bare BacklogError (e.g. a
         # transient GraphQL failure inside reconcile()) both mean this attempt
@@ -3849,6 +3854,10 @@ def strike_entry(
         if isinstance(backend, SyncProvider):
             try:
                 backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+            except CacheStateCorruptError:
+                # A corrupted local cache state file needs operator attention — never
+                # degrade it to a routine "queued" message alongside the case below.
+                raise
             except BacklogError:
                 # Mirrors _reconcile_groomed_item: BackendUnavailableError and a bare
                 # BacklogError (e.g. a transient GraphQL failure) both mean this

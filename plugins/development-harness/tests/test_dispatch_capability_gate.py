@@ -26,10 +26,18 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def sqlite_backend():
-    """Wire a real SQLiteBackend (supports_github_extras=False) as the active config."""
-    _set_bp_config(_BacklogConfig(backend=SQLiteBackend(":memory:")))
+    """Wire a real SQLiteBackend (supports_github_extras=False) as the active config.
+
+    ``SQLiteBackend`` leaves its connection open with no lifecycle owner, so
+    teardown closes it explicitly — an unclosed connection fails this repo's
+    strict warning-as-error validation policy (AGENTS.md #18) with a
+    ResourceWarning.
+    """
+    backend = SQLiteBackend(":memory:")
+    _set_bp_config(_BacklogConfig(backend=backend))
     yield
     _reset_bp_config()
+    backend._conn.close()
 
 
 @pytest.mark.unit
