@@ -555,22 +555,21 @@ class InMemoryBackend:
             counts = open_counts if issue["state"] == "OPEN" else closed_counts
             counts[milestone["number"]] = counts.get(milestone["number"], 0) + 1
         milestones: list[MilestoneFullNode] = [
-            MilestoneFullNode(
-                **{
-                    **m,
-                    "openIssueCount": open_counts.get(m["number"], 0),
-                    "closedIssueCount": closed_counts.get(m["number"], 0),
-                }
-            )
+            MilestoneFullNode(**{
+                **m,
+                "openIssueCount": open_counts.get(m["number"], 0),
+                "closedIssueCount": closed_counts.get(m["number"], 0),
+            })
             for m in self._milestones.values()
         ]
         if states:
             state_set = {s.upper() for s in states}
             milestones = [m for m in milestones if str(m["state"]).upper() in state_set]
+        milestones.sort(key=lambda m: (m["dueOn"] is None, m["dueOn"], m["number"]))
         return milestones
 
     def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]:
-        """Return stored milestones, optionally filtered by state.
+        """Return stored milestones, ordered by due date then number, optionally filtered by state.
 
         Args:
             states: Optional list of state filters (e.g. ``["OPEN", "CLOSED"]``).

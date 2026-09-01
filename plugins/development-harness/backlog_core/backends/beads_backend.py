@@ -829,7 +829,7 @@ class BeadsBackend:
         """List beads issues of type ``milestone``, with member counts via ``parent``.
 
         Beads-native equivalent of :meth:`list_milestones`. A single
-        ``bd list --status all`` call fetches every issue once; milestone
+        ``bd list --all`` call fetches every issue once; milestone
         member counts are computed client-side by grouping on each issue's
         ``parent`` field rather than issuing one ``bd children`` call per
         milestone.
