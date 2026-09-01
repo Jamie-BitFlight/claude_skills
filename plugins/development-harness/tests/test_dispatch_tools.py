@@ -877,10 +877,11 @@ class TestDispatchCreatePlan:
 
         Tests: dispatch_create_plan — validate=False path
         How: Call with validate=False and a valid plan dict. Verify is_valid is
-             absent from the response (dropped by exclude_none=True) and the
-             file is still written.
+             present and explicitly null (preserved despite exclude_none=True)
+             and the file is still written.
         Why: Callers that have already validated externally can skip the post-write
-             check for performance; an absent is_valid signals validation was not run.
+             check for performance; an explicit null is_valid signals validation was
+             not run, distinguishing it from a malformed response missing the field.
         """
         # Arrange
         target = patch_create_plan_path
@@ -894,7 +895,8 @@ class TestDispatchCreatePlan:
         # Assert
         data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
-        assert "is_valid" not in data
+        assert "is_valid" in data
+        assert data["is_valid"] is None
         assert _has_dispatch_plan(target)
 
     async def test_create_plan_overwrite_existing(self, existing_plan_file: InMemoryBackend) -> None:

@@ -3955,7 +3955,7 @@ async def dispatch_create_plan(
     wave_count = len(plan.waves)
     item_count = sum(len(wave.items) for wave in plan.waves)
 
-    return DispatchCreatePlanResponse.model_validate({
+    response = DispatchCreatePlanResponse.model_validate({
         "milestone_number": milestone_number,
         "wave_count": wave_count,
         "item_count": item_count,
@@ -3963,7 +3963,10 @@ async def dispatch_create_plan(
         **out.to_dict(),
         "errors": val_errors,
         "warnings": val_warnings,
-    }).model_dump(exclude_none=True)
+    })
+    dump = response.model_dump(exclude_none=True)
+    dump["is_valid"] = response.is_valid
+    return dump
 
 
 @mcp.tool(
