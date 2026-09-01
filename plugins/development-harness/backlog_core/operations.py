@@ -4643,7 +4643,8 @@ def assign_item_to_milestone(
 
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
-        BacklogError: If ``issue_number`` or ``milestone_number`` is unknown to the backend.
+        BacklogError: If ``issue_number`` or ``milestone_number`` is unknown to the
+            backend, or on other GitHub API failures.
         GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
             set or GitHub is unreachable.
     """
@@ -4653,6 +4654,9 @@ def assign_item_to_milestone(
         backend.assign_item_to_milestone(issue_number, milestone_number, repo=repo)
     except KeyError as e:
         raise BacklogError(str(e.args[0])) from e
+    except GithubException as e:
+        msg = f"GitHub API error assigning issue to milestone: {e}"
+        raise BacklogError(msg) from e
     out.info(f"Assigned issue #{issue_number} to milestone #{milestone_number}")
     return {"issue_number": issue_number, "milestone_number": milestone_number, **out.to_dict()}
 

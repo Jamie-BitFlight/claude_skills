@@ -36,6 +36,7 @@ from backlog_core.models import (
     UnsupportedBackendCapabilityError,
     ValidationError,
 )
+from github import GithubException
 from github.Repository import Repository as GithubRepository
 
 _MOCK_REPO: GithubRepository = MagicMock(spec=GithubRepository)
@@ -331,3 +332,29 @@ def test_assign_unknown_issue_raises_backlog_error(backend: WorkItemBackend) -> 
         operations.assign_item_to_milestone(issue_number=999999, milestone_number=ms_number)
 
     assert "not found" in str(exc_info.value)
+
+
+def test_assign_item_to_milestone_normalizes_github_exception() -> None:
+    """A GithubException from the backend (e.g. GitHubBackend's unknown issue/milestone 404) is
+    normalized to BacklogError, not left to escape as a raw PyGithub exception.
+
+    KeyError-raising backends (Memory/SQLite) are covered by
+    test_assign_unknown_issue_raises_backlog_error above; GitHubBackend's
+    assign_item_to_milestone raises GithubException instead (PyGithub's
+    get_issue/get_milestone), which is a distinct code path in the
+    operations.py wrapper.
+    """
+
+    class _FakeGitHubLikeBackend:
+        supports_milestones = True
+
+        def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+            raise GithubException(404, {"message": "Not Found"}, None)
+
+    set_config(BacklogConfig(backend=cast("WorkItemBackend", _FakeGitHubLikeBackend())))
+    try:
+        with pytest.raises(BacklogError) as exc_info:
+            operations.assign_item_to_milestone(issue_number=1, milestone_number=1)
+        assert "GitHub API error" in str(exc_info.value)
+    finally:
+        reset_config()
