@@ -36,7 +36,7 @@ _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 
 def _schema_tokens(schema: dict[str, object]) -> int:
-    return len(_ENCODING.encode(json.dumps(schema)))
+    return len(_ENCODING.encode(json.dumps(schema, sort_keys=True)))
 
 
 TOOLS_NOT_YET_TYPED = {

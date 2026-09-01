@@ -91,6 +91,7 @@ from .search import (
 )
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
 from .tool_responses import (
+    AccumulatedUsage,
     ArtifactReadResponse,
     ArtifactRegisterResponse,
     ArtifactsListResponse,
@@ -4246,17 +4247,9 @@ async def dispatch_wave_status(
         elapsed_seconds=elapsed,
         items=[i.model_dump(mode="json") for i in items],
         warnings=warnings,
+        accumulated_usage=AccumulatedUsage.model_validate(accumulated_usage),
     )
-    # accumulated_usage isn't a schema-advertised field (see tool_responses.py's
-    # design notes above DispatchWaveStatusResponse) -- merged in directly to
-    # keep this TODO placeholder out of the single-tool schema token budget.
-    # Built as a separate statement (not a `{**dump, ...}` literal) so ty
-    # still sees a `DispatchWaveStatusResponse`-compatible return -- pydantic's
-    # model_dump() return type is opaque to ty, but a dict *literal* built
-    # from it is not.
-    dump = summary.model_dump(exclude_none=True)
-    dump["accumulated_usage"] = accumulated_usage
-    return dump
+    return summary.model_dump(exclude_none=True)
 
 
 @dataclasses.dataclass

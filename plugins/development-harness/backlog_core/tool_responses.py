@@ -40,6 +40,7 @@ from pydantic import BaseModel, Field
 from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
 
 __all__ = [
+    "AccumulatedUsage",
     "ArtifactEntryOut",
     "ArtifactReadResponse",
     "ArtifactRegisterResponse",
@@ -388,6 +389,21 @@ class SamTaskLookupResult(FallibleToolResponse):
     """True when the backend could not be reached at all."""
 
 
+class AccumulatedUsage(BaseModel):
+    """Token/cost usage accumulated across a wave's dispatch events.
+
+    TODO: not yet wired to stored dispatch state -- always zero. See
+    ``dispatch_wave_status``'s docstring.
+    """
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
+    estimated_cost_usd: float = 0.0
+    events_with_usage: int = 0
+
+
 # Design notes for DispatchWaveStatusResponse and DispatchSpawnResponse below:
 # each mixes in its domain model (DispatchWaveSummary / DispatchSpawnSummary)
 # rather than redeclaring its fields; kept as wire-only subclasses so the
@@ -398,10 +414,7 @@ class SamTaskLookupResult(FallibleToolResponse):
 # error arm never has the full summary to report. ``items``/``per_wave``
 # are further widened to plain dicts rather than full nested models
 # (``DispatchItemRecord`` alone is a 13-field SQLite row mirror) to stay
-# within the single-tool schema token budget. ``accumulated_usage`` (a
-# TODO placeholder, always zero -- see the tool's docstring) is left off
-# this model entirely and merged into the response dict after
-# ``model_dump()`` for the same budget reason; it isn't schema-advertised.
+# within the single-tool schema token budget.
 class DispatchWaveStatusResponse(DispatchWaveSummary, FallibleToolResponse):
     """Response for ``dispatch_wave_status``."""
 
@@ -413,6 +426,7 @@ class DispatchWaveStatusResponse(DispatchWaveSummary, FallibleToolResponse):
     failed: int | None = None
     skipped: int | None = None
     items: list[dict[str, object]] = Field(default_factory=list)
+    accumulated_usage: AccumulatedUsage | None = None
 
 
 # See DispatchWaveStatusResponse's design notes above.
