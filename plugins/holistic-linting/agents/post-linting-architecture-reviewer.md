@@ -39,13 +39,15 @@ Four sub-checks run in sequence. Any failure stops the review and returns a fail
 **2a. Inline suppression scan** — run on every source file listed in the resolution summary:
 
 ```bash
-grep -nE "# ?noqa|# ?type: *ignore|# ?ty: *ignore|# ?pyright: *ignore|# ?pylint: *disable|# ?ruff: *(ignore|noqa|file-ignore)" <file>
+grep -nE "#[[:space:]]*noqa|#[[:space:]]*type:[[:space:]]*ignore|#[[:space:]]*ty:[[:space:]]*ignore|#[[:space:]]*pyright:[[:space:]]*ignore|#[[:space:]]*pylint:[[:space:]]*disable|#[[:space:]]*ruff:[[:space:]]*(ignore|noqa|file-ignore)" <file>
 ```
 
 Keep the full alternation above, including `# ruff: ignore[<rule>]` and `# ruff: file-ignore[<rules>]`
 — live, distinct suppression forms (see the `holistic-linting-resolver` skill's Suppression Gate for
 why) that a `# noqa`-only grep would silently miss. `file-ignore` suppresses an entire file, not one
-line — confirm the whole file's rule set is actually clean before treating a match as resolved.
+line — confirm the whole file's rule set is actually clean before treating a match as resolved. Keep
+`[[:space:]]*` rather than a literal space: ruff (verified against 0.16.5) accepts a tab between the
+comment marker and the directive, and a literal-space-only pattern misses that form.
 
 Cross-reference matches against `git diff` to confirm they appear in modified lines. A match inside
 a string literal or fixture — code whose entire purpose is exercising suppression syntax itself, not
