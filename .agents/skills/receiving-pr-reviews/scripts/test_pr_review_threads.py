@@ -1520,8 +1520,11 @@ def test_fetch_summary_reduces_to_the_documented_fields(mocker: MockerFixture) -
             "path": "x.py",
             "line": 10,
             "comment_count": 1,
+            "comments_truncated": False,
             "author": "reviewer",
             "body": "fix this",
+            "latest_author": None,
+            "latest_body": None,
         }
     ]
     assert data["unresponded_reviews"] == [
@@ -1558,8 +1561,8 @@ def test_fetch_summary_thread_exposes_latest_comment_when_it_has_replies(mocker:
 
 
 def test_fetch_summary_thread_omits_latest_fields_when_no_replies(mocker: MockerFixture) -> None:
-    """A single-comment thread carries `comment_count: 1` and no `latest_*` fields -- the common
-    case pays nothing extra for a field that would just duplicate `body`/`author`."""
+    """A single-comment thread carries `comment_count: 1` and null `latest_*` fields -- nothing to
+    report beyond what `body`/`author` already carry."""
     state = _fetch_result(unresolved=[_thread_with_comment()])
     mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
 
@@ -1568,8 +1571,56 @@ def test_fetch_summary_thread_omits_latest_fields_when_no_replies(mocker: Mocker
     assert result.exit_code == 0, result.output
     entry = json.loads(result.output)["unresolved"][0]
     assert entry["comment_count"] == 1
-    assert "latest_author" not in entry
-    assert "latest_body" not in entry
+    assert entry["latest_author"] is None
+    assert entry["latest_body"] is None
+
+
+def test_fetch_summary_thread_omits_latest_when_truncated(mocker: MockerFixture) -> None:
+    """A truncated thread's fetched page may not actually end at the newest comment, so its last
+    fetched item must not be reported as `latest_*` even though it has more than one comment --
+    `comments_truncated` is carried through instead, signalling the caller to page it directly."""
+    thread = UnresolvedThread(
+        id="T1",
+        path="x.py",
+        comments=[
+            CommentNode(databaseId=42, body="fix this", line=10, originalLine=10, author=Author(login="reviewer")),
+            CommentNode(
+                databaseId=43,
+                body="reply within the fetched page",
+                line=10,
+                originalLine=10,
+                author=Author(login="reviewer"),
+            ),
+        ],
+        comments_truncated=True,
+    )
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result(unresolved=[thread]))
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    entry = json.loads(result.output)["unresolved"][0]
+    assert entry["comment_count"] == 2
+    assert entry["comments_truncated"] is True
+    assert entry["latest_author"] is None
+    assert entry["latest_body"] is None
+
+
+def test_fetch_summary_thread_falls_back_to_original_line_when_line_is_null(mocker: MockerFixture) -> None:
+    """An outdated diff comment has `line: null` but keeps `originalLine` -- the summary prefers
+    it over a bare null whenever GitHub provides it."""
+    thread = UnresolvedThread(
+        id="T1",
+        path="x.py",
+        comments=[CommentNode(databaseId=42, body="fix this", line=None, originalLine=17, author=Author(login="r"))],
+        comments_truncated=False,
+    )
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_fetch_result(unresolved=[thread]))
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--summary"])
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["unresolved"][0]["line"] == 17
 
 
 def test_fetch_summary_fails_clean_on_a_thread_with_no_comments(mocker: MockerFixture) -> None:
@@ -1728,8 +1779,8 @@ def test_fetch_multi_pr_tolerates_whitespace_around_entries(mocker: MockerFixtur
 
 @pytest.mark.parametrize(
     "value",
-    ["", "abc", "41,", "41,,42", "41, abc"],
-    ids=["empty", "non-numeric", "trailing-comma", "empty-part", "mixed"],
+    ["", "abc", "41,", "41,,42", "41, abc", "0", "-1", "41,0"],
+    ids=["empty", "non-numeric", "trailing-comma", "empty-part", "mixed", "zero", "negative", "positive-then-zero"],
 )
 def test_fetch_rejects_a_malformed_pr_list(value: str, mocker: MockerFixture) -> None:
     """A malformed `--pr` value is rejected before any `gh` call is attempted -- including

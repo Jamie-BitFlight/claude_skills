@@ -31,7 +31,6 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import subprocess
 import time
 from typing import Annotated
@@ -40,7 +39,17 @@ import typer
 from pydantic import ValidationError
 
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
-from pr_review_models import FetchResult, ReviewNode, UnresolvedThread, WatchResult
+from pr_review_models import (
+    BoardEntry,
+    FetchResult,
+    FetchSummary,
+    ReviewNode,
+    ReviewSummary,
+    ThreadSummary,
+    UnresolvedThread,
+    WatchResult,
+    WatchSummary,
+)
 
 app = typer.Typer(help="GitHub PR review-thread operations (fetch/watch/reply/resolve) via gh.")
 
@@ -140,16 +149,26 @@ def _parse_pr_list(value: str) -> list[int]:
         intent.
 
     Raises:
-        typer.BadParameter: `value` is empty, or any comma-separated part is not a plain integer.
+        typer.BadParameter: `value` is empty, any comma-separated part is not a plain integer, or
+            any parsed number is not positive -- GitHub PR numbers start at 1, so a non-positive
+            value can only be wrong input; rejecting it here is a more specific, actionable error
+            than the `gh` failure it would otherwise surface as later.
     """
     parts = [part.strip() for part in value.split(",")]
     if not all(parts):
         message = "must be one or more PR numbers, comma-separated (e.g. '41,42,44')"
         raise typer.BadParameter(message)
-    try:
-        return [int(part) for part in parts]
-    except ValueError as exc:
-        raise typer.BadParameter(f"not a valid PR number: {exc}") from exc
+    numbers = []
+    for part in parts:
+        try:
+            number = int(part)
+        except ValueError as exc:
+            raise typer.BadParameter(f"not a valid PR number: {exc}") from exc
+        if number <= 0:
+            message = f"PR number must be positive, got {number}"
+            raise typer.BadParameter(message)
+        numbers.append(number)
+    return numbers
 
 
 def _truncate_body(body: str, max_body: int | None) -> str:
@@ -172,18 +191,21 @@ def _truncate_body(body: str, max_body: int | None) -> str:
     return f"{body[:max_body]}...[truncated, showing {max_body}/{len(body)} chars]"
 
 
-def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> dict[str, object]:
+def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> ThreadSummary:
     """Reduce one unresolved thread to the fields `--summary` needs.
 
-    Ids, its opening comment, and -- when the thread has follow-ups -- its latest comment too.
+    Ids, its opening comment, and -- when there is one to report -- its latest comment too.
     `comment_id`/`author`/`body` always come from the thread's *first* comment -- the one that
     opened it, and the one `reply`'s `--comment-id` must target regardless of how the discussion
     continued (GitHub rejects a reply targeted at another reply). But the opening comment alone can
     be stale: a reviewer's later reply in the same thread can clarify or renew an objection the
     opening comment never carried, and reading only the opener risks answering and resolving a
-    thread against feedback that has since moved on. `comment_count` names how many comments the
-    thread actually has; `latest_author`/`latest_body` are added only when it is more than one, so
-    a single-comment thread (the common case) costs nothing extra. The full comment history stays
+    thread against feedback that has since moved on. `latest_author`/`latest_body` are `None` when
+    there is nothing to add (`comment_count == 1`) *and* when `thread.comments_truncated` is
+    `True`: a truncated thread's fetched page ends wherever GitHub's 100-comment page limit did,
+    not necessarily at the newest comment, so its last fetched item is not reliably "latest" --
+    `comments_truncated` is carried through instead so a caller knows to page the thread's own
+    `comments` connection before trusting anything about it. The full comment history stays
     available via a plain (non-`--summary`) `fetch`.
 
     Args:
@@ -191,8 +213,7 @@ def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> dict
         max_body: Forwarded to `_truncate_body`.
 
     Returns:
-        A dict with `thread_id`, `comment_id`, `path`, `line`, `comment_count`, `author`, `body`,
-        plus `latest_author`/`latest_body` when `comment_count > 1`.
+        A `ThreadSummary` for this thread.
 
     Raises:
         typer.Exit: `thread.comments` is empty -- an unexpected API shape this script has no
@@ -201,29 +222,36 @@ def _summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> dict
     """
     if not thread.comments:
         typer.echo(
-            f"fetch --summary: thread {thread.id} has no comments (unexpected API shape) -- "
+            f"--summary: thread {thread.id} has no comments (unexpected API shape) -- "
             "re-run without --summary to inspect it directly.",
             err=True,
         )
         raise typer.Exit(code=1)
     first = thread.comments[0]
-    summary: dict[str, object] = {
-        "thread_id": thread.id,
-        "comment_id": first.databaseId,
-        "path": thread.path,
-        "line": first.line,
-        "comment_count": len(thread.comments),
-        "author": first.author.login if first.author is not None else None,
-        "body": _truncate_body(first.body, max_body),
-    }
-    if len(thread.comments) > 1:
+    latest_author: str | None = None
+    latest_body: str | None = None
+    if len(thread.comments) > 1 and not thread.comments_truncated:
         latest = thread.comments[-1]
-        summary["latest_author"] = latest.author.login if latest.author is not None else None
-        summary["latest_body"] = _truncate_body(latest.body, max_body)
-    return summary
+        latest_author = latest.author.login if latest.author is not None else None
+        latest_body = _truncate_body(latest.body, max_body)
+    return ThreadSummary(
+        thread_id=thread.id,
+        comment_id=first.databaseId,
+        path=thread.path,
+        # `line` is null for an outdated diff comment (the line it was left on no longer exists
+        # in the diff); `originalLine` still names where it was originally left, so it is a better
+        # answer than a bare null whenever GitHub provides it.
+        line=first.line if first.line is not None else first.originalLine,
+        comment_count=len(thread.comments),
+        comments_truncated=thread.comments_truncated,
+        author=first.author.login if first.author is not None else None,
+        body=_truncate_body(first.body, max_body),
+        latest_author=latest_author,
+        latest_body=latest_body,
+    )
 
 
-def _summarize_review(review: ReviewNode, *, max_body: int | None) -> dict[str, object]:
+def _summarize_review(review: ReviewNode, *, max_body: int | None) -> ReviewSummary:
     """Reduce one unresponded review to the fields `--summary` needs.
 
     Args:
@@ -231,18 +259,18 @@ def _summarize_review(review: ReviewNode, *, max_body: int | None) -> dict[str, 
         max_body: Forwarded to `_truncate_body`.
 
     Returns:
-        A dict with `author`, `state`, `url`, `body`.
+        A `ReviewSummary` for this review.
     """
-    return {
-        "author": review.author.login if review.author is not None else None,
-        "state": review.state,
-        "url": review.url,
-        "body": _truncate_body(review.body, max_body),
-    }
+    return ReviewSummary(
+        author=review.author.login if review.author is not None else None,
+        state=review.state,
+        url=review.url,
+        body=_truncate_body(review.body, max_body),
+    )
 
 
-def _summarize(result: FetchResult, *, pr: int, max_body: int | None) -> dict[str, object]:
-    """Build the reduced-field dict `--summary` prints for one `FetchResult` snapshot.
+def _summarize(result: FetchResult, *, pr: int, max_body: int | None) -> FetchSummary:
+    """Build the reduced-field `FetchSummary` `--summary` prints for one `FetchResult` snapshot.
 
     Carries exactly what the receiving-pr-reviews workflow reads on every call instead of the full
     JSON `fetch` prints by default: the outcome counts, `reviewability.blockers` (always present,
@@ -259,50 +287,49 @@ def _summarize(result: FetchResult, *, pr: int, max_body: int | None) -> dict[st
         max_body: Forwarded to `_truncate_body`.
 
     Returns:
-        A JSON-serializable dict with the reduced fields.
+        A `FetchSummary` with the reduced fields.
     """
-    return {
-        "pr": pr,
-        "reviews_count": result.reviews_count,
-        "threads_count": result.threads_count,
-        "unresolved_count": result.unresolved_count,
-        "unresponded_count": len(result.unresponded_reviews),
-        "codex_approved": result.codex_approved,
-        "blockers": result.reviewability.blockers,
-        "unresolved": [_summarize_thread(thread, max_body=max_body) for thread in result.unresolved],
-        "unresponded_reviews": [_summarize_review(review, max_body=max_body) for review in result.unresponded_reviews],
-    }
+    return FetchSummary(
+        pr=pr,
+        reviews_count=result.reviews_count,
+        threads_count=result.threads_count,
+        unresolved_count=result.unresolved_count,
+        unresponded_count=len(result.unresponded_reviews),
+        codex_approved=result.codex_approved,
+        blockers=result.reviewability.blockers,
+        unresolved=[_summarize_thread(thread, max_body=max_body) for thread in result.unresolved],
+        unresponded_reviews=[_summarize_review(review, max_body=max_body) for review in result.unresponded_reviews],
+    )
 
 
-def _board_entry(pr: int, result: FetchResult) -> dict[str, object]:
-    """One PR's status entry for the multi-`--pr` `fetch` board.
+def _board_entry(pr: int, result: FetchResult) -> BoardEntry:
+    """One PR's `BoardEntry` for the multi-`--pr` `fetch` board.
 
-    The default output when several PRs are checked without `--summary`. A dict, not a formatted
-    string: this repository's own CLI-output policy (AGENTS.md, "CLI and
-    script output — agent-only, never human-facing") requires structured output to be JSON with an
-    explicit repeated key per value, not a text table or a hand-built `key=value` line, since only
-    an agent ever reads this. `mergeable`/`merge_state_status` are included alongside `blockers`
-    because `blockers` alone doesn't say whether a PR is landable -- it can be empty (reviews
-    aren't blocked) while the PR is still unresolved or otherwise unmergeable, which is the
-    difference between "quiet" and "ready".
+    The default output when several PRs are checked without `--summary`. A validated model, not a
+    formatted string: this repository's own CLI-output policy (AGENTS.md, "CLI and script output —
+    agent-only, never human-facing") requires structured output to be JSON with an explicit
+    repeated key per value, not a text table or a hand-built `key=value` line, since only an agent
+    ever reads this. `mergeable`/`merge_state_status` are included alongside `blockers` because
+    `blockers` alone doesn't say whether a PR is landable -- it can be empty (reviews aren't
+    blocked) while the PR is still unresolved or otherwise unmergeable, which is the difference
+    between "quiet" and "ready".
 
     Args:
         pr: The PR number this entry is for.
         result: Its fresh `FetchResult` snapshot.
 
     Returns:
-        A dict with `pr`, `unresolved`, `unresponded`, `codex_approved`, `mergeable`,
-        `merge_state_status`, `blockers`.
+        A `BoardEntry` for this PR.
     """
-    return {
-        "pr": pr,
-        "unresolved": result.unresolved_count,
-        "unresponded": len(result.unresponded_reviews),
-        "codex_approved": result.codex_approved,
-        "mergeable": result.reviewability.mergeable,
-        "merge_state_status": result.reviewability.merge_state_status,
-        "blockers": result.reviewability.blockers,
-    }
+    return BoardEntry(
+        pr=pr,
+        unresolved=result.unresolved_count,
+        unresponded=len(result.unresponded_reviews),
+        codex_approved=result.codex_approved,
+        mergeable=result.reviewability.mergeable,
+        merge_state_status=result.reviewability.merge_state_status,
+        blockers=result.reviewability.blockers,
+    )
 
 
 SummaryOption = Annotated[
@@ -378,9 +405,9 @@ def fetch(
     for number in pr_numbers:
         result = build_fetch_result(owner, repo, number, gh_timeout=gh_timeout_seconds)
         if summary:
-            typer.echo(json.dumps(_summarize(result, pr=number, max_body=max_body)))
+            typer.echo(_summarize(result, pr=number, max_body=max_body).model_dump_json())
         else:
-            typer.echo(json.dumps(_board_entry(number, result)))
+            typer.echo(_board_entry(number, result).model_dump_json())
 
 
 @app.command()
@@ -515,9 +542,9 @@ def watch(
         raise typer.Exit(code=1)
     timed_out = not current.has_outstanding_work()
     if summary:
-        payload = _summarize(current, pr=pr, max_body=max_body)
-        payload["timed_out"] = timed_out
-        typer.echo(json.dumps(payload))
+        fetch_summary = _summarize(current, pr=pr, max_body=max_body)
+        watch_summary = WatchSummary(**fetch_summary.model_dump(), timed_out=timed_out)
+        typer.echo(watch_summary.model_dump_json())
         return
     result = WatchResult(timed_out=timed_out, state=current)
     typer.echo(result.model_dump_json())
