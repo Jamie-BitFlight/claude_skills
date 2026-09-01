@@ -4291,7 +4291,12 @@ async def dispatch_wave_status(
         warnings=warnings,
         accumulated_usage=AccumulatedUsage.model_validate(accumulated_usage),
     )
-    return summary.model_dump(exclude_none=True)
+    dump = summary.model_dump(exclude_none=True)
+    # elapsed_seconds is a meaningful, documented null for a pending wave that
+    # hasn't started yet -- exclude_none=True would otherwise drop the key
+    # entirely instead of keeping it explicit.
+    dump["elapsed_seconds"] = summary.elapsed_seconds
+    return dump
 
 
 @dataclasses.dataclass
@@ -4619,8 +4624,6 @@ async def dispatch_spawn(
             )
         )
 
-    elapsed_seconds = _time.monotonic() - start_time
-
     def _sum_costs() -> float | None:
         all_w = mgr.get_all_waves(milestone)
         costs = [i.cost for w in all_w if w.wave_num >= wave_num for i in w.items if i.cost is not None]
@@ -4634,13 +4637,18 @@ async def dispatch_spawn(
         completed=overall.completed,
         failed=overall.failed,
         skipped=overall.skipped,
-        elapsed_seconds=elapsed_seconds,
+        elapsed_seconds=_time.monotonic() - start_time,
         per_wave=[w.model_dump(mode="json") for w in per_wave_summaries],
         total_cost=total_cost,
         messages=[f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
         warnings=warnings,
     )
-    return summary.model_dump(exclude_none=True)
+    dump = summary.model_dump(exclude_none=True)
+    # total_cost is a meaningful, documented null when no dispatched item
+    # reported a cost -- exclude_none=True would otherwise drop the key
+    # entirely instead of keeping it explicit.
+    dump["total_cost"] = summary.total_cost
+    return dump
 
 
 from agent_profile import mcp as _agent_profile_mcp
