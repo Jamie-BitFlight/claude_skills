@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -112,6 +112,7 @@ class InMemoryBackend:
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
     supports_github_extras: bool = False
+    supports_milestones: bool = True
 
     def __init__(self) -> None:
         """Initialise empty in-memory storage for all backend state."""
@@ -544,12 +545,101 @@ class InMemoryBackend:
     def _fetch_milestones_graphql(
         self, repo: Repository, owner: str, repo_name: str, states: list[str] | None = None
     ) -> list[MilestoneFullNode]:
-        """Return stored milestones, optionally filtered by state."""
-        milestones = list(self._milestones.values())
+        """Return stored milestones (with issue counts recomputed live), optionally filtered by state."""
+        open_counts: dict[int, int] = {}
+        closed_counts: dict[int, int] = {}
+        for issue in self._issues.values():
+            milestone = issue["milestone"]
+            if milestone is None:
+                continue
+            counts = open_counts if issue["state"] == "OPEN" else closed_counts
+            counts[milestone["number"]] = counts.get(milestone["number"], 0) + 1
+        milestones: list[MilestoneFullNode] = [
+            MilestoneFullNode(**{
+                **m,
+                "openIssueCount": open_counts.get(m["number"], 0),
+                "closedIssueCount": closed_counts.get(m["number"], 0),
+            })
+            for m in self._milestones.values()
+        ]
         if states:
-            state_set = set(states)
-            milestones = [m for m in milestones if m["state"] in state_set]
+            state_set = {s.upper() for s in states}
+            milestones = [m for m in milestones if str(m["state"]).upper() in state_set]
+        milestones.sort(key=lambda m: (m["dueOn"] is None, m["dueOn"], m["number"]))
         return milestones
+
+    def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]:
+        """Return stored milestones, ordered by due date then number, optionally filtered by state.
+
+        Args:
+            states: Optional list of state filters (e.g. ``["OPEN", "CLOSED"]``).
+            repo: Ignored — InMemoryBackend has no GitHub connection.
+
+        Returns:
+            List of ``MilestoneFullNode`` TypedDicts.
+        """
+        return self._fetch_milestones_graphql(cast("Repository", None), "", "", states)
+
+    def create_milestone(
+        self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
+    ) -> MilestoneFullNode:
+        """Create and store a milestone.
+
+        Args:
+            title: Milestone title.
+            description: Optional milestone description.
+            due_on: Optional due date.
+            repo: Ignored — InMemoryBackend has no GitHub connection.
+
+        Returns:
+            MilestoneFullNode describing the created milestone.
+        """
+        number = self._next_milestone_number
+        self._next_milestone_number += 1
+        due_on_str = None
+        if due_on is not None:
+            if due_on.tzinfo is None:
+                due_on = due_on.replace(tzinfo=UTC)
+            due_on_str = due_on.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        node = MilestoneFullNode(
+            id=f"memory-milestone-{number}",
+            number=number,
+            title=title,
+            state="OPEN",
+            description=description or "",
+            dueOn=due_on_str,
+            openIssueCount=0,
+            closedIssueCount=0,
+        )
+        self._milestones[number] = node
+        return node
+
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+        """Set an issue's embedded milestone reference.
+
+        Args:
+            issue_number: Issue to assign.
+            milestone_number: Milestone to assign it to.
+            repo: Ignored — InMemoryBackend has no GitHub connection.
+
+        Raises:
+            KeyError: When ``issue_number`` or ``milestone_number`` is unknown.
+        """
+        issue = self._issues.get(issue_number)
+        if issue is None:
+            msg = f"InMemoryBackend: issue #{issue_number} not found"
+            raise KeyError(msg)
+        milestone = self._milestones.get(milestone_number)
+        if milestone is None:
+            msg = f"InMemoryBackend: milestone #{milestone_number} not found"
+            raise KeyError(msg)
+        issue["milestone"] = MilestoneNode(
+            id=milestone["id"],
+            number=milestone["number"],
+            title=milestone["title"],
+            dueOn=milestone["dueOn"],
+            state=cast('Literal["OPEN", "CLOSED"]', milestone["state"]),
+        )
 
     def _projects_v2_list_query(self, owner: str, limit: int = 20) -> tuple[str, dict[str, object]]:
         """Return stub query/variables — no ProjectsV2 in in-memory backend."""

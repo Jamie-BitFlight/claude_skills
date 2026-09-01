@@ -3285,8 +3285,8 @@ async def backlog_get_soonest_milestone() -> dict:
 
     Requires a backend with milestone support — errors otherwise. Milestones
     without a due date are excluded. If all open milestones
-    lack a due date, the first one by GitHub's default ordering is returned
-    with a warning.
+    lack a due date, the first one by the backend's default ordering is
+    returned with a warning.
 
     Returns:
         Dict with ``milestone`` (dict or None) containing ``number``, ``title``,

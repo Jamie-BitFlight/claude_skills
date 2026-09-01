@@ -45,6 +45,7 @@ import logging
 import os
 import uuid
 from collections.abc import Iterator, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Final, Literal, Protocol
@@ -60,6 +61,7 @@ from backlog_core.backends.bd_runner import (
     JsonValue,
 )
 from backlog_core.backends.beads_models import (
+    BeadsIssueRaw,
     BeadsIssueType,
     BeadsStatus,
     parse_issue,
@@ -89,7 +91,7 @@ from backlog_core.models import (
 if TYPE_CHECKING:
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueNode, MilestoneNode
+    from backlog_core.backend_types import IssueNode, MilestoneFullNode, MilestoneNode
     from backlog_core.models import Output
 
 __all__ = ["BeadsBackend"]
@@ -217,6 +219,42 @@ def _beads_status_for_item_status(status: str) -> str:
     return _LOGICAL_STATUS_TO_BEADS.get(status.casefold(), status)
 
 
+def _collapse_beads_status(status: BeadsStatus) -> Literal["OPEN", "CLOSED"]:
+    """Collapse beads' seven-value status enum onto the backend-neutral open/closed pair.
+
+    Returns:
+        ``"CLOSED"`` for :attr:`BeadsStatus.CLOSED`, ``"OPEN"`` for every
+        other beads status (``open``, ``in_progress``, ``blocked``,
+        ``hooked``, ``deferred``, ``pinned``).
+    """
+    return "CLOSED" if status == BeadsStatus.CLOSED else "OPEN"
+
+
+def _normalize_due_at(due_at: str | None) -> str | None:
+    """Normalize a beads ``due_at`` timestamp to a UTC ``Z``-suffixed string.
+
+    ``bd create --json`` and ``bd list --json`` return this field with
+    different UTC offset shapes for the same underlying value (e.g.
+    ``+10:00`` vs ``Z``); normalizing here keeps callers offset-agnostic.
+
+    Returns:
+        ISO-8601 string with a ``Z`` suffix, or ``None`` when ``due_at`` is
+        absent or unparsable.
+    """
+    if not due_at:
+        return None
+    try:
+        parsed = datetime.fromisoformat(due_at)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        # A date-only or offset-less value has no timezone to convert from;
+        # treat it as already UTC rather than silently reinterpreting it
+        # through the host process's local timezone.
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 _ADR_001_NOTE = (
     "BeadsBackend does not implement GitHub-specific operations. See ADR-001 in the project architecture documentation."
 )
@@ -224,6 +262,18 @@ _ADR_001_NOTE = (
 _ADR_002_NOTE = (
     "fetch_open_issues_by_title returns dict[str, int] but beads issue IDs are strings. "
     "Use fetch_open_issues_by_title_str() for beads-native title lookup. See ADR-002."
+)
+
+# ADR-003: the same int-vs-string-ID mismatch ADR-002 describes for issues,
+# applied to milestones — MilestoneFullNode.number is int, beads milestone
+# IDs are string nanoids. Design-time rationale only; kept out of the raised
+# message text below, which callers receive at runtime and only need told
+# what to call instead, not why the Protocol method can't be implemented.
+_ADR_003_NOTE = (
+    "list_milestones/create_milestone/assign_item_to_milestone use int issue/milestone numbers "
+    "(MilestoneFullNode.number: int) but beads milestones are issues with string nanoid IDs "
+    "(bd create --type milestone). Use list_beads_milestones/create_beads_milestone/"
+    "assign_beads_item_to_milestone for beads-native milestone support instead."
 )
 
 _ADR_002_BATCH_NOTE = (
@@ -254,6 +304,13 @@ class BeadsBackend:
       ``GitHubExtras`` methods (see ``backend_types.py`` for the protocol);
       this is the one backend the old ``isinstance``-only gate actually
       caught correctly.
+    - ``supports_milestones = False`` — the generic ``list_milestones``/
+      ``create_milestone``/``assign_item_to_milestone`` methods use ``int``
+      issue/milestone numbers, which beads' string nanoid IDs cannot satisfy
+      (see ADR-003). Beads-native milestone support is real, just reached
+      through the beads-native shadow methods
+      (:meth:`list_beads_milestones`, :meth:`create_beads_milestone`,
+      :meth:`assign_beads_item_to_milestone`) instead of the generic gate.
 
     Parameters
     ----------
@@ -269,6 +326,7 @@ class BeadsBackend:
     issue_id_type: Literal["integer", "string"] = "string"
     supports_branches: bool = False
     supports_github_extras: bool = False
+    supports_milestones: bool = False
 
     def __init__(self, runner: _BdRunnerLike | None = None) -> None:
         """Store the runner; do not touch the filesystem or spawn processes."""
@@ -698,7 +756,7 @@ class BeadsBackend:
             return False
 
         result.status = str(parsed.status)
-        result.state = "closed" if parsed.status == BeadsStatus.CLOSED else "open"
+        result.state = _collapse_beads_status(parsed.status).lower()
         result.source = "beads"
         result.issue = parsed.id
         if parsed.title:
@@ -739,6 +797,123 @@ class BeadsBackend:
             assignees=assignees,
             labels=labels,
         )
+
+    # ------------------------------------------------------------------
+    # Milestones
+    # ------------------------------------------------------------------
+
+    def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]:
+        """Raise NotImplementedError — beads milestone IDs are strings; see ADR-003.
+
+        Use :meth:`list_beads_milestones` for beads-native milestone listing.
+        """
+        raise NotImplementedError(_ADR_003_NOTE)
+
+    def create_milestone(
+        self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
+    ) -> MilestoneFullNode:
+        """Raise NotImplementedError — beads milestone IDs are strings; see ADR-003.
+
+        Use :meth:`create_beads_milestone` for beads-native milestone creation.
+        """
+        raise NotImplementedError(_ADR_003_NOTE)
+
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+        """Raise NotImplementedError — beads milestone IDs are strings; see ADR-003.
+
+        Use :meth:`assign_beads_item_to_milestone` for beads-native assignment.
+        """
+        raise NotImplementedError(_ADR_003_NOTE)
+
+    def list_beads_milestones(self, states: list[str] | None = None) -> list[dict[str, object]]:
+        """List beads issues of type ``milestone``, with member counts via ``parent``.
+
+        Beads-native equivalent of :meth:`list_milestones`. A single
+        ``bd list --all`` call fetches every issue once; milestone
+        member counts are computed client-side by grouping on each issue's
+        ``parent`` field rather than issuing one ``bd children`` call per
+        milestone.
+
+        Args:
+            states: Optional state filter (``"OPEN"``/``"CLOSED"``, case-insensitive).
+
+        Returns:
+            List of dicts with ``number`` (beads nanoid), ``title``, ``state``,
+            ``description``, ``due_on`` (UTC ``Z``-normalized), ``open_issues``,
+            ``closed_issues`` — the same field names ``operations.py`` uses for
+            GitHub/SQLite/Memory milestones, so a future beads-native dispatch
+            path can reuse the shape without translation.
+        """
+        raw = self._runner.run_json(["list", "--all", "--limit", "0"])
+        issues = parse_issue_list(raw)
+        milestones = [i for i in issues if i.type == BeadsIssueType.MILESTONE]
+        if states:
+            state_set = {s.upper() for s in states}
+            milestones = [m for m in milestones if _collapse_beads_status(m.status) in state_set]
+        children_by_parent: dict[str, list[BeadsIssueRaw]] = {}
+        for i in issues:
+            if i.parent is not None:
+                children_by_parent.setdefault(i.parent, []).append(i)
+        result: list[dict[str, object]] = []
+        for m in milestones:
+            children = children_by_parent.get(m.id, [])
+            open_count = sum(1 for c in children if _collapse_beads_status(c.status) == "OPEN")
+            closed_count = sum(1 for c in children if _collapse_beads_status(c.status) == "CLOSED")
+            result.append({
+                "number": m.id,
+                "title": m.title,
+                "state": _collapse_beads_status(m.status).lower(),
+                "description": m.description or "",
+                "due_on": _normalize_due_at(m.due_at),
+                "open_issues": open_count,
+                "closed_issues": closed_count,
+            })
+        return result
+
+    def create_beads_milestone(
+        self, title: str, description: str = "", due_on: str | None = None, parent: str | None = None
+    ) -> str | None:
+        """Create a beads milestone issue via ``bd create --type milestone``.
+
+        Args:
+            title: Milestone title.
+            description: Optional milestone description.
+            due_on: Optional due date, any format ``bd create --due`` accepts
+                (e.g. ``"2026-06-30"``).
+            parent: Optional parent-child parent ID, set at creation time via
+                ``bd create --parent`` instead of a separate ``bd link`` call.
+
+        Returns:
+            Beads nanoid string of the created milestone, or ``None`` when
+            ``bd`` is unavailable or creation fails.
+        """
+        argv = ["create", title, "--type", BeadsIssueType.MILESTONE]
+        if description:
+            argv.extend(["--description", description])
+        if due_on:
+            argv.extend(["--due", due_on])
+        if parent:
+            argv.extend(["--parent", parent])
+        try:
+            raw = self._runner.run_json(argv)
+            parsed = parse_issue(raw)
+        except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
+            _log.debug("create_beads_milestone: bd invocation failed: %s", exc)
+            return None
+        except ValidationError as exc:
+            _log.debug("create_beads_milestone: bd create output validation failed: %s", exc)
+            return None
+        else:
+            return parsed.id or None
+
+    def assign_beads_item_to_milestone(self, issue_id: str, milestone_id: str) -> None:
+        """Assign a beads issue to a milestone via ``bd link --type parent-child``.
+
+        Args:
+            issue_id: Beads nanoid of the item being assigned (the child).
+            milestone_id: Beads nanoid of the milestone (the parent).
+        """
+        self._runner.run_text(["link", issue_id, milestone_id, "--type", "parent-child"])
 
     # ------------------------------------------------------------------
     # Status mutations

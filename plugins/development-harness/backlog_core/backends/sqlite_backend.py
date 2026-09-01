@@ -3,13 +3,16 @@
 Stores all backlog state in a local SQLite database file.  No PyGithub
 dependency — uses only ``sqlite3`` from the standard library.
 
-Schema (6 tables):
-    items            — maps directly to BacklogItem fields
+Schema (7 tables):
+    items            — maps directly to BacklogItem fields; each item carries
+                       a nullable ``milestone_number`` FK (one milestone per
+                       item, matching GitHub's model)
     item_tags        — replaces GitHub label system
-    milestones       — maps to GitHub milestones
-    item_milestones  — item-to-milestone association
+    milestones       — backend-neutral milestone/deadline-bucket concept
     comments         — maps to GitHub issue comments
     projects         — maps to GitHub Projects V2
+    content_records  — logical plan/artifact content (``ContentProvider``)
+    work_item_records — opaque native work-item store (``put_work_item``)
 
 Branch operations are not supported; all five branch methods raise
 ``RuntimeError``.  The body column stores sections as JSON.
@@ -34,7 +37,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import wraps
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Concatenate, Literal, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, Concatenate, Literal, ParamSpec, TypeVar, cast
 
 if TYPE_CHECKING:
     from github.Repository import Repository
@@ -42,7 +45,7 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
+from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -70,22 +73,6 @@ __all__ = ["SQLiteBackend"]
 
 # DDL executed once at startup — CREATE TABLE IF NOT EXISTS is idempotent.
 _SCHEMA_SQL = """\
-CREATE TABLE IF NOT EXISTS items (
-    issue_number   INTEGER PRIMARY KEY,
-    title          TEXT NOT NULL,
-    status         TEXT NOT NULL DEFAULT 'open',
-    body           TEXT,
-    created_at     TEXT NOT NULL,
-    updated_at     TEXT NOT NULL,
-    closed_at      TEXT
-);
-
-CREATE TABLE IF NOT EXISTS item_tags (
-    issue_number   INTEGER NOT NULL REFERENCES items(issue_number),
-    tag            TEXT NOT NULL,
-    UNIQUE(issue_number, tag)
-);
-
 CREATE TABLE IF NOT EXISTS milestones (
     number         INTEGER PRIMARY KEY,
     title          TEXT NOT NULL,
@@ -95,10 +82,21 @@ CREATE TABLE IF NOT EXISTS milestones (
     created_at     TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS item_milestones (
-    issue_number      INTEGER NOT NULL REFERENCES items(issue_number),
-    milestone_number  INTEGER NOT NULL REFERENCES milestones(number),
-    PRIMARY KEY (issue_number, milestone_number)
+CREATE TABLE IF NOT EXISTS items (
+    issue_number      INTEGER PRIMARY KEY,
+    title             TEXT NOT NULL,
+    status            TEXT NOT NULL DEFAULT 'open',
+    body              TEXT,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL,
+    closed_at         TEXT,
+    milestone_number  INTEGER REFERENCES milestones(number)
+);
+
+CREATE TABLE IF NOT EXISTS item_tags (
+    issue_number   INTEGER NOT NULL REFERENCES items(issue_number),
+    tag            TEXT NOT NULL,
+    UNIQUE(issue_number, tag)
 );
 
 CREATE TABLE IF NOT EXISTS comments (
@@ -187,6 +185,7 @@ class SQLiteBackend:
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = False
     supports_github_extras: bool = False
+    supports_milestones: bool = True
 
     def __init__(self, db_path: str = ":memory:") -> None:
         """Initialise the SQLite database and create tables if absent.
@@ -199,7 +198,36 @@ class SQLiteBackend:
         self._conn.row_factory = sqlite3.Row
         self._content_lock = RLock()
         self._conn.executescript(_SCHEMA_SQL)
+        self._migrate_schema()
         self._conn.commit()
+
+    def _migrate_schema(self) -> None:
+        """Add columns introduced after a durable database's original schema.
+
+        ``CREATE TABLE IF NOT EXISTS`` is a no-op on a table that already
+        exists, so a pre-existing durable ``items`` table never gains new
+        columns on its own. Backfills from the legacy ``item_milestones``
+        join table when present, then drops it.
+        """
+        columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(items)").fetchall()}
+        if "milestone_number" not in columns:
+            self._conn.execute("ALTER TABLE items ADD COLUMN milestone_number INTEGER REFERENCES milestones(number)")
+        # Runs after the column above is guaranteed present, so this is safe on
+        # both a fresh database and a durable one migrated by this method.
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_items_milestone_number ON items(milestone_number)")
+        legacy_table = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'item_milestones'"
+        ).fetchone()
+        if legacy_table is not None:
+            self._conn.execute(
+                "UPDATE items SET milestone_number = ("
+                "  SELECT milestone_number FROM item_milestones"
+                "  WHERE item_milestones.issue_number = items.issue_number"
+                "  ORDER BY milestone_number LIMIT 1"
+                ") WHERE milestone_number IS NULL"
+                "  AND issue_number IN (SELECT issue_number FROM item_milestones)"
+            )
+            self._conn.execute("DROP TABLE item_milestones")
 
     @_serialized_connection_operation
     def list_work_items(self) -> list[BacklogItem]:
@@ -353,12 +381,32 @@ class SQLiteBackend:
         row = self._conn.execute("SELECT COALESCE(MAX(number), 0) + 1 FROM projects").fetchone()
         return int(row[0])
 
-    def _row_to_issue_node(self, row: sqlite3.Row, tags: list[str] | None = None) -> IssueNode:
+    def _milestones_by_number_for(self, rows: list[sqlite3.Row]) -> dict[int, sqlite3.Row]:
+        """Pre-fetch milestones for a batch of ``items`` rows, or skip the query entirely.
+
+        Returns:
+            Empty dict, with no query run, when no row in ``rows`` references
+            a milestone. Otherwise every ``milestones`` row keyed by number.
+        """
+        if not any(r["milestone_number"] is not None for r in rows):
+            return {}
+        return {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
+
+    def _row_to_issue_node(
+        self,
+        row: sqlite3.Row,
+        tags: list[str] | None = None,
+        milestones_by_number: dict[int, sqlite3.Row] | None = None,
+    ) -> IssueNode:
         """Convert a database row from ``items`` to an ``IssueNode``.
 
         Args:
             row: Row from the ``items`` table.
             tags: Pre-fetched tag list for this issue, or ``None`` to fetch now.
+            milestones_by_number: Pre-fetched ``milestones`` rows keyed by
+                ``number``, or ``None`` to fetch this row's milestone
+                individually. Callers converting many rows at once should
+                pass this to avoid one extra query per row.
 
         Returns:
             ``IssueNode`` TypedDict populated from the row.
@@ -369,6 +417,22 @@ class SQLiteBackend:
             tags = [r["tag"] for r in tag_rows]
         label_nodes: list[LabelNode] = [LabelNode(id=f"label-{t}", name=t) for t in tags]
         state = "OPEN" if str(row["status"]).lower() == "open" else "CLOSED"
+        milestone: MilestoneNode | None = None
+        milestone_number = row["milestone_number"]
+        if milestone_number is not None:
+            ms_row = (
+                milestones_by_number.get(int(milestone_number))
+                if milestones_by_number is not None
+                else self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+            )
+            if ms_row is not None:
+                milestone = MilestoneNode(
+                    id=f"sqlite-milestone-{milestone_number}",
+                    number=int(milestone_number),
+                    title=ms_row["title"],
+                    dueOn=ms_row["due_on"],
+                    state=cast('Literal["OPEN", "CLOSED"]', str(ms_row["state"]).upper()),
+                )
         return IssueNode(
             id=f"sqlite-issue-{number}",
             number=number,
@@ -378,7 +442,7 @@ class SQLiteBackend:
             createdAt=row["created_at"],
             updatedAt=row["updated_at"],
             labels=label_nodes,
-            milestone=None,
+            milestone=milestone,
             assignees=[],
         )
 
@@ -394,18 +458,12 @@ class SQLiteBackend:
         number = int(row["number"])
         open_count = int(
             self._conn.execute(
-                "SELECT COUNT(*) FROM item_milestones im "
-                "JOIN items i ON im.issue_number = i.issue_number "
-                "WHERE im.milestone_number = ? AND i.status = 'open'",
-                (number,),
+                "SELECT COUNT(*) FROM items WHERE milestone_number = ? AND status = 'open'", (number,)
             ).fetchone()[0]
         )
         closed_count = int(
             self._conn.execute(
-                "SELECT COUNT(*) FROM item_milestones im "
-                "JOIN items i ON im.issue_number = i.issue_number "
-                "WHERE im.milestone_number = ? AND i.status != 'open'",
-                (number,),
+                "SELECT COUNT(*) FROM items WHERE milestone_number = ? AND status != 'open'", (number,)
             ).fetchone()[0]
         )
         state = str(row["state"]).upper()
@@ -507,24 +565,22 @@ class SQLiteBackend:
             List of ``IssueNode`` TypedDicts.
         """
         db_status = "open" if state.upper() == "OPEN" else "closed"
-        rows = self._conn.execute(
-            "SELECT * FROM items WHERE status = ? ORDER BY issue_number LIMIT ?", (db_status, first)
-        ).fetchall()
+        if milestone_number is not None:
+            rows = self._conn.execute(
+                "SELECT * FROM items WHERE status = ? AND milestone_number = ? ORDER BY issue_number LIMIT ?",
+                (db_status, milestone_number, first),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM items WHERE status = ? ORDER BY issue_number LIMIT ?", (db_status, first)
+            ).fetchall()
 
-        nodes = [self._row_to_issue_node(r) for r in rows]
+        milestones_by_number = self._milestones_by_number_for(rows)
+        nodes = [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
 
         if labels:
             label_set = set(labels)
             nodes = [n for n in nodes if any(lbl["name"] in label_set for lbl in n["labels"])]
-
-        if milestone_number is not None:
-            milestone_numbers = {
-                int(r["issue_number"])
-                for r in self._conn.execute(
-                    "SELECT issue_number FROM item_milestones WHERE milestone_number = ?", (milestone_number,)
-                ).fetchall()
-            }
-            nodes = [n for n in nodes if n["number"] in milestone_numbers]
 
         return nodes
 
@@ -1043,11 +1099,83 @@ class SQLiteBackend:
         Returns:
             List of ``MilestoneFullNode`` TypedDicts.
         """
-        rows = self._conn.execute("SELECT * FROM milestones").fetchall()
+        rows = self._conn.execute("SELECT * FROM milestones ORDER BY due_on IS NULL, due_on, number").fetchall()
         if states:
             state_set = {s.lower() for s in states}
             rows = [r for r in rows if str(r["state"]).lower() in state_set]
         return [self._row_to_milestone_full(r) for r in rows]
+
+    def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]:
+        """Return stored milestones, ordered by due date then number.
+
+        Args:
+            states: Optional list of state filters (e.g. ``["OPEN", "CLOSED"]``).
+            repo: Ignored — SQLite has no GitHub connection.
+
+        Returns:
+            List of ``MilestoneFullNode`` TypedDicts.
+        """
+        return self._fetch_milestones_graphql(cast("Repository", None), "", "", states)
+
+    @_serialized_connection_operation
+    def create_milestone(
+        self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
+    ) -> MilestoneFullNode:
+        """Insert a new milestone row and return it as a MilestoneFullNode.
+
+        Args:
+            title: Milestone title.
+            description: Optional milestone description.
+            due_on: Optional due date.
+            repo: Ignored — SQLite has no GitHub connection.
+
+        Returns:
+            MilestoneFullNode describing the created milestone.
+        """
+        number = self._next_milestone_number()
+        due_on_str = None
+        if due_on is not None:
+            if due_on.tzinfo is None:
+                due_on = due_on.replace(tzinfo=UTC)
+            due_on_str = due_on.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self._conn.execute(
+            "INSERT INTO milestones (number, title, due_on, description, state, created_at) "
+            "VALUES (?, ?, ?, ?, 'open', ?)",
+            (number, title, due_on_str, description or "", _now()),
+        )
+        self._conn.commit()
+        row = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (number,)).fetchone()
+        if row is None:
+            msg = f"SQLiteBackend: milestone #{number} not found immediately after insert"
+            raise RuntimeError(msg)
+        return self._row_to_milestone_full(row)
+
+    @_serialized_connection_operation
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+        """Set an item's ``milestone_number`` FK.
+
+        Args:
+            issue_number: Item to assign.
+            milestone_number: Milestone to assign it to.
+            repo: Ignored — SQLite has no GitHub connection.
+
+        Raises:
+            KeyError: When ``issue_number`` or ``milestone_number`` is unknown.
+                SQLite foreign keys are never enforced (``PRAGMA foreign_keys``
+                defaults off), so an unchecked ``UPDATE`` would silently accept
+                a nonexistent milestone or update zero rows for an unknown
+                issue.
+        """
+        if self._conn.execute("SELECT 1 FROM items WHERE issue_number = ?", (issue_number,)).fetchone() is None:
+            msg = f"SQLiteBackend: issue #{issue_number} not found"
+            raise KeyError(msg)
+        if self._conn.execute("SELECT 1 FROM milestones WHERE number = ?", (milestone_number,)).fetchone() is None:
+            msg = f"SQLiteBackend: milestone #{milestone_number} not found"
+            raise KeyError(msg)
+        self._conn.execute(
+            "UPDATE items SET milestone_number = ? WHERE issue_number = ?", (milestone_number, issue_number)
+        )
+        self._conn.commit()
 
     def _projects_v2_list_query(self, owner: str, limit: int = 20) -> tuple[str, dict[str, object]]:
         """Return stub query/variables — SQLite has no GraphQL layer.
@@ -1138,7 +1266,8 @@ class SQLiteBackend:
             All stored issue nodes.
         """
         rows = self._conn.execute("SELECT * FROM items ORDER BY issue_number").fetchall()
-        return [self._row_to_issue_node(r) for r in rows]
+        milestones_by_number = self._milestones_by_number_for(rows)
+        return [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
 
     @_serialized_connection_operation
     def update_task_status(

@@ -159,6 +159,14 @@ class BeadsIssueRaw(BaseModel):
         created_at: ISO-8601 creation timestamp, may be absent.
         updated_at: ISO-8601 last-update timestamp, may be absent.
         closed_at: ISO-8601 closure timestamp, absent when issue is open.
+        parent: Beads nanoid of this issue's parent-child parent, if any.
+            Emitted by the CLI as a first-class ``"parent"`` scalar on both
+            ``bd create --parent`` and ``bd link --type parent-child``
+            output; used as the milestone-membership signal (Slice C).
+        due_at: ISO-8601 due date/time, may be absent.  ``bd create --json``
+            and ``bd list --json`` return this field with different UTC
+            offset shapes for the same value — callers normalize to a ``Z``
+            suffix at the backend boundary, not here.
     """
 
     model_config = ConfigDict(strict=True, extra="ignore")
@@ -176,6 +184,8 @@ class BeadsIssueRaw(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     closed_at: str | None = None
+    parent: str | None = None
+    due_at: str | None = None
 
 
 class BeadsDependencyRaw(BaseModel):

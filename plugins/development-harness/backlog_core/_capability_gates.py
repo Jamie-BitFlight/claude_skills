@@ -25,7 +25,7 @@ from __future__ import annotations
 from .backend_types import BranchBackend, GitHubExtras, WorkItemBackend
 from .models import UnsupportedBackendCapabilityError
 
-__all__ = ["require_branch_support", "require_github_extras"]
+__all__ = ["require_branch_support", "require_github_extras", "require_milestone_support"]
 
 
 def require_github_extras(backend: WorkItemBackend, operation: str) -> GitHubExtras:
@@ -79,4 +79,27 @@ def require_branch_support(backend: WorkItemBackend, operation: str) -> BranchBa
         raise UnsupportedBackendCapabilityError("branches", type(backend).__name__, operation)
     if not isinstance(backend, BranchBackend):
         raise UnsupportedBackendCapabilityError("branches", type(backend).__name__, operation, protocol_mismatch=True)
+    return backend
+
+
+def require_milestone_support(backend: WorkItemBackend, operation: str) -> WorkItemBackend:
+    """Return ``backend``, or raise if it does not support milestones.
+
+    Unlike ``require_github_extras``/``require_branch_support``, the milestone
+    methods live directly on ``WorkItemBackend`` rather than a separate
+    optional Protocol, so no ``isinstance`` structural check is needed here
+    — the flag alone is authoritative.
+
+    Args:
+        backend: The active backend instance to check (see require_github_extras's Args for why this is a parameter rather than fetched internally).
+        operation: See require_github_extras.
+
+    Returns:
+        The same backend instance.
+
+    Raises:
+        UnsupportedBackendCapabilityError: If ``backend.supports_milestones`` is falsy.
+    """
+    if not getattr(backend, "supports_milestones", False):
+        raise UnsupportedBackendCapabilityError("milestones", type(backend).__name__, operation)
     return backend

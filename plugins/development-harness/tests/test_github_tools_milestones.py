@@ -14,7 +14,6 @@ No @pytest.mark.asyncio decorators — asyncio_mode = "auto" is set globally.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import cast
 from unittest.mock import MagicMock, patch
 
@@ -30,29 +29,7 @@ from tests.helpers import call_mcp_tool
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-_DUE_ON = datetime(2026, 6, 30, 0, 0, 0, tzinfo=UTC)
 _DUE_ON_STR = "2026-06-30T00:00:00Z"
-
-
-def _make_milestone(
-    number: int = 1,
-    title: str = "v1.0",
-    state: str = "open",
-    description: str = "",
-    due_on: datetime | None = _DUE_ON,
-    open_issues: int = 3,
-    closed_issues: int = 7,
-) -> MagicMock:
-    """Build a MagicMock mimicking a PyGithub Milestone object."""
-    ms = MagicMock()
-    ms.number = number
-    ms.title = title
-    ms.state = state
-    ms.description = description
-    ms.due_on = due_on
-    ms.open_issues = open_issues
-    ms.closed_issues = closed_issues
-    return ms
 
 
 async def _call(tool_name: str, params: dict | None = None) -> dict:
@@ -305,19 +282,13 @@ def test_get_soonest_milestone_falls_back_to_first_when_no_due_dates(monkeypatch
 # ---------------------------------------------------------------------------
 
 
-def test_create_milestone_returns_milestone_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_milestone_returns_milestone_fields() -> None:
     """create_milestone returns a milestone dict with all expected fields.
 
     Tests: create_milestone return shape
-    How: Mock create_milestone on repo; verify returned dict keys.
+    How: Create through the real (in-memory) backend dispatch; verify returned dict keys.
     Why: Callers need the milestone number immediately after creation.
     """
-    # Arrange
-    mock_ms = _make_milestone(number=5, title="v3.0")
-    mock_repo = MagicMock()
-    mock_repo.create_milestone.return_value = mock_ms
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
-
     from backlog_core.operations import create_milestone
 
     # Act
@@ -326,22 +297,19 @@ def test_create_milestone_returns_milestone_fields(monkeypatch: pytest.MonkeyPat
     # Assert
     ms = cast("dict[str, object]", result["milestone"])
     assert ms is not None
-    assert ms["number"] == 5
+    assert ms["number"] is not None
     assert ms["title"] == "v3.0"
     assert "state" in ms
     assert "due_on" in ms
 
 
-def test_create_milestone_empty_title_raises_validation_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_milestone_empty_title_raises_validation_error() -> None:
     """create_milestone raises ValidationError when title is empty or whitespace.
 
     Tests: create_milestone title validation
     How: Pass empty title string; expect ValidationError.
     Why: An empty milestone title is invalid and would confuse consumers.
     """
-    # Arrange
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: MagicMock())
-
     from backlog_core.operations import create_milestone
 
     # Act / Assert
@@ -349,39 +317,30 @@ def test_create_milestone_empty_title_raises_validation_error(monkeypatch: pytes
         create_milestone(title="")
 
 
-def test_create_milestone_parses_date_string(monkeypatch: pytest.MonkeyPatch) -> None:
-    """create_milestone parses ISO 8601 date string and passes datetime to PyGithub.
+def test_create_milestone_formats_due_on_as_utc_z_string() -> None:
+    """create_milestone parses an ISO 8601 date string and normalizes due_on to UTC Z.
 
     Tests: create_milestone due_on date parsing
-    How: Capture kwargs passed to create_milestone on mock repo; verify due_on is datetime.
-    Why: PyGithub expects a datetime object, not a string.
+    How: Create with a bare-date due_on; verify the returned due_on is UTC-Z-normalized.
+    Why: Consumers must see one consistent due_on shape regardless of backend.
     """
-    # Arrange
-    mock_ms = _make_milestone(number=1, title="v1.0", due_on=datetime(2026, 6, 30, tzinfo=UTC))
-    mock_repo = MagicMock()
-    mock_repo.create_milestone.return_value = mock_ms
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: mock_repo)
-
     from backlog_core.operations import create_milestone
 
     # Act
-    create_milestone(title="v1.0", due_on="2026-06-30")
+    result = create_milestone(title="v1.0", due_on="2026-06-30")
 
     # Assert
-    call_kwargs = mock_repo.create_milestone.call_args.kwargs
-    assert isinstance(call_kwargs.get("due_on"), datetime)
+    ms = cast("dict[str, object]", result["milestone"])
+    assert ms["due_on"] == _DUE_ON_STR
 
 
-def test_create_milestone_invalid_date_raises_validation_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_milestone_invalid_date_raises_validation_error() -> None:
     """create_milestone raises ValidationError when due_on cannot be parsed.
 
     Tests: create_milestone due_on parse failure
     How: Pass nonsensical date string; verify ValidationError is raised.
     Why: Silent date parsing failure would create milestones with wrong due dates.
     """
-    # Arrange
-    monkeypatch.setattr("backlog_core.operations.get_github", lambda repo=None: MagicMock())
-
     from backlog_core.operations import create_milestone
 
     # Act / Assert

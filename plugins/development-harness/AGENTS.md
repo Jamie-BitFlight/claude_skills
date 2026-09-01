@@ -544,7 +544,7 @@ grooming, plan, task, artifact-manifest, and artifact-content operations. The fo
 families are available:
 
 - `github` (default) — GitHub Issues via GraphQL + PyGithub REST. Requires `GITHUB_TOKEN`.
-- `sqlite` — local 6-table SQLite schema, WAL mode. No external credentials.
+- `sqlite` — local 7-table SQLite schema, WAL mode. No external credentials.
 - `memory` — in-memory native test double. No persistence, YAML, or `FileCache`.
 - `beads` — routes to `bd` CLI via lazy subprocess wrapper. Auto-detected when `.beads/dh-backend` marker file exists at project root (explicit opt-in required). `bd` binary validated on first use; raises `BdNotInstalledError` on failure with no silent fallback.
 

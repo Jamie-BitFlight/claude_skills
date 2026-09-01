@@ -80,6 +80,11 @@ support reconciliation and recovery but do not create a second backlog. Beads,
 SQLite, and memory backends read and write their own native state directly and
 do not use YAML or a provider cache.
 
+Known gap: `add_item` on `sqlite`/`memory` does not insert a normally-created
+item into that backend's native issue table — it is stored only through
+`put_work_item`, so a backend-native operation keyed on `issue_number`
+(milestone assignment included) cannot find it yet. Tracked as #3365.
+
 <provider_contract>
 
 ## Provider behavior
@@ -115,7 +120,7 @@ the accepted state.
 
 ### Capability flags
 
-`WorkItemBackend` declares four class-level capability flags every backend
+`WorkItemBackend` declares five class-level capability flags every backend
 sets. Callers read a flag before invoking the operation it gates, rather than
 probing behavior or catching a stub's exception:
 
@@ -125,6 +130,7 @@ probing behavior or catching a stub's exception:
 | `supports_branches` | Backend can satisfy `BranchBackend` — integration branch create/merge/delete. | `True` | `False` | `True` | `False` |
 | `supports_batch_status_fetch` | Backend implements a real batched status fetch. | `True` | `True` | `True` | `False` |
 | `supports_batch_issue_update` | Backend implements a real batched GraphQL update. | `True` | `False` | `False` | `False` |
+| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept (ADR-003) — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
 
 **Flag-first gating rule:** `GitHubExtras` and `BranchBackend` are both
 `runtime_checkable` Protocols. `isinstance(backend, SomeProtocol)` checks
@@ -139,6 +145,26 @@ also set the matching flag `True` — declaring the flag without satisfying the
 Protocol raises `UnsupportedBackendCapabilityError` with `protocol_mismatch=True`
 (a backend bug), and satisfying the Protocol without setting the flag is
 treated as unsupported (the flag getter defaults `False`).
+
+### Milestones
+
+Milestone assignment is one-per-item on every backend: `sqlite`'s
+`items.milestone_number` is a nullable FK, and beads' own `parent` field is a
+scalar, so an item belongs to at most one milestone. Opening a durable
+`sqlite` database created before this contract existed self-migrates on
+connect — adds `milestone_number`, backfills it from the deprecated
+`item_milestones` join table (lowest milestone number wins when an item had
+more than one legacy link), then drops that table. `sqlite`/`memory` order
+`list_milestones` by `due_on` then `number`; neither has a priority-ordering
+concept.
+
+`beads` sets `supports_milestones = False` (ADR-003 — its milestone IDs are
+string nanoids, `MilestoneFullNode.number` is `int`). Use its beads-native
+shadow methods instead of the generic Protocol methods:
+`list_beads_milestones`/`create_beads_milestone`/`assign_beads_item_to_milestone`,
+backed by `bd create --type milestone [--due] [--parent]` and
+`bd link --type parent-child` (`bd`'s `--all` flag, not `--status all`, is
+what includes closed issues).
 
 ### GitHub contract
 
