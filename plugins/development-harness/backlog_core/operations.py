@@ -16,8 +16,8 @@ from typing import Any, Final, NotRequired, TypeGuard
 
 from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
-from github import GithubException, GithubObject
-from github.Repository import Repository  # GithubObject used only by create_milestone (ADR-004)
+from github import GithubException
+from github.Repository import Repository
 from ruamel.yaml.error import YAMLError
 from sam_schema.core.backends.content import parse_plan_content
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
@@ -25,7 +25,7 @@ from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
 
 from . import models as _models
-from ._capability_gates import require_github_extras
+from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
 from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
@@ -4460,13 +4460,31 @@ def list_merged_prs(
 # ---------------------------------------------------------------------------
 
 
+def _milestone_dict(ms: MilestoneFullNode) -> dict[str, object]:
+    """Shape a ``MilestoneFullNode`` into the dict returned by the milestone operations.
+
+    Returns:
+        Dict with ``number``, ``title``, ``state``, ``description``,
+        ``due_on``, ``open_issues``, ``closed_issues``.
+    """
+    return {
+        "number": ms["number"],
+        "title": ms["title"],
+        "state": ms["state"].lower(),
+        "description": ms["description"] or "",
+        "due_on": ms["dueOn"],
+        "open_issues": ms["openIssueCount"],
+        "closed_issues": ms["closedIssueCount"],
+    }
+
+
 def list_milestones(
     repo: str = "", state: str = "open", output: Output | None = None
 ) -> dict[str, list[dict[str, object]] | int | list[str]]:
-    """Return repository milestones filtered by state.
+    """Return backend milestones filtered by state.
 
     Args:
-        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
+        repo: Repository slug (``owner/name``). Ignored by non-GitHub backends.
         state: Filter by milestone state: ``"open"``, ``"closed"``, or ``"all"``.
             Defaults to ``"open"``.
         output: Optional Output collector.
@@ -4477,7 +4495,7 @@ def list_milestones(
         ``closed_issues``), ``count`` (int), and output messages/warnings.
 
     Raises:
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         ValidationError: If ``state`` is not one of ``open``, ``closed``, ``all``.
     """
     out = output or Output()
@@ -4485,22 +4503,10 @@ def list_milestones(
     if state not in valid_states:
         msg = f"state must be one of {sorted(valid_states)!r}, got {state!r}"
         raise ValidationError(msg)
-    repository = get_github(repo)
-    owner, repo_name = repository.full_name.split("/", 1)
+    backend = require_milestone_support(get_config().backend, "list_milestones")
     state_map = {"open": ["OPEN"], "closed": ["CLOSED"], "all": ["OPEN", "CLOSED"]}
-    ms_nodes = _fetch_milestones_graphql(repository, owner, repo_name, states=state_map[state])
-    milestones: list[dict[str, object]] = [
-        {
-            "number": ms["number"],
-            "title": ms["title"],
-            "state": ms["state"].lower(),
-            "description": ms["description"] or "",
-            "due_on": ms["dueOn"],
-            "open_issues": ms["openIssueCount"],
-            "closed_issues": ms["closedIssueCount"],
-        }
-        for ms in ms_nodes
-    ]
+    ms_nodes = backend.list_milestones(states=state_map[state], repo=repo)
+    milestones = [_milestone_dict(ms) for ms in ms_nodes]
     return {"milestones": milestones, "count": len(milestones), **out.to_dict()}
 
 
@@ -4508,11 +4514,11 @@ def get_soonest_milestone(repo: str = "", output: Output | None = None) -> dict[
     """Return the open milestone with the earliest due date.
 
     Milestones without a due date are excluded from consideration.
-    If all open milestones lack a due date, the first one by GitHub's
+    If all open milestones lack a due date, the first one by the backend's
     default ordering is returned with a warning.
 
     Args:
-        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
+        repo: Repository slug (``owner/name``). Ignored by non-GitHub backends.
         output: Optional Output collector.
 
     Returns:
@@ -4522,12 +4528,11 @@ def get_soonest_milestone(repo: str = "", output: Output | None = None) -> dict[
         ``milestone`` is ``None`` when no open milestones exist.
 
     Raises:
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        UnsupportedBackendCapabilityError: If the active backend does not support milestones.
     """
     out = output or Output()
-    repository = get_github(repo)
-    owner, repo_name = repository.full_name.split("/", 1)
-    all_open = _fetch_milestones_graphql(repository, owner, repo_name, states=["OPEN"])
+    backend = require_milestone_support(get_config().backend, "get_soonest_milestone")
+    all_open = backend.list_milestones(states=["OPEN"], repo=repo)
     if not all_open:
         return {"milestone": None, **out.to_dict()}
 
@@ -4538,32 +4543,21 @@ def get_soonest_milestone(repo: str = "", output: Output | None = None) -> dict[
         out.warn("No open milestones have a due date; returning first by default ordering")
         soonest = all_open[0]
 
-    return {
-        "milestone": {
-            "number": soonest["number"],
-            "title": soonest["title"],
-            "state": soonest["state"].lower(),
-            "description": soonest["description"] or "",
-            "due_on": soonest["dueOn"],
-            "open_issues": soonest["openIssueCount"],
-            "closed_issues": soonest["closedIssueCount"],
-        },
-        **out.to_dict(),
-    }
+    return {"milestone": _milestone_dict(soonest), **out.to_dict()}
 
 
 def create_milestone(
     repo: str = "", title: str = "", description: str = "", due_on: str | None = None, output: Output | None = None
 ) -> dict[str, object]:
-    """Create a new milestone on the repository.
+    """Create a new milestone on the active backend.
 
     Args:
-        repo: Repository slug (``owner/name``). Defaults to ``DEFAULT_REPO``.
+        repo: Repository slug (``owner/name``). Ignored by non-GitHub backends.
         title: Milestone title. Must be non-empty.
         description: Optional milestone description.
         due_on: Optional due date as ISO 8601 string (e.g. ``"2026-06-30"`` or
             ``"2026-06-30T00:00:00Z"``). Parsed to a ``datetime`` before
-            passing to PyGithub.
+            dispatch.
         output: Optional Output collector.
 
     Returns:
@@ -4572,7 +4566,7 @@ def create_milestone(
         and output messages/warnings.
 
     Raises:
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         ValidationError: If ``title`` is empty or ``due_on`` cannot be parsed.
     """
     out = output or Output()
@@ -4592,26 +4586,10 @@ def create_milestone(
             msg = f"due_on must be ISO 8601 (e.g. '2026-06-30' or '2026-06-30T00:00:00Z'), got {due_on!r}"
             raise ValidationError(msg)
 
-    repository = get_github(repo)
-    ms = repository.create_milestone(
-        title=title.strip(),
-        state="open",
-        description=description or GithubObject.NotSet,
-        due_on=due_on_dt if due_on_dt is not None else GithubObject.NotSet,
-    )
-    out.info(f"Created milestone #{ms.number}: {ms.title}")
-    return {
-        "milestone": {
-            "number": ms.number,
-            "title": ms.title,
-            "state": ms.state,
-            "description": ms.description or "",
-            "due_on": ms.due_on.strftime("%Y-%m-%dT%H:%M:%SZ") if ms.due_on else None,
-            "open_issues": ms.open_issues,
-            "closed_issues": ms.closed_issues,
-        },
-        **out.to_dict(),
-    }
+    backend = require_milestone_support(get_config().backend, "create_milestone")
+    ms = backend.create_milestone(title=title.strip(), description=description, due_on=due_on_dt, repo=repo)
+    out.info(f"Created milestone #{ms['number']}: {ms['title']}")
+    return {"milestone": _milestone_dict(ms), **out.to_dict()}
 
 
 # ---------------------------------------------------------------------------

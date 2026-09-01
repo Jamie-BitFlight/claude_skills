@@ -29,9 +29,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 import dh_paths as _dh_paths
+from github import GithubObject
 
 from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
+from backlog_core.backend_types import MilestoneFullNode
 from backlog_core.backends.github_content_migration import (
     _GitHubContentCache,
     _GitHubContentMigration,
@@ -67,7 +69,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueCommentNode, IssueNode, MilestoneFullNode
+    from backlog_core.backend_types import IssueCommentNode, IssueNode
     from backlog_core.file_cache_state import _PendingWorkItemMutation
     from backlog_core.models import (
         BackendStatus,
@@ -112,6 +114,7 @@ class GitHubBackend:
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
     supports_github_extras: bool = True
+    supports_milestones: bool = True
 
     def __init__(
         self,
@@ -670,6 +673,48 @@ class GitHubBackend:
             Tuple of (mutation_string, variables_dict).
         """
         return gh_client._projects_v2_create_mutation(owner_id, title)
+
+    def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]:
+        """List milestones via the GraphQL milestone query.
+
+        Returns:
+            List of MilestoneFullNode TypedDicts.
+        """
+        repository = self.get_github(repo)
+        owner, repo_name = repository.full_name.split("/", 1)
+        return self._fetch_milestones_graphql(repository, owner, repo_name, states)
+
+    def create_milestone(
+        self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
+    ) -> MilestoneFullNode:
+        """Create a milestone via PyGithub's REST create_milestone call.
+
+        Returns:
+            MilestoneFullNode describing the created milestone.
+        """
+        repository = self.get_github(repo)
+        ms = repository.create_milestone(
+            title=title,
+            state="open",
+            description=description or GithubObject.NotSet,
+            due_on=due_on if due_on is not None else GithubObject.NotSet,
+        )
+        return MilestoneFullNode(
+            id=str(getattr(ms, "node_id", f"github-milestone-{ms.number}")),
+            number=ms.number,
+            title=ms.title,
+            state=str(ms.state).upper(),
+            description=ms.description or "",
+            dueOn=ms.due_on.strftime("%Y-%m-%dT%H:%M:%SZ") if ms.due_on else None,
+            openIssueCount=ms.open_issues,
+            closedIssueCount=ms.closed_issues,
+        )
+
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
+        """Assign a GitHub issue to a milestone via PyGithub's issue.edit call."""
+        repository = self.get_github(repo)
+        milestone_obj = repository.get_milestone(milestone_number)
+        repository.get_issue(issue_number).edit(milestone=milestone_obj)
 
     # ------------------------------------------------------------------
     # Task issues

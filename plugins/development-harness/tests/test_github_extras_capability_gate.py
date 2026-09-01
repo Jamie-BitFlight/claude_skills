@@ -41,26 +41,59 @@ def sqlite_backend() -> Iterator[SQLiteBackend]:
     backend._conn.close()
 
 
-def test_list_milestones_under_sqlite_backend_raises_typed_capability_error(sqlite_backend: SQLiteBackend) -> None:
-    """list_milestones() under SQLiteBackend raises UnsupportedBackendCapabilityError.
+def test_list_milestones_under_sqlite_backend_no_longer_requires_github_extras(sqlite_backend: SQLiteBackend) -> None:
+    """list_milestones() under SQLiteBackend no longer routes through get_github().
 
-    Tests: the GitHubExtras capability gate (require_github_extras)
-    How: Configure SQLiteBackend (supports_github_extras=False) as the active
-        backend, then call list_milestones() — which calls get_github() first —
-        and assert the typed error's structured fields.
-    Why: This is the exact bug reported in backlog #2287: SQLite structurally
-        satisfies GitHubExtras via isinstance, so the old gate let it reach a
-        bare RuntimeError instead of a typed, caller-recognisable error. This
-        test fails on pre-fix code with RuntimeError instead of
-        UnsupportedBackendCapabilityError.
+    Tests: slice C's milestone capability gate (require_milestone_support)
+        supersedes the old GitHubExtras-only routing for milestones.
+    How: Configure SQLiteBackend (supports_github_extras=False, but
+        supports_milestones=True as of slice C) as the active backend, then
+        call list_milestones() — it must succeed (empty list), not raise.
+    Why: Before slice C, list_milestones() called get_github() unconditionally,
+        so every non-GitHub backend raised UnsupportedBackendCapabilityError
+        for the "github_extras" capability regardless of whether it could
+        genuinely support milestones. Slice C gives SQLite (and Memory) a
+        real milestone implementation, gated on the new "milestones"
+        capability instead — this test fails if that routing regresses back
+        to the GitHubExtras gate.
     """
-    # Act / Assert
-    with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
-        operations.list_milestones()
+    # Act
+    result = operations.list_milestones()
 
-    assert exc_info.value.backend == "SQLiteBackend"
-    assert exc_info.value.capability == "github_extras"
-    assert exc_info.value.operation == "get_github"
+    # Assert
+    assert result["milestones"] == []
+    assert result["count"] == 0
+
+
+def test_list_milestones_under_beads_backend_raises_typed_milestones_capability_error() -> None:
+    """list_milestones() under BeadsBackend raises UnsupportedBackendCapabilityError for "milestones".
+
+    Tests: require_milestone_support() gates on supports_milestones, not
+        supports_github_extras.
+    How: Configure a BeadsBackend (supports_milestones=False — beads
+        milestone IDs are strings, see ADR-003 in beads_backend.py) as the
+        active backend, then call list_milestones() and assert the typed
+        error's structured fields name the "milestones" capability.
+    Why: BeadsBackend is the one backend that genuinely cannot satisfy the
+        int-typed generic milestone Protocol methods; this proves it still
+        fails loudly with a typed, caller-recognisable error rather than a
+        bare NotImplementedError leaking out of operations.py.
+    """
+    from unittest.mock import MagicMock
+
+    from backlog_core.backends.beads_backend import BeadsBackend
+
+    backend = BeadsBackend(runner=MagicMock())
+    set_config(BacklogConfig(backend=backend))
+    try:
+        with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+            operations.list_milestones()
+    finally:
+        reset_config()
+
+    assert exc_info.value.backend == "BeadsBackend"
+    assert exc_info.value.capability == "milestones"
+    assert exc_info.value.operation == "list_milestones"
 
 
 def test_list_issues_under_sqlite_backend_raises_typed_capability_error_not_wrapped(

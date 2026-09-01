@@ -27,7 +27,7 @@ from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 
-from ._capability_gates import require_branch_support, require_github_extras
+from ._capability_gates import require_branch_support, require_github_extras, require_milestone_support
 from .backend_types import (
     AssigneeNode,
     BacklogConfig,
@@ -81,6 +81,7 @@ __all__ = [
     "get_config",
     "require_branch_support",
     "require_github_extras",
+    "require_milestone_support",
     "reset_config",
     "set_config",
 ]

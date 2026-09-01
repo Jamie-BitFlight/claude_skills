@@ -40,7 +40,12 @@ class LabelNode(TypedDict):
 
 
 class MilestoneNode(TypedDict):
-    """Milestone node nested inside an IssueNode."""
+    """Milestone node nested inside an IssueNode.
+
+    ``state`` is a backend-neutral open/closed flag, not a GitHub-only value
+    set — every backend collapses its own milestone lifecycle onto these two
+    values at the backend boundary.
+    """
 
     id: str
     number: int
@@ -132,6 +137,15 @@ class WorkItemBackend(Protocol):
     - ``issue_id_type`` — integer vs string issue IDs.
     - ``supports_branches`` — whether ``BranchBackend`` is implemented.
     - ``supports_github_extras`` — whether ``GitHubExtras`` is implemented; gate via ``require_github_extras()`` (see ``GitHubExtras``'s docstring for why ``isinstance`` alone is insufficient).
+    - ``supports_milestones`` — whether the milestone create/list/assign
+      methods below are genuinely implemented; gate via
+      ``require_milestone_support()`` in ``_capability_gates.py``. Unlike
+      ``supports_branches``/``supports_github_extras`` this is not a
+      separate optional Protocol — the methods live directly on
+      ``WorkItemBackend`` and every backend must define them (raising
+      ``NotImplementedError`` and setting the flag ``False`` is the
+      documented escape hatch for a backend whose native ID type cannot
+      satisfy the ``int`` signature below — see ``BeadsBackend``'s ADR-002).
     """
 
     supports_batch_status_fetch: bool
@@ -139,6 +153,7 @@ class WorkItemBackend(Protocol):
     issue_id_type: Literal["integer", "string"]
     supports_branches: bool
     supports_github_extras: bool
+    supports_milestones: bool
 
     def list_work_items(self) -> list[BacklogItem]: ...
     def get_work_item(self, reference: str) -> BacklogItem: ...
@@ -199,6 +214,13 @@ class WorkItemBackend(Protocol):
     def section_heading(self) -> dict[str, str]: ...
     def render_groomed_section(self, groomed: GroomedData) -> str: ...
     def section_display_title(self, key: str, groomed_date: str = "") -> str: ...
+
+    # Milestones (generic — gate via require_milestone_support())
+    def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]: ...
+    def create_milestone(
+        self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
+    ) -> MilestoneFullNode: ...
+    def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None: ...
 
 
 @runtime_checkable

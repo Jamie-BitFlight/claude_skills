@@ -817,7 +817,9 @@ class MilestoneInfo(BaseModel):
     ``milestone_due_on``, ``milestone_state``) that previously appeared
     separately on :class:`BacklogItemMetadata` and :class:`IssueLocalFields`.
 
-    ``state`` is constrained to the two values GitHub's GraphQL API returns.
+    ``state`` is a backend-neutral open/closed flag: every backend collapses
+    its own milestone lifecycle (or, for beads, its native issue-status set)
+    onto these two values at the backend boundary.
     """
 
     title: str = ""
