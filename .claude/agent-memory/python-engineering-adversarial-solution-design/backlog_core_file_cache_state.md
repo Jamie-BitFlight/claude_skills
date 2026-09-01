@@ -60,14 +60,12 @@ which preserves the raw, unvalidated payload in `corrupt_queue_entries` (a
 fallback with nothing further to preserve it from) rather than dropping the
 entry. `reconcile()`'s `rejected_mutations` count includes
 `corrupt_queue_entries` alongside both rejected buckets
-(`github_work_items.py:529-541`). That count now reaches a user on both
-paths: `_reconcile_groomed_item` (`operations.py:1170-1174`, per-item
-grooming) and `refresh_local_cache_from_github` (`operations.py:1676-1685`,
-the main sync path — dropped both mutation counts before this fix), and
-`sync_status()`/`sync_now()` (`server.py`) report the same two counts as of
-the last completed background sync via `SyncState.pending_mutations`/
-`.rejected_mutations` (`sync_state.py`, populated in
-`sync_engine._run_single_sync`).
+(`github_work_items.py`). That count reaches a user on every sync path:
+`_reconcile_groomed_item` (per-item grooming) and
+`refresh_local_cache_from_github` (the main sync path) both print it, and
+`sync_status()`/`sync_now()` report the same two counts as of the last
+completed background sync via `SyncState.pending_mutations`/
+`.rejected_mutations`, populated in `sync_engine._run_single_sync`.
 
 Latent (tamper-only) bug, still present, unrelated to the above: `acknowledge_replay`
 does `remaining = [e for e in state.pending if e.idempotency_key not in acknowledged_keys]`
