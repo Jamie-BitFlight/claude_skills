@@ -407,9 +407,12 @@ def assign_milestone(
 ) -> None:
     """Assign a backlog item to a milestone."""
     output = Output()
-    result = operations.assign_item_to_milestone(
-        issue_number=issue_number, milestone_number=milestone_number, repo=repo, output=output
-    )
+    try:
+        result = operations.assign_item_to_milestone(
+            issue_number=issue_number, milestone_number=milestone_number, repo=repo, output=output
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc)})
     _emit(result, output)
 
 
