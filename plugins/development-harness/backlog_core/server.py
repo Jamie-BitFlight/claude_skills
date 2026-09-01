@@ -3478,6 +3478,40 @@ async def backlog_create_milestone(
 
 @mcp.tool(
     annotations=ToolAnnotations(
+        title="Assign Item To Milestone",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=True,
+    )
+)
+async def backlog_assign_item_to_milestone(
+    issue_number: Annotated[int, Field(description="Issue number to assign")],
+    milestone_number: Annotated[int, Field(description="Milestone number to assign the issue to")],
+) -> dict:
+    """Assign a backlog item to a milestone.
+
+    Requires a backend with milestone support — errors otherwise.
+
+    Returns:
+        Dict with ``issue_number``, ``milestone_number``, and output
+        messages/warnings. On error, dict contains an ``error`` key.
+    """
+    out = Output()
+    try:
+        result = await asyncio.to_thread(
+            operations.assign_item_to_milestone,
+            issue_number=issue_number,
+            milestone_number=milestone_number,
+            output=out,
+        )
+        return {**result, **out.to_dict()}
+    except BacklogError as e:
+        return {"error": str(e), **out.to_dict()}
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
         title="List Issues", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )

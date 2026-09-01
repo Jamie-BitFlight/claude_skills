@@ -1,9 +1,10 @@
 """Tests for backlog milestone MCP tools and operations.
 
-Covers three tools and operations:
+Covers four tools and operations:
 - list_milestones / backlog_list_milestones
 - get_soonest_milestone / backlog_get_soonest_milestone
 - create_milestone / backlog_create_milestone
+- assign_item_to_milestone / backlog_assign_item_to_milestone
 
 Tests are structured in two layers:
 - Operation layer: functions in operations.py, mocked at get_github boundary.
@@ -577,3 +578,45 @@ async def test_backlog_create_milestone_backlog_error_returns_error_key() -> Non
     # Assert
     assert "error" in result
     assert "Milestone title already used" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# Server layer: backlog_assign_item_to_milestone tool
+# ---------------------------------------------------------------------------
+
+
+async def test_backlog_assign_item_to_milestone_success_returns_result() -> None:
+    """backlog_assign_item_to_milestone returns issue_number/milestone_number with no error key.
+
+    Tests: backlog_assign_item_to_milestone server tool success path
+    How: Patch assign_item_to_milestone with fake result; verify response shape.
+    Why: Verifies the tool is registered and wired to the operation.
+    """
+    # Arrange
+    fake_result = {"issue_number": 12, "milestone_number": 5, "messages": [], "warnings": []}
+
+    with patch("dh_core.operations.assign_item_to_milestone", return_value=fake_result):
+        # Act
+        result = await _call("backlog_assign_item_to_milestone", {"issue_number": 12, "milestone_number": 5})
+
+    # Assert
+    assert result["issue_number"] == 12
+    assert result["milestone_number"] == 5
+    assert "error" not in result
+
+
+async def test_backlog_assign_item_to_milestone_backlog_error_returns_error_key() -> None:
+    """backlog_assign_item_to_milestone returns dict with error key on BacklogError.
+
+    Tests: backlog_assign_item_to_milestone error handling
+    How: Raise BacklogError from patched operation; verify error key.
+    Why: Tool must not raise; MCP requires serialisable error response.
+    """
+    # Arrange
+    with patch("dh_core.operations.assign_item_to_milestone", side_effect=BacklogError("issue #999 not found")):
+        # Act
+        result = await _call("backlog_assign_item_to_milestone", {"issue_number": 999, "milestone_number": 5})
+
+    # Assert
+    assert "error" in result
+    assert "issue #999 not found" in result["error"]

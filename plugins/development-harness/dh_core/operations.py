@@ -119,6 +119,7 @@ __all__ = [
     "artifact_read",
     # --- Artifact operations ---
     "artifact_register",
+    "assign_item_to_milestone",
     "batch_fetch_statuses",
     "check_open_prs_for_issue",
     "claim_task",
@@ -1124,6 +1125,7 @@ from backlog_core.operations import (
     apply_status_groomed,
     apply_status_in_progress,
     apply_status_verified,
+    assign_item_to_milestone,
     batch_fetch_statuses,
     check_open_prs_for_issue,
     close_github_issue,

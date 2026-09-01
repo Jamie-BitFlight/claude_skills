@@ -80,13 +80,7 @@ Skip issue creation for P2/Ideas items — assign by milestone number only if th
 
 ### Step 5: Assign Existing Issues
 
-For selected items that already have issues but are not yet in this milestone:
-
-```bash
-uv run .claude/skills/gh/scripts/github_project_setup.py issue set-milestone \
-  --issue {issue_number} \
-  --milestone {milestone_number}
-```
+For selected items that already have issues but are not yet in this milestone, call `backlog_assign_item_to_milestone(issue_number={issue_number}, milestone_number={milestone_number})`.
 
 ### Step 6: Update Project V2 Status
 
