@@ -33,9 +33,12 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # untested number. These values leave headroom for the remaining 14 tools
 # (13 ordinary tools plus backlog_view, the one deliberately complex
 # exception) while staying two orders of magnitude below sam_plan's
-# single-tool disaster.
+# single-tool disaster. Per-tool cap bumped 600->700 when widening several
+# list-response fields to Optional (fixing error-arm default-value leaks,
+# e.g. dispatch_wave_status) pushed one tool to 604 -- still nowhere near
+# sam_plan's per-tool cost.
 _MAX_TOTAL_SCHEMA_TOKENS = 13000
-_MAX_SINGLE_TOOL_SCHEMA_TOKENS = 600
+_MAX_SINGLE_TOOL_SCHEMA_TOKENS = 700
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 

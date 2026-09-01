@@ -3387,8 +3387,11 @@ async def backlog_list_milestones(
     dump = response.model_dump(exclude_none=True)
     # due_on is a meaningful, documented null per milestone (no due date set) --
     # exclude_none=True's recursive drop would otherwise remove the key from
-    # any milestone lacking one.
-    dump["milestones"] = [m.model_dump() for m in response.milestones]
+    # any milestone lacking one. response.milestones is always a real list
+    # here (never None): the operations.list_milestones result this branch
+    # validated from always supplies it.
+    if response.milestones is not None:
+        dump["milestones"] = [m.model_dump() for m in response.milestones]
     return dump
 
 
@@ -3500,8 +3503,11 @@ async def backlog_list_issues(
     dump = response.model_dump(exclude_none=True)
     # milestone is a meaningful, documented null per issue (no milestone
     # assigned) -- exclude_none=True's recursive drop would otherwise remove
-    # the key from any issue without one.
-    dump["issues"] = [i.model_dump() for i in response.issues]
+    # the key from any issue without one. response.issues is always a real
+    # list here (never None): the operations.list_issues result this branch
+    # validated from always supplies it.
+    if response.issues is not None:
+        dump["issues"] = [i.model_dump() for i in response.issues]
     return dump
 
 

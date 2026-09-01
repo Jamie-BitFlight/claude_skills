@@ -35,7 +35,7 @@ from __future__ import annotations
 from typing import Literal
 
 from dispatch_schema import ConflictGroup
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
 
@@ -173,11 +173,11 @@ class ArtifactEntryOut(BaseModel):
 class ArtifactsListResponse(FallibleToolResponse):
     """Response for ``artifact_list``/``artifact_get``."""
 
-    artifacts: list[ArtifactEntryOut] = Field(default_factory=list)
-    """Registered artifact entries matching the request."""
+    artifacts: list[ArtifactEntryOut] | None = None
+    """Registered artifact entries matching the request. Absent on the error arm."""
 
-    count: int = 0
-    """Total number of artifacts returned; ``0`` alongside an empty ``artifacts``."""
+    count: int | None = None
+    """Total number of artifacts returned; ``0`` alongside an empty ``artifacts``. Absent on the error arm."""
 
 
 # Mirrors ArtifactContent's model_dump(mode="json") shape. Its
@@ -299,8 +299,8 @@ class BacklogGetReadySamTasksResponse(FallibleToolResponse):
     feature: str | None = None
     """Feature slug the ready tasks belong to."""
 
-    ready_tasks: list[dict[str, object]] = Field(default_factory=list)
-    """Ready task dicts, each with id, name, agent, skills, issue_number."""
+    ready_tasks: list[dict[str, object]] | None = None
+    """Ready task dicts, each with id, name, agent, skills, issue_number. Absent on the error arm."""
 
     count: int | None = None
     """Number of ready tasks returned."""
@@ -370,8 +370,8 @@ class SamTaskRow(BaseModel):
 class SamTaskLookupResult(FallibleToolResponse):
     """Response for ``backlog_get_sam_tasks``."""
 
-    tasks: list[SamTaskRow] = Field(default_factory=list)
-    """Matching SAM task rows."""
+    tasks: list[SamTaskRow] | None = None
+    """Matching SAM task rows. Absent on the error arm."""
 
     count: int | None = None
     """Number of tasks returned."""
@@ -425,7 +425,9 @@ class DispatchWaveStatusResponse(DispatchWaveSummary, FallibleToolResponse):
     complete: int | None = None
     failed: int | None = None
     skipped: int | None = None
-    items: list[dict[str, object]] = Field(default_factory=list)
+    started_at: str | None = None
+    completed_at: str | None = None
+    items: list[dict[str, object]] | None = None
     accumulated_usage: AccumulatedUsage | None = None
 
 
@@ -439,7 +441,7 @@ class DispatchSpawnResponse(DispatchSpawnSummary, FallibleToolResponse):
     failed: int | None = None
     skipped: int | None = None
     elapsed_seconds: float | None = None
-    per_wave: list[dict[str, object]] = Field(default_factory=list)
+    per_wave: list[dict[str, object]] | None = None
 
 
 # Its BacklogError arm (item not found, or found item lacking a
@@ -467,11 +469,11 @@ class FollowupItem(BaseModel):
 class BacklogListFollowupsResponse(FallibleToolResponse):
     """Response for ``backlog_list_followups``."""
 
-    items: list[FollowupItem] = Field(default_factory=list)
-    """Backlog items matching the requested origin."""
+    items: list[FollowupItem] | None = None
+    """Backlog items matching the requested origin. Absent on the error arm."""
 
-    count: int = 0
-    """Number of items returned; ``0`` alongside an empty ``items``."""
+    count: int | None = None
+    """Number of items returned; ``0`` alongside an empty ``items``. Absent on the error arm."""
 
 
 # backlog_list has two disjoint success shapes selected by count_only: the
@@ -531,14 +533,14 @@ class CommentEntry(BaseModel):
 class BacklogListCommentsResponse(FallibleToolResponse):
     """Response for ``backlog_list_comments``."""
 
-    comments: list[CommentEntry] = Field(default_factory=list)
-    """Comments in the requested window."""
+    comments: list[CommentEntry] | None = None
+    """Comments in the requested window. Absent on the error arm."""
 
-    count: int = 0
-    """Number of comments in this response window; ``0`` alongside an empty ``comments``."""
+    count: int | None = None
+    """Number of comments in this response window; ``0`` alongside an empty ``comments``. Absent on the error arm."""
 
-    has_more: bool = False
-    """``True`` when comments exist beyond the current window."""
+    has_more: bool | None = None
+    """``True`` when comments exist beyond the current window. Absent on the error arm."""
 
 
 class IssueEntry(BaseModel):
@@ -557,11 +559,11 @@ class IssueEntry(BaseModel):
 class BacklogListIssuesResponse(FallibleToolResponse):
     """Response for ``backlog_list_issues``."""
 
-    issues: list[IssueEntry] = Field(default_factory=list)
-    """Matching GitHub issues."""
+    issues: list[IssueEntry] | None = None
+    """Matching GitHub issues. Absent on the error arm."""
 
-    count: int = 0
-    """Number of issues returned; ``0`` alongside an empty ``issues``."""
+    count: int | None = None
+    """Number of issues returned; ``0`` alongside an empty ``issues``. Absent on the error arm."""
 
 
 class LabelEntry(BaseModel):
@@ -575,11 +577,11 @@ class LabelEntry(BaseModel):
 class BacklogListLabelsResponse(FallibleToolResponse):
     """Response for ``backlog_list_labels``."""
 
-    labels: list[LabelEntry] = Field(default_factory=list)
-    """Repository labels, up to the requested limit."""
+    labels: list[LabelEntry] | None = None
+    """Repository labels, up to the requested limit. Absent on the error arm."""
 
-    count: int = 0
-    """Number of labels returned; ``0`` alongside an empty ``labels``."""
+    count: int | None = None
+    """Number of labels returned; ``0`` alongside an empty ``labels``. Absent on the error arm."""
 
 
 class MergedPullRequestEntry(BaseModel):
@@ -596,21 +598,21 @@ class MergedPullRequestEntry(BaseModel):
 class BacklogListMergedPrsResponse(FallibleToolResponse):
     """Response for ``backlog_list_merged_prs``."""
 
-    pull_requests: list[MergedPullRequestEntry] = Field(default_factory=list)
-    """Merged pull requests matching the request."""
+    pull_requests: list[MergedPullRequestEntry] | None = None
+    """Merged pull requests matching the request. Absent on the error arm."""
 
-    count: int = 0
-    """Number of pull requests returned; ``0`` alongside an empty ``pull_requests``."""
+    count: int | None = None
+    """Number of pull requests returned; ``0`` alongside an empty ``pull_requests``. Absent on the error arm."""
 
 
 class BacklogListMilestonesResponse(FallibleToolResponse):
     """Response for ``backlog_list_milestones``."""
 
-    milestones: list[Milestone] = Field(default_factory=list)
-    """Repository milestones matching the requested state filter."""
+    milestones: list[Milestone] | None = None
+    """Repository milestones matching the requested state filter. Absent on the error arm."""
 
-    count: int = 0
-    """Number of milestones returned; ``0`` alongside an empty ``milestones``."""
+    count: int | None = None
+    """Number of milestones returned; ``0`` alongside an empty ``milestones``. Absent on the error arm."""
 
 
 class ProjectEntry(BaseModel):
@@ -627,11 +629,11 @@ class ProjectEntry(BaseModel):
 class BacklogListProjectsResponse(FallibleToolResponse):
     """Response for ``backlog_list_projects``."""
 
-    projects: list[ProjectEntry] = Field(default_factory=list)
-    """Projects V2 projects for the resolved owner."""
+    projects: list[ProjectEntry] | None = None
+    """Projects V2 projects for the resolved owner. Absent on the error arm."""
 
-    count: int = 0
-    """Number of projects returned; ``0`` alongside an empty ``projects``."""
+    count: int | None = None
+    """Number of projects returned; ``0`` alongside an empty ``projects``. Absent on the error arm."""
 
 
 # dry_run is absent on the no-items early return (only normalized: 0 is
