@@ -29,19 +29,6 @@ def _schema_tokens(schema: dict[str, object]) -> int:
 
 
 TOOLS_NOT_YET_TYPED = {
-    "backlog_link_followup",
-    "backlog_list",
-    "backlog_list_comments",
-    "backlog_list_followups",
-    "backlog_list_issues",
-    "backlog_list_labels",
-    "backlog_list_merged_prs",
-    "backlog_list_milestones",
-    "backlog_list_projects",
-    "backlog_normalize",
-    "backlog_pull",
-    "backlog_read_comment",
-    "backlog_resolve",
     "backlog_strike_entry",
     "backlog_sync",
     "backlog_update",

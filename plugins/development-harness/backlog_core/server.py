@@ -103,6 +103,19 @@ from .tool_responses import (
     BacklogGetReadySamTasksResponse,
     BacklogGetSoonestMilestoneResponse,
     BacklogGroomResponse,
+    BacklogLinkFollowupResponse,
+    BacklogListCommentsResponse,
+    BacklogListFollowupsResponse,
+    BacklogListIssuesResponse,
+    BacklogListLabelsResponse,
+    BacklogListMergedPrsResponse,
+    BacklogListMilestonesResponse,
+    BacklogListProjectsResponse,
+    BacklogListResponse,
+    BacklogNormalizeResponse,
+    BacklogPullResponse,
+    BacklogReadCommentResponse,
+    BacklogResolveResponse,
     DispatchSpawnResponse,
     DispatchWaveStatusResponse,
     SamTaskLookupResult,
@@ -1679,7 +1692,7 @@ async def backlog_list(
             )
         ),
     ] = None,
-) -> dict:
+) -> BacklogListResponse:
     """List all open backlog items.
 
     When match_context=True, use page/tokens_per_page/page_token_limit to control
@@ -1687,15 +1700,16 @@ async def backlog_list(
     page=2..N to retrieve subsequent pages.
 
     Returns:
-        Dict with items list, count, pagination object, and output messages/warnings.
+        :class:`~backlog_core.tool_responses.BacklogListResponse` with items
+        list, count, pagination object, and output messages/warnings.
         Each item includes status (workflow status from status:* labels).
         pagination contains offset, limit, total, and has_more. When has_more=true,
         next_call provides the suggested follow-up call string.
         When match_context=True, match_pages contains current_page, total_pages,
         tokens_per_page, total_match_tokens, and paginated flag.
-        When count_only=True, the count key is present; a running background sync
-        may add sync_state/warnings alongside it.
-        On error, dict contains an error key.
+        When count_only=True, only the count key (and, when a background sync
+        is running, sync_state/warnings) is present.
+        On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
     """
@@ -1721,7 +1735,11 @@ async def backlog_list(
         )
     except BacklogError as e:
         backend_status = await asyncio.to_thread(_probe_backend_status)
-        return {"error": str(e), "backend": backend_status.model_dump(), **out.to_dict()}
+        return BacklogListResponse.model_validate({
+            "error": str(e),
+            "backend": backend_status.model_dump(),
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
@@ -1749,7 +1767,7 @@ async def backlog_list(
     if count_only:
         count_resp: dict[str, object] = {"count": total}
         _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
-        return count_resp
+        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_none=True)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
@@ -1796,7 +1814,7 @@ async def backlog_list(
     if match_pages is not None:
         response["match_pages"] = match_pages
         _maybe_add_pagination_notice(match_pages, out, response)
-    return response
+    return BacklogListResponse.model_validate(response).model_dump(exclude_none=True)
 
 
 def _build_compact_manifest(
@@ -2275,24 +2293,27 @@ async def backlog_link_followup(
             )
         ),
     ],
-) -> dict:
+) -> BacklogLinkFollowupResponse:
     """Link a follow-up backlog item to its originating plan or task.
 
     Records the origin's logical ID on the item's ``followup_to`` metadata
     field so the relationship is queryable via ``backlog_list_followups``.
 
     Returns:
-        Dict with title, followup_to, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogLinkFollowupResponse`
+        with title, followup_to, and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.link_followup, selector=selector, followup_to=followup_to, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogLinkFollowupResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogLinkFollowupResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -2310,22 +2331,25 @@ async def backlog_list_followups(
             )
         ),
     ],
-) -> dict:
+) -> BacklogListFollowupsResponse:
     """List backlog items linked as follow-ups to the given origin.
 
     Returns all items whose ``metadata.followup_to`` exactly matches the
     given logical ID.
 
     Returns:
-        Dict with items list (each with title, section, issue, followup_to),
-        count, and output messages/warnings.
+        :class:`~backlog_core.tool_responses.BacklogListFollowupsResponse`
+        with items (each with title, section, issue, followup_to), count,
+        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_followups, followup_to=followup_to, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListFollowupsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListFollowupsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -2400,7 +2424,7 @@ async def backlog_resolve(
     findings: Annotated[str | None, Field(description="Retrospective learnings from this work")] = None,
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Resolve even if open PRs reference the issue")] = False,
-) -> dict:
+) -> BacklogResolveResponse:
     """Mark a backlog item as DONE (completed) and close it on the configured backend.
 
     plan/method/notes/follow_ups/findings become a structured completion comment
@@ -2410,8 +2434,10 @@ async def backlog_resolve(
     For dismissals (duplicate, out of scope, etc.), use backlog_close instead.
 
     Returns:
-        Dict with resolved item title, summary, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogResolveResponse` with the
+        resolved item's title, either ``already_resolved`` or
+        ``resolved``/``summary``, and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
@@ -2428,9 +2454,9 @@ async def backlog_resolve(
             force=force,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogResolveResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogResolveResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2651,12 +2677,13 @@ async def backlog_groom(
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
-) -> dict:
+) -> BacklogNormalizeResponse:
     """Normalize all work items through the configured backend.
 
     Returns:
-        Dict with count of normalized files and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogNormalizeResponse` with
+        the count of normalized files and output messages/warnings. On
+        error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2667,9 +2694,9 @@ async def backlog_normalize(
         updated = result.get("normalized", 0)
         suffix = " (dry-run)" if dry_run else ""
         await ctx.info(f"Normalized {updated} file(s){suffix}")
-        return {**result, **out.to_dict()}
+        return BacklogNormalizeResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogNormalizeResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2690,7 +2717,7 @@ async def backlog_pull(
         bool, Field(description="Overwrite local content even if local version is newer or longer")
     ] = False,
     diff: Annotated[bool, Field(description="Include entry-level diff output showing local vs remote changes")] = False,
-) -> dict:
+) -> BacklogPullResponse:
     """Reconcile linked issue content.
 
     Only backends that support reconciliation act on this — on other backends
@@ -2700,8 +2727,9 @@ async def backlog_pull(
     Merges by section using entry-aware merge (keeps longer entries, preserves strikes).
 
     Returns:
-        Dict with count of pulled items (bulk) or file_path (single) and
-        output messages/warnings. On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogPullResponse` with count
+        of pulled items (bulk path) or file_path (single-selector path), and
+        output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2712,16 +2740,16 @@ async def backlog_pull(
                 await ctx.warning(w)
             file_path = result.get("file_path")
             await ctx.info(f"Pulled: {file_path}" if file_path else "Nothing pulled")
-            return {**result, **out.to_dict()}
+            return BacklogPullResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
         await ctx.info("Starting bulk pull from GitHub" + (" (dry-run)" if dry_run else ""))
         result = await asyncio.to_thread(operations.pull_items, dry_run=dry_run, force=force, diff=diff, output=out)
         for w in out.warnings:
             await ctx.warning(w)
         pulled = result.get("pulled", 0)
         await ctx.info(f"Pull complete: {pulled} item(s) pulled")
-        return {**result, **out.to_dict()}
+        return BacklogPullResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogPullResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3231,7 +3259,9 @@ async def backlog_strike_entry(
         title="List Labels", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )
-async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum labels to return")] = 100) -> dict:
+async def backlog_list_labels(
+    limit: Annotated[int, Field(description="Maximum labels to return")] = 100,
+) -> BacklogListLabelsResponse:
     """List repository labels. Requires a backend with label support — errors otherwise.
 
     Returns all labels defined on the repository, up to ``limit``. There is no
@@ -3239,16 +3269,18 @@ async def backlog_list_labels(limit: Annotated[int, Field(description="Maximum l
     ``backlog_groom``, ``backlog_resolve``, or ``backlog_close`` changing an item's status.
 
     Returns:
-        Dict with ``labels`` (list of dicts with ``name``, ``color``, ``description``),
-        ``count``, and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogListLabelsResponse` with
+        ``labels`` (each with ``name``, ``color``, ``description``), ``count``,
+        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_labels, limit=limit, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListLabelsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListLabelsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3268,7 +3300,7 @@ async def backlog_list_merged_prs(
         ),
     ] = None,
     limit: Annotated[int, Field(description="Maximum number of PRs to return")] = 20,
-) -> dict:
+) -> BacklogListMergedPrsResponse:
     """List merged pull requests. Requires a backend with PR support — errors otherwise.
 
     Only PRs that were actually merged (not just closed) are returned.
@@ -3276,17 +3308,19 @@ async def backlog_list_merged_prs(
     keyword present in the PR title or body.
 
     Returns:
-        Dict with ``pull_requests`` (list of dicts with ``number``,
-        ``title``, ``merged_at``, ``author``, ``url``, ``head_branch``),
-        ``count``, and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogListMergedPrsResponse`
+        with ``pull_requests`` (each with ``number``, ``title``, ``merged_at``,
+        ``author``, ``url``, ``head_branch``), ``count``, and output
+        messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_merged_prs, search=search, limit=limit, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListMergedPrsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListMergedPrsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3296,24 +3330,26 @@ async def backlog_list_merged_prs(
 )
 async def backlog_list_milestones(
     state: Annotated[str, Field(description="Milestone state filter: open | closed | all")] = "open",
-) -> dict:
+) -> BacklogListMilestonesResponse:
     """List repository milestones filtered by state.
 
     Requires a backend with milestone support — errors otherwise. Returns
     milestones with their issue counts and optional due dates.
 
     Returns:
-        Dict with ``milestones`` (list of dicts with ``number``, ``title``,
-        ``state``, ``description``, ``due_on``, ``open_issues``,
-        ``closed_issues``), ``count``, and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogListMilestonesResponse`
+        with ``milestones`` (each with ``number``, ``title``, ``state``,
+        ``description``, ``due_on``, ``open_issues``, ``closed_issues``),
+        ``count``, and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_milestones, state=state, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListMilestonesResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListMilestonesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3391,21 +3427,24 @@ async def backlog_list_issues(
     labels: Annotated[str | None, Field(description="Comma-separated label names to filter by")] = None,
     state: Annotated[str, Field(description="Issue state: open, closed, or all")] = "open",
     limit: Annotated[int, Field(description="Maximum issues to return")] = 30,
-) -> dict:
+) -> BacklogListIssuesResponse:
     """List GitHub issues with optional milestone, label, and state filters.
 
     Returns:
-        Dict with issues list, count, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogListIssuesResponse` with
+        issues list, count, and output messages/warnings. On error, ``error``
+        is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.list_issues, milestone=milestone, labels=labels, state=state, limit=limit, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogListIssuesResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListIssuesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3445,22 +3484,25 @@ async def backlog_list_comments(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     limit: Annotated[int, Field(description="Maximum comments to return")] = 20,
     offset: Annotated[int, Field(description="Number of comments to skip")] = 0,
-) -> dict:
+) -> BacklogListCommentsResponse:
     """List comments on a GitHub issue.
 
     Returns:
-        Dict with comments (list of {id, author, created_at, updated_at, preview}),
-        count, has_more, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogListCommentsResponse`
+        with comments (each with id, author, created_at, updated_at, preview),
+        count, has_more, and output messages/warnings. On error, ``error``
+        is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.list_comments, issue_number=issue_number, limit=limit, offset=offset, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogListCommentsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListCommentsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3480,22 +3522,25 @@ async def backlog_read_comment(
             )
         ),
     ],
-) -> dict:
+) -> BacklogReadCommentResponse:
     """Read the full body of a single comment on a GitHub issue.
 
     Returns:
-        Dict with id (GraphQL node ID), author, created_at, updated_at,
-        body (full Markdown — no truncation), and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogReadCommentResponse` with
+        id (GraphQL node ID), author, created_at, updated_at, body (full
+        Markdown — no truncation), and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.read_comment, issue_number=issue_number, comment_id=comment_id, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogReadCommentResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogReadCommentResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3506,19 +3551,22 @@ async def backlog_read_comment(
 async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
-) -> dict:
+) -> BacklogListProjectsResponse:
     """List Projects V2 for the repository owner via GraphQL.
 
     Returns:
-        Dict with projects list, count, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogListProjectsResponse`
+        with projects list, count, and output messages/warnings. On error,
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_projects, owner=owner, limit=limit, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogListProjectsResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogListProjectsResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
