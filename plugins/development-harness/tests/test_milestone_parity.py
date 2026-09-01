@@ -90,6 +90,22 @@ def _force_milestone_closed(backend: WorkItemBackend, number: int) -> None:
         milestone_obj.edit(title=milestone_obj.title, state="closed")
 
 
+def _repo_for_create_issue(backend: WorkItemBackend) -> GithubRepository:
+    """Return the repository argument to pass to ``create_issue_for_item``.
+
+    Memory/SQLite document this argument as ignored, so the shared mock is
+    fine there. GitHubBackend genuinely uses it (``gh_client.create_issue_for_item``
+    reads ``repo.full_name``), so it needs the real configured repository —
+    passing ``_MOCK_REPO`` there raises before ever reaching milestone
+    assignment, silently skipping the GitHub leg of the decisive test below.
+    """
+    if isinstance(backend, (InMemoryBackend, SQLiteBackend)):
+        return _MOCK_REPO
+    from backlog_core.backends.github_backend import GitHubBackend
+
+    return cast("GitHubBackend", backend).get_github()
+
+
 # ---------------------------------------------------------------------------
 # 1. Shape parity
 # ---------------------------------------------------------------------------
@@ -164,7 +180,17 @@ def test_soonest_milestone_returns_earliest_due_date(backend: WorkItemBackend) -
 
 
 def test_soonest_milestone_none_on_fresh_backend(backend: WorkItemBackend) -> None:
-    """A fresh backend with no milestones returns {"milestone": None}, no exception."""
+    """A fresh backend with no milestones returns {"milestone": None}, no exception.
+
+    GitHub is excluded: Memory/SQLite get a brand-new backend instance per
+    test, but the GitHub leg targets a real persistent repository whose
+    milestone state carries over across test runs and earlier tests in this
+    file — "fresh" isn't guaranteed there without live cleanup this slice
+    doesn't add.
+    """
+    if not isinstance(backend, (InMemoryBackend, SQLiteBackend)):
+        pytest.skip("GitHub backend milestone state is not guaranteed fresh across runs")
+
     result = operations.get_soonest_milestone()
 
     assert result["milestone"] is None
@@ -233,8 +259,9 @@ def test_membership_counts_after_assign_and_close(backend: WorkItemBackend) -> N
     ms_number = cast("int", ms["number"])
     item_a = _make_item("Item A")
     item_b = _make_item("Item B")
-    num_a = backend.create_issue_for_item(_MOCK_REPO, item_a)
-    num_b = backend.create_issue_for_item(_MOCK_REPO, item_b)
+    repo = _repo_for_create_issue(backend)
+    num_a = backend.create_issue_for_item(repo, item_a)
+    num_b = backend.create_issue_for_item(repo, item_b)
     assert num_a is not None
     assert num_b is not None
 

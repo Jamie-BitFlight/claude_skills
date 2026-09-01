@@ -844,7 +844,7 @@ class BeadsBackend:
             GitHub/SQLite/Memory milestones, so a future beads-native dispatch
             path can reuse the shape without translation.
         """
-        raw = self._runner.run_json(["list", "--status", "all", "--limit", "0"])
+        raw = self._runner.run_json(["list", "--all", "--limit", "0"])
         issues = parse_issue_list(raw)
         milestones = [i for i in issues if i.type == BeadsIssueType.MILESTONE]
         if states:
