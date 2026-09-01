@@ -899,7 +899,11 @@ class BacklogViewResponse(BaseModel):
     hint: str | None = Field(default=None, alias="_hint")
 
     # --- over-budget view ---
-    over_budget_flag: bool | None = Field(default=None, alias="_over_budget")
+    # Distinct from map mode's `over_budget` field below: this one carries
+    # the wire key `_over_budget` (directory-view mode); that one carries
+    # the wire key `over_budget` (map mode). Named apart, not just by a
+    # `_flag` suffix, so the two are not mistaken for each other.
+    directory_over_budget: bool | None = Field(default=None, alias="_over_budget")
     usage: str | None = Field(default=None, alias="_usage")
 
     # --- map mode ---
