@@ -17,8 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 __all__ = [
     "Author",
+    "BoardEntry",
     "CommentNode",
+    "CommentSummary",
     "FetchResult",
+    "FetchSummary",
     "ForcePushEvent",
     "GitHubCommitDate",
     "HeadCommitNode",
@@ -27,9 +30,12 @@ __all__ = [
     "Reaction",
     "RepoIdentity",
     "ReviewNode",
+    "ReviewSummary",
     "Reviewability",
+    "ThreadSummary",
     "UnresolvedThread",
     "WatchResult",
+    "WatchSummary",
 ]
 
 
@@ -354,3 +360,104 @@ class WatchResult(BaseModel):
 
     timed_out: bool
     state: FetchResult
+
+
+class CommentSummary(BaseModel):
+    """One follow-up comment on an unresolved thread, beyond its opening comment.
+
+    See `ThreadSummary.replies` — one of these per comment after the first, in the order GitHub
+    returned them.
+    """
+
+    author: str | None
+    body: str
+
+
+class ThreadSummary(BaseModel):
+    """One unresolved thread's reduced fields for `--summary`.
+
+    Assembled by `pr_review_threads._summarize_thread`, the only assembler.
+    `comment_id`/`author`/`body` always describe the thread's *first* comment — the one `reply`'s
+    `--comment-id` must target, regardless of how the discussion continued. `replies` carries every
+    comment after the first, in order — not just the newest one: a thread can have a reviewer's
+    clarification in the middle followed by an unrelated closing note, and reporting only the last
+    comment would hide exactly the content an agent most needs before resolving the thread.
+    `comments_truncated` (from `UnresolvedThread`) says whether GitHub's 100-comment page limit cut
+    the fetched page short — `replies` still reports whatever was actually fetched either way; it
+    is never padded or trimmed to imply completeness it doesn't have.
+    """
+
+    thread_id: str
+    comment_id: int
+    path: str
+    line: int | None
+    comment_count: int
+    comments_truncated: bool
+    author: str | None
+    body: str
+    replies: list[CommentSummary] = []
+
+
+class ReviewSummary(BaseModel):
+    """One unresponded review's reduced fields for `--summary`.
+
+    Assembled by `pr_review_threads._summarize_review`, the only assembler.
+    """
+
+    author: str | None
+    state: str
+    url: str
+    body: str
+
+
+class FetchSummary(BaseModel):
+    """The reduced-field payload `fetch --summary` prints for one PR.
+
+    Assembled by `pr_review_threads._summarize`, the only assembler. `blockers` is flattened to
+    the top level here (`FetchResult` nests it under `reviewability`)
+    and always present, even empty — an empty `unresolved` with a non-empty `blockers` means
+    something different from a clean PR. `pr` is stamped on every instance so multi-`--pr` output
+    is self-describing per block.
+    """
+
+    pr: int
+    reviews_count: int
+    threads_count: int
+    unresolved_count: int
+    unresponded_count: int
+    codex_approved: bool
+    blockers: list[str]
+    unresolved: list[ThreadSummary]
+    unresponded_reviews: list[ReviewSummary]
+
+
+class WatchSummary(FetchSummary):
+    """`watch --summary`'s payload.
+
+    Every `FetchSummary` field plus `timed_out`, flattened at the same level rather than nested
+    under a separate `state` key — see `pr_review_threads.watch`'s own `--summary` handling.
+    `fetch --summary` and `watch --summary` share this one shape (minus `timed_out`), so one
+    parser handles either command's output.
+    """
+
+    timed_out: bool
+
+
+class BoardEntry(BaseModel):
+    """One PR's status entry for the multi-`--pr` `fetch` board.
+
+    Assembled by `pr_review_threads._board_entry`, the only assembler. The default output when
+    several PRs are checked without `--summary`: light enough that
+    checking many PRs at once does not turn into megabytes of JSON, but `mergeable`/
+    `merge_state_status` are included alongside `blockers` because `blockers` alone doesn't say
+    whether a PR is landable — it can be empty (reviews aren't blocked) while the PR is still
+    unresolved or otherwise unmergeable, which is the difference between "quiet" and "ready".
+    """
+
+    pr: int
+    unresolved: int
+    unresponded: int
+    codex_approved: bool
+    mergeable: str
+    merge_state_status: str
+    blockers: list[str]
