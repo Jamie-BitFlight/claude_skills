@@ -620,12 +620,15 @@ class BeadsBackend:
         Args:
             issue_ref: Beads issue ID or selector string.
             summary: Resolution summary forwarded as ``--reason``.
-            method: Ignored for the beads backend.
-            notes: Ignored for the beads backend.
-            follow_ups: Ignored for the beads backend.
-            findings: Ignored for the beads backend.
-            repo: Ignored for the beads backend.
-            output: Records a warning naming any ignored fields, if provided.
+            method: Dropped structured resolution content; see ``output``.
+            notes: Dropped structured resolution content; see ``output``.
+            follow_ups: Dropped structured resolution content; see ``output``.
+            findings: Dropped structured resolution content; see ``output``.
+            repo: Ignored for the beads backend, like every other method here
+                (no repo-scoped routing concept for a local ``bd`` workspace) —
+                not part of the dropped-content warning below.
+            output: Records a warning naming any dropped structured resolution
+                fields (method/notes/follow_ups/findings), if provided.
         """
         dropped = [
             name
