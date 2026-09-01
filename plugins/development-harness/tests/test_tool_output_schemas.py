@@ -8,10 +8,14 @@ Once empty, delete this set and the skip branch below.
 
 from __future__ import annotations
 
+import inspect
 import json
 
 import tiktoken
+from backlog_core import tool_responses as _tool_responses
+from backlog_core.models import Output
 from backlog_core.server import mcp
+from pydantic import BaseModel
 
 EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of scope
 
@@ -74,3 +78,27 @@ async def test_output_schemas_stay_within_token_budget() -> None:
     assert total <= _MAX_TOTAL_SCHEMA_TOKENS, (
         f"Total outputSchema tokens across all tools ({total}) exceeds budget of {_MAX_TOTAL_SCHEMA_TOKENS}"
     )
+
+
+def test_no_response_model_field_shadows_an_output_method() -> None:
+    """No tool_responses.py model field name collides with an Output method.
+
+    Regression guard for a real bug hit during this rollout: a field named
+    ``error`` on a subclass of ``Output`` silently shadowed the inherited
+    ``Output.error()`` method (since renamed to ``record_error()``) --
+    pydantic v2 resolved the field's default back to the bound method
+    instead of the declared default, breaking JSON serialization with no
+    exception at class-definition time. Checked against Output's actual
+    method names (not a hardcoded list), so this still catches a future
+    mutator method added to Output, not just today's three.
+    """
+    output_method_names = {
+        name for name, _ in inspect.getmembers(Output, predicate=inspect.isfunction) if not name.startswith("_")
+    }
+    offenders: dict[str, set[str]] = {}
+    for name, obj in vars(_tool_responses).items():
+        if isinstance(obj, type) and issubclass(obj, BaseModel) and issubclass(obj, Output):
+            shadowed = set(obj.model_fields) & output_method_names
+            if shadowed:
+                offenders[name] = shadowed
+    assert not offenders, f"Field name(s) shadow an Output method, breaking serialization: {offenders}"
