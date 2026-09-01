@@ -1243,7 +1243,7 @@ def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any
 
     backend = get_config().backend
     try:
-        github_backend = require_github_extras(backend, "get_github")
+        github_backend = require_github_extras(backend, "dispatch_stale_check")
         gh_repo = github_backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
         open_issues = github_backend.sync_issues_graphql(
@@ -1357,7 +1357,7 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     """
     backend = get_config().backend
     try:
-        github_backend = require_github_extras(backend, "get_github")
+        github_backend = require_github_extras(backend, "dispatch_conflicts")
         gh_repo = github_backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
         issue_nodes = github_backend.sync_issues_graphql(

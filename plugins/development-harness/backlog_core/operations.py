@@ -34,7 +34,6 @@ from .models import (
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
     VALID_NEW_ITEM_PRIORITIES,
-    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     ContentKind,
@@ -1151,7 +1150,11 @@ def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
         return
     try:
         result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-    except BackendUnavailableError:
+    except BacklogError:
+        # BackendUnavailableError (auth/config) and a bare BacklogError (e.g. a
+        # transient GraphQL failure inside reconcile()) both mean this attempt
+        # didn't reconcile — item.metadata is already saved via put_work_item()
+        # upstream, so degrade to "queued" rather than crash the caller.
         output.info(f"Queued {item.issue} for provider reconciliation.")
         return
     output.info(
@@ -3846,7 +3849,11 @@ def strike_entry(
         if isinstance(backend, SyncProvider):
             try:
                 backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-            except BackendUnavailableError:
+            except BacklogError:
+                # Mirrors _reconcile_groomed_item: BackendUnavailableError and a bare
+                # BacklogError (e.g. a transient GraphQL failure) both mean this
+                # attempt didn't reconcile, not that the strike itself failed — the
+                # strike is already saved via put_work_item() above.
                 out.info(f"  Queued {item.issue} for provider reconciliation.")
             else:
                 out.info(f"  Reconciled strike for {item.issue}")
