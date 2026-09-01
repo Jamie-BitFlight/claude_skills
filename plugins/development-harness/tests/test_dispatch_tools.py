@@ -1002,7 +1002,7 @@ class TestDispatchCreatePlan:
             artifact = await client.call_tool("artifact_read", {"item_id": 42, "artifact_type": "dispatch-plan"})
 
         assert "error" not in result.data
-        assert artifact.data["content"] == DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
+        assert artifact.structured_content["content"] == DispatchPlan.model_validate(valid_plan_dict).model_dump_json()
 
     async def test_create_plan_artifact_content_failure_does_not_register_manifest(
         self, valid_plan_dict: dict, patch_create_plan_path: InMemoryBackend, mocker: MockerFixture

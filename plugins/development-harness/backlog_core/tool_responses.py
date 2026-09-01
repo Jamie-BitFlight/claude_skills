@@ -40,14 +40,23 @@ from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterR
 
 __all__ = [
     "ArtifactEntryOut",
+    "ArtifactReadResponse",
     "ArtifactRegisterResponse",
     "ArtifactsListResponse",
+    "BacklogAddResponse",
+    "BacklogCloseResponse",
+    "BacklogCommentIssueResponse",
+    "BacklogCreateMilestoneResponse",
+    "BacklogCreateProjectResponse",
+    "BacklogCreateSamTaskResponse",
+    "BacklogGetReadySamTasksResponse",
+    "BacklogGetSoonestMilestoneResponse",
+    "BacklogGroomResponse",
     "DispatchSpawnResponse",
     "DispatchWaveStatusResponse",
     "FallibleToolResponse",
     "Milestone",
     "SamTaskLookupResult",
-    "SamTaskRow",
     "ToolResponse",
 ]
 
@@ -106,13 +115,13 @@ class Milestone(BaseModel):
     """Count of closed issues attached to this milestone."""
 
 
+# Mirrors backlog_core.models.ArtifactEntry's model_dump(mode="json") shape --
+# string fields here correspond to that model's enum fields (ArtifactType,
+# ArtifactStatus) serialised to their string values. Docstring kept short: this
+# model is inlined (not $ref'd) into both artifact_list's and artifact_get's
+# outputSchema, so its description is billed twice against the token budget.
 class ArtifactEntryOut(BaseModel):
-    """One artifact manifest entry as returned by artifact-listing MCP tools.
-
-    Mirrors ``backlog_core.models.ArtifactEntry``'s ``model_dump(mode="json")``
-    shape -- string fields here correspond to that model's enum fields
-    (``ArtifactType``, ``ArtifactStatus``) serialised to their string values.
-    """
+    """One artifact manifest entry, as returned by artifact-listing MCP tools."""
 
     artifact_type: str
     """Artifact category, e.g. ``architect`` or ``code-review``."""
@@ -136,79 +145,223 @@ class ArtifactEntryOut(BaseModel):
     """Storage tier for this artifact."""
 
 
-class ArtifactsListResponse(ToolResponse):
-    """Response shape returned by the ``artifact_list`` MCP tool."""
+# Shared by artifact_list and artifact_get. Both have a BacklogError arm
+# (artifact_get also treats "type not found"/"id not found" as BacklogError,
+# per its docstring) that returns only error plus the Output triad, so
+# artifacts/count are widened to optional.
+class ArtifactsListResponse(FallibleToolResponse):
+    """Response shape for the ``artifact_list`` and ``artifact_get`` MCP tools."""
 
-    artifacts: list[ArtifactEntryOut]
-    """Registered artifact entries for the requested issue."""
+    artifacts: list[ArtifactEntryOut] | None = None
+    """Registered artifact entries matching the request."""
 
-    count: int
+    count: int | None = None
     """Total number of artifacts returned."""
 
 
-class SamTaskRow(BaseModel):
-    """One SAM task row as returned by SAM-task-listing MCP tools.
+class ArtifactReadResponse(FallibleToolResponse):
+    """Response shape returned by the ``artifact_read`` MCP tool.
 
-    Pydantic counterpart of ``backlog_core.operations._SamTaskRow`` for the
-    MCP wire boundary; ``operations.py`` keeps using its own TypedDict
-    internally.
+    Mirrors ``backlog_core.models.ArtifactContent``'s ``model_dump(mode="json")``
+    shape. Its ``BacklogError`` arm (raised for "type not found" and "id not
+    found", per the tool's docstring) never has content to report, so every
+    field is widened to optional.
     """
 
-    task_id: str
-    """SAM task identifier."""
+    artifact_type: str | None = None
+    """Category of the returned artifact."""
 
-    feature: str
-    """Feature slug the task belongs to."""
+    path: str | None = None
+    """Repo-relative path (or logical artifact id) that was read."""
 
-    status: str
-    """Task status."""
+    content: str | None = None
+    """Raw artifact content."""
 
-    agent: str
-    """Agent assigned to the task."""
-
-    priority: int
-    """Dispatch priority."""
-
-    skills: list[str]
-    """Skill names required by the task."""
-
-    dependencies: list[str]
-    """Task IDs this task depends on."""
-
-    issue_number: int
-    """Parent issue number."""
-
-    issue_url: str
-    """URL of the parent issue."""
-
-    title: str
-    """Task title."""
+    status: str | None = None
+    """Lifecycle state of the artifact."""
 
 
-class SamTaskLookupResult(ToolResponse):
-    """Response shape returned by SAM-task-lookup MCP tools.
+class BacklogAddResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_add`` MCP tool.
 
-    Pydantic counterpart of ``backlog_core.operations._SamTaskLookupResult``
-    for the MCP wire boundary; ``operations.py`` keeps using its own
-    TypedDict internally.
+    Its ``BacklogError`` arm never has an ``operations.add_item`` result to
+    report, so every field is widened to optional.
     """
 
-    tasks: list[SamTaskRow]
-    """Matching SAM task rows."""
+    title: str | None = None
+    """Item title as stored."""
 
-    count: int
+    priority: str | None = None
+    """Priority level applied to the item."""
+
+    reference: str | None = None
+    """Logical reference for the created item."""
+
+    file_path: str | None = None
+    """Compatibility alias for ``reference`` -- for display only."""
+
+    item_ref: str | None = None
+    """Backend issue ref, or ``""`` when creation failed or was skipped."""
+
+
+class BacklogCloseResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_close`` MCP tool.
+
+    ``operations.close_item`` has two distinct success shapes: an
+    already-closed early return (``title``, ``already_closed``) and a normal
+    close (``title``, ``closed``, ``reason``). Both are optional here besides
+    ``title`` because the ``BacklogError`` arm supplies neither.
+    """
+
+    title: str | None = None
+    """Title of the item that was closed (or already closed)."""
+
+    closed: bool | None = None
+    """``True`` when this call performed the close."""
+
+    already_closed: bool | None = None
+    """``True`` when the item was already closed before this call."""
+
+    reason: str | None = None
+    """Close reason, present only on the normal (non-already-closed) path."""
+
+
+class BacklogCommentIssueResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_comment_issue`` MCP tool."""
+
+    issue_number: int | None = None
+    """GitHub issue number the comment was added to."""
+
+    comment_id: str | None = None
+    """GraphQL node ID of the newly created comment -- not a REST integer ID."""
+
+    comment_url: str | None = None
+    """Always ``""`` -- the backend does not resolve a comment URL."""
+
+
+class BacklogCreateMilestoneResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_create_milestone`` MCP tool."""
+
+    milestone: Milestone | None = None
+    """The created milestone. Absent only on the ``BacklogError`` arm."""
+
+
+class BacklogCreateProjectResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_create_project`` MCP tool."""
+
+    project_id: str | None = None
+    """GraphQL node ID of the created Projects V2 project."""
+
+    title: str | None = None
+    """Project title."""
+
+    url: str | None = None
+    """Project URL."""
+
+    number: int | None = None
+    """Project number."""
+
+
+class BacklogCreateSamTaskResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_create_sam_task`` MCP tool."""
+
+    issue_number: int | None = None
+    """Created sub-issue number, or ``0`` when issue creation failed."""
+
+    title: str | None = None
+    """Task issue title, or ``""`` when issue creation failed."""
+
+    url: str | None = None
+    """Always ``""`` -- the backend does not resolve an issue URL."""
+
+
+class BacklogGetReadySamTasksResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_get_ready_sam_tasks`` MCP tool.
+
+    ``ready_tasks`` entries are built via untyped ``.get()`` lookups in
+    ``operations.get_ready_sam_tasks`` -- kept as ``dict[str, object]`` rather
+    than a nested model per this module's token-budget policy (see
+    :class:`DispatchWaveStatusResponse`'s design note).
+    """
+
+    feature: str | None = None
+    """Feature slug the ready tasks belong to."""
+
+    ready_tasks: list[dict[str, object]] = Field(default_factory=list)
+    """Ready task dicts, each with id, name, agent, skills, issue_number."""
+
+    count: int | None = None
+    """Number of ready tasks returned."""
+
+
+class BacklogGetSoonestMilestoneResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_get_soonest_milestone`` MCP tool."""
+
+    milestone: Milestone | None = None
+    """Soonest-due open milestone, or ``None`` when no open milestones exist."""
+
+
+# title/groomed_updated are absent when operations.groom_item is called with no
+# content to write (section/content/groomed_file/groomed_content/sections all
+# omitted) and returns {} before any mark_groomed handling runs -- so both are
+# optional. The tool's inline pre-flight validation error (sections passed
+# together with the single-section args) returns only error, with no Output
+# triad; that still validates because messages/warnings/errors default to [].
+class BacklogGroomResponse(FallibleToolResponse):
+    """Response shape returned by the ``backlog_groom`` MCP tool."""
+
+    title: str | None = None
+    """Groomed item's title."""
+
+    groomed_updated: bool | None = None
+    """``True`` when groomed content was written."""
+
+    sections_written: list[str] | None = None
+    """Section names written, present only for batch (``sections=``) writes."""
+
+    mark_groomed_skipped: bool | None = None
+    """``True`` when ``mark_groomed=True`` but the post-write re-lookup failed."""
+
+    mark_groomed_skip_reason: str | None = None
+    """Explains why the status advance was skipped."""
+
+    mark_groomed_applied: bool | None = None
+    """``True`` when the local groomed status was applied."""
+
+    mark_groomed_label_error: str | None = None
+    """GitHub label update error, present only when that step failed."""
+
+
+# Pydantic counterpart of backlog_core.operations._SamTaskLookupResult for the
+# MCP wire boundary; operations.py keeps using its own TypedDict internally.
+# The tool wraps operations.get_sam_tasks in a BacklogError arm that reports
+# only error plus the Output triad, so every other field is widened to
+# optional even though operations.get_sam_tasks itself always returns the
+# full shape. ``tasks`` is kept as ``dict[str, object]`` rather than a nested
+# per-row model (task_id, feature, status, agent, priority, skills,
+# dependencies, issue_number, issue_url, title) -- inlining that row shape
+# here blew the single-tool schema token budget (see
+# :class:`DispatchWaveStatusResponse`'s design note for the same tradeoff).
+class SamTaskLookupResult(FallibleToolResponse):
+    """Response shape returned by the ``backlog_get_sam_tasks`` MCP tool."""
+
+    tasks: list[dict[str, object]] = Field(default_factory=list)
+    """Matching SAM task rows (task_id, feature, status, agent, priority,
+    skills, dependencies, issue_number, issue_url, title)."""
+
+    count: int | None = None
     """Number of tasks returned."""
 
-    parent_issue_number: int | str
+    parent_issue_number: int | str | None = None
     """Parent issue number, or a placeholder string when unavailable."""
 
-    stale: bool
+    stale: bool | None = None
     """True when the cached task data is known to be out of date."""
 
-    pending: bool
+    pending: bool | None = None
     """True when a sync is pending and results may be incomplete."""
 
-    unavailable: bool
+    unavailable: bool | None = None
     """True when the backend could not be reached at all."""
 
 

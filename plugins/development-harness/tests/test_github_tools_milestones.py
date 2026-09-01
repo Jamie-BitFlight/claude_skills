@@ -444,11 +444,13 @@ async def test_backlog_get_soonest_milestone_returns_milestone_dict() -> None:
 
 
 async def test_backlog_get_soonest_milestone_none_when_no_milestones() -> None:
-    """backlog_get_soonest_milestone returns milestone=None when no milestones exist.
+    """backlog_get_soonest_milestone omits milestone when no milestones exist.
 
     Tests: backlog_get_soonest_milestone empty case
     How: Patch get_soonest_milestone to return milestone=None; verify serialisation.
-    Why: None milestone must survive JSON serialisation round-trip.
+    Why: BacklogGetSoonestMilestoneResponse.milestone is `Milestone | None = None`,
+        so a genuinely-None milestone is dropped by model_dump(exclude_none=True) --
+        the key is absent, not present with a null value.
     """
     # Arrange
     fake_result = {"milestone": None, "messages": [], "warnings": []}
@@ -458,7 +460,7 @@ async def test_backlog_get_soonest_milestone_none_when_no_milestones() -> None:
         result = await _call("backlog_get_soonest_milestone", {})
 
     # Assert
-    assert result["milestone"] is None
+    assert result.get("milestone") is None
 
 
 async def test_backlog_get_soonest_milestone_backlog_error_returns_error_key() -> None:

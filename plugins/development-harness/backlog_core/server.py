@@ -90,7 +90,23 @@ from .search import (
     tokenize_search as _tokenize_search,
 )
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
-from .tool_responses import ArtifactRegisterResponse, DispatchSpawnResponse, DispatchWaveStatusResponse
+from .tool_responses import (
+    ArtifactReadResponse,
+    ArtifactRegisterResponse,
+    ArtifactsListResponse,
+    BacklogAddResponse,
+    BacklogCloseResponse,
+    BacklogCommentIssueResponse,
+    BacklogCreateMilestoneResponse,
+    BacklogCreateProjectResponse,
+    BacklogCreateSamTaskResponse,
+    BacklogGetReadySamTasksResponse,
+    BacklogGetSoonestMilestoneResponse,
+    BacklogGroomResponse,
+    DispatchSpawnResponse,
+    DispatchWaveStatusResponse,
+    SamTaskLookupResult,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
@@ -1266,7 +1282,7 @@ async def backlog_add(
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
     force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
-) -> dict:
+) -> BacklogAddResponse:
     """Add a new item through the configured backend and optionally create its native issue.
 
     For guided creation with classification and research support, use
@@ -1275,10 +1291,10 @@ async def backlog_add(
     detection here runs unless force=True.
 
     Returns:
-        Dict with file_path, title, priority, issue number (if created),
-        and output messages/warnings. file_path is for reference only — use
-        backlog_update or backlog_groom for all modifications. On error, dict
-        contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogAddResponse` with
+        file_path, title, priority, item_ref, and output messages/warnings.
+        file_path is for reference only — use backlog_update or backlog_groom
+        for all modifications. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -1292,9 +1308,9 @@ async def backlog_add(
             force=force,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogAddResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogAddResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 def _assert_config() -> None:
@@ -2336,15 +2352,16 @@ async def backlog_close(
     comment: Annotated[str, Field(description="Additional context about why this item is being closed")] = "",
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Close even if open PRs reference the issue")] = False,
-) -> dict:
+) -> BacklogCloseResponse:
     """Dismiss a backlog item without completing it and close it on the configured backend.
 
     Use for items that are duplicates, out of scope, superseded, wontfix,
     or permanently blocked. For completed work, use backlog_resolve instead.
 
     Returns:
-        Dict with closed item title, reason, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogCloseResponse` with the
+        closed item's title, either ``already_closed`` or ``closed``/``reason``,
+        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2358,9 +2375,9 @@ async def backlog_close(
             force=force,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogCloseResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCloseResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2578,25 +2595,26 @@ async def backlog_groom(
             )
         ),
     ] = False,
-) -> dict:
+) -> BacklogGroomResponse:
     """Write groomed content through the configured backend and sync its linked GitHub issue.
 
     When the item has a GitHub issue, the groomed content is synced there
     automatically.
 
     Returns:
-        Dict with groomed item title, synced status, and output
-        messages/warnings. On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogGroomResponse` with groomed
+        item title, synced status, and output messages/warnings. On error,
+        ``error`` is set.
         When mark_groomed=True and the post-write item re-lookup fails to resolve the
-        selector, the status advance is skipped and the dict additionally contains
+        selector, the status advance is skipped and the response additionally has
         mark_groomed_skipped=True and mark_groomed_skip_reason (str) explaining why —
-        callers checking mark_groomed's effect should test for this key.
+        callers checking mark_groomed's effect should test for this field.
     """
     out = Output()
     if sections is not None and any((section, content, entry_id, replace_section, reason, append)):
-        return {
-            "error": "sections is mutually exclusive with section, content, entry_id, replace_section, reason, and append"
-        }
+        return BacklogGroomResponse(
+            error="sections is mutually exclusive with section, content, entry_id, replace_section, reason, and append"
+        ).model_dump(exclude_none=True)
     try:
         await ctx.info(f"Grooming item: {selector}")
         result = await asyncio.to_thread(
@@ -2616,9 +2634,9 @@ async def backlog_groom(
             await ctx.warning(w)
         title = result.get("title", selector)
         await ctx.info(f"Groomed: {title}")
-        return {**result, **out.to_dict()}
+        return BacklogGroomResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogGroomResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2724,12 +2742,13 @@ async def backlog_create_sam_task(
     acceptance_criteria: Annotated[list[str] | None, Field(description="Acceptance criteria strings")] = None,
     labels: Annotated[list[str] | None, Field(description="GitHub label names to apply")] = None,
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> dict:
+) -> BacklogCreateSamTaskResponse:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
     Returns:
-        Dict with issue_number, title, url (always empty), and output messages.
-        On error, returns error key.
+        :class:`~backlog_core.tool_responses.BacklogCreateSamTaskResponse`
+        with issue_number, title, url (always empty), and output messages.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2749,9 +2768,11 @@ async def backlog_create_sam_task(
             labels=labels,
             output=out,
         )
-        return {**result, **out.to_dict()}
+        return BacklogCreateSamTaskResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCreateSamTaskResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -2766,7 +2787,7 @@ async def backlog_get_sam_tasks(
     refresh_cache: Annotated[
         bool, Field(description="Compatibility flag; the configured provider owns refresh")
     ] = True,
-) -> dict:
+) -> SamTaskLookupResult:
     """Return SAM tasks owned by a configured-backend work item.
 
     Returns tasks plus explicit provider freshness and availability state.
@@ -2776,9 +2797,9 @@ async def backlog_get_sam_tasks(
         result = await asyncio.to_thread(
             operations.get_sam_tasks, parent_issue_number=parent_issue_number, refresh_cache=refresh_cache, output=out
         )
-        return {**result, **out.to_dict()}
+        return SamTaskLookupResult.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return SamTaskLookupResult.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -2944,14 +2965,14 @@ async def artifact_list(
         ),
     ],
     artifact_type: Annotated[str | None, Field(description="Filter by artifact type (optional)")] = None,
-) -> dict:
+) -> ArtifactsListResponse:
     """Return all artifacts registered for a backlog item.
 
     Returns an empty list when no manifest section exists yet — this is not an error.
 
     Returns:
-        Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings.
+        :class:`~backlog_core.tool_responses.ArtifactsListResponse` with
+        artifacts, count (int), and output messages/warnings.
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
@@ -2973,9 +2994,13 @@ async def artifact_list(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({
+            "artifacts": artifacts,
+            "count": len(artifacts),
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3000,16 +3025,17 @@ async def artifact_get(
             )
         ),
     ] = None,
-) -> dict:
+) -> ArtifactsListResponse:
     """Return metadata for artifacts registered on a backlog item under one type.
 
     Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
     codebase-analysis files). Supplying it returns the single addressed entry.
 
     Returns:
-        Dict with artifacts (list of dicts), count (int), and output
-        messages/warnings. Returns error key when the type is not found, or when a supplied
-        ``artifact_id`` matches no entry of that type — an absent artifact is data, not a
+        :class:`~backlog_core.tool_responses.ArtifactsListResponse` with
+        artifacts, count (int), and output messages/warnings. ``error`` is
+        set when the type is not found, or when a supplied ``artifact_id``
+        matches no entry of that type — an absent artifact is data, not a
         failed call.
 
     Raises:
@@ -3035,9 +3061,13 @@ async def artifact_get(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({
+            "artifacts": artifacts,
+            "count": len(artifacts),
+            **out.to_dict(),
+        }).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3062,7 +3092,7 @@ async def artifact_read(
             )
         ),
     ] = None,
-) -> dict:
+) -> ArtifactReadResponse:
     """Read provider-owned logical content for a registered artifact.
 
     The selected ContentProvider resolves the artifact by owner, type, and
@@ -3072,10 +3102,10 @@ async def artifact_read(
     Supplying it addresses one specific entry.
 
     Returns:
-        Dict with type (str), path (str), content (str), status (str), and
-        output messages/warnings. Returns error key on type-not-found or when
-        the selected provider has no matching content — an absent artifact is
-        data, not a failed call.
+        :class:`~backlog_core.tool_responses.ArtifactReadResponse` with
+        artifact_type, path, content, status, and output messages/warnings.
+        ``error`` is set on type-not-found or when the selected provider has
+        no matching content — an absent artifact is data, not a failed call.
 
     Raises:
         ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
@@ -3115,9 +3145,11 @@ async def artifact_read(
             )
 
         result = await asyncio.to_thread(_run)
-        return {**result.model_dump(mode="json"), **out.to_dict()}
+        return ArtifactReadResponse.model_validate({**result.model_dump(mode="json"), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactReadResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3127,11 +3159,12 @@ async def artifact_read(
 )
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (native reference)")],
-) -> dict:
+) -> BacklogGetReadySamTasksResponse:
     """Return SAM tasks whose status is not-started and all dependencies are terminal.
 
     Returns:
-        Dict with feature (slug), ready_tasks (list), count. Each ready_task
+        :class:`~backlog_core.tool_responses.BacklogGetReadySamTasksResponse`
+        with feature (slug), ready_tasks (list), count. Each ready_task dict
         contains id, name, agent, skills, issue_number.
     """
     out = Output()
@@ -3139,9 +3172,11 @@ async def backlog_get_ready_sam_tasks(
         result = await asyncio.to_thread(
             operations.get_ready_sam_tasks, parent_issue_number=parent_issue_number, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogGetReadySamTasksResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogGetReadySamTasksResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3286,7 +3321,7 @@ async def backlog_list_milestones(
         title="Get Soonest Milestone", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
     )
 )
-async def backlog_get_soonest_milestone() -> dict:
+async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
     """Return the open milestone with the earliest due date.
 
     Requires a backend with milestone support — errors otherwise. Milestones
@@ -3295,18 +3330,21 @@ async def backlog_get_soonest_milestone() -> dict:
     returned with a warning.
 
     Returns:
-        Dict with ``milestone`` (dict or None) containing ``number``, ``title``,
-        ``state``, ``description``, ``due_on``, ``open_issues``,
-        ``closed_issues``, and output messages/warnings.
+        :class:`~backlog_core.tool_responses.BacklogGetSoonestMilestoneResponse`
+        with ``milestone`` (or ``None``) and output messages/warnings.
         ``milestone`` is ``None`` when no open milestones exist.
-        On error, dict contains an ``error`` key.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.get_soonest_milestone, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogGetSoonestMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogGetSoonestMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3321,25 +3359,26 @@ async def backlog_create_milestone(
         str | None,
         Field(description="Optional due date as ISO 8601 string, e.g. '2026-06-30' or '2026-06-30T00:00:00Z'"),
     ] = None,
-) -> dict:
+) -> BacklogCreateMilestoneResponse:
     """Create a new milestone on the repository.
 
     Requires a backend with milestone support — errors otherwise.
 
     Returns:
-        Dict with ``milestone`` containing ``number``, ``title``, ``state``,
-        ``description``, ``due_on``, ``open_issues``, ``closed_issues``,
-        and output messages/warnings.
-        On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogCreateMilestoneResponse`
+        with ``milestone`` and output messages/warnings.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(
             operations.create_milestone, title=title, description=description, due_on=due_on, output=out
         )
-        return {**result, **out.to_dict()}
+        return BacklogCreateMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCreateMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3377,21 +3416,24 @@ async def backlog_list_issues(
 async def backlog_comment_issue(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     body: Annotated[str, Field(description="Comment body (Markdown)")],
-) -> dict:
+) -> BacklogCommentIssueResponse:
     """Add a comment to a GitHub issue.
 
     Returns:
-        Dict with issue_number, comment_id (a GraphQL node ID — not usable as
+        :class:`~backlog_core.tool_responses.BacklogCommentIssueResponse` with
+        issue_number, comment_id (a GraphQL node ID — not usable as
         backlog_read_comment's comment_id, which requires a REST integer ID),
         comment_url (always empty), and output messages/warnings. On error,
-        dict contains an error key.
+        ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.comment_issue, issue_number=issue_number, body=body, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogCommentIssueResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCommentIssueResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 @mcp.tool(
@@ -3487,21 +3529,24 @@ async def backlog_list_projects(
 async def backlog_create_project(
     title: Annotated[str, Field(description="Project title")],
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
-) -> dict:
+) -> BacklogCreateProjectResponse:
     """Create a Projects V2 project under the repository owner.
 
     Resolves the owner node ID then runs the createProjectV2 GraphQL mutation.
 
     Returns:
-        Dict with project_id, title, url, number, and output messages/warnings.
-        On error, dict contains an error key.
+        :class:`~backlog_core.tool_responses.BacklogCreateProjectResponse` with
+        project_id, title, url, number, and output messages/warnings.
+        On error, ``error`` is set.
     """
     out = Output()
     try:
         result = await asyncio.to_thread(operations.create_project, title=title, owner=owner, output=out)
-        return {**result, **out.to_dict()}
+        return BacklogCreateProjectResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogCreateProjectResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
 
 
 def _dispatch_reference(milestone_number: int) -> ContentRef:

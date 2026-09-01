@@ -1428,7 +1428,7 @@ async def test_backlog_update_backlog_error_returns_error_key():
 
 async def test_backlog_groom_success_with_section_content():
     """backlog_groom calls operations.groom_item with section and content."""
-    op_result = {"title": "Feature", "synced": True}
+    op_result = {"title": "Feature", "groomed_updated": True}
     with patch("dh_core.operations.groom_item", return_value=op_result) as mock_groom:
         response = await _call(
             "backlog_groom", {"selector": "Feature", "section": "Acceptance Criteria", "content": "- [ ] Pass tests"}
@@ -1440,7 +1440,7 @@ async def test_backlog_groom_success_with_section_content():
     assert call_kwargs["section"] == "Acceptance Criteria"
     assert call_kwargs["content"] == "- [ ] Pass tests"
     assert response["title"] == "Feature"
-    assert response["synced"] is True
+    assert response["groomed_updated"] is True
 
 
 async def test_backlog_groom_passes_section_and_content():
