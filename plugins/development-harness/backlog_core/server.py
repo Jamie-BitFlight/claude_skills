@@ -2646,9 +2646,9 @@ async def backlog_groom(
     automatically.
 
     Returns:
-        :class:`~backlog_core.tool_responses.BacklogGroomResponse` with groomed
-        item title, synced status, and output messages/warnings. On error,
-        ``error`` is set.
+        :class:`~backlog_core.tool_responses.BacklogGroomResponse` with the
+        groomed item's ``title``, ``groomed_updated`` (true when content was
+        written), and output messages/warnings. On error, ``error`` is set.
         When mark_groomed=True and the post-write item re-lookup fails to resolve the
         selector, the status advance is skipped and the response additionally has
         mark_groomed_skipped=True and mark_groomed_skip_reason (str) explaining why —
