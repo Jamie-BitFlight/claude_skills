@@ -90,6 +90,19 @@ def _force_milestone_closed(backend: WorkItemBackend, number: int) -> None:
         milestone_obj.edit(title=milestone_obj.title, state="closed")
 
 
+def _skip_github_shared_state(backend: WorkItemBackend) -> None:
+    """Skip on GitHub: assertions here assume a pristine milestone set.
+
+    Memory/SQLite get a brand-new backend instance per test. The GitHub leg
+    targets one real, persistent, possibly non-empty repository with no
+    cleanup between test runs — an exact-match or no-earlier-milestone
+    assumption cannot hold there without live remote cleanup this slice
+    doesn't add.
+    """
+    if not isinstance(backend, (InMemoryBackend, SQLiteBackend)):
+        pytest.skip("GitHub backend milestone state is not guaranteed pristine across runs")
+
+
 def _repo_for_create_issue(backend: WorkItemBackend) -> GithubRepository:
     """Return the repository argument to pass to ``create_issue_for_item``.
 
@@ -144,6 +157,7 @@ def test_write_read_round_trip(backend: WorkItemBackend) -> None:
 
 def test_state_filter_excludes_closed_includes_all(backend: WorkItemBackend) -> None:
     """state='closed' excludes an open milestone; state='all' includes both."""
+    _skip_github_shared_state(backend)
     open_ms = cast("dict[str, object]", operations.create_milestone(title="open one")["milestone"])
     closed_ms = cast("dict[str, object]", operations.create_milestone(title="closed one")["milestone"])
     _force_milestone_closed(backend, cast("int", closed_ms["number"]))
@@ -165,6 +179,7 @@ def test_state_filter_excludes_closed_includes_all(backend: WorkItemBackend) -> 
 
 def test_soonest_milestone_returns_earliest_due_date(backend: WorkItemBackend) -> None:
     """get_soonest_milestone returns the milestone due earliest, everywhere."""
+    _skip_github_shared_state(backend)
     operations.create_milestone(title="mid", due_on="2026-06-30")
     operations.create_milestone(title="early", due_on="2026-01-31")
 
@@ -180,16 +195,8 @@ def test_soonest_milestone_returns_earliest_due_date(backend: WorkItemBackend) -
 
 
 def test_soonest_milestone_none_on_fresh_backend(backend: WorkItemBackend) -> None:
-    """A fresh backend with no milestones returns {"milestone": None}, no exception.
-
-    GitHub is excluded: Memory/SQLite get a brand-new backend instance per
-    test, but the GitHub leg targets a real persistent repository whose
-    milestone state carries over across test runs and earlier tests in this
-    file — "fresh" isn't guaranteed there without live cleanup this slice
-    doesn't add.
-    """
-    if not isinstance(backend, (InMemoryBackend, SQLiteBackend)):
-        pytest.skip("GitHub backend milestone state is not guaranteed fresh across runs")
+    """A fresh backend with no milestones returns {"milestone": None}, no exception."""
+    _skip_github_shared_state(backend)
 
     result = operations.get_soonest_milestone()
 
@@ -203,6 +210,7 @@ def test_soonest_milestone_none_on_fresh_backend(backend: WorkItemBackend) -> No
 
 def test_soonest_milestone_without_due_date_warns_not_raises(backend: WorkItemBackend) -> None:
     """When no open milestone has a due date, a warning is emitted instead of an exception."""
+    _skip_github_shared_state(backend)
     operations.create_milestone(title="undated")
 
     result = operations.get_soonest_milestone()

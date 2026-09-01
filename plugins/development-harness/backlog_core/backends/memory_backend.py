@@ -596,13 +596,18 @@ class InMemoryBackend:
         """
         number = self._next_milestone_number
         self._next_milestone_number += 1
+        due_on_str = None
+        if due_on is not None:
+            if due_on.tzinfo is None:
+                due_on = due_on.replace(tzinfo=UTC)
+            due_on_str = due_on.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         node = MilestoneFullNode(
             id=f"memory-milestone-{number}",
             number=number,
             title=title,
             state="OPEN",
             description=description or "",
-            dueOn=due_on.strftime("%Y-%m-%dT%H:%M:%SZ") if due_on is not None else None,
+            dueOn=due_on_str,
             openIssueCount=0,
             closedIssueCount=0,
         )

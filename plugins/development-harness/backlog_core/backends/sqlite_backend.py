@@ -1119,7 +1119,11 @@ class SQLiteBackend:
             MilestoneFullNode describing the created milestone.
         """
         number = self._next_milestone_number()
-        due_on_str = due_on.strftime("%Y-%m-%dT%H:%M:%SZ") if due_on is not None else None
+        due_on_str = None
+        if due_on is not None:
+            if due_on.tzinfo is None:
+                due_on = due_on.replace(tzinfo=UTC)
+            due_on_str = due_on.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         self._conn.execute(
             "INSERT INTO milestones (number, title, due_on, description, state, created_at) "
             "VALUES (?, ?, ?, ?, 'open', ?)",
