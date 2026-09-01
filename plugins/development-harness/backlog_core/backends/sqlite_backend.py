@@ -3,7 +3,7 @@
 Stores all backlog state in a local SQLite database file.  No PyGithub
 dependency — uses only ``sqlite3`` from the standard library.
 
-Schema (5 tables):
+Schema (7 tables):
     items            — maps directly to BacklogItem fields; each item carries
                        a nullable ``milestone_number`` FK (one milestone per
                        item, matching GitHub's model)
@@ -11,6 +11,8 @@ Schema (5 tables):
     milestones       — backend-neutral milestone/deadline-bucket concept
     comments         — maps to GitHub issue comments
     projects         — maps to GitHub Projects V2
+    content_records  — logical plan/artifact content (``ContentProvider``)
+    work_item_records — opaque native work-item store (``put_work_item``)
 
 Branch operations are not supported; all five branch methods raise
 ``RuntimeError``.  The body column stores sections as JSON.
@@ -378,6 +380,17 @@ class SQLiteBackend:
         row = self._conn.execute("SELECT COALESCE(MAX(number), 0) + 1 FROM projects").fetchone()
         return int(row[0])
 
+    def _milestones_by_number_for(self, rows: list[sqlite3.Row]) -> dict[int, sqlite3.Row]:
+        """Pre-fetch milestones for a batch of ``items`` rows, or skip the query entirely.
+
+        Returns:
+            Empty dict, with no query run, when no row in ``rows`` references
+            a milestone. Otherwise every ``milestones`` row keyed by number.
+        """
+        if not any(r["milestone_number"] is not None for r in rows):
+            return {}
+        return {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
+
     def _row_to_issue_node(
         self,
         row: sqlite3.Row,
@@ -561,7 +574,7 @@ class SQLiteBackend:
                 "SELECT * FROM items WHERE status = ? ORDER BY issue_number LIMIT ?", (db_status, first)
             ).fetchall()
 
-        milestones_by_number = {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
+        milestones_by_number = self._milestones_by_number_for(rows)
         nodes = [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
 
         if labels:
@@ -1249,7 +1262,7 @@ class SQLiteBackend:
             All stored issue nodes.
         """
         rows = self._conn.execute("SELECT * FROM items ORDER BY issue_number").fetchall()
-        milestones_by_number = {int(r["number"]): r for r in self._conn.execute("SELECT * FROM milestones").fetchall()}
+        milestones_by_number = self._milestones_by_number_for(rows)
         return [self._row_to_issue_node(r, milestones_by_number=milestones_by_number) for r in rows]
 
     @_serialized_connection_operation
