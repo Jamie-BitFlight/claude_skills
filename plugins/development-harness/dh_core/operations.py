@@ -117,7 +117,6 @@ __all__ = [
     "artifact_get",
     "artifact_list",
     "artifact_read",
-    # --- Artifact operations ---
     "artifact_register",
     "assign_item_to_milestone",
     "batch_fetch_statuses",
