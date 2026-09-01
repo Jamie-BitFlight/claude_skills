@@ -93,6 +93,7 @@ from .tool_responses import (
     ArtifactRegisterResponse,
     ArtifactsListResponse,
     BacklogAddResponse,
+    BacklogAssignItemToMilestoneResponse,
     BacklogCloseResponse,
     BacklogCommentIssueResponse,
     BacklogCreateMilestoneResponse,
@@ -3488,14 +3489,15 @@ async def backlog_create_milestone(
 async def backlog_assign_item_to_milestone(
     issue_number: Annotated[int, Field(description="Issue number to assign")],
     milestone_number: Annotated[int, Field(description="Milestone number to assign the issue to")],
-) -> dict:
+) -> BacklogAssignItemToMilestoneResponse:
     """Assign a backlog item to a milestone.
 
     Requires a backend with milestone support — errors otherwise.
 
     Returns:
-        Dict with ``issue_number``, ``milestone_number``, and output
-        messages/warnings. On error, dict contains an ``error`` key.
+        :class:`~backlog_core.tool_responses.BacklogAssignItemToMilestoneResponse`
+        with ``issue_number``, ``milestone_number``, and output
+        messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3505,9 +3507,13 @@ async def backlog_assign_item_to_milestone(
             milestone_number=milestone_number,
             output=out,
         )
-        return {**result, **out.to_dict()}
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return BacklogAssignItemToMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
+            exclude_none=True
+        )
+    return BacklogAssignItemToMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
+        exclude_none=True
+    )
 
 
 @mcp.tool(
