@@ -113,6 +113,33 @@ The same rule applies to remote work-item reconciliation: provider snapshots
 and local item files are private cache records, while the remote provider owns
 the accepted state.
 
+### Capability flags
+
+`WorkItemBackend` declares four class-level capability flags every backend
+sets. Callers read a flag before invoking the operation it gates, rather than
+probing behavior or catching a stub's exception:
+
+| Flag | Meaning | `github` | `sqlite` | `memory` | `beads` |
+|---|---|---|---|---|---|
+| `supports_github_extras` | Backend can satisfy `GitHubExtras` — `get_github()` returns a real `Repository`, GraphQL issue/comment/milestone/project operations work. | `True` | `False` | `False` | `False` |
+| `supports_branches` | Backend can satisfy `BranchBackend` — integration branch create/merge/delete. | `True` | `False` | `True` | `False` |
+| `supports_batch_status_fetch` | Backend implements a real batched status fetch. | `True` | `True` | `True` | `False` |
+| `supports_batch_issue_update` | Backend implements a real batched GraphQL update. | `True` | `False` | `False` | `False` |
+
+**Flag-first gating rule:** `GitHubExtras` and `BranchBackend` are both
+`runtime_checkable` Protocols. `isinstance(backend, SomeProtocol)` checks
+method *names* only — a backend can satisfy a Protocol structurally, by
+implementing every method (even as a local simulation, as `sqlite` and
+`memory` do for `GitHubExtras`), without having the underlying capability.
+Gate on the flag first via `require_github_extras()` /
+`require_branch_support()` (`backlog_core/_capability_gates.py`), which use
+`isinstance` only as a secondary assertion once the flag confirms the
+capability is genuinely present. A backend adding one of these protocols must
+also set the matching flag `True` — declaring the flag without satisfying the
+Protocol raises `UnsupportedBackendCapabilityError` with `protocol_mismatch=True`
+(a backend bug), and satisfying the Protocol without setting the flag is
+treated as unsupported (the flag getter defaults `False`).
+
 ### GitHub contract
 
 GitHub stores plans, artifact manifests, artifact content, and dispatch plans as

@@ -248,8 +248,40 @@ def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
     return SyncErrorKind.UNKNOWN
 
 
+_MAX_CAUSE_CHAIN_DEPTH = 5
+
+
+def _find_wrapped_github_exception(exc: BaseException) -> GithubException | None:
+    """Walk ``exc``'s ``__cause__`` chain looking for a wrapped GithubException.
+
+    A content-provider error can wrap through more than one layer before
+    reaching the original GithubException. E.g. ``gh_client._graphql_request()``
+    wraps a GithubException in ``BacklogError``, and
+    ``_fetch_blobs_graphql()`` then wraps that ``BacklogError`` in
+    ``ContentUnavailableError`` — the GithubException sits two ``__cause__``
+    links down, not one.
+
+    Args:
+        exc: The outermost exception to search from.
+
+    Returns:
+        The first GithubException found while walking ``__cause__``, or
+        ``None`` if none is present within ``_MAX_CAUSE_CHAIN_DEPTH`` links
+        (bounded so a pathological or accidentally-cyclic chain can't loop
+        forever — real exception chains here are 1-2 links deep).
+    """
+    cause: BaseException | None = exc.__cause__
+    for _ in range(_MAX_CAUSE_CHAIN_DEPTH):
+        if cause is None:
+            return None
+        if isinstance(cause, GithubException):
+            return cause
+        cause = cause.__cause__
+    return None
+
+
 def _classify_content_provider_error(exc: ContentProviderError) -> SyncErrorKind:
-    """Classify a ContentProviderError by inspecting its wrapped cause, if any.
+    """Classify a ContentProviderError by inspecting its wrapped cause chain, if any.
 
     A ContentProviderError is not always structural: ``_GitHubContentsStore.get_many()``
     wraps *any* ``GithubException`` it sees — including a transient 503 or a
@@ -259,18 +291,20 @@ def _classify_content_provider_error(exc: ContentProviderError) -> SyncErrorKind
     policy transient failures are supposed to get.
 
     Args:
-        exc: A ContentProviderError, possibly wrapping a GithubException as its
-            ``__cause__``.
+        exc: A ContentProviderError, possibly wrapping a GithubException
+            somewhere in its ``__cause__`` chain (see
+            ``_find_wrapped_github_exception``).
 
     Returns:
         The wrapped GithubException's own classification when one is present
-        (delegates to ``_classify_github_exception``); otherwise
-        ``NON_RETRYABLE`` — the error is genuinely structural (a capability
-        gap, a not-found, a revision conflict), and retrying won't fix it.
+        anywhere in the chain (delegates to ``_classify_github_exception``);
+        otherwise ``NON_RETRYABLE`` — the error is genuinely structural (a
+        capability gap, a not-found, a revision conflict), and retrying
+        won't fix it.
     """
-    cause = exc.__cause__
-    if isinstance(cause, GithubException):
-        return _classify_github_exception(cause)
+    github_cause = _find_wrapped_github_exception(exc)
+    if github_cause is not None:
+        return _classify_github_exception(github_cause)
     return SyncErrorKind.NON_RETRYABLE
 
 
