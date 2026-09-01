@@ -852,7 +852,7 @@ class TestMCPToolArtifactRegister:
             )
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["registered"] is True
         assert data["action"] == "added"
         assert data["artifact_count"] == 1
@@ -897,7 +897,7 @@ class TestMCPToolArtifactRegister:
             )
 
         # Assert
-        data = result.data
+        data = result.structured_content
         assert data["registered"] is True
         assert data["action"] == "updated"
         assert data["artifact_count"] == 1  # Still one entry

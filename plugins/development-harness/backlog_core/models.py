@@ -1410,8 +1410,18 @@ class Output(BaseModel):
         """Record a warning message."""
         self.warnings.append(msg)
 
-    def error(self, msg: str) -> None:
-        """Record an error message."""
+    def record_error(self, msg: str) -> None:
+        """Record an error message.
+
+        Named ``record_error``, not ``error`` -- an MCP tool response
+        subclass (``tool_responses.FallibleToolResponse``) adds a singular
+        ``error: str | None`` field, and pydantic v2 silently resolves that
+        field's default back to an inherited same-named *method* rather than
+        ``None`` when the field isn't redeclared in every subclass, breaking
+        serialization. Renaming this method removes the collision at its
+        root rather than relying on every future subclass to remember a
+        workaround.
+        """
         self.errors.append(msg)
 
     def to_dict(self) -> dict[str, list[str]]:

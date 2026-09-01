@@ -4161,7 +4161,7 @@ def get_sam_tasks(
     _ = refresh_cache, repo
     backend = get_config().backend
     if not isinstance(backend, ContentProvider):
-        out.error("Active backend does not support SAM task content")
+        out.record_error("Active backend does not support SAM task content")
         return {
             "tasks": [],
             "count": 0,
@@ -4196,7 +4196,7 @@ def get_sam_tasks(
                     break
                 offset += len(page)
     except ContentUnavailableError as exc:
-        out.error(str(exc))
+        out.record_error(str(exc))
         return {
             "tasks": [],
             "count": 0,
@@ -4218,7 +4218,7 @@ def get_sam_tasks(
             for record in records.values()
         ]
     except (ValueError, YAMLError) as exc:
-        out.error(f"SAM task content is invalid: {exc}")
+        out.record_error(f"SAM task content is invalid: {exc}")
         return {
             "tasks": [],
             "count": 0,

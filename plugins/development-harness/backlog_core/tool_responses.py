@@ -57,18 +57,7 @@ class ToolResponse(Output):
 
 
 class FallibleToolResponse(ToolResponse):
-    """Base for tool responses whose except-BacklogError arm returns a shaped error.
-
-    Pydantic v2 quirk (verified empirically, not documented upstream): this
-    field's name collides with ``Output.error()``, the mutator method it
-    shadows. A *direct* subclass resolves the field's ``None`` default
-    correctly, but any class that adds new fields on top of an *inherited*
-    (non-redeclared) ``error`` field silently resolves its default back to
-    the shadowed bound method instead of ``None`` -- which then fails
-    JSON-schema/serialization. Every concrete subclass that adds fields
-    -- e.g. :class:`ArtifactRegisterResponse` -- must therefore redeclare
-    ``error: str | None = None`` itself; see those classes for the pattern.
-    """
+    """Base for tool responses whose except-BacklogError arm returns a shaped error."""
 
     error: str | None = None
     """Error message set when the operation failed; ``None`` on success."""
@@ -85,9 +74,6 @@ class ArtifactRegisterResponse(RegisterResult, FallibleToolResponse):
     ``exclude_none=True`` on that arm) without touching ``RegisterResult``
     itself, which stays required for every other caller.
     """
-
-    error: str | None = None
-    """Redeclared, not merely inherited -- see :class:`FallibleToolResponse`."""
 
     registered: bool | None = None
     artifact_count: int | None = None
@@ -243,9 +229,6 @@ class SamTaskLookupResult(ToolResponse):
 class DispatchWaveStatusResponse(DispatchWaveSummary, FallibleToolResponse):
     """Response shape returned by the ``dispatch_wave_status`` MCP tool."""
 
-    error: str | None = None
-    """Redeclared, not merely inherited -- see :class:`FallibleToolResponse`."""
-
     status: str | None = None
     total_items: int | None = None
     pending: int | None = None
@@ -261,9 +244,6 @@ class DispatchSpawnResponse(DispatchSpawnSummary, FallibleToolResponse):
 
     See :class:`DispatchWaveStatusResponse`'s design notes.
     """
-
-    error: str | None = None
-    """Redeclared, not merely inherited -- see :class:`FallibleToolResponse`."""
 
     waves_executed: int | None = None
     total_items: int | None = None
