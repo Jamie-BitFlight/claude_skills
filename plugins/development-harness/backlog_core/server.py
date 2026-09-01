@@ -2758,7 +2758,15 @@ async def backlog_pull(
                 await ctx.warning(w)
             file_path = result.get("file_path")
             await ctx.info(f"Pulled: {file_path}" if file_path else "Nothing pulled")
-            return BacklogPullResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
+            response = BacklogPullResponse.model_validate({**result, **out.to_dict()})
+            dump = response.model_dump(exclude_none=True)
+            # file_path is a meaningful, documented null on this path's no-op
+            # success shape (e.g. the backend lacks reconciliation support) --
+            # exclude_none=True would otherwise drop the key entirely. Not
+            # applied on the bulk (no-selector) path below, where file_path
+            # genuinely doesn't apply and should stay absent.
+            dump["file_path"] = response.file_path
+            return dump
         await ctx.info("Starting bulk pull from GitHub" + (" (dry-run)" if dry_run else ""))
         result = await asyncio.to_thread(operations.pull_items, dry_run=dry_run, force=force, diff=diff, output=out)
         for w in out.warnings:
@@ -3371,11 +3379,17 @@ async def backlog_list_milestones(
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_milestones, state=state, output=out)
-        return BacklogListMilestonesResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
         return BacklogListMilestonesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
             exclude_none=True
         )
+    response = BacklogListMilestonesResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    # due_on is a meaningful, documented null per milestone (no due date set) --
+    # exclude_none=True's recursive drop would otherwise remove the key from
+    # any milestone lacking one.
+    dump["milestones"] = [m.model_dump() for m in response.milestones]
+    return dump
 
 
 @mcp.tool(
@@ -3441,11 +3455,18 @@ async def backlog_create_milestone(
         result = await asyncio.to_thread(
             operations.create_milestone, title=title, description=description, due_on=due_on, output=out
         )
-        return BacklogCreateMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
         return BacklogCreateMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
             exclude_none=True
         )
+    response = BacklogCreateMilestoneResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    # due_on is a meaningful, legitimate null (caller can create a milestone
+    # without a due date) -- exclude_none=True's recursive drop would
+    # otherwise remove the key from the nested milestone.
+    if response.milestone is not None:
+        dump["milestone"] = response.milestone.model_dump()
+    return dump
 
 
 @mcp.tool(
@@ -3471,11 +3492,17 @@ async def backlog_list_issues(
         result = await asyncio.to_thread(
             operations.list_issues, milestone=milestone, labels=labels, state=state, limit=limit, output=out
         )
-        return BacklogListIssuesResponse.model_validate({**result, **out.to_dict()}).model_dump(exclude_none=True)
     except BacklogError as e:
         return BacklogListIssuesResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
             exclude_none=True
         )
+    response = BacklogListIssuesResponse.model_validate({**result, **out.to_dict()})
+    dump = response.model_dump(exclude_none=True)
+    # milestone is a meaningful, documented null per issue (no milestone
+    # assigned) -- exclude_none=True's recursive drop would otherwise remove
+    # the key from any issue without one.
+    dump["issues"] = [i.model_dump() for i in response.issues]
+    return dump
 
 
 @mcp.tool(
