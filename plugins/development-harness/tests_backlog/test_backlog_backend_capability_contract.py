@@ -253,6 +253,9 @@ class TestGitHubExtrasCapabilityContract:
                 require_github_extras(backend, "get_github")
             assert exc_info.value.capability == "github_extras"
             assert exc_info.value.backend == type(backend).__name__
+            assert exc_info.value.protocol_mismatch is False, (
+                "a flag-False backend is a genuinely unsupported capability, not a protocol mismatch"
+            )
 
     @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
     def test_true_flag_does_not_raise_unsupported_capability(self, name: str) -> None:
@@ -277,3 +280,28 @@ class TestGitHubExtrasCapabilityContract:
                 )
             else:
                 assert narrowed is backend
+
+    def test_protocol_mismatch_flag_distinguishes_backend_bug_from_unsupported(self) -> None:
+        """A True flag paired with a non-conforming backend raises protocol_mismatch=True.
+
+        Contract: no backend in ``_bp._VALID_BACKENDS`` currently exhibits this
+        inconsistency (each one's flag matches its actual method set), so this
+        test builds a minimal stub that lies about its own capability —
+        ``supports_github_extras = True`` but none of the ``GitHubExtras``
+        methods implemented — to exercise the ``isinstance`` branch directly.
+
+        Why: a flag-``False`` backend is a normal, expected "this capability
+        isn't offered" outcome; a flag-``True`` backend that fails the
+        ``isinstance`` check is a backend implementation bug (the flag lied).
+        Conflating the two in one message misleads whoever reads it — this
+        was raised in code review on PR #3360.
+        """
+
+        class _LyingBackend:
+            supports_github_extras = True
+
+        with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+            require_github_extras(_LyingBackend(), "get_github")  # type: ignore[arg-type]
+
+        assert exc_info.value.protocol_mismatch is True
+        assert "backend bug" in str(exc_info.value)

@@ -624,20 +624,33 @@ class UnsupportedBackendCapabilityError(BacklogError):
     only) so callers can render a specific remediation.
     """
 
-    def __init__(self, capability: str, backend: str, operation: str) -> None:
+    def __init__(self, capability: str, backend: str, operation: str, *, protocol_mismatch: bool = False) -> None:
         """Initialize with the missing capability, backend name, and attempted operation.
 
         Args:
             capability: Name of the missing capability flag (e.g. "github_extras").
             backend: ``type(backend).__name__`` of the active backend.
             operation: Name of the operation the caller attempted.
+            protocol_mismatch: True when the backend declared the capability flag
+                ``True`` but does not structurally satisfy the corresponding
+                ``runtime_checkable`` Protocol — a backend implementation bug, not
+                a genuinely unsupported capability. Produces a message that says
+                so, rather than the misleading "does not support" wording that
+                fits only the flag-``False`` case.
         """
         self.capability = capability
         self.backend = backend
         self.operation = operation
-        super().__init__(
-            f"{backend}: {operation} requires the {capability} capability, which this backend does not support."
-        )
+        self.protocol_mismatch = protocol_mismatch
+        if protocol_mismatch:
+            msg = (
+                f"{backend}: {operation} — backend declares supports_{capability}=True but does not "
+                f"structurally implement the {capability} protocol. This is a backend bug, not an "
+                "unsupported capability."
+            )
+        else:
+            msg = f"{backend}: {operation} requires the {capability} capability, which this backend does not support."
+        super().__init__(msg)
 
     def to_response(self, milestone_number: int) -> dict[str, str | int]:
         """Build the dispatch-tool error payload for this capability gap.

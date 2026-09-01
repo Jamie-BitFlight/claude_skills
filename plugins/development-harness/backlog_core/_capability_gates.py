@@ -11,10 +11,13 @@ both implement every ``GitHubExtras`` method, but neither can return a real
 The functions here gate on the backend's explicit capability flag first —
 ``supports_github_extras`` / ``supports_branches`` — and use ``isinstance``
 only as a secondary structural assertion once the flag confirms the
-capability is genuinely present. Both raise the same typed
+capability is genuinely present. Both failure modes raise the same typed
 ``UnsupportedBackendCapabilityError`` (rather than a bare ``RuntimeError``
-or ``TypeError``) so every capability gap in the ``BacklogError`` tree looks
-identical to callers.
+or ``TypeError``), staying inside the ``BacklogError`` tree — but a
+flag-``False`` backend and a flag-``True``-yet-protocol-mismatched backend
+are different situations (the latter is a backend bug, not a genuinely
+unsupported capability), so the error's ``protocol_mismatch`` flag and
+message distinguish them.
 """
 
 from __future__ import annotations
@@ -41,11 +44,17 @@ def require_github_extras(backend: WorkItemBackend, operation: str) -> GitHubExt
 
     Raises:
         UnsupportedBackendCapabilityError: If ``backend.supports_github_extras``
-            is falsy, or the backend does not structurally satisfy
-            ``GitHubExtras`` despite declaring the flag.
+            is falsy (capability genuinely unsupported), or the backend does
+            not structurally satisfy ``GitHubExtras`` despite declaring the
+            flag (``protocol_mismatch=True`` — a backend bug, not an
+            unsupported capability).
     """
-    if not getattr(backend, "supports_github_extras", False) or not isinstance(backend, GitHubExtras):
+    if not getattr(backend, "supports_github_extras", False):
         raise UnsupportedBackendCapabilityError("github_extras", type(backend).__name__, operation)
+    if not isinstance(backend, GitHubExtras):
+        raise UnsupportedBackendCapabilityError(
+            "github_extras", type(backend).__name__, operation, protocol_mismatch=True
+        )
     return backend
 
 
@@ -65,9 +74,13 @@ def require_branch_support(backend: WorkItemBackend, operation: str) -> BranchBa
 
     Raises:
         UnsupportedBackendCapabilityError: If ``backend.supports_branches``
-            is falsy, or the backend does not structurally satisfy
-            ``BranchBackend`` despite declaring the flag.
+            is falsy (capability genuinely unsupported), or the backend does
+            not structurally satisfy ``BranchBackend`` despite declaring the
+            flag (``protocol_mismatch=True`` — a backend bug, not an
+            unsupported capability).
     """
-    if not getattr(backend, "supports_branches", False) or not isinstance(backend, BranchBackend):
+    if not getattr(backend, "supports_branches", False):
         raise UnsupportedBackendCapabilityError("branches", type(backend).__name__, operation)
+    if not isinstance(backend, BranchBackend):
+        raise UnsupportedBackendCapabilityError("branches", type(backend).__name__, operation, protocol_mismatch=True)
     return backend
