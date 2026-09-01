@@ -217,7 +217,8 @@ class SQLiteBackend:
             self._conn.execute(
                 "UPDATE items SET milestone_number = ("
                 "  SELECT milestone_number FROM item_milestones"
-                "  WHERE item_milestones.issue_number = items.issue_number LIMIT 1"
+                "  WHERE item_milestones.issue_number = items.issue_number"
+                "  ORDER BY milestone_number LIMIT 1"
                 ") WHERE issue_number IN (SELECT issue_number FROM item_milestones)"
             )
             self._conn.execute("DROP TABLE item_milestones")

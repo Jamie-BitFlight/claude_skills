@@ -546,25 +546,24 @@ class InMemoryBackend:
         self, repo: Repository, owner: str, repo_name: str, states: list[str] | None = None
     ) -> list[MilestoneFullNode]:
         """Return stored milestones (with issue counts recomputed live), optionally filtered by state."""
-        milestones: list[MilestoneFullNode] = []
-        for m in self._milestones.values():
-            open_count = sum(
-                1
-                for issue in self._issues.values()
-                if issue["milestone"] is not None
-                and issue["milestone"]["number"] == m["number"]
-                and issue["state"] == "OPEN"
+        open_counts: dict[int, int] = {}
+        closed_counts: dict[int, int] = {}
+        for issue in self._issues.values():
+            milestone = issue["milestone"]
+            if milestone is None:
+                continue
+            counts = open_counts if issue["state"] == "OPEN" else closed_counts
+            counts[milestone["number"]] = counts.get(milestone["number"], 0) + 1
+        milestones: list[MilestoneFullNode] = [
+            MilestoneFullNode(
+                **{
+                    **m,
+                    "openIssueCount": open_counts.get(m["number"], 0),
+                    "closedIssueCount": closed_counts.get(m["number"], 0),
+                }
             )
-            closed_count = sum(
-                1
-                for issue in self._issues.values()
-                if issue["milestone"] is not None
-                and issue["milestone"]["number"] == m["number"]
-                and issue["state"] == "CLOSED"
-            )
-            milestones.append(
-                MilestoneFullNode(**{**m, "openIssueCount": open_count, "closedIssueCount": closed_count})
-            )
+            for m in self._milestones.values()
+        ]
         if states:
             state_set = {s.upper() for s in states}
             milestones = [m for m in milestones if str(m["state"]).upper() in state_set]

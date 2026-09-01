@@ -264,12 +264,16 @@ _ADR_002_NOTE = (
     "Use fetch_open_issues_by_title_str() for beads-native title lookup. See ADR-002."
 )
 
+# ADR-003: the same int-vs-string-ID mismatch ADR-002 describes for issues,
+# applied to milestones — MilestoneFullNode.number is int, beads milestone
+# IDs are string nanoids. Design-time rationale only; kept out of the raised
+# message text below, which callers receive at runtime and only need told
+# what to call instead, not why the Protocol method can't be implemented.
 _ADR_003_NOTE = (
     "list_milestones/create_milestone/assign_item_to_milestone use int issue/milestone numbers "
     "(MilestoneFullNode.number: int) but beads milestones are issues with string nanoid IDs "
     "(bd create --type milestone). Use list_beads_milestones/create_beads_milestone/"
-    "assign_beads_item_to_milestone for beads-native milestone support instead. See ADR-003 — "
-    "the same int-vs-string-ID mismatch ADR-002 describes for issues, applied to milestones."
+    "assign_beads_item_to_milestone for beads-native milestone support instead."
 )
 
 _ADR_002_BATCH_NOTE = (
