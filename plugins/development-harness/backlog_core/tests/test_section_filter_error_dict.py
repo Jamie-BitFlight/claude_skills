@@ -47,13 +47,11 @@ selects the full ADR-3 suite.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import backlog_core.server as server
-from backlog_core.tests._view_test_helpers import _patch_github_body
+from backlog_core.tests._view_test_helpers import _call_view, _patch_github_body
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -139,7 +137,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER))
+        resp = _call_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER)
 
         # Assert
         assert "error" in resp, (
@@ -162,7 +160,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER))
+        resp = _call_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER)
 
         # Assert — key present
         assert "valid_sections" in resp, (
@@ -195,7 +193,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER))
+        resp = _call_view(selector="2521", summary=False, section=_NONEXISTENT_FILTER)
 
         # Assert
         assert "body" not in resp, (
@@ -232,9 +230,7 @@ class TestSectionMissErrorDictCompactMode:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
-        )
+        resp = _call_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
 
         # Assert
         assert "error" in resp, (
@@ -251,9 +247,7 @@ class TestSectionMissErrorDictCompactMode:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
-        )
+        resp = _call_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
 
         # Assert
         assert "valid_sections" in resp, (
@@ -273,9 +267,7 @@ class TestSectionMissErrorDictCompactMode:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(
-            server.backlog_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
-        )
+        resp = _call_view(selector="2521", summary=False, include_content=False, section=_NONEXISTENT_FILTER)
 
         # Assert
         assert "body" not in resp, (
@@ -309,7 +301,7 @@ class TestSectionsFilterPluralMissErrorDict:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER]))
+        resp = _call_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER])
 
         # Assert
         assert "error" in resp, (
@@ -328,7 +320,7 @@ class TestSectionsFilterPluralMissErrorDict:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER]))
+        resp = _call_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER])
 
         # Assert — key present
         assert "valid_sections" in resp, (
@@ -355,7 +347,7 @@ class TestSectionsFilterPluralMissErrorDict:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER]))
+        resp = _call_view(selector="2521", summary=False, sections=[_NONEXISTENT_FILTER])
 
         # Assert — 'body' must be absent (error dict has no content fields)
         assert "body" not in resp, (
@@ -394,7 +386,7 @@ class TestSectionMissErrorDictSuggestion:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NEAR_MISS_FILTER))
+        resp = _call_view(selector="2521", summary=False, section=_NEAR_MISS_FILTER)
 
         # Assert
         assert "suggestion" in resp, (
@@ -413,7 +405,7 @@ class TestSectionMissErrorDictSuggestion:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_NEAR_MISS_FILTER))
+        resp = _call_view(selector="2521", summary=False, section=_NEAR_MISS_FILTER)
 
         # Assert — suggestion present
         assert "suggestion" in resp, f"'suggestion' key must be present for near-miss filter {_NEAR_MISS_FILTER!r}."
@@ -439,7 +431,7 @@ class TestSectionMissErrorDictSuggestion:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_NEAR_MISS_FILTER]))
+        resp = _call_view(selector="2521", summary=False, sections=[_NEAR_MISS_FILTER])
 
         # Assert
         assert "suggestion" in resp, (
@@ -476,7 +468,7 @@ class TestSectionHitRegressionGuard:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, section=_VALID_SECTION))
+        resp = _call_view(selector="2521", summary=False, section=_VALID_SECTION)
 
         # Assert — no error
         assert "error" not in resp, (
@@ -503,7 +495,7 @@ class TestSectionHitRegressionGuard:
         _patch_issue_2521(mocker)
 
         # Act
-        resp = asyncio.run(server.backlog_view(selector="2521", summary=False, sections=[_VALID_SECTION]))
+        resp = _call_view(selector="2521", summary=False, sections=[_VALID_SECTION])
 
         # Assert — no error
         assert "error" not in resp, (
@@ -558,7 +550,7 @@ class TestSectionMissErrorDictUnresolvedSections:
         """
         _patch_github_body(mocker, issue_num=2974, body=_MISKEYED_BODY)
 
-        resp = asyncio.run(server.backlog_view(selector="2974", summary=False, section=_NONEXISTENT_FILTER))
+        resp = _call_view(selector="2974", summary=False, section=_NONEXISTENT_FILTER)
 
         assert "unresolved_sections" in resp, (
             f"Miss response must report 'unresolved_sections' when the item has a "
@@ -577,7 +569,7 @@ class TestSectionMissErrorDictUnresolvedSections:
         """
         _patch_github_body(mocker, issue_num=2974, body=_MISKEYED_BODY)
 
-        resp = asyncio.run(server.backlog_view(selector="2974", summary=False, sections=[_NONEXISTENT_FILTER]))
+        resp = _call_view(selector="2974", summary=False, sections=[_NONEXISTENT_FILTER])
 
         assert "unresolved_sections" in resp, (
             f"Plural miss response must report 'unresolved_sections' when the item has a "
@@ -597,7 +589,7 @@ class TestSectionMissErrorDictUnresolvedSections:
         """
         _patch_github_body(mocker, issue_num=2974, body=_CLEAN_BODY)
 
-        resp = asyncio.run(server.backlog_view(selector="2974", summary=False, section=_NONEXISTENT_FILTER))
+        resp = _call_view(selector="2974", summary=False, section=_NONEXISTENT_FILTER)
 
         assert "unresolved_sections" not in resp, (
             f"Miss response must NOT report 'unresolved_sections' when every section "

@@ -41,7 +41,7 @@ from __future__ import annotations
 from typing import Literal
 
 from dispatch_schema import ConflictGroup
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
 
@@ -78,6 +78,7 @@ __all__ = [
     "BacklogSyncResponse",
     "BacklogUpdateResponse",
     "BacklogUpdateSamTaskStatusResponse",
+    "BacklogViewResponse",
     "CommentEntry",
     "DispatchConflictsResponse",
     "DispatchCreatePlanResponse",
@@ -830,6 +831,113 @@ class BacklogUpdateSamTaskStatusResponse(FallibleToolResponse):
 
     new_status: str | None = None
     """Status value that was applied, echoed back from the request."""
+
+
+# backlog_view is the one deliberately multi-mode tool (#3368): one flat,
+# all-Optional model covers all seven response shapes -- map, navigate,
+# extract, compact summary manifest, over-budget view, full detail, and the
+# four error arms -- rather than a `ModelA | ModelB` return-type union, which
+# FastMCP's schema introspection does not recognise (silently wraps the
+# result under x-fastmcp-wrap-result, a wire-protocol regression). Every
+# field is optional because no single call path populates them all.
+#
+# `sections`/`sections_metadata` are flattened to `dict[str, object]` /
+# `list[dict[str, object]]` rather than reusing ViewItemResult's real nested
+# section models -- measured cost: 1,904 tokens flattened vs. 2,636 with the
+# real models, against a 700-token-per-tool budget already overridden once
+# for this tool (see test_tool_output_schemas.py's _PER_TOOL_SCHEMA_OVERRIDES).
+# Deliberate simplification: nested section models flattened to
+# dict[str, object] to fit the schema budget, rather than reusing
+# ViewItemResult's real SectionEntryMetadata/GroomedSectionMetadata/
+# SectionMeta models (import them from .models to restore full fidelity
+# if the per-tool cap is ever raised past ~2,600).
+#
+# Five fields carry a leading underscore on the wire (`_summary`,
+# `_full_chars`, `_hint`, `_over_budget`, `_usage`). A leading underscore is
+# a valid Python identifier, but Pydantic treats such a field name as a
+# private attribute rather than a model field by default, so each is
+# declared under a plain field name with an `alias` instead, and
+# `serialize_by_alias=True` makes `model_dump(exclude_none=True)` (the call
+# pattern every tool uses, with no explicit `by_alias=True`) emit the
+# underscored key. `populate_by_name=True` lets `model_validate()` accept
+# either spelling.
+class BacklogViewResponse(BaseModel):
+    """Response for ``backlog_view`` -- covers all seven of its disclosure-mode shapes."""
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+    # --- full detail (mirrors ViewItemResult; see .models) ---
+    title: str | None = None
+    priority: str | None = None
+    description: str | None = None
+    source: str | None = None
+    added: str | None = None
+    plan: str | None = None
+    issue: str | None = None
+    file_path: str | None = None
+    groomed: str | None = None
+    status: str | None = None
+    number: int | None = None
+    state: str | None = None
+    body: str | None = None
+    labels: list[str] | None = None
+    milestone: str | None = None
+    sections: dict[str, object] | None = None
+    sections_metadata: list[dict[str, object]] | None = None
+    sections_index: str | None = None
+    body_truncated: bool | None = None
+    body_remaining_entries: int | None = None
+    body_total_entries: int | None = None
+    body_remaining_lines: int | None = None
+    body_total_lines: int | None = None
+    section_filter_miss: bool | None = None
+    messages: list[str] | None = None
+    warnings: list[str] | None = None
+    errors: list[str] | None = None
+
+    # --- compact summary manifest ---
+    issue_number: int | None = None
+    plan_address: str | None = None
+    summary_flag: bool | None = Field(default=None, alias="_summary")
+    full_chars: int | None = Field(default=None, alias="_full_chars")
+    hint: str | None = Field(default=None, alias="_hint")
+
+    # --- over-budget view ---
+    # Distinct from map mode's `over_budget` field below: this one carries
+    # the wire key `_over_budget` (directory-view mode); that one carries
+    # the wire key `over_budget` (map mode). Named apart, not just by a
+    # `_flag` suffix, so the two are not mistaken for each other.
+    directory_over_budget: bool | None = Field(default=None, alias="_over_budget")
+    usage: str | None = Field(default=None, alias="_usage")
+
+    # --- map mode ---
+    selector: str | None = None
+    total_sections: int | None = None
+    total_est_tokens: int | None = None
+    map_text: str | None = None
+    over_budget: bool | None = None
+    struck_ordinals: list[str] | None = None
+
+    # --- navigate / extract modes ---
+    ordinal: str | None = None
+    content: str | None = None
+    total_tokens: int | None = None
+    returned_tokens: int | None = None
+    truncated: bool | None = None
+    next_call: str | None = None
+    child_map: str | None = None
+    has_children: bool | None = None
+    struck: bool | None = None
+    entry_id: str | None = None
+
+    # --- error arms ---
+    error: str | None = None
+    invalid_params: dict[str, object] | None = None
+    requested_ordinal: str | None = None
+    valid_ordinals: list[str] | None = None
+    valid_sections: list[str] | None = None
+    unresolved_sections: list[str] | None = None
+    suggestion: str | None = None
 
 
 # Shared error-arm shape for dispatch_* tools keyed by a GitHub milestone

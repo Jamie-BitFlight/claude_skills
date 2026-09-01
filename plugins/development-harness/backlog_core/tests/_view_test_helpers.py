@@ -7,7 +7,8 @@ collecting this module as a test file.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import asyncio
+from typing import TYPE_CHECKING, Any, cast
 
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
@@ -81,6 +82,31 @@ def _patch_github_body(mocker: MockerFixture, issue_num: int, body: str) -> None
     _configure_memory_view(mocker, item=_make_local_item(), issue_num=issue_num, body=body)
 
 
+def _call_view(**kwargs: Any) -> dict[str, object]:
+    """Call ``backlog_view`` in-process and return its wire dict, typed for tests.
+
+    ``backlog_view`` is annotated ``-> BacklogViewResponse`` for its MCP
+    ``outputSchema`` (#3368), but like every typed tool it returns a plain
+    dict at runtime -- FastMCP serialises a returned model instance or an
+    already-dumped dict identically at the wire boundary, so the annotation
+    describes the schema, not the runtime value. Tests in this module call
+    the tool function directly (bypassing the MCP ``Client``), so ``ty``
+    otherwise infers ``resp``'s type as ``BacklogViewResponse`` and rejects
+    every ``dict``-style access (``.get``, ``[...]``, ``.keys()``) below.
+    This wrapper gives call sites the ``dict`` type they've always actually
+    received.
+
+    Args:
+        **kwargs: Forwarded verbatim to ``backlog_view``.
+
+    Returns:
+        The response dict.
+    """
+    from backlog_core import server
+
+    return cast("dict[str, object]", asyncio.run(server.backlog_view(**kwargs)))
+
+
 def _resp_body(resp: dict[str, object]) -> str:
     """Return the response ``body`` as a typed ``str`` (boundary accessor).
 
@@ -132,6 +158,7 @@ __all__ = [
     "_FILLER",
     "_HUGE_SINGLE",
     "_OVER_BUDGET_BODY",
+    "_call_view",
     "_configure_memory_view",
     "_make_local_item",
     "_patch_github_body",

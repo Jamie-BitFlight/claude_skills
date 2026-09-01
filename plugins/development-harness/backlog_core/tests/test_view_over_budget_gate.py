@@ -17,15 +17,20 @@ Test naming: every test contains ``over_budget`` or ``numeric_section`` so
 
 from __future__ import annotations
 
-import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
 from backlog_core import operations
 from backlog_core.models import SectionEntryDict, ViewItemResult
 from backlog_core.operations import _apply_body_section_filter
-from backlog_core.tests._view_test_helpers import _HUGE_SINGLE, _OVER_BUDGET_BODY, _patch_github_body, _resp_body
+from backlog_core.tests._view_test_helpers import (
+    _HUGE_SINGLE,
+    _OVER_BUDGET_BODY,
+    _call_view,
+    _patch_github_body,
+    _resp_body,
+)
 from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
 
 if TYPE_CHECKING:
@@ -136,9 +141,8 @@ class TestOverBudgetGateHonoursNarrowing:
         delivered regardless of original item size.
         """
         _patch_github_body(mocker, 2495, _OVER_BUDGET_BODY)
-        from backlog_core import server
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, section="RT-ICA"))
+        resp = _call_view(selector="2495", summary=False, section="RT-ICA")
 
         assert resp.get("_over_budget") is not True, (
             "A matched section narrows the body well under budget; backlog_view must NOT "
@@ -163,10 +167,9 @@ class TestOverBudgetGateHonoursNarrowing:
         RED: response is _over_budget with section_filter_miss=True.
         """
         _patch_github_body(mocker, 2495, _OVER_BUDGET_BODY)
-        from backlog_core import server
 
         # Index 2 of the body's headers is '## RT-ICA'
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, section="2"))
+        resp = _call_view(selector="2495", summary=False, section="2")
 
         assert resp.get("section_filter_miss") is not True, (
             "section='2' (numeric index) must resolve to a real section on the raw body, "
@@ -197,9 +200,8 @@ class TestOverBudgetGateHonoursNarrowing:
         discarding the pagination the caller requested.
         """
         _patch_github_body(mocker, 2495, _MANY_SECTION_BODY)
-        from backlog_core import server
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, offset=0, limit=2))
+        resp = _call_view(selector="2495", summary=False, offset=0, limit=2)
 
         assert resp.get("_over_budget") is not True, (
             "offset/limit pagination must be honoured on a large item; backlog_view must "
@@ -232,11 +234,8 @@ class TestOverBudgetGateHonoursNarrowing:
         returning metadata only.
         """
         _patch_github_body(mocker, 2495, _OVER_BUDGET_BODY)
-        from backlog_core import server
 
-        resp = asyncio.run(
-            server.backlog_view(selector="2495", summary=False, sections=["RT-ICA", "Issue Classification"])
-        )
+        resp = _call_view(selector="2495", summary=False, sections=["RT-ICA", "Issue Classification"])
 
         assert resp.get("_over_budget") is not True, (
             "sections=[...] narrows the payload to the named sections; backlog_view must "
@@ -278,7 +277,7 @@ class TestReviewRoundContract:
         _patch_github_body(mocker, 2495, _SINGLE_OVER_BUDGET_BODY)
         from backlog_core import server
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, section="Huge"))
+        resp = _call_view(selector="2495", summary=False, section="Huge")
 
         assert resp.get("_over_budget") is True, (
             "section='Huge' narrows to a single slice that itself exceeds the "
@@ -351,9 +350,8 @@ class TestReviewRoundContract:
         invalid rather than reading silence as "item too big".
         """
         _patch_github_body(mocker, 2495, _OVER_BUDGET_BODY)
-        from backlog_core import server
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=["DOES-NOT-EXIST"]))
+        resp = _call_view(selector="2495", summary=False, sections=["DOES-NOT-EXIST"])
 
         assert resp.get("section_filter_miss") is True, (
             "sections=['DOES-NOT-EXIST'] matched no structured section and no body header; "
@@ -385,11 +383,10 @@ class TestEmptySectionsListBehavesLikeNone:
             "## Impact Radius\n\nimpact body\n"
         )
         _patch_github_body(mocker, 2495, SYNC_BODY)
-        from backlog_core import server
 
-        resp_empty = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=[]))
+        resp_empty = _call_view(selector="2495", summary=False, sections=[])
         _patch_github_body(mocker, 2495, SYNC_BODY)
-        resp_none = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=None))
+        resp_none = _call_view(selector="2495", summary=False, sections=None)
 
         assert resp_empty.get("section_filter_miss") is not True, (
             "sections=[] must not report a miss — it is equivalent to no filter. Finding #6."
@@ -397,7 +394,9 @@ class TestEmptySectionsListBehavesLikeNone:
         assert resp_empty.get("body") == resp_none.get("body"), (
             "sections=[] must return the same body as sections=None (no narrowing applied)."
         )
-        assert sorted(resp_empty.get("sections", {})) == sorted(resp_none.get("sections", {})), (
+        sections_empty = cast("dict[str, object]", resp_empty.get("sections", {}))
+        sections_none = cast("dict[str, object]", resp_none.get("sections", {}))
+        assert sorted(sections_empty) == sorted(sections_none), (
             "sections=[] must leave the sections dict identical to sections=None — it must not empty it."
         )
 
@@ -430,7 +429,7 @@ class TestUnboundedOverBudgetStillReturnsDirectory:
         )
         _patch_github_body(mocker, 2495, _GENUINELY_OVER_BUDGET_BODY)
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+        resp = _call_view(selector="2495", summary=False)
 
         assert resp.get("_over_budget") is True, (
             "an unbounded genuinely-over-budget default call (no section/sections/offset/limit) must "
@@ -471,7 +470,7 @@ class TestUnboundedOverBudgetStillReturnsDirectory:
             "heuristic/token divergence boundary (a header would duplicate the run into the sections dict)."
         )
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+        resp = _call_view(selector="2495", summary=False)
 
         assert resp.get("_over_budget") is not True, (
             "a large-but-compressible body (>16000 chars but <= token budget) must be delivered INLINE — "
@@ -550,7 +549,7 @@ class TestOverBudgetMeasurementCountsClearedBodySoleContent:
 
         mocker.patch.object(server.operations, "view_item", side_effect=lambda **_kwargs: _drift_view_result())
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, sections=["RT-ICA"]))
+        resp = _call_view(selector="2495", summary=False, sections=["RT-ICA"])
 
         assert resp.get("_over_budget") is True, (
             "the drift payload (body cleared, sole section copy over budget) must return the compact "

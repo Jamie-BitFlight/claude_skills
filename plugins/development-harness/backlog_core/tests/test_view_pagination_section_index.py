@@ -18,13 +18,12 @@ Test naming: every test contains ``over_budget`` or ``numeric_section`` so
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 
 import pytest
 
 from backlog_core import operations
-from backlog_core.tests._view_test_helpers import _patch_github_body, _resp_body
+from backlog_core.tests._view_test_helpers import _call_view, _patch_github_body, _resp_body
 from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
 
 if TYPE_CHECKING:
@@ -133,7 +132,7 @@ class TestOverBudgetMeasurementExcludesDuplicatedContent:
         )
 
         _patch_github_body(mocker, 2495, body)
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+        resp = _call_view(selector="2495", summary=False)
 
         assert resp.get("_over_budget") is not True, (
             "a ``## ``-headed body comfortably under budget on its own must be delivered INLINE; the "
@@ -418,7 +417,7 @@ class TestPagedSectionNoneIndexDoesNotTripOverBudget:
         )
 
         _patch_github_body(mocker, 2495, body)
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, limit=2))
+        resp = _call_view(selector="2495", summary=False, limit=2)
 
         assert resp.get("_over_budget") is not True, (
             "an explicit paged request (limit=2) must be delivered inline; backlog_view must NOT prepend "
@@ -453,12 +452,10 @@ class TestPagedSectionNoneIndexDoesNotTripOverBudget:
         Companion offset>0 case: the page lands deeper in the body and must still be
         delivered inline (not displaced by the unbounded whole-item index).
         """
-        from backlog_core import server
-
         body = _many_heading_body(400)
         _patch_github_body(mocker, 2495, body)
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False, offset=4, limit=2))
+        resp = _call_view(selector="2495", summary=False, offset=4, limit=2)
 
         assert resp.get("_over_budget") is not True, (
             "an explicit paged request with offset>0 must be delivered inline, not replaced by the "
@@ -477,13 +474,11 @@ class TestPagedSectionNoneIndexDoesNotTripOverBudget:
         (well under budget) must still receive the prepended index so agents can
         discover available sections — the M1 behaviour (e6191da) is preserved.
         """
-        from backlog_core import server
-
         # Small body so the unpaged response stays under budget and is delivered inline.
         small_body = "## Alpha\n\naaa\n\n## Beta\n\nbbb\n\n## Gamma\n\nggg\n"
         _patch_github_body(mocker, 2495, small_body)
 
-        resp = asyncio.run(server.backlog_view(selector="2495", summary=False))
+        resp = _call_view(selector="2495", summary=False)
 
         assert resp.get("_over_budget") is not True, "premise: the small unpaged body must be delivered inline."
         body_out = _resp_body(resp)

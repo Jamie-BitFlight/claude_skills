@@ -18,7 +18,6 @@ Test naming: every test contains ``over_budget`` or ``numeric_section`` so
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 
 import pytest
@@ -27,7 +26,7 @@ from backlog_core import operations
 from backlog_core.models import ViewItemResult
 from backlog_core.operations import _apply_body_section_filter
 from backlog_core.parsing import split_body_sections
-from backlog_core.tests._view_test_helpers import _patch_github_body, _resp_metadata
+from backlog_core.tests._view_test_helpers import _call_view, _patch_github_body, _resp_metadata
 from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
 
 if TYPE_CHECKING:
@@ -301,11 +300,8 @@ class TestCompactValidNamesNotReportedAsMiss:
         a valid name was wrongly reported as section_filter_miss.
         """
         _patch_github_body(mocker, 2495, _SYNC_BODY)
-        from backlog_core import server
 
-        resp = asyncio.run(
-            server.backlog_view(selector="2495", summary=False, include_content=False, sections=["RT-ICA"])
-        )
+        resp = _call_view(selector="2495", summary=False, include_content=False, sections=["RT-ICA"])
 
         assert resp.get("section_filter_miss") is not True, (
             "a VALID section name in compact mode must NOT report section_filter_miss. "
@@ -321,11 +317,8 @@ class TestCompactValidNamesNotReportedAsMiss:
     def test_compact_invalid_section_name_reports_miss(self, mocker: MockerFixture) -> None:
         """An INVALID name in compact mode still reports a miss (no false negative)."""
         _patch_github_body(mocker, 2495, _SYNC_BODY)
-        from backlog_core import server
 
-        resp = asyncio.run(
-            server.backlog_view(selector="2495", summary=False, include_content=False, sections=["DOES-NOT-EXIST"])
-        )
+        resp = _call_view(selector="2495", summary=False, include_content=False, sections=["DOES-NOT-EXIST"])
 
         assert resp.get("section_filter_miss") is True, (
             "an invalid name in compact mode must still report section_filter_miss so the miss "
