@@ -391,7 +391,7 @@ The backlog system uses the configured provider's native interface and selected 
 
 Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `backlog_close`
 
-- The selected backend is the source of truth. **This checkout's backend is GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`; no `.beads/` directory exists here) — the Beads block near the end of this file is generic boilerplate injected regardless of which backend a checkout actually uses. Follow this section, not that block, unless `.beads/` appears. `.claude/backlog/` is local cache either way.
+- The selected backend is the source of truth. **This checkout's backend is GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`; no `.beads/` directory exists here) — the Beads blocks near the end of this file (`BEADS INTEGRATION` and `BEADS CODEX SETUP`) are generic boilerplate the `bd` CLI injects and periodically regenerates, regardless of which backend a checkout actually uses. Follow this section, not those blocks, unless `.beads/` appears. `.claude/backlog/` is local cache either way.
 - Before starting multi-step work: create a backlog item through the selected backend or its structured `backlog_add` operation
 - Use `backlog_groom` with `append=True` for incremental section writes
 
