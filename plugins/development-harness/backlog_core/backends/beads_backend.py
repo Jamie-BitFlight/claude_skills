@@ -268,8 +268,8 @@ _ADR_003_NOTE = (
     "list_milestones/create_milestone/assign_item_to_milestone use int issue/milestone numbers "
     "(MilestoneFullNode.number: int) but beads milestones are issues with string nanoid IDs "
     "(bd create --type milestone). Use list_beads_milestones/create_beads_milestone/"
-    "assign_beads_item_to_milestone for beads-native milestone support instead. See ADR-002 — "
-    "the same int-vs-string-ID mismatch, applied to milestones."
+    "assign_beads_item_to_milestone for beads-native milestone support instead. See ADR-003 — "
+    "the same int-vs-string-ID mismatch ADR-002 describes for issues, applied to milestones."
 )
 
 _ADR_002_BATCH_NOTE = (
