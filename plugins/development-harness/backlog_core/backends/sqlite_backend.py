@@ -1144,6 +1144,9 @@ class SQLiteBackend:
         )
         self._conn.commit()
         row = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (number,)).fetchone()
+        if row is None:
+            msg = f"SQLiteBackend: milestone #{number} not found immediately after insert"
+            raise RuntimeError(msg)
         return self._row_to_milestone_full(row)
 
     @_serialized_connection_operation

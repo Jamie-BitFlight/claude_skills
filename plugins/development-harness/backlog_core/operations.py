@@ -4582,15 +4582,12 @@ def create_milestone(
 
     due_on_dt: datetime | None = None
     if due_on is not None:
-        for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
-            try:
-                due_on_dt = datetime.strptime(due_on, fmt).replace(tzinfo=UTC)
-                break
-            except ValueError:
-                continue
-        else:
+        try:
+            due_on_dt = datetime.fromisoformat(due_on)
+        except ValueError:
             msg = f"due_on must be ISO 8601 (e.g. '2026-06-30' or '2026-06-30T00:00:00Z'), got {due_on!r}"
-            raise ValidationError(msg)
+            raise ValidationError(msg) from None
+        due_on_dt = due_on_dt.replace(tzinfo=UTC) if due_on_dt.tzinfo is None else due_on_dt.astimezone(UTC)
 
     backend = require_milestone_support(get_config().backend, "create_milestone")
     ms = backend.create_milestone(title=title.strip(), description=description, due_on=due_on_dt, repo=repo)
