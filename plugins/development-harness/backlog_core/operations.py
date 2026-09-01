@@ -57,6 +57,7 @@ from .models import (
     Section,
     SectionEntryDict,
     SectionEntryMetadata,
+    UnsupportedBackendCapabilityError,
     ValidationError,
     ViewItemResult,
     parse_issue_number,
@@ -4723,6 +4724,8 @@ def list_issues(
         milestone_number = _resolve_milestone_number(gh_repo, milestone, out)
         label_names = _resolve_label_names(labels)
         issue_list = _collect_issues(gh_repo, state, label_names, milestone_number, limit)
+    except UnsupportedBackendCapabilityError:
+        raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error fetching issues: {e}"
         raise BacklogError(msg) from e
@@ -4762,6 +4765,8 @@ def comment_issue(
         issue_node = _fetch_issue_graphql(gh_repo, owner, repo_name, issue_number)
         comment_node_id = _add_comment_graphql(gh_repo, issue_node["id"], body)
         out.info(f"  Comment added to issue #{issue_number}")
+    except UnsupportedBackendCapabilityError:
+        raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error adding comment: {e}"
         raise BacklogError(msg) from e
@@ -4803,6 +4808,8 @@ def list_comments(
         gh_repo = get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
         all_comments = _fetch_issue_comments_graphql(gh_repo, owner, repo_name, issue_number)
+    except UnsupportedBackendCapabilityError:
+        raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error fetching comments: {e}"
         raise BacklogError(msg) from e
@@ -4878,6 +4885,8 @@ def read_comment(
         pygithub_comment = pygithub_issue.get_comment(comment_id)
         node_id: str = str(pygithub_comment.node_id)
         comment = _fetch_comment_by_id_graphql(gh_repo, node_id)
+    except UnsupportedBackendCapabilityError:
+        raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error reading comment: {e}"
         raise BacklogError(msg) from e
