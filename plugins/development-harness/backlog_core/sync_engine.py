@@ -33,7 +33,7 @@ from .models import BacklogError
 from .sync_state import SyncErrorKind, SyncState, SyncStatus, classify_sync_error
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
 __all__ = ["_startup_sync_loop"]
 
@@ -89,13 +89,30 @@ def _make_progress_callback(state: SyncState) -> Callable[[int, int | None], Non
     return _callback
 
 
+def _count(result: Mapping[str, int | list[str]], key: str) -> int:
+    """Narrow one ``refresh_local_cache_from_github`` result field to an int.
+
+    Args:
+        result: The dict returned by ``refresh_local_cache_from_github``.
+        key: The field to read.
+
+    Returns:
+        The field's int value, or 0 if absent or not an int.
+    """
+    value = result.get(key, 0)
+    return value if isinstance(value, int) else 0
+
+
 async def _run_single_sync(state: SyncState, full_refresh: bool = False) -> None:
     """Execute one sync pass by calling ``refresh_local_cache_from_github`` in a thread.
 
     Updates ``state.items_done`` and ``state.items_total`` via progress callback
-    as pages arrive.  On success, sets ``state.status = IDLE`` and records
-    ``state.last_success_at``.  On error, raises the original exception for
-    the caller to classify and handle.
+    as pages arrive.  On success, sets ``state.status = IDLE``, records
+    ``state.last_success_at``, and copies the offline queue's pending/rejected
+    mutation counts onto ``state`` so ``sync_status()`` can report them.  On
+    error, raises the original exception for the caller to classify and
+    handle -- ``state.pending_mutations``/``rejected_mutations`` are left at
+    their last known values in that case, not zeroed.
 
     Args:
         state: Process-singleton SyncState — written by progress callback.
@@ -106,7 +123,7 @@ async def _run_single_sync(state: SyncState, full_refresh: bool = False) -> None
             re-raised for the caller to classify.
     """
     callback = _make_progress_callback(state)
-    await asyncio.to_thread(
+    result = await asyncio.to_thread(
         operations.refresh_local_cache_from_github, full_refresh=full_refresh, progress_callback=callback
     )
     # The progress callback marshals mutations via loop.call_soon_threadsafe.
@@ -118,6 +135,8 @@ async def _run_single_sync(state: SyncState, full_refresh: bool = False) -> None
     state.last_success_at = now
     state.last_error = ""
     state.retry_count = 0
+    state.pending_mutations = _count(result, "pending_mutations")
+    state.rejected_mutations = _count(result, "rejected_mutations")
     _log.info("Background sync completed successfully.")
 
 

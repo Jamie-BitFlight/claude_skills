@@ -531,15 +531,16 @@ class _CacheStateStore:
         per-entry salvage cannot help when the document itself doesn't parse.
 
         records/checkpoints are different from the other four fields: those
-        are pure cache, safely dropped and logged (:meth:`_salvage_list`).
-        pending/pending_work_items/rejected/rejected_work_items are all
-        precious -- a schema-invalid entry there is more likely a legitimate
-        write this version can't parse yet (schema evolution) than genuine
-        corruption, including in the two terminal dead-letter buckets
-        themselves (a stored ``rejected``/``rejected_work_items`` entry is
-        the only recovery record for whatever it holds; losing it too on a
-        later load would be worse than the mismatch that put it there).
-        :meth:`_salvage_queue_list` preserves each one's raw payload in
+        are pure cache, safely dropped and logged (:meth:`_salvage_field`
+        with ``preserve=False``). pending/pending_work_items/rejected/
+        rejected_work_items are all precious -- a schema-invalid entry there
+        is more likely a legitimate write this version can't parse yet
+        (schema evolution) than genuine corruption, including in the two
+        terminal dead-letter buckets themselves (a stored ``rejected``/
+        ``rejected_work_items`` entry is the only recovery record for
+        whatever it holds; losing it too on a later load would be worse
+        than the mismatch that put it there). :meth:`_salvage_field` with
+        ``preserve=True`` preserves each one's raw payload in
         ``corrupt_queue_entries`` instead of dropping it. That field is the
         terminal fallback and isn't routed through the same path itself:
         its ``raw: Any`` member can't fail model validation, so there's
@@ -551,15 +552,15 @@ class _CacheStateStore:
             entries in the four precious fields are preserved in
             ``corrupt_queue_entries``.
         """
-        # Runtime shape is guaranteed by _salvage_list's/_salvage_queue_list's own
+        # Runtime shape is guaranteed by _salvage_field's own
         # model.model_validate() calls; the casts below narrow the result back
         # for the type checker, which can't express that generically without an
         # overload per field. Driven by a loop rather than one named pair of
         # locals per field, to stay under ruff's too-many-locals limit.
-        records = cast("list[ContentRecord]", self._salvage_list(raw, "records", ContentRecord, path))
-        checkpoints = cast("list[CacheCheckpoint]", self._salvage_list(raw, "checkpoints", CacheCheckpoint, path))
+        records = cast("list[ContentRecord]", self._salvage_field(raw, "records", ContentRecord, path)[0])
+        checkpoints = cast("list[CacheCheckpoint]", self._salvage_field(raw, "checkpoints", CacheCheckpoint, path)[0])
         corrupt = cast(
-            "list[_CorruptQueueEntry]", self._salvage_list(raw, "corrupt_queue_entries", _CorruptQueueEntry, path)
+            "list[_CorruptQueueEntry]", self._salvage_field(raw, "corrupt_queue_entries", _CorruptQueueEntry, path)[0]
         )
         survivors: dict[str, list[BaseModel]] = {}
         for field_name, model in (
@@ -568,7 +569,7 @@ class _CacheStateStore:
             ("rejected", _RejectedMutation),
             ("rejected_work_items", _RejectedWorkItemMutation),
         ):
-            entries, bad = self._salvage_queue_list(raw, field_name, model, path)
+            entries, bad = self._salvage_field(raw, field_name, model, path, preserve=True)
             survivors[field_name] = entries
             corrupt.extend(bad)
         # Idempotency-key self-consistency is checked once, uniformly, in
@@ -587,61 +588,56 @@ class _CacheStateStore:
         )
 
     @staticmethod
-    def _salvage_list(raw: dict[str, object], field_name: str, model: type[BaseModel], path: Path) -> list[BaseModel]:
-        """Validate each entry of one non-queue field independently, dropping failures.
-
-        Not used for pending/pending_work_items -- see :meth:`_salvage_queue_list`.
-
-        Returns:
-            The entries that validated; malformed ones are logged and dropped.
-        """
-        value = raw.get(field_name, [])
-        if not isinstance(value, list):
-            _log.warning("Cache state %s: %r is not a list (%r) -- dropping all entries", path, field_name, value)
-            return []
-        survivors: list[BaseModel] = []
-        for entry in value:
-            try:
-                survivors.append(model.model_validate(entry))
-            except pydantic.ValidationError as exc:
-                _log.warning("Cache state %s: dropping malformed %s entry: %s", path, field_name, exc)
-        return survivors
-
-    @staticmethod
-    def _salvage_queue_list(
-        raw: dict[str, object], field_name: str, model: type[BaseModel], path: Path
+    def _salvage_field(
+        raw: dict[str, object], field_name: str, model: type[BaseModel], path: Path, *, preserve: bool = False
     ) -> tuple[list[BaseModel], list[_CorruptQueueEntry]]:
-        """Validate each entry of a precious field, preserving failures instead of dropping them.
+        """Validate each entry of one field independently, per ``preserve``'s failure policy.
 
-        Used for pending/pending_work_items/rejected/rejected_work_items --
-        every field where losing an entry outright would discard something
-        no longer recoverable elsewhere.
+        ``preserve=False`` (records/checkpoints/corrupt_queue_entries -- pure
+        cache, safe to drop): a malformed entry is logged at warning level and
+        dropped; the second return element is always empty.
+
+        ``preserve=True`` (pending/pending_work_items/rejected/
+        rejected_work_items -- precious, losing one outright would discard
+        something no longer recoverable elsewhere): a malformed entry is
+        logged at error level and dead-lettered into a :class:`_CorruptQueueEntry`
+        instead of being dropped.
 
         Returns:
-            The entries that validated, and a :class:`_CorruptQueueEntry` for
-            each one that didn't -- or, if ``field_name`` itself isn't a
-            list, a single entry preserving the whole raw value, rather than
-            silently discarding the entire field.
+            The entries that validated, and (``preserve=True`` only) a
+            :class:`_CorruptQueueEntry` for each one that didn't -- or, if
+            ``field_name`` itself isn't a list, a single such entry
+            preserving the whole raw value rather than silently discarding
+            the entire field. Always ``[]`` when ``preserve=False``.
         """
         value = raw.get(field_name, [])
         if not isinstance(value, list):
-            _log.error(
-                "Cache state %s: %r is not a list (%r) -- preserving as a single corrupt entry", path, field_name, value
-            )
-            return [], [_CorruptQueueEntry(field=field_name, raw=value, reason="value is not a list")]
+            if preserve:
+                _log.error(
+                    "Cache state %s: %r is not a list (%r) -- preserving as a single corrupt entry",
+                    path,
+                    field_name,
+                    value,
+                )
+                return [], [_CorruptQueueEntry(field=field_name, raw=value, reason="value is not a list")]
+            _log.warning("Cache state %s: %r is not a list (%r) -- dropping all entries", path, field_name, value)
+            return [], []
         survivors: list[BaseModel] = []
         corrupt: list[_CorruptQueueEntry] = []
         for entry in value:
             try:
                 survivors.append(model.model_validate(entry))
             except pydantic.ValidationError as exc:
-                _log.error(
-                    "Cache state %s: dead-lettering malformed %s entry (raw payload preserved): %s",
-                    path,
-                    field_name,
-                    exc,
-                )
-                corrupt.append(_CorruptQueueEntry(field=field_name, raw=entry, reason=str(exc)))
+                if preserve:
+                    _log.error(
+                        "Cache state %s: dead-lettering malformed %s entry (raw payload preserved): %s",
+                        path,
+                        field_name,
+                        exc,
+                    )
+                    corrupt.append(_CorruptQueueEntry(field=field_name, raw=entry, reason=str(exc)))
+                else:
+                    _log.warning("Cache state %s: dropping malformed %s entry: %s", path, field_name, exc)
         return survivors, corrupt
 
     @staticmethod

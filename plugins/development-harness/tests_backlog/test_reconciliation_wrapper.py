@@ -9,6 +9,7 @@ from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
+from backlog_core.file_cache_state import _CacheState, _CorruptQueueEntry
 from backlog_core.models import (
     BackendUnavailableError,
     BacklogItem,
@@ -79,6 +80,43 @@ def test_refresh_wrapper_maps_label_and_progress(
     assert progress == expected_progress
     assert result["refreshed"] == 2
     assert result["reconciled"] == 1
+
+
+def test_refresh_wrapper_surfaces_a_dead_lettered_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given: a cache with one schema-invalid entry already dead-lettered into
+    # corrupt_queue_entries (e.g. from schema evolution -- see
+    # _CacheStateStore._salvage_field with preserve=True), and no other rejections.
+    # Before this fix, refresh_local_cache_from_github() computed this count via
+    # reconcile() but dropped it from both its message and its return dict.
+    cache = FileCache(tmp_path / "github-cache")
+    cache._root.mkdir(parents=True, exist_ok=True)
+    cache._state._save(
+        _CacheState(
+            corrupt_queue_entries=[
+                _CorruptQueueEntry(field="pending", raw={"whatever": "shape"}, reason="test fixture")
+            ]
+        )
+    )
+    backend = GitHubBackend(cache=cache)
+    monkeypatch.setattr(
+        backend,
+        "_fetch_snapshot",
+        lambda request: ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1),
+    )
+    monkeypatch.setattr(
+        _models, "_config", _models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
+    )
+    set_config(BacklogConfig(backend=backend))
+
+    # When: the main sync path runs (not the per-item grooming path)
+    result = refresh_local_cache_from_github(full_refresh=True)
+
+    # Then: the dead-lettered entry is counted and named in the sync message
+    assert result["rejected_mutations"] == 1
+    assert result["pending_mutations"] == 0
+    messages = result["messages"]
+    assert isinstance(messages, list)
+    assert any("1 rejected mutation(s)" in msg for msg in messages)
 
 
 @pytest.mark.parametrize(

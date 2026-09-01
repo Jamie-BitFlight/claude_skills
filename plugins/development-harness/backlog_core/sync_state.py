@@ -104,6 +104,9 @@ class SyncState:
         last_success_at: UTC timestamp of the last *successful* sync.
         retry_count: Consecutive failed attempts in the current cycle.
         offline_reason: Human-readable explanation for OFFLINE state entry.
+        pending_mutations: Offline-queue depth as of the last completed sync.
+        rejected_mutations: Dead-lettered mutation count as of the last
+            completed sync (key mismatches plus schema-invalid entries).
         lock: asyncio.Lock serialising sync workers.  Named without underscore
             so sync_engine can access it without triggering SLF001.
     """
@@ -117,6 +120,8 @@ class SyncState:
     last_success_at: datetime | None = None
     retry_count: int = 0
     offline_reason: str = ""
+    pending_mutations: int = 0
+    rejected_mutations: int = 0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False, compare=False)
 
     @property
@@ -181,6 +186,8 @@ class SyncState:
             "retry_count": self.retry_count,
             "offline_reason": self.offline_reason,
             "percent": self.percent,
+            "pending_mutations": self.pending_mutations,
+            "rejected_mutations": self.rejected_mutations,
         }
 
 

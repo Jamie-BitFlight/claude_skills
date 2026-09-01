@@ -284,8 +284,9 @@ class FileCache:
     def _corrupt_queue_entries(self) -> list[_CorruptQueueEntry]:
         """Return pending/pending_work_items entries that failed schema validation on load.
 
-        See :meth:`_CacheStateStore._salvage_queue_list` -- stored as raw
-        payloads for manual recovery, since they never became typed models.
+        See :meth:`_CacheStateStore._salvage_field` (``preserve=True``) --
+        stored as raw payloads for manual recovery, since they never became
+        typed models.
         """
         return list(self._load_state().corrupt_queue_entries)
 

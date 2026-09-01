@@ -1015,8 +1015,9 @@ def test_load_preserves_a_stored_rejected_entry_that_fails_schema_validation(tmp
     # Given: a stored rejected entry (already the terminal recovery record for
     # a prior key mismatch) that itself fails schema validation on this load
     # -- e.g. its nested ContentWrite gained a required field on a later
-    # version. Routed through _salvage_list before this fix, it would have
-    # been silently dropped -- losing the only remaining copy of what it held.
+    # version. Routed through _salvage_field(preserve=False) before this fix,
+    # it would have been silently dropped -- losing the only remaining copy
+    # of what it held.
     good_state = _populated_cache_state()
     raw = json.loads(good_state.model_dump_json())
     raw["rejected"] = [{"idempotency_key": "whatever", "write": {"reference": {}}}]  # missing "reason", malformed ref

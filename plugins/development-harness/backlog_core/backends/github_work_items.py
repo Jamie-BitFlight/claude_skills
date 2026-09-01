@@ -531,9 +531,9 @@ class _GitHubReconciliation:
                 "pending_mutations": len(self._cache.pending_mutations())
                 + len(self._cache._pending_work_item_mutations()),
                 # Schema-invalid entries dead-lettered into corrupt_queue_entries
-                # (see _CacheStateStore._salvage_queue_list) count as rejected
-                # too: like a key mismatch, they're terminal and need manual
-                # recovery, not silently invisible zero pending/zero rejected.
+                # (see _CacheStateStore._salvage_field with preserve=True) count
+                # as rejected too: like a key mismatch, they're terminal and need
+                # manual recovery, not silently invisible zero pending/zero rejected.
                 "rejected_mutations": len(self._cache.rejected_mutations())
                 + len(self._cache._rejected_work_item_mutations())
                 + len(self._cache._corrupt_queue_entries()),
