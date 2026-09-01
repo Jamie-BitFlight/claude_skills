@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -1260,24 +1260,18 @@ class TestKillSwitch:
 
         from backlog_core.server import _backlog_lifespan, sync_now
 
-        # sync_now's return-type annotation is SyncNowResponse (needed for
-        # FastMCP's outputSchema derivation), but its body always returns a
-        # plain dict via model_dump() -- ty statically trusts the declared
-        # annotation, not the runtime value, so a direct call's result
-        # types as a non-subscriptable SyncNowResponse. Routing through
-        # Client(mcp) would exercise the real MCP boundary instead (see
-        # test_sync_status_returns_all_required_fields for that pattern),
-        # but this test must call sync_now() in-process: Client(mcp)'s
-        # transport itself relies on the real asyncio.create_task, which
-        # the mock above replaces module-wide, and would hang. cast()
-        # documents the known-true runtime shape at this boundary instead
-        # of suppressing the diagnostic.
+        # sync_now returns the SyncNowResponse instance directly (no
+        # exclude_none/model_dump()), so its declared return type is accurate
+        # for in-process callers too -- this test must call sync_now()
+        # in-process rather than through Client(mcp) since that transport
+        # relies on the real asyncio.create_task, which the mock above
+        # replaces module-wide, and would hang.
         async with _backlog_lifespan(object()):
-            result = cast("dict[str, object]", await sync_now())
+            result = await sync_now()
 
         create_task.assert_not_called()
-        assert result["triggered"] is False
-        assert result["messages"] == ["Active backend does not support reconciliation."]
+        assert result.triggered is False
+        assert result.messages == ["Active backend does not support reconciliation."]
 
     async def test_sync_runs_when_kill_switch_enabled(self, mocker: MockerFixture) -> None:
         """startup sync IS launched when the kill-switch is true (default)."""

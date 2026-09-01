@@ -1203,7 +1203,12 @@ async def sync_status() -> SyncStatusResponse:
     # present on every path" widening) doesn't apply. Dropping null keys
     # here would be a wire-format regression against the pre-existing
     # contract that every key is always present.
-    return SyncStatusResponse.model_validate(get_sync_state().to_dict()).model_dump()
+    #
+    # Returning the model instance (not .model_dump()) keeps the declared
+    # SyncStatusResponse return type accurate for in-process callers; FastMCP
+    # serializes it identically at the wire boundary since no exclude_none is
+    # applied here either way.
+    return SyncStatusResponse.model_validate(get_sync_state().to_dict())
 
 
 @mcp.tool(
@@ -1242,7 +1247,7 @@ async def sync_now(
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["Active backend does not support reconciliation."],
-        }).model_dump()
+        })
 
     # Reset terminal states so the new attempt starts fresh.  Done before the
     # claim so the returned snapshot reflects the fresh RUNNING state, not the
@@ -1261,7 +1266,7 @@ async def sync_now(
             "triggered": False,
             "sync_state": state.to_dict(),
             "messages": ["A sync is already in progress. Returning current progress."],
-        }).model_dump()
+        })
 
     bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
     _register_bg_task(bg_sync_task)
@@ -1269,7 +1274,7 @@ async def sync_now(
         "triggered": True,
         "sync_state": state.to_dict(),
         "messages": ["Background sync triggered."],
-    }).model_dump()
+    })
 
 
 @mcp.tool(
