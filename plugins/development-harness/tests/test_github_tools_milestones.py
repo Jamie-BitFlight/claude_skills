@@ -444,13 +444,15 @@ async def test_backlog_get_soonest_milestone_returns_milestone_dict() -> None:
 
 
 async def test_backlog_get_soonest_milestone_none_when_no_milestones() -> None:
-    """backlog_get_soonest_milestone omits milestone when no milestones exist.
+    """backlog_get_soonest_milestone returns an explicit null milestone when none exist.
 
     Tests: backlog_get_soonest_milestone empty case
     How: Patch get_soonest_milestone to return milestone=None; verify serialisation.
-    Why: BacklogGetSoonestMilestoneResponse.milestone is `Milestone | None = None`,
-        so a genuinely-None milestone is dropped by model_dump(exclude_none=True) --
-        the key is absent, not present with a null value.
+    Why: milestone=None is meaningful, documented success data (no open
+        milestones), not an absent-on-this-branch field -- the key must stay
+        present with an explicit null, matching the tool's own docstring
+        ("milestone (or None)"), even though BacklogGetSoonestMilestoneResponse
+        otherwise dumps with exclude_none=True.
     """
     # Arrange
     fake_result = {"milestone": None, "messages": [], "warnings": []}
@@ -460,7 +462,8 @@ async def test_backlog_get_soonest_milestone_none_when_no_milestones() -> None:
         result = await _call("backlog_get_soonest_milestone", {})
 
     # Assert
-    assert result.get("milestone") is None
+    assert "milestone" in result
+    assert result["milestone"] is None
 
 
 async def test_backlog_get_soonest_milestone_backlog_error_returns_error_key() -> None:

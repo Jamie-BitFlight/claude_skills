@@ -3400,13 +3400,18 @@ async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
     out = Output()
     try:
         result = await asyncio.to_thread(operations.get_soonest_milestone, output=out)
-        return BacklogGetSoonestMilestoneResponse.model_validate({**result, **out.to_dict()}).model_dump(
-            exclude_none=True
-        )
     except BacklogError as e:
         return BacklogGetSoonestMilestoneResponse.model_validate({"error": str(e), **out.to_dict()}).model_dump(
             exclude_none=True
         )
+    response = BacklogGetSoonestMilestoneResponse.model_validate({**result, **out.to_dict()})
+    # milestone=None is a meaningful, documented success value (no open
+    # milestones exist), not an absent-on-this-branch field like `error` --
+    # exclude_none=True would otherwise drop the key entirely, which the
+    # docstring's "milestone (or None)" contract does not allow.
+    dump = response.model_dump(exclude_none=True)
+    dump["milestone"] = response.milestone.model_dump() if response.milestone is not None else None
+    return dump
 
 
 @mcp.tool(
