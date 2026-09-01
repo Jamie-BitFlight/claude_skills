@@ -68,7 +68,6 @@ from .models import (
     ContentUnavailableError,
     ContentWrite,
     DispatchItemRecord as _DispatchItemRecord,
-    DispatchSpawnSummary as _DispatchSpawnSummary,
     DispatchWaveRecord as _DispatchWaveRecord,
     DispatchWaveSummary as _DispatchWaveSummary,
     GitHubUnavailableError,
@@ -91,6 +90,7 @@ from .search import (
     tokenize_search as _tokenize_search,
 )
 from .sync_state import SyncState as _SyncState, SyncStatus, get_sync_state
+from .tool_responses import ArtifactRegisterResponse, DispatchSpawnResponse, DispatchWaveStatusResponse
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
@@ -2882,7 +2882,7 @@ async def artifact_register(
     ],
     status: Annotated[ArtifactStatus, Field(description="Lifecycle status of the artifact")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, Field(description="Name of the producing agent")] = "",
-) -> dict:
+) -> ArtifactRegisterResponse:
     """Upsert an artifact entry in provider-owned logical content.
 
     Idempotent by (artifact_type, artifact_id). If an entry with the same type and
@@ -2890,13 +2890,14 @@ async def artifact_register(
     If only the type matches but the artifact_id differs, a new row is added.
 
     Returns:
-        Dict with registered (bool), artifact_count (int), action (str),
-        content_stored (bool), and output messages/warnings.
+        :class:`~backlog_core.tool_responses.ArtifactRegisterResponse` with
+        registered (bool), artifact_count (int), action (str), content_stored
+        (bool), and output messages/warnings.
 
-    A dict with an ``error`` key is returned for a ``BacklogError``. A
-    ``ContentUnavailableError`` or ``ContentConflictError`` (the backend could
-    not store the artifact or its manifest) is not caught here and surfaces as
-    a tool call error, not a dict.
+    A response with only ``error`` and the output triad set is returned for a
+    ``BacklogError``. A ``ContentUnavailableError`` or ``ContentConflictError``
+    (the backend could not store the artifact or its manifest) is not caught
+    here and surfaces as a tool call error, not a response.
     """
     out = Output()
     try:
@@ -2920,9 +2921,14 @@ async def artifact_register(
             )
 
         result = await asyncio.to_thread(_run)
-        return {**result.model_dump(), **out.to_dict()}
+        response = ArtifactRegisterResponse(
+            **result.model_dump(), messages=out.messages, warnings=out.warnings, errors=out.errors
+        )
+        return response.model_dump(exclude_none=True)
     except BacklogError as e:
-        return {"error": str(e), **out.to_dict()}
+        return ArtifactRegisterResponse(
+            error=str(e), messages=out.messages, warnings=out.warnings, errors=out.errors
+        ).model_dump(exclude_none=True)
 
 
 @mcp.tool(
@@ -3996,7 +4002,7 @@ async def dispatch_item_status(
 async def dispatch_wave_status(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[int, Field(description="Wave number to query (1-based)")],
-) -> dict:
+) -> DispatchWaveStatusResponse:
     """Query the current status of a dispatch wave.
 
     Returns items as a flat list (in issue order) plus per-status counts and
@@ -4006,9 +4012,9 @@ async def dispatch_wave_status(
     reported in the returned warnings.
 
     Returns:
-        Dict with :class:`~backlog_core.models.DispatchWaveSummary` fields,
-        or ``error`` if wave not found. accumulated_usage is currently always
-        zero (not yet wired up).
+        :class:`~backlog_core.tool_responses.DispatchWaveStatusResponse` with
+        wave-status fields, or ``error`` if wave not found. accumulated_usage
+        is currently always zero (not yet wired up).
     """
     mgr = _dispatch_state_manager()
     warnings: list[str] = []
@@ -4025,11 +4031,9 @@ async def dispatch_wave_status(
     wave = await asyncio.to_thread(_check_and_query)
 
     if wave is None:
-        return {
-            "error": f"Wave {wave_num} not found for milestone {milestone}",
-            "milestone": milestone,
-            "wave_num": wave_num,
-        }
+        return DispatchWaveStatusResponse(
+            error=f"Wave {wave_num} not found for milestone {milestone}", milestone=milestone, wave_num=wave_num
+        ).model_dump(exclude_none=True)
 
     items = wave.items
     status_counts = collections.Counter(i.status for i in items)
@@ -4051,7 +4055,7 @@ async def dispatch_wave_status(
         "events_with_usage": 0,
     }
 
-    summary = _DispatchWaveSummary(
+    summary = DispatchWaveStatusResponse(
         milestone=milestone,
         wave_num=wave_num,
         status=wave.status,
@@ -4064,15 +4068,19 @@ async def dispatch_wave_status(
         started_at=wave.started_at,
         completed_at=wave.completed_at,
         elapsed_seconds=elapsed,
-        items=items,
+        items=[i.model_dump(mode="json") for i in items],
+        warnings=warnings,
     )
-    return {
-        **summary.model_dump(),
-        "messages": [],
-        "warnings": warnings,
-        "errors": [],
-        "accumulated_usage": accumulated_usage,
-    }
+    # accumulated_usage isn't a schema-advertised field (see tool_responses.py's
+    # design notes above DispatchWaveStatusResponse) -- merged in directly to
+    # keep this TODO placeholder out of the single-tool schema token budget.
+    # Built as a separate statement (not a `{**dump, ...}` literal) so ty
+    # still sees a `DispatchWaveStatusResponse`-compatible return -- pydantic's
+    # model_dump() return type is opaque to ty, but a dict *literal* built
+    # from it is not.
+    dump = summary.model_dump(exclude_none=True)
+    dump["accumulated_usage"] = accumulated_usage
+    return dump
 
 
 @dataclasses.dataclass
@@ -4294,7 +4302,7 @@ async def dispatch_spawn(
             )
         ),
     ] = None,
-) -> dict:
+) -> DispatchSpawnResponse:
     """Spawn and monitor kage-bunshin sessions for a dispatch wave.
 
     Runs as a background task (``task=True``). Returns a task ID immediately.
@@ -4322,15 +4330,19 @@ async def dispatch_spawn(
             omits the flag and lets the model default apply.
 
     Returns:
-        Dict with :class:`~backlog_core.models.DispatchSpawnSummary` fields
-        on completion, or ``error`` on failure.
+        :class:`~backlog_core.tool_responses.DispatchSpawnResponse` with
+        dispatch-run fields on completion, or ``error`` on failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone)
     except ContentUnavailableError:
-        return {"error": f"Dispatch plan not found for milestone {milestone}", "milestone": milestone}
+        return DispatchSpawnResponse(
+            error=f"Dispatch plan not found for milestone {milestone}", milestone=milestone
+        ).model_dump(exclude_none=True)
     except ValueError as exc:
-        return {"error": f"Invalid dispatch plan: {exc}", "milestone": milestone}
+        return DispatchSpawnResponse(error=f"Invalid dispatch plan: {exc}", milestone=milestone).model_dump(
+            exclude_none=True
+        )
 
     mgr = _dispatch_state_manager()
     await asyncio.to_thread(mgr.check_stale_pids)
@@ -4404,7 +4416,7 @@ async def dispatch_spawn(
         return sum(costs) if costs else None
 
     total_cost = await asyncio.to_thread(_sum_costs)
-    summary = _DispatchSpawnSummary(
+    summary = DispatchSpawnResponse(
         milestone=milestone,
         waves_executed=len(all_waves),
         total_items=total_items,
@@ -4412,15 +4424,12 @@ async def dispatch_spawn(
         failed=overall.failed,
         skipped=overall.skipped,
         elapsed_seconds=elapsed_seconds,
-        per_wave=per_wave_summaries,
+        per_wave=[w.model_dump(mode="json") for w in per_wave_summaries],
         total_cost=total_cost,
+        messages=[f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
+        warnings=warnings,
     )
-    return {
-        **summary.model_dump(),
-        "messages": [f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
-        "warnings": warnings,
-        "errors": [],
-    }
+    return summary.model_dump(exclude_none=True)
 
 
 from agent_profile import mcp as _agent_profile_mcp

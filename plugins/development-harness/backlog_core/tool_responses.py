@@ -13,6 +13,19 @@ Tools build a response model and return ``response.model_dump(exclude_none=True)
 either identically, and returning a dict keeps existing runtime assertions
 (e.g. ``"error" not in response``) unchanged.
 
+FastMCP enforces a tool's advertised ``outputSchema`` at call time (verified
+empirically, not just documented): a returned payload missing a property the
+schema lists under ``required`` fails the call with "Output validation
+error: 'x' is a required property" -- this is a hard runtime error, not a
+lint-only concern. So for any tool whose except-arm reports a shaped error
+without the full success payload (e.g. a ``BacklogError`` catch, or a "not
+found" branch), every field the success arm doesn't unconditionally supply
+must be declared ``X | None = None`` (moving it out of the schema's
+``required`` list) rather than left required -- see
+:class:`ArtifactRegisterResponse` for the pattern. Build both arms with the
+normal validating constructor; the optional fields simply default to
+``None`` and get dropped by ``exclude_none=True`` on the error arm.
+
 This module is intentionally separate from ``models.py`` (1800+ lines of
 domain models): these types exist only to shape the MCP wire boundary.
 """
@@ -21,13 +34,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from .models import Output
+from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
 
 __all__ = [
     "ArtifactEntryOut",
+    "ArtifactRegisterResponse",
     "ArtifactsListResponse",
+    "DispatchSpawnResponse",
+    "DispatchWaveStatusResponse",
     "FallibleToolResponse",
     "Milestone",
     "SamTaskLookupResult",
@@ -41,10 +57,42 @@ class ToolResponse(Output):
 
 
 class FallibleToolResponse(ToolResponse):
-    """Base for tool responses whose except-BacklogError arm returns a shaped error."""
+    """Base for tool responses whose except-BacklogError arm returns a shaped error.
+
+    Pydantic v2 quirk (verified empirically, not documented upstream): this
+    field's name collides with ``Output.error()``, the mutator method it
+    shadows. A *direct* subclass resolves the field's ``None`` default
+    correctly, but any class that adds new fields on top of an *inherited*
+    (non-redeclared) ``error`` field silently resolves its default back to
+    the shadowed bound method instead of ``None`` -- which then fails
+    JSON-schema/serialization. Every concrete subclass that adds fields
+    -- e.g. :class:`ArtifactRegisterResponse` -- must therefore redeclare
+    ``error: str | None = None`` itself; see those classes for the pattern.
+    """
 
     error: str | None = None
     """Error message set when the operation failed; ``None`` on success."""
+
+
+class ArtifactRegisterResponse(RegisterResult, FallibleToolResponse):
+    """Response shape returned by the ``artifact_register`` MCP tool.
+
+    Mixes in :class:`~backlog_core.models.RegisterResult`'s domain fields
+    rather than redeclaring them, so the wire shape and the domain result
+    computed by ``artifact_register``'s ``_run()`` closure cannot drift
+    apart. Its ``BacklogError`` arm never has a ``RegisterResult`` to
+    report, so those four fields are widened to optional here (dropped by
+    ``exclude_none=True`` on that arm) without touching ``RegisterResult``
+    itself, which stays required for every other caller.
+    """
+
+    error: str | None = None
+    """Redeclared, not merely inherited -- see :class:`FallibleToolResponse`."""
+
+    registered: bool | None = None
+    artifact_count: int | None = None
+    action: Literal["added", "updated"] | None = None
+    content_stored: bool | None = None
 
 
 class Milestone(BaseModel):
@@ -176,3 +224,51 @@ class SamTaskLookupResult(ToolResponse):
 
     unavailable: bool
     """True when the backend could not be reached at all."""
+
+
+# Design notes for DispatchWaveStatusResponse and DispatchSpawnResponse below:
+# each mixes in its domain model (DispatchWaveSummary / DispatchSpawnSummary)
+# rather than redeclaring its fields; kept as wire-only subclasses so the
+# extra fields here don't leak into the CLI's unmodified reuse of the same
+# domain models (dh_core.operations, and DispatchSpawnSummary.per_wave).
+# Every field besides milestone/(wave_num)/error/the Output triad is
+# widened to optional, per this module's docstring, because each tool's
+# error arm never has the full summary to report. ``items``/``per_wave``
+# are further widened to plain dicts rather than full nested models
+# (``DispatchItemRecord`` alone is a 13-field SQLite row mirror) to stay
+# within the single-tool schema token budget. ``accumulated_usage`` (a
+# TODO placeholder, always zero -- see the tool's docstring) is left off
+# this model entirely and merged into the response dict after
+# ``model_dump()`` for the same budget reason; it isn't schema-advertised.
+class DispatchWaveStatusResponse(DispatchWaveSummary, FallibleToolResponse):
+    """Response shape returned by the ``dispatch_wave_status`` MCP tool."""
+
+    error: str | None = None
+    """Redeclared, not merely inherited -- see :class:`FallibleToolResponse`."""
+
+    status: str | None = None
+    total_items: int | None = None
+    pending: int | None = None
+    in_progress: int | None = None
+    complete: int | None = None
+    failed: int | None = None
+    skipped: int | None = None
+    items: list[dict[str, object]] = Field(default_factory=list)
+
+
+class DispatchSpawnResponse(DispatchSpawnSummary, FallibleToolResponse):
+    """Response shape returned by the ``dispatch_spawn`` MCP tool.
+
+    See :class:`DispatchWaveStatusResponse`'s design notes.
+    """
+
+    error: str | None = None
+    """Redeclared, not merely inherited -- see :class:`FallibleToolResponse`."""
+
+    waves_executed: int | None = None
+    total_items: int | None = None
+    completed: int | None = None
+    failed: int | None = None
+    skipped: int | None = None
+    elapsed_seconds: float | None = None
+    per_wave: list[dict[str, object]] = Field(default_factory=list)

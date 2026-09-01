@@ -451,7 +451,7 @@ class TestDispatchWaveStatus:
             result = await client.call_tool("dispatch_wave_status", {"milestone": 10, "wave_num": 1})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data
         assert data["total_items"] == 2
         assert data["pending"] == 2
@@ -472,7 +472,7 @@ class TestDispatchWaveStatus:
             result = await client.call_tool("dispatch_wave_status", {"milestone": 10, "wave_num": 99})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "99" in data["error"]
 
@@ -501,7 +501,7 @@ class TestDispatchWaveStatus:
             result = await client.call_tool("dispatch_wave_status", {"milestone": 10, "wave_num": 1})
 
         # Assert — stale PID warning is surfaced in the response
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data
         warnings: list[str] = data.get("warnings", [])
         assert any("77777" in w or "101" in w for w in warnings), (
@@ -529,7 +529,7 @@ class TestDispatchWaveStatus:
             result = await client.call_tool("dispatch_wave_status", {"milestone": 10, "wave_num": 1})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         items = data.get("items", [])
         assert len(items) == 2
         item_issues = {i["issue"] for i in items}
@@ -598,7 +598,7 @@ class TestDispatchSpawn:
             result = await client.call_tool("dispatch_spawn", {"milestone": 10, "wave_num": 1})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data, f"Unexpected error: {data.get('error')}"
         assert data["total_items"] == 1
         assert data["completed"] == 1
@@ -621,7 +621,7 @@ class TestDispatchSpawn:
             result = await client.call_tool("dispatch_spawn", {"milestone": 10, "wave_num": 1})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" in data
         assert "10" in str(data["error"]) or "not found" in data["error"].lower()
 
@@ -657,7 +657,7 @@ class TestDispatchSpawn:
             result = await client.call_tool("dispatch_spawn", {"milestone": 10, "wave_num": 1})
 
         # Assert
-        data: dict[str, Any] = result.data
+        data: dict[str, Any] = result.structured_content
         assert "error" not in data  # tool returns a summary, not an error
         assert data["failed"] > 0
 
