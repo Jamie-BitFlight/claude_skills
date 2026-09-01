@@ -36,7 +36,12 @@ Skill(skill: "python3-development:python3-development")
 Before implementing any fix, verify it is a code change — not suppression. Each category below is an immediate STOP:
 
 **Inline suppression comments:**
-- Adding `# noqa`, `# type: ignore`, `# pyright: ignore`, `# pylint: disable`, or any suppression comment
+- Adding `# noqa`, `# type: ignore`, `# ty: ignore`, `# pyright: ignore`, `# pylint: disable`,
+  `# ruff: ignore[<rule>]`, `# ruff: file-ignore[<rules>]` (suppresses the whole file, not one line),
+  or any suppression comment — `# ruff: ignore[<rule-name>]` is what `ruff check --add-ignore`
+  generates (verified: `--fix` alone does not add it); grepping only for `# noqa` misses it
+- Running `ruff check --add-ignore` — it exists to auto-generate suppression comments, which this
+  gate forbids regardless of how they're added
 
 **Configuration-level suppression (equally forbidden):**
 - Adding a rule to `[tool.ruff.lint] ignore = [...]` in `pyproject.toml`
@@ -194,18 +199,26 @@ All incidentally modified files must also produce zero errors before resolution 
 
    Mypy errors contain error codes in brackets like `[attr-defined]` or `[arg-type]`.
 
-   Look up the error code in locally-cached documentation:
-
-   ```claude
-   Read("./references/mypy-docs/error_code_list.rst")
-   Read("./references/mypy-docs/error_code_list2.rst")
-   ```
-
-   Search for the error code:
+   Look up the error code in this plugin's curated rule docs first — `${CLAUDE_PLUGIN_ROOT}` keeps
+   this resolvable regardless of the target repository's working directory:
 
    ```bash
-   grep -n "error-code-{CODE}" ./references/mypy-docs/*.rst
+   grep -rn "<CODE>" "${CLAUDE_PLUGIN_ROOT}/skills/holistic-linting/references/rules/mypy/"
    ```
+
+   The curated docs cover the common codes, not every one mypy defines. If the code isn't there,
+   check the full vendored code list before falling back to the network — it works offline and needs
+   no network access:
+
+   ```bash
+   grep -n "\[<CODE>\]" "${CLAUDE_PLUGIN_ROOT}/skills/holistic-linting/references/mypy-docs/"*.rst
+   ```
+
+   If the code isn't in either local source, fetch mypy's own official documentation — it stays
+   current with the installed mypy version, which a vendored copy cannot:
+
+   - Default-enabled codes: `https://mypy.readthedocs.io/en/stable/error_code_list.html`
+   - Optional-check codes: `https://mypy.readthedocs.io/en/stable/error_code_list2.html`
 
    **Motivation**: Mypy error codes map to specific type safety principles. Understanding the principle prevents misunderstanding type relationships.
 

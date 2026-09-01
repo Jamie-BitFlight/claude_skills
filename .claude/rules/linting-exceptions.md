@@ -53,7 +53,8 @@ mocks" is not a justification. "This mock's target signature is generated at run
 For these exceptions: update linting config files (`pyproject.toml`, `.vscode/settings.json`) to
 exclude the files or set a scoped `target-version` for the affected paths, and cite the category plus
 the specific justification in a comment beside the config entry. Do not use inline comments (`# noqa`,
-`# type: ignore`) as the mechanism.
+`# type: ignore`, `# ruff: ignore[<rule>]`, `# ruff: file-ignore[<rules>]` — see
+`astral-tool-overrides.md` for why these count too) as the mechanism.
 
 ## Unacceptable Exceptions (MUST fix or escalate)
 
@@ -61,7 +62,8 @@ If none of the above apply:
 
 1. Fix linting smell using `/holistic-linting:holistic-linting` Skill (exact methodology for addressing linting issues)
 2. If unable to fix, document specific blocker
-3. Adding `# type: ignore` or `# noqa` requires explicit user approval
+3. Adding `# type: ignore` or `# noqa` requires explicit user approval; `# ruff: ignore[<rule>]` and
+   `# ruff: file-ignore[<rules>]` are never eligible for that exception — see `astral-tool-overrides.md`
 
 ## Rule Codes That MUST Always Be Fixed (never suppress)
 
@@ -76,9 +78,9 @@ These are never eligible for any exception above:
 ## Per-File Exceptions
 
 Configured in `pyproject.toml`'s `[tool.ruff.lint.per-file-ignores]` (and `[[tool.ty.overrides]]` for
-ty) — never as an inline `# noqa`/`# type: ignore`. This file does not summarize that list: it is
-long and changes independently of this document, so a copy here would only go stale. Read
-`pyproject.toml` directly for the current entries.
+ty) — never as an inline `# noqa`/`# type: ignore`/`# ruff: ignore[<rule>]`/`# ruff: file-ignore[<rules>]`.
+This file does not summarize that list: it is long and changes independently of this document, so a copy here would
+only go stale. Read `pyproject.toml` directly for the current entries.
 
 Every entry there names specific rule codes for a specific path pattern and (with rare exceptions
 treated as bugs to fix, not precedent) carries an inline comment stating why — matching one of the
