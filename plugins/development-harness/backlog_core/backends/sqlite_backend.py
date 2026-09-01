@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode
+from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -391,6 +391,18 @@ class SQLiteBackend:
             tags = [r["tag"] for r in tag_rows]
         label_nodes: list[LabelNode] = [LabelNode(id=f"label-{t}", name=t) for t in tags]
         state = "OPEN" if str(row["status"]).lower() == "open" else "CLOSED"
+        milestone: MilestoneNode | None = None
+        milestone_number = row["milestone_number"]
+        if milestone_number is not None:
+            ms_row = self._conn.execute("SELECT * FROM milestones WHERE number = ?", (milestone_number,)).fetchone()
+            if ms_row is not None:
+                milestone = MilestoneNode(
+                    id=f"sqlite-milestone-{milestone_number}",
+                    number=int(milestone_number),
+                    title=ms_row["title"],
+                    dueOn=ms_row["due_on"],
+                    state=cast('Literal["OPEN", "CLOSED"]', str(ms_row["state"]).upper()),
+                )
         return IssueNode(
             id=f"sqlite-issue-{number}",
             number=number,
@@ -400,7 +412,7 @@ class SQLiteBackend:
             createdAt=row["created_at"],
             updatedAt=row["updated_at"],
             labels=label_nodes,
-            milestone=None,
+            milestone=milestone,
             assignees=[],
         )
 
