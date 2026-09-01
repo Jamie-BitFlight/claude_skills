@@ -186,6 +186,8 @@ class SyncState:
             "retry_count": self.retry_count,
             "offline_reason": self.offline_reason,
             "percent": self.percent,
+            "pending_mutations": self.pending_mutations,
+            "rejected_mutations": self.rejected_mutations,
         }
 
 
