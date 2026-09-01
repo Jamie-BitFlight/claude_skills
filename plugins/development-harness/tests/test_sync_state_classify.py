@@ -1,19 +1,20 @@
 """Regression tests for classify_sync_error's ContentProviderError handling.
 
-A Codex review on PR #3360 found that a prior fix in this same PR — adding
-ContentProviderError to classify_sync_error's NON_RETRYABLE branch — was too
-broad: ``_GitHubContentsStore.get_many()`` wraps *any* ``GithubException``,
-including a transient 503 or a rate-limited 429, in ``ContentUnavailableError``
-via ``raise ... from exc``. Blanket-classifying every ContentProviderError as
-non-retryable sends a merely-overloaded GitHub API straight to OFFLINE instead
-of the bounded retry policy transient failures are supposed to get.
+ContentProviderError is a separate exception tree from BacklogError (see
+models.py), so classify_sync_error needs its own branch for it — and that
+branch is not always NON_RETRYABLE. ``_GitHubContentsStore.get_many()`` wraps
+*any* ``GithubException`` it sees, including a transient 503 or a
+rate-limited 429, in ``ContentUnavailableError`` via ``raise ... from exc``.
+Blanket-classifying every ContentProviderError as non-retryable would send a
+merely-overloaded GitHub API straight to OFFLINE instead of the bounded retry
+policy transient failures are supposed to get.
 
-A follow-up Codex review found the single-level ``__cause__`` inspection this
-fix first shipped with was itself incomplete: ``_fetch_blobs_graphql()``
-double-wraps — ``gh_client._graphql_request()`` wraps the GithubException in
-``BacklogError`` first, then ``_fetch_blobs_graphql()`` wraps that
-``BacklogError`` in ``ContentUnavailableError`` — so the GithubException sits
-two ``__cause__`` links down, not one.
+The ``__cause__`` inspection must walk the full chain, not stop at one level:
+``_fetch_blobs_graphql()`` double-wraps — ``gh_client._graphql_request()``
+wraps the GithubException in ``BacklogError`` first, then
+``_fetch_blobs_graphql()`` wraps that ``BacklogError`` in
+``ContentUnavailableError`` — so the GithubException sits two ``__cause__``
+links down, not one.
 """
 
 from __future__ import annotations

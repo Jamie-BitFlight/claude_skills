@@ -289,8 +289,7 @@ class TestGitHubExtrasCapabilityContract:
         Why: a flag-``False`` backend is a normal, expected "this capability
         isn't offered" outcome; a flag-``True`` backend that fails the
         ``isinstance`` check is a backend implementation bug (the flag lied).
-        Conflating the two in one message misleads whoever reads it — this
-        was raised in code review on PR #3360.
+        Conflating the two in one message misleads whoever reads it.
         """
 
         class _LyingBackend:
@@ -303,5 +302,5 @@ class TestGitHubExtrasCapabilityContract:
         assert "backend bug" in str(exc_info.value)
         assert "GitHubExtras" in str(exc_info.value), (
             "message should name the actual Protocol class, not just the opaque "
-            "capability flag string 'github_extras' — raised in code review on PR #3360"
+            "capability flag string 'github_extras'"
         )

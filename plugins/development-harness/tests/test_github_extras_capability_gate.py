@@ -56,14 +56,14 @@ def test_list_issues_under_sqlite_backend_raises_typed_capability_error_not_wrap
     How: Configure SQLiteBackend as the active backend, call list_issues(),
         and assert the raised exception is still UnsupportedBackendCapabilityError
         with its structured fields intact.
-    Why: A Codex review on PR #3360 found that list_issues(), comment_issue(),
-        list_comments(), and read_comment() each catch
-        ``(GithubException, BacklogError)`` around their internal
+    Why: list_issues(), comment_issue(), list_comments(), and read_comment()
+        each catch ``(GithubException, BacklogError)`` around their internal
         ``get_github()`` call and re-raise a generic ``BacklogError`` labeled
         "GitHub API error: ...", discarding the capability/backend/operation
-        fields. This test fails (wrong exception type, and .capability raises
-        AttributeError) without the ``except UnsupportedBackendCapabilityError:
-        raise`` guard preceding that generic handler.
+        fields. This test fails (wrong exception type, and ``.capability``
+        raises ``AttributeError``) without the
+        ``except UnsupportedBackendCapabilityError: raise`` guard preceding
+        that generic handler.
     """
     # Arrange
     set_config(BacklogConfig(backend=SQLiteBackend()))
