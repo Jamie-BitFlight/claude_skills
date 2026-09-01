@@ -80,7 +80,7 @@ Skip issue creation for P2/Ideas items — assign by milestone number only if th
 
 ### Step 5: Assign Existing Issues
 
-For selected items that already have issues but are not yet in this milestone, call `backlog_assign_item_to_milestone(issue_number={issue_number}, milestone_number={milestone_number})`.
+For selected items that already have issues but are not yet in this milestone, call `backlog_assign_item_to_milestone(issue_number={issue_number}, milestone_number={milestone_number})`. If the response contains an `error` key, the assignment did not happen — skip Steps 6-7 for that item and report the error instead.
 
 ### Step 6: Update Project V2 Status
 
@@ -111,5 +111,6 @@ Next step: /dh:groom-milestone {number}
 
 - Milestone not found: call `backlog_list_milestones(state="open")` and list available milestones, then stop.
 - Issue creation fails: log error per item, continue with remaining.
+- Milestone assignment fails (`backlog_assign_item_to_milestone` response has an `error` key): log error per item, skip Project V2 status update and success reporting for that item, continue with remaining.
 - No items match filter: report and show available sections.
 - Label not found: `github_project_setup.py issue create` handles label creation automatically via `_ensure_label()`.
