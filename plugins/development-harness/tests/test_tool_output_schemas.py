@@ -8,9 +8,25 @@ Once empty, delete this set and the skip branch below.
 
 from __future__ import annotations
 
+import json
+
+import tiktoken
 from backlog_core.server import mcp
 
 EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of scope
+
+# Guards against the failure mode seen in the sibling SAM server, where a
+# consolidated tool's outputSchema alone costs 8,758 tokens (sam_plan) --
+# 60% of that server's entire 45-tool listing. A real schema is the point of
+# this rollout; an unbounded one defeats it just as badly as no schema at all.
+_MAX_TOTAL_SCHEMA_TOKENS = 6000
+_MAX_SINGLE_TOOL_SCHEMA_TOKENS = 400
+_ENCODING = tiktoken.get_encoding("cl100k_base")
+
+
+def _schema_tokens(schema: dict[str, object]) -> int:
+    return len(_ENCODING.encode(json.dumps(schema)))
+
 
 TOOLS_NOT_YET_TYPED = {
     "artifact_get",
@@ -78,3 +94,14 @@ async def test_every_registered_tool_is_accounted_for() -> None:
     # Catches a renamed/added/removed tool falling through the cracks of TOOLS_NOT_YET_TYPED.
     schemas = await _tool_schemas()
     assert set(schemas) >= TOOLS_NOT_YET_TYPED, "TOOLS_NOT_YET_TYPED references a tool that no longer exists"
+
+
+async def test_output_schemas_stay_within_token_budget() -> None:
+    schemas = await _tool_schemas()
+    per_tool = {name: _schema_tokens(schema) for name, schema in schemas.items()}
+    total = sum(per_tool.values())
+    over_budget = {name: n for name, n in per_tool.items() if n > _MAX_SINGLE_TOOL_SCHEMA_TOKENS}
+    assert not over_budget, f"Tool(s) exceed {_MAX_SINGLE_TOOL_SCHEMA_TOKENS}-token schema budget: {over_budget}"
+    assert total <= _MAX_TOTAL_SCHEMA_TOKENS, (
+        f"Total outputSchema tokens across all tools ({total}) exceeds budget of {_MAX_TOTAL_SCHEMA_TOKENS}"
+    )
