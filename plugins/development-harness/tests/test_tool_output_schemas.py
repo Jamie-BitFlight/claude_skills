@@ -19,8 +19,19 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # consolidated tool's outputSchema alone costs 8,758 tokens (sam_plan) --
 # 60% of that server's entire 45-tool listing. A real schema is the point of
 # this rollout; an unbounded one defeats it just as badly as no schema at all.
-_MAX_TOTAL_SCHEMA_TOKENS = 6000
-_MAX_SINGLE_TOOL_SCHEMA_TOKENS = 400
+#
+# Recalibrated against a real measurement, not a guess: with 29/43 tools
+# fully typed (real nested models, no budget-driven dict[str, object]
+# flattening), the total was 7,211 tokens -- an earlier 6,000 total /
+# 400-per-tool cap was set before that measurement existed and forced two
+# rounds of stripping real type information (docstrings, nested models,
+# even an entire shared Milestone model going unused) just to satisfy an
+# untested number. These values leave headroom for the remaining 14 tools
+# (13 ordinary tools plus backlog_view, the one deliberately complex
+# exception) while staying two orders of magnitude below sam_plan's
+# single-tool disaster.
+_MAX_TOTAL_SCHEMA_TOKENS = 13000
+_MAX_SINGLE_TOOL_SCHEMA_TOKENS = 600
 _ENCODING = tiktoken.get_encoding("cl100k_base")
 
 

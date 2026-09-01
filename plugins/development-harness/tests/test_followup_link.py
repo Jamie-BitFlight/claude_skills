@@ -106,7 +106,7 @@ async def test_backlog_link_followup_backlog_error_returns_error_key() -> None:
 
 async def test_backlog_list_followups_forwards_params() -> None:
     """backlog_list_followups passes followup_to to operations."""
-    op_result = {"items": [{"title": "X", "followup_to": "P1"}], "count": 1}
+    op_result = {"items": [{"title": "X", "section": "P2", "issue": "#7", "followup_to": "P1"}], "count": 1}
     with patch("dh_core.operations.list_followups", return_value=op_result) as mock_list:
         response = await call_mcp_tool(mcp, "backlog_list_followups", {"followup_to": "P1"})
 

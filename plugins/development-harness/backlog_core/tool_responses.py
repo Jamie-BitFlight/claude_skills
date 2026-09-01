@@ -39,6 +39,7 @@ from pydantic import BaseModel, Field
 from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
 
 __all__ = [
+    "ArtifactEntryOut",
     "ArtifactReadResponse",
     "ArtifactRegisterResponse",
     "ArtifactsListResponse",
@@ -64,11 +65,18 @@ __all__ = [
     "BacklogPullResponse",
     "BacklogReadCommentResponse",
     "BacklogResolveResponse",
+    "CommentEntry",
     "DispatchSpawnResponse",
     "DispatchWaveStatusResponse",
     "FallibleToolResponse",
+    "FollowupItem",
+    "IssueEntry",
+    "LabelEntry",
+    "MergedPullRequestEntry",
     "Milestone",
+    "ProjectEntry",
     "SamTaskLookupResult",
+    "SamTaskRow",
     "ToolResponse",
 ]
 
@@ -116,7 +124,7 @@ class Milestone(BaseModel):
     description: str
     """Milestone description."""
 
-    due_on: str | None
+    due_on: str | None = None
     """ISO 8601 due date, or ``None`` when unset."""
 
     open_issues: int
@@ -126,22 +134,29 @@ class Milestone(BaseModel):
     """Count of closed issues attached to this milestone."""
 
 
+# Mirrors backlog_core.models.ArtifactEntry's model_dump(mode="json") shape --
+# string fields correspond to that model's enum fields (ArtifactType,
+# ArtifactStatus) serialised to their string values.
+class ArtifactEntryOut(BaseModel):
+    """One artifact manifest entry, as returned by artifact-listing MCP tools."""
+
+    artifact_type: str
+    artifact_id: str
+    status: str
+    created_at: str
+    agent: str
+    content_revision: str
+    storage_tier: Literal["local", "remote"]
+
+
 # Shared by artifact_list and artifact_get. Both have a BacklogError arm
 # (artifact_get also treats "type not found"/"id not found" as BacklogError,
 # per its docstring) that returns only error plus the Output triad, so
-# artifacts/count are widened to optional. ``artifacts`` was originally a
-# ``list[ArtifactEntryOut]`` nested model (artifact_type, artifact_id,
-# status, created_at, agent, content_revision, storage_tier) mirroring
-# ``backlog_core.models.ArtifactEntry``'s ``model_dump(mode="json")`` shape;
-# inlined twice (once per tool sharing this response model), it alone put
-# artifact_list/artifact_get at 298 tokens each and blocked the total
-# outputSchema budget (see :class:`~backlog_core.tool_responses.BacklogListResponse`'s
-# design note for the full total-budget context) -- flattened to
-# ``dict[str, object]`` per this module's token-budget policy.
+# artifacts/count are widened to optional.
 class ArtifactsListResponse(FallibleToolResponse):
     """Response for ``artifact_list``/``artifact_get``."""
 
-    artifacts: list[dict[str, object]] = Field(default_factory=list)
+    artifacts: list[ArtifactEntryOut] = Field(default_factory=list)
     """Registered artifact entries matching the request."""
 
     count: int = 0
@@ -221,13 +236,10 @@ class BacklogCommentIssueResponse(FallibleToolResponse):
     """Always ``""`` -- the backend does not resolve a comment URL."""
 
 
-# ``milestone`` was a nested :class:`Milestone` model; flattened to
-# ``dict[str, object]`` per this module's token-budget policy -- see
-# :class:`~backlog_core.tool_responses.BacklogListResponse`'s design note.
 class BacklogCreateMilestoneResponse(FallibleToolResponse):
     """Response for ``backlog_create_milestone``."""
 
-    milestone: dict[str, object] | None = None
+    milestone: Milestone | None = None
     """The created milestone. Absent only on the ``BacklogError`` arm."""
 
 
@@ -277,12 +289,10 @@ class BacklogGetReadySamTasksResponse(FallibleToolResponse):
     """Number of ready tasks returned."""
 
 
-# ``milestone`` flattened to ``dict[str, object]`` -- see
-# :class:`BacklogCreateMilestoneResponse`'s design note.
 class BacklogGetSoonestMilestoneResponse(FallibleToolResponse):
     """Response for ``backlog_get_soonest_milestone``."""
 
-    milestone: dict[str, object] | None = None
+    milestone: Milestone | None = None
     """Soonest-due open milestone, or ``None`` when no open milestones exist."""
 
 
@@ -317,22 +327,34 @@ class BacklogGroomResponse(FallibleToolResponse):
     """GitHub label update error, present only when that step failed."""
 
 
+# Pydantic counterpart of backlog_core.operations._SamTaskRow for the MCP
+# wire boundary; operations.py keeps using its own TypedDict internally.
+class SamTaskRow(BaseModel):
+    """One SAM task row as returned by SAM-task-listing MCP tools."""
+
+    task_id: str
+    feature: str
+    status: str
+    agent: str
+    priority: int
+    skills: list[str]
+    dependencies: list[str]
+    issue_number: int
+    issue_url: str
+    title: str
+
+
 # Pydantic counterpart of backlog_core.operations._SamTaskLookupResult for the
 # MCP wire boundary; operations.py keeps using its own TypedDict internally.
 # The tool wraps operations.get_sam_tasks in a BacklogError arm that reports
 # only error plus the Output triad, so every other field is widened to
 # optional even though operations.get_sam_tasks itself always returns the
-# full shape. ``tasks`` is kept as ``dict[str, object]`` rather than a nested
-# per-row model (task_id, feature, status, agent, priority, skills,
-# dependencies, issue_number, issue_url, title) -- inlining that row shape
-# here blew the single-tool schema token budget (see
-# :class:`DispatchWaveStatusResponse`'s design note for the same tradeoff).
+# full shape.
 class SamTaskLookupResult(FallibleToolResponse):
     """Response for ``backlog_get_sam_tasks``."""
 
-    tasks: list[dict[str, object]] = Field(default_factory=list)
-    """Matching SAM task rows (task_id, feature, status, agent, priority,
-    skills, dependencies, issue_number, issue_url, title)."""
+    tasks: list[SamTaskRow] = Field(default_factory=list)
+    """Matching SAM task rows."""
 
     count: int | None = None
     """Number of tasks returned."""
@@ -403,15 +425,20 @@ class BacklogLinkFollowupResponse(FallibleToolResponse):
     """Logical ID recorded on the item, or ``""`` when the link was cleared."""
 
 
-# ``items`` is kept as ``dict[str, object]`` rather than a nested per-row
-# model (title, section, issue, followup_to) -- see the total-schema-budget
-# design note on :class:`BacklogListResponse` below for why every
-# list-of-dict field across this batch of tools follows the same tradeoff.
+class FollowupItem(BaseModel):
+    """One backlog item linked as a follow-up to another item or plan."""
+
+    title: str
+    section: str
+    issue: str
+    followup_to: str
+
+
 class BacklogListFollowupsResponse(FallibleToolResponse):
     """Response for ``backlog_list_followups``."""
 
-    items: list[dict[str, object]] = Field(default_factory=list)
-    """Backlog items (title, section, issue, followup_to) matching the requested origin."""
+    items: list[FollowupItem] = Field(default_factory=list)
+    """Backlog items matching the requested origin."""
 
     count: int = 0
     """Number of items returned; ``0`` alongside an empty ``items``."""
@@ -425,26 +452,14 @@ class BacklogListFollowupsResponse(FallibleToolResponse):
 # The BacklogError arm reports only error/backend plus the Output triad.
 # ``items`` stays ``dict[str, object]`` (never a model) because the
 # caller-supplied ``fields=`` parameter projects an arbitrary per-call key
-# subset via ``_apply_fields_projection`` in server.py -- genuinely dynamic.
-# ``pagination``/``backend``/``sync_state``/``match_pages`` are all
-# fixed-shape but kept as plain dicts rather than nested models -- even
-# with only ``backend`` (mirroring models.BackendStatus) expanded as a
-# $ref, that one field's inlined class + enum docstrings alone put this
-# tool's schema at 694 tokens, well over the 400-token single-tool budget.
-# The same tradeoff -- ``list[dict[str, object]]`` instead of a nested
-# per-row model -- is applied to every other list-of-dict field across this
-# batch of 13 tools (backlog_list_comments/issues/labels/merged_prs/
-# milestones/projects, backlog_list_followups): typing all of them as
-# small Pydantic models pushed the *total* outputSchema token count across
-# all 43 registered tools to 7954, over the 6000-token total budget in
-# ``test_output_schemas_stay_within_token_budget`` even though every
-# individual tool stayed under its own 400-token cap. Flattening trades
-# away nested-field documentation in the schema for staying in budget;
-# callers still get the field names via each source function's docstring
-# (operations.list_items/list_comments/list_issues/list_labels/
-# list_merged_prs/list_milestones/list_projects/list_followups,
-# _probe_backend_status, _build_sync_state_block, _paginate_match_items
-# in server.py).
+# subset via ``_apply_fields_projection`` in server.py -- genuinely dynamic,
+# not a budget tradeoff. ``pagination``/``backend``/``sync_state``/
+# ``match_pages`` stay plain dicts too: this is already the most complex
+# tool in the server (a full expansion of just ``backend`` alone, mirroring
+# models.BackendStatus's enum, put this tool's schema at 694 tokens on its
+# own) -- callers get the field names via operations.list_items's docstring
+# and _probe_backend_status/_build_sync_state_block/_paginate_match_items
+# in server.py.
 class BacklogListResponse(FallibleToolResponse):
     """Response for ``backlog_list``."""
 
@@ -473,12 +488,20 @@ class BacklogListResponse(FallibleToolResponse):
     """Match token-pagination metadata, present only when ``match_context=True``."""
 
 
-# ``comments`` stays ``dict[str, object]`` (id, author, created_at,
-# updated_at, preview) -- see :class:`BacklogListResponse`'s design note.
+class CommentEntry(BaseModel):
+    """One issue comment, truncated to a preview."""
+
+    id: str
+    author: str
+    created_at: str
+    updated_at: str
+    preview: str
+
+
 class BacklogListCommentsResponse(FallibleToolResponse):
     """Response for ``backlog_list_comments``."""
 
-    comments: list[dict[str, object]] = Field(default_factory=list)
+    comments: list[CommentEntry] = Field(default_factory=list)
     """Comments in the requested window."""
 
     count: int = 0
@@ -488,66 +511,93 @@ class BacklogListCommentsResponse(FallibleToolResponse):
     """``True`` when comments exist beyond the current window."""
 
 
-# ``issues`` stays ``dict[str, object]`` (number, title, state, labels,
-# assignees, milestone, created_at, updated_at) -- see
-# :class:`BacklogListResponse`'s design note.
+class IssueEntry(BaseModel):
+    """One GitHub issue summary."""
+
+    number: int
+    title: str
+    state: str
+    labels: list[str]
+    assignees: list[str]
+    milestone: str | None = None
+    created_at: str
+    updated_at: str
+
+
 class BacklogListIssuesResponse(FallibleToolResponse):
     """Response for ``backlog_list_issues``."""
 
-    issues: list[dict[str, object]] = Field(default_factory=list)
+    issues: list[IssueEntry] = Field(default_factory=list)
     """Matching GitHub issues."""
 
     count: int = 0
     """Number of issues returned; ``0`` alongside an empty ``issues``."""
 
 
-# ``labels`` stays ``dict[str, object]`` (name, color, description) -- see
-# :class:`BacklogListResponse`'s design note.
+class LabelEntry(BaseModel):
+    """One repository label."""
+
+    name: str
+    color: str
+    description: str
+
+
 class BacklogListLabelsResponse(FallibleToolResponse):
     """Response for ``backlog_list_labels``."""
 
-    labels: list[dict[str, object]] = Field(default_factory=list)
+    labels: list[LabelEntry] = Field(default_factory=list)
     """Repository labels, up to the requested limit."""
 
     count: int = 0
     """Number of labels returned; ``0`` alongside an empty ``labels``."""
 
 
-# ``pull_requests`` stays ``dict[str, object]`` (number, title, merged_at,
-# author, url, head_branch) -- see :class:`BacklogListResponse`'s design note.
+class MergedPullRequestEntry(BaseModel):
+    """One merged pull request."""
+
+    number: int
+    title: str
+    merged_at: str
+    author: str
+    url: str
+    head_branch: str
+
+
 class BacklogListMergedPrsResponse(FallibleToolResponse):
     """Response for ``backlog_list_merged_prs``."""
 
-    pull_requests: list[dict[str, object]] = Field(default_factory=list)
+    pull_requests: list[MergedPullRequestEntry] = Field(default_factory=list)
     """Merged pull requests matching the request."""
 
     count: int = 0
     """Number of pull requests returned; ``0`` alongside an empty ``pull_requests``."""
 
 
-# ``milestones`` stays ``dict[str, object]`` -- see
-# :class:`BacklogListResponse`'s design note. :class:`Milestone` (kept as a
-# documented reusable shape above) is no longer referenced by any response
-# model: :class:`BacklogCreateMilestoneResponse` and
-# :class:`BacklogGetSoonestMilestoneResponse` also flattened their single
-# ``milestone`` field to ``dict[str, object]`` for the same total-budget
-# reason.
 class BacklogListMilestonesResponse(FallibleToolResponse):
     """Response for ``backlog_list_milestones``."""
 
-    milestones: list[dict[str, object]] = Field(default_factory=list)
+    milestones: list[Milestone] = Field(default_factory=list)
     """Repository milestones matching the requested state filter."""
 
     count: int = 0
     """Number of milestones returned; ``0`` alongside an empty ``milestones``."""
 
 
-# ``projects`` stays ``dict[str, object]`` (id, title, number, url, closed,
-# short_description) -- see :class:`BacklogListResponse`'s design note.
+class ProjectEntry(BaseModel):
+    """One Projects V2 project."""
+
+    id: str
+    title: str
+    number: int
+    url: str
+    closed: bool
+    short_description: str
+
+
 class BacklogListProjectsResponse(FallibleToolResponse):
     """Response for ``backlog_list_projects``."""
 
-    projects: list[dict[str, object]] = Field(default_factory=list)
+    projects: list[ProjectEntry] = Field(default_factory=list)
     """Projects V2 projects for the resolved owner."""
 
     count: int = 0
