@@ -1,7 +1,9 @@
 """Branch operation delegates — thin wrappers routing through the active BacklogBackend.
 
-Gate on the active backend's ``supports_branches`` capability flag (T-P6-PROTOCOL)
-so unsupported backends report it cleanly instead of relying on the
+Gate on the active backend's ``supports_branches`` capability flag
+(T-P6-PROTOCOL) via the shared ``require_branch_support`` helper in
+``_capability_gates.py``, so unsupported backends raise a typed
+``UnsupportedBackendCapabilityError`` instead of relying on the
 ``RuntimeError`` stubs in ``SQLiteBackend`` / ``InMemoryBackend``.
 """
 
@@ -9,8 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ._capability_gates import require_branch_support
 from .backend_protocol import get_config
-from .backend_types import BranchBackend
 
 if TYPE_CHECKING:
     from .models import BranchInfo, MergeResult, Output
@@ -22,25 +24,6 @@ __all__ = [
     "list_integration_branches",
     "merge_integration_branch",
 ]
-
-
-def _require_branch_support() -> BranchBackend:
-    """Return the active backend as a BranchBackend, or raise if unsupported.
-
-    Raises:
-        RuntimeError: If the active backend does not support branch operations.
-    """
-    backend = get_config().backend
-    if not getattr(backend, "supports_branches", False):
-        msg = (
-            f"{type(backend).__name__}: branch operations not supported "
-            f"(supports_branches=False). Use the GitHub backend for branch ops."
-        )
-        raise RuntimeError(msg)
-    if not isinstance(backend, BranchBackend):
-        msg = f"{type(backend).__name__}: does not implement BranchBackend protocol."
-        raise TypeError(msg)
-    return backend
 
 
 def create_integration_branch(
@@ -59,9 +42,9 @@ def create_integration_branch(
         BranchInfo describing the created branch.
 
     Raises:
-        RuntimeError: If the active backend does not support branch operations.
+        UnsupportedBackendCapabilityError: If the active backend does not support branch operations.
     """
-    backend = _require_branch_support()
+    backend = require_branch_support(get_config().backend, "create_integration_branch")
     return backend.create_integration_branch(milestone_number, slug, base_branch=base_branch, repo=repo, output=output)
 
 
@@ -79,9 +62,9 @@ def get_integration_branch_status(
         BranchInfo, or None if the branch does not exist.
 
     Raises:
-        RuntimeError: If the active backend does not support branch operations.
+        UnsupportedBackendCapabilityError: If the active backend does not support branch operations.
     """
-    backend = _require_branch_support()
+    backend = require_branch_support(get_config().backend, "get_integration_branch_status")
     return backend.get_integration_branch_status(branch_name, repo=repo, output=output)
 
 
@@ -101,9 +84,9 @@ def merge_integration_branch(
         MergeResult with merge outcome.
 
     Raises:
-        RuntimeError: If the active backend does not support branch operations.
+        UnsupportedBackendCapabilityError: If the active backend does not support branch operations.
     """
-    backend = _require_branch_support()
+    backend = require_branch_support(get_config().backend, "merge_integration_branch")
     return backend.merge_integration_branch(head_branch, base_branch, commit_message, repo=repo, output=output)
 
 
@@ -119,9 +102,9 @@ def delete_integration_branch(branch_name: str, *, repo: str = "", output: Outpu
         True if the branch was deleted, False if it did not exist.
 
     Raises:
-        RuntimeError: If the active backend does not support branch operations.
+        UnsupportedBackendCapabilityError: If the active backend does not support branch operations.
     """
-    backend = _require_branch_support()
+    backend = require_branch_support(get_config().backend, "delete_integration_branch")
     return backend.delete_integration_branch(branch_name, repo=repo, output=output)
 
 
@@ -136,7 +119,7 @@ def list_integration_branches(*, repo: str = "", output: Output | None = None) -
         List of BranchInfo for all integration branches.
 
     Raises:
-        RuntimeError: If the active backend does not support branch operations.
+        UnsupportedBackendCapabilityError: If the active backend does not support branch operations.
     """
-    backend = _require_branch_support()
+    backend = require_branch_support(get_config().backend, "list_integration_branches")
     return backend.list_integration_branches(repo=repo, output=output)

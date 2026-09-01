@@ -6,8 +6,11 @@ Routes all supported backlog operations to the ``bd`` (beads) CLI via
 BeadsBackend implements :class:`~backlog_core.backend_types.WorkItemBackend`
 only — it does not implement :class:`~backlog_core.backend_types.GitHubExtras`
 or :class:`~backlog_core.backend_types.BranchBackend`.  Callers gate
-GitHub-specific operations on ``isinstance(backend, GitHubExtras)`` and branch
-operations on the ``supports_branches`` capability flag.
+GitHub-specific operations on the ``supports_github_extras`` capability flag
+(via ``require_github_extras()`` in ``_capability_gates.py``) and branch
+operations on the ``supports_branches`` flag (via ``require_branch_support()``)
+— ``isinstance`` alone is not sufficient, since both protocols are
+``runtime_checkable`` and check attribute names only.
 
 ADR-001: GitHub-specific operations (GraphQL, integration branches, task
 issues, milestone/project management) are not implemented for beads and have
@@ -247,6 +250,10 @@ class BeadsBackend:
       title is used as the selector.
     - ``supports_branches = False`` — beads does not manage git branches;
       callers must check this flag before invoking ``BranchBackend`` methods.
+    - ``supports_github_extras = False`` — beads implements none of the
+      ``GitHubExtras`` methods (see ``backend_types.py`` for the protocol);
+      this is the one backend the old ``isinstance``-only gate actually
+      caught correctly.
 
     Parameters
     ----------
@@ -261,6 +268,7 @@ class BeadsBackend:
     supports_batch_issue_update: bool = False
     issue_id_type: Literal["integer", "string"] = "string"
     supports_branches: bool = False
+    supports_github_extras: bool = False
 
     def __init__(self, runner: _BdRunnerLike | None = None) -> None:
         """Store the runner; do not touch the filesystem or spawn processes."""

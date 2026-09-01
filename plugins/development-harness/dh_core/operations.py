@@ -43,8 +43,8 @@ from backlog_core.artifact_manifest_store import (
     publish_artifact,
 )
 from backlog_core.artifact_registry import ArtifactRegistry
-from backlog_core.backend_protocol import get_config
-from backlog_core.backend_types import ContentProvider, GitHubExtras
+from backlog_core.backend_protocol import get_config, require_github_extras
+from backlog_core.backend_types import ContentProvider
 from backlog_core.dispatch_state import DispatchStateManager
 from backlog_core.models import (
     ArtifactContent,
@@ -64,6 +64,7 @@ from backlog_core.models import (
     DispatchWaveSummary,
     GitHubUnavailableError,
     Output,
+    UnsupportedBackendCapabilityError,
     UnsupportedCapabilityError,
     get_repo_root,
 )
@@ -1241,18 +1242,19 @@ def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any
         return {"error": str(exc), "milestone_number": milestone_number}
 
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        return {"error": "dispatch_stale_check requires a GitHub-backed backend", "milestone_number": milestone_number}
     try:
-        gh_repo = backend.get_github(repo)
+        github_backend = require_github_extras(backend, "get_github")
+        gh_repo = github_backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        open_issues = backend.sync_issues_graphql(
+        open_issues = github_backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
-        closed_issues = backend.sync_issues_graphql(
+        closed_issues = github_backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="CLOSED", milestone_number=milestone_number
         )
         current_numbers = [issue["number"] for issue in open_issues + closed_issues]
+    except UnsupportedBackendCapabilityError as exc:
+        return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     except (BacklogError, GithubException) as exc:
@@ -1354,14 +1356,15 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
         or ``error`` on failure.
     """
     backend = get_config().backend
-    if not isinstance(backend, GitHubExtras):
-        return {"error": "dispatch_conflicts requires a GitHub-backed backend", "milestone_number": milestone_number}
     try:
-        gh_repo = backend.get_github(repo)
+        github_backend = require_github_extras(backend, "get_github")
+        gh_repo = github_backend.get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
-        issue_nodes = backend.sync_issues_graphql(
+        issue_nodes = github_backend.sync_issues_graphql(
             gh_repo, owner, repo_name, state="OPEN", milestone_number=milestone_number
         )
+    except UnsupportedBackendCapabilityError as exc:
+        return exc.to_response(milestone_number)
     except GitHubUnavailableError as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
     except (BacklogError, GithubException) as exc:

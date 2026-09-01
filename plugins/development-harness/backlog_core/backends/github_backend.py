@@ -102,12 +102,16 @@ class GitHubBackend:
       is implemented via aliased GraphQL mutations.
     - ``issue_id_type = "integer"`` — GitHub Issues are identified by integer
       issue numbers.
+    - ``supports_github_extras = True`` — this is the only backend that
+      implements ``GitHubExtras`` for real, backed by a live GitHub
+      connection.
     """
 
     supports_batch_status_fetch: bool = True
     supports_batch_issue_update: bool = True
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
+    supports_github_extras: bool = True
 
     def __init__(
         self,

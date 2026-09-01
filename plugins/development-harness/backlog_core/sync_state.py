@@ -24,7 +24,7 @@ from enum import StrEnum
 import requests
 from github import GithubException
 
-from .models import BackendUnavailableError, BacklogError
+from .models import BackendUnavailableError, BacklogError, ContentProviderError, UnsupportedBackendCapabilityError
 
 # Transient-network exceptions that are also OSError subclasses, so they must be
 # checked before the generic OSError branch: asyncio.TimeoutError (Python 3.11+
@@ -255,12 +255,79 @@ def _classify_github_exception(exc: GithubException) -> SyncErrorKind:
     return SyncErrorKind.UNKNOWN
 
 
+_MAX_CAUSE_CHAIN_DEPTH = 5
+
+
+def _find_wrapped_github_exception(exc: BaseException) -> GithubException | None:
+    """Walk ``exc``'s ``__cause__`` chain looking for a wrapped GithubException.
+
+    A content-provider error can wrap through more than one layer before
+    reaching the original GithubException. E.g. ``gh_client._graphql_request()``
+    wraps a GithubException in ``BacklogError``, and
+    ``_fetch_blobs_graphql()`` then wraps that ``BacklogError`` in
+    ``ContentUnavailableError`` — the GithubException sits two ``__cause__``
+    links down, not one.
+
+    Args:
+        exc: The outermost exception to search from.
+
+    Returns:
+        The first GithubException found while walking ``__cause__``, or
+        ``None`` if none is present within ``_MAX_CAUSE_CHAIN_DEPTH`` links
+        (bounded so a pathological or accidentally-cyclic chain can't loop
+        forever — real exception chains here are 1-2 links deep).
+    """
+    cause: BaseException | None = exc.__cause__
+    for _ in range(_MAX_CAUSE_CHAIN_DEPTH):
+        if cause is None:
+            return None
+        if isinstance(cause, GithubException):
+            return cause
+        cause = cause.__cause__
+    return None
+
+
+def _classify_content_provider_error(exc: ContentProviderError) -> SyncErrorKind:
+    """Classify a ContentProviderError by inspecting its wrapped cause chain, if any.
+
+    A ContentProviderError is not always structural: ``_GitHubContentsStore.get_many()``
+    wraps *any* ``GithubException`` it sees — including a transient 503 or a
+    rate-limited 429 — in ``ContentUnavailableError`` via ``raise ... from exc``.
+    Blanket-classifying every ContentProviderError as non-retryable would send a
+    merely-overloaded GitHub API straight to OFFLINE instead of the bounded retry
+    policy transient failures are supposed to get.
+
+    Args:
+        exc: A ContentProviderError, possibly wrapping a GithubException
+            somewhere in its ``__cause__`` chain (see
+            ``_find_wrapped_github_exception``).
+
+    Returns:
+        The wrapped GithubException's own classification when one is present
+        anywhere in the chain (delegates to ``_classify_github_exception``);
+        otherwise ``NON_RETRYABLE`` — the error is genuinely structural (a
+        capability gap, a not-found, a revision conflict), and retrying
+        won't fix it.
+    """
+    github_cause = _find_wrapped_github_exception(exc)
+    if github_cause is not None:
+        return _classify_github_exception(github_cause)
+    return SyncErrorKind.NON_RETRYABLE
+
+
 def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     """Classify a sync exception as retryable or non-retryable.
 
     Classification table (from design doc section 5.1):
 
     - ``BackendUnavailableError`` (includes ``GitHubUnavailableError``) — NON_RETRYABLE.
+    - ``UnsupportedBackendCapabilityError`` (backend lacks an optional capability;
+      retrying will not change what the backend supports) — NON_RETRYABLE.
+    - ``ContentProviderError`` (unrelated exception tree from ``BacklogError``, so
+      needs its own branch) — delegates to ``_classify_content_provider_error``,
+      which inspects ``__cause__``: a wrapped ``GithubException`` (e.g. a transient
+      503 from ``get_many()``) gets that exception's own classification; otherwise
+      NON_RETRYABLE (a genuine capability gap, not-found, or conflict).
     - ``BacklogError`` (generic backend/GraphQL fetch failure) — RETRYABLE.
     - ``GithubException`` with status 401 or 404 — NON_RETRYABLE.
     - ``GithubException`` with status 403 and no ``Retry-After`` header — NON_RETRYABLE.
@@ -284,15 +351,23 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
     Returns:
         ``SyncErrorKind`` indicating whether the sync should retry.
     """
-    if isinstance(exc, BackendUnavailableError):
+    if isinstance(exc, (BackendUnavailableError, UnsupportedBackendCapabilityError)):
+        # Structural, not transient: a capability gap won't resolve by retrying.
         return SyncErrorKind.NON_RETRYABLE
-    if isinstance(exc, BacklogError):
-        # Generic backend/GraphQL failure (e.g. from sync_issues_graphql) — transient.
-        # Checked after BackendUnavailableError (its subclass) so auth/config stays non-retryable.
-        return SyncErrorKind.RETRYABLE
+    if isinstance(exc, ContentProviderError):
+        # Unrelated exception tree from BacklogError (see models.py) — needs its own
+        # branch or it falls through to UNKNOWN. Not always structural: see
+        # _classify_content_provider_error's docstring.
+        return _classify_content_provider_error(exc)
     if isinstance(exc, GithubException):
         return _classify_github_exception(exc)
-    if isinstance(exc, RETRYABLE_TRANSIENT_EXCEPTIONS):
+    if isinstance(exc, (BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS)):
+        # Generic BacklogError (e.g. from sync_issues_graphql) and the transient
+        # network exceptions both mean "worth retrying" — merged into one branch to
+        # stay under ruff's too-many-return-statements limit. Checked after the
+        # structural non-retryable cases above so those stay non-retryable, and
+        # after GithubException so a raw GithubException still gets status-code
+        # classification rather than a blanket RETRYABLE.
         return SyncErrorKind.RETRYABLE
     if isinstance(exc, (OSError, ValueError)):
         return SyncErrorKind.NON_RETRYABLE

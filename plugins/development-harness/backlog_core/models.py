@@ -613,6 +613,71 @@ class GitHubUnavailableError(BackendUnavailableError):
     """Raised when GITHUB_TOKEN is missing or the GitHub API is unreachable."""
 
 
+# Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
+# UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
+# doesn't tell a reader which Protocol class the backend failed to satisfy.
+_CAPABILITY_PROTOCOL_NAMES: dict[str, str] = {"github_extras": "GitHubExtras", "branches": "BranchBackend"}
+
+
+class UnsupportedBackendCapabilityError(BacklogError):
+    """Raised when the active backend does not implement an optional capability.
+
+    Pick this class for any ``BacklogError``-tree call site (``operations.py``,
+    the ~30 ``except BacklogError`` handlers in ``server.py``). Pick
+    ``ContentProviderError``'s sibling ``UnsupportedCapabilityError`` (below)
+    for ``ContentProvider``-tree call sites instead — the two trees are
+    deliberately not unified. Carries structured fields (rather than prose
+    only) so callers can render a specific remediation.
+    """
+
+    def __init__(self, capability: str, backend: str, operation: str, *, protocol_mismatch: bool = False) -> None:
+        """Initialize with the missing capability, backend name, and attempted operation.
+
+        Args:
+            capability: Name of the missing capability flag (e.g. "github_extras").
+            backend: ``type(backend).__name__`` of the active backend.
+            operation: Name of the operation the caller attempted, echoed into the raised error's message.
+            protocol_mismatch: True when the backend declared the capability flag
+                ``True`` but does not structurally satisfy the corresponding
+                ``runtime_checkable`` Protocol — a backend implementation bug, not
+                a genuinely unsupported capability. Produces a message that says
+                so, rather than the misleading "does not support" wording that
+                fits only the flag-``False`` case.
+        """
+        self.capability = capability
+        self.backend = backend
+        self.operation = operation
+        self.protocol_mismatch = protocol_mismatch
+        if protocol_mismatch:
+            protocol_name = _CAPABILITY_PROTOCOL_NAMES.get(capability, capability)
+            msg = (
+                f"{backend}: {operation} — backend declares supports_{capability}=True but does not "
+                f"structurally implement the {protocol_name} protocol. This is a backend bug, not an "
+                "unsupported capability."
+            )
+        else:
+            msg = f"{backend}: {operation} requires the {capability} capability, which this backend does not support."
+        super().__init__(msg)
+
+    def to_response(self, milestone_number: int) -> dict[str, str | int]:
+        """Build the dispatch-tool error payload for this capability gap.
+
+        Shared by ``dispatch_stale_check``/``dispatch_conflicts`` in both
+        ``server.py`` and ``dh_core/operations.py`` so the four call sites
+        don't each hand-build the same dict.
+
+        Returns:
+            Dict with ``error``, ``unsupported_capability``, ``backend``, and
+            ``milestone_number`` fields for the caller to return directly.
+        """
+        return {
+            "error": str(self),
+            "unsupported_capability": self.capability,
+            "backend": self.backend,
+            "milestone_number": milestone_number,
+        }
+
+
 class ValidationError(BacklogError):
     """Raised on input validation failure."""
 

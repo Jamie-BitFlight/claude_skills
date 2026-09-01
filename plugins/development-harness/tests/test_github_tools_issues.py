@@ -33,6 +33,11 @@ def configured_github_backend(monkeypatch: pytest.MonkeyPatch) -> tuple[InMemory
     assert isinstance(backend, InMemoryBackend)
     repository = MagicMock(full_name="owner/repo")
     monkeypatch.setattr(backend, "get_github", lambda repo="", timeout=15: repository)
+    # InMemoryBackend declares supports_github_extras=False (it cannot return a real
+    # Repository), so require_github_extras() would reject it despite implementing
+    # every GitHubExtras method. This fixture deliberately simulates a GitHub-shaped
+    # backend, so flip the flag to make that simulation honest.
+    monkeypatch.setattr(backend, "supports_github_extras", True)
     return backend, repository
 
 

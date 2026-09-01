@@ -35,7 +35,9 @@ from typing import TYPE_CHECKING
 
 import backlog_core.backend_protocol as _bp
 import pytest
-from backlog_core.backend_protocol import create_backend
+from backlog_core.backend_protocol import create_backend, require_branch_support, require_github_extras
+from backlog_core.backends.sqlite_backend import SQLiteBackend
+from backlog_core.models import UnsupportedBackendCapabilityError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -206,4 +208,202 @@ class TestBacklogBackendCapabilityContract:
             f"batch_fetch_statuses([]) "
             + ("did NOT raise" if flag is False else "raised")
             + " NotImplementedError — flag and behaviour are inconsistent"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestGitHubExtrasCapabilityContract
+# ---------------------------------------------------------------------------
+
+
+def _close_if_sqlite(backend: object) -> None:
+    """Close backend's sqlite3.Connection if it's a SQLiteBackend.
+
+    ``create_backend("sqlite")`` leaves its connection open with no
+    lifecycle owner; a bare instance with no cleanup fails this repo's
+    strict warning-as-error validation policy (AGENTS.md #18) with a
+    ResourceWarning/PytestUnraisableExceptionWarning.
+    """
+    if isinstance(backend, SQLiteBackend):
+        backend._conn.close()
+
+
+@pytest.mark.unit
+class TestGitHubExtrasCapabilityContract:
+    """Parametrized contract suite for the ``supports_github_extras`` flag.
+
+    Mirrors ``TestBacklogBackendCapabilityContract``'s Contract 1/Contract 2
+    pair above, for the ``GitHubExtras`` capability gate
+    (``require_github_extras``, re-exported from ``backend_protocol.py``)
+    instead of ``supports_batch_status_fetch``. Every backend in
+    ``_bp._VALID_BACKENDS`` is enrolled automatically.
+
+    Unlike ``supports_batch_status_fetch``, the ``GitHubExtras`` gate is not
+    self-checked inside the backend's own ``get_github()`` — it is enforced by
+    the caller-side ``require_github_extras()`` helper (this is precisely the
+    defect backlog #2287 reports: ``isinstance(backend, GitHubExtras)`` alone
+    lets a structurally-compliant backend reach its own bare ``RuntimeError``
+    stub). These tests therefore exercise ``require_github_extras()`` rather
+    than the backend method directly.
+    """
+
+    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    def test_false_flag_raises_unsupported_capability(self, name: str) -> None:
+        """Backends declaring ``supports_github_extras == False`` MUST raise.
+
+        Contract: When ``supports_github_extras`` is ``False``,
+        ``require_github_extras(backend, ...)`` MUST raise
+        ``UnsupportedBackendCapabilityError``.
+        """
+        backend = create_backend(name)
+        try:
+            if not backend.supports_github_extras:
+                with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+                    require_github_extras(backend, "get_github")
+                assert exc_info.value.capability == "github_extras"
+                assert exc_info.value.backend == type(backend).__name__
+                assert exc_info.value.protocol_mismatch is False, (
+                    "a flag-False backend is a genuinely unsupported capability, not a protocol mismatch"
+                )
+        finally:
+            _close_if_sqlite(backend)
+
+    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    def test_true_flag_does_not_raise_unsupported_capability(self, name: str) -> None:
+        """Backends declaring ``supports_github_extras == True`` MUST NOT raise it.
+
+        Contract: When ``supports_github_extras`` is ``True``,
+        ``require_github_extras(backend, ...)`` must not raise
+        ``UnsupportedBackendCapabilityError`` and must return the backend
+        unchanged. The gate is checked without calling ``get_github()`` itself,
+        so no network or credential dependency is required even for
+        ``GitHubBackend``.
+        """
+        backend = create_backend(name)
+        try:
+            if backend.supports_github_extras:
+                try:
+                    narrowed = require_github_extras(backend, "get_github")
+                except UnsupportedBackendCapabilityError as exc:
+                    pytest.fail(
+                        f"{type(backend).__name__}.supports_github_extras is True but "
+                        f"require_github_extras() raised UnsupportedBackendCapabilityError: {exc}"
+                    )
+                else:
+                    assert narrowed is backend
+        finally:
+            _close_if_sqlite(backend)
+
+    def test_protocol_mismatch_flag_distinguishes_backend_bug_from_unsupported(self) -> None:
+        """A True flag paired with a non-conforming backend raises protocol_mismatch=True.
+
+        Contract: no backend in ``_bp._VALID_BACKENDS`` currently exhibits this
+        inconsistency (each one's flag matches its actual method set), so this
+        test builds a minimal stub that lies about its own capability —
+        ``supports_github_extras = True`` but none of the ``GitHubExtras``
+        methods implemented — to exercise the ``isinstance`` branch directly.
+
+        Why: a flag-``False`` backend is a normal, expected "this capability
+        isn't offered" outcome; a flag-``True`` backend that fails the
+        ``isinstance`` check is a backend implementation bug (the flag lied).
+        Conflating the two in one message misleads whoever reads it.
+        """
+
+        class _LyingBackend:
+            supports_github_extras = True
+
+        with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+            require_github_extras(_LyingBackend(), "get_github")  # ty: ignore[invalid-argument-type]
+
+        assert exc_info.value.protocol_mismatch is True
+        assert "backend bug" in str(exc_info.value)
+        assert "GitHubExtras" in str(exc_info.value), (
+            "message should name the actual Protocol class, not just the opaque capability flag string 'github_extras'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestBranchSupportCapabilityContract
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestBranchSupportCapabilityContract:
+    """Parametrized contract suite for the ``supports_branches`` flag.
+
+    Mirrors ``TestGitHubExtrasCapabilityContract`` above, for
+    ``require_branch_support`` instead of ``require_github_extras``.
+    ``test_branch_backend.py`` skips every backend where ``supports_branches``
+    is ``False``, so it never exercises this gate's failure path — this class
+    fills that gap: the flag-False raise, the flag-True non-raise, and the
+    ``protocol_mismatch`` path, all of which changed behavior when
+    ``require_branch_support`` replaced ``_branch_delegates.py``'s ad-hoc
+    ``RuntimeError``/``TypeError`` (backlog #2287, slice 1).
+    """
+
+    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    def test_false_flag_raises_unsupported_capability(self, name: str) -> None:
+        """Backends declaring ``supports_branches == False`` MUST raise.
+
+        Contract: When ``supports_branches`` is ``False``,
+        ``require_branch_support(backend, ...)`` MUST raise
+        ``UnsupportedBackendCapabilityError``.
+        """
+        backend = create_backend(name)
+        try:
+            if not backend.supports_branches:
+                with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+                    require_branch_support(backend, "create_integration_branch")
+                assert exc_info.value.capability == "branches"
+                assert exc_info.value.backend == type(backend).__name__
+                assert exc_info.value.protocol_mismatch is False, (
+                    "a flag-False backend is a genuinely unsupported capability, not a protocol mismatch"
+                )
+        finally:
+            _close_if_sqlite(backend)
+
+    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    def test_true_flag_does_not_raise_unsupported_capability(self, name: str) -> None:
+        """Backends declaring ``supports_branches == True`` MUST NOT raise it.
+
+        Contract: When ``supports_branches`` is ``True``,
+        ``require_branch_support(backend, ...)`` must not raise
+        ``UnsupportedBackendCapabilityError`` and must return the backend
+        unchanged.
+        """
+        backend = create_backend(name)
+        try:
+            if backend.supports_branches:
+                try:
+                    narrowed = require_branch_support(backend, "create_integration_branch")
+                except UnsupportedBackendCapabilityError as exc:
+                    pytest.fail(
+                        f"{type(backend).__name__}.supports_branches is True but "
+                        f"require_branch_support() raised UnsupportedBackendCapabilityError: {exc}"
+                    )
+                else:
+                    assert narrowed is backend
+        finally:
+            _close_if_sqlite(backend)
+
+    def test_protocol_mismatch_flag_distinguishes_backend_bug_from_unsupported(self) -> None:
+        """A True flag paired with a non-conforming backend raises protocol_mismatch=True.
+
+        Contract: no backend in ``_bp._VALID_BACKENDS`` currently exhibits this
+        inconsistency, so this test builds a minimal stub that lies about its
+        own capability — ``supports_branches = True`` but none of the
+        ``BranchBackend`` methods implemented — to exercise the ``isinstance``
+        branch directly.
+        """
+
+        class _LyingBackend:
+            supports_branches = True
+
+        with pytest.raises(UnsupportedBackendCapabilityError) as exc_info:
+            require_branch_support(_LyingBackend(), "create_integration_branch")  # ty: ignore[invalid-argument-type]
+
+        assert exc_info.value.protocol_mismatch is True
+        assert "backend bug" in str(exc_info.value)
+        assert "BranchBackend" in str(exc_info.value), (
+            "message should name the actual Protocol class, not just the opaque capability flag string 'branches'"
         )

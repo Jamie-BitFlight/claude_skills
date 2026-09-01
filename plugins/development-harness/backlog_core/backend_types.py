@@ -131,12 +131,14 @@ class WorkItemBackend(Protocol):
     - ``supports_batch_issue_update`` — batch GraphQL update implemented.
     - ``issue_id_type`` — integer vs string issue IDs.
     - ``supports_branches`` — whether ``BranchBackend`` is implemented.
+    - ``supports_github_extras`` — whether ``GitHubExtras`` is implemented; gate via ``require_github_extras()`` (see ``GitHubExtras``'s docstring for why ``isinstance`` alone is insufficient).
     """
 
     supports_batch_status_fetch: bool
     supports_batch_issue_update: bool
     issue_id_type: Literal["integer", "string"]
     supports_branches: bool
+    supports_github_extras: bool
 
     def list_work_items(self) -> list[BacklogItem]: ...
     def get_work_item(self, reference: str) -> BacklogItem: ...
@@ -220,10 +222,19 @@ class GitHubExtras(Protocol):
     """GitHub-specific surface only ``GitHubBackend`` implements.
 
     Backends that are not GitHub-backed are NOT required to implement this
-    protocol; they set the capability flags to ``False`` / raise
-    ``NotImplementedError`` only if a caller bypasses the capability check.
-    Callers gate on ``isinstance(backend, GitHubExtras)`` (or the relevant
-    capability flag) before invoking these.
+    protocol. ``GitHubExtras`` is ``runtime_checkable``, which means
+    ``isinstance(backend, GitHubExtras)`` checks attribute *names* only —
+    ``SQLiteBackend`` and ``InMemoryBackend`` implement all of these methods
+    as local simulations and therefore satisfy ``isinstance`` structurally,
+    even though neither can return a real ``Repository``.
+
+    Callers MUST gate on the ``supports_github_extras`` capability flag
+    first — via ``require_github_extras()`` in ``_capability_gates.py`` —
+    and treat ``isinstance(backend, GitHubExtras)`` only as a secondary
+    assertion after that flag check passes. Gating on ``isinstance`` alone
+    is a defect: it lets non-GitHub backends pass the gate and reach a
+    bare ``RuntimeError`` stub instead of a typed
+    ``UnsupportedBackendCapabilityError``.
     """
 
     # Repository access (GitHub-only)
@@ -325,9 +336,12 @@ class BranchBackend(Protocol):
 
     Backends that do not support Git branch operations set
     ``supports_branches = False`` and are NOT required to implement this
-    protocol.  Callers branch on ``supports_branches`` (or
-    ``isinstance(backend, BranchBackend)``) before invoking these methods;
-    they must not rely on catching :exc:`RuntimeError` from a stub.
+    protocol. ``BranchBackend`` is ``runtime_checkable``, which means
+    ``isinstance(backend, BranchBackend)`` checks attribute names only, so
+    callers MUST gate on the ``supports_branches`` flag first — via
+    ``require_branch_support()`` in ``_capability_gates.py`` — and must not
+    rely on catching :exc:`RuntimeError` from a stub; the gate raises
+    ``UnsupportedBackendCapabilityError`` instead.
     """
 
     def create_integration_branch(
