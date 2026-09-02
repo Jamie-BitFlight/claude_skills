@@ -337,6 +337,9 @@ class BookendValidator:
         4. TN must depend on every non-bookend task ID.
         5. If ``acceptance_criteria_structured`` is non-empty, both T0 and TN
            must exist.
+        6. When T0 exists, every non-bookend task must list it as a
+           dependency, so no implementation task can dispatch before the
+           baseline is captured.
 
         Plans without bookend tasks and without structured criteria produce
         no errors.
@@ -388,6 +391,15 @@ class BookendValidator:
             if tn is None:
                 errors.append(
                     "Plan has acceptance-criteria-structured but no TN verification task (bookend_type='tn-verification'). Add a TN task or remove structured criteria."
+                )
+
+        # Rule 6: every non-bookend task must depend on T0
+        if t0 is not None:
+            missing_t0_dep = [t.id for t in self._plan.tasks if not t.is_bookend and t0.id not in t.dependencies]
+            if missing_t0_dep:
+                missing_list = ", ".join(sorted(missing_t0_dep, key=_task_id_sort_key))
+                errors.append(
+                    f"T0 task '{t0.id}' must be a dependency of every non-bookend task, but is missing from: {missing_list}."
                 )
 
         return errors

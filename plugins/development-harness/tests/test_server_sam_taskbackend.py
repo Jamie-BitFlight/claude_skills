@@ -861,12 +861,27 @@ def test_local_yaml_plan_update_list_field_has_no_model_repr(tmp_path: Path) -> 
 
     from dh_core.operations import update_plan_fields
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
+    from sam_schema.core.models import BookendType, Task, TaskStatus
 
     # Arrange
     p_dir = tmp_path / "plan"
     p_dir.mkdir()
     backend = LocalYamlTaskProvider(p_dir)
-    plan_id = backend.create_plan("noreprtest", "Goal", [])["plan_id"]
+    # LocalYamlTaskProvider's read path always reports state=ready (its reader/
+    # normalizer does not round-trip the "state" field — see backlog follow-up),
+    # so bookend validation runs on every update_plan_fields call here. Give the
+    # plan valid bookends up front so this stays a repr-serialization test.
+    t0 = Task(
+        id="T0", title="Baseline", status=TaskStatus.NOT_STARTED, is_bookend=True, bookend_type=BookendType.T0_BASELINE
+    )
+    tn = Task(
+        id="T99",
+        title="Verify",
+        status=TaskStatus.NOT_STARTED,
+        is_bookend=True,
+        bookend_type=BookendType.TN_VERIFICATION,
+    )
+    plan_id = backend.create_plan("noreprtest", "Goal", [t0, tn])["plan_id"]
     ac_value = [
         {
             "criterion-id": "AC01",

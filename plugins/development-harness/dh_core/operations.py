@@ -598,6 +598,8 @@ def update_plan_fields(
         PlanNotFoundError: When the plan address cannot be resolved.
         pydantic.ValidationError: When a field value fails Plan model
             validation.
+        BookendValidationError: When the patched fields would leave an
+            already-``ready`` plan with structurally invalid T0/TN bookends.
         ValueError: When ``append_section_name`` is given without ``task_id``
             or ``section_content``.
     """
@@ -612,6 +614,10 @@ def update_plan_fields(
     plan_fields: dict[str, Any] | None = None
     if set_fields is not None and task_id is None:
         validated = _validated_plan_patch(backend, plan, set_fields)
+        if validated.state == PlanState.READY:
+            errors = BookendValidator(validated).validate()
+            if errors:
+                raise BookendValidationError(validated.plan_id or plan, errors)
         # by_alias=True: set_fields uses kebab-case keys (wire convention);
         # alias keys must match so we extract only the requested keys.
         plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
@@ -673,12 +679,22 @@ def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) ->
         TaskValidationError: When the task ID duplicates an existing
             task in the plan.
         pydantic.ValidationError: When a dict task fails model validation.
+        BookendValidationError: When the plan is already ``ready`` and
+            appending this task would leave its T0/TN bookends structurally
+            invalid. Appending to a ``drafting`` plan is never gated — that
+            is the incremental-build repair path (architect ADR-1770-1).
     """
     if not isinstance(task, Task):
         if isinstance(task, dict) and "task" in task and "id" not in task:
             # Accept "task" key as the task id (YAML frontmatter convention)
             task = {**task, "id": task.pop("task")}
         task = Task.model_validate(task)
+    current = read_plan(backend, plan)
+    if current.plan.state == PlanState.READY:
+        prospective_plan = current.plan.model_copy(update={"tasks": [*current.plan.tasks, task]})
+        errors = BookendValidator(prospective_plan).validate()
+        if errors:
+            raise BookendValidationError(current.plan.plan_id or plan, errors)
     result = backend.append_task(plan, task)
     return AppendTaskResult(
         appended=result["appended"], task_id=result["task_id"], github_issue=result.get("github_issue")
