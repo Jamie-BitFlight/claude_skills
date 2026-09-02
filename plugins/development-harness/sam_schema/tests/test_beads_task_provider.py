@@ -13,6 +13,7 @@ import pytest
 from sam_schema.core.action_models import TaskDefinition
 from sam_schema.core.backends.beads import BeadsTaskProvider
 from sam_schema.core.exceptions import DocumentNotFoundError, PlanNotFoundError, TaskNotFoundError, TaskValidationError
+from sam_schema.core.models import AcceptanceCriterion, PlanState
 
 from .conftest import _FakeBdRunner, _ListParentBdRunner, _ListShowBdRunner, make_task_record
 
@@ -112,6 +113,33 @@ class TestCreatePlan:
         desc = epics[0]["description"] or ""
         assert "Extra context" in desc
 
+    def test_create_plan_with_tasks_stores_ready_state(self, fake_runner: _FakeBdRunner) -> None:
+        """When tasks are present at creation, the plan state is stored as ready."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        result = provider.create_plan("slug", "goal", [_task_def("T01", "Task")])
+
+        plan_id = result["plan_id"]
+        assert fake_runner._memory[f"dh.plan-state.{plan_id}"] == PlanState.READY.value
+
+    def test_create_plan_without_tasks_stores_drafting_state(self, fake_runner: _FakeBdRunner) -> None:
+        """An empty task list stores the plan as drafting for the incremental workflow."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        result = provider.create_plan("slug", "goal", [])
+
+        plan_id = result["plan_id"]
+        assert fake_runner._memory[f"dh.plan-state.{plan_id}"] == PlanState.DRAFTING.value
+
+    def test_create_plan_stores_structured_criteria(self, fake_runner: _FakeBdRunner) -> None:
+        """Structured acceptance criteria are persisted in bd remember."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+        result = provider.create_plan("slug", "goal", [], acceptance_criteria_structured=[criterion])
+
+        plan_id = result["plan_id"]
+        stored = json.loads(fake_runner._memory[f"dh.plan-criteria.{plan_id}"])
+        assert len(stored) == 1
+        assert stored[0]["criterion_id"] == "AC-1"
+
 
 # ---------------------------------------------------------------------------
 # read_plan
@@ -160,6 +188,46 @@ class TestReadPlan:
             "read_plan must pass --all to bd list --parent so closed tasks are included; "
             "without --all, completed tasks are excluded and completion_pct is always 0%"
         )
+
+    def test_read_plan_restores_drafting_state(self, fake_runner: _FakeBdRunner) -> None:
+        """read_plan must return the persisted drafting state, not default to ready."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        created = provider.create_plan("slug", "goal", [])
+        plan_id = created["plan_id"]
+
+        plan = provider.read_plan(plan_id)
+        assert plan["state"] == PlanState.DRAFTING
+
+    def test_read_plan_restores_structured_criteria(self, fake_runner: _FakeBdRunner) -> None:
+        """read_plan must include persisted structured acceptance criteria."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+        created = provider.create_plan("slug", "goal", [], acceptance_criteria_structured=[criterion])
+        plan_id = created["plan_id"]
+
+        plan = provider.read_plan(plan_id)
+        assert "acceptance_criteria_structured" in plan
+        assert len(plan["acceptance_criteria_structured"]) == 1
+        assert plan["acceptance_criteria_structured"][0]["criterion_id"] == "AC-1"
+
+
+# ---------------------------------------------------------------------------
+# finalize_plan
+# ---------------------------------------------------------------------------
+
+
+class TestFinalizePlan:
+    def test_finalize_plan_transitions_state_to_ready(self, fake_runner: _FakeBdRunner) -> None:
+        """finalize_plan must update the persisted plan state from drafting to ready."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        created = provider.create_plan("slug", "goal", [])
+        plan_id = created["plan_id"]
+        assert fake_runner._memory[f"dh.plan-state.{plan_id}"] == PlanState.DRAFTING.value
+
+        result = provider.finalize_plan(plan_id)
+
+        assert result["state"] == PlanState.READY
+        assert fake_runner._memory[f"dh.plan-state.{plan_id}"] == PlanState.READY.value
 
 
 # ---------------------------------------------------------------------------

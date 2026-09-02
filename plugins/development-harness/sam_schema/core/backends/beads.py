@@ -10,10 +10,12 @@ SAM plan/task IDs to beads epic/issue IDs.  This avoids any modification to
 ``beads_models.py`` (owned by T05) and does not rely on issue metadata fields.
 
 Keys:
-- ``dh.plan-index.{plan_id}``         → beads epic ID (plain string)
+- ``dh.plan-index.{plan_id}``           → beads epic ID (plain string)
 - ``dh.task-index.{plan_id}.{task_id}`` → JSON
   ``{"bd_id":"bd-xxx","is_bookend":false,"bookend_type":null}``
-- ``dh.active-task.{session_id}``     → JSON-encoded ActiveTaskContext
+- ``dh.plan-state.{plan_id}``           → plan state (``drafting`` or ``ready``)
+- ``dh.plan-criteria.{plan_id}``        → JSON-encoded structured acceptance criteria
+- ``dh.active-task.{session_id}``       → JSON-encoded ActiveTaskContext
   (written by BeadsContextBackend)
 
 Document storage
@@ -82,6 +84,8 @@ __all__ = ["BeadsContextBackend", "BeadsTaskProvider"]
 
 _PLAN_IDX_PREFIX: Final[str] = "dh.plan-index."
 _TASK_IDX_PREFIX: Final[str] = "dh.task-index."
+_PLAN_STATE_PREFIX: Final[str] = "dh.plan-state."
+_PLAN_CRITERIA_PREFIX: Final[str] = "dh.plan-criteria."
 _CTX_PREFIX: Final[str] = "dh.active-task."
 
 
@@ -226,13 +230,23 @@ def _issue_to_task_data(issue: BeadsIssueRaw, task_id: str) -> TaskData:
     return data
 
 
-def _build_plan_data(plan_id: str, epic: BeadsIssueRaw, task_data_list: list[TaskData]) -> PlanData:
+def _build_plan_data(
+    plan_id: str,
+    epic: BeadsIssueRaw,
+    task_data_list: list[TaskData],
+    *,
+    state: PlanState = PlanState.READY,
+    acceptance_criteria_structured: list[dict[str, Any]] | None = None,
+) -> PlanData:
     """Build a PlanData dict from a beads epic and task list.
 
     Args:
         plan_id: SAM plan identifier.
         epic: Parsed BeadsIssueRaw for the plan's epic.
         task_data_list: List of TaskData dicts for the plan's tasks.
+        state: Plan state to record; defaults to ``ready``.
+        acceptance_criteria_structured: Optional structured acceptance criteria
+            to include in the returned plan data.
 
     Returns:
         PlanData TypedDict populated from the epic fields.
@@ -248,9 +262,11 @@ def _build_plan_data(plan_id: str, epic: BeadsIssueRaw, task_data_list: list[Tas
         "issue": None,
         "tasks": task_data_list,
         "source_path": None,
-        "state": PlanState.READY,
+        "state": state,
         "backend_ref": epic.id,
     }
+    if acceptance_criteria_structured:
+        plan_data["acceptance_criteria_structured"] = acceptance_criteria_structured
     return plan_data
 
 
@@ -361,6 +377,37 @@ class BeadsTaskProvider:
         if not epic_id:
             raise PlanNotFoundError(plan_id)
         return epic_id
+
+    def _read_plan_state(self, plan_id: str) -> PlanState:
+        """Return the persisted plan state, defaulting to ready for legacy plans.
+
+        Args:
+            plan_id: SAM plan identifier.
+
+        Returns:
+            ``PlanState.DRAFTING`` or ``PlanState.READY``.
+        """
+        raw = self._remember_get(f"{_PLAN_STATE_PREFIX}{plan_id}")
+        if raw == PlanState.DRAFTING.value:
+            return PlanState.DRAFTING
+        return PlanState.READY
+
+    def _read_plan_criteria(self, plan_id: str) -> list[dict[str, Any]] | None:
+        """Return the persisted structured acceptance criteria, if any.
+
+        Args:
+            plan_id: SAM plan identifier.
+
+        Returns:
+            List of criterion dicts, or ``None`` if no criteria were stored.
+        """
+        raw = self._remember_get(f"{_PLAN_CRITERIA_PREFIX}{plan_id}")
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
 
     def _write_task_index(
         self, plan_id: str, task_id: str, bd_id: str, *, is_bookend: bool = False, bookend_type: str | None = None
@@ -591,6 +638,16 @@ class BeadsTaskProvider:
         epic = parse_issue(epic_raw)
         self._write_plan_index(plan_id, epic.id)
 
+        # Persist plan state and structured criteria so read_plan can reconstruct
+        # the same values instead of grandfathering everything as ready/no-criteria.
+        state = PlanState.DRAFTING if not tasks else PlanState.READY
+        self._remember_set(f"{_PLAN_STATE_PREFIX}{plan_id}", state.value)
+        if acceptance_criteria_structured:
+            criteria_payload = json.dumps([
+                criterion.model_dump(mode="json") for criterion in acceptance_criteria_structured
+            ])
+            self._remember_set(f"{_PLAN_CRITERIA_PREFIX}{plan_id}", criteria_payload)
+
         # Create task issues and register in index
         task_data_list = self._create_and_index_tasks(plan_id, tasks, epic.id)
 
@@ -631,6 +688,8 @@ class BeadsTaskProvider:
 
         task_index = self._task_index(plan_id)
         task_data_list: list[TaskData] = []
+        plan_state = self._read_plan_state(plan_id)
+        plan_criteria = self._read_plan_criteria(plan_id)
 
         # Batch fetch: replace N individual bd show calls with a single
         # bd list --parent <epic_id>. Falls back to per-task shows when the
@@ -657,7 +716,9 @@ class BeadsTaskProvider:
                     raise
                 except (BdInvocationError, ValueError):
                     continue  # individual issue inaccessible or deleted; skip rather than fail whole plan
-            return _build_plan_data(plan_id, epic, task_data_list)
+            return _build_plan_data(
+                plan_id, epic, task_data_list, state=plan_state, acceptance_criteria_structured=plan_criteria
+            )
 
         # Happy path: join batch result against task index for task_id mapping
         # and bookend metadata. Issues absent from the batch result are skipped —
@@ -674,7 +735,9 @@ class BeadsTaskProvider:
                 td["bookend_type"] = meta["bookend_type"]
             task_data_list.append(td)
 
-        return _build_plan_data(plan_id, epic, task_data_list)
+        return _build_plan_data(
+            plan_id, epic, task_data_list, state=plan_state, acceptance_criteria_structured=plan_criteria
+        )
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
         """Return plan summaries by scanning bd remember for plan index entries.
@@ -984,6 +1047,7 @@ class BeadsTaskProvider:
             PlanNotFoundError: When plan_id has no registered epic.
         """
         self._epic_id_for_plan(plan_id)  # validate plan exists
+        self._remember_set(f"{_PLAN_STATE_PREFIX}{plan_id}", PlanState.READY.value)
         return {"finalized": True, "state": PlanState.READY}
 
     def get_ready_tasks(self, plan_id: str) -> list[TaskData]:
