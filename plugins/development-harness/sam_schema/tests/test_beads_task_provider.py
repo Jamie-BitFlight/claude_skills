@@ -210,6 +210,76 @@ class TestReadPlan:
         assert len(plan["acceptance_criteria_structured"]) == 1
         assert plan["acceptance_criteria_structured"][0]["criterion_id"] == "AC-1"
 
+    def test_read_plan_restores_dependencies(self, fake_runner: _FakeBdRunner) -> None:
+        """read_plan must reconstruct task dependencies from the task index.
+
+        Regression test for the Codex review finding that read_plan rebuilt
+        every child with dependencies=[], which made BookendValidator reject
+        a valid T0 -> T1 -> TN plan at finalize time.
+        """
+        provider = BeadsTaskProvider(runner=fake_runner)
+        tasks = [
+            _task_def("T0", "Baseline"),
+            _task_def("T1", "Impl", deps=["T0"]),
+            _task_def("T2", "Verify", deps=["T1"]),
+        ]
+        created = provider.create_plan("slug", "goal", tasks)
+        plan_id = created["plan_id"]
+
+        plan = provider.read_plan(plan_id)
+        deps_by_id = {t["id"]: t["dependencies"] for t in plan["tasks"]}
+        assert deps_by_id["T0"] == []
+        assert deps_by_id["T1"] == ["T0"]
+        assert deps_by_id["T2"] == ["T1"]
+
+    def test_append_task_persists_dependencies(self, fake_runner: _FakeBdRunner) -> None:
+        """append_task must index and wire the new task's dependencies."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        created = provider.create_plan("slug", "goal", [_task_def("T0", "Baseline")])
+        plan_id = created["plan_id"]
+
+        provider.append_task(plan_id, _task_def("T1", "Impl", deps=["T0"]))
+
+        plan = provider.read_plan(plan_id)
+        deps_by_id = {t["id"]: t["dependencies"] for t in plan["tasks"]}
+        assert deps_by_id["T1"] == ["T0"]
+        assert any(c[:2] == ["dep", "add"] for c in fake_runner.text_calls)
+
+
+class TestUpdatePlanFields:
+    def test_update_persists_structured_criteria(self, fake_runner: _FakeBdRunner) -> None:
+        """update_plan_fields must persist acceptance-criteria-structured.
+
+        Regression test for the Codex review finding that the update path
+        ignored the criteria key, letting a plan add criteria post-create
+        and finalize without T0/TN.
+        """
+        provider = BeadsTaskProvider(runner=fake_runner)
+        created = provider.create_plan("slug", "goal", [])
+        plan_id = created["plan_id"]
+
+        criterion = AcceptanceCriterion(criterion_id="AC-2", check_command="true")
+        provider.update_plan_fields(
+            plan_id, set_fields={"acceptance-criteria-structured": [criterion.model_dump(mode="json")]}
+        )
+
+        plan = provider.read_plan(plan_id)
+        assert "acceptance_criteria_structured" in plan
+        assert len(plan["acceptance_criteria_structured"]) == 1
+        assert plan["acceptance_criteria_structured"][0]["criterion_id"] == "AC-2"
+
+    def test_update_with_empty_criteria_clears_stored_criteria(self, fake_runner: _FakeBdRunner) -> None:
+        """update_plan_fields with an empty criteria list clears the stored value."""
+        provider = BeadsTaskProvider(runner=fake_runner)
+        criterion = AcceptanceCriterion(criterion_id="AC-1", check_command="true")
+        created = provider.create_plan("slug", "goal", [], acceptance_criteria_structured=[criterion])
+        plan_id = created["plan_id"]
+
+        provider.update_plan_fields(plan_id, set_fields={"acceptance-criteria-structured": []})
+
+        plan = provider.read_plan(plan_id)
+        assert not plan.get("acceptance_criteria_structured")
+
 
 # ---------------------------------------------------------------------------
 # finalize_plan
