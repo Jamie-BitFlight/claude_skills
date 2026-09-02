@@ -322,9 +322,9 @@ class BookendValidator:
         """Return task IDs of all non-bookend tasks in the plan.
 
         Returns:
-            Sorted list of task IDs whose ``is_bookend`` field is ``False``.
+            Sorted list of task IDs whose ``bookend_type`` is ``None``.
         """
-        return sorted([t.id for t in self._plan.tasks if not t.is_bookend], key=_task_id_sort_key)
+        return sorted([t.id for t in self._plan.tasks if t.bookend_type is None], key=_task_id_sort_key)
 
     def validate(self) -> list[str]:
         """Validate bookend structural constraints and return error strings.
@@ -395,11 +395,33 @@ class BookendValidator:
 
         # Rule 6: every non-bookend task must depend on T0
         if t0 is not None:
-            missing_t0_dep = [t.id for t in self._plan.tasks if not t.is_bookend and t0.id not in t.dependencies]
+            missing_t0_dep = [t.id for t in self._plan.tasks if t.bookend_type is None and t0.id not in t.dependencies]
             if missing_t0_dep:
                 missing_list = ", ".join(sorted(missing_t0_dep, key=_task_id_sort_key))
                 errors.append(
                     f"T0 task '{t0.id}' must be a dependency of every non-bookend task, but is missing from: {missing_list}."
                 )
 
+        # Rule 7: bookend flag and type must be consistent
+        errors.extend(self._bookend_flag_consistency_errors())
+
+        return errors
+
+    def _bookend_flag_consistency_errors(self) -> list[str]:
+        """Return errors for tasks whose is_bookend and bookend_type disagree."""
+        errors: list[str] = []
+        for task in self._plan.tasks:
+            if task.is_bookend and task.bookend_type is None:
+                errors.append(
+                    f"Task '{task.id}' has is-bookend=true but no bookend_type. "
+                    "Set bookend_type to 't0-baseline' or 'tn-verification', or set is-bookend=false."
+                )
+            elif not task.is_bookend and task.bookend_type is not None:
+                type_label = (
+                    task.bookend_type.value if isinstance(task.bookend_type, BookendType) else task.bookend_type
+                )
+                errors.append(
+                    f"Task '{task.id}' has bookend_type='{type_label}' but is-bookend=false. "
+                    "Set is-bookend=true, or remove bookend_type."
+                )
         return errors

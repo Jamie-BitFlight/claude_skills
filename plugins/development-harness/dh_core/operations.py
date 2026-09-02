@@ -1058,6 +1058,12 @@ def update_task_fields(
     """
     if set_fields_json is not None:
         validated_task = _validated_task_patch(backend, plan, task, set_fields_json)
+        current = read_plan(backend, plan)
+        if current.plan.state == PlanState.READY:
+            prospective_plan = _validated_task_patch_plan(current, task, set_fields_json)
+            errors = BookendValidator(prospective_plan).validate()
+            if errors:
+                raise BookendValidationError(current.plan.plan_id or plan, errors)
         backend.update_task(plan, validated_task)
     if append_section is not None:
         backend.append_task_section(plan, task, append_section, section_content or "")

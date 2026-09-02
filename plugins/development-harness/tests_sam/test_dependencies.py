@@ -628,6 +628,28 @@ class TestBookendValidatorInvalidPlans:
         assert any("T0" in e for e in errors)
         assert any("TN" in e for e in errors)
 
+    def test_is_bookend_true_without_type_returns_error(self) -> None:
+        """A task flagged as bookend but lacking a type is rejected."""
+        t0 = make_bookend_task("T0", BookendType.T0_BASELINE)
+        impl = Task(id="T1", title="Impl", status=TaskStatus.NOT_STARTED, dependencies=["T0"], is_bookend=True)
+        tn = make_bookend_task("T2", BookendType.TN_VERIFICATION, dependencies=["T1"])
+        plan = Plan(feature="bookend-test", tasks=[t0, impl, tn], acceptance_criteria_structured=[])
+
+        errors = BookendValidator(plan).validate()
+
+        assert any("is-bookend=true but no bookend_type" in e for e in errors)
+
+    def test_bookend_type_without_is_bookend_returns_error(self) -> None:
+        """A task with a bookend type but is_bookend=false is rejected."""
+        t0 = Task(id="T0", title="Baseline", status=TaskStatus.NOT_STARTED, bookend_type=BookendType.T0_BASELINE)
+        impl = make_task("T1", dependencies=["T0"])
+        tn = make_bookend_task("T2", BookendType.TN_VERIFICATION, dependencies=["T1"])
+        plan = Plan(feature="bookend-test", tasks=[t0, impl, tn], acceptance_criteria_structured=[])
+
+        errors = BookendValidator(plan).validate()
+
+        assert any("bookend_type" in e and "is-bookend=false" in e for e in errors)
+
 
 # ---------------------------------------------------------------------------
 # BookendValidator accessor methods
