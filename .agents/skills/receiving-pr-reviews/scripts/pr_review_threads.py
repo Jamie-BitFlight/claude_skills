@@ -31,8 +31,10 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import subprocess
 import time
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -585,6 +587,74 @@ def resolve(
         timeout=gh_timeout_seconds,
     )
     typer.echo(raw.strip())
+
+
+@app.command(name="reply-and-resolve")
+def reply_and_resolve(
+    pr: Annotated[int, typer.Option(help="Pull request number.")],
+    thread_id: Annotated[str, typer.Option(help="Review thread id, from `fetch`.")],
+    comment_id: Annotated[int, typer.Option(help="Review comment databaseId of the thread's FIRST comment.")],
+    body: Annotated[str, typer.Option(help="Reply text.")],
+    github: GithubOption = None,
+    gh_timeout_seconds: Annotated[
+        float | None, typer.Option(min=0, help="Seconds to bound each `gh` call to. Unbounded by default.")
+    ] = None,
+) -> None:
+    """Reply to a thread then resolve it in one call.
+
+    Prints two compact JSON lines: the created-comment response, then the
+    resolve mutation response. The resolve runs only if the reply succeeded.
+    """
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
+    reply_raw = run_gh(
+        ["api", "-X", "POST", f"repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies", "-f", f"body={body}"],
+        timeout=gh_timeout_seconds,
+    )
+    typer.echo(reply_raw.strip())
+    resolve_raw = run_gh(
+        ["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={thread_id}"],
+        timeout=gh_timeout_seconds,
+    )
+    typer.echo(resolve_raw.strip())
+
+
+@app.command(name="reply-and-resolve-batch")
+def reply_and_resolve_batch(
+    pr: Annotated[int, typer.Option(help="Pull request number.")],
+    input_file: Annotated[
+        Path, typer.Option(help="JSON file: array of {thread_id, comment_id, body} objects, one per thread.")
+    ],
+    github: GithubOption = None,
+    gh_timeout_seconds: Annotated[
+        float | None, typer.Option(min=0, help="Seconds to bound each `gh` call to. Unbounded by default.")
+    ] = None,
+) -> None:
+    """Reply to and resolve many threads on one PR in a single process.
+
+    Stops at the first failure. Prints one compact JSON line per thread:
+    {thread_id, replied, resolved}.
+    """
+    entries = json.loads(input_file.read_text())
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
+    for entry in entries:
+        reply_raw = run_gh(
+            [
+                "api",
+                "-X",
+                "POST",
+                f"repos/{owner}/{repo}/pulls/{pr}/comments/{entry['comment_id']}/replies",
+                "-f",
+                f"body={entry['body']}",
+            ],
+            timeout=gh_timeout_seconds,
+        )
+        resolve_raw = run_gh(
+            ["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={entry['thread_id']}"],
+            timeout=gh_timeout_seconds,
+        )
+        replied = json.loads(reply_raw).get("id") is not None
+        resolved = "errors" not in json.loads(resolve_raw)
+        typer.echo(json.dumps({"thread_id": entry["thread_id"], "replied": replied, "resolved": resolved}))
 
 
 if __name__ == "__main__":
