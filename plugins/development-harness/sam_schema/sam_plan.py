@@ -448,7 +448,15 @@ def update(
             append_section_name=action_config.append_section_name,
             section_content=action_config.section_content,
         )
-    except (ValidationError, ValueError, KeyError, FileNotFoundError, PlanNotFoundError, FormatDetectionError) as exc:
+    except (
+        ValidationError,
+        ValueError,
+        KeyError,
+        FileNotFoundError,
+        PlanNotFoundError,
+        FormatDetectionError,
+        BookendValidationError,
+    ) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
     _emit(result)
 
@@ -536,7 +544,14 @@ def append_task(
                 _error("--task-id and --task-title are required (or use --stdin)")
         config = AppendTaskInput(plan_address=plan_ref, task=task)
         result = operations.append_task(backend, plan_ref, config.task)
-    except (ValidationError, ValueError, PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
+    except (
+        ValidationError,
+        ValueError,
+        PlanNotFoundError,
+        FileNotFoundError,
+        FormatDetectionError,
+        BookendValidationError,
+    ) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
     _emit(result)
 

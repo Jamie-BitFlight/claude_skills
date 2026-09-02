@@ -541,6 +541,92 @@ def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[s
     return Plan.model_validate({**current.model_dump(), **raw_fields})
 
 
+def _validated_task_patch_plan(current: ReadResult, task_id: str, raw_fields: dict[str, Any]) -> Plan:
+    """Return the prospective plan after applying a task-level patch.
+
+    The task identified by ``task_id`` is replaced with a task built from its
+    current fields merged with ``raw_fields`` (kebab-case or snake_case), then
+    the containing plan is rebuilt so callers can validate bookend constraints
+    on the result.
+
+    Args:
+        current: The current plan read result.
+        task_id: Task identifier to patch.
+        raw_fields: JSON-decoded patch dict for the task.
+
+    Returns:
+        Prospective Plan model with the patched task applied.
+
+    Raises:
+        TaskNotFoundError: When ``task_id`` is not present in the plan.
+        pydantic.ValidationError: When the patched task fails model validation.
+    """
+    for idx, task in enumerate(current.plan.tasks):
+        if task.id == task_id:
+            current_task_data = task.model_dump(mode="json")
+            patched_task = Task.model_validate({**current_task_data, **raw_fields})
+            new_tasks = list(current.plan.tasks)
+            new_tasks[idx] = patched_task
+            return current.plan.model_copy(update={"tasks": new_tasks})
+    raise TaskNotFoundError(current.plan.plan_id or "", task_id)
+
+
+def _plan_fields_for_update(backend: TaskBackend, plan: str, set_fields: dict[str, Any]) -> dict[str, Any]:
+    """Validate plan-level patch fields and return normalized backend fields.
+
+    The prospective plan is validated through ``Plan.model_validate`` and, if
+    the result is ``ready``, checked with ``BookendValidator``.
+
+    Args:
+        backend: Active TaskBackend instance.
+        plan: Plan address string.
+        set_fields: Raw JSON-decoded patch dict.
+
+    Returns:
+        Dict of normalized plan-level fields to pass to the backend.
+
+    Raises:
+        BookendValidationError: When the patch leaves a ready plan with invalid
+            bookend structure.
+    """
+    validated = _validated_plan_patch(backend, plan, set_fields)
+    if validated.state == PlanState.READY:
+        errors = BookendValidator(validated).validate()
+        if errors:
+            raise BookendValidationError(validated.plan_id or plan, errors)
+    # by_alias=True: set_fields uses kebab-case keys (wire convention);
+    # alias keys must match so we extract only the requested keys.
+    plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
+    if "acceptance-criteria-structured" in plan_fields:
+        plan_fields["acceptance-criteria-structured"] = [
+            criterion.model_dump(mode="json") for criterion in validated.acceptance_criteria_structured
+        ]
+    return plan_fields
+
+
+def _update_task_fields(backend: TaskBackend, plan: str, task_id: str, set_fields: dict[str, Any]) -> None:
+    """Validate a task-level patch on a ready plan and write it to the backend.
+
+    Args:
+        backend: Active TaskBackend instance.
+        plan: Plan address string.
+        task_id: Task identifier to patch.
+        set_fields: Raw JSON-decoded patch dict for the task.
+
+    Raises:
+        BookendValidationError: When the patch leaves a ready plan with invalid
+            bookend structure.
+        TaskNotFoundError: When ``task_id`` is not present in the plan.
+    """
+    current = read_plan(backend, plan)
+    if current.plan.state == PlanState.READY:
+        prospective_plan = _validated_task_patch_plan(current, task_id, set_fields)
+        errors = BookendValidator(prospective_plan).validate()
+        if errors:
+            raise BookendValidationError(current.plan.plan_id or plan, errors)
+    backend.update_task_fields(plan, task_id, set_fields)
+
+
 def update_plan_fields(
     backend: TaskBackend,
     plan: str,
@@ -613,18 +699,7 @@ def update_plan_fields(
 
     plan_fields: dict[str, Any] | None = None
     if set_fields is not None and task_id is None:
-        validated = _validated_plan_patch(backend, plan, set_fields)
-        if validated.state == PlanState.READY:
-            errors = BookendValidator(validated).validate()
-            if errors:
-                raise BookendValidationError(validated.plan_id or plan, errors)
-        # by_alias=True: set_fields uses kebab-case keys (wire convention);
-        # alias keys must match so we extract only the requested keys.
-        plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
-        if "acceptance-criteria-structured" in plan_fields:
-            plan_fields["acceptance-criteria-structured"] = [
-                criterion.model_dump(mode="json") for criterion in validated.acceptance_criteria_structured
-            ]
+        plan_fields = _plan_fields_for_update(backend, plan, set_fields)
 
     # Only call the plan-level update when there is something to write at the
     # plan level (context narrative or validated plan-level fields). Task-only
@@ -636,7 +711,7 @@ def update_plan_fields(
             backend.update_plan_fields(plan, context=context, set_fields=plan_fields, owner_reference=owner_reference)
 
     if set_fields is not None and task_id is not None:
-        backend.update_task_fields(plan, task_id, set_fields)
+        _update_task_fields(backend, plan, task_id, set_fields)
 
     if append_section_name is not None and task_id is not None and section_content:
         backend.append_task_section(plan, task_id, append_section_name, section_content)
