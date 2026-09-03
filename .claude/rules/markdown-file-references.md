@@ -35,6 +35,8 @@ Use markdown links with relative paths starting with `./`. **Reason**: Enables C
 
 Never backtick-only (`modern-modules/httpx.md`) or absolute paths (`/home/user/...`). External file: full URL with access date.
 
+**Exception — `.claude/` and `rules/`:** these files are injected as raw text at the agent's cwd (repo root), never browsed via GitHub/editor click-through. Links there are repo-root-relative, no `./` prefix. Do not "fix" them back to file-relative.
+
 ## Skill Activation References
 
 Reference other skills using activation syntax:
