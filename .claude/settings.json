@@ -21,6 +21,17 @@
     }
   },
   "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-rules.mjs",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Write|Edit"
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [
