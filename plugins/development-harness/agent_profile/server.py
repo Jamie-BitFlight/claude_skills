@@ -35,7 +35,11 @@ mcp: FastMCP = FastMCP("agent-profile")
 @mcp.tool(
     name="load",
     annotations=ToolAnnotations(
-        title="Load Agent Profile", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="Load Agent Profile",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     ),
 )
 def _load(
@@ -108,7 +112,11 @@ def _load(
 @mcp.tool(
     name="list",
     annotations=ToolAnnotations(
-        title="List Agent Profiles", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="List Agent Profiles",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     ),
 )
 def _list(

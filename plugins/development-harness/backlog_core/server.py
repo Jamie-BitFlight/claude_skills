@@ -1228,10 +1228,25 @@ mcp = FastMCP(
     lifespan=_backlog_lifespan,
 )
 
+# fastmcp 4 requires a server exposing task-enabled tools (dispatch_spawn) to register
+# the tasks extension explicitly; fastmcp 3 registered it implicitly. Guard the import
+# so both major versions keep working without pinning fastmcp<4.
+try:
+    from fastmcp_tasks import TasksExtension
+except ImportError:
+    pass
+else:
+    if hasattr(mcp, "add_extension"):
+        mcp.add_extension(TasksExtension())
+
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Backlog Sync Status", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="Backlog Sync Status",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def sync_status() -> SyncStatusResponse:
@@ -1262,10 +1277,10 @@ async def sync_status() -> SyncStatusResponse:
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Trigger Backlog Sync",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=False,
-        openWorldHint=True,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
     )
 )
 async def sync_now(
@@ -1327,7 +1342,11 @@ async def sync_now(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Add Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+        title="Add Backlog Item",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
     )
 )
 async def backlog_add(
@@ -1587,7 +1606,11 @@ def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Backlog Items", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Backlog Items",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_list(
@@ -2041,7 +2064,11 @@ def _execute_disclosure_or_passthrough(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="View Backlog Item", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="View Backlog Item",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_view(
@@ -2326,7 +2353,7 @@ async def backlog_view(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Sync Backlog", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+        title="Sync Backlog", read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True
     )
 )
 async def backlog_sync(
@@ -2358,7 +2385,11 @@ async def backlog_sync(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Link Follow-up Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Link Follow-up Item",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_link_followup(
@@ -2398,7 +2429,11 @@ async def backlog_link_followup(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Follow-up Items", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="List Follow-up Items",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def backlog_list_followups(
@@ -2432,7 +2467,11 @@ async def backlog_list_followups(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Close Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Close Backlog Item",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_close(
@@ -2484,7 +2523,11 @@ async def backlog_close(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Resolve Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Resolve Backlog Item",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_resolve(
@@ -2539,7 +2582,11 @@ async def backlog_resolve(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Update Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Update Backlog Item",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_update(
@@ -2633,7 +2680,11 @@ async def backlog_update(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Groom Backlog Item", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Groom Backlog Item",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_groom(
@@ -2750,10 +2801,10 @@ async def backlog_groom(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Normalize Backlog Items",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def backlog_normalize(
@@ -2783,7 +2834,11 @@ async def backlog_normalize(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Pull Backlog Items", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Pull Backlog Items",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_pull(
@@ -2844,7 +2899,11 @@ async def backlog_pull(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Create SAM Task", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+        title="Create SAM Task",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
     )
 )
 async def backlog_create_sam_task(
@@ -2893,7 +2952,7 @@ async def backlog_create_sam_task(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Get SAM Tasks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Get SAM Tasks", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_get_sam_tasks(
@@ -2921,10 +2980,10 @@ async def backlog_get_sam_tasks(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Update SAM Task Status",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_update_sam_task_status(
@@ -2990,7 +3049,11 @@ def _load_manifest(provider: ContentProvider, item_id: ItemId) -> ArtifactManife
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Register Artifact", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Register Artifact",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def artifact_register(
@@ -3071,7 +3134,7 @@ async def artifact_register(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Artifacts", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Artifacts", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def artifact_list(
@@ -3118,7 +3181,7 @@ async def artifact_list(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Get Artifact", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Get Artifact", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def artifact_get(
@@ -3181,7 +3244,7 @@ async def artifact_get(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Read Artifact", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Read Artifact", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def artifact_read(
@@ -3261,7 +3324,11 @@ async def artifact_read(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Get Ready SAM Tasks", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Get Ready SAM Tasks",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_get_ready_sam_tasks(
@@ -3286,7 +3353,7 @@ async def backlog_get_ready_sam_tasks(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Strike Entry", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Strike Entry", read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_strike_entry(
@@ -3334,7 +3401,7 @@ async def backlog_strike_entry(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Labels", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Labels", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_list_labels(
@@ -3361,7 +3428,7 @@ async def backlog_list_labels(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Merged PRs", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Merged PRs", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_list_merged_prs(
@@ -3399,7 +3466,7 @@ async def backlog_list_merged_prs(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Milestones", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Milestones", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_list_milestones(
@@ -3435,7 +3502,11 @@ async def backlog_list_milestones(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Get Soonest Milestone", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Get Soonest Milestone",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
@@ -3469,7 +3540,11 @@ async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Create Milestone", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+        title="Create Milestone",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
     )
 )
 async def backlog_create_milestone(
@@ -3509,10 +3584,10 @@ async def backlog_create_milestone(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Assign Item To Milestone",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_assign_item_to_milestone(
@@ -3547,7 +3622,7 @@ async def backlog_assign_item_to_milestone(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Issues", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Issues", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_list_issues(
@@ -3584,7 +3659,11 @@ async def backlog_list_issues(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Comment on Issue", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+        title="Comment on Issue",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
     )
 )
 async def backlog_comment_issue(
@@ -3610,7 +3689,11 @@ async def backlog_comment_issue(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Issue Comments", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Issue Comments",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_list_comments(
@@ -3638,7 +3721,11 @@ async def backlog_list_comments(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Read Issue Comment", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Read Issue Comment",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def backlog_read_comment(
@@ -3674,7 +3761,7 @@ async def backlog_read_comment(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="List Projects", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="List Projects", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
     )
 )
 async def backlog_list_projects(
@@ -3698,7 +3785,11 @@ async def backlog_list_projects(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Create Project", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+        title="Create Project",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=True,
     )
 )
 async def backlog_create_project(
@@ -3761,7 +3852,11 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Read Dispatch Plan", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="Read Dispatch Plan",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def dispatch_read(
@@ -3791,10 +3886,10 @@ async def dispatch_read(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Validate Dispatch Plan",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def dispatch_validate(
@@ -3822,10 +3917,10 @@ async def dispatch_validate(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Check Dispatch Staleness",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def dispatch_stale_check(
@@ -3853,7 +3948,11 @@ async def dispatch_stale_check(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="Create Dispatch Plan", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True
+        title="Create Dispatch Plan",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def dispatch_create_plan(
@@ -3979,10 +4078,10 @@ async def dispatch_create_plan(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Analyze Dispatch Conflicts",
-        readOnlyHint=True,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=True,
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=True,
     )
 )
 async def dispatch_conflicts(
@@ -4054,10 +4153,10 @@ def _dispatch_state_manager() -> _DispatchStateManager:
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Start Dispatch Wave",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=False,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=False,
     )
 )
 async def dispatch_wave_start(
@@ -4121,10 +4220,10 @@ async def dispatch_wave_start(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Update Dispatch Item Status",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def dispatch_item_status(
@@ -4193,10 +4292,10 @@ async def dispatch_item_status(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Query Dispatch Wave Status",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 async def dispatch_wave_status(
@@ -4473,10 +4572,10 @@ async def _run_spawn_item(
     task=True,
     annotations=ToolAnnotations(
         title="Spawn Dispatch Wave",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=False,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=False,
     ),
 )
 async def dispatch_spawn(
