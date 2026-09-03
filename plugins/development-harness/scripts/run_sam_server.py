@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "fastmcp>=3.0.2",
+#   "fastmcp>=4.0.0",
 #   "httpx>=0.27.0",
 #   "gitpython>=3.1.0",
 #   "pygithub>=2.8.1",

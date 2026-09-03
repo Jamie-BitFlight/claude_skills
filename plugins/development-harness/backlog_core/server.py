@@ -34,6 +34,7 @@ import dispatch_schema as _ds
 import tiktoken
 from dh_core import operations
 from fastmcp import Context, FastMCP
+from fastmcp_tasks import TasksExtension
 from github import GithubException as _GithubException
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
@@ -1229,15 +1230,8 @@ mcp = FastMCP(
 )
 
 # fastmcp 4 requires a server exposing task-enabled tools (dispatch_spawn) to register
-# the tasks extension explicitly; fastmcp 3 registered it implicitly. Guard the import
-# so both major versions keep working without pinning fastmcp<4.
-try:
-    from fastmcp_tasks import TasksExtension
-except ImportError:
-    pass
-else:
-    if hasattr(mcp, "add_extension"):
-        mcp.add_extension(TasksExtension())
+# the tasks extension explicitly; fastmcp 3 registered it implicitly.
+mcp.add_extension(TasksExtension())
 
 
 @mcp.tool(
