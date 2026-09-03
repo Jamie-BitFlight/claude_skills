@@ -25,14 +25,7 @@ if TYPE_CHECKING:
 # but the test runner may not have it yet.
 # ---------------------------------------------------------------------------
 
-_SCRIPTS_DIR = (
-    Path(__file__).resolve().parents[2]
-    / "plugins"
-    / "development-harness"
-    / "skills"
-    / "implementation-manager"
-    / "scripts"
-)
+_SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "skills" / "implementation-manager" / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
@@ -41,7 +34,7 @@ from implementation_manager import Task, TaskPriority, TaskStatus, app
 
 # dh_paths is part of the development-harness package; add its directory to
 # sys.path so it is importable from outside the plugin tree.
-_DH_DIR = Path(__file__).resolve().parents[2] / "plugins" / "development-harness"
+_DH_DIR = Path(__file__).resolve().parents[1]
 if str(_DH_DIR) not in sys.path:
     sys.path.insert(0, str(_DH_DIR))
 

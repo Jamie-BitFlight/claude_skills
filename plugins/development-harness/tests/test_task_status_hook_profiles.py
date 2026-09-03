@@ -14,7 +14,7 @@ Strategy:
   called.
 - No test touches real task plan files on disk.
 
-Test file: tests/test_task_status_hook_profiles.py
+Test file: plugins/development-harness/tests/test_task_status_hook_profiles.py
 Implementation: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 """
 

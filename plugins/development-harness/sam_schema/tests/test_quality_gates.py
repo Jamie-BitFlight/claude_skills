@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 from ruamel.yaml import YAML
+
 from sam_schema.core.models import Plan, Task, TaskStatus
 from sam_schema.core.quality_gates import (
     _proportional_phase_body,

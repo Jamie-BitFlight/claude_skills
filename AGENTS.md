@@ -10,11 +10,21 @@ prefer the cheapest evidence that can resolve the uncertainty rather than maximi
 
 ## Repository Overview
 
-**Project**: Claude Code Marketplace Plugin Collection (see `plugins/` for the full roster)
-**Purpose**: Extends Claude Code CLI with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD, AI/LLM tools, documentation, and agent orchestration.
-**Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts), JavaScript/TypeScript (hooks, MCP scripts)
+**Project**: Claude Code Marketplace Plugin Collection — marketplace name `jamie-bitflight-skills`,
+defined in `.claude-plugin/marketplace.json`. Most entries are local directories under `plugins/`.
+The rest are external: the upstream `astral` plugin pinned by git-subdir, and
+`hallucination-detector` from a sibling GitHub repo. Read the manifest for the current roster.
+**Purpose**: Extends Claude Code CLI (and secondarily Codex, OpenCode, and GitHub's coding agent)
+with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD,
+AI/LLM tools, documentation, and agent orchestration.
+**Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts; `.python-version` pins 3.13),
+JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix
 **Python Version**: 3.11+ required
+
+The largest plugin is `plugins/development-harness` (install name `dh`) — the SAM 7-stage pipeline
+with its own MCP servers (`backlog_core/`, `sam_schema/`), agents, and skills. It has its own
+`AGENTS.md`; read it before working inside that directory.
 
 ## Essential Commands
 
@@ -44,12 +54,14 @@ uvx skilllint@latest check <path>          # Validate skill/agent/plugin frontma
 ### Testing
 
 ```bash
-uv run pytest                              # Run full test suite (parallel via xdist)
-uv run pytest -m "not slow"                # Skip slow tests
-uv run pytest --cov=scripts                # Coverage is always on (addopts); this flag is redundant
+uv run pytest                              # Fast suite (parallel via xdist); e2e, cross_backend, and integration are deselected by addopts
+uv run pytest -m "not slow"                # Additionally skip slow tests
+uv run pytest -m integration plugins/development-harness/tests/   # Integration tests (deselected by default)
 uv run pytest plugins/development-harness/tests/  # Specific test directory
 uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py  # Specific test file
 ```
+
+Coverage (`--cov=scripts --cov=plugins`) is always on via addopts — passing `--cov` again is redundant.
 
 ### Plugin Testing
 
@@ -143,6 +155,9 @@ plugins/{name}/
 ├── scripts/                    # Optional: Python scripts
 └── README.md                   # Optional
 ```
+
+A plugin's directory name need not equal its install name: `plugins/development-harness` installs
+as `dh`, `plugins/the-rewrite-room` as `rwr`, `plugins/clang-format` as `clang-format-configuration`.
 
 ### SKILL.md Frontmatter
 
@@ -319,11 +334,26 @@ commit and changed path.
 ## Testing Patterns
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`
-- **Markers**: `unit`, `integration`, `e2e`, `slow`, `demos`
+- **Markers**: `unit`, `integration`, `e2e`, `slow`, `demos`, `cross_backend`, `critical`,
+  `allow_startup_sync`
+- **Default deselection**: addopts include `-m "not e2e and not cross_backend and not integration"`,
+  so a bare `uv run pytest` runs the fast in-process suite only. Integration tests (real-subprocess
+  CLI/network-guard behavior, ~2-30s each) and cross-backend tests run as separate CI jobs; e2e
+  tests need a live `GITHUB_TOKEN` and run only on main.
 - **Async mode**: `asyncio_mode = "auto"` — tests auto-detect async
 - **Test discovery**: Multiple test directories configured in `pyproject.toml [tool.pytest.ini_options] testpaths`
+  (plugin `tests/` dirs, `development-harness`'s `tests_sam`/`sam_schema/tests`/`backlog_core/tests`,
+  root `tests/`, `examples/solid-review-ab/tests`, and the scripts dirs that host colocated tests)
 - **Type checker exclusions**: Test files get relaxed rules in `pyproject.toml` per-file overrides
-- **Test file placement**: Tests go in `plugins/{name}/tests/` or root `tests/`
+- **Test file placement**: A test lives beside the code it exercises. Tests for code inside a
+  plugin go in that plugin's own test directory (`plugins/{name}/tests/`, or the module-local
+  directory a plugin already uses, e.g. `sam_schema/tests/`). Root `tests/` is only for code that
+  serves repository maintenance and systems — `scripts/`, `.claude/` skill scripts, and CI
+  tooling. Placement follows the import target, not convenience: a test that imports plugin code
+  belongs in that plugin even when it also touches root tooling. A plugin test placed in root
+  `tests/` runs in CI but is invisible to that plugin's standalone runner, so its coverage
+  silently disappears for anyone who installs the plugin on its own. Move a misplaced test file
+  to the correct location rather than leaving it and noting the exception.
 - **Close criteria**: passing pre-existing tests proves no regression, not correctness — do not
   mark a fix or issue closed without a test that specifically demonstrates the new/fixed behavior
 - **SAM/backlog MCP error contract**: `sam_schema/server.py` tool handlers let exceptions
@@ -337,7 +367,8 @@ commit and changed path.
 For full ty usage guidance beyond this repo's own overrides, load the `astral` plugin skill
 (`/astral:ty`) if installed, or see `docs.astral.sh` directly.
 
-This repository enforces **ty** (Astral) only, run via `prek`.
+This repository enforces **ty** (Astral) only, run via `prek`. `[tool.basedpyright]` is set to
+`typeCheckingMode = "off"` so IDEs do not apply a second checker's defaults.
 
 ### ty overrides and suppression policy
 
@@ -365,7 +396,7 @@ list itself lives in `pyproject.toml [tool.ty]`, not restated here.
 
 ## CI Pipeline (`.github/workflows/code-quality.yml`)
 
-Quality Gate requires ALL of these to pass:
+The `quality-gate` summary job requires ALL of these to pass:
 
 | Job | What it does |
 |-----|-------------|
@@ -375,10 +406,18 @@ Quality Gate requires ALL of these to pass:
 | `lint-markdown` | markdownlint-cli2 |
 | `lint-shell` | shellcheck + shfmt |
 | `validate-plugins` | skilllint (plugin/skill structure) |
-| `manifest-sync` | Auto-sync plugin manifests |
+| `manifest-sync` | Auto-sync plugin manifests; the per-PR plugin.json version-bump check is advisory (`continue-on-error`) — `bump-marketplace.yml` on main is the backstop |
 | `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
-| `test-python` | pytest |
-| `test-node` | npm test (if defined) |
+| `test-python` | pytest fast suite (default addopts filter) |
+| `test-cross-backend` | pytest `-m cross_backend` on a memory/sqlite matrix (`BACKLOG_BACKEND` env) |
+| `test-integration` | pytest `-m integration` on `plugins/development-harness/tests/` |
+
+Advisory jobs outside the gate: `research-validation` (research-corpus template gaps) and
+`test-e2e` (live GitHub sandbox issues; main push / manual dispatch only).
+
+Other workflows in `.github/workflows/`: `backlog-sync.yml`, `bump-marketplace.yml`,
+`auto-rebase.yml`, `claude.yml`, `claude-code-review.yml`, `copilot-setup-steps.yml`,
+`main-ci-health-check.yml`, `quality-gate-audit.yml`.
 
 ## Backlog & Planning System
 
@@ -391,7 +430,14 @@ The backlog system uses the configured provider's native interface and selected 
 
 Key tools: `backlog_add`, `backlog_list`, `backlog_view`, `backlog_update`, `backlog_close`
 
-- The selected backend is the source of truth. **This checkout's backend is GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`; no `.beads/` directory exists here) — the Beads blocks near the end of this file (`BEADS INTEGRATION` and `BEADS CODEX SETUP`) are generic boilerplate the `bd` CLI injects and periodically regenerates, regardless of which backend a checkout actually uses. Follow this section, not those blocks, unless `.beads/` appears. `.claude/backlog/` is local cache either way.
+- The selected backend is the source of truth. **This checkout's backend is GitHub Issues**
+  (`.dh/config.yaml`'s `backend.name: github`, repo `Jamie-BitFlight/claude_skills` under `gh.repo`).
+  A `.beads/` directory exists here but holds only `bd`-installed git hook shims — no issue
+  database, no `issues.jsonl`, no `.beads/dh-backend` opt-in marker — so the Beads blocks near the
+  end of this file (`BEADS INTEGRATION` and `BEADS CODEX SETUP`, generic boilerplate the `bd` CLI
+  injects and periodically regenerates) do not describe this checkout's backend. Follow this
+  section, not those blocks, unless a real Beads database appears. `.claude/backlog/` is local
+  cache either way.
 - Before starting multi-step work: create a backlog item through the selected backend or its structured `backlog_add` operation
 - Use `backlog_groom` with `append=True` for incremental section writes
 
@@ -419,6 +465,7 @@ Rule files outside `.claude/rules/` that other harnesses read — not a full rul
 | File | Purpose |
 |------|---------|
 | `.cursor/rules/backlog-before-work.mdc` | Always create backlog items for multi-step work |
+| `.cursor/rules/json-no-pretty-print.mdc` | Compact-JSON rule for agent-facing CLI output |
 | `.agent/rules/git-commits.md` | Commit message rules (conventional commits, no --no-verify) |
 
 GitHub's coding agent reads `AGENTS.md` directly — `.github/copilot-instructions.md` (a subset of
@@ -435,7 +482,7 @@ this file) was removed to avoid two files drifting out of sync.
 7. **Ignored planning context**: `plan/` and `.claude/backlog/` are ignored working context and excluded from markdownlint. Do not force-add either directory.
 8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 9. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
-10. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism.
+10. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism. Narrow per-file exceptions exist in `[tool.ruff.lint.per-file-ignores]` (e.g. `backlog_core/sync_state.py`, which must match PyGithub's requests-based exception types).
 11. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `.claude/rules/script-invocation.md` for the isolation rationale.
 12. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
 13. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
@@ -445,11 +492,20 @@ this file) was removed to avoid two files drifting out of sync.
 17. **MCP runtime tests**: Load the active FastMCP client skill first; if it is unavailable, read the bundled FastMCP client guidance. Invoke the client through a `uv`-managed environment rather than assuming a host-global `fastmcp` binary, and run it from outside the plugin directory. Never use a native agent MCP tool. Wrap each actual `list` or `call` with `uv run --script scripts/run_bounded.py --timeout-seconds 5 -- <command>`; it terminates the process tree on expiry. Retain a redacted result and mark timeouts or startup failures as failed/blocked.
 18. **Validation warnings**: Warnings fail validation unless a versioned, scope-limited exception is recorded in the relevant plan with an expiry/review condition. Never disable pytest's strict configuration to make a warning non-fatal; a minimal runner must explicitly retain `--strict-config` and install each configured pytest plugin it needs.
 
+## Security Considerations
+
+- Never commit credentials. `.mcp.json` references API keys by environment indirection
+  (`$REF_API_KEY`, `$CONTEXT7_API_KEY`), not literal values — follow that pattern.
+- Live e2e tests create real GitHub issues in a sandbox repo and are gated to CI on `main` with
+  `GITHUB_TOKEN`; do not run them locally against the production backlog.
+- Git hooks are mandatory (see Commit Conventions); `conventional-pre-commit`, `skilllint`, and
+  the manifest-sync hook all mutate or validate on commit — do not bypass them.
+
 ## File Locations Quick Reference
 
 | Purpose | Location |
 |---------|----------|
-| AI project instructions | `.claude/CLAUDE.md` (primary context file for Claude Code) |
+| AI project instructions | `.claude/CLAUDE.md` (primary context file for Claude Code; imports this file) |
 | Repo terminology (skill vs. plugin vs. agent vs. command vs. hook vs. MCP server) | `docs/terminology-glossary.md` |
 | Linting config | `pyproject.toml [tool.ruff]` |
 | Type checking config | `pyproject.toml [tool.ty]` |
@@ -459,6 +515,8 @@ this file) was removed to avoid two files drifting out of sync.
 | Plugin registry | `.claude-plugin/marketplace.json` |
 | MCP servers | `.mcp.json` |
 | Session hooks | `.claude/hooks/` |
+| Backlog backend config | `.dh/config.yaml` |
+| development-harness agent guide | `plugins/development-harness/AGENTS.md` |
 | CI pipeline | `.github/workflows/code-quality.yml` |
 
 ## PR Review Protocol
@@ -468,10 +526,11 @@ After pushing a commit to a PR, or when asked to check or address PR reviews, lo
 
 ## GitHub CLI Conventions
 
-- This checkout's git remote points to a local proxy (`127.0.0.1`), not `github.com` — `gh` cannot
-  auto-detect the repository. Pass `-R <owner/repo>` on every `gh` command. `GITHUB_TOKEN` set in
-  environment handles authentication automatically. The correct `<owner/repo>` for this checkout is
-  written to `.dh/config.yaml` under `gh.repo` by `setup_gh.py`.
+- The canonical `<owner/repo>` for this checkout is written to `.dh/config.yaml` under `gh.repo`
+  (`Jamie-BitFlight/claude_skills`, set by `setup_gh.py`). Pass `-R <owner/repo>` on every `gh`
+  command rather than relying on remote auto-detection — checkout remotes vary (this one currently
+  points at `github.com` directly, but proxied setups break auto-detection). `GITHUB_TOKEN` set in
+  environment handles authentication automatically.
 - Prefer extending this repo's existing GitHub tooling — backlog MCP tools
   (`mcp__plugin_dh_backlog__*`) and PyGithub-based scripts — over adding new `gh` CLI usage; the
   project has invested in portable Python tooling that needs no separate `gh` auth/installation.
