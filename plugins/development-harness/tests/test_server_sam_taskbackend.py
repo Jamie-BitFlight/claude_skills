@@ -36,19 +36,6 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
 # Canonical minimal return values for the mock backend
 # ---------------------------------------------------------------------------
 
-_PLAN_DATA: dict = {
-    "plan_id": "P1",
-    "feature": "test-feature",
-    "version": "1",
-    "description": "test description",
-    "goal": "test goal",
-    "context": "",
-    "acceptance_criteria": "",
-    "issue": None,
-    "tasks": [],
-    "source_path": None,
-}
-
 _TASK_DATA: dict = {
     "id": "T1",
     "title": "test task",
@@ -66,6 +53,19 @@ _TASK_DATA: dict = {
     "last_activity": None,
     "body": "",
     "description": "",
+}
+
+_PLAN_DATA: dict = {
+    "plan_id": "P1",
+    "feature": "test-feature",
+    "version": "1",
+    "description": "test description",
+    "goal": "test goal",
+    "context": "",
+    "acceptance_criteria": "",
+    "issue": None,
+    "tasks": [_TASK_DATA],
+    "source_path": None,
 }
 
 _STATUS_DATA: dict = {
