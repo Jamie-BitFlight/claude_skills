@@ -32,7 +32,7 @@ flowchart TD
         S1["/add-new-feature"]
         A1["feature-researcher"]
         A2["codebase-analyzer"]
-        A3["python-cli-design-spec"]
+        A3["resolved architect (profile_list match)"]
         A4["swarm-task-planner"]
         A5["plan-validator"]
         A6["context-gathering"]
@@ -287,9 +287,9 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 
 | Artifact | Publisher | Consumer(s) |
 |----------|-----------|-------------|
-| `feature-context` artifact | `feature-researcher` | `python-cli-design-spec`, `swarm-task-planner` |
+| `feature-context` artifact | `feature-researcher` | resolved architect agent (via `profile_list`), `swarm-task-planner` |
 | `codebase-analysis` artifact | `codebase-analyzer` | `swarm-task-planner` |
-| `architect` artifact | `python-cli-design-spec` | `swarm-task-planner`, executing agents via `/start-task` |
+| `architect` artifact | resolved architect agent (via `profile_list`) | `swarm-task-planner`, executing agents via `/start-task` |
 | `{plan_address}` plan record | `swarm-task-planner` via the `sam_plan` create action (monolithic) or the same action followed by `append_task` × N → `finalize` (incremental) | `/implement-feature`, `sam_plan` ready/status actions, all execution agents |
 | `T0-baseline` artifact | `t0-baseline-capture` | `tn-verification-gate` |
 | `TN-verification` artifact | `tn-verification-gate` | `/complete-implementation` Pre-Phase 1 check |

@@ -1,4 +1,4 @@
-# Role Resolution Protocol
+# Agent Resolution Protocol
 
 How the development harness resolves abstract roles to concrete agents at runtime.
 
@@ -6,9 +6,9 @@ How the development harness resolves abstract roles to concrete agents at runtim
 
 ## Overview
 
-The harness defines abstract roles (architect, test-designer, code-reviewer, design-spec, linting). Language plugins provide manifests that map these roles to their specialist agents. At pipeline start, the harness detects the project language, finds the matching manifest, and resolves all roles before S1 begins.
+The harness defines abstract roles (architect, test-designer, code-reviewer, design-spec, linting). It resolves each role by calling `mcp__plugin_dh_backlog__profile_list()` — which enumerates every installed agent's declared `name`, `plugin`, and `description` across every plugin, live, with no configuration file to maintain — and matching the role plus the task's actual content (title, requirements, file paths) against those descriptions. Whichever agent's declared capability has the strongest overlap is assigned. No language manifest, hardcoded table, or plugin name is baked into this protocol; installing a new language plugin's agent makes it selectable the next time `profile_list()` is called.
 
-**Layer 0 gates apply before role resolution.** RT-ICA, human touchpoint model, artifact conventions, and verification protocol are enforced before the harness resolves language-specific roles. See [docs/sdlc-layers/layer-0/](../../../docs/sdlc-layers/layer-0/).
+**Layer 0 gates apply before role resolution.** RT-ICA, human touchpoint model, artifact conventions, and verification protocol are enforced before the harness resolves roles. See [docs/sdlc-layers/layer-0/](../../../docs/sdlc-layers/layer-0/).
 
 ---
 
@@ -16,72 +16,22 @@ The harness defines abstract roles (architect, test-designer, code-reviewer, des
 
 ```mermaid
 flowchart TD
-    Start([Pipeline Start]) --> ScanRoot[Scan project root for language markers]
-    ScanRoot --> Markers{Which markers found?}
-    Markers -->|pyproject.toml, setup.py, setup.cfg| Python[Language = Python]
-    Markers -->|package.json, tsconfig.json| TypeScript[Language = TypeScript/JavaScript]
-    Markers -->|Cargo.toml| Rust[Language = Rust]
-    Markers -->|go.mod| Go[Language = Go]
-    Markers -->|Multiple languages| Disambiguate[Count source files per language]
-    Markers -->|No recognized markers| Fallback[Use dh:task-worker for all roles]
-    Disambiguate --> Primary[Select language with most source files]
-    Python --> FindManifest[Search language plugin for manifest]
-    TypeScript --> FindManifest
-    Rust --> FindManifest
-    Go --> FindManifest
-    Primary --> FindManifest
-    FindManifest --> ManifestExists{Manifest found?}
-    ManifestExists -->|Yes| ParseManifest[Parse Role Fulfillment section]
-    ManifestExists -->|No| Fallback
-    ParseManifest --> ValidateRoles{All 5 roles declared?}
-    ValidateRoles -->|Yes| FullResolve[All roles resolved to specialist agents]
-    ValidateRoles -->|Partial| MixedResolve[Declared roles use specialists; missing roles use dh:task-worker]
-    Fallback --> DefaultResolve[All roles use dh:task-worker]
-    FullResolve --> LoadGates[Load Quality Gates from manifest]
-    MixedResolve --> LoadGates
-    DefaultResolve --> InferGates[Infer quality gates from file types]
+    Start([Pipeline Start]) --> Classify[Classify task by abstract role and content]
+    Classify --> ListAgents["Call profile_list() — every installed agent's name, plugin, description"]
+    ListAgents --> Match{Description overlap found?}
+    Match -->|Yes| Resolve[Assign matched agent to task]
+    Match -->|No| Fallback[Use dh:task-worker — no specialist profile]
+    Resolve --> LoadGates[Load Quality Gates from the project's language manifest, if any]
+    Fallback --> InferGates[Infer quality gates from detected file types]
     LoadGates --> Ready([Resolution Complete])
     InferGates --> Ready
 ```
 
 ---
 
-## Step 1 — Detect Project Language
+## Step 1 — Classify the Task
 
-Scan the project root directory for configuration files that identify the language.
-
-**Detection markers by language:**
-
-- **Python** — `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`, `Pipfile`
-- **TypeScript/JavaScript** — `package.json`, `tsconfig.json`, `deno.json`
-- **Rust** — `Cargo.toml`
-- **Go** — `go.mod`
-- **Java** — `pom.xml`, `build.gradle`, `build.gradle.kts`
-- **C/C++** — `CMakeLists.txt`, `Makefile`, `meson.build`
-
-**Multi-language disambiguation:** When multiple language markers are found, count source files matching each language's source patterns. The language with the most source files becomes the primary language. Secondary languages are noted but do not influence role resolution.
-
----
-
-## Step 2 — Find Language Manifest
-
-Search installed language plugins for a manifest file.
-
-**Search locations (in order):**
-
-1. Active plugins matching the detected language name (e.g., `python3-development` for Python)
-2. Any active plugin containing `references/language-manifest.md`
-3. Project-local `.claude/language-manifest.md` (allows per-project overrides)
-
-**Manifest file:** `references/language-manifest.md` within the language plugin's skill directory.
-
-The manifest schema is documented in [./language-manifest-schema.md](./language-manifest-schema.md).
-
----
-
-## Step 3 — Resolve Roles
-
-Parse the manifest's Role Fulfillment section and map each abstract role to a concrete agent or skill.
+Identify the abstract role a task needs and gather its actual content (title, requirements, file paths) to match against.
 
 **Abstract roles:**
 
@@ -91,20 +41,27 @@ Parse the manifest's Role Fulfillment section and map each abstract role to a co
 - **design-spec** — Responsible for design specification documents and architectural decision records. Consulted during S2 (Planning).
 - **linting** — Responsible for code formatting and linting orchestration. Consulted during S5 (Execution) quality gates.
 
+---
+
+## Step 2 — List Installed Agents
+
+Call `mcp__plugin_dh_backlog__profile_list()` with no `plugin` filter. It scans every `plugins/*/agents/**/*.md` across all installed plugins and returns each one's `name`, `plugin`, `description`, `model`, and `skills` — the live, zero-maintenance capability index. Nothing to keep in sync; a newly installed plugin's agents appear on the next call.
+
+---
+
+## Step 3 — Resolve Roles
+
+Match the role from Step 1 and the task's actual content against the `description` fields returned by Step 2. Assign whichever agent's declared capability has the strongest overlap.
+
 **Resolution rules:**
 
-- If the manifest declares a role, use the declared agent/skill
-- If the manifest omits a role, fall back to `dh:task-worker` for that role (no specialist profile loaded)
-- If no manifest exists at all, use `dh:task-worker` for every role
+- If an agent's description plausibly matches, assign it
+- If no agent's description matches, fall back to `dh:task-worker` for that role (no specialist profile loaded)
+- If the architecture spec specifies an agent explicitly, use that instead of matching
 
 **Dispatch routing rule:**
 
-Record the resolved agent name in the task's `agent:` field, then choose the dispatch target with the decision in `dh:dispatch-contract`. The orchestrator passes only the task reference.
-
-**Agent reference format in manifests:**
-
-- Agents use `@{plugin}:{agent-name}` syntax (e.g., `@python3-development:python-architect`)
-- Skills use `/{plugin}:{skill-name}` syntax (e.g., `/python3-development:stinkysnake`)
+Record the resolved agent name in the task's `agent:` field, then choose the dispatch target with the decision in `dh:dispatch-contract`. The orchestrator passes only the task reference. The stored value stays plugin-qualified (`plugin:agent-name`).
 
 ---
 
@@ -143,11 +100,11 @@ After resolving roles and gates, check if the manifest declares a Process Flow O
 
 ## Error Handling
 
-**Language detection failure:** If no language markers are found at all, log a warning and dispatch `dh:task-worker` for all roles (no specialist profile loaded). The harness does not block on detection failure.
+**No matching agent:** If no installed agent's description plausibly matches a role, log a warning and dispatch `dh:task-worker` for that role (no specialist profile loaded). The harness does not block on a resolution miss.
 
-**Manifest parse failure:** If a manifest exists but cannot be parsed (malformed markdown, missing sections), log the specific parse error, dispatch `dh:task-worker` for all roles, and note the parse failure in the S1 discovery artifact.
+**`profile_list()` failure or empty result:** Dispatch `dh:task-worker` for every role and note the failure in the S1 discovery artifact.
 
-**Agent not found:** If a manifest references an agent that is not installed, log a warning, fall back to dh:task-worker for that specific role, and note the resolution failure in the S1 discovery artifact.
+**Quality-gate manifest missing or unparseable:** Independent of agent resolution (see Step 4) — if no language manifest provides quality gate commands, or an existing one fails to parse, infer gates from detected file types instead of blocking.
 
 ---
 

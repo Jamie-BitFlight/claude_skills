@@ -1,9 +1,8 @@
 """Shared CLI output helpers for development-harness migration scripts.
 
-``dh_migrate.py``, ``migrate_tasks_to_github.py``, ``migrate_backlog_to_yaml.py``,
-``verify_migration_fidelity.py``, and ``manifest_resolver.py`` are invoked
-exclusively by AI agents via subprocess — never by a human at an interactive
-terminal. There is no dual audience and no "sometimes interactive" case, so
+``dh_migrate.py``, ``migrate_tasks_to_github.py``, ``migrate_backlog_to_yaml.py``, and
+``verify_migration_fidelity.py`` are invoked exclusively by AI agents via
+subprocess — never by a human at an interactive terminal. There is no dual audience and no "sometimes interactive" case, so
 these tools optimize for one consumer: a token-parsing LLM reading process
 output, not a human visually scanning a terminal.
 

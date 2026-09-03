@@ -33,7 +33,7 @@ that require your judgment.
 /plugin install development-harness@jamie-bitflight-skills
 
 # 3. (Optional) Full Python specialist support
-/plugin install python3-development@jamie-bitflight-skills
+/plugin install python-engineering@jamie-bitflight-skills
 ```
 
 Restart your Claude Code session after installation. Then:
@@ -327,20 +327,15 @@ The harness owns the process. Language plugins own the specialists.
 
 ```mermaid
 flowchart TD
-    Start([Feature Request]) --> Detect{Detect Project Language}
-    Detect -->|pyproject.toml| Python[Python plugin]
-    Detect -->|package.json| TypeScript[TypeScript plugin]
-    Detect -->|Cargo.toml| Rust[Rust plugin]
-    Detect -->|None found| Fallback[dh:task-worker]
-    Python --> Manifest[Read language manifest]
-    TypeScript --> Manifest
-    Rust --> Manifest
-    Manifest --> Resolve[Resolve roles to specialist agents]
+    Start([Feature Request]) --> ListAgents["Call profile_list() — every installed agent's capability"]
+    ListAgents --> Match{Description overlap found?}
+    Match -->|Yes| Resolve[Assign matched specialist agent]
+    Match -->|No| Fallback[dh:task-worker]
     Resolve --> Pipeline[Run SAM Pipeline]
     Fallback --> Pipeline
 ```
 
-Install the `python3-development` plugin alongside this one for full Python specialist support. TypeScript and Rust plugins are planned.
+Install the `python-engineering` plugin alongside this one for full Python specialist support. TypeScript and Rust plugins are planned.
 
 ---
 
@@ -538,7 +533,7 @@ Then install the plugin:
 For full Python specialist support, also install:
 
 ```bash
-/plugin install python3-development@jamie-bitflight-skills
+/plugin install python-engineering@jamie-bitflight-skills
 ```
 
 Restart your Claude Code session after installation to load all components.

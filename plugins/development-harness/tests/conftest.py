@@ -24,7 +24,7 @@ _plugin_dir = Path(__file__).parent.parent
 if str(_plugin_dir) not in sys.path:
     sys.path.insert(0, str(_plugin_dir))
 
-# Standalone script modules (dispatch_helper, manifest_schema, etc.) live in
+# Standalone script modules (cli_output, merge_layer, etc.) live in
 # scripts/ and are imported by tests as bare module names.
 _scripts_dir = _plugin_dir / "scripts"
 if str(_scripts_dir) not in sys.path:

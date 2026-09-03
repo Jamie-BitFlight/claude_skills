@@ -18,7 +18,7 @@ and does NOT perform cross-layer graph assembly (owned by
 This module is imported by callers (and by tests), not executed as a
 standalone script -- it declares no PEP 723 dependency block and has no
 ``__main__`` entry point, matching the convention used by other pure-logic
-helper modules in this directory (e.g. ``manifest_merge.py``). It requires no
+helper modules in this directory (e.g. ``cli_output.py``). It requires no
 third-party dependencies.
 
 Design notes (decisions not fully spelled out by the architect spec):

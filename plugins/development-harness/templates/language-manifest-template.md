@@ -1,12 +1,12 @@
 # Language Manifest: {Language Name}
 
-## Role Fulfillment
-
-- architect: @{plugin}:{agent-name}
-- test-designer: @{plugin}:{agent-name}
-- code-reviewer: @{plugin}:{agent-name}
-- design-spec: @{plugin}:{agent-name}
-- linting: /{plugin}:{skill-name}
+<!--
+Agent resolution (architect, test-designer, code-reviewer, design-spec, linting) is not part of
+this manifest — the harness resolves agents at runtime via profile_list(), matching task content
+against every installed agent's own declared capability. See
+plugins/development-harness/skills/dh-meta-docs/references/role-resolution-protocol.md.
+Nothing reads a "Role Fulfillment" section.
+-->
 
 ## Quality Gates
 

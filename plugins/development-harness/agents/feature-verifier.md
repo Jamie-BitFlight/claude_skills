@@ -321,8 +321,8 @@ The live invocation fails when:
 
 The live invocation times out when:
 
-- `check_live_validation()` catches `subprocess.TimeoutExpired` (command did not complete within 120 seconds)
-- Returns `GAPS_FOUND` with `gap_message` set to `"LIVE_VALIDATION: TIMEOUT — command did not complete within 120s.\nCommand: {cmd}"` and `exit_code=None`
+- The command does not complete within 120 seconds
+- Record `gap_message` as `"LIVE_VALIDATION: TIMEOUT — command did not complete within 120s.\nCommand: {cmd}"` with `exit_code=None`
 
 ### Gap: No `live_validation` Declared
 
