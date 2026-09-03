@@ -2,7 +2,7 @@
   "rules": [
     {
       "file": "agent-output-contracts.md",
-      "match": "**/agents/**/*.md"
+      "match": "**/agents/*.md"
     },
     {
       "file": "astral-tool-overrides.md",
@@ -14,11 +14,11 @@
     },
     {
       "file": "citation-requirements.md",
-      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md,CLAUDE.md"
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
     },
     {
       "file": "delegation-format.md",
-      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md,**/references/*.md"
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,**/references/*.md"
     },
     {
       "file": "exception-handling.md",
@@ -26,7 +26,7 @@
     },
     {
       "file": "frontmatter-requirements.md",
-      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md"
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md"
     },
     {
       "file": "language-conventions.md",
@@ -58,7 +58,7 @@
     },
     {
       "file": "review-and-correction-discipline.md",
-      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md,.claude/rules/**/*.md,CLAUDE.md"
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,.claude/rules/**/*.md,CLAUDE.md"
     },
     {
       "file": "script-invocation.md",
