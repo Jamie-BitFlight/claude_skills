@@ -391,7 +391,7 @@ This applies to all sections except `## Recommendations`, which derives from oth
 
 ### Write Strategy
 
-Single `Write` tool call for typical repositories (report expected under 25K characters). If an unusually large repository produces output exceeding 25K characters, apply Strategy B (skeleton + Edit-fill per section) per [large-file-write-strategy.md](../../rules/large-file-write-strategy.md).
+Single `Write` tool call for typical repositories (report expected under 25K characters). If an unusually large repository produces output exceeding 25K characters, apply Strategy B (skeleton + Edit-fill per section) per [large-file-write-strategy.md](../../../rules/large-file-write-strategy.md).
 
 ## Edge Case Contracts
 
@@ -409,7 +409,7 @@ No walkthrough/recon-report.md was written.
 
 Do not create a partial report. Do not create the `walkthrough/` directory.
 
-SOURCE: [silent-failure-prevention.md](../../rules/silent-failure-prevention.md) — EC-1 fail-fast contract (accessed 2026-05-22).
+SOURCE: [silent-failure-prevention.md](../../../rules/silent-failure-prevention.md) — EC-1 fail-fast contract (accessed 2026-05-22).
 
 ### EC-2: Empty Hotspot ∩ Bug-Magnet Intersection
 
@@ -489,5 +489,5 @@ The required section headers (`## Code Hotspots`, `## Bug Magnets`, `## High-Ris
 - SOURCE: [create-merge-request-changelog/SKILL.md](../create-merge-request-changelog/SKILL.md) — git command documentation style, `allowed-tools` comma-string format (accessed 2026-05-22)
 - SOURCE: `codebase-analysis` artifact on issue #2249 (agent="codebase-analyzer") — frontmatter schema verification, skilllint requirements, section ordering conventions (accessed 2026-05-22)
 - SOURCE: architect document on issue #2249 (artifact\_type="architect") — Phase 0–3 design, pipeline command templates, edge case contracts EC-1–EC-6, integration contract (accessed 2026-05-22)
-- SOURCE: [silent-failure-prevention.md](../../rules/silent-failure-prevention.md) — EC-1 non-git fail-fast contract
-- SOURCE: [large-file-write-strategy.md](../../rules/large-file-write-strategy.md) — Strategy B referenced in Phase 3 write step
+- SOURCE: [silent-failure-prevention.md](../../../rules/silent-failure-prevention.md) — EC-1 non-git fail-fast contract
+- SOURCE: [large-file-write-strategy.md](../../../rules/large-file-write-strategy.md) — Strategy B referenced in Phase 3 write step
