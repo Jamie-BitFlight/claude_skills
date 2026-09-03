@@ -32,6 +32,8 @@ Never backtick-only (`modern-modules/httpx.md`) or absolute paths (`/home/user/.
 
 **Exception — `.claude/` and `rules/`:** these files are injected as raw text at the agent's cwd (repo root), never browsed via GitHub/editor click-through. Links there are repo-root-relative, no `./` prefix. Do not "fix" them back to file-relative.
 
+**Exception — `SKILL.md` link targets:** `${CLAUDE_PLUGIN_ROOT}`/`${CLAUDE_SKILL_DIR}` substitute at load time inside the `SKILL.md` body, link targets included — not a broken link. Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths. See `skill-substitution.md`.
+
 ## Skill Activation References
 
 Reference other skills using activation syntax:
