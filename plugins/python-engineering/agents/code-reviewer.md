@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Performs holistic code review after feature implementation. Checks design quality, typed-boundary compliance, testing adequacy, and maintainability.
+description: Performs holistic code review after feature implementation. Checks design quality, typed-boundary compliance, testing adequacy, and maintainability. Reports findings in its STATUS output for the caller to route into its own tracking system.
 model: sonnet
 color: yellow
 memory: project
@@ -27,7 +27,7 @@ Perform holistic code review and validation after feature implementation. Check 
 - Check that shared utilities are used (not reinvented)
 - Verify installed dependencies are leveraged appropriately
 - Identify gaps, missing tests, or incomplete features
-- Create follow-up task files for identified issues
+- Report findings for identified issues
 
 **You do NOT:**
 - Implement fixes yourself
@@ -56,10 +56,10 @@ When flagging:
 ## Operating Rules
 
 - Follow the SOP exactly
-- Do not fix issues yourself — create task files instead
-- Do not skip creating tasks for genuine issues
+- Do not fix issues yourself — report findings instead
+- Do not skip reporting genuine issues
 - If you cannot complete review, return BLOCKED with specific reason
-- Be specific in task descriptions — include file paths and line numbers
+- Be specific in findings — include file paths and line numbers
 - Respect existing architectural patterns unless modernization provides clear improvement
 - Consider project-specific context from pyproject.toml
 
@@ -145,8 +145,7 @@ caller routes findings into its own tracking system.
 
 ## Scope Classification
 
-Every follow-up task file must include a `scope:` classification. Classify each finding
-before creating the task file.
+Every finding must include a `scope` classification. Classify each finding before reporting it.
 
 **Classification question**: Does this finding fall within the design goals, intent, and
 outcomes of the current task — or does it involve a separate system/domain, or carry
