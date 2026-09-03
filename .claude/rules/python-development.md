@@ -5,15 +5,13 @@ paths:
 - '**/uv.lock'
 ---
 
-# Python Development Rules
-
 ## Plugin Python — PEP 723 Scripts, No uv Workspace
 
 **This repo has NO uv workspace.** Do not add `[tool.uv.workspace]` entries; plugin sub-projects are not workspace members. Plugin MCP servers are PEP 723 self-resolving scripts, not installed projects.
 
-- **Runtime source of truth** is the script's inline `# /// script … dependencies = [...] # ///` block — `uv` resolves it at launch, with no `pyproject.toml`, `uv.lock`, or workspace lookup. See the PEP 723 shebang and block in [`run_backlog_server.py`](../../plugins/development-harness/scripts/run_backlog_server.py), launched via the `uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/…` command in [`plugin.json`](../../plugins/development-harness/.claude-plugin/plugin.json). `${CLAUDE_PLUGIN_ROOT}` resolves in the installed plugin cache, not the source tree.
+- **Runtime source of truth** is the script's inline `# /// script … dependencies = [...] # ///` block — `uv` resolves it at launch, with no `pyproject.toml`, `uv.lock`, or workspace lookup. See the PEP 723 shebang and block in [`run_backlog_server.py`](plugins/development-harness/scripts/run_backlog_server.py), launched via the `uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/…` command in [`plugin.json`](plugins/development-harness/.claude-plugin/plugin.json). `${CLAUDE_PLUGIN_ROOT}` resolves in the installed plugin cache, not the source tree.
 - **Plugins ship zipped, outside this repo** — no source-tree `uv.lock` is consulted at runtime.
-- **Root dev-dependencies mirror the script blocks**, solely so `ty`, `ruff`, and the IDE/LSP (which don't read PEP 723) can resolve imports while editing here — tooling convenience, not the runtime or distribution path. See `[dependency-groups] dev` in [`pyproject.toml`](../../pyproject.toml).
+- **Root dev-dependencies mirror the script blocks**, solely so `ty`, `ruff`, and the IDE/LSP (which don't read PEP 723) can resolve imports while editing here — tooling convenience, not the runtime or distribution path. See `[dependency-groups] dev` in [`pyproject.toml`](pyproject.toml).
 
 ### Adding a new plugin MCP server
 
@@ -37,7 +35,7 @@ Must return only the root `uv.lock`. A per-plugin `uv.lock` is never read — th
 Fix the code to satisfy the type checker — inline `# ty: ignore` suppressions are prohibited.
 Config-level relaxation via `[[tool.ty.overrides]]` in `pyproject.toml` is allowed, but only for a
 case matching one of the acceptable-exception categories in
-[`linting-exceptions.md`](./linting-exceptions.md) — cite the matching category by name in a
+[`linting-exceptions.md`](.claude/rules/linting-exceptions.md) — cite the matching category by name in a
 comment beside the override (the SOLID-corpus override in `pyproject.toml` shows the pattern).
 Load `python-engineering:ty` for suppression syntax, diagnostics, and unresolved-import/environment
 resolution. Load `python-engineering:python3-typing` for the boundary-validation pattern
@@ -52,4 +50,4 @@ importing code itself. A root-level `ty.toml`, if one exists, takes precedence o
 `pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths` addition doesn't
 resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see [AGENTS.md's "Common ty Failure
-Patterns"](../../AGENTS.md#common-ty-failure-patterns).
+Patterns"](AGENTS.md#common-ty-failure-patterns).
