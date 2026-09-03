@@ -264,7 +264,7 @@ class InMemoryTaskProvider:
         }
         if acceptance_criteria_structured:
             plan_data["acceptance_criteria_structured"] = [
-                criterion.model_dump() for criterion in acceptance_criteria_structured
+                criterion.model_dump(by_alias=False) for criterion in acceptance_criteria_structured
             ]
         self._plans[plan_id] = copy.deepcopy(plan_data)
         return copy.deepcopy(plan_data)

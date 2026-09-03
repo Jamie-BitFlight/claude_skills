@@ -758,12 +758,19 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
     With the fix, model_dump(by_alias=True, mode='json') emits kebab-case keys on both
     sides of the merge, so the kebab-case raw_fields value wins cleanly.
 
+    ``Task`` now inherits ``WireContractModel`` (see sam_schema.core.models), which
+    flips ``model_dump()``'s bare, no-argument default to kebab-case — that is the
+    new intentional wire-contract default (asserted separately below), not a
+    regression, so this test asserts merge *correctness* (the right value survives,
+    under a single key) rather than pinning the bare-default dump's key casing.
+
     Arrange: create a plan with one task that has parallelize_with=[]; call
              _validated_task_patch directly with raw_fields using the kebab-case key.
     Act: pass raw_fields={"parallelize-with": ["T01", "T02"]} to _validated_task_patch.
     Assert:
         1. returned Task.parallelize_with == ["T01", "T02"]
-        2. model_dump() produces a single key for the field (no duplication)
+        2. model_dump(by_alias=True) — the wire-contract dump — carries the merged
+           value under a single kebab-case key (no snake/kebab duplication)
     """
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
     from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
@@ -790,12 +797,51 @@ def test_validated_task_patch_kebab_case_fields_survive_merge(tmp_path: Path) ->
         "This is the kebab/snake key collision bug from #1528 Fix 1."
     )
 
-    dumped = patched_task.model_dump()
-    assert "parallelize_with" in dumped, "Expected 'parallelize_with' snake_case key in model_dump()"
-    assert "parallelize-with" not in dumped, (
-        "Unexpected 'parallelize-with' key found in model_dump() — "
+    dumped = patched_task.model_dump(by_alias=True)
+    assert dumped.get("parallelize-with") == ["T01", "T02"], (
+        "Expected the merged value under a single 'parallelize-with' key in the "
+        "by_alias=True dump — this means both snake and kebab keys survived the merge."
+    )
+    assert "parallelize_with" not in dumped, (
+        "Unexpected 'parallelize_with' snake_case key found alongside the kebab alias — "
         "this means both snake and kebab keys survived the merge."
     )
+
+
+def test_task_model_dump_default_now_emits_kebab_case_aliases() -> None:
+    """Task's bare ``model_dump()`` default matches its ``by_alias=True`` wire dump.
+
+    Regression guard for the WireContractModel migration (#3391 Fix 3): Task now
+    inherits ``WireContractModel``, whose ``serialize_by_alias=True`` config flips
+    the *default* used when a caller does not pass ``by_alias`` explicitly. This
+    guards that intentional default directly, since
+    ``test_validated_task_patch_kebab_case_fields_survive_merge`` above now asserts
+    on ``model_dump(by_alias=True)`` explicitly rather than the bare default.
+    """
+    from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
+
+    task = Task(
+        id="T01",
+        title="Task One",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.HIGH,
+        complexity=Complexity.LOW,
+        parallelize_with=["T02"],
+        context_notes="hello",
+    )
+
+    default_dump = task.model_dump()
+    explicit_alias_dump = task.model_dump(by_alias=True)
+
+    assert default_dump == explicit_alias_dump, (
+        "Task.model_dump()'s bare default must match model_dump(by_alias=True) — "
+        "WireContractModel's serialize_by_alias=True should govern the unspecified case."
+    )
+    assert default_dump.get("parallelize-with") == ["T02"]
+    assert default_dump.get("context-notes") == "hello"
+    assert "parallelize_with" not in default_dump
+    assert "context_notes" not in default_dump
 
 
 async def test_sam_update_kebab_case_field_roundtrips_through_provider() -> None:
@@ -818,6 +864,43 @@ async def test_sam_update_kebab_case_field_roundtrips_through_provider() -> None
             "plan": plan_id,
             "task": "T01",
             "config": {"action": "update", "set_fields_json": {"parallelize-with": ["T01", "T02"]}},
+        },
+    )
+
+    assert "error" not in update_result, f"sam_task update failed: {update_result}"
+    assert _get_backend("ignored").read_task(plan_id, "T01")["parallelize_with"] == ["T01", "T02"]
+
+
+async def test_sam_update_snake_case_field_roundtrips_through_provider() -> None:
+    """A snake_case set_fields_json patch survives the merge exactly like kebab-case.
+
+    Regression guard for the #1528 data-loss class of bug (see
+    test_validated_task_patch_kebab_case_fields_survive_merge above): the merge
+    site's key convention must not silently drop a patch just because the caller
+    used the internal (snake_case) spelling instead of the wire (kebab-case) one.
+    ``Task.populate_by_name=True`` plus per-field ``AliasChoices`` accept both
+    spellings on construction, so this must keep passing exactly as the
+    kebab-case sibling test above does.
+    """
+    from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
+
+    backend = _get_backend("ignored")
+    minimal_task = Task(
+        id="T01",
+        title="Task One",
+        status=TaskStatus.NOT_STARTED,
+        agent="a",
+        priority=Priority.HIGH,
+        complexity=Complexity.LOW,
+    )
+    plan_id = backend.create_plan("snakeint", "Goal", [minimal_task])["plan_id"]
+
+    update_result = await _call(
+        "sam_task",
+        {
+            "plan": plan_id,
+            "task": "T01",
+            "config": {"action": "update", "set_fields_json": {"parallelize_with": ["T01", "T02"]}},
         },
     )
 

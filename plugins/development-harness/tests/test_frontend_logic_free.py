@@ -94,6 +94,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "dispatch_schema",
         "tiktoken",
         "fastmcp",
+        "fastmcp_tasks",
         "mcp",
         "pydantic",
         "ruamel",

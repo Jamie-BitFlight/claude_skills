@@ -27,7 +27,14 @@ from backlog_core.models import (
     Output,
 )
 from backlog_core.operations import create_sam_task, get_ready_sam_tasks, get_sam_tasks, update_sam_task_status
-from dh_core.operations import append_task, create_plan, finalize_plan, read_plan, update_plan_fields
+from dh_core.operations import (
+    _canonicalize_patch_keys,
+    append_task,
+    create_plan,
+    finalize_plan,
+    read_plan,
+    update_plan_fields,
+)
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.exceptions import BookendValidationError
 from sam_schema.core.models import AcceptanceCriterion, BookendType, PlanState, Task, TaskStatus
@@ -791,3 +798,51 @@ class TestBookendEnforcement:
         result = update_plan_fields(task_provider, drafted.plan_id, task_id="T1", set_fields={"dependencies": ["T0"]})
 
         assert result.updated is True
+
+
+# ---------------------------------------------------------------------------
+# _canonicalize_patch_keys tests
+# ---------------------------------------------------------------------------
+
+
+class TestCanonicalizePatchKeys:
+    """Unit coverage for the merge-key normalizer used by the *_validated_*_patch* helpers.
+
+    _canonicalize_patch_keys remaps a caller-supplied patch dict's keys to the
+    target model's canonical (Python attribute) field name, regardless of
+    whether the caller used the kebab-case wire alias or the snake_case
+    attribute name. This is what lets ``{**current.model_dump(by_alias=False), **normalized}``
+    merge deterministically instead of silently losing a patch value to a
+    stale value under the field's other spelling (the #1528 data-loss bug
+    class) — see dh_core.operations._validated_task_patch and its siblings.
+    """
+
+    def test_kebab_case_key_maps_to_canonical_field_name(self) -> None:
+        """A kebab-case alias key is remapped to the field's snake_case name."""
+        result = _canonicalize_patch_keys(Task, {"parallelize-with": ["T01", "T02"]})
+
+        assert result == {"parallelize_with": ["T01", "T02"]}
+
+    def test_snake_case_key_maps_to_canonical_field_name(self) -> None:
+        """A snake_case key (already canonical) passes through unchanged."""
+        result = _canonicalize_patch_keys(Task, {"parallelize_with": ["T01", "T02"]})
+
+        assert result == {"parallelize_with": ["T01", "T02"]}
+
+    def test_kebab_and_snake_case_keys_produce_the_same_canonical_output(self) -> None:
+        """Both spellings of the same logical field resolve to one identical key."""
+        kebab_result = _canonicalize_patch_keys(Task, {"context-notes": "hello"})
+        snake_result = _canonicalize_patch_keys(Task, {"context_notes": "hello"})
+
+        assert kebab_result == snake_result == {"context_notes": "hello"}
+
+    def test_unrecognized_key_passes_through_unchanged(self) -> None:
+        """A key with no matching model field is left as-is rather than dropped.
+
+        Validation downstream (Task.model_validate) is what should report an
+        unknown key as an error/extra — silently dropping it here would hide
+        the mistake instead of surfacing it.
+        """
+        result = _canonicalize_patch_keys(Task, {"totally-unknown-field": "value"})
+
+        assert result == {"totally-unknown-field": "value"}

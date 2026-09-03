@@ -351,7 +351,7 @@ class GitHubTaskProvider:
         )
         if acceptance_criteria_structured:
             plan_data["acceptance_criteria_structured"] = [
-                criterion.model_dump() for criterion in acceptance_criteria_structured
+                criterion.model_dump(by_alias=False) for criterion in acceptance_criteria_structured
             ]
         return plan_data
 

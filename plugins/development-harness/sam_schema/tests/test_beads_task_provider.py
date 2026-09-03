@@ -260,7 +260,7 @@ class TestUpdatePlanFields:
 
         criterion = AcceptanceCriterion(criterion_id="AC-2", check_command="true")
         provider.update_plan_fields(
-            plan_id, set_fields={"acceptance-criteria-structured": [criterion.model_dump(mode="json")]}
+            plan_id, set_fields={"acceptance-criteria-structured": [criterion.model_dump(mode="json", by_alias=False)]}
         )
 
         plan = provider.read_plan(plan_id)
