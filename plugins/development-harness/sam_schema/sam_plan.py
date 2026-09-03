@@ -37,7 +37,7 @@ from sam_schema.core.addressing import (
 )
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.backends.local_yaml import plan_id_from_path
-from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
+from sam_schema.core.exceptions import BookendValidationError, PlanNotFoundError, TaskNotFoundError
 from sam_schema.core.models import AcceptanceCriterion, Complexity, CreatePlanError, PlanState, Priority, TaskStatus
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
@@ -289,7 +289,7 @@ def create(
         })
         backend = _backend()
         result = operations.create_plan(backend, **action_config.model_dump(exclude={"action"}))
-    except (ValidationError, ValueError, OSError) as exc:
+    except (ValidationError, ValueError, OSError, BookendValidationError) as exc:
         _error(str(exc))
     if isinstance(result, CreatePlanError):
         _error(result.error, 2)
@@ -448,7 +448,15 @@ def update(
             append_section_name=action_config.append_section_name,
             section_content=action_config.section_content,
         )
-    except (ValidationError, ValueError, KeyError, FileNotFoundError, PlanNotFoundError, FormatDetectionError) as exc:
+    except (
+        ValidationError,
+        ValueError,
+        KeyError,
+        FileNotFoundError,
+        PlanNotFoundError,
+        FormatDetectionError,
+        BookendValidationError,
+    ) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
     _emit(result)
 
@@ -536,7 +544,14 @@ def append_task(
                 _error("--task-id and --task-title are required (or use --stdin)")
         config = AppendTaskInput(plan_address=plan_ref, task=task)
         result = operations.append_task(backend, plan_ref, config.task)
-    except (ValidationError, ValueError, PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
+    except (
+        ValidationError,
+        ValueError,
+        PlanNotFoundError,
+        FileNotFoundError,
+        FormatDetectionError,
+        BookendValidationError,
+    ) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
     _emit(result)
 
@@ -553,7 +568,7 @@ def finalize(
         _error("--plan-address must identify a plan, not a task")
     try:
         _emit(operations.finalize_plan(backend, plan_ref))
-    except (PlanNotFoundError, FileNotFoundError, FormatDetectionError) as exc:
+    except (PlanNotFoundError, FileNotFoundError, FormatDetectionError, BookendValidationError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
 
 

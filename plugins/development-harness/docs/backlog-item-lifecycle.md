@@ -442,6 +442,8 @@ backend owns the plan and its task records; no second task provider is selected.
 
 **T0 baseline is a bookend task during EXECUTION, not during planning**. The `swarm-task-planner` generates T0 and TN as tasks inside the logical plan with appropriate priority and dependency settings. They dispatch automatically during execution via normal SAM readiness ordering — T0 fires first (priority 1, no deps), TN fires last (depends on all implementation tasks). No special handling is needed in the dispatch loop.
 
+Bookend generation at P4_BOOKEND_GEN is now backed by hard schema-level enforcement, not just agent instructions: `BookendValidator` (`sam_schema/core/dependencies.py`) is wired into `dh_core/operations.py`'s `create_plan` and `finalize_plan`, so a plan with non-empty `acceptance-criteria-structured` and missing/misconfigured T0 or TN tasks is rejected at write time rather than silently persisted (#3277).
+
 **context-gathering writes into the plan record** via `sam_plan`, not to a separate provider.
 
 **Status advance**: `backlog_update(selector="{title}", plan="{plan_ref}")` links the opaque plan
