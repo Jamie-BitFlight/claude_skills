@@ -90,9 +90,10 @@ function readStdinJSON() {
 function main() {
   const arg = process.argv[2];
   const hookInput = readStdinJSON();
-  const sessionId = hookInput.session_id ?? 'no-session-id';
+  const sessionId = hookInput.session_id;
 
   if (arg === '--reset') {
+    if (!sessionId) process.exit(0);
     const state = pruneExpired(loadState(), Date.now());
     delete state[sessionId];
     saveState(state);
@@ -115,8 +116,10 @@ function main() {
 
   const relPath = relative(REPO_ROOT, resolve(touchedPath));
   const now = Date.now();
-  const state = pruneExpired(loadState(), now);
-  const loadedForSession = new Set(state[sessionId]?.files ?? []);
+  // No session_id means we can't tell callers apart — never dedup against
+  // an unidentified caller. Show full content every time and skip state I/O.
+  const state = sessionId ? pruneExpired(loadState(), now) : {};
+  const loadedForSession = new Set(sessionId ? (state[sessionId]?.files ?? []) : []);
   const output = [];
 
   for (const rule of manifest.rules ?? []) {
@@ -142,8 +145,10 @@ function main() {
     process.stdout.write(`${output.join('\n\n---\n\n')}\n`);
   }
 
-  state[sessionId] = { files: [...loadedForSession], lastSeen: now };
-  saveState(state);
+  if (sessionId) {
+    state[sessionId] = { files: [...loadedForSession], lastSeen: now };
+    saveState(state);
+  }
 }
 
 main();
