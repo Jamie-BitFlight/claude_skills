@@ -2,7 +2,7 @@
   "rules": [
     {
       "file": "agent-output-contracts.md",
-      "match": "agents/**/*.md"
+      "match": "**/agents/**/*.md"
     },
     {
       "file": "astral-tool-overrides.md",
@@ -14,11 +14,11 @@
     },
     {
       "file": "citation-requirements.md",
-      "match": "SKILL.md,agents/**/*.md,commands/**/*.md,CLAUDE.md"
+      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md,CLAUDE.md"
     },
     {
       "file": "delegation-format.md",
-      "match": "SKILL.md,agents/**/*.md,commands/**/*.md,references/*.md"
+      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md,**/references/*.md"
     },
     {
       "file": "exception-handling.md",
@@ -26,11 +26,11 @@
     },
     {
       "file": "frontmatter-requirements.md",
-      "match": "SKILL.md,agents/**/*.md,commands/**/*.md"
+      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md"
     },
     {
       "file": "language-conventions.md",
-      "match": "scripts/**,.claude/hooks/**,*.py"
+      "match": "**/scripts/**,.claude/hooks/**,*.py"
     },
     {
       "file": "linting-exceptions.md",
@@ -58,11 +58,11 @@
     },
     {
       "file": "review-and-correction-discipline.md",
-      "match": "SKILL.md,agents/**/*.md,commands/**/*.md,.claude/rules/**/*.md,CLAUDE.md"
+      "match": "SKILL.md,**/agents/**/*.md,**/commands/**/*.md,.claude/rules/**/*.md,CLAUDE.md"
     },
     {
       "file": "script-invocation.md",
-      "match": "scripts/**,.claude/hooks/**"
+      "match": "**/scripts/**,.claude/hooks/**"
     },
     {
       "file": "silent-failure-prevention.md",
@@ -70,11 +70,11 @@
     },
     {
       "file": "skill-content-optimization.md",
-      "match": "SKILL.md,references/*.md"
+      "match": "SKILL.md,**/references/*.md"
     },
     {
       "file": "skill-documentation-verification.md",
-      "match": "SKILL.md,references/*.md"
+      "match": "SKILL.md,**/references/*.md"
     },
     {
       "file": "skill-substitution.md",
@@ -82,7 +82,7 @@
     },
     {
       "file": "uv-run-fallback.md",
-      "match": "scripts/**,*.py,.claude/hooks/**"
+      "match": "**/scripts/**,*.py,.claude/hooks/**"
     },
     {
       "file": "yaml-toml-libraries.md",

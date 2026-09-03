@@ -2,8 +2,11 @@
 
 Plain-content mirror of `.claude/rules/*.md` for tools without a native path-glob mechanism
 (Codex, Hermes). `manifest.json` is the authoritative source for which glob patterns load which
-file — read it directly rather than trusting a restated pattern here. `context-loader.mjs` is the
-shared matcher/loader every harness's own hook wrapper calls.
+file — read it directly rather than trusting a restated pattern here. `context-loader.mjs` is
+designed as the shared matcher/loader for every harness's own hook wrapper to call; as of this
+writing only Claude Code's wrapper (`.claude/hooks/context-rules.mjs`) exists and is wired
+(`.claude/settings.json`'s `PostToolUse`/`SessionStart` hooks) — a Codex or Hermes wrapper has not
+been added yet.
 
 | File | Loads when editing... |
 |---|---|

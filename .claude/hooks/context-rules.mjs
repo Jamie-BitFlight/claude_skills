@@ -1,12 +1,9 @@
 #!/usr/bin/env node
-// PostToolUse hook (matcher: Read|Write|Edit) — pipes tool_input.file_path through rules/context-loader.mjs, wraps its output as additionalContext. Never blocks/crashes.
+// PostToolUse hook (matcher: Read|Write|Edit) — calls rules/context-loader.mjs's
+// loadRulesFor() in-process and wraps its output as additionalContext. Never blocks/crashes.
 
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { loadRulesFor } from '../../rules/context-loader.mjs';
 
 function readStdin() {
   try {
@@ -26,17 +23,17 @@ function main() {
   }
 
   const filePath = input.tool_input?.file_path;
-  if (!filePath) {
+  if (typeof filePath !== 'string' || !filePath) {
     process.exit(0);
   }
 
-  const loaderPath = join(__dirname, '..', '..', 'rules', 'context-loader.mjs');
-  const result = spawnSync('node', [loaderPath, filePath], {
-    input: raw,
-    encoding: 'utf8',
-  });
+  let content = '';
+  try {
+    content = loadRulesFor(input, filePath);
+  } catch (err) {
+    process.stderr.write(`context-rules: loader threw, no context injected: ${err.message}\n`);
+  }
 
-  const content = result.stdout ? result.stdout.trim() : '';
   if (!content) {
     process.exit(0);
   }

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// Shared path-based rule loader (Claude Code/Codex/Hermes). Usage: echo '<hook stdin>' | node context-loader.mjs <file-path>
+// Shared path-based rule loader (Claude Code/Codex/Hermes). CLI usage: echo '<hook stdin>' | node context-loader.mjs <file-path>
+// Also exports loadRulesFor()/resetSession() for in-process callers (e.g. .claude/hooks/context-rules.mjs).
 // Matches manifest.json globs, prints full content once per session_id then a pointer line; state entries older than 48h are pruned; never throws.
 // Reset mode: echo '<hook stdin>' | node context-loader.mjs --reset — clears that session_id's dedup state (wire to SessionStart, matcher compact|clear).
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RULES_DIR = dirname(fileURLToPath(import.meta.url));
@@ -68,7 +69,14 @@ function pruneExpired(state, now) {
 function saveState(state) {
   try {
     mkdirSync(dirname(STATE_PATH), { recursive: true });
-    writeFileSync(STATE_PATH, JSON.stringify(state));
+    // ponytail: atomic rename avoids a torn/corrupted state file, but this is
+    // not a cross-process lock — two hook invocations racing on the same
+    // session_id can still last-writer-wins clobber each other's newly-added
+    // entries. Add flock/proper-lockfile if that starts causing visibly
+    // duplicated rule re-injection.
+    const tmpPath = `${STATE_PATH}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(state));
+    renameSync(tmpPath, STATE_PATH);
   } catch (err) {
     process.stderr.write(`context-loader: state write failed (non-fatal): ${err.message}\n`);
   }
@@ -87,34 +95,43 @@ function readStdinJSON() {
   }
 }
 
-function main() {
-  const arg = process.argv[2];
-  const hookInput = readStdinJSON();
-  const sessionId = hookInput.session_id;
+export function resetSession(sessionId) {
+  if (!sessionId) return;
+  const state = pruneExpired(loadState(), Date.now());
+  delete state[sessionId];
+  saveState(state);
+}
 
-  if (arg === '--reset') {
-    if (!sessionId) process.exit(0);
-    const state = pruneExpired(loadState(), Date.now());
-    delete state[sessionId];
-    saveState(state);
-    process.exit(0);
-  }
+// Resolves the repo-relative, forward-slash-normalized, containment-checked
+// path for a touched file. Returns null when the file is outside the repo —
+// none of this repo's rules should ever apply to it.
+function resolveRelPath(touchedPath) {
+  const relPath = relative(REPO_ROOT, resolve(touchedPath)).split(sep).join('/');
+  if (relPath === '..' || relPath.startsWith('../')) return null;
+  return relPath;
+}
 
-  const touchedPath = arg;
-  if (!touchedPath) {
-    process.stderr.write('context-loader: no file path argument given\n');
-    process.exit(0);
-  }
+// Core entrypoint for in-process callers: given the raw PostToolUse hook
+// payload and the touched file path, returns the additionalContext string
+// ('' when nothing matches or there's nothing left to inject). Never throws.
+export function loadRulesFor(hookInput, touchedPath) {
+  const sessionId = hookInput?.session_id;
 
   let manifest;
   try {
     manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
   } catch (err) {
     process.stderr.write(`context-loader: manifest read/parse failed: ${err.message}\n`);
-    process.exit(0);
+    return '';
   }
 
-  const relPath = relative(REPO_ROOT, resolve(touchedPath));
+  const relPath = resolveRelPath(touchedPath);
+  if (relPath === null) return '';
+
+  const rules = Array.isArray(manifest.rules) ? manifest.rules : [];
+  const matchingRules = rules.filter((rule) => matchesAny(relPath, rule.match));
+  if (matchingRules.length === 0) return '';
+
   const now = Date.now();
   // No session_id means we can't tell callers apart — never dedup against
   // an unidentified caller. Show full content every time and skip state I/O.
@@ -122,9 +139,7 @@ function main() {
   const loadedForSession = new Set(sessionId ? (state[sessionId]?.files ?? []) : []);
   const output = [];
 
-  for (const rule of manifest.rules ?? []) {
-    if (!matchesAny(relPath, rule.match)) continue;
-
+  for (const rule of matchingRules) {
     const ruleFile = join(RULES_DIR, rule.file);
     if (loadedForSession.has(rule.file)) {
       output.push(
@@ -141,14 +156,36 @@ function main() {
     }
   }
 
-  if (output.length > 0) {
-    process.stdout.write(`${output.join('\n\n---\n\n')}\n`);
-  }
-
   if (sessionId) {
     state[sessionId] = { files: [...loadedForSession], lastSeen: now };
     saveState(state);
   }
+
+  return output.join('\n\n---\n\n');
 }
 
-main();
+function main() {
+  const arg = process.argv[2];
+  const hookInput = readStdinJSON();
+
+  if (arg === '--reset') {
+    resetSession(hookInput.session_id);
+    process.exit(0);
+  }
+
+  const touchedPath = arg;
+  if (!touchedPath) {
+    process.stderr.write('context-loader: no file path argument given\n');
+    process.exit(0);
+  }
+
+  const content = loadRulesFor(hookInput, touchedPath);
+  if (content) {
+    process.stdout.write(`${content}\n`);
+  }
+}
+
+// Only run as a hook when invoked directly (CLI / --reset), not when imported
+// by another module (e.g. .claude/hooks/context-rules.mjs calling loadRulesFor).
+const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+if (isMain) main();
