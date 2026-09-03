@@ -29,6 +29,17 @@ description: Work through every unresolved review thread on a PR to completion �
    ```bash
    uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py resolve --thread-id <id>
    ```
+
+   Steps 4 and 5 combined — one thread or many in one process:
+
+   ```bash
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve \
+     --pr <N> --thread-id <id> --comment-id <databaseId> --body '...'
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve-batch \
+     --pr <N> --input-file threads.json   # [{thread_id, comment_id, body}, ...]
+   ```
+
+   The batch form stops at the first failure and prints one JSON line per thread.
 6. A decision spanning threads (PR sequencing, rebase disposition), or a response to a `reviews_with_body`/`unresponded_reviews` entry, goes on the PR itself via `gh pr comment <N> -R <owner>/<repo>` — the same owner/repo this run used in step 1 — before the work it governs. When answering a specific entry, quote that review's own `url` field from step 1's output in the comment body. That quoted `url`, postdating the review, is what clears the review out of `unresponded_reviews` on the next check; chronological order alone does not.
 7. Once all current threads and reviews are addressed, re-check with `watch`, looping short calls rather than one long block:
 
