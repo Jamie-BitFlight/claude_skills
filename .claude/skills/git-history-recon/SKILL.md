@@ -44,19 +44,26 @@ flowchart TD
     Window6M --> CommitCheck
 
     CommitCheck{"Any commits in window?<br>Run: git log --since=WINDOW --oneline \| wc -l<br>(omit --since if window = all history)"}
-    CommitCheck -->|"> 0 commits"| Phase1
+    CommitCheck -->|"> 0 commits"| ExcludeLoad
     CommitCheck -->|"0 commits — window too narrow"| WindowFallback["WARN: No commits in window.<br>Override: Window = all history, N = 20.<br>Emit warning in report header.<br>Rerun CommitCheck (all history)."]
-    WindowFallback --> Phase1
+    WindowFallback --> ExcludeLoad
+
+    ExcludeLoad{"Load Skill-Local Exclusions<br>Read: SKILL_DIR/assets/exclude-patterns<br>File exists and is non-empty?"}
+    ExcludeLoad -->|"Yes"| ExcludeParse["Parse one glob pattern per line<br>Skip blank lines and # comments<br>Build EXCLUDE_PATHSPECS =<br>':(glob,exclude)PATTERN' per line"]
+    ExcludeLoad -->|"No — file missing or empty (EC-7)"| ExcludeNone["EXCLUDE_PATHSPECS = empty<br>0 patterns loaded"]
+    ExcludeParse --> ExcludeReport["Report: 'Excluded via skill-local<br>ignore file: N patterns loaded'<br>Record N for report header"]
+    ExcludeNone --> ExcludeReport
+    ExcludeReport --> Phase1
 
     Phase1["Phase 1 — Parallel Pipeline Dispatch<br>Run all 7 pipelines concurrently via parallel Bash calls.<br>Do not wait for one to complete before starting the next."]
 
-    Phase1 --> P1["Pipeline 1: Hotspots<br>git log --name-only --since=WINDOW --format='' \| grep -v '^$' \| sort \| uniq -c \| sort -rn \| head -N"]
-    Phase1 --> P2["Pipeline 2: Bug Magnets<br>git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --format='' \| grep -v '^$' \| sort \| uniq -c \| sort -rn \| head -N"]
+    Phase1 --> P1["Pipeline 1: Hotspots<br>git log --name-only --since=WINDOW --format='' -- . EXCLUDE_PATHSPECS \| grep -v '^$' \| sort \| uniq -c \| sort -rn \| head -N"]
+    Phase1 --> P2["Pipeline 2: Bug Magnets<br>git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --format='' -- . EXCLUDE_PATHSPECS \| grep -v '^$' \| sort \| uniq -c \| sort -rn \| head -N"]
     Phase1 --> P3["Pipeline 3: Bus Factor<br>git shortlog -sn HEAD --no-merges \| head -20"]
     Phase1 --> P4["Pipeline 4: Active vs Total Contributors<br>git shortlog -sn HEAD --no-merges --since='3 months ago' \| wc -l (active)<br>git shortlog -sn HEAD --no-merges \| wc -l (total)"]
     Phase1 --> P5["Pipeline 5: Momentum<br>git log --since=WINDOW --pretty=format:'%cd' --date=format:'%Y-%m' \| sort \| uniq -c"]
     Phase1 --> P6["Pipeline 6: Firefighting<br>git log --since=WINDOW --grep='revert\|hotfix\|rollback' --oneline \| wc -l"]
-    Phase1 --> P7["Pipeline 7: Newly Added Files<br>git log --since=WINDOW --diff-filter=A --name-only --format='' \| grep -v '^$' \| sort -u \| head -N"]
+    Phase1 --> P7["Pipeline 7: Newly Added Files<br>git log --since=WINDOW --diff-filter=A --name-only --format='' -- . EXCLUDE_PATHSPECS \| grep -v '^$' \| sort -u \| head -N"]
 
     P1 --> Phase2
     P2 --> Phase2
@@ -66,7 +73,7 @@ flowchart TD
     P6 --> Phase2
     P7 --> Phase2
 
-    Phase2["Phase 2 — Cross-Reference Computation<br>Compute: hotspot_filepaths ∩ bug_magnet_filepaths"]
+    Phase2["Phase 2 — Cross-Reference Computation<br>Compute: hotspot_filepaths ∩ bug_magnet_filepaths<br>(exclusions already applied — inputs are P1/P2 output)"]
 
     Phase2 --> IntersectCheck{"Intersection non-empty?"}
     IntersectCheck -->|"Yes — ≥1 file in both lists"| OwnerAnnotation["For each file in intersection:<br>Run: git shortlog -sn -- FILEPATH \| head -1<br>Extract primary owner from line 1"]
@@ -84,6 +91,24 @@ flowchart TD
 
 Run all 7 pipelines concurrently. Do not wait for one to complete before starting the next. Collect all results before beginning Phase 2.
 
+### Skill-Local Exclusions (Pipelines 1, 2, and 7)
+
+Before Phase 1 dispatch, read `${CLAUDE_SKILL_DIR}/assets/exclude-patterns` — a gitignore-style file that ships inside this skill's own directory, not the target repository. It excludes files whose git-history signal is mechanical noise (auto-bumped plugin manifests, auto-generated lockfiles) rather than genuine defect-proneness. See the file's own header and per-pattern comments for the verified rationale behind each shipped default.
+
+Parse the file: one glob pattern per line, blank lines and lines starting with `#` ignored. Build `EXCLUDE_PATHSPECS` by wrapping each pattern in git's `:(glob,exclude)` pathspec magic (one pathspec argument per pattern):
+
+```bash
+':(glob,exclude)PATTERN1' ':(glob,exclude)PATTERN2' ...
+```
+
+Append `-- . EXCLUDE_PATHSPECS` to the end of the `git log` invocation in Pipelines 1, 2, and 7 — after all other flags, before the `|` pipe to `grep`. `:(glob,exclude)` supports `**` and standard shell-glob syntax (FNM_PATHNAME semantics — `*` does not cross a `/`, a leading `**/` matches at any depth), the closest native git mechanism to gitignore-style matching without a custom matcher. When no patterns are loaded (EC-7), omit `-- . EXCLUDE_PATHSPECS` entirely and run the pipeline unfiltered — do not pass an empty pathspec list.
+
+**Not applied to Pipelines 3, 4, 5, 6**: those pipelines operate on commits and authors (`git shortlog`, commit-count `git log` with no `--name-only`), not file paths. A pathspec exclusion on a command with no file-path output is meaningless and must not be added.
+
+**Phase 2 High-Risk intersection**: no separate exclusion step is needed — the intersection is computed from Pipeline 1 and Pipeline 2 output, which is already filtered.
+
+SOURCE: [git-scm.com/docs/gitglossary](https://git-scm.com/docs/gitglossary) — pathspec magic signature `glob` and `exclude` definitions (accessed 2026-09-03). Verified against this repo's actual git history (git 2.55.0): `git log --name-only --since='1 year ago' --format='' -- . ':(glob,exclude)**/.claude-plugin/marketplace.json'` removes the excluded file from output while preserving all others.
+
 ### Blank-Line Filter (Pipelines 1, 2, and 7)
 
 `git log --name-only` emits blank lines between commits alongside file names. Without filtering, `sort | uniq -c` counts blank lines as file entries, inflating counts and producing a blank-line "file" at the top of the sorted output. The `grep -v '^$'` filter is inserted after `--name-only` output and before `sort` to remove these blank lines. This filter is mandatory for Pipelines 1, 2, and 7.
@@ -95,10 +120,10 @@ SOURCE: architect document §4.3 — blank-line correction (accessed 2026-05-22)
 **Command**:
 
 ```bash
-git log --name-only --since=WINDOW --format='' | grep -v '^$' | sort | uniq -c | sort -rn | head -N
+git log --name-only --since=WINDOW --format='' -- . EXCLUDE_PATHSPECS | grep -v '^$' | sort | uniq -c | sort -rn | head -N
 ```
 
-**Flags explained**: `--format=''` suppresses commit metadata (author, date, message), leaving only filenames. `grep -v '^$'` removes blank lines between commits. `sort | uniq -c` counts unique files. `sort -rn` orders descending by count. `head -N` returns the top N entries.
+**Flags explained**: `--format=''` suppresses commit metadata (author, date, message), leaving only filenames. `-- . EXCLUDE_PATHSPECS` restricts to the working tree root while applying the skill-local exclusions loaded in the Skill-Local Exclusions step above (omit this entirely when 0 patterns were loaded). `grep -v '^$'` removes blank lines between commits. `sort | uniq -c` counts unique files. `sort -rn` orders descending by count. `head -N` returns the top N entries.
 
 **When window = all history**: omit `--since=WINDOW` entirely.
 
@@ -111,10 +136,10 @@ git log --name-only --since=WINDOW --format='' | grep -v '^$' | sort | uniq -c |
 **Command**:
 
 ```bash
-git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --format='' | grep -v '^$' | sort | uniq -c | sort -rn | head -N
+git log --grep='fix\|bug\|broken\|hotfix\|revert' --name-only --since=WINDOW --format='' -- . EXCLUDE_PATHSPECS | grep -v '^$' | sort | uniq -c | sort -rn | head -N
 ```
 
-**Note**: The `--grep` pattern uses BRE alternation (`\|`). Files from commits whose message matches any of: `fix`, `bug`, `broken`, `hotfix`, `revert`.
+**Note**: The `--grep` pattern uses BRE alternation (`\|`). Files from commits whose message matches any of: `fix`, `bug`, `broken`, `hotfix`, `revert`. `-- . EXCLUDE_PATHSPECS` applies the same skill-local exclusions as Pipeline 1 (see Skill-Local Exclusions above); omit when 0 patterns were loaded.
 
 **Caveat**: This detection is convention-dependent. Repositories using ticket-ID-only messages, Conventional Commits without these keywords, or non-English commit conventions will have under-reported results. The report header discloses this limitation.
 
@@ -197,10 +222,10 @@ git log --since=WINDOW --grep='revert\|hotfix\|rollback' --oneline | wc -l
 **Command**:
 
 ```bash
-git log --since=WINDOW --diff-filter=A --name-only --format='' | grep -v '^$' | sort -u | head -N
+git log --since=WINDOW --diff-filter=A --name-only --format='' -- . EXCLUDE_PATHSPECS | grep -v '^$' | sort -u | head -N
 ```
 
-**Flags explained**: `--diff-filter=A` selects only commits that Added a file. `sort -u` deduplicates (a file added and then renamed appears once). `grep -v '^$'` removes blank lines (same as Pipelines 1 and 2).
+**Flags explained**: `--diff-filter=A` selects only commits that Added a file. `-- . EXCLUDE_PATHSPECS` applies the same skill-local exclusions as Pipelines 1 and 2 (see Skill-Local Exclusions above); omit when 0 patterns were loaded. `sort -u` deduplicates (a file added and then renamed appears once). `grep -v '^$'` removes blank lines (same as Pipelines 1 and 2).
 
 **Output shape**: Filepath lines (unique new files in the analysis window).
 
@@ -222,11 +247,14 @@ The header appears above the first section and is not counted as one of the repo
 **Size Class**: small | medium | large (COMMIT_COUNT commits, CONTRIBUTOR_COUNT contributors)
 **Analysis Window**: all history | last 1 year | last 6 months
 **Bug-Magnet Keywords**: fix, bug, broken, hotfix, revert
+**Exclusions**: Excluded via skill-local ignore file: N patterns loaded (source: assets/exclude-patterns; applied to Code Hotspots, Bug Magnets, High-Risk Files, and Recently Added Files)
 **Caveat**: Bug-magnet detection relies on commit-message keyword matching. Repositories
 using ticket-ID-only messages, Conventional Commits without fix/bug words, or non-English
 commit conventions may have an under-reported High-Risk Files section. Absence of entries
 does not mean low risk.
 ```
+
+Set N to the count recorded in the ExcludeLoad/ExcludeReport step. When 0 patterns were loaded (EC-7 — exclude-patterns file missing or empty), the line still writes explicitly rather than being omitted: `**Exclusions**: 0 patterns loaded — no exclusions applied.`
 
 When warnings apply (shallow clone, window fallback), prepend them after `**Caveat**`:
 
@@ -447,6 +475,12 @@ All other sections are written normally. The report is valid and complete. The s
 
 **Behavior**: The skill does not filter binary or generated files from hotspot output. This is a documented limitation. The `## Recommendations` section may note that `vendor/`, `dist/`, or `node_modules/` directories appearing in hotspots indicate generated-file noise that reduces signal quality. No automatic filtering is performed.
 
+### EC-7: Skill-Local Exclusion File Missing or Empty
+
+**Detection**: `${CLAUDE_SKILL_DIR}/assets/exclude-patterns` does not exist, or exists but contains zero non-blank, non-comment lines.
+
+**Behavior**: Degrade gracefully — do not fail. Set `EXCLUDE_PATHSPECS` to empty and omit the `-- . EXCLUDE_PATHSPECS` argument entirely from Pipelines 1, 2, and 7 (run them exactly as documented before this exclusion mechanism existed). Record 0 patterns loaded and write the explicit `**Exclusions**: 0 patterns loaded — no exclusions applied.` header line per Report Header above. This keeps the skill fully functional on an older install of this skill's assets, or if the file is intentionally emptied.
+
 ## Integration Contract
 
 ### Output Path
@@ -491,3 +525,5 @@ The required section headers (`## Code Hotspots`, `## Bug Magnets`, `## High-Ris
 - SOURCE: architect document on issue #2249 (artifact\_type="architect") — Phase 0–3 design, pipeline command templates, edge case contracts EC-1–EC-6, integration contract (accessed 2026-05-22)
 - SOURCE: [silent-failure-prevention.md](../../rules/silent-failure-prevention.md) — EC-1 non-git fail-fast contract
 - SOURCE: [large-file-write-strategy.md](../../rules/large-file-write-strategy.md) — Strategy B referenced in Phase 3 write step
+- SOURCE: [git-scm.com/docs/gitglossary](https://git-scm.com/docs/gitglossary) — pathspec magic signature `glob` and `exclude` definitions, basis for the Skill-Local Exclusions `:(glob,exclude)` mechanism (accessed 2026-09-03)
+- SOURCE: `assets/exclude-patterns` (this skill's own file) — default exclusion patterns and their per-pattern rationale, verified against this repo's git history (`plugins/plugin-creator/scripts/auto_sync_manifests.py`, `git log` sampling) before being shipped (accessed 2026-09-03)
