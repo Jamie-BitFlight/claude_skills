@@ -95,7 +95,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P1
     {
       "id": "1.3",
       "name": "Create core/prepare.py Business Logic",
-      "agent": "python-cli-architect"
+      "agent": "{resolved_agent}"
     }
   ],
   "count": 1
@@ -142,7 +142,7 @@ Tasks are represented as YAML frontmatter fields, defined in `sam_schema/core/mo
 task: T01
 title: "Task title"
 status: not-started
-agent: python-cli-architect
+agent: {resolved_agent}
 dependencies: []
 priority: 1
 complexity: medium

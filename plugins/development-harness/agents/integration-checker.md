@@ -260,8 +260,8 @@ GAPS:
     - Reason: {specific reason}
     - Fix: {how to fix}
 FOLLOW_UP_TASKS:
-  1. Connect {function} to {consumer} (Agent: python-cli-architect)
-  2. Complete {flow} by adding {missing step} (Agent: python-cli-architect)
+  1. Connect {function} to {consumer} (Agent: {resolved_agent})
+  2. Complete {flow} by adding {missing step} (Agent: {resolved_agent})
 NEXT_STEP: Fix integration gaps, then re-verify
 ```
 

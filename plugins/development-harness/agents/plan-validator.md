@@ -228,23 +228,30 @@ For each task T:
 
 ## Dimension 4: Agent Capability Match
 
-**Question:** Is each task assigned to an appropriate agent?
+**Question:** Is each task assigned to an agent that can actually fulfill it?
 
-**Agent assignment rules:**
+**Process:**
 
-| Task Type                                     | Valid Agents                |
-| --------------------------------------------- | --------------------------- |
-| Python code (cli/, core/, services/, shared/) | python-cli-architect        |
-| Test files (tests/)                           | python-pytest-architect     |
-| Linting, type checking                        | linting-root-cause-resolver |
-| Documentation (.md files)                     | service-docs-maintainer       |
-| Agent/skill creation                          | agent-creator               |
+1. Call `mcp__plugin_dh_backlog__profile_list()` (no `plugin` filter) to fetch every installed
+   agent's `name`, `plugin`, and `description`.
+2. For each task with a non-empty `agent`: valid iff that name (bare or plugin-qualified —
+   compare after stripping any plugin prefix) matches an entry in the fetched list AND the
+   matched entry's `description` plausibly covers the task's type (e.g. a task about writing
+   documentation assigned to an agent whose description is about implementing CLI features is a
+   mismatch, regardless of whether the name resolves).
+3. `agent` absent, or explicitly `dh:task-worker`, is always valid — the documented generic
+   fallback when nothing matched at assignment time
+   (`plugins/development-harness/skills/execution/SKILL.md` Step 2).
 
 **Red flags:**
 
-- Documentation task assigned to python-cli-architect
-- Test task assigned to service-docs-maintainer
-- Agent field missing
+- `agent` value doesn't match any entry from `profile_list()` — hallucinated or misspelled name
+- `agent`'s matched description has no plausible overlap with the task's type (assignment
+  mismatch, not a naming problem)
+
+This also fixes a latent bug in the old hardcoded table: it validated against **bare, unprefixed**
+names while `sam_plan`'s actual `agent` field — and `swarm-task-planner`'s own assignment — writes
+**plugin-qualified** names.
 
 ## Dimension 5: Input/Output Validity
 

@@ -332,7 +332,7 @@ flowchart TD
     P3_CODEBASE -->|"No — patterns already<br>captured in feature-context"| P3_ARCHITECT
     P3_CODEBASE_OUT --> P3_ARCHITECT
 
-    P3_ARCHITECT["Phase 3: Architecture Design<br>Agent: resolved from language manifest<br>(pyproject.toml → @python3-development:python-cli-design-spec)<br>Input: feature-context + optional codebase analysis<br>Output: architect artifact<br>Constraint: HOW only — interfaces, contracts, models"]
+    P3_ARCHITECT["Phase 3: Architecture Design<br>Agent: resolved via profile_list capability match<br>Input: feature-context + optional codebase analysis<br>Output: architect artifact<br>Constraint: HOW only — interfaces, contracts, models"]
 ```
 
 ### Node Contracts
@@ -352,9 +352,9 @@ flowchart TD
 | P3_RESEARCH | `@dh:feature-researcher` | composed feature request, prior artifacts (if any) | feature-context artifact registered with owner, `artifact_type`, logical `artifact_id`, and content | always → P3_CODEBASE |
 | P3_CODEBASE | orchestrator | feature context, codebase state | codebase analysis decision | invoked → P3_CODEBASE_OUT, skipped → P3_ARCHITECT |
 | P3_CODEBASE_OUT | `@dh:codebase-analyzer` | focus areas (patterns, architecture, testing, conventions) | registered `codebase-analysis` artifact content | always → P3_ARCHITECT |
-| P3_ARCHITECT | language manifest agent (e.g. `@python3-development:python-cli-design-spec`) | feature context + optional codebase analysis | registered `architect` artifact content | terminal (continues to Phase 4) |
+| P3_ARCHITECT | `profile_list`-resolved agent | feature context + optional codebase analysis | registered `architect` artifact content | terminal (continues to Phase 4) |
 
-**Agent selection for architecture**: The skill does NOT hardcode `@python3-development:python-cli-design-spec`. It resolves the `design-spec` role from the language manifest at runtime based on project detection markers (`pyproject.toml` → Python, `package.json` → TypeScript, `Cargo.toml` → Rust, none → dh:task-worker fallback).
+**Agent selection for architecture**: The skill does NOT hardcode a specific language plugin's agent. It calls `mcp__plugin_dh_backlog__profile_list()` at runtime to fetch every installed agent's declared capability and matches the task against those descriptions (none matching → dh:task-worker fallback).
 
 **Artifact registration**: Each document-artifact phase calls `artifact_register` with the opaque
 owner reference, `artifact_type`, logical artifact identifier, and `agent` fields. The configured

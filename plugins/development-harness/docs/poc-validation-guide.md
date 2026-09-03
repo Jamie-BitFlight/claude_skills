@@ -187,7 +187,7 @@ Run ALL of these before declaring completion:
 - Lint: `uv run ruff check {files}`
 - Typecheck: `uv run mypy {files}`
 - Test: `uv run pytest tests/ --tb=short`
-- Standards: Load skill `/python3-development:modernpython`
+- Standards: Load the skill named in the resolved manifest's `quality_gates.standards` field, if present
 
 **Note on `{files}` in quality gate commands**: Commands containing `{files}`
 use Python `str.format()` syntax. Substitute `{files}` with the actual
