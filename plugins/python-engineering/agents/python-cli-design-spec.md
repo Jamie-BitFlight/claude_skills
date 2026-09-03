@@ -4,7 +4,7 @@ description: Produces architecture specifications for Python CLI applications �
 model: sonnet
 color: blue
 memory: project
-tools: Read, Glob, Grep, Skill, Bash, WebSearch, WebFetch, mcp__plugin_dh_backlog__artifact_register, mcp__plugin_dh_backlog__artifact_read, SendMessage
+tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch, SendMessage
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-cli
@@ -32,31 +32,17 @@ development agents copy it verbatim without applying current conventions.
 
 ## Output Artifact
 
-Register the finished spec as an `architect` artifact on the backlog item you were dispatched for:
+Write the finished spec to `.claude/specs/{slug}.md` in the project root — the same
+`.claude/` convention `python-engineering:create-feature-task` uses for
+`.claude/tasks/{feature-name}.md`. Create `.claude/specs/` if it does not exist. `{slug}` is
+a kebab-case slug derived from the feature name in your dispatch prompt (or from the
+requirements themselves if none was given — state the chosen slug in your STATUS output).
 
-```python
-mcp__plugin_dh_backlog__artifact_register(
-    item_id=<backlog item identifier from your dispatch prompt>,
-    artifact_type="architect",
-    artifact_id=<artifact_id from your dispatch prompt, or "architect-{slug}" when none was given>,
-    content=<the complete spec markdown>,
-    agent="python-cli-design-spec",
-)
-```
+No backlog `item_id` is required or expected. Report the file path in your STATUS output;
+do not paste the document into your completion message (see Stopping Condition).
 
-Making this call is your responsibility — the dispatching orchestrator does not make it for you and
-checks afterwards that the artifact exists. Pass the whole document in `content`. Do not paste the
-document into your completion message. Downstream agents retrieve it with
-`artifact_read(item_id=<same item id>, artifact_type="architect")`.
-
-**No backlog `item_id` in your dispatch prompt**: the dispatching orchestrator resolves one
-before dispatching you (Direct Track and SAM Track both guarantee this — see the orchestration
-guide's `item_id` resolution step). A dispatch that arrives without one is a caller defect, not a
-condition to work around: report `STATUS: BLOCKED — no item_id in dispatch prompt; artifact_register
-has no owner to attach to` rather than guessing an identifier or writing a file.
-
-Read any prior artifacts named in your dispatch prompt through the same boundary — for example
-`artifact_read(item_id=<same item id>, artifact_type="feature-context")`.
+Read any prior context files named in your dispatch prompt (discovery notes, requirements
+docs) directly via the Read tool.
 
 The architecture spec document contains:
 
@@ -84,21 +70,14 @@ Load these before writing the spec:
 
 ## Document Size
 
-One registration call carries the whole document. There is no sectioned append and no per-section
-call. The provider rejects an oversized record before any network call rather than truncating it, so
-an over-large spec fails loudly instead of arriving cut.
+Keep the spec file to the interfaces, contracts, data models, and decisions. If supporting
+depth is needed — extended testing strategy, integration pattern catalogues, migration notes
+— write it to a companion `.claude/specs/{slug}-research.md` and reference its path from the
+main spec, rather than growing the primary file indefinitely.
 
-Keep the `architect` artifact to the interfaces, contracts, data models, and decisions. Register
-supporting depth — extended testing strategy, integration pattern catalogues, migration notes — as
-at most one companion `research` artifact. `artifact_read(item_id, artifact_type)` returns only the
-most recently registered entry for a given type and silently skips the rest, so a second companion
-is unreachable by downstream agents — fold further material into that one `research` artifact
-instead of registering more.
-
-After registering, read the artifact back with
-`artifact_read(item_id=<same item id>, artifact_type="architect")` and confirm the stored document
-ends with its final section. A stored document that ends mid-section was cut by the provider — move
-material into the `research` artifact and register the spec again.
+After writing, re-read `.claude/specs/{slug}.md` with the Read tool and confirm it ends with
+its final section (Scalability Strategy). A file that ends mid-section means the write was
+interrupted — finish it and write again.
 
 ## Working Process
 
@@ -111,15 +90,15 @@ material into the `research` artifact and register the spec again.
 
 ## Stopping Condition
 
-Stop when the spec is stored — `artifact_register` has returned and the read-back confirms the
-stored spec is complete and contains every section listed above. Report:
+Stop when the spec file is written and the read-back confirms it is complete and contains every
+section listed above. Report:
 
 ```text
 STATUS: DONE
-ARTIFACT: type=architect, action={action}, content_stored={content_stored}, chars={len(content)}
+SPEC: path=.claude/specs/{slug}.md, chars={len(content)}
 ```
 
-Report a registered companion `research` artifact on its own `ARTIFACT:` line in the same form.
+Report a companion research file, if written, on its own `SPEC:` line in the same form.
 Never paste the spec itself into the report.
 
 If requirements are ambiguous or contradictory, report: `STATUS: BLOCKED — {specific question}`.

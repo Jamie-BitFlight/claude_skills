@@ -37,10 +37,6 @@ Opinionated Python 3.11+ engineering system. Establishes strong defaults and rou
 - `@python-engineering:code-reviewer` — general code review with Python awareness
 - `@python-engineering:semantic-code-search` — semantic search over Python codebases
 
-### Shared Workflow Agents (development-harness)
-
-Language-agnostic agents use the `@dh:` prefix. Do not duplicate them here.
-
 ---
 
 ## Typing Policy

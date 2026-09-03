@@ -125,9 +125,9 @@ Load `test-failure-mindset` when resetting investigation approach to test failur
 
 Load `python3-add-feature` when adding a new feature to an existing Python project — discovery, MoSCoW prioritization, TDD implementation, integration, verification.
 
-### SAM Task Creation
+### Feature Task Creation
 
-Load `create-feature-task` when creating a structured feature task with SAM tracking — produces task documentation with phases, acceptance criteria, and context preservation ready for the SAM pipeline.
+Load `create-feature-task` when creating a structured feature task file — produces task documentation at `.claude/tasks/{feature-name}.md` with phases, acceptance criteria, and context preservation.
 
 ### Package Configuration
 

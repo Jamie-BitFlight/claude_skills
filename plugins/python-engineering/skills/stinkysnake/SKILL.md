@@ -264,7 +264,7 @@ See the library modernization reference table in `references/type-patterns.md#li
 
 ### Step 3.4: Create Modernization Plan Document
 
-Resolve the plan directory at runtime: `uv run python -c 'from dh_paths import plan_dir; print(plan_dir())'` (typically `~/.dh/projects/{slug}/plan/`). Create the plan at `{plan_dir}/stinkysnake-plan.md` using the template in `references/plan-templates.md#modernization-plan-template-phase-3-output`.
+Write to `.claude/plans/stinkysnake-plan.md` (create the directory if it does not exist) using the template in `references/plan-templates.md#modernization-plan-template-phase-3-output`.
 
 ---
 
