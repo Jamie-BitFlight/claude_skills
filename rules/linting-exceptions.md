@@ -86,5 +86,5 @@ every code genuinely applies, and state the reason next to the code, not above t
 Never pass `--ignore` to `ruff check` to make this repository's CI pass — that suppresses the same
 class of error this file already prohibits suppressing by comment. `ruff check --fix --unsafe-fixes`
 is permitted only after reviewing the change with `--diff` first; never apply unsafe fixes blind.
-See [`astral-tool-overrides.md`](./astral-tool-overrides.md) for why this departs from Astral's own
+See [`astral-tool-overrides.md`](rules/astral-tool-overrides.md) for why this departs from Astral's own
 `ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gate.
