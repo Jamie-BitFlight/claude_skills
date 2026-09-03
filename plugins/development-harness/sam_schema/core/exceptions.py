@@ -9,6 +9,7 @@ from __future__ import annotations
 
 __all__ = [
     "ArtifactWriteError",
+    "BookendValidationError",
     "ConcurrentClaimUnsupportedError",
     "DocumentNotFoundError",
     "PlanExistsError",
@@ -101,6 +102,21 @@ class ArtifactWriteError(SamError):
         self.issue = issue
         self.reason = reason
         super().__init__(f"Artifact write failed for plan {plan_id} (issue #{issue}): {reason}")
+
+
+class BookendValidationError(SamError):
+    """Raised when a plan-write operation would leave bookend tasks structurally invalid."""
+
+    def __init__(self, plan_id: str, errors: list[str]) -> None:
+        """Initialize with the plan ID and the bookend validation failures.
+
+        Args:
+            plan_id: The plan identifier that failed bookend validation.
+            errors: Human-readable descriptions of each validation failure.
+        """
+        self.plan_id = plan_id
+        self.errors = errors
+        super().__init__(f"Plan {plan_id} failed bookend validation: {'; '.join(errors)}")
 
 
 class PlanIndexError(SamError):

@@ -443,7 +443,7 @@ class TestBookendValidatorInvalidPlans:
         """
         # Arrange
         t0 = make_bookend_task("T0", BookendType.T0_BASELINE)
-        impl = make_task("T1")
+        impl = make_task("T1", dependencies=["T0"])
         criteria = [AcceptanceCriterion(criterion_id="AC-1", check_command="pytest")]
         plan = make_plan_with_bookends(impl_tasks=[impl], t0=t0, criteria=criteria)
 
@@ -568,6 +568,46 @@ class TestBookendValidatorInvalidPlans:
         # Assert
         assert any("Multiple TN" in e for e in errors)
 
+    def test_impl_task_missing_t0_dependency_returns_error(self) -> None:
+        """Verify a non-bookend task omitting T0 from its dependencies produces error.
+
+        Tests: Rule 6 — every non-bookend task must depend on T0.
+        How: Build plan with T0 and two impl tasks, only one depends on T0.
+        Why: A task that can dispatch before T0 captures baseline contaminates it.
+        """
+        # Arrange
+        t0 = make_bookend_task("T0", BookendType.T0_BASELINE)
+        impl1 = make_task("T1")  # missing T0 dependency
+        impl2 = make_task("T2", dependencies=["T0"])
+        plan = make_plan_with_bookends(impl_tasks=[impl1, impl2], t0=t0)
+
+        # Act
+        errors = BookendValidator(plan).validate()
+
+        # Assert
+        assert len(errors) == 1
+        assert "T1" in errors[0]
+        assert "T2" not in errors[0]
+
+    def test_impl_tasks_all_depending_on_t0_returns_no_error(self) -> None:
+        """Verify plan where every non-bookend task depends on T0 passes Rule 6.
+
+        Tests: Rule 6 — compliant plan produces no error.
+        How: Build plan with T0 and two impl tasks, both depend on T0.
+        Why: Compliant plans must not produce false-positive Rule 6 errors.
+        """
+        # Arrange
+        t0 = make_bookend_task("T0", BookendType.T0_BASELINE)
+        impl1 = make_task("T1", dependencies=["T0"])
+        impl2 = make_task("T2", dependencies=["T0"])
+        plan = make_plan_with_bookends(impl_tasks=[impl1, impl2], t0=t0)
+
+        # Act
+        errors = BookendValidator(plan).validate()
+
+        # Assert
+        assert errors == []
+
     def test_criteria_without_any_bookends_returns_two_errors(self) -> None:
         """Verify plan with criteria but no bookends produces two errors.
 
@@ -587,6 +627,28 @@ class TestBookendValidatorInvalidPlans:
         assert len(errors) == 2
         assert any("T0" in e for e in errors)
         assert any("TN" in e for e in errors)
+
+    def test_is_bookend_true_without_type_returns_error(self) -> None:
+        """A task flagged as bookend but lacking a type is rejected."""
+        t0 = make_bookend_task("T0", BookendType.T0_BASELINE)
+        impl = Task(id="T1", title="Impl", status=TaskStatus.NOT_STARTED, dependencies=["T0"], is_bookend=True)
+        tn = make_bookend_task("T2", BookendType.TN_VERIFICATION, dependencies=["T1"])
+        plan = Plan(feature="bookend-test", tasks=[t0, impl, tn], acceptance_criteria_structured=[])
+
+        errors = BookendValidator(plan).validate()
+
+        assert any("is-bookend=true but no bookend_type" in e for e in errors)
+
+    def test_bookend_type_without_is_bookend_returns_error(self) -> None:
+        """A task with a bookend type but is_bookend=false is rejected."""
+        t0 = Task(id="T0", title="Baseline", status=TaskStatus.NOT_STARTED, bookend_type=BookendType.T0_BASELINE)
+        impl = make_task("T1", dependencies=["T0"])
+        tn = make_bookend_task("T2", BookendType.TN_VERIFICATION, dependencies=["T1"])
+        plan = Plan(feature="bookend-test", tasks=[t0, impl, tn], acceptance_criteria_structured=[])
+
+        errors = BookendValidator(plan).validate()
+
+        assert any("bookend_type" in e and "is-bookend=false" in e for e in errors)
 
 
 # ---------------------------------------------------------------------------
