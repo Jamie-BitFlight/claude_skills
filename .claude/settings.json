@@ -30,6 +30,26 @@
           }
         ],
         "matcher": "Read|Write|Edit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-rules-agent.mjs",
+            "type": "command"
+          }
+        ],
+        "matcher": "Agent"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-rules-prompt.mjs",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
       }
     ],
     "SessionStart": [

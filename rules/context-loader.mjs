@@ -111,12 +111,48 @@ function resolveRelPath(touchedPath) {
   return relPath;
 }
 
+// Shared delivery core: given a list of rule filenames (already decided —
+// no glob matching here) and a session_id, returns the additionalContext
+// string, applying the same per-session dedup as the glob-matched path.
+function deliverRules(fileNames, sessionId) {
+  if (fileNames.length === 0) return '';
+
+  const now = Date.now();
+  // No session_id means we can't tell callers apart — never dedup against
+  // an unidentified caller. Show full content every time and skip state I/O.
+  const state = sessionId ? pruneExpired(loadState(), now) : {};
+  const loadedForSession = new Set(sessionId ? (state[sessionId]?.files ?? []) : []);
+  const output = [];
+
+  for (const file of fileNames) {
+    const ruleFile = join(RULES_DIR, file);
+    if (loadedForSession.has(file)) {
+      output.push(
+        `The conventions for editing this file should be read here: ${relative(REPO_ROOT, ruleFile)}`,
+      );
+      continue;
+    }
+
+    try {
+      output.push(readFileSync(ruleFile, 'utf8').trim());
+      loadedForSession.add(file);
+    } catch (err) {
+      process.stderr.write(`context-loader: failed to read ${file}: ${err.message}\n`);
+    }
+  }
+
+  if (sessionId) {
+    state[sessionId] = { files: [...loadedForSession], lastSeen: now };
+    saveState(state);
+  }
+
+  return output.join('\n\n---\n\n');
+}
+
 // Core entrypoint for in-process callers: given the raw PostToolUse hook
 // payload and the touched file path, returns the additionalContext string
 // ('' when nothing matches or there's nothing left to inject). Never throws.
 export function loadRulesFor(hookInput, touchedPath) {
-  const sessionId = hookInput?.session_id;
-
   let manifest;
   try {
     manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
@@ -129,39 +165,15 @@ export function loadRulesFor(hookInput, touchedPath) {
   if (relPath === null) return '';
 
   const rules = Array.isArray(manifest.rules) ? manifest.rules : [];
-  const matchingRules = rules.filter((rule) => matchesAny(relPath, rule.match));
-  if (matchingRules.length === 0) return '';
+  const matchingFiles = rules.filter((rule) => matchesAny(relPath, rule.match)).map((r) => r.file);
+  return deliverRules(matchingFiles, hookInput?.session_id);
+}
 
-  const now = Date.now();
-  // No session_id means we can't tell callers apart — never dedup against
-  // an unidentified caller. Show full content every time and skip state I/O.
-  const state = sessionId ? pruneExpired(loadState(), now) : {};
-  const loadedForSession = new Set(sessionId ? (state[sessionId]?.files ?? []) : []);
-  const output = [];
-
-  for (const rule of matchingRules) {
-    const ruleFile = join(RULES_DIR, rule.file);
-    if (loadedForSession.has(rule.file)) {
-      output.push(
-        `The conventions for editing this file should be read here: ${relative(REPO_ROOT, ruleFile)}`,
-      );
-      continue;
-    }
-
-    try {
-      output.push(readFileSync(ruleFile, 'utf8').trim());
-      loadedForSession.add(rule.file);
-    } catch (err) {
-      process.stderr.write(`context-loader: failed to read ${rule.file}: ${err.message}\n`);
-    }
-  }
-
-  if (sessionId) {
-    state[sessionId] = { files: [...loadedForSession], lastSeen: now };
-    saveState(state);
-  }
-
-  return output.join('\n\n---\n\n');
+// For triggers that aren't file-path-based at all (an Agent tool call, a
+// UserPromptSubmit match) — an explicit, hardcoded rule-file list, same
+// dedup semantics as the glob-matched path.
+export function loadRulesByNames(fileNames, sessionId) {
+  return deliverRules(fileNames, sessionId);
 }
 
 function main() {
