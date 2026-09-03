@@ -5,12 +5,6 @@ designer, code reviewer) and quality gates for modern Python 3.11+ development.
 
 ---
 
-## Key References
-
-- Language manifest (library registry, modern patterns): `./manifests/python3/language-manifest.yaml`
-
----
-
 ## Agents in This Plugin (Python-specific)
 
 - `@python3-development:python-cli-architect` — implements Python CLI features (Typer/Rich)
