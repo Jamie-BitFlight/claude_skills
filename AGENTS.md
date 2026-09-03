@@ -231,6 +231,10 @@ correctly regardless of installation location.
   and reuse what's already declared (e.g. `httpx`, `ruamel.yaml`) instead of assuming a stdlib-only
   design. Stdlib-only is a valid constraint only for a confirmed deployment restriction (airgapped,
   no pip access) — not a default posture.
+- **Public by default**: name new functions and modules without a leading underscore. Early
+  "private" naming gets cargo-culted onto things that aren't private, then breaks tests that
+  legitimately need the name — add privacy once actually needed. Existing underscored code stays
+  as-is.
 
 ### CLI and script output — agent-only, never human-facing
 
@@ -478,7 +482,7 @@ this file) was removed to avoid two files drifting out of sync.
 3. **Skip magic trailing comma**: Ruff config has `skip-magic-trailing-comma = true` — formatting differences around trailing commas are expected.
 4. **EXE003 ignored**: Scripts with `uv run --script` shebang pattern trigger EXE003 (intentionally suppressed).
 5. **pytest parallelism**: Tests run with `-n 2 --dist loadgroup` (xdist): one controller plus two workers. Tests marked with `@pytest.mark.xdist_group` run in same worker.
-6. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`.
+6. **No uv workspace**: plugin MCP servers are PEP 723 self-resolving scripts (inline `# /// script` deps are the runtime source of truth); root `pyproject.toml` dev-deps only mirror them for `ty`/`ruff`/IDE. No `[tool.uv.workspace]`, no per-plugin `uv.lock`. This extends to every directory those scripts import (`backlog_core/`, `dh_core/`, `sam_schema/`, etc.): they have `__init__.py` and dotted imports for internal organization, but are not distributable packages — never build, bundle, publish, or add a `pyproject.toml` beside them. Doing so creates two dependency sources of truth (the script's own inline deps vs. a new package's) that silently diverge — a split-brain, not a cleanup.
 7. **Ignored planning context**: `plan/` and `.claude/backlog/` are ignored working context and excluded from markdownlint. Do not force-add either directory.
 8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 9. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
