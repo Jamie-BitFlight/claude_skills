@@ -792,3 +792,52 @@ class TestRealPluginsIntegration:
         # Assert
         assert result.is_error is False
         assert "error" in result.data
+
+    async def test_profile_list_no_parse_warnings_across_all_agents(self) -> None:
+        """profile_list() over every installed plugin's agents produces zero parse warnings.
+
+        Tests: Every agent .md file's YAML frontmatter is well-formed.
+        How: Call list with no filter, assert no "warnings" key is present (the server
+             only adds it when parse_warnings is non-empty — absent means zero warnings).
+        Why: swarm-task-planner/plan-validator now resolve agents by calling profile_list()
+             instead of a hardcoded table — a single malformed frontmatter block silently
+             drops that agent from every future resolution (parse_agent_file failures are
+             skipped with a warning, not raised), so this is the one check standing between
+             a routing regression and a passing test suite.
+        """
+        # Arrange / Act
+        async with Client(mcp) as client:
+            result = await client.call_tool("list", {})
+
+        # Assert
+        assert result.is_error is False
+        assert "warnings" not in result.data, result.data.get("warnings")
+
+    async def test_profile_list_includes_agents_the_routing_refactor_depends_on(self) -> None:
+        """profile_list() surfaces the specific agents swarm-task-planner/plan-validator
+        now resolve dynamically, in place of the deleted hardcoded table.
+
+        Tests: The agents most likely to break silently (renamed, moved, or dropped)
+               remain discoverable by exactly the (plugin, name) pair callers match on.
+        How: Call list with no filter, assert each expected (plugin, name) pair is present.
+        Why: These are the concrete instance of the profile_list-based routing design —
+             dh's own dispatcher/reviewer agents, and the language-plugin agents
+             swarm-task-planner matches tasks against.
+        """
+        # Arrange / Act
+        async with Client(mcp) as client:
+            result = await client.call_tool("list", {})
+
+        # Assert
+        present = {(a["plugin"], a["name"]) for a in result.data["agents"]}
+        expected = {
+            ("dh", "swarm-task-planner"),
+            ("dh", "plan-validator"),
+            ("dh", "code-reviewer"),
+            ("python-engineering", "code-reviewer"),
+            ("python-engineering", "python-cli-architect"),
+            ("python-engineering", "python-pytest-architect"),
+            ("python3-development", "code-reviewer"),
+        }
+        missing = expected - present
+        assert not missing, f"agents missing from profile_list(): {missing}"

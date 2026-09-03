@@ -224,4 +224,4 @@ The standards and graphs in this document are living artifacts. If you discover 
 2. Update the Text: Add or modify the relevant bullet points in `Section 1. Shared Development Standards`. Ensure the new rule is concise and actionable.
 3. Update the Knowledge Graph: If adding a new tool, library, or core concept, add a corresponding node to the Mermaid mindmap in `Section 2. Python Development Knowledge Graph`.
 4. Update the Process Graph: If adding a new agent or altering the development workflow, update the Mermaid flowchart in `Section 3. Python Development Process Graph` to show exactly where the new step fits into the lifecycle.
-5. Validate: Ensure that the changes do not introduce contradictions with other rules in this document or the `language-manifest.md`.
+5. Validate: Ensure that the changes do not introduce contradictions with other rules in this document.

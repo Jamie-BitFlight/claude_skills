@@ -8,16 +8,14 @@ Canonical starting point for language manifests. All Layer 1 plugins produce a m
 
 ## Template
 
+Agent resolution (architect, test-designer, code-reviewer, design-spec, linting) is not part of
+this template — the harness resolves agents at runtime via `profile_list()`, matching task
+content against every installed agent's own declared capability. See
+[role-resolution-protocol.md](../../../skills/dh-meta-docs/references/role-resolution-protocol.md).
+Nothing reads a "Role Fulfillment" section.
+
 ```markdown
 # Language Manifest: {Language Name}
-
-## Role Fulfillment
-
-- architect: @{plugin}:{agent-name}
-- test-designer: @{plugin}:{agent-name}
-- code-reviewer: @{plugin}:{agent-name}
-- design-spec: @{plugin}:{agent-name}
-- linting: /{plugin}:{skill-name}
 
 ## Quality Gates
 

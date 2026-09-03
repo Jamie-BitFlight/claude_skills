@@ -19,7 +19,6 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 - **python-pytest-architect** — Design comprehensive test suites
 - **code-reviewer** — Review Python code for quality and standards
 - **python-cli-design-spec** — Design system architecture
-- **dh:swarm-task-planner** — Break down tasks into implementation plans
 
 ### Commands (in this skill: references/commands/)
 
@@ -32,11 +31,8 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 
 **Context to include in the prompt** means: file paths, outcomes, and user requirements only. Do not pass file contents, summaries, or pre-gathered data — agents discover and read files themselves.
 
-**Design/Architecture steps below dispatch `python-cli-design-spec`**, which registers its spec
-as an artifact against a backlog item and has no file-write fallback. Before any Design or
-Architecture step in the workflows below: use an `item_id` already named by the task (`#N` GitHub
-issue or Beads ID), or call `mcp__plugin_dh_backlog__backlog_add(title=..., priority=..., description=...)`
-and capture the returned issue number as `item_id`. Include `item_id` in that step's Context.
+Design/Architecture steps dispatch `python-cli-design-spec`, which writes its spec to
+`.claude/specs/{slug}.md` — no backlog item_id needed.
 
 ## Core Workflow Patterns
 
@@ -48,13 +44,13 @@ Prose above the diagram carries detail that would clutter the nodes. Before dele
 
 Before the Implement step, check whether the deployment environment is restricted (no internet, no uv). If yes, use `python-engineering:python3-stdlib-only` instead of `python-engineering:python-cli-architect`.
 
-When the task involves display/output/interaction code, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. In SAM track, this gate must run during the Plan phase (interactive with user); the Execute phase receives the confirmed brief as a file path — the shape-brief AskUserQuestion cannot block automated execution.
+When the task involves display/output/interaction code, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. This gate is interactive with the user — run it before any automated execution phase, since the shape-brief AskUserQuestion cannot block automated execution once one starts.
 
 The adversarial design step reads the actual codebase, not the architecture spec, and challenges the approach against real code. It identifies gotchas, alternative approaches, and which specialist skills apply. Pass the architecture file path and affected module paths — the agent reads further from there. It produces a behavioral validation plan (Phases 1–3) that the architect receives alongside the implementation brief.
 
 ```mermaid
 flowchart TD
-    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths, item_id<br>Output: architect artifact registered against item_id (interfaces, layout, CLI command tree)"]
+    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: .claude/specs/{slug}.md (interfaces, layout, CLI command tree)"]
     S2["2. Write Tests<br>subagent_type=python-engineering:python-pytest-architect<br>Context: architecture design file path<br>Output: tests/ directory with failing test suite"]
     S3{"3. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: tests/ path, load python-engineering:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
@@ -78,8 +74,8 @@ flowchart TD
 User: "Build a CLI tool to process CSV files with progress bars"
 
 1. Task is Design with subagent_type="python-engineering:python-cli-design-spec"
-   Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking; item_id resolved per the Delegation Rule above
-   Output: architect artifact registered against item_id — read via artifact_read(item_id, artifact_type="architect")
+   Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking
+   Output: .claude/specs/{slug}.md — read directly via the Read tool
 
 2. Task is Write Tests with subagent_type="python-engineering:python-pytest-architect"
    Context to include in the prompt: Path to architecture design file from step 1
@@ -108,9 +104,8 @@ Before delegating Requirements Gathering, read `git log --oneline -10` and pass 
 ```mermaid
 flowchart TD
     S1["1. Requirements Gathering<br>subagent_type=spec-analyst<br>Context: codebase path, user request verbatim<br>Output: requirements doc with acceptance criteria"]
-    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path, item_id<br>Output: architect artifact registered against item_id, showing integration points"]
-    S3["3. Implementation Planning<br>subagent_type=dh:swarm-task-planner<br>Context: architecture design path, existing test patterns path<br>Output: ordered task list with file targets and acceptance criteria per task"]
-    S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: task list path, relevant existing file paths<br>Output: new feature implementation in packages/"}
+    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: .claude/specs/{slug}.md, showing integration points"]
+    S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: architecture spec path, relevant existing file paths<br>Output: new feature implementation in packages/, broken into an ordered internal task list before writing code"}
     S5["5. Testing<br>subagent_type=python-engineering:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
     S6["6. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
     S7["7. Validate<br>Run: uv run pytest (verify no regressions, >80% coverage)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
@@ -118,11 +113,10 @@ flowchart TD
     S2Q{"Display, output, or<br>interaction code in scope?"}
     S2B["2.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
     S2 -->|"Output: design with integration points"| S2Q
-    S2Q -->|"No"| S3
+    S2Q -->|"No"| S_AD2
     S2Q -->|"Yes"| S2B
-    S2B -->|"Output: confirmed shape brief"| S3
-    S_AD2["Adversarial Solution Design<br>subagent_type=python-engineering:adversarial-solution-design<br>Context: implementation plan path, affected module paths<br>Output: solution brief + validation plan + TDD recommendation"]
-    S3 -->|"Output: ordered task list with file targets"| S_AD2
+    S2B -->|"Output: confirmed shape brief"| S_AD2
+    S_AD2["Adversarial Solution Design<br>subagent_type=python-engineering:adversarial-solution-design<br>Context: architecture spec path, affected module paths<br>Output: solution brief + validation plan + TDD recommendation"]
     S_AD2 -->|"Output: solution brief, validation plan"| S4
     S4 -->|"Output: new feature implementation"| S5
     S5 -->|"Output: tests for new feature + integration tests"| S6

@@ -25,7 +25,7 @@ Apply the correct testing mode based on task context.
 
 **Project tasks where tests already exist** (this agent is one part of a larger TDD workflow): run existing tests first. Follow TDD — do not write new feature tests. Fix any test broken by your changes before reporting done.
 
-**Project tasks where test coverage is missing for touched code**: record the gap to the plan directory. Resolve the path at runtime using: `uv run python -c 'from dh_paths import plan_dir; print(plan_dir())'` — the result is typically `~/.dh/projects/{slug}/plan/`. Write to `{plan_dir}/test-coverage-gaps.md`. Append an entry using this format:
+**Project tasks where test coverage is missing for touched code**: record the gap to `.claude/plans/test-coverage-gaps.md` (create the directory if it does not exist). Append an entry using this format:
 
 ```markdown
 ## Gap: <affected file(s)>

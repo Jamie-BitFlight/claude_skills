@@ -50,16 +50,12 @@ Read the task via `sam_task`. The returned
 
 ### Step 2 — Resolve Role to Agent
 
-Map the abstract role from the task to a concrete agent using the project's
-language manifest or configuration:
+Call `mcp__plugin_dh_backlog__profile_list()` (no `plugin` filter) to fetch every installed
+agent's `name`, `plugin`, and `description`. Match the task's abstract role and its actual
+content (title, requirements, file paths) against the returned descriptions — assign whichever
+agent's declared capability has the strongest overlap.
 
-- `architect` resolves to the project's design/architecture agent
-- `implementer` resolves to the project's coding agent
-- `test-designer` resolves to the project's test writing agent
-- `code-reviewer` resolves to the project's review agent
-- `docs-writer` resolves to the project's documentation agent
-
-If no language manifest exists, dispatch dh:task-worker. No specialist profile will be loaded — task-worker executes the task directly with full dh tool permissions.
+If no agent's description plausibly matches, dispatch dh:task-worker. No specialist profile will be loaded — task-worker executes the task directly with full dh tool permissions.
 
 ### Step 3 — Dispatch to Fresh Session
 

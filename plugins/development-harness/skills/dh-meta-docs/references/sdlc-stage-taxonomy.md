@@ -1,12 +1,12 @@
 # SDLC Stage Naming Taxonomy
 
-Canonical reference for stage naming conventions in the development-harness (dh) plugin. Agents and language plugin authors must use these definitions when naming workflow skills, manifest `stage_skills` keys, and dispatch prompts.
+Canonical reference for stage naming conventions in the development-harness (dh) plugin. Agents must use these definitions when naming workflow skills and dispatch prompts.
 
 ---
 
 ## Section 1: Layer 1 — Cross-Cutting Stage Names
 
-The 7 bare stage names used as workflow skill directory names under `plugins/development-harness/skills/` and as input 2 (cross-cutting stage skill) of the generic-stage-agent. These names are namespace-independent — they do not carry a plugin prefix.
+The 7 bare stage names used as workflow skill directory names under `plugins/development-harness/skills/`. These names are namespace-independent — they do not carry a plugin prefix.
 
 | stage_id | name | purpose | workflow skill path |
 |----------|------|---------|---------------------|
@@ -106,112 +106,26 @@ artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}
 
 ---
 
-## Section 2: Layer 2 — Domain-Prefixed Skill Names
+## Section 2: Naming Convention Rules
 
-Domain-prefixed names are used as `stage_skills` keys in language plugin manifests. They are the strings passed as input 3 (domain skills) to the generic-stage-agent.
-
-### Pattern
-
-```text
-{domain}-{sdlc-stage}
-```
-
-Where `{domain}` is drawn from the closed list below and `{sdlc-stage}` is one of the 7 bare Layer 1 names.
-
-### Closed Domain Prefix List
-
-This list is exhaustive. Adding a new domain requires updating this document and the manifest schema validation.
-
-| Domain | Covers stages | Rationale |
-|--------|--------------|-----------|
-| `planning` | S2 planning, S3 context-integration, S4 task-decomposition | Pre-implementation planning activities involving design, scope, and decomposition |
-| `design` | S1 discovery, S2 planning | Architectural and structural design decisions that shape the solution |
-| `implementation` | S5 execution | Skills for writing and modifying source code |
-| `testing` | S6 forensic-review, S7 final-verification | Verification and validation activities — both per-task review and feature-level certification |
-| `review` | S6 forensic-review | Code review, quality inspection, and audit |
-
-### Composition Rules
-
-1. **Bare stage name** (e.g., `discovery`): Use when a skill applies to exactly one stage and that stage name alone is unambiguous in the manifest.
-2. **Bare domain name** (e.g., `implementation`): Use when a domain covers exactly one stage in the manifest and no disambiguation is needed.
-3. **Domain-prefixed** (e.g., `planning-context-integration`): Required when a domain covers multiple stages in the same manifest to identify which stage the skill list applies to.
-4. **Adding a new domain**: Requires adding the domain to the closed list in this document and updating manifest schema validation.
-
-### Examples
-
-| Manifest key | Domain | SDLC stage | Valid? | Notes |
-|-------------|--------|------------|--------|-------|
-| `discovery` | (bare stage) | `discovery` | Yes | Unambiguous single-stage |
-| `design` | (bare domain) | S2 planning (implied) | Yes | Domain covers one stage in manifest |
-| `planning-context-integration` | `planning` | `context-integration` | Yes | Disambiguates among planning-domain stages |
-| `planning-task-decomposition` | `planning` | `task-decomposition` | Yes | Disambiguates among planning-domain stages |
-| `implementation` | (bare domain) | `execution` | Yes | Domain covers one stage |
-| `testing-forensic-review` | `testing` | `forensic-review` | Yes | Disambiguates among testing-domain stages |
-| `testing-final-verification` | `testing` | `final-verification` | Yes | Correct full form |
-| `testing-verification` | `testing` | `final-verification` | **No** | Incorrect — the stage name is `final-verification`, not `verification`. Use `testing-final-verification`. |
-
----
-
-## Section 3: Naming Convention Rules
-
-Numbered rules for determining the correct form for any stage-related name.
+Numbered rules for determining the correct form for a stage-related name.
 
 1. **Workflow skill directories** under `plugins/development-harness/skills/` use **bare Layer 1 stage names only**. Example: `plugins/development-harness/skills/final-verification/SKILL.md`, not `plugins/development-harness/skills/testing-final-verification/SKILL.md`.
 
-2. **Language manifest `stage_skills` keys** use **domain-prefixed Layer 2 names** when disambiguating, **bare names** when unambiguous (see Section 2 composition rules).
+2. **Cross-cutting stage skills** provided by the dh plugin use bare Layer 1 names. They are activated as `/dh:{stage-name}`.
 
-3. **Cross-cutting stage skills** provided by the dh plugin use bare Layer 1 names. They are activated as `/dh:{stage-name}`.
-
-4. **Language-specific stage skills** provided by language plugins use Layer 2 domain-prefixed names. They appear as values in the manifest `stage_skills` map.
-
-5. **`testing-final-verification` is correct; `testing-verification` is wrong.** The Layer 1 stage name is `final-verification`. The bare form `verification` is not a recognized alias and must not appear as a manifest key.
-
-6. **YAML keys in manifests use hyphens, not underscores.** `planning-context-integration` is correct; `planning_context_integration` is not.
-
-7. **Domain prefix must come from the closed list in Section 2.** Keys using unlisted domain prefixes are invalid. Adding a new domain requires updating Section 2 and the manifest schema validation.
-
-8. **Extends-based overrides** must use the same key form as the base manifest key they override. If the base manifest declares `testing-final-verification`, the extending manifest must use the same key.
-
-### Worked Example — Complete `stage_skills` Block
-
-This example shows a valid `stage_skills` block for a hypothetical Python manifest. All keys use the forms defined in Sections 1 and 2.
-
-```yaml
-stage_skills:
-  # Bare stage name — unambiguous single-stage skill
-  discovery:
-    - python3-discovery
-
-  # Bare domain name — design domain covers one stage (S2 planning) in this manifest
-  design:
-    - python3-design
-
-  # Domain-prefixed — planning domain covers multiple stages; must disambiguate
-  planning-context-integration:
-    - python3-implementation
-
-  planning-task-decomposition:
-    - python3-planning-task-decomposition
-
-  # Bare domain name — implementation domain covers one stage (S5 execution)
-  implementation:
-    - python3-implementation
-
-  # Domain-prefixed — testing domain covers multiple stages; must disambiguate
-  testing-forensic-review:
-    - python3-testing-forensic-review
-
-  # Correct form — NOT testing-verification
-  testing-final-verification:
-    - python3-testing
-```
+Removed: the domain-prefixed Layer 2 naming scheme (`{domain}-{sdlc-stage}` keys like
+`planning-context-integration`, `testing-forensic-review`) existed solely to name `stage_skills`
+manifest keys for `generic-stage-agent`. That agent and its dispatch pipeline
+(`manifest_resolver.py`, `dispatch_helper.py`) were built as a proof of concept in March 2026 and
+never got a live caller — both deleted. See [./language-manifest-schema.md](./language-manifest-schema.md)
+for what a language manifest actually declares today.
 
 ---
 
 ## Sources
 
 - Language manifest schema: [./language-manifest-schema.md](./language-manifest-schema.md)
-- Generic stage agent: [../../agents/generic-stage-agent.md](../../agents/generic-stage-agent.md) (inputs 2 and 3 reference this taxonomy)
 - IEEE 12207:2017 — Systems and software engineering — Software life cycle processes
 - ISO 15288:2023 — Systems and software engineering — System life cycle processes
 - SAFe 6.0 — Scaled Agile Framework practices (scaledagileframework.com)

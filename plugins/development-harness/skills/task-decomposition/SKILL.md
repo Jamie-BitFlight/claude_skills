@@ -104,14 +104,14 @@ before writing it into the task's `agent` field:
 - `test-designer` — write tests and fixtures
 - `code-reviewer` — review and quality assessment
 
-Resolve a role through the project's language manifest: detect the language from the project-root
-markers, read the manifest's `Role Fulfillment` section, and take the agent it maps that role to.
-Manifest entries carry a leading `@` — `@dh:code-reviewer` — and `agent` stores the same name
-without it. The stored value stays plugin-qualified.
+Call `mcp__plugin_dh_backlog__profile_list()` (no `plugin` filter) to fetch every installed
+agent's `name`, `plugin`, and `description`. Match the role and the task's actual content
+against the returned descriptions, and take whichever agent's declared capability has the
+strongest overlap. The stored `agent` value stays plugin-qualified (`plugin:agent-name`).
 
-Write no `agent` value at all when the manifest omits that role, no manifest matches the project,
-or the work is production code, documentation, or anything else no role above covers. The
-executing worker then runs the task with no specialist profile, which is the documented fallback.
+Write no `agent` value at all when no agent's description plausibly matches, or the work is
+production code, documentation, or anything else no role above covers. The executing worker then
+runs the task with no specialist profile, which is the documented fallback.
 
 ## Input
 
@@ -184,7 +184,7 @@ rejected — do not invent fields:
 task: T1
 title: <descriptive imperative title>
 status: not-started
-agent: <plugin-qualified agent resolved from the language manifest — omit when no role applies>
+agent: <plugin-qualified agent resolved via profile_list — omit when no role applies>
 dependencies: []
 priority: <1-5 based on dependency depth>
 complexity: <low / medium / high>

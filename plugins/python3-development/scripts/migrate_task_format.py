@@ -15,8 +15,8 @@ Usage:
     # Migrate single file
     ./migrate_task_format.py tasks-refactor-plugin.md
 
-    # Migrate all task files in directory (use dh_paths.plan_dir() to resolve path)
-    ./migrate_task_format.py "$(uv run python -c 'from dh_paths import plan_dir; print(plan_dir())')"
+    # Migrate all task files in a directory
+    ./migrate_task_format.py .claude/plans/
 
     # Dry run (show changes without writing)
     ./migrate_task_format.py --dry-run tasks.md

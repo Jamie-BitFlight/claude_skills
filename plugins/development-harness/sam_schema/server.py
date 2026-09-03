@@ -372,7 +372,11 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="SAM Plan Operations", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="SAM Plan Operations",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 def sam_plan(
@@ -475,7 +479,11 @@ def sam_plan(
 
 @mcp.tool(
     annotations=ToolAnnotations(
-        title="SAM Task Operations", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        title="SAM Task Operations",
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 def sam_task(
@@ -542,10 +550,10 @@ def sam_task(
 @mcp.tool(
     annotations=ToolAnnotations(
         title="SAM Active Task Context",
-        readOnlyHint=False,
-        destructiveHint=False,
-        idempotentHint=True,
-        openWorldHint=False,
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
     )
 )
 def sam_active_task(

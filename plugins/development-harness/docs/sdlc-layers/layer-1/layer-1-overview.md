@@ -14,7 +14,9 @@ Layer 1 specializes the SDLC framework for a specific programming language. It i
 4. Verification protocol (producer vs evaluator, CERTIFIED/NOT_CERTIFIED)
 5. Orchestrator discipline (delegation, no investigation escalation)
 
-Language manifests **declare specialists and gates**. They do **not** redefine process.
+Language manifests **declare gates, detection markers, and conventions**. They do **not**
+declare specialist agents — the harness resolves those at runtime via `profile_list()` — and do
+**not** redefine process.
 
 ---
 
@@ -28,7 +30,6 @@ Language manifests **declare specialists and gates**. They do **not** redefine p
 | RT-ICA, verification | — |
 | SAM task schema (`models.py`) | — |
 | Subagent contract | — |
-| — | Role Fulfillment (architect, test-designer, etc.) |
 | — | Quality Gates (format, lint, typecheck, test, standards) |
 | — | Project Detection (markers, source/test patterns) |
 | — | Conventions (naming, structure, testing, documentation) |

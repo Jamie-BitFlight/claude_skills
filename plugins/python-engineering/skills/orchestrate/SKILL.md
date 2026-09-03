@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: "Use when implementing a Python feature, adding CLI commands, writing pytest suites, reviewing Python code, debugging, or refactoring. The primary Python engineering workflow orchestrator — routes to SAM track (multi-step feature additions, work spanning 2+ agents or files, durable progress tracking) or Direct track (single-focused tasks: bug fix, tests for one file, one-shot refactor, code review). Delegates to python-cli-architect (implementation), python-pytest-architect (tests), code-reviewer (review), python-cli-design-spec (architecture). Triggers on any Python task requiring specialist agent coordination or multi-agent execution."
+description: "Use when implementing a Python feature, adding CLI commands, writing pytest suites, reviewing Python code, debugging, or refactoring. The primary Python engineering workflow orchestrator — classifies the task and delegates through this plugin's own specialist agents (architect → implement → test → review), sized to the task. Delegates to python-cli-architect (implementation), python-pytest-architect (tests), code-reviewer (review), python-cli-design-spec (architecture). Triggers on any Python task requiring specialist agent coordination or multi-agent execution."
 argument-hint: '[task description]'
 ---
 
@@ -20,91 +20,40 @@ Load and follow the guide in `/python-engineering:orchestrating-python-developme
 
 Do not proceed to Step 2 until this skill has been loaded. It contains agent selection criteria, workflow patterns, quality gates, and multi-agent chaining patterns needed for Step 2.
 
-## Step 2 — Route to track
+## Step 2 — Classify the task
 
-```mermaid
-flowchart TD
-    Q{"Does the task meet ANY of:<br>- user said 'add a feature', 'plan', or 'track'<br>- requires 2+ agents in sequence<br>- spans multiple files or modules<br>- needs durable progress tracking across turns"}
-    Q -->|"Yes"| SAM["SAM Track — Step 3A"]
-    Q -->|"No — single focused task:<br>fix a bug, write tests for one file,<br>review code, one-shot refactor"| Direct["Direct Track — Step 3B"]
-```
+1. Classify the task: feature, refactor, review, debug, packaging, migration, or cleanup
+2. Identify project lane: CLI, web, data, library, service, or legacy
+3. Identify typing lane from repository constraints and dependencies
+4. Choose the minimum set of specialist skills needed
 
-Then state aloud before the first Agent tool call:
+State aloud before the first Agent tool call:
 
 ```text
 Task: <one sentence>
-Track: SAM | Direct
 Workflow pattern: <TDD | Feature Addition | Refactoring | Debugging | Code Review>
 Agent chain: <AGENT1> → <AGENT2> → ...
 ```
 
 If you cannot fill in workflow pattern and agent chain from the guide read in Step 1, go back and read it.
 
-## Step 3A — SAM Track
+## Step 3 — Execute
 
-```mermaid
-flowchart TD
-    P1["Phase 1 — Plan<br>Skill: /dh:add-new-feature<br>Args: task description<br>Produces: ~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml"]
-    P1 --> P1Q{"add-new-feature result?"}
-    P1Q -->|"BLOCKED — plan-validator gate failed"| P1Blocked["Surface blocker to user<br>Await clarification<br>STOP"]
-    P1Q -->|"PASS — task file produced"| P2
-    P2["Phase 2 — Execute<br>Skill: /dh:implement-feature<br>Args: path to task file<br>Loop: sam ready → start-task → SubagentStop hook marks COMPLETE<br>Repeat until no tasks remain"]
-    P2 --> P3["Phase 3 — Quality gates<br>Auto-invoked by implement-feature<br>Skill: /dh:complete-implementation<br>Runs: code review → feature verification → integration check<br>→ doc drift → doc update → context refinement → commit"]
-    P3 --> Done(["DONE — changes committed"])
-```
-
-### SAM task creation format (when creating tasks directly)
-
-When `mcp__plugin_dh_sam__sam_plan` is called directly with the `create` action (e.g., from
-`create-feature-task`), each entry in `tasks` carries:
-
-```yaml
-task: "<task id, e.g. T1>"
-title: "<short imperative title>"
-body: |
-  <what must be true when this task is done>
-
-  ## Acceptance Criteria
-  - Given <context>, when <action>, then <observable result>
-```
-
-Update task status with `mcp__plugin_dh_sam__sam_task(plan="{plan}", task="{task}", config={"action": "state", "status": "complete"})` as phases complete.
-
-## Step 3B — Direct Track
-
-Classify the task then delegate:
-
-1. Classify the task: feature, refactor, review, debug, packaging, migration, or cleanup
-2. Identify project lane: CLI, web, data, library, service, or legacy
-3. Identify typing lane from repository constraints and dependencies
-4. Choose the minimum set of specialist skills needed
-5. Produce a concise execution plan
-6. Execute or delegate in the smallest coherent units
-7. Run deterministic checks before declaring completion
+1. Produce a concise execution plan
+2. Execute or delegate in the smallest coherent units
+3. Run deterministic checks before declaring completion
 
 Agent routing — delegate rather than implement:
 
 - Python code → subagent_type="python-engineering:python-cli-architect"
 - Tests → subagent_type="python-engineering:python-pytest-architect"
 - Code review → subagent_type="python-engineering:code-reviewer"
-- Architecture design → subagent_type="python-engineering:python-cli-design-spec" — requires a resolved `item_id` (see below)
-- Task breakdown → subagent_type="dh:swarm-task-planner"
+- Architecture design → subagent_type="python-engineering:python-cli-design-spec"
 - Stdlib-only script → Skill(skill: "python-engineering:python3-stdlib-only")
 - CLI/TUI UI design, shape brief, critique, audit, or polish → Skill(skill: "python-engineering:designing-ui-for-cli")
 - Pre-implementation challenge → subagent_type="python-engineering:adversarial-solution-design"
 
 Before delegating any non-trivial implementation to `python-cli-architect`, route through `adversarial-solution-design` first. Skip only for one-line fixes where the correct change is unambiguous (typo, wrong variable name, trivial rename).
-
-#### Resolving `item_id` for `python-cli-design-spec`
-
-`python-cli-design-spec` registers its spec as an artifact against a backlog item — it has no
-file-write fallback, so every dispatch, Direct Track included, must resolve an `item_id` first:
-
-1. Task already names a tracked item (`#N` GitHub issue or a Beads ID) → use it as `item_id`.
-2. Otherwise call `mcp__plugin_dh_backlog__backlog_add(title=<task title>, priority=<P0|P1|P2|Ideas>, description=<task description>)` and capture the returned issue number (or backend-native identifier) as `item_id`. Treat an `error` key in the response as a hard stop — report it, do not fall back to a file write.
-
-Pass the resolved `item_id` in the delegation context alongside Outcomes/Constraints/Known
-issues/File paths below.
 
 Each delegation must include:
 
@@ -112,11 +61,10 @@ Each delegation must include:
 - Constraints: user requirements, compatibility, scope boundaries
 - Known issues: error messages already in context (pass-through, not pre-gathered)
 - File paths: where to start looking — not what you found there
-- `item_id`: required for `python-cli-design-spec` dispatches — resolved per the previous section
 
 ### Delegation Hard Rules
 
-These apply to all delegations — SAM and Direct:
+These apply to all delegations:
 
 | Prohibited | Instead |
 |---|---|

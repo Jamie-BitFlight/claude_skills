@@ -152,7 +152,7 @@ row before writing the call. The `Registering agents` column holds the value eac
 | Type | Registering agents | Gate-read | Notes |
 |---|---|---|---|
 | `feature-context` | `discovery`, `feature-researcher` | no | Discovery document. Each producer re-registers the same `artifact_id`, so the type holds one entry per item. |
-| `architect` | `planning`, `context-integration`, `context-refinement`, `python-cli-design-spec`, `{resolved_agent}` | no | Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read returned, appending annotations. |
+| `architect` | `planning`, `context-integration`, `context-refinement`, `{resolved_agent}` | no | Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read returned, appending annotations. |
 | `codebase-analysis` | `codebase-analyzer`, `code-review-architecture` | no | Codebase pattern, architecture, testing, convention, and dependency-graph documents. Intentionally multi-entry — one per focus area or diagram. Consumers reach the full set through `artifact_list`. |
 | `code-review` | `code-reviewer` | yes | Code review verdict. One entry per reviewed task, so consumers read it by `artifact_id` (`code-review-{task_id}-{slug}`), reported in the reviewer's STATUS output. `complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`. |
 | `T0-baseline` | `t0-baseline-capture` | yes | Pre-implementation baseline. `tn-verification-gate` compares final state against it. |

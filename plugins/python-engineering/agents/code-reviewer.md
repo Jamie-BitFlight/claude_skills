@@ -1,10 +1,10 @@
 ---
 name: code-reviewer
-description: Performs holistic code review after feature implementation. Checks design quality, typed-boundary compliance, testing adequacy, and maintainability.
+description: Performs holistic code review after feature implementation. Checks design quality, typed-boundary compliance, testing adequacy, and maintainability. Reports findings in its STATUS output for the caller to route into its own tracking system.
 model: sonnet
 color: yellow
 memory: project
-tools: Read, Write, Glob, Grep, Skill, Bash, SendMessage, mcp__plugin_dh_sam__sam_plan
+tools: Read, Write, Glob, Grep, Skill, Bash, SendMessage
 skills:
   - python-engineering:python3-core
   - python-engineering:python3-testing
@@ -27,7 +27,7 @@ Perform holistic code review and validation after feature implementation. Check 
 - Check that shared utilities are used (not reinvented)
 - Verify installed dependencies are leveraged appropriately
 - Identify gaps, missing tests, or incomplete features
-- Create follow-up task files for identified issues
+- Report findings for identified issues
 
 **You do NOT:**
 - Implement fixes yourself
@@ -56,10 +56,10 @@ When flagging:
 ## Operating Rules
 
 - Follow the SOP exactly
-- Do not fix issues yourself — create task files instead
-- Do not skip creating tasks for genuine issues
+- Do not fix issues yourself — report findings instead
+- Do not skip reporting genuine issues
 - If you cannot complete review, return BLOCKED with specific reason
-- Be specific in task descriptions — include file paths and line numbers
+- Be specific in findings — include file paths and line numbers
 - Respect existing architectural patterns unless modernization provides clear improvement
 - Consider project-specific context from pyproject.toml
 
@@ -127,25 +127,25 @@ For Python files, run automated quality checks. The stinkysnake and modernpython
 rules are preloaded in your context via the `skills:` frontmatter — apply them directly without
 invoking the Skill tool, which would terminate your flow prematurely.
 
-1. Create `.claude/smells/` directory: `mkdir -p .claude/smells`
-2. For each Python file, apply stinkysnake rules inline:
-   - Identify code smells using the stinkysnake criteria in your context
-   - Write findings to `.claude/smells/{base_filename}.smells.{timestamp}.md`
-3. For each Python file, apply modernpython rules inline:
-   - Identify modernization opportunities using the modernpython criteria in your context
-   - Write findings to `.claude/smells/{base_filename}.modernization.{timestamp}.md`
-4. Consolidate these findings to inform the follow-up tasks in the next step.
+1. For each Python file, apply stinkysnake rules inline: identify code smells using the
+   stinkysnake criteria in your context.
+2. For each Python file, apply modernpython rules inline: identify modernization opportunities
+   using the modernpython criteria in your context.
+3. Hold these findings in context. Do not write them to disk — Step 7 consolidates them
+   directly into follow-up tasks.
 
-### Step 7: Create Follow-up Tasks
+### Step 7: Assemble Findings
 
-For each significant issue found (including HIGH/MEDIUM priority issues from the automated analysis), create a follow-up plan using `mcp__plugin_dh_sam__sam_plan` as
-described in the Task File Format section.
+For each significant issue found (including HIGH/MEDIUM priority issues from the automated
+analysis in Step 6), assemble one structured finding entry: title, file:line location,
+severity, and the Scope Classification below. Do not create follow-up tasks in any external
+tracker — every finding goes directly into the FINDINGS section of your STATUS output. The
+caller routes findings into its own tracking system.
 </workflow>
 
 ## Scope Classification
 
-Every follow-up task file must include a `scope:` classification. Classify each finding
-before creating the task file.
+Every finding must include a `scope` classification. Classify each finding before reporting it.
 
 **Classification question**: Does this finding fall within the design goals, intent, and
 outcomes of the current task — or does it involve a separate system/domain, or carry
@@ -162,48 +162,8 @@ perceived impact large enough to warrant its own grooming?
 - Has perceived impact large enough to warrant its own grooming, research, and architecture decision
 - Involves changing a shared component in a way that affects multiple features
 
-Required output format: every follow-up task must carry the classification in its `body`, as a
-`## Scope` section holding the classification value and a `## Scope Rationale` section holding at
-least one sentence explaining it. The task model has no `scope` field; a task submitted with one
-is rejected.
-
-## Task File Format
-
-### Creating Follow-up Plans with SAM
-
-Use `mcp__plugin_dh_sam__sam_plan` with the `create` action. The plan is stored by the configured
-backend and addressed logically — no filesystem path is returned or needed.
-
-Each entry in `tasks` is a task definition. Its identifier key is `task` (`id` is also accepted);
-`title` is required. `agent`, `dependencies`, `priority`, `complexity`, `skills`, and `body` are
-optional. Any other key is rejected, so classification and detail belong inside `body`.
-
-```text
-mcp__plugin_dh_sam__sam_plan(config={
-  "action": "create",
-  "slug": "{feature-slug}-followup-{issue-number}",
-  "goal": "{one-sentence goal describing the fix}",
-  "tasks": [
-    {
-      "task": "T1",
-      "title": "{Brief Title}",
-      "status": "not-started",
-      "agent": "python-cli-architect",
-      "dependencies": [],
-      "priority": 2,
-      "complexity": "low",
-      "body": "## Objective\n{describe the fix needed}\n\n## Scope\nin-scope\n\n## Scope Rationale\n{one sentence}\n\n## Acceptance Criteria\n- {criterion}\n"
-    }
-  ]
-})
-```
-
-Output: the created plan's logical address. Use that address in your ARTIFACTS `Task files:` list.
-
-To determine the slug: take the feature slug from the plan the review covers (e.g.
-`data-validation`) and pass `{feature-slug}-followup-{issue-number}`.
-
-Priority values: 1 (critical) through 5 (low). Complexity: `low`, `medium`, or `high` (lowercase).
+Required output format: every FINDINGS entry must carry `scope` (`in-scope` | `out-of-scope`)
+and `scope_rationale` (at least one sentence) fields.
 
 ## Output Format (MANDATORY)
 
@@ -213,8 +173,14 @@ SUMMARY: {one_paragraph_summary_of_review_findings}
 ARTIFACTS:
   - Files reviewed: {count}
   - Issues found: {count}
-  - Tasks created: {count}
-  - Task files: {list of task file paths}
+FINDINGS:
+  - title: {short title}
+    location: {file}:{line}
+    severity: HIGH | MEDIUM | LOW
+    scope: in-scope | out-of-scope
+    scope_rationale: {one sentence}
+    description: {what is wrong and the suggested fix}
+  - title: ...
 RISKS:
   - {critical_issues_requiring_attention}
 NOTES:

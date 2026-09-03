@@ -33,7 +33,10 @@ post-implementation test writing, which contradicts the team's process.
 ```yaml
 - when: "feature involves new functionality and the team follows test-driven development"
   use:
-    - python-engineering:python3-tdd
+    # Resolve from this run's candidate_skills (Step 2/3), not a fixed name — the installed
+    # Python plugin providing TDD workflow guidance. Currently python-engineering:python3-tdd;
+    # if no matching skill was found for this project's stack, note the gap instead of
+    # inventing one.
 ```
 
 ---
@@ -58,7 +61,8 @@ exists with substantial existing test files)
 - when: "feature involves algorithms, validators, parsers, or data transformations requiring
   property-based tests"
   use:
-    - python-engineering:python3-testing
+    # Resolve from this run's candidate_skills, same as Q1 — currently
+    # python-engineering:python3-testing.
 ```
 
 ---
@@ -325,7 +329,9 @@ test dependencies
 - when: "feature requires Robot Framework test cases, .robot file modifications, or
   keyword library extensions"
   use:
-    - python-engineering:python3-testing
+    # Resolve from this run's candidate_skills, same as Q1 — currently
+    # python-engineering:python3-testing. No dedicated Robot Framework skill exists yet; note
+    # the gap if the resolved skill doesn't actually cover .robot authoring.
 ```
 
 ---

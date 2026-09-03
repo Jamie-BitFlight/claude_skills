@@ -26,7 +26,6 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 - **python-pytest-architect** — Design comprehensive test suites
 - **code-reviewer** — Review Python code for quality and standards
 - **python-cli-design-spec** — Design system architecture
-- **dh:swarm-task-planner** — Break down tasks into implementation plans
 
 ### Commands (in this skill: references/commands/)
 
@@ -99,14 +98,12 @@ Before delegating Requirements Gathering, read `git log --oneline -10` and pass 
 flowchart TD
     S1["1. Requirements Gathering<br>subagent_type=spec-analyst<br>Context: codebase path, user request verbatim<br>Output: requirements doc with acceptance criteria"]
     S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: design showing integration points with existing code"]
-    S3["3. Implementation Planning<br>subagent_type=dh:swarm-task-planner<br>Context: architecture design path, existing test patterns path<br>Output: ordered task list with file targets and acceptance criteria per task"]
-    S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: task list path, relevant existing file paths<br>Output: new feature implementation in packages/"}
+    S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: architecture design path, relevant existing file paths<br>Output: new feature implementation in packages/, broken into an ordered internal task list before writing code"}
     S5["5. Testing<br>subagent_type=python-engineering:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
     S6["6. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
     S7["7. Validate<br>Run: uv run pytest (verify no regressions, >80% coverage)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
     S1 -->|"Output: requirements doc, acceptance criteria"| S2
-    S2 -->|"Output: design with integration points"| S3
-    S3 -->|"Output: ordered task list with file targets"| S4
+    S2 -->|"Output: design with integration points"| S4
     S4 -->|"Output: new feature implementation"| S5
     S5 -->|"Output: tests for new feature + integration tests"| S6
     S6 -->|"Output: quality assessment, improvement list"| S7

@@ -26,7 +26,6 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 - **python-pytest-architect** — Design comprehensive test suites
 - **code-reviewer** — Review Python code for quality and standards
 - **python-cli-design-spec** — Design system architecture
-- **dh:swarm-task-planner** — Break down tasks into implementation plans
 
 ### Commands (in this skill: references/commands/)
 
@@ -39,11 +38,8 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 
 **Context to include in the prompt** means: file paths, outcomes, and user requirements only. Do not pass file contents, summaries, or pre-gathered data — agents discover and read files themselves.
 
-**Design/Architecture steps below dispatch `python-cli-design-spec`**, which registers its spec
-as an artifact against a backlog item and has no file-write fallback. Before any Design or
-Architecture step in the workflows below: use an `item_id` already named by the task (`#N` GitHub
-issue or Beads ID), or call `mcp__plugin_dh_backlog__backlog_add(title=..., priority=..., description=...)`
-and capture the returned issue number as `item_id`. Include `item_id` in that step's Context.
+Design/Architecture steps dispatch `python-cli-design-spec`, which writes its spec to
+`.claude/specs/{slug}.md` — no backlog item_id needed.
 
 ## Core Workflow Patterns
 
@@ -57,12 +53,12 @@ Before the Implement step, check whether the deployment environment is restricte
 
 ```mermaid
 flowchart TD
-    S1["1. Design<br>subagent_type=python3-development:python-cli-design-spec<br>Context: user requirements, any existing codebase paths, item_id<br>Output: architect artifact registered against item_id (interfaces, layout, CLI command tree)"]
+    S1["1. Design<br>subagent_type=python3-development:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: .claude/specs/{slug}.md (interfaces, layout, CLI command tree)"]
     S2["2. Write Tests<br>subagent_type=python3-development:python-pytest-architect<br>Context: architecture design file path<br>Output: tests/ directory with failing test suite"]
     S3{"3. Implement<br>Default: python3-development:python-cli-architect<br>Restricted env only: python3-development:stdlib-scripting<br>Context: tests/ path, load python3-development:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python3-development:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
     S5["5. Validate<br>Run: /python3-development:shebangpython on each script<br>Run: Activate holistic-linting skill<br>Run: uv run pytest (verify >80% coverage)<br>Check: CI config for additional validators<br>Pass criteria: all tests green, linting clean, coverage threshold met"]
-    S1 -->|"Output: architect artifact registered against item_id"| S2
+    S1 -->|"Output: .claude/specs/{slug}.md"| S2
     S2 -->|"Output: tests/ with failing test suite"| S3
     S3 -->|"Output: implementation making all tests pass"| S4
     S4 -->|"Output: review findings, improvement list"| S5
@@ -74,8 +70,8 @@ flowchart TD
 User: "Build a CLI tool to process CSV files with progress bars"
 
 1. Task is Design with subagent_type="python3-development:python-cli-design-spec"
-   Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking; item_id resolved per the Delegation Rule above
-   Output: architect artifact registered against item_id — read via artifact_read(item_id, artifact_type="architect")
+   Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking
+   Output: .claude/specs/{slug}.md — read directly via the Read tool
 
 2. Task is Write Tests with subagent_type="python3-development:python-pytest-architect"
    Context to include in the prompt: Path to architecture design file from step 1
@@ -104,18 +100,16 @@ Before delegating Requirements Gathering, read `git log --oneline -10` and pass 
 ```mermaid
 flowchart TD
     S1["1. Requirements Gathering<br>subagent_type=spec-analyst<br>Context: codebase path, user request verbatim<br>Output: requirements doc with acceptance criteria"]
-    S2["2. Architecture<br>subagent_type=python3-development:python-cli-design-spec<br>Context: requirements doc path, existing codebase path, item_id<br>Output: architect artifact registered against item_id, showing integration points"]
-    S3["3. Implementation Planning<br>subagent_type=dh:swarm-task-planner<br>Context: architecture design path, existing test patterns path<br>Output: ordered task list with file targets and acceptance criteria per task"]
-    S4{"4. Implement<br>Default: python3-development:python-cli-architect<br>Restricted env only: python3-development:stdlib-scripting<br>Context: task list path, relevant existing file paths<br>Output: new feature implementation in packages/"}
-    S5["5. Testing<br>subagent_type=python3-development:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
-    S6["6. Review<br>subagent_type=python3-development:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
-    S7["7. Validate<br>Run: uv run pytest (verify no regressions, >80% coverage)<br>Run: Activate holistic-linting skill<br>Run: /python3-development:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
+    S2["2. Architecture<br>subagent_type=python3-development:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: .claude/specs/{slug}.md, showing integration points"]
+    S3{"3. Implement<br>Default: python3-development:python-cli-architect<br>Restricted env only: python3-development:stdlib-scripting<br>Context: architecture spec path, relevant existing file paths<br>Instruct the agent to break its own work into an ordered internal task list before writing code<br>Output: new feature implementation in packages/"}
+    S4["4. Testing<br>subagent_type=python3-development:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
+    S5["5. Review<br>subagent_type=python3-development:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
+    S6["6. Validate<br>Run: uv run pytest (verify no regressions, >80% coverage)<br>Run: Activate holistic-linting skill<br>Run: /python3-development:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
     S1 -->|"Output: requirements doc, acceptance criteria"| S2
     S2 -->|"Output: design with integration points"| S3
-    S3 -->|"Output: ordered task list with file targets"| S4
-    S4 -->|"Output: new feature implementation"| S5
-    S5 -->|"Output: tests for new feature + integration tests"| S6
-    S6 -->|"Output: quality assessment, improvement list"| S7
+    S3 -->|"Output: new feature implementation"| S4
+    S4 -->|"Output: tests for new feature + integration tests"| S5
+    S5 -->|"Output: quality assessment, improvement list"| S6
 ```
 
 ### 3. Code Review Workflow
@@ -470,8 +464,8 @@ User: "Build a CLI tool to validate YAML configurations"
 
 Orchestrator:
 1. Task is Architecture Design with subagent_type="python3-development:python-cli-design-spec"
-   Context to include in the prompt: Design architecture for YAML validation CLI; item_id resolved per the Delegation Rule above
-   Output: architect artifact registered against item_id (component list, validation rules, module layout)
+   Context to include in the prompt: Design architecture for YAML validation CLI
+   Output: .claude/specs/{slug}.md (component list, validation rules, module layout)
 
 2. Task is Write Tests with subagent_type="python3-development:python-pytest-architect"
    Context to include in the prompt: Architecture design file path from step 1

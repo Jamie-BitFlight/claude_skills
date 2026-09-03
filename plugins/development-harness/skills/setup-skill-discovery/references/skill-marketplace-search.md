@@ -44,7 +44,7 @@ each signal into one or more search queries.
 
 | Inferred Stack | Search Queries | Example Skills to Look For |
 |---|---|---|
-| **Python** | `python testing`, `python linting`, `python typing`, `pytest` | `python-engineering`, `holistic-linting`, `python3-development` |
+| **Python** | `python testing`, `python linting`, `python typing`, `pytest` | `python-engineering`, `holistic-linting` |
 | **JavaScript / TypeScript / Node** | `typescript`, `react`, `node testing`, `eslint`, `jest` | `react-expert`, `react-patterns`, `shadcn`, `frontend-design` |
 | **Infrastructure / DevOps** | `terraform`, `docker`, `kubernetes`, `vagrant`, `packer`, `ci cd` | `vagrant-reference`, `packer-prerequisites`, `vm-flightsimulator` |
 | **Database / SQL** | `sqlite`, `sql optimization`, `database migration`, `postgres` | `sqlite-database-expert`, `sql-optimization`, `sql-code-review` |

@@ -13,7 +13,8 @@ Without this plugin, Claude applies generic Python patterns and makes ad-hoc dec
 - Every Python task automatically applies Python 3.11+ standards
 - Tasks are routed to specialist skills (CLI, web, data, TDD, typing) based on what you are building
 - Code quality gates run via `ruff`, `ty`, and `pytest` with strict typing enforced
-- Multi-step features are tracked via the SAM workflow with durable progress
+- Multi-step features get a structured task file via `create-feature-task`
+  (`.claude/tasks/{feature-name}.md`) capturing phases, acceptance criteria, and context
 
 ## Architecture
 
@@ -21,11 +22,12 @@ Without this plugin, Claude applies generic Python patterns and makes ad-hoc dec
 
 `python3-core` loads on every Python task, establishes defaults, and routes to specialists based on the task domain.
 
-`/python-engineering:orchestrate` is the primary user entrypoint. It classifies the task, loads appropriate specialist skills, and routes to the correct agent track. This command is model-invocable — Claude can route work internally using the orchestrate workflow.
-
-**SAM track** — multi-step feature additions spanning 2+ agents or files, with durable progress tracking.
-
-**Direct track** — single-focused tasks: bug fix, tests for one file, one-shot refactor, code review.
+`/python-engineering:orchestrate` is the primary user entrypoint. It classifies the task,
+loads the appropriate specialist skills, and delegates through this plugin's own agent
+chain — architect (design) → implement → test → review — sized to the task: a one-line fix
+goes straight to implement → review, while a multi-file feature runs the full chain. This
+command is model-invocable — Claude can route work internally using the orchestrate
+workflow.
 
 ### Manual Entrypoints (slash commands)
 

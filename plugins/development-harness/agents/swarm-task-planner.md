@@ -6,7 +6,6 @@ model: opus
 skills:
   - dh:clear-cove-task-design
   - dh:create-artifact
-  - python-engineering:specialist-skill-routing
   - dh:subagent-contract
 ---
 
@@ -276,7 +275,7 @@ Task fields — one object per task, used in `tasks` or in `append_task`:
 task: T01                     # required, str — task id
 title: "..."                  # required, str
 status: not-started
-agent: python-cli-architect
+agent: {resolved_agent}
 dependencies: []
 blocked-by: []
 parallelize-with: []
@@ -394,40 +393,25 @@ When computing TN's dependency list: collect all task IDs in the plan where `is-
 
 ## Agent Assignment Rules
 
-Map task types to appropriate specialist agents:
+No hardcoded task-type-to-agent table. Call `mcp__plugin_dh_backlog__profile_list()` (omit
+`plugin` to include every installed plugin) to fetch every installed agent's `name`, `plugin`,
+`description`, and `skills`. Match the task's file paths, title, and requirements against the
+returned `description` fields — assign whichever agent's declared capability has the strongest
+overlap with what the task actually needs.
 
-| Task Type                                      | Agent                                    |
-| ---------------------------------------------- | ---------------------------------------- |
-| Python implementation (cli/, core/, services/) | python-engineering:python-cli-architect |
-| Test files (tests/\*_/_.py)                    | python-engineering:python-pytest-architect |
-| Linting/type fixing                            | holistic-linting:linting-root-cause-resolver |
-| Documentation (.md files)                      | dh:service-docs-maintainer               |
-| Skill creation                                 | plugin-creator:agent-creator             |
-| Agent creation                                 | plugin-creator:subagent-refactorer       |
-| Bookend baseline capture (is-bookend: t0-baseline) | dh:t0-baseline-capture              |
-| Bookend verification gate (is-bookend: tn-verification) | dh:tn-verification-gate        |
+This covers every task type — implementation, tests, linting, documentation, skill/agent
+creation, bookends — with one mechanism. Installing a new plugin's agent makes it immediately
+selectable the next time `profile_list()` is called; nothing in this file needs updating.
 
-If architecture spec specifies an agent, use that. Otherwise infer from file paths and task type.
+If the architecture spec specifies an agent explicitly, use that instead of matching. On no
+clear match, write no `agent` value — the task dispatches to `dh:task-worker` with no specialist
+profile, the documented generic fallback (`plugins/development-harness/skills/execution/SKILL.md`
+Step 2).
 
-## Skills Mapping Table
-
-Map task content to skills that the executing agent should load. Apply when task title, requirements, or expected outputs match the pattern. Multiple rows can match — union all matched skills into the `skills:` field.
-
-| Pattern (in title, requirements, or outputs) | Skills |
-|-----------------------------------------------|--------|
-| pytest, test, tests, test coverage, integration tests, unit tests | `fastmcp-creator:fastmcp-python-tests`, `python-engineering:python3-testing` |
-| skill creation, SKILL.md, skill structure | `plugin-creator:skill-creator` |
-| documentation, docs, README, CONTRIBUTING | `dh:clear-cove-task-design` |
-| agent creation, agent prompt, agent definition | `plugin-creator:skill-creator` |
-| linting, type checking, ty, ruff | `holistic-linting:holistic-linting`, `python-engineering:ty` |
-| CLI, command-line, typer, click | `python-engineering:typer`, `python-engineering:python3-cli` |
-
-**Rules:**
-
-1. If the architecture spec explicitly lists skills for a task, use those (override auto-detection).
-2. If multiple patterns match, union all skills (deduplicated).
-3. If no pattern matches, set `skills: []` (empty list, not omitted).
-4. The table is extensible. Add new rows when new skill-task associations are identified.
+`skills:` needs no separate mapping step — the assigned agent's own `skills` (returned by
+`profile_list()`) load automatically when it's dispatched. Only add a skill to the task's
+`skills:` field when the architecture spec explicitly calls for one beyond what the assigned
+agent already declares.
 
 ## Parallelization and Conflict Avoidance
 
@@ -466,7 +450,7 @@ The swarm-task-planner MUST, during Phase 3 (Task Decomposition), perform the fo
 
 **Exception — sequential dependency already exists**: If tasks sharing an output file are already chained by dependencies (Task A depends on Task B, both write file X), no merge is required. The dependency chain already serializes execution, preventing edit conflicts. However, the planner SHOULD note in the plan that merging would reduce agent launch overhead.
 
-**Exception — different agents required**: If the constituent tasks require different agent types (e.g., one requires `python-cli-architect` for code changes and another requires `service-docs-maintainer` for documentation), the planner should evaluate whether one agent can handle the combined scope. If not, chain the tasks with dependencies instead of merging.
+**Exception — different agents required**: If the constituent tasks require different agent types (e.g., one resolves to a code-implementation agent and another to `dh:service-docs-maintainer` for documentation), the planner should evaluate whether one agent can handle the combined scope. If not, chain the tasks with dependencies instead of merging.
 
 **Illustrative example** (showing structure, not prescriptive content):
 
