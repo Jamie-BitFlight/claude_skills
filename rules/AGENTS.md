@@ -32,6 +32,19 @@ been added yet.
 | `skill-substitution.md` | SKILL.md — load-time string substitution gotcha |
 | `uv-run-fallback.md` | scripts/, Python files, `.claude/hooks/` — uv run fallback when uv unavailable |
 | `yaml-toml-libraries.md` | Python files — `ruamel.yaml`/`tomlkit` only, never `pyyaml` |
+| `agent-delegation.md` | any file (always-on) — path conventions and agent-selection for delegation |
+| `commit-cadence-and-worktrees.md` | any file (always-on) — small scoped commits, worktrees for concurrent writes |
+| `evidence-action-proportionality.md` | any file (always-on) — files changed must match evidence gathered |
+| `fact-verification-first.md` | any file (always-on) — WebSearch before planning around a named product/version |
+| `falsification-requirement.md` | any file (always-on) — every hypothesis test needs a falsification check |
+| `fix-delegation-discipline.md` | any file (always-on) — reproduction-first cycle for bug-fix delegation |
+| `interactive-terminal-workarounds.md` | any file (always-on) — PTY providers when a tool needs a TTY |
+| `large-file-write-strategy.md` | any file (always-on) — skeleton+edit-fill above 25K chars |
+| `model-selection.md` | any file (always-on) — model/effort tier by cognitive requirement |
+| `proactive-fix-gate.md` | any file (always-on) — gate before acting on a self-discovered problem |
+| `reproduction-integrity.md` | any file (always-on) — reproduce in the real environment before synthetic ones |
+| `scratch-directory.md` | any file (always-on) — `.tmp/scratch/` fallback output convention |
 
-A file with no `paths:` frontmatter in `.claude/rules/` was never migrated here — it loads some
-other way (always-on, or referenced directly) and has no glob-triggered equivalent.
+`match: "*"` in `manifest.json` means always-on: it fires on the first file touch of a session,
+same dedup rules as any other entry. Every `.claude/rules/*.md` file is now migrated — a file with
+no `paths:` frontmatter there became an always-on entry here instead of being skipped.

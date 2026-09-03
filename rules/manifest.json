@@ -87,6 +87,54 @@
     {
       "file": "yaml-toml-libraries.md",
       "match": "*.py"
+    },
+    {
+      "file": "agent-delegation.md",
+      "match": "*"
+    },
+    {
+      "file": "commit-cadence-and-worktrees.md",
+      "match": "*"
+    },
+    {
+      "file": "evidence-action-proportionality.md",
+      "match": "*"
+    },
+    {
+      "file": "fact-verification-first.md",
+      "match": "*"
+    },
+    {
+      "file": "falsification-requirement.md",
+      "match": "*"
+    },
+    {
+      "file": "fix-delegation-discipline.md",
+      "match": "*"
+    },
+    {
+      "file": "interactive-terminal-workarounds.md",
+      "match": "*"
+    },
+    {
+      "file": "large-file-write-strategy.md",
+      "match": "*"
+    },
+    {
+      "file": "model-selection.md",
+      "match": "*"
+    },
+    {
+      "file": "proactive-fix-gate.md",
+      "match": "*"
+    },
+    {
+      "file": "reproduction-integrity.md",
+      "match": "*"
+    },
+    {
+      "file": "scratch-directory.md",
+      "match": "*"
     }
   ]
 }
