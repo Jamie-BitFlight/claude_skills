@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Shared path-based rule loader (Claude Code/Codex/Hermes). Usage: echo '<hook stdin>' | node context-loader.mjs <file-path>
-// Matches manifest.json globs, prints full content once per session_id then a pointer line; never throws.
+// Matches manifest.json globs, prints full content once per session_id then a pointer line; state entries older than 48h are pruned; never throws.
+// Reset mode: echo '<hook stdin>' | node context-loader.mjs --reset — clears that session_id's dedup state (wire to SessionStart, matcher compact|clear).
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
@@ -10,6 +11,7 @@ const RULES_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(RULES_DIR, '..');
 const MANIFEST_PATH = join(RULES_DIR, 'manifest.json');
 const STATE_PATH = join(REPO_ROOT, '.tmp', 'context-rules-state.json');
+const STATE_TTL_MS = 48 * 60 * 60 * 1000;
 
 const REGEX_METACHARS = new Set(['.', '+', '?', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
 
@@ -52,6 +54,17 @@ function loadState() {
   }
 }
 
+function pruneExpired(state, now) {
+  const pruned = {};
+  for (const [sessionId, entry] of Object.entries(state)) {
+    // Legacy flat-array entries (pre-lastSeen) have no age to check — drop them
+    // rather than guess; they self-heal to the new shape on next real activity.
+    if (Array.isArray(entry)) continue;
+    if (now - entry.lastSeen <= STATE_TTL_MS) pruned[sessionId] = entry;
+  }
+  return pruned;
+}
+
 function saveState(state) {
   try {
     mkdirSync(dirname(STATE_PATH), { recursive: true });
@@ -75,14 +88,22 @@ function readStdinJSON() {
 }
 
 function main() {
-  const touchedPath = process.argv[2];
+  const arg = process.argv[2];
+  const hookInput = readStdinJSON();
+  const sessionId = hookInput.session_id ?? 'no-session-id';
+
+  if (arg === '--reset') {
+    const state = pruneExpired(loadState(), Date.now());
+    delete state[sessionId];
+    saveState(state);
+    process.exit(0);
+  }
+
+  const touchedPath = arg;
   if (!touchedPath) {
     process.stderr.write('context-loader: no file path argument given\n');
     process.exit(0);
   }
-
-  const hookInput = readStdinJSON();
-  const sessionId = hookInput.session_id ?? 'no-session-id';
 
   let manifest;
   try {
@@ -93,8 +114,9 @@ function main() {
   }
 
   const relPath = relative(REPO_ROOT, resolve(touchedPath));
-  const state = loadState();
-  const loadedForSession = new Set(state[sessionId] ?? []);
+  const now = Date.now();
+  const state = pruneExpired(loadState(), now);
+  const loadedForSession = new Set(state[sessionId]?.files ?? []);
   const output = [];
 
   for (const rule of manifest.rules ?? []) {
@@ -117,10 +139,10 @@ function main() {
   }
 
   if (output.length > 0) {
-    process.stdout.write(output.join('\n\n---\n\n') + '\n');
+    process.stdout.write(`${output.join('\n\n---\n\n')}\n`);
   }
 
-  state[sessionId] = [...loadedForSession];
+  state[sessionId] = { files: [...loadedForSession], lastSeen: now };
   saveState(state);
 }
 

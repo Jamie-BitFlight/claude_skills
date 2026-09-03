@@ -36,6 +36,15 @@
       {
         "hooks": [
           {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/rules/context-loader.mjs --reset",
+            "type": "command"
+          }
+        ],
+        "matcher": "compact|clear"
+      },
+      {
+        "hooks": [
+          {
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/session-init.sh\"",
             "type": "command"
           }
