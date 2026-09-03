@@ -7,7 +7,7 @@ Pre-built prompts for delegating stinkysnake workflow phases to specialist agent
 <eg>
 Agent(
   agent="code-reviewer",
-  prompt="Review the modernization plan at {plan_dir}/stinkysnake-plan.md (resolve plan_dir via: uv run python -c 'from dh_paths import plan_dir; print(plan_dir())')
+  prompt="Review the modernization plan at .claude/plans/stinkysnake-plan.md
 
 REVIEW CRITERIA:
 
@@ -54,7 +54,7 @@ Agent(
   prompt="Write failing tests for the interfaces defined in the modernization plan.
 
 CONTEXT:
-- Plan: {plan_dir}/stinkysnake-plan.md (resolve plan_dir via: uv run python -c 'from dh_paths import plan_dir; print(plan_dir())')
+- Plan: .claude/plans/stinkysnake-plan.md
 - Interfaces: src/types.py, src/protocols.py, src/schemas.py
 
 REQUIREMENTS:

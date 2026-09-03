@@ -101,7 +101,7 @@ Once installed, Claude automatically applies these patterns when working with Py
 | Skill | Domain |
 |-------|--------|
 | `python3-development` | Core orchestration and modern Python patterns |
-| `orchestrate` | Multi-step engineering workflow with SAM tracking |
+| `orchestrate` | Multi-step engineering workflow, sized to the task |
 | `specialist-skill-routing` | Routes Typer, Rich, Textual, FastMCP, TOML tasks |
 | `python3-test-design` | Test suite architecture and strategy |
 | `async-python-patterns` | asyncio, gather, queues, WebSocket |
@@ -133,19 +133,6 @@ Once installed, Claude automatically applies these patterns when working with Py
 | `python-pytest-architect` | Writes pytest test suites |
 | `code-reviewer` | Code review with Python quality and idiom awareness |
 | `semantic-code-search` | Searches codebase by behavior, not just keywords |
-
-## Shared Workflow Agents (development-harness)
-
-Language-agnostic planning and verification agents are in the `development-harness` plugin. Use `@dh:` prefix:
-
-| Agent | Role |
-|-------|------|
-| `@dh:feature-researcher` | Research features, produce discovery context |
-| `@dh:codebase-analyzer` | Explore patterns, write structured analysis |
-| `@dh:context-gathering` | Gather context for implementation |
-| `@dh:plan-validator` | Validate implementation plans |
-| `@dh:feature-verifier` | Goal-backward verification after implementation |
-| `@dh:swarm-task-planner` | Decompose features into structured task plans |
 
 ## Example
 
@@ -183,7 +170,7 @@ Then install the plugin:
 This plugin and `python-engineering` share many skills. Each also has unique skills the other does not:
 
 **Only in `python3-development`**:
-`stdlib-scripting`, `semantic-code-search`, `python-cli-architect`, `rich`, `python3-bug`, `python3-review`, `implementation-manager`, `use-command-template`, `python3-development-meta-docs`, `python3-development`
+`stdlib-scripting`, `semantic-code-search`, `python-cli-architect`, `rich`, `python3-bug`, `python3-review`, `use-command-template`, `python3-development-meta-docs`, `python3-development`
 
 **Only in `python-engineering`**:
 `python3-core`, `python3-typing`, `python3-tdd`, `python3-testing`, `python3-tools`, `python3-cli`, `python3-web`, `python3-data`, `python3-stdlib-only`, `debug`, `lint`, `review`, `cleanup`, `designing-ui-for-cli`, `orchestrating-python-development`, `python-cross-platform-smoothing`, `standards-for-python-development`, `python3-stdlib-only`

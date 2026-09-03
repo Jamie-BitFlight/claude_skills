@@ -8,13 +8,9 @@ project_detection:
   test_patterns: ["tests/**/*.py", "test_*.py", "*_test.py"]
 
 stage_skills:
-  discovery: [python3-discovery]
   design: [python3-development:python-cli-design-spec]
-  planning-context-integration: [python3-implementation]
-  planning-task-decomposition: [python3-planning-task-decomposition]
-  implementation: [python3-implementation]
-  testing-forensic-review: [python3-testing-forensic-review]
-  testing-final-verification: [python3-testing]
+  implementation: [python3-development:python-cli-architect, python3-development:python-pytest-architect]
+  testing-forensic-review: [dh:code-reviewer]
 
 # Quality gate commands. {files} is a template variable substituted at
 # dispatch time via str.format(files=...) with the list of affected files.
