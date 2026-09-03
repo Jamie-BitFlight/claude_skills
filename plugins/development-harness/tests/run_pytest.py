@@ -1,10 +1,11 @@
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
 #   "cryptography>=48.0.1",
 #   "fastmcp[tasks]>=3.2.0",
 #   "gitpython>=3.1.0",
+#   "httpx>=0.28.1",
 #   "hypothesis>=6.0.0",
 #   "markdown-it-py>=3.0.0",
 #   "marko>=2.2.2",

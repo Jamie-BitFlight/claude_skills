@@ -2,6 +2,8 @@ raw/
 
 # Scratch space for agent output and temporary reports (not committed)
 .tmp/
+# git-history-recon / linear-walkthrough generated output (regenerate on demand)
+walkthrough/
 .omo/
 .cache*/
 .*_cache/
