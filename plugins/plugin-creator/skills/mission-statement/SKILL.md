@@ -1,6 +1,6 @@
 ---
 name: mission-statement
-description: Define and develop plugin mission statements — purpose, values, anti-patterns, and trade-offs. Use when creating a new plugin, auditing an existing plugin's alignment, or providing a reference for the alignment check loop to evaluate decisions against. Produces mission.json with [draft] status and creates a backlog interview task for the human to refine it.
+description: Define and develop plugin mission statements — purpose, values, anti-patterns, and trade-offs. Use when creating a new plugin, auditing an existing plugin's alignment, or providing a reference for the alignment check loop to evaluate decisions against. Produces mission.json with [draft] status and writes an interview file for the human to refine it.
 argument-hint: <plugin-path>
 model: sonnet
 user-invocable: true
@@ -117,9 +117,9 @@ When invoked (during Phase 0.6 of plugin lifecycle, or standalone):
 2. Read `discuss-CONTEXT.md` if this is a new plugin creation
 3. Draft `mission.json` with `status: "draft"`. Populate all fields from observed design choices and stated preferences.
 4. Write `mission.json` to the plugin root directory
-5. Create a backlog interview task via `mcp__plugin_dh_backlog__backlog_add` with title `"Mission interview: {plugin-name}"` and body containing the 5 questions and the current draft mission field
-6. Update `mission.json` with `"interview_backlog_item": "#NNN"` using the created issue number
-7. Report: path of draft written, backlog item number, 2-3 sentence summary of draft mission
+5. Write the interview file to `.plugin-creator/plans/{plugin-name}/mission-interview.md` — same convention `plugin-lifecycle` already uses for its own research/design scratch files — containing the 5 questions and the current draft mission field
+6. Update `mission.json` with `"interview_file": ".plugin-creator/plans/{plugin-name}/mission-interview.md"`
+7. Report: path of draft written, path of interview file, 2-3 sentence summary of draft mission
 
 ## Validation Scenario Format
 
