@@ -146,6 +146,45 @@ def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> N
     ]
 
 
+def test_file_cache_work_item_snapshots_skips_orphaned_temp_file_without_crashing(tmp_path: Path) -> None:
+    """A 0-byte orphaned ``_save_item_snapshot`` temp file must not take the whole batch offline.
+
+    Regression test: a process killed between ``tempfile.mkstemp()`` and
+    ``_save_item_snapshot``'s ``finally`` cleanup leaves an orphaned
+    ``*.tmp.yaml`` file behind (e.g. ``.1466.yaml.vosleo7o.tmp.yaml``, 0
+    bytes). It still matches ``_work_item_snapshots``' ``*.yaml`` glob, and
+    ``yaml.safe_load`` of an empty file returns ``None``, so
+    ``BacklogItem.model_validate(None)`` used to raise a pydantic
+    ``ValidationError`` that propagated out of the whole enumeration --
+    taking every other, perfectly good snapshot offline with it.
+    """
+    # Given: a cache root whose items/issues directory holds only an orphaned temp file
+    cache = FileCache(tmp_path)
+    issues_dir = tmp_path / "items" / "issues"
+    issues_dir.mkdir(parents=True)
+    (issues_dir / ".1466.yaml.vosleo7o.tmp.yaml").touch()
+
+    # When: the provider enumerates its durable snapshots
+    snapshots = cache._work_item_snapshots()
+
+    # Then: the orphan is silently excluded, not raised as a crash
+    assert snapshots == []
+
+
+def test_file_cache_work_item_snapshots_excludes_orphaned_temp_file_alongside_real_items(tmp_path: Path) -> None:
+    # Given: one real, successfully-saved snapshot and one orphaned temp file left
+    # behind beside it by a prior interrupted write for the same destination
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    (tmp_path / "items" / "issues" / ".12.yaml.abcd1234.tmp.yaml").touch()
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: only the real item is returned -- the orphan never reaches load_item()
+    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+
+
 def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:
     # Given: an opaque provider key and an item whose backend reference is meaningful
     cache = FileCache(tmp_path)

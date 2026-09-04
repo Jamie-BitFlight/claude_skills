@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import tempfile
 import warnings
@@ -10,6 +11,7 @@ from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
 
+import pydantic
 from ruamel.yaml import YAML, YAMLError
 
 from .file_cache_state import (
@@ -28,6 +30,8 @@ from .file_cache_state import (
 )
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
 from .yaml_io import load_item, load_item_text, save_item
+
+_log = logging.getLogger(__name__)
 
 
 class LegacyMigrationError(ValueError):
@@ -431,13 +435,42 @@ class FileCache:
         self._save_item_snapshot(item, relative_path)
 
     def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:
+        """Return every durable work-item snapshot beneath the cache root.
+
+        Skips two kinds of on-disk noise rather than letting either take the
+        whole batch offline for every other, perfectly good snapshot:
+
+        - An orphaned :meth:`_save_item_snapshot` temp file. That method's
+          ``tempfile.mkstemp`` always names its temp file
+          ``suffix=".tmp.yaml"``, so it still matches this method's
+          ``*.yaml`` glob; a process killed between ``mkstemp()`` and its
+          ``finally`` cleanup (session interrupt, OOM, crash) leaves one
+          behind forever. It is excluded here by the same suffix, never a
+          real snapshot.
+        - A snapshot that fails to load at all -- e.g. the 0-byte body such
+          an orphaned temp file has, which parses to ``None`` and fails
+          ``BacklogItem`` validation, or a file with unparseable YAML. One
+          bad file is logged and skipped, mirroring the per-entry salvage
+          policy :meth:`_CacheStateStore._salvage_field` already applies to
+          the durable mutation queue.
+
+        Returns:
+            Ordered ``(logical_key, item)`` pairs for every snapshot that
+            loaded successfully.
+        """
         item_root = self._root / "items"
         if not item_root.exists():
             return []
-        return [
-            (relative.as_posix(), self._load_item_snapshot(relative))
-            for relative in (path.relative_to(item_root) for path in sorted(item_root.rglob("*.yaml")))
-        ]
+        snapshots: list[tuple[str, BacklogItem]] = []
+        for path in sorted(item_root.rglob("*.yaml")):
+            if path.name.endswith(".tmp.yaml"):
+                continue
+            relative = path.relative_to(item_root)
+            try:
+                snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
+            except (pydantic.ValidationError, YAMLError) as exc:
+                _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
+        return snapshots
 
     @staticmethod
     def _serialize_item(item: BacklogItem) -> str:
