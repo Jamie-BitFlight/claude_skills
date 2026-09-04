@@ -431,6 +431,55 @@ class TestAddItemCreatesLocalFile:
         result = add_item(title="Local Only No Ref", description="desc", priority="P2")
 
         assert result["item_ref"] == ""
+        assert result["errors"] == []
+
+    def test_add_item_records_error_when_issue_creation_raises(self, mocker: MockerFixture) -> None:
+        """Verify a genuine GitHub issue-creation failure lands in result["errors"] (#3182).
+
+        Tests: add_item's caller-visible-failure contract — the defect this fix addresses.
+        How: try_get_github succeeds (a client is obtained); create_issue_for_item raises
+             GithubException.
+        Why: This is the sub-case the underlying defect actually hits — a valid token but
+             a failed create call. Routes through the existing Output.record_error/errors
+             channel rather than a new ad hoc field, matching the established pattern
+             already used by get_sam_tasks (operations.py's out.record_error call sites).
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.Mock())
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=GithubException(500, "boom", None))
+
+        result = add_item(title="Flaky Create", description="desc", priority="P1")
+
+        assert result["item_ref"] == ""
+        errors = result["errors"]
+        assert isinstance(errors, list)
+        assert len(errors) == 1
+        assert errors[0].startswith("Issue creation failed:")
+        # The item itself is still stored — this is a non-fatal, reported failure.
+        assert result["reference"]
+
+    def test_add_item_rejects_empty_title_raises_validation_error(self, mocker: MockerFixture) -> None:
+        """Verify add_item raises ValidationError for an empty or whitespace-only title.
+
+        Tests: add_item ingress validation — empty title. Code review on #3182 found
+               that an empty title reaching create_issue_for_item hits that function's
+               own `if not item.title: return None` guard, which returns None without
+               raising — indistinguishable, downstream, from the tolerated
+               GitHub-unavailable fallback (no error, no item_ref, silent). Rejecting
+               it here, before any storage or issue creation is attempted, keeps that
+               guard's None return meaning only "GitHub unavailable."
+        How: Call add_item with title="" and title="   " (whitespace-only).
+        Why: Neither the MCP tool's title Field nor the CLI's --title option enforce
+             non-empty, so this is the only remaining check.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.Mock())
+        mock_create = mocker.patch("backlog_core.operations.create_issue_for_item")
+
+        with pytest.raises(ValidationError, match="Title is required"):
+            add_item(title="", description="desc", priority="P1")
+        with pytest.raises(ValidationError, match="Title is required"):
+            add_item(title="   ", description="desc", priority="P1")
+
+        mock_create.assert_not_called()
 
     def test_add_item_local_only_pending_state_visible_via_list_and_view(self, mocker: MockerFixture) -> None:
         """Verify a local-only create's pending state is visible on later reads, not just at creation.

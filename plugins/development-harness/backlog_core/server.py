@@ -1384,9 +1384,13 @@ async def backlog_add(
 
     Returns:
         :class:`~backlog_core.tool_responses.BacklogAddResponse` with
-        file_path, title, priority, item_ref, and output messages/warnings.
+        file_path, title, priority, item_ref, and output messages/warnings/errors.
         file_path is for reference only — use backlog_update or backlog_groom
-        for all modifications. On error, ``error`` is set.
+        for all modifications. On error, ``error`` is set. On an integer-ID
+        backend, a non-empty ``errors`` list with the item otherwise stored
+        (``reference``/``file_path`` present) means GitHub issue creation
+        itself failed after a client was obtained — non-fatal, ``item_ref``
+        is simply empty for that reason.
     """
     out = Output()
     try:
