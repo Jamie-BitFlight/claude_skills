@@ -1,0 +1,140 @@
+{
+  "rules": [
+    {
+      "file": "agent-output-contracts.md",
+      "match": "**/agents/*.md"
+    },
+    {
+      "file": "astral-tool-overrides.md",
+      "match": "*.py,pyproject.toml,uv.lock"
+    },
+    {
+      "file": "ci-workflows.md",
+      "match": ".github/workflows/**/*.yml"
+    },
+    {
+      "file": "citation-requirements.md",
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
+    },
+    {
+      "file": "delegation-format.md",
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,**/references/*.md"
+    },
+    {
+      "file": "exception-handling.md",
+      "match": "*.py,*.ts,*.js"
+    },
+    {
+      "file": "frontmatter-requirements.md",
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md"
+    },
+    {
+      "file": "language-conventions.md",
+      "match": "**/scripts/**,.claude/hooks/**,*.py"
+    },
+    {
+      "file": "linting-exceptions.md",
+      "match": "*.py,pyproject.toml"
+    },
+    {
+      "file": "markdown-file-references.md",
+      "match": "*.md"
+    },
+    {
+      "file": "plugin-development.md",
+      "match": "plugins/**/*,.claude-plugin/**/*"
+    },
+    {
+      "file": "plugin-json.md",
+      "match": ".claude-plugin/plugin.json,plugin.json"
+    },
+    {
+      "file": "prose-file-classification.md",
+      "match": "*.md"
+    },
+    {
+      "file": "python-development.md",
+      "match": "*.py,pyproject.toml,uv.lock"
+    },
+    {
+      "file": "review-and-correction-discipline.md",
+      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,.claude/rules/**/*.md,CLAUDE.md"
+    },
+    {
+      "file": "script-invocation.md",
+      "match": "**/scripts/**,.claude/hooks/**"
+    },
+    {
+      "file": "silent-failure-prevention.md",
+      "match": "*.py,*.ts,*.js"
+    },
+    {
+      "file": "skill-content-optimization.md",
+      "match": "SKILL.md,**/references/*.md"
+    },
+    {
+      "file": "skill-documentation-verification.md",
+      "match": "SKILL.md,**/references/*.md"
+    },
+    {
+      "file": "skill-substitution.md",
+      "match": "SKILL.md"
+    },
+    {
+      "file": "uv-run-fallback.md",
+      "match": "**/scripts/**,*.py,.claude/hooks/**"
+    },
+    {
+      "file": "yaml-toml-libraries.md",
+      "match": "*.py"
+    },
+    {
+      "file": "agent-delegation.md",
+      "match": "*"
+    },
+    {
+      "file": "commit-cadence-and-worktrees.md",
+      "match": "*"
+    },
+    {
+      "file": "evidence-action-proportionality.md",
+      "match": "*"
+    },
+    {
+      "file": "fact-verification-first.md",
+      "match": "*"
+    },
+    {
+      "file": "falsification-requirement.md",
+      "match": "*"
+    },
+    {
+      "file": "fix-delegation-discipline.md",
+      "match": "*"
+    },
+    {
+      "file": "interactive-terminal-workarounds.md",
+      "match": "*"
+    },
+    {
+      "file": "large-file-write-strategy.md",
+      "match": "*"
+    },
+    {
+      "file": "model-selection.md",
+      "match": "*"
+    },
+    {
+      "file": "proactive-fix-gate.md",
+      "match": "*"
+    },
+    {
+      "file": "reproduction-integrity.md",
+      "match": "*"
+    },
+    {
+      "file": "scratch-directory.md",
+      "match": "*"
+    }
+  ]
+}

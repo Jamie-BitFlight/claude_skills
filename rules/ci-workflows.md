@@ -1,8 +1,3 @@
----
-paths:
-- .github/workflows/**/*.yml
----
-
 # GitHub Actions CI Workflow Modification Protocol
 
 Follow this phase-gate checklist when creating/modifying/debugging GitHub Actions workflows. Each phase gates the next.

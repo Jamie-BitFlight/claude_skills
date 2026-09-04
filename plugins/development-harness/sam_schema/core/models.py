@@ -20,6 +20,23 @@ if TYPE_CHECKING:
 # letter-suffixed (T10a, T10b), and slash-separated compound IDs (P1/T3, T10a/T10b).
 TASK_ID_PATTERN: re.Pattern[str] = re.compile(r"^[A-Za-z]?\d+(\.\d+)?[A-Za-z]?(/[A-Za-z]?\d+(\.\d+)?[A-Za-z]?)?$")
 
+
+class WireContractModel(BaseModel):
+    """Base for every SAM model returned directly by an MCP tool.
+
+    Centralises the config that makes ``populate_by_name`` + kebab-case
+    ``serialization_alias`` fields round-trip correctly in both directions:
+    accepting either snake_case or kebab-case on construction, and always
+    emitting kebab-case aliases when FastMCP's automatic tool-return
+    serialization calls ``TypeAdapter.dump_python(mode="json")`` — which does
+    not pass ``by_alias=True`` explicitly, so each model's own
+    ``model_config`` default governs. Every subclass gets this without
+    repeating the ``ConfigDict(...)`` line.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
 # Beads nanoid pattern — matches IDs like "bd-a3f8", "bd-x1y2z3.4", "issue-abc.1"
 _BEADS_ID_PATTERN: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]*-[A-Za-z0-9.]+$")
 
@@ -115,7 +132,7 @@ class PlanState(StrEnum):
     READY = "ready"
 
 
-class Task(BaseModel):
+class Task(WireContractModel):
     """Canonical task model. All format-specific readers normalize to this.
 
     Field aliases map YAML kebab-case names to Python snake_case attributes.
@@ -123,7 +140,7 @@ class Task(BaseModel):
     ``populate_by_name=True`` is set in ``model_config``.
     """
 
-    model_config = ConfigDict(populate_by_name=True, use_enum_values=True)
+    model_config = ConfigDict(serialize_by_alias=True, use_enum_values=True)
 
     # Required fields
     id: str = Field(..., pattern=TASK_ID_PATTERN.pattern)
@@ -259,7 +276,7 @@ class Task(BaseModel):
         return items
 
 
-class Plan(BaseModel):
+class Plan(WireContractModel):
     """Canonical plan model containing metadata and all tasks.
 
     A plan corresponds to a single SAM task/plan file (or directory).
@@ -268,8 +285,6 @@ class Plan(BaseModel):
     Both the alias and the Python name are accepted during construction because
     ``populate_by_name=True`` is set in ``model_config``.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     # Backend-assigned plan identifier (e.g. "P912").  Persisted in the YAML
     # body so that the ID survives state-directory wipes or backend migrations.
@@ -359,14 +374,12 @@ class CriterionStatus(StrEnum):
     NEWLY_PASSING = "newly-passing"
 
 
-class AcceptanceCriterion(BaseModel):
+class AcceptanceCriterion(WireContractModel):
     """A single structured acceptance criterion with an executable check command.
 
     Stored in ``Plan.acceptance_criteria_structured``.  The T0 and TN bookend
     agents iterate over this list to capture and compare baseline vs. final state.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     criterion_id: str = Field(
         ..., validation_alias=AliasChoices("criterion-id", "criterion_id"), serialization_alias="criterion-id"
@@ -387,14 +400,12 @@ class AcceptanceCriterion(BaseModel):
     )
 
 
-class BookendResult(BaseModel):
+class BookendResult(WireContractModel):
     """Result of running a single acceptance criterion check command.
 
     Written to ``plan/T0-baseline-{slug}.yaml`` by the T0 bookend agent, and
     re-captured to ``plan/TN-verification-{slug}.yaml`` by the TN bookend agent.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     criterion_id: str = Field(
         ..., validation_alias=AliasChoices("criterion-id", "criterion_id"), serialization_alias="criterion-id"
@@ -415,15 +426,13 @@ class BookendResult(BaseModel):
     )
 
 
-class BookendVerification(BaseModel):
+class BookendVerification(WireContractModel):
     """Per-criterion comparison between T0 baseline and TN final results.
 
     Written to ``plan/TN-verification-{slug}.yaml``.  The ``status`` field
     encodes the 4-cell matrix: passed / regressed / pre-existing-fail /
     newly-passing.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     criterion_id: str = Field(
         ..., validation_alias=AliasChoices("criterion-id", "criterion_id"), serialization_alias="criterion-id"
@@ -475,7 +484,7 @@ class ReadResult(BaseModel):
     source_path: Path
 
 
-class TaskAssignment(BaseModel):
+class TaskAssignment(WireContractModel):
     """Composite response returned by ``sam read P{N}/T{M}``.
 
     Combines plan-level context (goal, shared context, acceptance criteria)
@@ -485,8 +494,6 @@ class TaskAssignment(BaseModel):
     Per ADR-003: all task dispatches return this shape when a task address is
     provided. Plan-only reads (``sam read P{N}``) continue to return ``Plan``.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     # Plan-level context fields
     plan_number: str | None = Field(
@@ -616,7 +623,7 @@ class PaginationMeta(BaseModel):
     has_more: bool
 
 
-class PlanSummaryModel(BaseModel):
+class PlanSummaryModel(WireContractModel):
     """MCP envelope model for plan summary items.
 
     Mirrors :class:`~sam_schema.core.task_backend_types.PlanSummary` but is a
@@ -624,8 +631,6 @@ class PlanSummaryModel(BaseModel):
     resorting to ``dict[str, Any]``. The backend continues to return the
     TypedDict; the operations layer converts to this model at the MCP boundary.
     """
-
-    model_config = ConfigDict(populate_by_name=True)
 
     plan_id: str
     feature: str

@@ -35,7 +35,7 @@ async def test_call_mcp_tool_bounds_a_stalled_initialization_handshake(monkeypat
     async def _hang_forever(self: ClientSession, *args: object, **kwargs: object) -> None:
         await asyncio.sleep(999)
 
-    monkeypatch.setattr(ClientSession, "initialize", _hang_forever)
+    monkeypatch.setattr(ClientSession, "send_discover", _hang_forever)
 
     mcp = FastMCP("stall-test")
 

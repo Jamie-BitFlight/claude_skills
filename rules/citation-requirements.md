@@ -1,11 +1,3 @@
----
-paths:
-- '**/SKILL.md'
-- '**/agents/**/*.md'
-- '**/commands/**/*.md'
-- '**/CLAUDE.md'
----
-
 # Citation Requirements
 
 Every factual claim in skill documentation requires a cited source. **Reason**: Without citations, guidance cannot be verified, updated, or trusted — and false claims persist across sessions.

@@ -70,7 +70,7 @@ from backlog_core.models import (
 )
 from dispatch_schema import Wave
 from github import GithubException
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel
 from sam_schema.core.dependencies import BookendValidator, DependencyGraph
 from sam_schema.core.exceptions import (
     BookendValidationError,
@@ -515,14 +515,60 @@ def get_ready_tasks(backend: TaskBackend, plan: str, *, full: bool = False) -> R
     )
 
 
+def _canonicalize_patch_keys(model_cls: type[BaseModel], raw_fields: Mapping[str, Any]) -> dict[str, Any]:
+    """Remap every key in *raw_fields* to its model field's canonical (Python) name.
+
+    A patch-merge dict built from ``{**current.model_dump(...), **raw_fields}``
+    only overwrites a field correctly when both sides of the merge use the
+    *same* spelling of that field's key. ``Task``/``Plan`` fields accept both a
+    kebab-case wire alias and the snake_case Python name (``AliasChoices``), so
+    a caller-supplied patch may use either spelling. Without this
+    normalization step, a patch field spelled differently than the merge
+    base's dump convention lands under a second key that ``AliasChoices``
+    validation then silently prefers over the stale value already present
+    under the base's own alias — the #1528 data-loss bug class, in either
+    direction. Mapping every raw key to the field's canonical name before
+    merging removes the ambiguity: both sides of the merge always agree on one
+    spelling per field, so the patch value always wins regardless of which
+    convention the caller used.
+
+    Args:
+        model_cls: The Pydantic model class the merged dict will be validated
+            against (e.g. ``Task``, ``Plan``).
+        raw_fields: Caller-supplied patch dict; keys may be the field's Python
+            name, its kebab-case wire alias, or any other declared
+            ``AliasChoices`` member.
+
+    Returns:
+        A new dict with every recognized key rewritten to its canonical field
+        name. Keys with no matching field (typos, forward-compat fields) pass
+        through unchanged so validation still reports them as extras/errors
+        rather than silently dropping them.
+    """
+    alias_to_name: dict[str, str] = {}
+    for field_name, field_info in model_cls.model_fields.items():
+        alias_to_name[field_name] = field_name
+        choices = field_info.validation_alias
+        if isinstance(choices, AliasChoices):
+            for choice in choices.choices:
+                if isinstance(choice, str):
+                    alias_to_name[choice] = field_name
+        elif isinstance(choices, str):
+            alias_to_name[choices] = field_name
+    return {alias_to_name.get(key, key): value for key, value in raw_fields.items()}
+
+
 def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[str, Any]) -> Plan:
     """Validate raw JSON patch fields through the Pydantic Plan model.
 
-    Reads the current plan, merges *raw_fields* into its data, then passes the
-    merged dict through ``Plan.model_validate`` so field validators run (e.g.
-    ``coerce_issue_to_str`` normalises the ``issue`` field).  Returns the
-    fully-validated Plan model so callers use normalized field values, not the
-    raw input.
+    Reads the current plan, canonicalizes *raw_fields*' keys to their Python
+    field names (via :func:`_canonicalize_patch_keys`, so a kebab-case or
+    snake_case patch key merges correctly regardless of which spelling the
+    caller used), merges the result into the current plan's own snake_case
+    dump, then passes the merged dict through ``Plan.model_validate`` so field
+    validators run (e.g. ``coerce_issue_to_str`` normalises the ``issue``
+    field).  Returns the fully-validated Plan model so callers use normalized
+    field values, not the raw input.
 
     Args:
         backend: Active TaskBackend instance.
@@ -538,16 +584,18 @@ def _validated_plan_patch(backend: TaskBackend, plan_id: str, raw_fields: dict[s
     """
     plan_data = backend.read_plan(plan_id)
     current = Plan.model_validate(plan_data)
-    return Plan.model_validate({**current.model_dump(), **raw_fields})
+    normalized_fields = _canonicalize_patch_keys(Plan, raw_fields)
+    return Plan.model_validate({**current.model_dump(by_alias=False, mode="json"), **normalized_fields})
 
 
 def _validated_task_patch_plan(current: ReadResult, task_id: str, raw_fields: dict[str, Any]) -> Plan:
     """Return the prospective plan after applying a task-level patch.
 
     The task identified by ``task_id`` is replaced with a task built from its
-    current fields merged with ``raw_fields`` (kebab-case or snake_case), then
-    the containing plan is rebuilt so callers can validate bookend constraints
-    on the result.
+    current fields merged with ``raw_fields`` (kebab-case or snake_case keys
+    are both accepted; :func:`_canonicalize_patch_keys` normalizes both sides
+    to the same keyspace before merging), then the containing plan is rebuilt
+    so callers can validate bookend constraints on the result.
 
     Args:
         current: The current plan read result.
@@ -563,8 +611,9 @@ def _validated_task_patch_plan(current: ReadResult, task_id: str, raw_fields: di
     """
     for idx, task in enumerate(current.plan.tasks):
         if task.id == task_id:
-            current_task_data = task.model_dump(mode="json")
-            patched_task = Task.model_validate({**current_task_data, **raw_fields})
+            current_task_data = task.model_dump(mode="json", by_alias=False)
+            normalized_fields = _canonicalize_patch_keys(Task, raw_fields)
+            patched_task = Task.model_validate({**current_task_data, **normalized_fields})
             new_tasks = list(current.plan.tasks)
             new_tasks[idx] = patched_task
             return current.plan.model_copy(update={"tasks": new_tasks})
@@ -599,7 +648,7 @@ def _plan_fields_for_update(backend: TaskBackend, plan: str, set_fields: dict[st
     plan_fields = {k: v for k, v in validated.model_dump(by_alias=True, mode="json").items() if k in set_fields}
     if "acceptance-criteria-structured" in plan_fields:
         plan_fields["acceptance-criteria-structured"] = [
-            criterion.model_dump(mode="json") for criterion in validated.acceptance_criteria_structured
+            criterion.model_dump(mode="json", by_alias=False) for criterion in validated.acceptance_criteria_structured
         ]
     return plan_fields
 
@@ -977,11 +1026,14 @@ def update_task_status(backend: TaskBackend, plan: str, task: str, status: str) 
 def _validated_task_patch(backend: TaskBackend, plan: str, task: str, raw_fields: dict[str, Any]) -> Task:
     """Validate raw JSON patch fields through the Pydantic Task model.
 
-    Reads the current task, merges *raw_fields* into its data, then passes
-    the merged dict through ``Task.model_validate`` so field validators run
-    (e.g. ``validate_task_id_list`` normalises ``dependencies``).  Returns
-    the fully-validated Task model for the caller to write via
-    ``backend.update_task``.
+    Reads the current task, canonicalizes *raw_fields*' keys to their Python
+    field names (via :func:`_canonicalize_patch_keys`, so a kebab-case or
+    snake_case patch key merges correctly regardless of which spelling the
+    caller used), merges the result into the current task's own snake_case
+    dump, then passes the merged dict through ``Task.model_validate`` so
+    field validators run (e.g. ``validate_task_id_list`` normalises
+    ``dependencies``).  Returns the fully-validated Task model for the caller
+    to write via ``backend.update_task``.
 
     Args:
         backend: Active TaskBackend instance.
@@ -1000,7 +1052,8 @@ def _validated_task_patch(backend: TaskBackend, plan: str, task: str, raw_fields
     """
     task_data = backend.read_task(plan, task)
     current = Task.model_validate(task_data)
-    return Task.model_validate({**current.model_dump(by_alias=True, mode="json"), **raw_fields})
+    normalized_fields = _canonicalize_patch_keys(Task, raw_fields)
+    return Task.model_validate({**current.model_dump(by_alias=False, mode="json"), **normalized_fields})
 
 
 def update_task_fields(

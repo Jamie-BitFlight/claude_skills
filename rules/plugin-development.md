@@ -1,9 +1,3 @@
----
-paths:
-- plugins/**/*
-- .claude-plugin/**/*
----
-
 # Plugin Development Workflows
 
 ## Local Testing
@@ -21,7 +15,7 @@ claude --plugin-dir ./plugins/plugin-name
 /plugin install plugin-name@jamie-bitflight-skills --scope local
 ```
 
-For full add/remove/update procedures, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+For full add/remove/update procedures, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Prerequisite Skills for Plugin Work
 

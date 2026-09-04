@@ -660,7 +660,7 @@ class BeadsTaskProvider:
         self._remember_set(f"{_PLAN_STATE_PREFIX}{plan_id}", state.value)
         if acceptance_criteria_structured:
             criteria_payload = json.dumps([
-                criterion.model_dump(mode="json") for criterion in acceptance_criteria_structured
+                criterion.model_dump(mode="json", by_alias=False) for criterion in acceptance_criteria_structured
             ])
             self._remember_set(f"{_PLAN_CRITERIA_PREFIX}{plan_id}", criteria_payload)
 
@@ -683,7 +683,7 @@ class BeadsTaskProvider:
         }
         if acceptance_criteria_structured:
             plan_data["acceptance_criteria_structured"] = [
-                criterion.model_dump() for criterion in acceptance_criteria_structured
+                criterion.model_dump(by_alias=False) for criterion in acceptance_criteria_structured
             ]
         return plan_data
 

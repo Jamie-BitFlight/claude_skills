@@ -1,10 +1,3 @@
----
-paths:
-- '**/scripts/**'
-- .claude/hooks/**
-- '**/*.py'
----
-
 # Language Conventions
 
 Choose the correct language when creating new repository components.
@@ -58,3 +51,7 @@ CORRECT — declare typer only; rich and shellingham arrive transitively:
 ```
 
 SCOPE: Applies to every PEP 723 script declaring `typer`. Remove `rich` and `shellingham` if already present. Do not add them when creating new scripts.
+
+---
+
+Node.js scripts: always `.cjs`/`.mjs`, never bare `.js` — module type must not depend on an ambient `package.json`.

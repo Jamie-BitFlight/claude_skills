@@ -1,8 +1,3 @@
----
-paths:
-- '**/*.py'
----
-
 # YAML and TOML Libraries
 
 This repository uses `ruamel.yaml` for all YAML operations and `tomlkit` for TOML read-write operations.

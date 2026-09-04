@@ -1,10 +1,3 @@
----
-paths:
-- '**/SKILL.md'
-- '**/agents/**/*.md'
-- '**/commands/**/*.md'
----
-
 # Frontmatter Requirements
 
 ## Skills

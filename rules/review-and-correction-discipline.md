@@ -1,18 +1,9 @@
----
-paths:
-- '**/SKILL.md'
-- '**/agents/**/*.md'
-- '**/commands/**/*.md'
-- .claude/rules/**/*.md
-- '**/CLAUDE.md'
----
-
 # Review and Correction Discipline
 
 Process rules for reviewing and correcting AI-facing instruction files (prompts, `SKILL.md`,
 agent files, `*.md` rules, `CLAUDE.md`) and for acting on what review finds. These complement the
 content rubric in the ensemble-rule-review skill's
-[instruction-hygiene reference](../../plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md);
+[instruction-hygiene reference](plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md);
 this file governs the *gates and the orchestrator's behavior around them*, not the rubric itself.
 
 ## 1. Two orthogonal gates: structural ≠ content
@@ -50,7 +41,7 @@ required step, then ship.
 Route each review check by its error structure, not by a fixed reviewer tier — mechanical checks to
 cheap corroborating workers, judgment checks to capable heterogeneous reviewers, adjudicated once.
 The full routing taxonomy lives in
-[instruction-hygiene §6](../../plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
+[instruction-hygiene §6](plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
 (which routes onward to `candidate-fit.md`); do not restate it here.
 
 When a judgment review is wrong, escalate by **changing the reviewer, not by re-running the cheap
@@ -72,7 +63,7 @@ state. Confirm agents are idle — token count stable across two readings — th
 ## Cross-references
 
 - **Mechanism leaks** — read
-  [instruction-hygiene §1–2](../../plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
+  [instruction-hygiene §1–2](plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
   before writing or reviewing any task prompt, skill, or agent file: what belongs in the prompt
   versus the executor config, and when a skill narrates itself instead of the reader's task.
 - **Custom agents only; verify their claims** — never use general-purpose agents for workers (they

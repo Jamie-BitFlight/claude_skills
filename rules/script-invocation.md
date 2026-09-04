@@ -1,9 +1,3 @@
----
-paths:
-- '**/scripts/**'
-- .claude/hooks/**
----
-
 # Script Invocation
 
 Every script has a shebang and executable permission (enforced by pre-commit).

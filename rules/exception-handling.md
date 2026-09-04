@@ -1,10 +1,3 @@
----
-paths:
-- '**/*.py'
-- '**/*.ts'
-- '**/*.js'
----
-
 # Exception Handling — Narrow Catches Only
 
 Catch only the exceptions the called code is documented to raise. Let all others propagate.

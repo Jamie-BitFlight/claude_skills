@@ -21,7 +21,47 @@
     }
   },
   "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-rules.mjs",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|Write|Edit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-rules-agent.mjs",
+            "type": "command"
+          }
+        ],
+        "matcher": "Agent"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/context-rules-prompt.mjs",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
     "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/rules/context-loader.mjs --reset",
+            "type": "command"
+          }
+        ],
+        "matcher": "compact|clear"
+      },
       {
         "hooks": [
           {

@@ -1,8 +1,3 @@
----
-paths:
-- '**/SKILL.md'
----
-
 # SKILL.md String Substitution
 
 Happens at load time, including inside fenced code blocks — backslash-escaping (`\$1`) does not

@@ -1,8 +1,3 @@
----
-paths:
-- '**/*.md'
----
-
 # Prose File Classification — Review Treatment Decision Tree
 
 Not all markdown is documentation. Any file whose prose describes or influences a process or function has **functional behavior** — modifying it changes how people or systems act. Use this decision tree to assign review treatment before classifying any prose file as "docs-only" or assigning it a SKIP verdict.

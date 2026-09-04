@@ -1,10 +1,3 @@
----
-paths:
-- '**/*.py'
-- '**/*.ts'
-- '**/*.js'
----
-
 # Silent Failure Prevention
 
 ## Write Operations Must Report What Changed

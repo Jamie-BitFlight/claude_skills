@@ -1,9 +1,3 @@
----
-paths:
-- '**/SKILL.md'
-- '**/references/*.md'
----
-
 # Skill Documentation Verification
 
 Skill documentation (SKILL.md, reference files) is AI-facing, NOT user-facing.

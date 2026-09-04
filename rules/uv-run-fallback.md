@@ -1,10 +1,3 @@
----
-paths:
-- '**/scripts/**'
-- '**/*.py'
-- .claude/hooks/**
----
-
 # uv run — Fallback When uv Is Not Available
 
 ## Standard invocation
@@ -74,4 +67,3 @@ Then re-run the original command with `uv run`.
    ```bash
    python scripts/some_script.py
    ```
-

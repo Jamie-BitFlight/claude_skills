@@ -1,9 +1,3 @@
----
-paths:
-- '**/.claude-plugin/plugin.json'
-- '**/plugin.json'
----
-
 # Plugin.json Requirements
 
 ## Manifest Location

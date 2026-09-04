@@ -1,10 +1,3 @@
----
-paths:
-- '**/*.py'
-- '**/pyproject.toml'
-- '**/uv.lock'
----
-
 # Astral Tool Overrides
 
 Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this repo wins. Live

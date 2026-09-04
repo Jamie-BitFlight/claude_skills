@@ -203,7 +203,9 @@ def _plan_to_plan_data(plan: Plan, plan_id: str) -> PlanData:
     data["state"] = plan.state
     data["autonomy"] = plan.autonomy
     if plan.acceptance_criteria_structured:
-        data["acceptance_criteria_structured"] = [c.model_dump() for c in plan.acceptance_criteria_structured]
+        data["acceptance_criteria_structured"] = [
+            c.model_dump(by_alias=False) for c in plan.acceptance_criteria_structured
+        ]
     return data
 
 

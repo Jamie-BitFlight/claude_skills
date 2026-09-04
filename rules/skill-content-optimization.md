@@ -1,9 +1,3 @@
----
-paths:
-- '**/SKILL.md'
-- '**/references/*.md'
----
-
 # Skill Content Optimization
 
 Before creating or editing any skill file, load the `/plugin-creator:skill-creator` skill.

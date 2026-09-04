@@ -143,7 +143,7 @@ Include these in the agent prompt (pass file paths — do not transcribe file co
 
 ### Large output handling
 
-If the crosswalk or any deck outline exceeds 25k characters, apply the [large file write strategy](../../rules/large-file-write-strategy.md) using Strategy A (multi-file split).
+If the crosswalk or any deck outline exceeds 25k characters, apply the [large file write strategy](../../../rules/large-file-write-strategy.md) using Strategy A (multi-file split).
 
 ## Deck Planning Heuristics
 

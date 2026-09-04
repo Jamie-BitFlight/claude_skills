@@ -51,7 +51,7 @@ def parse_plan_content(content: str, record_name: str) -> PlanData:
         return _PLAN_DATA_ADAPTER.validate_python(raw_plan)
 
     result = normalize_plan(raw_plan, raw_tasks, FormatType.PURE_YAML, Path(record_name))
-    plan_data = result.plan.model_dump(mode="json")
+    plan_data = result.plan.model_dump(mode="json", by_alias=False)
     plan_data.update(
         goal=result.plan.goal or "",
         context=result.plan.context or "",

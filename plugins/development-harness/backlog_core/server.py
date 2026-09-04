@@ -4555,11 +4555,12 @@ async def _run_spawn_item(
             warnings.append(f"Item #{issue_num} failed: {error_msg}")
 
         counters.total_done += 1
-        await ctx.report_progress(counters.total_done, total_items)
-        await ctx.info(
+        progress_message = (
             f"Wave {wave_num}: {counters.total_done}/{total_items} items — "
             f"{counters.completed} done, {counters.failed} failed"
         )
+        _sync_task_log.info(progress_message)
+        await ctx.report_progress(counters.total_done, total_items, message=progress_message)
 
 
 @mcp.tool(

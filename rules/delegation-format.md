@@ -1,11 +1,3 @@
----
-paths:
-- '**/SKILL.md'
-- '**/agents/**/*.md'
-- '**/commands/**/*.md'
-- '**/references/*.md'
----
-
 # Delegation Format Standard
 
 Canonical format for delegation instructions in workflow documentation (SKILL.md, agent files, reference files).
