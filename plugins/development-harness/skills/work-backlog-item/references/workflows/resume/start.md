@@ -1,6 +1,6 @@
 # Resume Report (Step R)
 
-**Trigger:** <mode/> is `resume`.
+**Trigger:** <route/> is `resume`.
 
 1. Extract title from <item_ref/>+ joined. If <item_ref/> starts with `#`, fetch title from the linked work item (same logic as issue-first path).
 

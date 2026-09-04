@@ -27,7 +27,7 @@ flowchart TD
     EffortWarn --> C3
 
     C3(["Criterion 3 — Blast radius check"]) --> PatternCheck
-    PatternCheck{"Any Impact Radius row<br>contains pattern: field?"}
+    PatternCheck{"Any Impact Radius row<br>(or Resources row, fallback for older templates)<br>contains pattern: field?"}
     PatternCheck -->|"No pattern: fields present"| ManualCount["Use manual row count"]
     PatternCheck -->|"Yes — pattern: field found"| RunRg["Run: rg -l '<pattern>' | wc -l<br>Capture as live_count"]
     RunRg --> Compare{"live_count > 1.5 * manual_count?"}
@@ -40,20 +40,25 @@ flowchart TD
     C3Decision -->|"Over 20 systems"| FBlock3(["BLOCKED: blast radius exceeds safe threshold<br>Over 20 affected systems requires human confirmation"])
     RiskWarn --> C4
 
-    C4{"Criterion 4 — Prior attempt check<br>Does item body contain 'tried', 'previous attempt', or 'failed'?<br>Does Impact Radius list exactly 1 file total AND Effort lists 4 or more tasks?"}
+    C4{"Criterion 4 — Prior attempt check<br>Does item body contain 'tried', 'previous attempt', or 'failed'?<br>Does Impact Radius (or Resources fallback) list exactly 1 file total AND Effort lists 4 or more tasks?"}
     C4 -->|"No prior failure refs, scope appropriate"| PASS(["FEASIBILITY: PASS<br>Proceed to Step 4.1 — Compose Feature Request"])
     C4 -->|"Prior failure reference found"| AltWarn["WARN: prior attempt referenced — include in feature request"]
-    C4 -->|"Impact Radius = 1 file total AND task count >= 4"| AltBlock(["BLOCKED: potential over-engineering<br>1-file scope with 4+ tasks — offer --quick path"])
+    C4 -->|"Impact Radius (or Resources fallback) = 1 file total AND task count >= 4"| AltBlock(["BLOCKED: potential over-engineering<br>1-file scope with 4+ tasks — offer --quick path"])
     AltWarn --> PASS
 ```
 
 **Criterion 4 — observable thresholds:**
 
-- Count rows under all Impact Radius sections (Code, Docs, Config, Agent Instructions) to get the total affected-file count.
+Extract file paths using the same priority order as [groom-check.md](./groom-check.md)'s "Extract
+Impact Radius files" step:
+
+1. Primary key: `sections["Impact Radius"]` (Code, Docs, Config, Agent Instructions rows) — count rows to get the total affected-file count.
+2. Fallback key: `sections["Resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius) — count rows here only when the primary key is absent or empty.
+
 - Count task entries in the item's Effort section (lines starting with `- [ ]` or `- [x]`) to get the estimated task count.
 - BLOCKED condition: `impact_radius_file_count == 1 AND estimated_task_count >= 4`. Both conditions must be true simultaneously.
 - If the Effort section is absent, treat task count as 0 — the BLOCKED condition cannot be met, proceed.
-- If the Impact Radius section is absent, treat file count as 0 — the BLOCKED condition cannot be met, proceed.
+- If neither the Impact Radius section nor its Resources fallback is present, treat file count as 0 — the BLOCKED condition cannot be met, proceed.
 
 ---
 

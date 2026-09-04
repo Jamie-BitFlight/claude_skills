@@ -1,6 +1,6 @@
 # RT-ICA Gate
 
-Reverse Thinking — Information Completeness Assessment. Mandatory pre-planning checkpoint. **BLOCK** if any required condition is MISSING.
+Mandatory pre-planning checkpoint — see `dh:rt-ica` or `dh:dh-glossary` for the reverse-thinking method definition. **BLOCK** if any required condition is MISSING.
 
 ---
 

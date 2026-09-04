@@ -1,6 +1,7 @@
 ---
 name: rt-ica
-description: Use before creating plans, delegating to agents, or defining acceptance criteria — performs Reverse Thinking Information Completeness Assessment (RT-ICA) to surface missing prerequisites and block planning until all required inputs are verified. Activates on specs, PRDs, tickets, RFCs, architecture designs, and multi-step engineering tasks. Integrates with CoVe-style planning pipelines.
+description: Works backward from the stated goal through its prerequisite chain — what must exist to reach the goal, then what each of those requires, back to the current state — classifying each prerequisite as AVAILABLE, DERIVABLE, or MISSING, and blocking planning until nothing is MISSING. Use before creating plans, delegating to agents, or defining acceptance criteria. Activates on specs, PRDs, tickets, RFCs, architecture designs, and multi-step engineering tasks. Always pass `#N` or an inline goal — invoking with no argument and no inline context returns BLOCKED. Integrates with CoVe-style planning pipelines.
+argument-hint: '[#N | goal text]'
 user-invocable: true
 context: fork
 ---

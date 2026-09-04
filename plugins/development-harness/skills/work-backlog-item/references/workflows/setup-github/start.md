@@ -1,6 +1,6 @@
 # setup-github Command
 
-**Trigger:** <mode/> is `setup-github`.
+**Trigger:** <route/> is `setup-github`.
 
 > **Repository**: OWNER/REPO is discovered via `discover_repo()` from `backlog_core.models`. Use MCP tools for all GitHub operations — no `gh` CLI required.
 

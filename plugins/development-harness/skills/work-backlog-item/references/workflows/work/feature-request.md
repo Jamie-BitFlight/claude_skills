@@ -34,7 +34,8 @@ Build this string for `add-new-feature`:
 
 ### Impact Radius
 
-{full content of the ## Impact Radius section from the `backlog_view` response}
+{full content of the ## Impact Radius section from the `backlog_view` response — fall back to the
+`## Resources` section when Impact Radius is absent (older grooming template; see groom-check.md)}
 
 **Planner constraint**: Create tasks for every item listed above, or document the exclusion reason inline. The plan is incomplete if any row in the Impact Radius is unaddressed.
 

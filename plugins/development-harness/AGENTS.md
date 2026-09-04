@@ -269,6 +269,7 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 - `/dh:dispatch` - Dispatch tasks to agents using teams-first parallel execution; prefer over implement-feature when milestone-scoped work needs concurrent agent dispatch
 - `/dh:dh-meta-docs` - Plugin meta-documentation
+- `/dh:dh-glossary` - One-line definitions of dh terminology (RT-ICA, ARL, SAM, S1-S7, Impact Radius) with pointers to canonical sources
 - `/dh:interop` - Cross-plugin interoperability
 - `/dh:subagent-contract` - Where a dispatched step's output goes, and how it signals state upstream
 
@@ -322,6 +323,11 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 ## Required Reading by Task Type
 
 Load these documents based on what you are doing. They contain the system design knowledge required for that work to succeed.
+
+**Designing new architecture for a feature (any module, before writing an architect spec):**
+
+- Nearest-first: check the touched module's own subtree for an `ARCHITECTURE.md`, `CONTEXT.md`, or `adrs/ADR-*.md` before designing from scratch — extend what exists rather than re-deriving it.
+- Files under `docs/adrs/` follow `ADR-{issue}-{n}-{slug}.md`. Other ADR identifier schemes are referenced elsewhere in the plugin and not yet reconciled to this one — see #3050 before assuming this naming is universal across the whole codebase.
 
 **Modifying the pipeline process, stage sequencing, or touchpoint gates:**
 
