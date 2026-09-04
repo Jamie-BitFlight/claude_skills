@@ -207,6 +207,28 @@ def test_file_cache_work_item_snapshots_skips_invalid_utf8_without_crashing(tmp_
     assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
 
 
+def test_file_cache_work_item_snapshots_skips_unreadable_path_without_crashing(tmp_path: Path) -> None:
+    """A filesystem-level failure on one path must not take the whole batch offline.
+
+    Regression test: the corrupt-snapshot guard only caught
+    ``(pydantic.ValidationError, YAMLError, UnicodeDecodeError)``, so an
+    ``OSError``-family failure -- e.g. a directory matching the ``*.yaml``
+    glob (a plausible artifact of an interrupted or malformed write) --
+    still propagated out of the whole enumeration uncaught, taking the
+    good snapshot down with it.
+    """
+    # Given: one real snapshot and one sibling path that is a directory, not a file
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    (tmp_path / "items" / "issues" / "13.yaml").mkdir()
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the real item is still returned; the unreadable path is skipped, not raised
+    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+
+
 def test_file_cache_work_item_snapshots_keeps_real_snapshot_ending_in_tmp(tmp_path: Path) -> None:
     """A real snapshot whose logical key ends in ``.tmp`` must not be mistaken for an orphan.
 

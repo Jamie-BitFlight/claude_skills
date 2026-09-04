@@ -453,13 +453,20 @@ class FileCache:
           a leading dot since it is written straight to ``destination``.
         - A snapshot that fails to load at all -- e.g. the 0-byte body such
           an orphaned temp file has, which parses to ``None`` and fails
-          ``BacklogItem`` validation; a file with unparseable YAML; or a
-          file with invalid UTF-8 bytes, which ``load_item``'s
+          ``BacklogItem`` validation; a file with unparseable YAML; a file
+          with invalid UTF-8 bytes, which ``load_item``'s
           ``path.open(encoding="utf-8")`` surfaces as ``UnicodeDecodeError``
-          rather than a YAML or validation error. One bad file is logged and
-          skipped, mirroring the per-entry salvage policy
+          rather than a YAML or validation error; or a filesystem-level
+          failure (``OSError`` and subclasses -- e.g. a directory matching
+          ``*.yaml``, or a file whose permissions block reads) on the
+          specific path being loaded. One bad file is logged and skipped,
+          mirroring the per-entry salvage policy
           :meth:`_CacheStateStore._salvage_field` already applies to the
-          durable mutation queue.
+          durable mutation queue. (That queue-side policy also surfaces a
+          rejection *count* to callers via ``ReconcileOutcome``; this
+          snapshot-side policy does not yet have an equivalent plumbed
+          through its one caller, ``GitHubWorkItemsBackend.load_records`` --
+          tracked separately, out of scope for the crash fix here.)
 
         Returns:
             Ordered ``(logical_key, item)`` pairs for every snapshot that
@@ -475,7 +482,7 @@ class FileCache:
             relative = path.relative_to(item_root)
             try:
                 snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
-            except (pydantic.ValidationError, YAMLError, UnicodeDecodeError) as exc:
+            except (pydantic.ValidationError, YAMLError, UnicodeDecodeError, OSError) as exc:
                 _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
         return snapshots
 
