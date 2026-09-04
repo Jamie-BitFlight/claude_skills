@@ -193,7 +193,9 @@ class TestLiveLifecycle:
         # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
         assert "item_ref" in result, f"Expected item_ref in result, got: {list(result.keys())}"
         item_ref: str = result["item_ref"]
-        assert item_ref.startswith("#"), f"Expected item_ref like '#N', got: {item_ref!r}"
+        assert item_ref.startswith("#"), (
+            f"Expected item_ref like '#N', got: {item_ref!r}, error: {result.get('error')!r}"
+        )
         issue_num = int(item_ref.lstrip("#"))
         assert issue_num > 0
         assert isinstance(result["file_path"], str)
@@ -317,7 +319,11 @@ class TestLiveLifecycle:
         )
         # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
         assert "item_ref" in create_result, f"Expected item_ref, got: {list(create_result.keys())}"
-        l11_issue_num = int(create_result["item_ref"].lstrip("#"))
+        l11_item_ref: str = create_result["item_ref"]
+        assert l11_item_ref.startswith("#"), (
+            f"Expected item_ref like '#N', got: {l11_item_ref!r}, error: {create_result.get('error')!r}"
+        )
+        l11_issue_num = int(l11_item_ref.lstrip("#"))
         assert l11_issue_num > 0
         live_items["issues"].append(l11_issue_num)
 
