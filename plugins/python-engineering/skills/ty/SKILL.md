@@ -25,7 +25,7 @@ configuration schema, and general usage (not duplicated here).
 - `ty` is the only type checker this policy permits — never add, install, configure, or run `mypy`, `pyright`, or `basedpyright` alongside it.
 - Invoke as `uv run ty`, never bare `ty` or `uvx ty` — those may resolve a different version than the one your lockfile pins.
 - **`unresolved-import` errors**: add the missing directory to `[tool.ty.environment] extra-paths` in `pyproject.toml`, then verify with `uv run ty check <path>`. A root `ty.toml` takes precedence over `pyproject.toml` — confirm which file ty is actually reading before assuming the fix didn't apply.
-- **`unresolved-import` in a PEP 723 standalone script** (a `# /// script ... ///` header importing a sibling module): the repo's `pyproject.toml` does not apply here — ty treats the script as its own isolated project. Put `extra-paths` inside the script's own metadata block instead:
+- **`unresolved-import` in a PEP 723 standalone script** (a `# /// script ... ///` header importing a sibling module): the project's `pyproject.toml` does not apply here — ty treats the script as its own isolated project. Put `extra-paths` inside the script's own metadata block instead:
   ```python
   #!/usr/bin/env -S uv run --quiet --script
   # /// script
@@ -35,4 +35,4 @@ configuration schema, and general usage (not duplicated here).
   # extra-paths = ["."]
   # ///
   ```
-  Working examples in this repo: `scripts/validate_codex_plugin_isolated.py`, `plugins/development-harness/sam_schema/cli.py` (accessed 2026-09-04). Verify with `uv run ty check <script>.py` against the script file directly, not the repo root.
+  Verify with `uv run ty check <script>.py` against the script file directly, not the project root.
