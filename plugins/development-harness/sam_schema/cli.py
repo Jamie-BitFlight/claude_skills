@@ -15,7 +15,7 @@
 # ]
 #
 # [tool.ty.environment]
-# extra-paths = [".."]
+# root = [".", ".."]
 # ///
 """Root Typer composer for the provider-neutral SAM CLI."""
 
