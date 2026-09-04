@@ -24,7 +24,7 @@ The **canonical SAM specification** lives in the [bitflight-devops/stateless-age
 - **Deterministic backpressure** — Gate progress on deterministic checks (build/tests/lint/security scans) executed by tools, not "advice" in prompts. Converts non-deterministic generation into a measurable loop.
 - **Embedded methodology** — The process IS the prompt, not instructions to follow. Cannot skip what structures the task.
 - **No recall required** — Task records contain all answers needed for the task. Reduces reliance on unverified recall; verification still required for synthesis/logic.
-- **RT-ICA gate** — Reverse Thinking - Information Completeness Assessment: works backward from the stated goal through its prerequisite chain before planning, marking each prerequisite AVAILABLE | DERIVABLE | MISSING; BLOCK if any MISSING.
+- **RT-ICA gate** — reverse-thinking information completeness check before planning (see `dh:rt-ica` or `dh:dh-glossary` for the method); marks each prerequisite AVAILABLE | DERIVABLE | MISSING, BLOCK if any MISSING.
 - **Semantic artifact tokens** — Storage-agnostic pattern `ARTIFACT:{TYPE}({SCOPE_OR_ID})` for DISCOVERY, PLAN, TASK, EXECUTION, REVIEW, VERIFICATION.
 - **Structure over instruction** — Behavioral instructions cannot override architectural limitations. The pipeline structure enforces behavior.
 - **AI cannot self-evaluate** — Independent verification required. Execution Agent and Forensic Review Agent are structurally separate.
