@@ -541,6 +541,23 @@ After pushing a commit to a PR, or when asked to check or address PR reviews, lo
   `gh api repos/{owner}/{repo}/contents/{path}?ref={branch} --jq '.content' | base64 -d` rather
   than a URL-fetch tool — it authenticates automatically and returns exact file bytes.
 
+## Git Workflow: Commit, Push, and PR per Task
+
+Repo owner instruction, standing: commit completed work as each discrete task finishes, push the
+branch, and open a pull request for it. Do not wait for interactive approval before committing or
+pushing in this repository — this overrides Claude Code's own default "ask before committing"
+behavior here.
+
+- Follow `rules/commit-cadence-and-worktrees.md` for commit hygiene: small, file-scoped commits
+  via an explicit file list, never `git add -A`.
+- One PR per discrete task or unit of work, not one PR per session. Push the branch and run
+  `gh pr create` once a task's commit(s) land.
+- This does not extend to force-pushing, pushing directly to `main`, merging PRs, or bypassing
+  hooks (`--no-verify`) — those still need explicit approval every time.
+- The Beads block's "Conservative (default)" git policy below does not describe this checkout
+  (see "Backlog" above: this checkout's backend is GitHub Issues, not Beads). This section is
+  authoritative for git/PR behavior here.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker
 
