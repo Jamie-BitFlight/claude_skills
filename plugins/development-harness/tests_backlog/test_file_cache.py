@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import get_context
 from multiprocessing.synchronize import Barrier as ProcessBarrier
@@ -175,114 +176,82 @@ def test_file_cache_work_item_snapshots_orphaned_temp_file_is_invisible_to_enume
     assert snapshots == []
 
 
-def test_file_cache_work_item_snapshots_ignores_orphaned_temp_file_alongside_real_items(tmp_path: Path) -> None:
-    """An orphaned temp file beside a real snapshot for the same key must not affect it.
-
-    Regression test: confirms the orphan doesn't shadow or otherwise
-    interfere with a real, successfully-saved snapshot for the same
-    logical key sitting right beside it.
-    """
-    # Given: one real, successfully-saved snapshot and one orphaned temp file left
-    # behind beside it by a prior interrupted write for the same destination
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
-    (tmp_path / "items" / "issues" / ".12.yaml.abcd1234.tmp").touch()
-
-    # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-
-    # Then: only the real item is returned -- the orphan never matches the glob
-    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+def _touch_orphaned_temp_file(issues_dir: Path) -> None:
+    (issues_dir / ".12.yaml.abcd1234.tmp").touch()
 
 
-def test_file_cache_work_item_snapshots_skips_zero_byte_yaml_without_crashing(tmp_path: Path) -> None:
-    """A 0-byte ``.yaml`` file from any source must not take the whole batch offline.
-
-    Regression test: a genuinely empty ``.yaml`` file -- e.g. a leftover
-    from before this fix, or any other write-time corruption -- still
-    matches the ``*.yaml`` glob and must still be caught by the generic
-    corrupt-snapshot salvage below, independent of the temp-file-naming
-    fix above. ``yaml.safe_load`` of an empty file returns ``None``, and
-    ``BacklogItem.model_validate(None)`` raises ``pydantic.ValidationError``.
-    """
-    # Given: one real snapshot and one sibling that is a genuinely empty .yaml file
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
-    (tmp_path / "items" / "issues" / "13.yaml").touch()
-
-    # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-
-    # Then: the real item is still returned; the empty one is skipped, not raised
-    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+def _touch_zero_byte_yaml(issues_dir: Path) -> None:
+    (issues_dir / "13.yaml").touch()
 
 
-def test_file_cache_work_item_snapshots_skips_invalid_utf8_without_crashing(tmp_path: Path) -> None:
-    """A snapshot with invalid UTF-8 bytes must not take the whole batch offline.
-
-    Regression test: ``load_item`` opens snapshots with
-    ``path.open(encoding="utf-8")``, so disk corruption or a partial write
-    that leaves invalid UTF-8 bytes raises ``UnicodeDecodeError`` -- a
-    ``ValueError`` subclass, but not ``pydantic.ValidationError`` or
-    ``YAMLError`` -- which used to propagate out of the whole enumeration,
-    taking every other, perfectly good snapshot offline with it.
-    """
-    # Given: one real snapshot and one sibling with invalid UTF-8 bytes
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
-    (tmp_path / "items" / "issues" / "13.yaml").write_bytes(b'title: "\xff\xfe bad utf8"')
-
-    # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-
-    # Then: the real item is still returned; the corrupt one is skipped, not raised
-    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+def _write_invalid_utf8_yaml(issues_dir: Path) -> None:
+    (issues_dir / "13.yaml").write_bytes(b'title: "\xff\xfe bad utf8"')
 
 
-def test_file_cache_work_item_snapshots_skips_unreadable_path_without_crashing(tmp_path: Path) -> None:
-    """A filesystem-level failure on one path must not take the whole batch offline.
-
-    Regression test: the corrupt-snapshot guard only caught
-    ``(pydantic.ValidationError, YAMLError, UnicodeDecodeError)``, so an
-    ``OSError``-family failure -- e.g. a directory matching the ``*.yaml``
-    glob (a plausible artifact of an interrupted or malformed write) --
-    still propagated out of the whole enumeration uncaught, taking the
-    good snapshot down with it.
-    """
-    # Given: one real snapshot and one sibling path that is a directory, not a file
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
-    (tmp_path / "items" / "issues" / "13.yaml").mkdir()
-
-    # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-
-    # Then: the real item is still returned; the unreadable path is skipped, not raised
-    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+def _make_directory_matching_glob(issues_dir: Path) -> None:
+    (issues_dir / "13.yaml").mkdir()
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="symlink creation requires elevated privileges on Windows")
-def test_file_cache_work_item_snapshots_skips_path_escaping_cache_root_without_crashing(tmp_path: Path) -> None:
-    """A path that resolves outside the cache root must not take the whole batch offline.
-
-    Regression test: the corrupt-snapshot guard didn't catch bare
-    ``ValueError``, but ``_snapshot_path``'s own boundary check raises
-    exactly that (via ``Path.relative_to``) when a symlink under ``items/``
-    resolves outside the cache root -- e.g. disk corruption or a
-    mis-restored backup. That ``ValueError`` used to propagate out of the
-    whole enumeration uncaught, taking the good snapshot down with it.
-    """
-    # Given: one real snapshot and a symlink whose target escapes the cache root entirely
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
-    outside_target = tmp_path.parent / "outside.yaml"
+def _make_symlink_escaping_cache_root(issues_dir: Path) -> None:
+    outside_target = issues_dir.parent.parent.parent / "outside.yaml"
     outside_target.write_text("title: escaped")
-    (tmp_path / "items" / "issues" / "13.yaml").symlink_to(outside_target)
+    (issues_dir / "13.yaml").symlink_to(outside_target)
+
+
+@pytest.mark.parametrize(
+    ("corrupt_sibling", "reason"),
+    [
+        pytest.param(
+            _touch_orphaned_temp_file,
+            "an orphaned temp file never matches the *.yaml glob at all",
+            id="orphaned_temp_file",
+        ),
+        pytest.param(
+            _touch_zero_byte_yaml,
+            "a genuinely empty .yaml file parses to None and fails BacklogItem validation",
+            id="zero_byte_yaml",
+        ),
+        pytest.param(
+            _write_invalid_utf8_yaml,
+            "invalid UTF-8 bytes raise UnicodeDecodeError, a ValueError subclass",
+            id="invalid_utf8",
+        ),
+        pytest.param(
+            _make_directory_matching_glob,
+            "a directory matching the *.yaml glob raises OSError on open()",
+            id="unreadable_path",
+        ),
+        pytest.param(
+            _make_symlink_escaping_cache_root,
+            "a symlink escaping the cache root raises a bare ValueError from Path.relative_to",
+            marks=pytest.mark.skipif(
+                sys.platform == "win32", reason="symlink creation requires elevated privileges on Windows"
+            ),
+            id="symlink_escaping_root",
+        ),
+    ],
+)
+def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
+    tmp_path: Path, corrupt_sibling: Callable[[Path], None], reason: str
+) -> None:
+    """A corrupt/orphaned sibling file must not take the whole batch offline.
+
+    Regression test, one case per way a sibling file can fail: before this
+    PR's fixes, each of these independently propagated an uncaught
+    exception out of the whole enumeration, taking every other, perfectly
+    good snapshot offline with it. See ``reason`` above for why each case
+    is caught now.
+    """
+    # Given: one real, successfully-saved snapshot and one corrupt/orphaned sibling
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    issues_dir = tmp_path / "items" / "issues"
+    corrupt_sibling(issues_dir)
 
     # When: the provider reloads its durable snapshots
     snapshots = FileCache(tmp_path)._work_item_snapshots()
 
-    # Then: the real item is still returned; the escaping symlink is skipped, not raised
+    # Then: only the real item is returned -- the corrupt sibling is skipped, not raised
     assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
 
 
