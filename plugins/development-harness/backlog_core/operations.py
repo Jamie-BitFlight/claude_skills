@@ -1296,6 +1296,30 @@ def _pull_if_issue_selector(selector: str, repo: str, output: Output | None = No
 # ---------------------------------------------------------------------------
 
 
+def _validate_add_item_title(title: str) -> None:
+    """Raise ValidationError if title is empty or whitespace-only.
+
+    An empty title reaching ``create_issue_for_item`` hits that function's
+    own ``if not item.title: return None`` guard, which returns ``None``
+    without raising -- indistinguishable, downstream in
+    ``_try_create_github_issue``, from the tolerated GitHub-unavailable
+    fallback. Rejecting an empty title here, before any storage or issue
+    creation is attempted, is the root-cause fix: it keeps that guard's
+    ``None`` return meaning only "GitHub unavailable," matching the
+    contract ``_try_create_github_issue``'s docstring documents.
+
+    Args:
+        title: Raw title value supplied by the caller.
+
+    Raises:
+        ValidationError: If title is empty or whitespace-only.
+    """
+    if title.strip():
+        return
+    msg = "Title is required and cannot be empty or whitespace-only."
+    raise ValidationError(msg)
+
+
 def _validate_add_item_priority(priority: str) -> None:
     """Raise ValidationError if priority is not an accepted value for a new item.
 
@@ -1586,6 +1610,7 @@ def add_item(
             Integer-ID backends (GitHub, sqlite, memory) do not raise this —
             their local-only fallback is unconditional.
     """
+    _validate_add_item_title(title)
     _validate_add_item_priority(priority)
     _validate_add_item_type(type_)
 
