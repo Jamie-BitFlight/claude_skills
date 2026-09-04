@@ -61,6 +61,10 @@
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,.claude/rules/**/*.md,CLAUDE.md"
     },
     {
+      "file": "runtime-vs-design-time.md",
+      "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md,AGENTS.md"
+    },
+    {
       "file": "script-invocation.md",
       "match": "**/scripts/**,.claude/hooks/**"
     },
