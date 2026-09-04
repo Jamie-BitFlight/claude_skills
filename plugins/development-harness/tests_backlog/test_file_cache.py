@@ -250,6 +250,53 @@ def test_file_cache_work_item_snapshots_keeps_real_snapshot_ending_in_tmp(tmp_pa
     assert [(key, item.title) for key, item in snapshots] == [("release-1.0.tmp.yaml", "Real item")]
 
 
+def test_file_cache_work_item_snapshots_keeps_real_snapshot_with_dot_prefixed_tmp_key(tmp_path: Path) -> None:
+    """A real snapshot whose key both starts with '.' and ends in '.tmp' must not be dropped.
+
+    Regression test: the orphan filter used to treat any filename starting
+    with '.' and ending in '.tmp.yaml' as an orphan. A legitimate key like
+    ``.release.tmp`` produces exactly that shape (``.release.tmp.yaml``)
+    without ever going through ``tempfile.mkstemp``, so it was silently and
+    permanently dropped -- with no warning logged, unlike the corrupt-YAML
+    path -- because the filter matched before the try/except ever ran. The
+    filter now also requires the embedded literal ``.yaml.`` that only a
+    real ``mkstemp`` orphan's name contains.
+    """
+    # Given: a real snapshot saved under a key that starts with "." and ends in ".tmp"
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot(".release.tmp", BacklogItem(title="Real item"))
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the real item is returned, not excluded as an orphan
+    assert [(key, item.title) for key, item in snapshots] == [(".release.tmp.yaml", "Real item")]
+
+
+def test_file_cache_work_item_snapshots_skips_path_escaping_cache_root_without_crashing(tmp_path: Path) -> None:
+    """A path that resolves outside the cache root must not take the whole batch offline.
+
+    Regression test: the corrupt-snapshot guard didn't catch bare
+    ``ValueError``, but ``_snapshot_path``'s own boundary check raises
+    exactly that (via ``Path.relative_to``) when a symlink under ``items/``
+    resolves outside the cache root -- e.g. disk corruption or a
+    mis-restored backup. That ``ValueError`` used to propagate out of the
+    whole enumeration uncaught, taking the good snapshot down with it.
+    """
+    # Given: one real snapshot and a symlink whose target escapes the cache root entirely
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    outside_target = tmp_path.parent / "outside.yaml"
+    outside_target.write_text("title: escaped")
+    (tmp_path / "items" / "issues" / "13.yaml").symlink_to(outside_target)
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the real item is still returned; the escaping symlink is skipped, not raised
+    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+
+
 def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:
     # Given: an opaque provider key and an item whose backend reference is meaningful
     cache = FileCache(tmp_path)

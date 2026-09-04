@@ -11,7 +11,6 @@ from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
 
-import pydantic
 from ruamel.yaml import YAML, YAMLError
 
 from .file_cache_state import (
@@ -442,31 +441,33 @@ class FileCache:
 
         - An orphaned :meth:`_save_item_snapshot` temp file. That method's
           ``tempfile.mkstemp`` always names its temp file
-          ``prefix=f".{destination.name}."`` and ``suffix=".tmp.yaml"``, so
-          it still matches this method's ``*.yaml`` glob; a process killed
-          between ``mkstemp()`` and its ``finally`` cleanup (session
-          interrupt, OOM, crash) leaves one behind forever. It is excluded
-          here by matching *both* the leading-dot ``mkstemp`` prefix and the
-          ``.tmp.yaml`` suffix -- suffix alone would also match a real
-          snapshot whose logical key happens to end in ``.tmp`` (e.g.
-          ``release-1.0.tmp`` -> ``release-1.0.tmp.yaml``), which never gets
-          a leading dot since it is written straight to ``destination``.
+          ``prefix=f".{destination.name}."`` and ``suffix=".tmp.yaml"``; a
+          process killed between ``mkstemp()`` and its ``finally`` cleanup
+          (session interrupt, OOM, crash) leaves one behind forever, still
+          matching this method's ``*.yaml`` glob. Its name therefore always
+          has the shape ``.{original-name}.yaml.{random}.tmp.yaml`` -- a
+          leading dot, the embedded literal ``.yaml.`` from the destination
+          name (every destination name ends in ``.yaml``), then mkstemp's
+          random segment, then the ``.tmp.yaml`` suffix. Matching on that
+          full shape (not just the leading dot and trailing suffix)
+          excludes a real snapshot whose logical key itself starts with
+          ``.`` and ends in ``.tmp`` -- e.g. ``.release.tmp`` ->
+          ``.release.tmp.yaml`` -- which has no embedded ``.yaml.`` marker.
         - A snapshot that fails to load at all -- e.g. the 0-byte body such
           an orphaned temp file has, which parses to ``None`` and fails
           ``BacklogItem`` validation; a file with unparseable YAML; a file
           with invalid UTF-8 bytes, which ``load_item``'s
-          ``path.open(encoding="utf-8")`` surfaces as ``UnicodeDecodeError``
-          rather than a YAML or validation error; or a filesystem-level
-          failure (``OSError`` and subclasses -- e.g. a directory matching
-          ``*.yaml``, or a file whose permissions block reads) on the
-          specific path being loaded. One bad file is logged and skipped,
-          mirroring the per-entry salvage policy
-          :meth:`_CacheStateStore._salvage_field` already applies to the
-          durable mutation queue. (That queue-side policy also surfaces a
-          rejection *count* to callers via ``ReconcileOutcome``; this
-          snapshot-side policy does not yet have an equivalent plumbed
-          through its one caller, ``GitHubWorkItemsBackend.load_records`` --
-          tracked separately, out of scope for the crash fix here.)
+          ``path.open(encoding="utf-8")`` surfaces as ``UnicodeDecodeError``;
+          a symlink whose target resolves outside the cache root, which
+          :meth:`_snapshot_path`'s own boundary check surfaces as a bare
+          ``ValueError`` from ``Path.relative_to``; or any other
+          filesystem-level failure (``OSError`` and subclasses -- e.g. a
+          directory matching ``*.yaml``, or unreadable permissions) on the
+          specific path being loaded. ``ValueError`` alone covers the
+          pydantic and Unicode cases too, since both are its subclasses.
+          One bad file is logged and skipped, mirroring the per-entry
+          salvage policy :meth:`_CacheStateStore._salvage_field` already
+          applies to the durable mutation queue.
 
         Returns:
             Ordered ``(logical_key, item)`` pairs for every snapshot that
@@ -477,12 +478,16 @@ class FileCache:
             return []
         snapshots: list[tuple[str, BacklogItem]] = []
         for path in sorted(item_root.rglob("*.yaml")):
-            if path.name.startswith(".") and path.name.endswith(".tmp.yaml"):
+            if (
+                path.name.startswith(".")
+                and path.name.endswith(".tmp.yaml")
+                and ".yaml." in path.name[: -len(".tmp.yaml")]
+            ):
                 continue
             relative = path.relative_to(item_root)
             try:
                 snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
-            except (pydantic.ValidationError, YAMLError, UnicodeDecodeError, OSError) as exc:
+            except (ValueError, YAMLError, OSError) as exc:
                 _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
         return snapshots
 
