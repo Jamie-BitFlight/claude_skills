@@ -52,11 +52,17 @@ def test_no_stale_dot_claude_rules_path_references() -> None:
     `.claude/rules/*.md` files that no longer exist at that path — an agent following the
     instruction literally (e.g. `.claude/CLAUDE.md:301`'s "load `.claude/rules/skill-substitution.md`
     before editing any SKILL.md") would load nothing and proceed unaware the safety rule never
-    loaded. Scoped to this repo's own root instruction files, not the whole tree — most other
+    loaded. Scoped to this repo's own root instruction files plus two files found by a
+    repo-wide grep to carry the same stale reference — not the whole tree, since most other
     `.claude/rules/` mentions in the repo describe a different project's convention or the
     generic Claude Code feature other projects use, which are not stale.
     """
-    targets = [_REPO_ROOT / "AGENTS.md", _REPO_ROOT / ".claude" / "CLAUDE.md"]
+    targets = [
+        _REPO_ROOT / "AGENTS.md",
+        _REPO_ROOT / ".claude" / "CLAUDE.md",
+        _REPO_ROOT / "rules" / "prose-file-classification.md",
+        _REPO_ROOT / "plugins" / "development-harness" / "agents" / "reviewer-security.md",
+    ]
     offenders = [
         str(path.relative_to(_REPO_ROOT)) for path in targets if ".claude/rules/" in path.read_text(encoding="utf-8")
     ]
