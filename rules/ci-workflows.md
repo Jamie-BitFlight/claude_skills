@@ -2,6 +2,31 @@
 
 Follow this phase-gate checklist when creating/modifying/debugging GitHub Actions workflows. Each phase gates the next.
 
+## Current Pipeline Reference (`.github/workflows/code-quality.yml`)
+
+The `quality-gate` summary job requires ALL of these to pass:
+
+| Job | What it does |
+|-----|-------------|
+| `lint-python` | Ruff lint + format (via prek) |
+| `typecheck-ty` | ty (Astral) |
+| `lint-js` | Biome (JS/TS/JSON) |
+| `lint-markdown` | markdownlint-cli2 |
+| `lint-shell` | shellcheck + shfmt |
+| `validate-plugins` | skilllint (plugin/skill structure) |
+| `manifest-sync` | Auto-sync plugin manifests; the per-PR plugin.json version-bump check is advisory (`continue-on-error`) — `bump-marketplace.yml` on main is the backstop |
+| `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
+| `test-python` | pytest fast suite (default addopts filter) |
+| `test-cross-backend` | pytest `-m cross_backend` on a memory/sqlite matrix (`BACKLOG_BACKEND` env) |
+| `test-integration` | pytest `-m integration` on `plugins/development-harness/tests/` |
+
+Advisory jobs outside the gate: `research-validation` (research-corpus template gaps) and
+`test-e2e` (live GitHub sandbox issues; main push / manual dispatch only).
+
+Other workflows in `.github/workflows/`: `backlog-sync.yml`, `bump-marketplace.yml`,
+`auto-rebase.yml`, `claude.yml`, `claude-code-review.yml`, `copilot-setup-steps.yml`,
+`main-ci-health-check.yml`, `quality-gate-audit.yml`.
+
 ## Phase 1: Research
 
 Before writing/modifying workflow YAML:
