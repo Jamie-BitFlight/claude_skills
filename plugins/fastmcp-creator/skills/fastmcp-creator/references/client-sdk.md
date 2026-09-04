@@ -461,6 +461,11 @@ fastmcp auth cimd validate https://myapp.example.com/oauth/client.json
 
 ## Sampling [8]
 
+CONSTRAINT (v4): FastMCP 4 removes `ctx.sample()`/`ctx.sample_step()` from the server API entirely
+— a server built against FastMCP 4 can never issue a sampling request. `sampling_handler` below
+only fires when the client connects to a pre-v4 (or non-FastMCP) server that still calls
+`ctx.sample()`. See [./migration.md](./migration.md).
+
 PATTERN: Implement a `sampling_handler` to respond to server-initiated LLM completion requests. The server delegates AI reasoning to the client.
 
 ```python
