@@ -1441,8 +1441,8 @@ def _resolve_reference(priority: str, slug: str) -> str:
     return reference
 
 
-def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> int | None:
-    """Attempt to create a GitHub issue for item_data; return issue number or None.
+def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> tuple[int | None, str | None]:
+    """Attempt to create a GitHub issue for item_data.
 
     Args:
         item_data: Populated BacklogItem (file_path may be empty at this stage).
@@ -1450,31 +1450,39 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
         out: Output collector for warnings.
 
     Returns:
-        Issue number on success, None when GitHub is unavailable or creation fails.
+        ``(issue_number, None)`` on success.
+        ``(None, None)`` when GitHub is unavailable (no token, or ``try_get_github``
+        could not reach/resolve the repo) — this is the intentional local-only-create
+        fallback (#2999); it is not reported as an error because no GitHub attempt was
+        actually made to fail.
+        ``(None, reason)`` when a GitHub client was obtained but issue creation itself
+        raised ``GithubException``/``BacklogError`` — this is a genuine, actionable
+        failure and ``reason`` is the caller-visible message (#3182).
     """
     repository = try_get_github(repo)
     if repository is None:
         out.warn("  WARNING: GitHub unavailable — creating local-only item")
-        return None
+        return None, None
     try:
-        return create_issue_for_item(repository, item_data, dry_run=False, output=out)
+        return create_issue_for_item(repository, item_data, dry_run=False, output=out), None
     except (GithubException, BacklogError) as e:
-        out.warn(f"  WARNING: Issue creation failed: {e}")
-        return None
+        reason = f"Issue creation failed: {e}"
+        out.warn(f"  WARNING: {reason}")
+        return None, reason
 
 
-def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output) -> str:
-    """Create a backend issue and return the issue ref string, or empty string on failure.
+def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output) -> tuple[str, str | None]:
+    """Create a backend issue and return (issue ref, error reason or None).
 
     Dispatches to the appropriate backend-native creation path:
 
     - String-ID backends (beads): calls ``create_beads_issue_for_item`` on the
-      backend, returns the nanoid (e.g. ``"bd-a3f8"``).
+      backend, returns the nanoid (e.g. ``"bd-a3f8"``). Failure here is unchanged —
+      ``add_item``'s subsequent ``put_work_item`` call raises ``ContentUnavailableError``
+      for a still-issueless beads item (see ``BeadsBackend.put_work_item``); this
+      function's own return only ever carries ``None`` for beads' error slot.
     - Integer-ID backends (GitHub, sqlite, memory): calls
       ``_try_create_github_issue``, formats the returned number as ``"#N"``.
-
-    The return value is always a ``str``: non-empty on success, empty string
-    when the backend is unavailable or creation fails.
 
     Args:
         item_data: Populated BacklogItem (file_path may be empty at this stage).
@@ -1482,7 +1490,9 @@ def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output
         out: Output collector for warnings.
 
     Returns:
-        Issue ref string (e.g. ``"#42"`` or ``"bd-a3f8"``), or ``""`` on failure.
+        ``(ref, None)`` on success, or on the tolerated GitHub-unavailable fallback.
+        ``("", reason)`` only when the integer-ID path's own creation attempt raised —
+        propagated verbatim from ``_try_create_github_issue``.
     """
     backend = get_config().backend
     if backend.issue_id_type == "string":
@@ -1490,13 +1500,13 @@ def _try_create_backend_issue_ref(item_data: BacklogItem, repo: str, out: Output
 
         if isinstance(backend, BeadsBackend):
             nanoid = backend.create_beads_issue_for_item(item_data, output=out)
-            return nanoid or ""
+            return nanoid or "", None
         # Unknown string-ID backend — log and fall through to local-only.
         out.warn("  WARNING: String-ID backend does not support create_beads_issue_for_item — creating local-only item")
-        return ""
+        return "", None
     # Integer-ID backend path (GitHub, sqlite, memory).
-    issue_num = _try_create_github_issue(item_data, repo, out)
-    return f"#{issue_num}" if issue_num else ""
+    issue_num, error = _try_create_github_issue(item_data, repo, out)
+    return (f"#{issue_num}", None) if issue_num else ("", error)
 
 
 def _build_item_body(research_first: str, files: str, suggested_location: str) -> str:
@@ -1556,6 +1566,14 @@ def add_item(
         ``view_item`` return for this same item on every later read (see
         ``_build_list_entry`` and ``view_result_from_local_item``).
 
+        ``error`` is present only when an integer-ID backend obtained a GitHub client
+        but issue creation itself failed (see ``_try_create_github_issue``); it is
+        absent both on success and on the tolerated GitHub-unavailable local-only-create
+        path. Its presence never changes whether the item was stored — the item is
+        always persisted by the time this function returns, ``error`` only adds a
+        caller-visible reason for why ``item_ref`` is empty in the "attempted and
+        failed" sub-case.
+
     Raises:
         ValidationError: If priority or type_ is not a recognized value. No
             item is stored and no backend issue is created when raised.
@@ -1591,7 +1609,7 @@ def add_item(
         files=files,
         suggested_location=suggested_location,
     )
-    issue_ref = _try_create_backend_issue_ref(item_data, repo, out)
+    issue_ref, issue_error = _try_create_backend_issue_ref(item_data, repo, out)
     item_reference = issue_ref or _resolve_reference(priority, slug)
 
     # Build and persist the backend-owned work item. Reuse item_data.title, not the
@@ -1634,6 +1652,8 @@ def add_item(
         # See #2999.
         "item_ref": issue_ref,
     }
+    if issue_error:
+        result["error"] = issue_error
     return {**result, **out.to_dict()}
 
 

@@ -1386,7 +1386,11 @@ async def backlog_add(
         :class:`~backlog_core.tool_responses.BacklogAddResponse` with
         file_path, title, priority, item_ref, and output messages/warnings.
         file_path is for reference only — use backlog_update or backlog_groom
-        for all modifications. On error, ``error`` is set.
+        for all modifications. On error, ``error`` is set — either because the
+        call raised (duplicate item, invalid priority/type) or, on an
+        integer-ID backend, because GitHub issue creation itself failed after
+        a local-only item was already stored (``item_ref`` will be ``""``,
+        ``reference`` still identifies the stored item).
     """
     out = Output()
     try:
