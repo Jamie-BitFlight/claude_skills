@@ -13,6 +13,12 @@
 
 Do not create a per-plugin `pyproject.toml` sub-project or a per-plugin `uv.lock`.
 
+This extends to every directory a script imports (`backlog_core/`, `dh_core/`, `sam_schema/`,
+etc.): they have `__init__.py` and dotted imports for internal organization, but are not
+distributable packages — never build, bundle, publish, or add a `pyproject.toml` beside them.
+Doing so creates two dependency sources of truth (the script's own inline deps vs. a new
+package's) that silently diverge — a split-brain, not a cleanup.
+
 ### Invariant
 
 ```bash

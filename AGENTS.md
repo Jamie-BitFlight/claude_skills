@@ -69,6 +69,10 @@ Before validating an MCP server (protocol, Codex, or Claude plugin integration),
   and reuse what's already declared (e.g. `httpx`, `ruamel.yaml`) instead of assuming a stdlib-only
   design. Stdlib-only is a valid constraint only for a confirmed deployment restriction (airgapped,
   no pip access) — not a default posture.
+- **Public by default**: name new functions and modules without a leading underscore. Early
+  "private" naming gets cargo-culted onto things that aren't private, then breaks tests that
+  legitimately need the name — add privacy once actually needed. Existing underscored code stays
+  as-is.
 
 Before writing a script or CLI meant to be consumed by an agent (which is every script/CLI/MCP
 server in this repo), read `docs/cli-output-conventions.md`.
