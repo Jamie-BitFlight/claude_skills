@@ -11,6 +11,7 @@ Batch the independent read calls concurrently when the host permits it. Use the 
 - `github_list_pull_request_reviews` for every submitted review and body;
 - `github_fetch_issue_comments` for PR-level responses;
 - `github_get_pr_reactions` for Codex's `+1` approval reaction;
+- `github_list_pr_timeline_events` for force-push events, needed only for the Codex approval check below;
 - `github_get_user_login` only when the authenticated comment author cannot otherwise be identified.
 
 Derive the same summary as `fetch --summary`:
@@ -18,7 +19,7 @@ Derive the same summary as `fetch --summary`:
 - `reviews_count`: all submitted reviews;
 - `threads_count`: all inline threads;
 - `unresolved`: every thread where `is_resolved` is false, and `unresolved_count` is its length;
-- `blockers`: closed or draft PR state, merge conflicts, or another explicit reviewability blocker. Treat unknown/pending mergeability as non-blocking;
+- `blockers`: exactly two conditions produce one — draft PR state, and merge conflicts (mergeable state is exactly "conflicting"). No other `mergeStateStatus` value is a blocker; treat unknown/pending mergeability as non-blocking;
 - `reviews_with_body`: submitted reviews with non-empty top-level bodies;
 - `unresponded_reviews`: each `reviews_with_body` entry not covered by the response rule below;
 - `codex_approved`: a current-revision Codex `+1` as defined below.
@@ -27,11 +28,11 @@ Do not treat counts from only one endpoint as the complete snapshot.
 
 ### Unresponded reviews
 
-Exclude Codex's exact fixed no-findings review wrapper; real Codex findings arrive as inline threads. Every other non-empty submitted review remains unresponded until a later PR-level comment by the authenticated user quotes that review's exact permalink. If the normalized review result lacks its permalink or timestamps, call `github_fetch_pr_comments` only for those missing fields. A response must postdate the later of the review's submission and edit timestamps.
+Exclude Codex's exact fixed no-findings review wrapper; real Codex findings arrive as inline threads. Every other non-empty submitted review remains unresponded until a later PR-level comment by the authenticated user quotes that review's exact permalink. If the normalized review result lacks its permalink or timestamps, call `github_fetch_issue_comments` only for those missing fields. A response must postdate the later of the review's submission and edit timestamps.
 
 ### Codex approval
 
-A `+1` counts only when its author is the exact Codex bot account and its timestamp is not older than the current head revision. When a Codex `+1` exists, use the general GitHub fetch tool to check the head commit timestamp and the latest force-push event; require the reaction to postdate both. Do not carry approval forward from an older revision.
+A `+1` counts only when its author is the exact Codex bot account and its timestamp is not older than the current head revision. The current head revision is the later of the head commit's own timestamp (from `github_get_pr_info`) and the latest force-push event's timestamp (from `github_list_pr_timeline_events`) — a force-push that resets the branch onto a pre-existing commit does not change that commit's own timestamp, so the timeline event is the only signal for it. When a Codex `+1` exists, require its timestamp to postdate this current head revision. Do not carry approval forward from an older revision.
 
 ## Reply and resolve
 
