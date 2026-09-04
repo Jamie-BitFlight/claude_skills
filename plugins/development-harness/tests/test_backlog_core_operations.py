@@ -417,20 +417,41 @@ class TestAddItemCreatesLocalFile:
         assert result["item_ref"] == "#1632"
 
     def test_add_item_item_ref_empty_when_no_github_issue(self, mocker: MockerFixture) -> None:
-        """Verify item_ref is present but empty when GitHub issue creation fails.
+        """Verify item_ref is empty and no error is set when GitHub is unavailable.
 
-        Tests: add_item item_ref contract on the local-only-create path (#2999).
+        Tests: add_item item_ref contract on the local-only-create path (#2999), now
+               also covering that this tolerated fallback does not populate `error` (#3182).
         How: Mock try_get_github to return None (no GitHub available).
         Why: item_ref must always be present — its emptiness, not its absence, is
-             the local-only signal. A dict with no distinguishing key at all is
-             indistinguishable from a successful create by any caller that does
-             not specifically probe for the key's presence (the original #2999 bug).
+             the local-only signal. GitHub-unavailable is a supported, silent fallback,
+             not a failure — `error` distinguishes it from the sibling case where a
+             GitHub client was obtained but creation itself raised.
         """
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
         result = add_item(title="Local Only No Ref", description="desc", priority="P2")
 
         assert result["item_ref"] == ""
+        assert "error" not in result
+
+    def test_add_item_error_set_when_issue_creation_raises(self, mocker: MockerFixture) -> None:
+        """Verify result["error"] is populated when GitHub issue creation raises (#3182).
+
+        Tests: add_item's new caller-visible-failure contract — the defect this item fixes.
+        How: try_get_github succeeds (a client is obtained); create_issue_for_item raises
+             GithubException.
+        Why: This is the sub-case the CI defect (#3182) actually hits — a valid token but
+             a failed create call — and the one this fix's `error` field exists to surface.
+        """
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mocker.Mock())
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=GithubException(500, "boom", None))
+
+        result = add_item(title="Flaky Create", description="desc", priority="P1")
+
+        assert result["item_ref"] == ""
+        error = result.get("error")
+        assert isinstance(error, str)
+        assert error.startswith("Issue creation failed:")
 
     def test_add_item_local_only_pending_state_visible_via_list_and_view(self, mocker: MockerFixture) -> None:
         """Verify a local-only create's pending state is visible on later reads, not just at creation.
