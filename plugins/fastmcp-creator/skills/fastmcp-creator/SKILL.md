@@ -221,7 +221,7 @@ changed and what to generate instead.
 
 ## Reference Files
 
-All v3 reference files sourced from <https://gofastmcp.com> (published docs) and <https://github.com/jlowin/fastmcp> (source code):
+All reference files sourced from <https://gofastmcp.com> (published docs) and <https://github.com/jlowin/fastmcp> (source code); v4-specific deltas are called out inline and centralized in [./references/migration.md](./references/migration.md):
 
 - [./references/server-core.md](./references/server-core.md) — `FastMCP()`, tools, resources, prompts, context, lifespan, `transforms=` kwarg
 - [./references/providers.md](./references/providers.md) — LocalProvider, FastMCPProvider, ProxyProvider, FileSystemProvider, SkillsProvider

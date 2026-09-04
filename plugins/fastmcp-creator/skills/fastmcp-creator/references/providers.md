@@ -1,4 +1,4 @@
-# FastMCP v3 Providers Reference
+# FastMCP Providers Reference
 
 How FastMCP sources components from different origins: local code, mounted servers, remote proxies, filesystems, and skills directories. [1]
 

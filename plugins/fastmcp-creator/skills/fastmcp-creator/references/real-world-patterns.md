@@ -1,4 +1,4 @@
-# FastMCP v3 Real-World Patterns
+# FastMCP Real-World Patterns
 
 Production-proven patterns for structuring, composing, and deploying FastMCP v3 servers — covers server composition, transport bridging, development workflows, CLI integration, and community examples. [1] [2] [3] [4]
 

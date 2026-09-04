@@ -1,4 +1,4 @@
-# FastMCP v3 Integrations Reference
+# FastMCP Integrations Reference
 
 How to connect FastMCP servers to external clients and frameworks — covers Anthropic API, OpenAI Responses API, Gemini SDK, FastAPI mounting, and Claude Code installation. [1] [2] [3] [4] [5] [6] [7] [8] [9]
 

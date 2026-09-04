@@ -1,4 +1,4 @@
-# FastMCP v3 Server Core Reference
+# FastMCP Server Core Reference
 
 How to instantiate a FastMCP server, register tools, resources, and prompts, inject context, and manage server lifecycle. [1]
 
