@@ -69,8 +69,8 @@ An agent whose assignment covers one unit of work. Two forms, both executed dire
 a SAM task reference with a task ID, which it runs by loading `start-task`, or a direct prompt carrying its
 own explicit instructions and no such task ID (it may still carry a plan address for read-only
 reference — e.g. a verification task that reads the plan to check criteria against it).
-`dh:task-worker` is dispatched both ways throughout the plugin; see the Dispatch Pattern section
-in [AGENTS.md](./AGENTS.md). The dispatcher passes the task reference and does not choose a
+`dh:task-worker` is dispatched both ways throughout the plugin; see
+[agents/task-worker.md](./agents/task-worker.md). The dispatcher passes the task reference and does not choose a
 specialist — the dispatched agent reads the task and resolves its own agent profile from it.
 An assignment may name a specific skill to invoke, including one that fans out its own bounded set
 of subagents; running it is executing the assignment, not widening it. `dh:task-worker` is this
@@ -133,9 +133,9 @@ Memory; see `docs/backend-providers.md`), accessed through `MarkdownContentProvi
 markdown-specific adapter in front of it). SAM plans and tasks currently do **not** share that
 `WorkItemBackend` — they route through a separate `TaskBackend` protocol
 (`dh_core/protocols.py`), confirmed by the repo owner and verified against `dh_core/operations.py`
-(`create_plan(backend: TaskBackend, ...)` etc.). This contradicts `AGENTS.md`'s current "that same
-backend... there is no TASKBACKEND" claim — tracked as [#3088](https://github.com/Jamie-BitFlight/claude_skills/issues/3088),
-not corrected here since it's outside this document's scope.
+(`create_plan(backend: TaskBackend, ...)` etc.). `AGENTS.md`'s "Plan and artifact capability
+boundary" section now describes this same `TaskBackend`/`WorkItemBackend` split; the earlier
+contradiction tracked as [#3088](https://github.com/Jamie-BitFlight/claude_skills/issues/3088) is resolved.
 _Avoid_: "backend call" for an MCP tool invocation or CLI request — that ambiguity caused real
 confusion in this session's design discussion. A backend call is specifically Collection
 reaching a data provider. Also avoid assuming "the backend" means one shared instance across
