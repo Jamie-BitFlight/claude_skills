@@ -268,7 +268,7 @@ guess:
   `references/typer-rich-non-tty-patterns.md` for the measure-and-render pattern that keeps it
   data-loss-safe; do not use Rich's TTY-oriented defaults unmodified.
 
-### Writing `.claude/rules/*.md` Files
+### Writing `./rules/*.md` Files
 
 Rules are the current requirement only — never provenance, citations, or narrative. Put those in
 the commit message or PR description; put a durable architecture decision in `docs/` instead.
@@ -292,13 +292,13 @@ flat directives, not `Edit`-trimming words from its existing structure.
   imperative wording for emphasis, backtick code-spans for literal identifiers (tool names, config
   keys)
 - Include XML tags for structured sections
-- Cite sources with URLs and access dates (not `.claude/rules/*.md` — see above)
+- Cite sources with URLs and access dates (not `./rules/*.md` — see above)
 - File references use `./` relative prefix
 - Skill handoffs use plain prose (`plugin:skill-name`, `/plugin:skill-name`), not
   `Skill(skill="...")` — that syntax is Claude-Code-only and this repo's plugin content also
   targets Codex and OpenCode. Existing `Skill(...)` blocks are pre-convention, not bugs.
 
-Before writing or editing any SKILL.md, load `.claude/rules/skill-substitution.md` — load-time
+Before writing or editing any SKILL.md, load `./rules/skill-substitution.md` — load-time
 substitution can silently corrupt the rendered skill if unaccounted for.
 
 ### JavaScript/TypeScript
@@ -374,7 +374,7 @@ This repository enforces **ty** (Astral) only, run via `prek`. `[tool.basedpyrig
 
 Suppression policy (inline `# ty: ignore` prohibited; config-level `[[tool.ty.overrides]]`
 relaxation allowed only for the categories in `linting-exceptions.md`) and its rationale live in
-`.claude/rules/astral-tool-overrides.md` and `.claude/rules/python-development.md` ("ty Type
+`./rules/astral-tool-overrides.md` and `./rules/python-development.md` ("ty Type
 Checker Errors") — both load on any `*.py`/`pyproject.toml`/`uv.lock` edit. The current override
 list itself lives in `pyproject.toml [tool.ty]`, not restated here.
 
@@ -385,7 +385,7 @@ list itself lives in `pyproject.toml [tool.ty]`, not restated here.
   mirroring the matching entry already in `[tool.pytest.ini_options] pythonpath` — and re-run
   before investigating the importing code itself. For the related `unresolved-import` failure
   (same `extra-paths` root cause, different symptom — the module isn't found at all rather than
-  an attribute on it), see `.claude/rules/python-development.md`'s "`unresolved-import` errors"
+  an attribute on it), see `./rules/python-development.md`'s "`unresolved-import` errors"
   section.
 - **TypedDict nominal typing**: ty treats a `TypedDict` as scoped to its defining module — two
   structurally identical TypedDicts from different modules are incompatible types to ty. Avoid
@@ -460,7 +460,7 @@ only when that is explicitly part of the requested deliverable.
 
 ### Other Tools' Rule Files
 
-Rule files outside `.claude/rules/` that other harnesses read — not a full rule-file index:
+Rule files outside `./rules/` that other harnesses read — not a full rule-file index:
 
 | File | Purpose |
 |------|---------|
@@ -483,7 +483,7 @@ this file) was removed to avoid two files drifting out of sync.
 8. **Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md, plugin.json, agent, and command files.
 9. **conftest name collision**: `plugins/scientific-method/mcp/experiment-registry/tests` is excluded from pytest testpaths because its conftest collides with development-harness's conftest (both resolve as "tests.conftest").
 10. **Banned API**: `requests` is banned — see "Python Conventions" above for the canonical statement and enforcement mechanism. Narrow per-file exceptions exist in `[tool.ruff.lint.per-file-ignores]` (e.g. `backlog_core/sync_state.py`, which must match PyGithub's requests-based exception types).
-11. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `.claude/rules/script-invocation.md` for the isolation rationale.
+11. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `./rules/script-invocation.md` for the isolation rationale.
 12. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
 13. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
 14. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.

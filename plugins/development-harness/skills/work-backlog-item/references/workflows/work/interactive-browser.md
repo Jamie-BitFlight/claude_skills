@@ -1,6 +1,6 @@
 # Interactive Browser (Step 1.1)
 
-**Trigger:** <mode/> is empty (no arguments passed).
+**Trigger:** no arguments were passed to the invocation.
 
 For MCP tool errors encountered at any step, load [error-handling.md](./error-handling.md) for error
 classification and handling instructions.

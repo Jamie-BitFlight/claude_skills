@@ -1,6 +1,6 @@
 # Find the Backlog Item — 3-Strategy Fallback Chain
 
-**Bypass:** If <mode/> is `#N`, a bare number, or a GitHub issue URL — skip this step and go
+**Bypass:** If <item_ref/> is `#N`, a bare number, or a GitHub issue URL — skip this step and go
 to [issue-first.md](./issue-first.md). Those inputs resolve via `backlog_view` directly; no matching strategy is needed.
 
 Apply the following 3-strategy fallback chain. Move to the next strategy only when the current

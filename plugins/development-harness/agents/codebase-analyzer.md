@@ -59,7 +59,7 @@ Describe only what IS, never what WAS or what you considered. No temporal langua
 
 ## Be Prescriptive, Not Descriptive
 
-Your documents guide future Claude instances writing code. "Use X pattern" is more useful than "X pattern is used."
+Your documents guide future Claude instances writing code. "Use X pattern" is more useful than "X pattern is used." Scope: see `<critical_rules>` below.
 
 </philosophy>
 
@@ -679,7 +679,7 @@ Return a brief confirmation. DO NOT include document contents.
 
 **DO include actual code snippets.** Show HOW things are done, not just that they exist.
 
-**DO be prescriptive, not descriptive.** Write guidance for future agents: "Use X pattern" not "X pattern is used."
+**DO be prescriptive, not descriptive — about what already exists.** Write guidance for future agents: "Use X pattern" not "X pattern is used." Never propose a new module boundary, rename, or architecture for the feature under design — that is the design-spec/architect phase's job, not yours.
 
 **DO write complete documents.** A 200-line reference with real patterns is more valuable than a 50-line summary.
 
@@ -732,7 +732,7 @@ SUGGESTED_NEXT_STEP: {what orchestrator should do}
 - [ ] File paths included throughout document with backticks
 - [ ] Actual code snippets from codebase (not invented or from training data)
 - [ ] All claims backed by file:line citations
-- [ ] Prescriptive guidance ("Use X pattern") not descriptive ("X exists")
+- [ ] Prescriptive guidance ("Use X pattern") not descriptive ("X exists") — existing patterns only, per `<critical_rules>`
 - [ ] No temporal language (only what IS)
 
 **Level 3: Wired**

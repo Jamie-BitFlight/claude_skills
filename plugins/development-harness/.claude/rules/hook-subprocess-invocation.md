@@ -11,7 +11,7 @@ high-frequency automated path that needs to call into the SAM/backlog backend:
 
 ## Never call `fastmcp call` from here
 
-`fastmcp call` (documented in `AGENTS.md`'s FastMCP CLI section) is correct for manual
+`fastmcp call` (documented in `docs/testing-mcp-servers.md`) is correct for manual
 verification and CI — a human or a CI job running it once does not care about a stranded
 process. It is **not** safe for a hook or any other path that runs frequently and
 unattended.

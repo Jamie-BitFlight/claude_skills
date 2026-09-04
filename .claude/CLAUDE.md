@@ -20,7 +20,7 @@ and the "chore(beads)" commit that inadvertently recreated it).
 
 **Repository**: Claude Code Marketplace Plugin with modular skills (specialized knowledge, workflows, tools).
 
-- Prose File Classification — review treatment decision tree for markdown/prose files: [Prose File Classification](./rules/prose-file-classification.md)
+- Prose File Classification — review treatment decision tree for markdown/prose files: [Prose File Classification](../rules/prose-file-classification.md)
 
 ---
 
@@ -57,7 +57,7 @@ Never introduce hard-coded truncation or length limits on content that a consume
 3. Follow `./CONTRIBUTING.md` procedures when modifying plugins
 4. Multi-step work identified: capture new backlog items via `/dh:work-backlog-item create -- "<what and why of the problem that triggered the need for a backlog issue>"` — add items freely, they get groomed and checked later. For behavioral/process items — descriptions of what an agent, workflow, or system must do — include the full procedural description. It is the requirement specification, not an implementation instruction, and the skill's classification gate will preserve it correctly.
 
-Run scripts using `uv run` — if `uv` is not available, see [.claude/rules/uv-run-fallback.md](./.claude/rules/uv-run-fallback.md).
+Run scripts using `uv run` — if `uv` is not available, see [rules/uv-run-fallback.md](../rules/uv-run-fallback.md).
 
 ---
 
@@ -71,7 +71,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 
 | Stage | Command | Purpose |
 |-------|---------|---------|
-| Starting complex task | `/dh:rt-ica` | High Quality Details |
+| Starting complex task | `/dh:rt-ica <#N \| goal>` | Works backward from the goal through the prerequisite chain, classifying each as available/derivable/missing, and blocks planning until nothing is missing |
 | Delegating to sub-agent | `/delegate` | Enforces delegation framework |
 | Reviewing agent output | `/hallucination-detector:hallucination-audit` | Checks hallucinations, unverified causality |
 | Claiming task complete | `/dh:verify-done` | Runs "Is It Done?" checklist |
@@ -81,7 +81,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 
 - No planning in "Weeks" or "Sprints" — work scales with parallelism
 - Output contains "likely", "probably", or "I think" — STOP and verify before continuing
-- Prompt names a specific product, version, or release event — run `WebSearch` FIRST before planning. See [Fact Verification First](./rules/fact-verification-first.md)
+- Prompt names a specific product, version, or release event — run `WebSearch` FIRST before planning. See [Fact Verification First](../rules/fact-verification-first.md)
 - **Pass file paths, let agents read** — agents perform their own Chain of Verification against actual source. Provide the path; the agent reads, verifies, and acts on it with a fresh context window. Never transcribe file contents into prompts — it bypasses agent verification.
 - Do NOT discover file paths on behalf of agents — the agent has full tool access and an empty context window; it finds what it needs itself. Pre-discovering paths wastes orchestrator context and duplicates agent work.
 - **Structured thinking before action** — form a hypothesis and plan internally before acting; see [Autonomous Action Boundary](#autonomous-action-boundary) for the destructive/ambiguous-vs-routine decision. For unknown failures (unclear cause, flaky test): load `/scientific-method:scientific-thinking` to structure the hypothesis.
@@ -188,11 +188,11 @@ Follow Delegation Template in agent-orchestration:agent-orchestration skill when
 
 ---
 
-- Language Conventions: [Language Conventions](./rules/language-conventions.md)
+- Language Conventions: [Language Conventions](../rules/language-conventions.md)
 
 ---
 
-- Script Invocation: [Script Invocation](./rules/script-invocation.md)
+- Script Invocation: [Script Invocation](../rules/script-invocation.md)
 
 ---
 
@@ -234,7 +234,7 @@ Phrase "pre-existing issues not related to my changes" is a TRIGGER TO ACT, not 
 
 **Reason**: Dismissing pre-existing issues normalizes technical debt. Every encountered issue is an opportunity for remediation.
 
-**If the fix is trivial (see [Proactive Fix Gate](./rules/proactive-fix-gate.md)):** Apply the gate, then route to `--quick`
+**If the fix is trivial (see [Proactive Fix Gate](../rules/proactive-fix-gate.md)):** Apply the gate, then route to `--quick`
 without asking the user. The gate determines the routing — user approval is not required for
 scoped fixes.
 
@@ -260,8 +260,8 @@ For backlog MCP tool reference (tool names, return format, DH state location, sy
 
 ---
 
-- Plugin Development Workflows: [Plugin Development Workflows](./rules/plugin-development.md)
-- Plugin.json Requirements (manifest location, schema): [Plugin.json Requirements](./rules/plugin-json.md)
+- Plugin Development Workflows: [Plugin Development Workflows](../rules/plugin-development.md)
+- Plugin.json Requirements (manifest location, schema): [Plugin.json Requirements](../rules/plugin-json.md)
 
 **Determining commit scope format**: read `.pre-commit-config.yaml` directly — not `git log`.
 
@@ -269,7 +269,7 @@ For backlog MCP tool reference (tool names, return format, DH state location, sy
 
 ---
 
-- Content Optimization for Skills: [Content Optimization for Skills](./rules/skill-content-optimization.md)
+- Content Optimization for Skills: [Content Optimization for Skills](../rules/skill-content-optimization.md)
 
 ---
 
@@ -286,31 +286,31 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
-- Markdown & File Reference Standards (code fences, links, skill activation syntax, subdirectory namespace gotcha): [Markdown & File Reference Standards](./rules/markdown-file-references.md)
+- Markdown & File Reference Standards (code fences, links, skill activation syntax, subdirectory namespace gotcha): [Markdown & File Reference Standards](../rules/markdown-file-references.md)
 
 ---
 
-- Skill Documentation Verification: [Skill Documentation Verification](./rules/skill-documentation-verification.md)
+- Skill Documentation Verification: [Skill Documentation Verification](../rules/skill-documentation-verification.md)
 
 ---
 
-- Citation Requirements: [Citation Requirements](./rules/citation-requirements.md)
+- Citation Requirements: [Citation Requirements](../rules/citation-requirements.md)
 
 ---
 
-- Python Development Rules (PEP 723, no uv workspace, ty type-checker errors): [Python Development Rules](./rules/python-development.md)
+- Python Development Rules (PEP 723, no uv workspace, ty type-checker errors): [Python Development Rules](../rules/python-development.md)
 
 ---
 
-- Linting Exception Conditions: [Linting Exception Conditions](./rules/linting-exceptions.md)
+- Linting Exception Conditions: [Linting Exception Conditions](../rules/linting-exceptions.md)
 
 ---
 
-- GitHub Actions CI Workflow Modification Protocol: [CI Workflow Modification Protocol](./rules/ci-workflows.md)
+- GitHub Actions CI Workflow Modification Protocol: [CI Workflow Modification Protocol](../rules/ci-workflows.md)
 
 ---
 
-- YAML and TOML Libraries: [YAML and TOML Libraries](./rules/yaml-toml-libraries.md)
+- YAML and TOML Libraries: [YAML and TOML Libraries](../rules/yaml-toml-libraries.md)
 
 ---
 
@@ -318,19 +318,19 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
-- Silent Failure Prevention: [Silent Failure Prevention](./rules/silent-failure-prevention.md)
+- Silent Failure Prevention: [Silent Failure Prevention](../rules/silent-failure-prevention.md)
 
 ---
 
-- Agent Output Contracts (explicit terminal output required — no silent exits): [Agent Output Contracts](./rules/agent-output-contracts.md)
+- Agent Output Contracts (explicit terminal output required — no silent exits): [Agent Output Contracts](../rules/agent-output-contracts.md)
 
 ---
 
-- Exception Handling (narrow catches, BLE001, the "must not crash" anti-pattern): [Exception Handling](./rules/exception-handling.md)
+- Exception Handling (narrow catches, BLE001, the "must not crash" anti-pattern): [Exception Handling](../rules/exception-handling.md)
 
 ---
 
-- Review and Correction Discipline (two gates structural≠content, run-the-review, judgment adjudication, match-action/quiesce): [Review and Correction Discipline](./rules/review-and-correction-discipline.md)
+- Review and Correction Discipline (two gates structural≠content, run-the-review, judgment adjudication, match-action/quiesce): [Review and Correction Discipline](../rules/review-and-correction-discipline.md)
 
 ---
 

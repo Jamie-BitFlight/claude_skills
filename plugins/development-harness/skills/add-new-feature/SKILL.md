@@ -65,6 +65,22 @@ This is especially important for Phase 1 (feature-researcher) and Phase 3 (archi
 Failure to fetch the primary source causes information loss from the summary layer to
 propagate into feature context and architecture decisions.
 
+**Registration read-back (applies after every `artifact_register` call in Phases 1-3):** a count
+of 1 from `artifact list` is not proof the content is real — after registering, read the artifact
+back and confirm which of three outcomes occurred: (1) content reads back as the document —
+proceed; (2) content reads back empty or a literal placeholder (e.g. `$(cat ...)`) — same failure
+as `count == 0`, re-dispatch; (3) content is not found at all despite the entry existing — the
+legacy-artifact case (a manifest entry registered without content), a different failure from "not
+registered," report it as such rather than treating it as re-dispatchable.
+
+**Canonical write-back across phases:** when a later phase resolves a question an earlier
+artifact posed as open, re-register the earlier artifact with the resolution — including the
+read-back above confirming the new content is in place — before dispatching the next phase.
+#2498's feature-context artifact still posed a question as open after the Concerns section had
+already resolved it; the next phase read the stale artifact fresh and reported it as drifted.
+Re-registering the resolved artifact before that phase runs is cheaper than a later phase
+re-discovering the same staleness.
+
 ---
 
 ## Orchestrator Discipline
@@ -168,6 +184,12 @@ reminder that `artifact_register(content=...)` is the agent's responsibility, no
 orchestrator's. The orchestrator MUST NOT call `artifact_register` as a workaround —
 the MCP-native rule is that agents own their artifact storage.
 
+Then apply the registration read-back rule from the Artifact Discovery section above:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type feature-context
+```
+
 ---
 
 ## Phase 2: Codebase Analysis (@dh:codebase-analyzer)
@@ -227,6 +249,12 @@ If `count == 0`, the agent did not register the artifact. Re-dispatch with an ex
 reminder that `artifact_register(content=...)` is the agent's responsibility, not the
 orchestrator's. The orchestrator MUST NOT call `artifact_register` as a workaround —
 the MCP-native rule is that agents own their artifact storage.
+
+Then apply the registration read-back rule from the Artifact Discovery section above:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type codebase-analysis
+```
 
 ---
 
@@ -366,6 +394,14 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 
 {quality_vigilance}
 
+Before designing, discover existing architecture documents nearest the module being changed —
+do not write architecture from scratch when one already covers this area. Derive the subtree to
+search from the item's `suggested_location` field (read via backlog_view above); scope each glob
+there first, then widen only if nothing is found: Glob(pattern="{subtree}/**/ARCHITECTURE.md"),
+Glob(pattern="{subtree}/**/CONTEXT.md"), Glob(pattern="{subtree}/**/adrs/ADR-*.md"). Read whatever
+exists nearest first, then work outward. Update or extend an existing ARCHITECTURE.md, CONTEXT.md,
+or ADR rather than duplicating its content in the new spec.
+
 Design the implementation for #{issue}: "{title}".
 Read the feature context via artifact_read(item_id={issue}, artifact_type="feature-context").
 [If codebase analysis exists: Read via artifact_read(item_id={issue}, artifact_type="codebase-analysis").]
@@ -418,12 +454,22 @@ reminder that the agent must call `artifact_register(content=...)` itself — th
 orchestrator MUST NOT call `artifact_register` as a workaround. The MCP-native rule
 is that agents own their artifact storage.
 
+Then apply the registration read-back rule from the Artifact Discovery section above:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type architect
+```
+
 ---
 
 ## Phase 4: Task Decomposition (@dh:swarm-task-planner)
 
 Delegate to `@dh:swarm-task-planner` to:
 
+- before decomposing, read the item's own declared documentation obligations — its "Documentation
+  (will become stale)" section and any ecosystem/completeness checklist — and create a task for
+  each declared obligation. Skipping this makes Phase 5's validator catch the gap expensively,
+  after the plan is already built, instead of during decomposition.
 - create the structured plan via `plan create` or MCP `sam_plan`; preserve the returned `plan_ref` unchanged
 - ensure every task has:
   - **Status**, **Dependencies**, **Priority**, **Complexity**, **Agent**
@@ -441,6 +487,9 @@ Read the details about the milestone and plan you are a part of at backlog_view(
 Decompose #{issue}: "{title}" into executable tasks.
 Read the architecture spec via artifact_read(item_id={issue}, artifact_type="architect").
 Read the feature context via artifact_read(item_id={issue}, artifact_type="feature-context").
+Before decomposing, also read the item's own "Documentation (will become stale)" section and any
+ecosystem/completeness checklist via backlog_view(selector="#{issue}") — create a task for every
+obligation declared there.
 Create the plan via sam_plan with CLEAR+CoVe task definitions.
 
 REQUIRED — skills field propagation:
@@ -502,7 +551,12 @@ impact radius coverage.
 Return READY or BLOCKED with specific gaps.
 ```
 
-If the validator returns `BLOCKED`, do not proceed to Phase 6. Fix the identified gaps and re-run Phase 4 before retrying Phase 5.
+If the validator returns `BLOCKED`, do not proceed to Phase 6. Fix the identified gaps: for a
+specific, scoped gap (e.g. one missing task), dispatch a new, narrowly-scoped delegation to
+`@dh:swarm-task-planner` naming the exact gap and asking it to add or amend that specific task in
+the existing plan `{plan_ref}` — a subagent dispatch terminates after Phase 4 returns, so this is a
+fresh call operating on the existing plan address, not a resumed session. Re-run Phase 4 from
+scratch only when the plan's overall structure itself is wrong. Retry Phase 5 after either path.
 
 ---
 

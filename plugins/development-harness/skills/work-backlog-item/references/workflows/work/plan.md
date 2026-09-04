@@ -8,11 +8,11 @@
 
 **Trigger:** RT-ICA APPROVED (Step 3.2) and feasibility PASS (Step 3.4).
 
-**Action:** Read [feature-request.md](./feature-request.md) to extract the feature request template, Impact Radius section from Step 2 grooming output, Ecosystem Completeness Constraint, and language/stack detection flags. Assemble these into a complete feature request string.
+**Action:** Read [feature-request.md](./feature-request.md) to extract the feature request template, Impact Radius section from Step 2 grooming output (or its `Resources` fallback for older grooming templates — see groom-check.md), Ecosystem Completeness Constraint, and language/stack detection flags. Assemble these into a complete feature request string.
 
 **Success:** Feature request string contains all required sections from template, Impact Radius data populated, language/stack flags set.
 
-**On failure:** If Impact Radius section is missing from grooming output, report BLOCKED — cannot proceed without affected systems inventory.
+**On failure:** If neither the Impact Radius section nor its Resources fallback is present in grooming output, report BLOCKED — cannot proceed without affected systems inventory.
 
 ## Step 4.2: Invoke SAM Planning
 
@@ -61,7 +61,11 @@ flowchart TD
 
 **Success:** `backlog_update` returns success, plan field set to `P{id}`.
 
-**Partial success:** Plan not found after full search — warning logged, Step 4.4 proceeds.
+**Partial success:** Plan not found after full search — warning logged, Step 4.4 proceeds. This is
+the never-existed case (a plan was just created here and can't yet be found by search) — a
+different starting condition from an item that already has a `**Plan**:` field pointing at a plan
+that is unreachable from this host. See [locate.md](./locate.md)'s "If the plan is reported
+unresolvable" branch for that case.
 
 **On failure:** If `backlog_update` returns error, report BLOCKED with error message — plan link is mandatory for dispatch.
 

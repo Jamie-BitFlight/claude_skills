@@ -1,10 +1,10 @@
 # Issue-First Path (Step 1.2)
 
-**Trigger:** <mode/> matches `#[0-9]+`, is a bare number, or is a GitHub issue URL (`https://github.com/.../issues/N`).
+**Trigger:** <item_ref/> matches `#[0-9]+`, is a bare number, or is a GitHub issue URL (`https://github.com/.../issues/N`).
 
 Fetch the issue using the CLI's `backlog view` command (accepts URLs, `#N`, and bare numbers):
 
-Call: `backlog view --selector "<mode/>"`.
+Call: `backlog view --selector "<item_ref/>"`.
 
 If the tool returns a dict with an `error` key, report and stop.
 If `state` is `closed`, run the **Completed Issue Discovery** procedure below and stop.

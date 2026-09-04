@@ -4,21 +4,21 @@ Read [scope.md](./scope.md) before proceeding. All work actions operate within t
 
 ## Checklist
 
-**At workflow start, create a TodoWrite checklist using the NUMBERED CHECKLIST for your mode (below the routing diagram) before executing any step. Use the numbered checklist items as the TodoWrite entries — not the Mermaid step names, which are summaries only.**
+**At workflow start, track the NUMBERED CHECKLIST for your mode (below the routing diagram) before executing any step. Use TodoWrite if it exists in your tool set and repo policy permits it; otherwise track narratively in your own response. Use the numbered checklist items as the tracked entries — not the Mermaid step names, which are summaries only.**
 
-The numbered checklist to use depends on `<mode/>`:
+The numbered checklist to use depends on whether `<mode/>` is `auto` or `interactive`:
 
 ```mermaid
 flowchart TD
-    Start([Workflow begins]) --> ReadScope["Create TodoWrite entry: Read scope.md"]
+    Start([Workflow begins]) --> ReadScope["Track checklist entry: Read scope.md"]
     ReadScope --> CreateList{What is mode?}
-    CreateList -->|"interactive (default)"| IList["Use INTERACTIVE MODE CHECKLIST below<br>as TodoWrite entries — ends at Present summary to user"]
-    CreateList -->|"auto"| AList["Use AUTO MODE CHECKLIST below<br>as TodoWrite entries — ends at Commit<br>MUST include Invoke implement-feature,<br>Invoke complete-implementation, Close or resolve item"]
+    CreateList -->|"interactive (default)"| IList["Use INTERACTIVE MODE CHECKLIST below<br>as tracked entries — ends at Present summary to user"]
+    CreateList -->|"auto"| AList["Use AUTO MODE CHECKLIST below<br>as tracked entries — ends at Commit<br>MUST include Invoke implement-feature,<br>Invoke complete-implementation, Close or resolve item"]
     IList --> Execute([Execute steps in order — do not skip])
     AList --> Execute
 ```
 
-**Interactive mode checklist** — steps to add to TodoWrite when `<mode/>` is `interactive`:
+**Interactive mode checklist** — steps to track when `<mode/>` is `interactive`:
 
 1. [ ] Read [scope.md](./scope.md) — align all actions with the work scope boundary
 2. [ ] **Locate** ([locate.md](./locate.md)) — find and extract the backlog item's fields
@@ -46,7 +46,7 @@ flowchart TD
 6. [ ] **Present summary to user** — output the planning summary report from post-planning.md
 7. [ ] **Commit** — if running in a worktree, commit all changes before closing (`git add -A && git commit -m "<type>(<scope>): <description>"`)
 
-**Auto mode checklist** — steps to add to TodoWrite when `<mode/>` is `auto`:
+**Auto mode checklist** — steps to track when `<mode/>` is `auto`:
 
 1. [ ] Read [scope.md](./scope.md) — align all actions with the work scope boundary
 2. [ ] **Locate** ([locate.md](./locate.md)) — find and extract the backlog item's fields (same sub-steps as interactive)
@@ -89,7 +89,7 @@ and identify the last error state?
 
 | Input | Source | Required |
 |---|---|---|
-| <item_ref/> | Backlog item — `#N` format, bare number, URL, or title substring | Depends on <mode/> |
+| <item_ref/> | Backlog item — `#N` format, bare number, URL, or title substring | Depends on whether <mode/> is auto or interactive |
 | <mode/> | `auto` or `interactive` (default: `interactive`) | No |
 | <user_text/> | Additional context from the user, if any | No |
 
