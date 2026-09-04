@@ -26,70 +26,32 @@ Language-agnostic development process harness that orchestrates feature developm
 
 ### SAM 7-Stage Pipeline
 
-The harness walks a feature request through the stages below, each producing a named artifact
-registered through the configured backend. Stages gate on artifact completion, not conversation state.
-
-1. **S1 Discovery** - Understand the feature, codebase, and constraints
-2. **S2 Planning + RT-ICA** - Generate a plan with information completeness analysis
-3. **S3 Context Integration** - Validate the plan against actual codebase state
-4. **S4 Task Decomposition** - Break the plan into executable tasks
-5. **S5 Execution** - Implement tasks using language-appropriate specialists
-6. **S6 Forensic Review** - Verify each task against its acceptance criteria
-7. **S7 Final Verification** - Certify the feature meets original requirements
-
-The `dh:dh-meta-docs` skill routes the default flow with ARL touchpoint gates.
+S1 Discovery → S2 Planning+RT-ICA → S3 Context Integration → S4 Task Decomposition → S5 Execution
+→ S6 Forensic Review → S7 Final Verification. Each stage produces a named artifact registered
+through the configured backend and gates on artifact completion, not conversation state. Load
+`dh:dh-meta-docs` for the full stage definitions and ARL touchpoint gates.
 
 ### ARL Human Touchpoints
 
-Not every stage requires human review. The harness uses ARL-derived constraint analysis to decide when to escalate. Escalation triggers include unbound constraints, domain knowledge gaps, high-risk irreversible changes, and novel architecture decisions. Routine changes with existing patterns proceed autonomously.
-
-Load `dh:dh-meta-docs` for the human touchpoint model.
+ARL-derived constraint analysis decides when a stage escalates to human review instead of
+proceeding autonomously — not arbitrary checkpoints. Load `dh:dh-meta-docs` for the human
+touchpoint model.
 
 ### Voltron-Style Composition
 
-Language plugins snap into the harness by providing a manifest that maps abstract roles to concrete agents and declares quality gate commands. The harness resolves roles at runtime based on project detection.
-
----
-
-## Role Resolution
-
-```mermaid
-flowchart TD
-    Start([Feature Request]) --> Detect{Detect Project Language}
-    Detect -->|pyproject.toml| Python[Python plugin]
-    Detect -->|package.json| TypeScript[TypeScript plugin]
-    Detect -->|Cargo.toml| Rust[Rust plugin]
-    Detect -->|None found| Fallback[dh:task-worker fallback]
-    Python --> Manifest[Read language manifest]
-    TypeScript --> Manifest
-    Rust --> Manifest
-    Manifest --> Resolve[Resolve roles to agents]
-    Resolve --> Override{Flow override declared?}
-    Override -->|Yes| Custom[Use plugin-defined flow]
-    Override -->|No| Default[Use default SAM pipeline]
-    Custom --> Configure[Configure orchestrator]
-    Default --> Configure
-    Fallback --> Configure
-    Configure --> Run([Begin S1 Discovery])
-```
-
-Load `dh:dh-meta-docs` for the role-resolution protocol.
+Language plugins snap into the harness by providing a manifest that maps abstract roles to
+concrete agents and declares quality gate commands. The harness resolves roles at runtime based on
+project-language detection, falling back to `dh:task-worker` when no manifest matches. Load
+`dh:dh-meta-docs` for the role-resolution protocol.
 
 ---
 
 ## State Management
 
 The configured backend is the sole storage boundary for work items, grooming, plans, task
-records, artifact manifests, and artifact content. `create_backend()` resolves that backend once;
-MCP, CLI, skills, and agents use its logical protocols and do not select a second provider.
-
-Remote-capable providers privately compose `FileCache` for snapshots, stale reads, queued offline
-mutations, provider revisions, and artifact/plan continuity. Cache misses are unavailable data,
-not authoritative empty results. A revision conflict stays pending and is retried until it either
-succeeds or a replay attempt determines it can never succeed, at which point it moves to a
-terminal, inspectable `rejected` state rather than being retried forever or silently dropped.
-Beads, SQLite, and Memory use native storage directly: they never instantiate `FileCache`, read or
-write backlog YAML, or queue remote mutations.
+records, artifact manifests, and artifact content — resolved once via `create_backend()`. See
+[docs/backend-providers.md](./docs/backend-providers.md) for cache behavior, revision-conflict
+handling, and the per-family (`github`/`sqlite`/`memory`/`beads`) storage contract.
 
 Agents address plans and tasks logically (`P{id}/T{M}`) through `sam_plan`, `sam_task`, or the
 grouped DH CLI adapter. Physical paths, cache records, provider IDs, and wire formats are backend
@@ -100,7 +62,7 @@ Load `dh:dh-meta-docs` for the artifact conventions.
 **Gotcha — Large plans must use the incremental append workflow:**
 
 For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
-the `sam_plan` create action:
+`sam_plan` create action:
 
 1. `sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[], "owner_reference":<work_item_reference>})` — creates a drafting plan and returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
 2. `sam_plan(plan='Pa1b2c3d4', config={"action":"append_task", "task":<single_task_object>})` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
@@ -119,7 +81,8 @@ CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_
 
 `append_task` is single-writer for a given plan. Serialize appends through the configured backend;
 concurrent writes are outside the contract. Do NOT call `append_task` for
-the same plan from multiple agents or sessions simultaneously.
+the same plan from multiple agents or sessions simultaneously. See
+[ADR-1770-1](./docs/adrs/ADR-1770-1-single-writer-task-backend.md) for the rationale.
 
 Plans, tasks, and artifacts are logical backend records. Their physical representation is private to
 the configured backend; access them through `sam_*` and `artifact_*` operations.
@@ -128,72 +91,17 @@ the configured backend; access them through `sam_*` and `artifact_*` operations.
 
 ## Artifact Manifest System
 
-Document artifacts are registered in a structured manifest owned by the configured backend. The
-manifest is the discovery mechanism — consumers query it via MCP to find artifacts for a work item.
+Document artifacts are registered in a structured manifest owned by the configured backend,
+discovered via `artifact_list`/`artifact_read` rather than filesystem access.
 
-**MCP tools (on backlog server) — Artifact Management:**
-
-- `artifact_register` — Register or update an artifact entry (`item_id`, `artifact_type`, `artifact_id`, `status`, `agent`, `content`)
-- `artifact_list` — List all artifacts for a work item, optionally filtered by `artifact_type`
-- `artifact_get` — Get metadata for a specific artifact type on a work item
-- `artifact_read` — Read logical artifact content resolved by the configured backend
-
-Each tool above has a full CLI equivalent under `artifact register|list|get|read` — see
+**MCP tools (on backlog server):** `artifact_register`, `artifact_list`, `artifact_get`,
+`artifact_read` — each has a full CLI equivalent under `artifact register|list|get|read`. See
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
 authoritative flag mapping.
 
-**Artifact types and registering agents:**
-
-This table is the complete registry of document-artifact types. Every `artifact_register` call — MCP
-tool or `artifact register` CLI — must match a `(Type, Registering agents)` pair listed here. Add the
-row before writing the call. The `Registering agents` column holds the value each call passes as
-`agent`; the `Gate-read` column marks the types whose read result decides a workflow branch.
-
-| Type | Registering agents | Gate-read | Notes |
-|---|---|---|---|
-| `feature-context` | `discovery`, `feature-researcher` | no | Discovery document. Each producer re-registers the same `artifact_id`, so the type holds one entry per item. |
-| `architect` | `planning`, `context-integration`, `context-refinement`, `{resolved_agent}` | no | Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read returned, appending annotations. |
-| `codebase-analysis` | `codebase-analyzer`, `code-review-architecture` | no | Codebase pattern, architecture, testing, convention, and dependency-graph documents. Intentionally multi-entry — one per focus area or diagram. Consumers reach the full set through `artifact_list`. |
-| `code-review` | `code-reviewer` | yes | Code review verdict. One entry per reviewed task, so consumers read it by `artifact_id` (`code-review-{task_id}-{slug}`), reported in the reviewer's STATUS output. `complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`. |
-| `T0-baseline` | `t0-baseline-capture` | yes | Pre-implementation baseline. `tn-verification-gate` compares final state against it. |
-| `TN-verification` | `tn-verification-gate` | yes | Post-implementation verification. `complete-implementation` branches on the verdict. |
-| `research` | `swarm-task-planner`, `ecosystem-researcher` | no | Investigation findings, coverage analysis, rationale. Multi-entry — one document per investigation. |
-| `audit-report` | `doc-drift-auditor` | no | Documentation drift audit. Never used for a code review verdict. |
-| `dispatch-plan` | `dispatch_create_plan` | no | Milestone dispatch plan, registered by the dispatch tool rather than an agent. |
-
-Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
-associate the returned logical address with the owning work item through `backlog_update`.
-
-Ownership rule: `artifact_read(item_id, artifact_type)` with no `artifact_id` sorts every entry of
-that type by creation time and returns only the newest, so a read by type alone can address exactly
-one document. A `Gate-read` type must therefore have exactly one registering agent — a second writer
-wins the read the moment it registers later, and the gate branches on the wrong document with no
-error. Types marked `no` may have several registering agents for one of two reasons: every producer
-re-registers a single shared `artifact_id` and so replaces one entry (`feature-context`,
-`architect`), or the type is intentionally multi-entry, so a read by type alone returns only its
-newest document and no gate branches on the result (`codebase-analysis`, `research`). Never point a
-gate at a multi-entry type, and never add a second registering agent to a `Gate-read` type.
-
-One registering agent is not one entry. `artifact_read` and `artifact_get` both accept an optional
-`artifact_id`, and a single agent that registers one entry per reviewed task leaves several under
-its own type. A `Gate-read` type whose producer emits more than one entry per work item — today,
-`code-review` — must be read by `artifact_id`; the producer names the identifier it used in its
-STATUS output so the consumer can address it. Reading such a type by type alone returns whichever
-task's document registered last.
-
-**Registration:** Producers call `artifact_register` after creating document-artifact content.
-Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores
-only the logical plan association on the owning work item. Never duplicate plan content through
-`artifact_register`.
-
-**Consumer discovery:** Consumers (including worktree-isolated agents) call `artifact_list` then
-`artifact_read` for document artifacts and `sam_plan` for plans instead of using filesystem access.
-The configured backend resolves content for every worktree.
-
-**MCP-native rule for agents:** Agents store document artifacts via `artifact_register` with
-`content=` and store plans through `sam_plan`. The configured backend owns persistence and retrieval.
-The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation
-files committed to the repo).
+Load the `dh:create-artifact` skill before registering or reading an artifact — it is the
+authoritative registry of accepted `artifact_type` strings, the producing agent for each, and the
+`Gate-read` ownership rule that keeps a gated read from resolving the wrong document.
 
 **Prohibited patterns — do not write these in agent instructions or tool calls:**
 
@@ -203,26 +111,19 @@ files committed to the repo).
 
 ## Dispatch Orchestration System
 
-Wave-based parallel execution state for `/work-milestone`. State is persisted to SQLite at `~/.dh/projects/{project-slug}/dispatch-state.db` via the `dispatch_state.DispatchStateManager` class (imported by `server.py`).
+Wave-based parallel execution state for `/work-milestone`, persisted to SQLite via
+`dispatch_state.DispatchStateManager`.
 
-**MCP tools (on backlog server) — Dispatch Orchestration:**
-
-- `dispatch_read(milestone_number)` — Read provider-owned dispatch content. Returns the parsed plan structure or an error.
-- `dispatch_validate(milestone_number)` — Validate structural integrity of an existing dispatch plan. Returns is_valid, errors, warnings.
-- `dispatch_stale_check(milestone_number)` — Check whether any wave items have stale or dead PIDs and return staleness summary.
-- `dispatch_create_plan(milestone_number, plan, overwrite, validate, issue)` — Validate and persist a dispatch plan atomically. `plan` is a typed DispatchPlan object. Returns `milestone_number`, `wave_count`, `item_count`, `is_valid`, `errors`, `warnings`, and `messages`. Set overwrite=True when re-grooming. Pass issue to auto-register as a `dispatch-plan` artifact.
-- `dispatch_conflicts(milestone_number, repo)` — Analyze Impact Radius conflicts for open issues in a milestone. Returns `conflict_groups` and `count`.
-- `dispatch_wave_start(milestone, wave_num, items)` — Create a wave entry; initialise all items with `status=pending`. Call before spawning processes. Returns error if wave already exists.
-- `dispatch_item_status(milestone, issue, status, result, error, cost)` — Record completion or failure of one item. Looks up item by milestone+issue across all waves. Valid status: `complete`, `failed`, `skipped`.
-- `dispatch_wave_status(milestone, wave_num)` — Query wave progress with per-item detail and elapsed time. Checks stale PIDs (marks dead processes failed) before returning.
-- `dispatch_spawn(milestone, wave_num, ...)` — Background task tool (`task=True`) that calls `dispatch_wave_start` then spawns one `claude -p` kage-bunshin process per wave item. Used by `/work-milestone`.
-
-Every tool above has a full CLI equivalent under `dispatch
-read|validate|stale-check|create-plan|conflicts|wave-start|item-status|wave-status|spawn` — see
+**MCP tools (on backlog server):** `dispatch_read`, `dispatch_validate`, `dispatch_stale_check`,
+`dispatch_create_plan`, `dispatch_conflicts`, `dispatch_wave_start`, `dispatch_item_status`,
+`dispatch_wave_status`, `dispatch_spawn` — each has a full CLI equivalent under `dispatch
+read|validate|stale-check|create-plan|conflicts|wave-start|item-status|wave-status|spawn`. See
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
 authoritative flag mapping.
 
-**Workflow:** `/groom-milestone` calls `dispatch_create_plan` to validate and persist provider-owned dispatch content. `/work-milestone` calls `dispatch_wave_start` per wave, `dispatch_spawn` to launch sessions, and `dispatch_wave_status` to poll progress. Spawned sessions call `dispatch_item_status` on completion.
+The `/dh:groom-milestone` and `/dh:work-milestone` skills own the per-tool call sequence and
+parameters for this workflow; load whichever skill owns the step you're changing rather than
+restating its steps here.
 
 ---
 
@@ -460,111 +361,22 @@ Layer-0 operational specifications (pipeline flow, artifact conventions, touchpo
 
 ## Testing MCP Servers Against Fresh Source Code
 
-Built-in MCP tool calls (`mcp__plugin_dh_backlog__*`, `mcp__plugin_dh_sam__*`) run against the **plugin cache**, not the current source. After modifying `backlog_core/` or `sam_schema/`, the cache is stale until a session restart + version bump. To test changes immediately, use `fastmcp` CLI against the source files:
-
-Run all commands from the **project root** (where `pyproject.toml` lives). `$(pwd)` resolves to the project root at execution time.
-
-**Suppress banner noise**: Set `FASTMCP_SHOW_SERVER_BANNER=false` to suppress the startup banner. Set `FASTMCP_LOG_ENABLED=false` to suppress INFO log lines. Both can be combined:
-
-```bash
-FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp call ...
-```
-
-SOURCE: [FastMCP Settings docs](https://gofastmcp.com/more/settings) — `FASTMCP_SHOW_SERVER_BANNER` (bool, default true), also controllable via `--no-banner`.
-
-**Backlog server** (`scripts/run_backlog_server.py`):
-
-```bash
-# List all tools
-FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp list \
-  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py"
-
-# View a backlog item (full content)
-FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp call \
-  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
-  --target backlog_view \
-  --input-json '{"selector": "groom-milestone", "summary": false}'
-
-# List backlog items (compact — body excluded by default, use fields=["body"] to include)
-FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp call \
-  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
-  --target backlog_list \
-  --input-json '{"search": "sdlc", "limit": 3}'
-```
-
-**SAM server** (`scripts/run_sam_server.py`):
-
-```bash
-# List all tools
-FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp list \
-  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_sam_server.py"
-
-# List all plans
-FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false uv run fastmcp call \
-  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_sam_server.py" \
-  --target sam_plan \
-  --input-json '{"config":{"action":"list"}}'
-```
-
-**Why `--command` is required**: The server files use relative imports (`from . import models`) and sibling packages (`import dh_paths`). Running `fastmcp call server.py` directly hits an asyncio conflict when invoked from within Claude Code's async context. The `--command` flag launches the runner script as a fresh subprocess, matching how the plugin cache launches the server.
-
-**`--json` output structure**: When using `--json`, fastmcp wraps the result — parse with:
-
-```python
-outer = json.loads(stdout)
-data = json.loads(outer["content"][0]["text"])
-```
-
-**`backlog_list` filter notes**:
-
-- `status` matches workflow labels (e.g. `"status:in-progress"`, `"status:groomed"`), NOT GitHub open/closed state. Passing `"open"` returns zero results.
-- `body` is excluded from default list responses. Use `fields=["body"]` to include it, or check `available_fields` in the response for the full list of requestable fields.
-
-**Backend selection during testing**: Prefix `fastmcp call` commands with `BACKLOG_BACKEND=sqlite` or `BACKLOG_BACKEND=memory` to test against a non-GitHub backend without requiring live credentials:
-
-```bash
-BACKLOG_BACKEND=memory FASTMCP_SHOW_SERVER_BANNER=false FASTMCP_LOG_ENABLED=false \
-uv run fastmcp call \
-  --command "uv run --script $(pwd)/plugins/development-harness/scripts/run_backlog_server.py" \
-  --target backlog_list \
-  --input-json '{}'
-```
-
-**When to use this vs built-in MCP calls**: Use `fastmcp call` to verify behavior after editing `backlog_core/` or `sam_schema/` source files. Use built-in MCP calls for normal workflow operations where the cached server is sufficient.
+Built-in MCP tool calls (`mcp__plugin_dh_backlog__*`, `mcp__plugin_dh_sam__*`) run against the
+plugin cache, not current source — stale until a session restart + version bump. Before verifying
+a change to `backlog_core/` or `sam_schema/` without restarting the session, read
+[docs/testing-mcp-servers.md](./docs/testing-mcp-servers.md) for the `fastmcp` CLI workaround.
 
 ---
 
 ## Backend Providers
 
-When discussing, extending, or adding backend providers for the development harness — including state management, task management, planning, issues, jobs, milestones, or boards — read [docs/backend-providers.md](./docs/backend-providers.md) first. Amend that document with any new points, references, discoveries, or user inputs that arise during the conversation.
-
-The backlog MCP server uses the provider-neutral `WorkItemBackend` and `ContentProvider`
-protocols (`backlog_core/backend_protocol.py`). One configured backend owns all work-item,
-grooming, plan, task, artifact-manifest, and artifact-content operations. The following backend
-families are available:
-
-- `github` (default) — GitHub Issues via GraphQL + PyGithub REST. Requires `GITHUB_TOKEN`.
-- `sqlite` — local 7-table SQLite schema, WAL mode. No external credentials.
-- `memory` — in-memory native test double. No persistence, YAML, or `FileCache`.
-- `beads` — routes to `bd` CLI via lazy subprocess wrapper. Auto-detected when `.beads/dh-backend` marker file exists at project root (explicit opt-in required). `bd` binary validated on first use; raises `BdNotInstalledError` on failure with no silent fallback.
-
-Select via `BACKLOG_BACKEND` env var, `backlog.backend` key in `.dh/config.yaml` (project config dir or `~/.dh/`), or auto-detected from `.beads/dh-backend` marker file presence. Default is `github` when no selector matches — existing deployments require no changes.
-
-Future platform backends (GitLab, Linear, Supabase) will implement the same Protocol. See [docs/backend-providers.md](./docs/backend-providers.md) for the full Protocol reference, method groups, configuration examples, and platform capability comparison.
-
-The backlog MCP server also exposes `profile_load` (agent_profile tool) for loading named agent
-profiles that specialize task-worker behavior at dispatch time. Profile definitions live in the
-backlog server configuration; see [docs/backend-providers.md](./docs/backend-providers.md) for
-the module boundary.
-
-Remote-capable providers privately compose `FileCache`; it owns stale snapshots, queued offline
-mutations, revisions, and provider-specific plan/artifact persistence. Beads, SQLite, and Memory
-use native storage directly and never read/write backlog YAML or instantiate `FileCache`.
-Backend unavailability and unsupported content capabilities are explicit outcomes; callers do not
-fall back to another provider.
-
-Plans and artifacts are addressed logically through `sam_*` and `artifact_*` operations. An
-issue or owner reference links a plan to its work item; it never selects a separate plan backend.
+When discussing, extending, or adding backend providers for the development harness — including
+state management, task management, planning, issues, jobs, milestones, or boards — read
+[docs/backend-providers.md](./docs/backend-providers.md) first. It is the authoritative Protocol
+reference (`WorkItemBackend`/`ContentProvider`), the `github`/`sqlite`/`memory`/`beads` family
+comparison, configuration, and the `profile_load` module boundary. Amend that document, not this
+one, with any new points, references, discoveries, or user inputs that arise during the
+conversation.
 
 ### Plan and artifact capability boundary
 
@@ -595,7 +407,9 @@ storage.
 ## References
 
 - [Backend Providers](./docs/backend-providers.md)
+- [Testing MCP Servers](./docs/testing-mcp-servers.md)
 - `dh:dh-meta-docs`
+- `dh:create-artifact`
 - [Language Manifest Template](./templates/language-manifest-template.md)
 
 ---
