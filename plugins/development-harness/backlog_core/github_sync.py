@@ -272,8 +272,16 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
             description = content.strip()
             continue
 
-        # Groomed section: heading starts with "Groomed"
-        if heading_name.startswith("Groomed"):
+        # Groomed section: heading matches the canonical "## Groomed (date)" form only.
+        # A loose `heading_name.startswith("Groomed")` check previously matched any
+        # unregistered section whose title-cased fallback heading happens to be
+        # "Groomed" (e.g. section key "GROOMED" -> unknown_key_to_heading ->
+        # "Groomed", with no parens) -- misrouting a generic Section into
+        # _parse_groomed_section and producing a GroomedData under "groomed"
+        # alongside the correct "unknown__groomed" key, duplicating the section on
+        # round-trip. Matching the same pattern _parse_groomed_section itself
+        # requires (a date in parens) keeps the two checks in agreement.
+        if _GROOMED_HEADING_RE.match(heading):
             parsed_sections["groomed"] = _parse_groomed_section(heading, content)
             continue
 
