@@ -49,3 +49,11 @@ been added yet.
 `match: "*"` in `manifest.json` means always-on: it fires on the first file touch of a session,
 same dedup rules as any other entry. Every `.claude/rules/*.md` file is now migrated — a file with
 no `paths:` frontmatter there became an always-on entry here instead of being skipped.
+
+## Writing a Rule File
+
+Rules are the current requirement only — never provenance, citations, or narrative. Put those in
+the commit message or PR description; put a durable architecture decision in `docs/` instead.
+
+Rules are read only when small. Tightening an existing rule means rewriting it from scratch as
+flat directives, not `Edit`-trimming words from its existing structure.

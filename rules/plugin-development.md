@@ -81,3 +81,37 @@ Result: only 2 of 19 agents were registered. The other 17 were invisible to Clau
 Branch-side derivation cannot be collision-free on its own: two branches independently computing `origin/main`'s version + 1 can land on the same number, and a PR squash-merged via the GitHub UI/API never runs the local hook at all, so a plugin can also change on `main` with no bump whatsoever. `main` closes both gaps itself: after every push touching `plugins/**`, `.github/workflows/bump-marketplace.yml` runs `check_plugin_version_bump.py --repair` before the marketplace sync — an authoritative, idempotent post-merge pass that patch-bumps any plugin whose content changed without a version increase, regardless of what any branch's local hook did or didn't do. Manual version edits are not sanctioned under any circumstance — the repair job is now the correction mechanism for every case, including a merge that missed the hook entirely.
 
 **Accepted cost**: because branch-side bumping is still active, a branch that keeps bumping while `main`'s repair job also bumps can occasionally hit a one-line `version`-field conflict on rebase (both sides changed the same JSON line). Resolve it by taking the higher version number, or by re-running the pre-commit hook — this is strictly less friction than the manual re-derivation a collision used to require.
+
+## Repo-Specific Plugin Conventions
+
+Not part of Claude Code's own plugin schema — see `plugin-creator:claude-plugins-reference-2026`
+for that. This section covers only what's specific to how this repo uses plugins.
+
+A plugin's directory name need not equal its install name: `plugins/development-harness` installs
+as `dh`, `plugins/the-rewrite-room` as `rwr`, `plugins/clang-format` as `clang-format-configuration`.
+
+The plugin-validator hook may silently strip unexpected frontmatter fields (e.g. `name` from skill
+frontmatter) — a field disappearing after commit is validator auto-fix, not a manual edit.
+
+**Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md,
+plugin.json, agent, and command files.
+
+**Cross-plugin documentation convention:**
+
+Plugins commonly ship a `{plugin-name}-meta-docs` skill so other skills can reach the plugin's
+`docs/` without hardcoding a cross-plugin relative path — those break on every directory
+restructure. When a skill needs another plugin's documentation, load that plugin's meta-docs skill
+instead.
+
+A bare path listing has no value on its own — an agent can already enumerate `docs/` itself with
+`Glob`/`find`. The value of a hand-maintained list is the annotation beside each path: a stated
+reason to read that file, which is what lets the agent skip everything else in the list with
+confidence. List only docs a real skill or agent hook actually depends on discovering through this
+index. Add an entry only when some skill or agent file's hook text depends on this index resolving
+it (e.g. "load `{plugin}-meta-docs` and read the X document it lists") — confirm that dependency
+exists before adding, give the entry a specific reason to read it, and drop the entry once nothing
+depends on it. Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
+correctly regardless of installation location.
+
+**Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md,
+plugin.json, agent, and command files.

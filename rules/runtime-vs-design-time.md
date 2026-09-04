@@ -13,6 +13,12 @@ Never write design-time content (history, past-tense rationale, "this fixes issu
 runtime text. Never rely on runtime text to carry design-time-only facts — put those in a
 maintenance file instead.
 
+Design-time artifacts such as `SKILL-GOALS.md`, `BENCHMARKS.md`, `MAINTENANCE.md`,
+`maintenance/*.md`, and `evals/**` travel inside the skill package but do not load with
+`SKILL.md`. Do not link to them from runtime skill content. Maintenance, review, and evaluation
+workflows may read them explicitly when making decisions about the skill. Put transient
+provenance in a commit or PR and durable architectural decisions in an ADR.
+
 ## The environment split
 
 The runtime audience does not run in the same place the artifact was authored. A skill, agent, or
