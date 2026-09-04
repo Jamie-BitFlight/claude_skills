@@ -146,42 +146,73 @@ def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> N
     ]
 
 
-def test_file_cache_work_item_snapshots_skips_orphaned_temp_file_without_crashing(tmp_path: Path) -> None:
-    """A 0-byte orphaned ``_save_item_snapshot`` temp file must not take the whole batch offline.
+def test_file_cache_work_item_snapshots_orphaned_temp_file_is_invisible_to_enumeration(tmp_path: Path) -> None:
+    """A ``_save_item_snapshot`` temp file must never match the snapshot glob.
 
-    Regression test: a process killed between ``tempfile.mkstemp()`` and
-    ``_save_item_snapshot``'s ``finally`` cleanup leaves an orphaned
-    ``*.tmp.yaml`` file behind (e.g. ``.1466.yaml.vosleo7o.tmp.yaml``, 0
-    bytes). It still matches ``_work_item_snapshots``' ``*.yaml`` glob, and
-    ``yaml.safe_load`` of an empty file returns ``None``, so
-    ``BacklogItem.model_validate(None)`` used to raise a pydantic
-    ``ValidationError`` that propagated out of the whole enumeration --
-    taking every other, perfectly good snapshot offline with it.
+    Regression test: ``_save_item_snapshot``'s ``tempfile.mkstemp`` suffix
+    is ``.tmp``, not ``.tmp.yaml``, so a process killed between
+    ``mkstemp()`` and its ``finally`` cleanup (session interrupt, OOM,
+    crash) leaves an orphan that never matches ``_work_item_snapshots``'s
+    ``*.yaml`` glob -- invisible by construction, not by a filename
+    heuristic applied after the fact. An earlier fix gave the temp file
+    suffix ``.tmp.yaml`` instead (so it still matched the glob) and tried
+    to filter it back out by name; a 0-byte body then parsed to ``None``
+    and failed ``BacklogItem`` validation, which propagated out of the
+    whole enumeration uncaught, taking every other, perfectly good
+    snapshot offline with it.
     """
     # Given: a cache root whose items/issues directory holds only an orphaned temp file
     cache = FileCache(tmp_path)
     issues_dir = tmp_path / "items" / "issues"
     issues_dir.mkdir(parents=True)
-    (issues_dir / ".1466.yaml.vosleo7o.tmp.yaml").touch()
+    (issues_dir / ".1466.yaml.vosleo7o.tmp").touch()
 
     # When: the provider enumerates its durable snapshots
     snapshots = cache._work_item_snapshots()
 
-    # Then: the orphan is silently excluded, not raised as a crash
+    # Then: the orphan never matches the *.yaml glob -- absent, not raised
     assert snapshots == []
 
 
-def test_file_cache_work_item_snapshots_excludes_orphaned_temp_file_alongside_real_items(tmp_path: Path) -> None:
+def test_file_cache_work_item_snapshots_ignores_orphaned_temp_file_alongside_real_items(tmp_path: Path) -> None:
+    """An orphaned temp file beside a real snapshot for the same key must not affect it.
+
+    Regression test: confirms the orphan doesn't shadow or otherwise
+    interfere with a real, successfully-saved snapshot for the same
+    logical key sitting right beside it.
+    """
     # Given: one real, successfully-saved snapshot and one orphaned temp file left
     # behind beside it by a prior interrupted write for the same destination
     cache = FileCache(tmp_path)
     cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
-    (tmp_path / "items" / "issues" / ".12.yaml.abcd1234.tmp.yaml").touch()
+    (tmp_path / "items" / "issues" / ".12.yaml.abcd1234.tmp").touch()
 
     # When: the provider reloads its durable snapshots
     snapshots = FileCache(tmp_path)._work_item_snapshots()
 
-    # Then: only the real item is returned -- the orphan never reaches load_item()
+    # Then: only the real item is returned -- the orphan never matches the glob
+    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+
+
+def test_file_cache_work_item_snapshots_skips_zero_byte_yaml_without_crashing(tmp_path: Path) -> None:
+    """A 0-byte ``.yaml`` file from any source must not take the whole batch offline.
+
+    Regression test: a genuinely empty ``.yaml`` file -- e.g. a leftover
+    from before this fix, or any other write-time corruption -- still
+    matches the ``*.yaml`` glob and must still be caught by the generic
+    corrupt-snapshot salvage below, independent of the temp-file-naming
+    fix above. ``yaml.safe_load`` of an empty file returns ``None``, and
+    ``BacklogItem.model_validate(None)`` raises ``pydantic.ValidationError``.
+    """
+    # Given: one real snapshot and one sibling that is a genuinely empty .yaml file
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    (tmp_path / "items" / "issues" / "13.yaml").touch()
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the real item is still returned; the empty one is skipped, not raised
     assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
 
 
@@ -227,50 +258,6 @@ def test_file_cache_work_item_snapshots_skips_unreadable_path_without_crashing(t
 
     # Then: the real item is still returned; the unreadable path is skipped, not raised
     assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
-
-
-def test_file_cache_work_item_snapshots_keeps_real_snapshot_ending_in_tmp(tmp_path: Path) -> None:
-    """A real snapshot whose logical key ends in ``.tmp`` must not be mistaken for an orphan.
-
-    Regression test: the orphan filter used to match any filename ending in
-    ``.tmp.yaml``, not just files created by ``_save_item_snapshot``'s
-    ``tempfile.mkstemp`` (which always adds a leading-dot prefix). A
-    legitimate snapshot saved under a key like ``release-1.0.tmp`` was
-    silently and permanently excluded, with no warning logged, unlike the
-    corrupt-YAML path.
-    """
-    # Given: a real snapshot saved under a key that happens to end in ".tmp"
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot("release-1.0.tmp", BacklogItem(title="Real item"))
-
-    # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-
-    # Then: the real item is returned, not excluded as an orphan
-    assert [(key, item.title) for key, item in snapshots] == [("release-1.0.tmp.yaml", "Real item")]
-
-
-def test_file_cache_work_item_snapshots_keeps_real_snapshot_with_dot_prefixed_tmp_key(tmp_path: Path) -> None:
-    """A real snapshot whose key both starts with '.' and ends in '.tmp' must not be dropped.
-
-    Regression test: the orphan filter used to treat any filename starting
-    with '.' and ending in '.tmp.yaml' as an orphan. A legitimate key like
-    ``.release.tmp`` produces exactly that shape (``.release.tmp.yaml``)
-    without ever going through ``tempfile.mkstemp``, so it was silently and
-    permanently dropped -- with no warning logged, unlike the corrupt-YAML
-    path -- because the filter matched before the try/except ever ran. The
-    filter now also requires the embedded literal ``.yaml.`` that only a
-    real ``mkstemp`` orphan's name contains.
-    """
-    # Given: a real snapshot saved under a key that starts with "." and ends in ".tmp"
-    cache = FileCache(tmp_path)
-    cache._save_work_item_snapshot(".release.tmp", BacklogItem(title="Real item"))
-
-    # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-
-    # Then: the real item is returned, not excluded as an orphan
-    assert [(key, item.title) for key, item in snapshots] == [(".release.tmp.yaml", "Real item")]
 
 
 def test_file_cache_work_item_snapshots_skips_path_escaping_cache_root_without_crashing(tmp_path: Path) -> None:

@@ -436,38 +436,29 @@ class FileCache:
     def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:
         """Return every durable work-item snapshot beneath the cache root.
 
-        Skips two kinds of on-disk noise rather than letting either take the
-        whole batch offline for every other, perfectly good snapshot:
+        :meth:`_save_item_snapshot`'s temp file (``tempfile.mkstemp(...,
+        suffix=".tmp")``) never matches this method's ``*.yaml`` glob, so a
+        process killed between ``mkstemp()`` and its ``finally`` cleanup
+        (session interrupt, OOM, crash) can leave one behind without this
+        enumeration ever seeing it -- no filename heuristic is needed to
+        tell an orphan apart from a real snapshot whose key happens to look
+        similar.
 
-        - An orphaned :meth:`_save_item_snapshot` temp file. That method's
-          ``tempfile.mkstemp`` always names its temp file
-          ``prefix=f".{destination.name}."`` and ``suffix=".tmp.yaml"``; a
-          process killed between ``mkstemp()`` and its ``finally`` cleanup
-          (session interrupt, OOM, crash) leaves one behind forever, still
-          matching this method's ``*.yaml`` glob. Its name therefore always
-          has the shape ``.{original-name}.yaml.{random}.tmp.yaml`` -- a
-          leading dot, the embedded literal ``.yaml.`` from the destination
-          name (every destination name ends in ``.yaml``), then mkstemp's
-          random segment, then the ``.tmp.yaml`` suffix. Matching on that
-          full shape (not just the leading dot and trailing suffix)
-          excludes a real snapshot whose logical key itself starts with
-          ``.`` and ends in ``.tmp`` -- e.g. ``.release.tmp`` ->
-          ``.release.tmp.yaml`` -- which has no embedded ``.yaml.`` marker.
-        - A snapshot that fails to load at all -- e.g. the 0-byte body such
-          an orphaned temp file has, which parses to ``None`` and fails
-          ``BacklogItem`` validation; a file with unparseable YAML; a file
-          with invalid UTF-8 bytes, which ``load_item``'s
-          ``path.open(encoding="utf-8")`` surfaces as ``UnicodeDecodeError``;
-          a symlink whose target resolves outside the cache root, which
-          :meth:`_snapshot_path`'s own boundary check surfaces as a bare
-          ``ValueError`` from ``Path.relative_to``; or any other
-          filesystem-level failure (``OSError`` and subclasses -- e.g. a
-          directory matching ``*.yaml``, or unreadable permissions) on the
-          specific path being loaded. ``ValueError`` alone covers the
-          pydantic and Unicode cases too, since both are its subclasses.
-          One bad file is logged and skipped, mirroring the per-entry
-          salvage policy :meth:`_CacheStateStore._salvage_field` already
-          applies to the durable mutation queue.
+        A snapshot that still fails to load is skipped rather than letting
+        it take the whole batch offline -- e.g. the 0-byte body a corrupted
+        write can leave, which parses to ``None`` and fails ``BacklogItem``
+        validation; a file with unparseable YAML; a file with invalid UTF-8
+        bytes, which ``load_item``'s ``path.open(encoding="utf-8")``
+        surfaces as ``UnicodeDecodeError``; a symlink whose target resolves
+        outside the cache root, which :meth:`_snapshot_path`'s own boundary
+        check surfaces as a bare ``ValueError`` from ``Path.relative_to``;
+        or any other filesystem-level failure (``OSError`` and subclasses --
+        e.g. a directory matching ``*.yaml``, or unreadable permissions) on
+        the specific path being loaded. ``ValueError`` alone covers the
+        pydantic and Unicode cases too, since both are its subclasses. One
+        bad file is logged and skipped, mirroring the per-entry salvage
+        policy :meth:`_CacheStateStore._salvage_field` already applies to
+        the durable mutation queue.
 
         Returns:
             Ordered ``(logical_key, item)`` pairs for every snapshot that
@@ -478,12 +469,6 @@ class FileCache:
             return []
         snapshots: list[tuple[str, BacklogItem]] = []
         for path in sorted(item_root.rglob("*.yaml")):
-            if (
-                path.name.startswith(".")
-                and path.name.endswith(".tmp.yaml")
-                and ".yaml." in path.name[: -len(".tmp.yaml")]
-            ):
-                continue
             relative = path.relative_to(item_root)
             try:
                 snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
@@ -505,9 +490,13 @@ class FileCache:
         destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary: Path | None = None
         try:
-            fd, temporary_name = tempfile.mkstemp(
-                dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp.yaml"
-            )
+            # suffix=".tmp", not ".tmp.yaml": save_item() writes valid YAML to
+            # any path regardless of extension, and a plain ".tmp" name never
+            # matches _work_item_snapshots()'s "*.yaml" glob -- an orphan left
+            # behind by a process killed before the finally block below is
+            # then invisible to that enumeration by construction, with no
+            # filename heuristic needed to tell it apart from a real snapshot.
+            fd, temporary_name = tempfile.mkstemp(dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp")
             temporary = Path(temporary_name)
             os.close(fd)
             save_item(item.model_copy(deep=True), temporary)
