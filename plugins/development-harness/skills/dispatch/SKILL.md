@@ -1,12 +1,12 @@
 ---
 name: dispatch
-description: Orchestrate parallel agent teams as a manager — not a micromanager. Use when coordinating 2+ independent workers, running SAM task waves, relaying discoveries between worker waves, handling blockers, or synthesizing team results. Covers both SAM structured dispatch (the task does the work) and ad-hoc dispatch (reference agent-orchestration for prompt template).
+description: Orchestrate parallel agent dispatch as a manager — not a micromanager. Use when coordinating 2+ independent workers, running SAM task waves, relaying discoveries between worker waves, handling blockers, or synthesizing results. Covers both SAM structured dispatch (the task does the work) and ad-hoc dispatch (reference agent-orchestration for prompt template).
 user-invocable: true
 ---
 
 # Dispatch — Orchestrator as Manager
 
-The orchestrator's job is experience sharing and team health, not prompt engineering.
+The orchestrator's job is experience sharing and worker health, not prompt engineering.
 Workers are specialists. Trust them. Relay what they learn. Unblock them when stuck. Synthesize what they produce.
 
 For the delegation prompt template and pre-send verification, activate the `/agent-orchestration:agent-orchestration` skill.
@@ -20,23 +20,15 @@ flowchart TD
     Q -->|"No — ad-hoc work"| AdHoc["Ad-Hoc Dispatch<br>Use delegation template from<br>/agent-orchestration:agent-orchestration"]
     SAM --> SAMPrompt["Agent prompt:<br>'You are working on P{N}/T{M}'<br>Agent loads task via sam_task —<br>acceptance criteria, context, verification steps all there"]
     AdHoc --> AdHocPrompt["Write OBSERVATIONS + DEFINITION OF SUCCESS +<br>CONTEXT per agent-orchestration template"]
-    SAMPrompt --> Team["TeamCreate and spawn workers"]
-    AdHocPrompt --> Team
+    SAMPrompt --> Spawn["Spawn workers directly"]
+    AdHocPrompt --> Spawn
 ```
 
 ## Manager Responsibilities
 
-### 1 — Set Up the Team
-
-```text
-TeamCreate(team_name="feature-slug-wave-1")
-```
-
-Name the team after the work and wave number. One team per parallel wave.
+### 1 — Spawn Workers
 
 **Fetch-once rule**: Before spawning any workers, call `backlog_view` **once per issue** that will be worked in this session. Store each result in context keyed by issue number. Do NOT call `backlog_view` again for any issue already fetched — use the stored data for all wave iterations, prompt construction, and relay building. If a `backlog_update` changes an item's state mid-session, replace the cached value with a single new `backlog_view` call for that issue only.
-
-### 2 — Spawn Workers
 
 Each worker gets exactly the context needed — no more.
 
@@ -44,7 +36,6 @@ Each worker gets exactly the context needed — no more.
 
 ```text
 Agent(
-  team_name="feature-slug-wave-1",
   name="T42-worker",
   prompt="Your ROLE_TYPE is sub-agent. You are working on Pf1a2b3c4/T42."
 )
@@ -54,7 +45,7 @@ The agent calls `sam_task` to load the task. All acceptance criteria, verificati
 
 **Ad-hoc dispatch:** follow the delegation template from `/agent-orchestration:agent-orchestration` — OBSERVATIONS, DEFINITION OF SUCCESS, CONTEXT.
 
-### 3 — Relay Discoveries Between Waves
+### 2 — Relay Discoveries Between Waves
 
 Workers learn things during execution. Relay those discoveries to the next wave — this is experience sharing.
 
@@ -70,7 +61,7 @@ flowchart TD
 
 Workers report what they observed — relay facts, not interpretations, to the next wave.
 
-### 4 — Handle Blockers
+### 3 — Handle Blockers
 
 When a worker sends a blocker message:
 
@@ -93,7 +84,7 @@ Reset the task to `not-started` before re-dispatching it. Appending the response
 `Orchestrator Response` the orchestrator just wrote, so the blocker is answered and the answer
 never reaches anyone.
 
-### 5 — Synthesize Results
+### 4 — Synthesize Results
 
 When all workers return:
 
@@ -107,14 +98,9 @@ full text as `content=`, and to return only the artifact type and identifier. Re
 `artifact_read` when you need the detail. This keeps orchestrator context lean without any worker
 writing a file for another step to read.
 
-### 6 — Clean Up
-
-```text
-TeamDelete()
-```
-
-Deleting the team releases every worker in it. Delete it once all tasks in the wave have reached a
-terminal status — read that through `sam_plan(config={"action": "status"})`, never by assuming a
+Workers dispatched via plain `Agent()` calls terminate automatically when their prompt completes
+— there is nothing to release. Confirm every task in the wave reached a terminal status through
+`sam_plan(config={"action": "status"})` before treating the wave as done, never by assuming a
 silent worker has finished.
 
 ## When to Dispatch

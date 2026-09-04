@@ -44,7 +44,7 @@ Split stdout by newline. Trim empty lines. This is the `changed_files` list.
 ERROR: No changed files found for diff range <git-range>. Nothing to review.
 ```
 
-Do not create a team or a plan when `changed_files` is empty.
+Do not create a plan when `changed_files` is empty.
 
 ---
 
@@ -70,7 +70,7 @@ uv run --quiet --script "${CLAUDE_SKILL_DIR}/scripts/gen_run_stamp.py"
 `review_slug` is `{review_base}-{run_stamp}`, for example
 `review-2181-20260824T014233Z-3f9a2c7e1b804d56`.
 
-Use `review_slug` unchanged in plan operations. Use `multi-{review_slug}` as the team name.
+Use `review_slug` unchanged in plan operations.
 
 ---
 

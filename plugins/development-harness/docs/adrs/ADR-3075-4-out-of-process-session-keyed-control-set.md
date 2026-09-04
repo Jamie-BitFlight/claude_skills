@@ -82,10 +82,11 @@ of scope for this ADR, which only concerns cache routing.
 ## Known gaps — named, not solved by this ADR
 
 **Concurrent writers within one session.** `CLAUDE_CODE_SESSION_ID` is shared not only across
-one agent's own MCP-vs-CLI calls but across every subagent this repo's `TeamCreate` and
-parallel `Agent()` patterns spawn within that session — they inherit the same session ID. That
-means multiple OS processes (a parallel review team all viewing or grooming the same item, for
-example) can perform a concurrent read-modify-write against the same session-keyed store.
+one agent's own MCP-vs-CLI calls but across every subagent this repo's parallel `Agent()`
+dispatch patterns spawn within that session — they inherit the same session ID. That
+means multiple OS processes (a set of parallel review or groom agents all viewing or grooming
+the same item, for example) can perform a concurrent read-modify-write against the same
+session-keyed store.
 `get-gate-token.mjs` is not precedent for this: it only ever performs one atomic
 `writeFileSync` of a single value, never a keyed read-modify-write, and has nothing analogous
 to write-triggered invalidation (ADR-3075-2) racing a concurrent requery. This ADR does not

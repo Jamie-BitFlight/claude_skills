@@ -31,14 +31,10 @@ STATUS: BLOCKED
 Reason: {specific reason}
 ```
 
-When operating as a **teammate** (spawned via `TeamCreate`), also send:
-
-```
-SendMessage(to="team-lead", summary="[brief]", message="[full STATUS block]")
-```
-
-That send is a notification, never the record. Put anything a later step reads in a named
-destination that step can read back — a task section, an artifact, a review thread.
+A plain `Agent()` call already returns this STATUS block straight back to whoever dispatched
+it — no `SendMessage` needed to report completion. Put anything a later step reads in a named
+destination that step can read back — a task section, an artifact, a review thread — never only
+in the STATUS message.
 
 ## The "Write to File" Anti-Pattern
 
@@ -79,8 +75,6 @@ When writing or reviewing an agent file, and when launching one:
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence
 3. Check that "write to file" instructions are paired with STATUS output, not replacing it
-4. Check the agent's `tools:` grant includes `SendMessage` before dispatching it anywhere it must
-   report to another agent. A teammate is the exception — team coordination tools stay available
-   to a teammate whatever `tools:` restricts. This is a grant check, not a prose check: the agent
-   needs the capability, not an explanation of the tool.
+4. Do not instruct an agent to report completion via `SendMessage` — a plain `Agent()` call's
+   return value already carries the STATUS block to the dispatcher.
 5. Check that any result a later step reads is written to a named destination, not only messaged

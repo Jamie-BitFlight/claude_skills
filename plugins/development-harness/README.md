@@ -90,7 +90,7 @@ Executes a SAM task plan produced by `/dh:add-new-feature`.
 What happens:
 
 - Queries the plan for ready tasks (not-started with all dependencies complete)
-- When 2 or more tasks are ready simultaneously, dispatches parallel agents via TeamCreate
+- When 2 or more tasks are ready simultaneously, dispatches one parallel `Agent()` call per task
 - Each task runs through `/dh:start-task`, which claims the task, executes it, and records divergence notes when implementation differs from plan
 - A SubagentStop hook automatically marks tasks complete
 - Bookend tasks run automatically: T0 captures baseline state before implementation begins, TN verifies acceptance criteria after all implementation tasks finish
@@ -200,7 +200,7 @@ Executes a groomed milestone with full parallel isolation. For each wave:
 
 1. Creates an integration branch
 2. Creates isolated git worktrees per issue
-3. Spawns independent `claude -p` sessions (kage-bunshin) — each is a full orchestrator with the Agent tool, TeamCreate, and all MCP servers
+3. Spawns independent `claude -p` sessions (kage-bunshin) — each is a full orchestrator with the Agent tool and all MCP servers
 4. Merges branches sequentially, classifying conflicts as trivial, medium, or heavy
 5. Relays discoveries from completed waves to subsequent waves
 6. Lands the integration branch to main after all quality gates pass
@@ -213,7 +213,7 @@ Executes a groomed milestone with full parallel isolation. For each wave:
 
 ### Parallel Orchestration: Kage-Bunshin Sessions
 
-`/dh:kage-bunshin` spawns persistent interactive Claude CLI sessions in tmux with bidirectional communication. Unlike subagents (which report only to their caller), kage-bunshin sessions are full orchestrators — they have the Agent tool, TeamCreate, and can delegate to their own sub-agents.
+`/dh:kage-bunshin` spawns persistent interactive Claude CLI sessions in tmux with bidirectional communication. Unlike subagents (which report only to their caller), kage-bunshin sessions are full orchestrators — they have the Agent tool and can delegate to their own sub-agents.
 
 This is what enables true parallel milestone execution: multiple independent Claude instances, each working on a separate issue in its own worktree, coordinated by the parent orchestrator.
 

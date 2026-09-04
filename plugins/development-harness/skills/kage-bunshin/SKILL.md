@@ -408,7 +408,7 @@ The monitor exits immediately on first detection — it does not continue watchi
 
 ## Team Health Check
 
-Inspect a running Claude Code agent team's live state — last JSONL tool calls per member and current tmux pane snapshot. Use this after spawning a team via `TeamCreate` to see what teammates are doing without waiting for message delivery.
+Inspect a running Claude Code session's live team state — last JSONL tool calls per member and current tmux pane snapshot. Every session gets one implicit team automatically (no `TeamCreate` call needed) as soon as it spawns an `Agent()`; use this to see what dispatched agents are doing without waiting for message delivery.
 
 **Script**: `${CLAUDE_SKILL_DIR}/scripts/monitor.py health`
 
@@ -438,7 +438,7 @@ JSONL session files are searched under `~/.claude/projects/{project-slug}/` (der
 
 ### When to use
 
-Call `monitor.py health` after spawning a team to verify agents are progressing. Unlike the poll-based monitor, this subcommand exits immediately after printing — it is a snapshot tool, not a watcher.
+Call `monitor.py health` after dispatching agents to verify they are progressing. Unlike the poll-based monitor, this subcommand exits immediately after printing — it is a snapshot tool, not a watcher.
 
 For other skills that want to reference this capability: load the `/dh:kage-bunshin` skill and invoke `monitor.py health {team-name}`.
 
