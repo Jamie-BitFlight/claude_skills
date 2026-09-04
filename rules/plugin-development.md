@@ -112,6 +112,3 @@ it (e.g. "load `{plugin}-meta-docs` and read the X document it lists") — confi
 exists before adding, give the entry a specific reason to read it, and drop the entry once nothing
 depends on it. Use `${CLAUDE_PLUGIN_ROOT}` for each listed path so the substitution still resolves
 correctly regardless of installation location.
-
-**Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md,
-plugin.json, agent, and command files.
