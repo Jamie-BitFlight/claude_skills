@@ -28,9 +28,7 @@ Backlog backend for this checkout: **GitHub Issues** (`.dh/config.yaml`'s `backe
 This repo does not use Beads (`bd`) for task tracking. **Never run `bd init` or `bd setup` at the
 repo root.** If a Beads integration block reappears in this file, delete it — it does not describe
 this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for how
-backend selection and the `backlog_*`/`sam_*` MCP tools actually work. The backlog system uses
-the configured provider's native interface and structured MCP tools
-(prefix: `mcp__plugin_dh_backlog__`) — **never edit `.claude/backlog/` files directly**.
+backend selection and the `backlog_*`/`sam_*` MCP tools actually work.
 
 ## Environment Setup (Required First)
 
