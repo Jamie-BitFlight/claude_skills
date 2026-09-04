@@ -124,20 +124,22 @@ def test_no_conflicting_rt_ica_acronym_expansion() -> None:
     )
 
 
-_IMPACT_RADIUS_EXTRACTION_RE = re.compile(r"""sections\[["']Impact Radius["']\]""")
+_IMPACT_RADIUS_EXTRACTION_RE = re.compile(r"""sections\[["']Impact Radius["']\]|Impact Radius section from""")
 
 
 def test_impact_radius_readers_carry_the_resources_fallback() -> None:
-    """Every file that extracts `sections["Impact Radius"]` also names a `Resources` fallback.
+    """Every file that extracts Impact Radius data also names a `Resources` fallback.
 
-    Matches on the bracket-access extraction pattern specifically (`sections["Impact Radius"]`),
-    not every prose mention of the term — a table column header or a downstream consumer
-    describing already-extracted content isn't the entry-8 bug class; a doc that reads the
-    registry key directly and has no fallback is. `groom-check.md` already has the primary/
-    fallback pair (added `f0ea6f6e1`, 2026-04-11). `feasibility-gate.md` and `groom-drift.md`
-    read the same primary key without it (#2498 entry 8) and silently treat an older-template
-    item's Impact Radius section as absent — zero file count — rather than falling back to the
-    section older templates actually used.
+    Matches on two specific extraction-site markers — the bracket-access pattern
+    (`sections["Impact Radius"]`, used by `groom-check.md`/`feasibility-gate.md`/`groom-drift.md`)
+    and the prose consumer phrase "Impact Radius section from" (used by `feature-request.md`/
+    `plan.md`) — not every mention of the term. A table column header, a generic description of
+    the concept, or a downstream consumer describing already-extracted content isn't the entry-8
+    bug class; a doc that reads the section directly and has no fallback is. `groom-check.md`
+    already has the primary/fallback pair (added `f0ea6f6e1`, 2026-04-11). `feasibility-gate.md`,
+    `groom-drift.md`, `feature-request.md`, and `plan.md` each read the same data without it
+    (#2498 entry 8) and would silently treat an older-template item's Impact Radius section as
+    absent rather than falling back to the section older templates actually used.
     """
     offenders = [
         str(path.relative_to(_REPO_ROOT))

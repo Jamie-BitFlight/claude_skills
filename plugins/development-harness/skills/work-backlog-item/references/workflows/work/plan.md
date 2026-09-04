@@ -8,11 +8,11 @@
 
 **Trigger:** RT-ICA APPROVED (Step 3.2) and feasibility PASS (Step 3.4).
 
-**Action:** Read [feature-request.md](./feature-request.md) to extract the feature request template, Impact Radius section from Step 2 grooming output, Ecosystem Completeness Constraint, and language/stack detection flags. Assemble these into a complete feature request string.
+**Action:** Read [feature-request.md](./feature-request.md) to extract the feature request template, Impact Radius section from Step 2 grooming output (or its `Resources` fallback for older grooming templates — see groom-check.md), Ecosystem Completeness Constraint, and language/stack detection flags. Assemble these into a complete feature request string.
 
 **Success:** Feature request string contains all required sections from template, Impact Radius data populated, language/stack flags set.
 
-**On failure:** If Impact Radius section is missing from grooming output, report BLOCKED — cannot proceed without affected systems inventory.
+**On failure:** If neither the Impact Radius section nor its Resources fallback is present in grooming output, report BLOCKED — cannot proceed without affected systems inventory.
 
 ## Step 4.2: Invoke SAM Planning
 

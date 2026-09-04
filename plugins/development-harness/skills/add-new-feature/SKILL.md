@@ -65,13 +65,21 @@ This is especially important for Phase 1 (feature-researcher) and Phase 3 (archi
 Failure to fetch the primary source causes information loss from the summary layer to
 propagate into feature context and architecture decisions.
 
+**Registration read-back (applies after every `artifact_register` call in Phases 1-3):** a count
+of 1 from `artifact list` is not proof the content is real — after registering, read the artifact
+back and confirm which of three outcomes occurred: (1) content reads back as the document —
+proceed; (2) content reads back empty or a literal placeholder (e.g. `$(cat ...)`) — same failure
+as `count == 0`, re-dispatch; (3) content is not found at all despite the entry existing — the
+legacy-artifact case (a manifest entry registered without content), a different failure from "not
+registered," report it as such rather than treating it as re-dispatchable.
+
 **Canonical write-back across phases:** when a later phase resolves a question an earlier
-artifact posed as open, re-register the earlier artifact with the resolution — including a
-read-back confirming the new content is in place, per Phase 1-3's read-back requirement above —
-before dispatching the next phase. #2498's feature-context artifact still posed a question as
-open after the Concerns section had already resolved it; the next phase read the stale artifact
-fresh and reported it as drifted. Re-registering the resolved artifact before that phase runs is
-cheaper than a later phase re-discovering the same staleness.
+artifact posed as open, re-register the earlier artifact with the resolution — including the
+read-back above confirming the new content is in place — before dispatching the next phase.
+#2498's feature-context artifact still posed a question as open after the Concerns section had
+already resolved it; the next phase read the stale artifact fresh and reported it as drifted.
+Re-registering the resolved artifact before that phase runs is cheaper than a later phase
+re-discovering the same staleness.
 
 ---
 
@@ -176,12 +184,7 @@ reminder that `artifact_register(content=...)` is the agent's responsibility, no
 orchestrator's. The orchestrator MUST NOT call `artifact_register` as a workaround —
 the MCP-native rule is that agents own their artifact storage.
 
-A count of 1 is not proof the content is real — read it back and confirm which of three
-outcomes occurred: (1) content reads back as the document — proceed; (2) content reads back
-empty or a literal placeholder (e.g. `$(cat ...)`) — same failure as `count == 0`, re-dispatch;
-(3) content is not found at all despite the entry existing — this is the legacy-artifact case
-(a manifest entry registered without content), a different failure from "not registered" and
-should be reported as such, not silently treated as re-dispatchable.
+Then apply the registration read-back rule from the Artifact Discovery section above:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type feature-context
@@ -247,12 +250,7 @@ reminder that `artifact_register(content=...)` is the agent's responsibility, no
 orchestrator's. The orchestrator MUST NOT call `artifact_register` as a workaround —
 the MCP-native rule is that agents own their artifact storage.
 
-A count of 1 is not proof the content is real — read it back and confirm which of three
-outcomes occurred: (1) content reads back as the document — proceed; (2) content reads back
-empty or a literal placeholder (e.g. `$(cat ...)`) — same failure as `count == 0`, re-dispatch;
-(3) content is not found at all despite the entry existing — this is the legacy-artifact case
-(a manifest entry registered without content), a different failure from "not registered" and
-should be reported as such, not silently treated as re-dispatchable.
+Then apply the registration read-back rule from the Artifact Discovery section above:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type codebase-analysis
@@ -456,12 +454,7 @@ reminder that the agent must call `artifact_register(content=...)` itself — th
 orchestrator MUST NOT call `artifact_register` as a workaround. The MCP-native rule
 is that agents own their artifact storage.
 
-A count of 1 is not proof the content is real — read it back and confirm which of three
-outcomes occurred: (1) content reads back as the document — proceed; (2) content reads back
-empty or a literal placeholder (e.g. `$(cat ...)`) — same failure as `count == 0`, re-dispatch;
-(3) content is not found at all despite the entry existing — this is the legacy-artifact case
-(a manifest entry registered without content), a different failure from "not registered" and
-should be reported as such, not silently treated as re-dispatchable.
+Then apply the registration read-back rule from the Artifact Discovery section above:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type architect
@@ -559,9 +552,11 @@ Return READY or BLOCKED with specific gaps.
 ```
 
 If the validator returns `BLOCKED`, do not proceed to Phase 6. Fix the identified gaps: for a
-specific, scoped gap (e.g. one missing task), send it to the still-live Phase 4 planner and ask it
-to add or amend the specific task in the existing plan — re-run Phase 4 from scratch only when the
-plan's overall structure itself is wrong. Retry Phase 5 after either path.
+specific, scoped gap (e.g. one missing task), dispatch a new, narrowly-scoped delegation to
+`@dh:swarm-task-planner` naming the exact gap and asking it to add or amend that specific task in
+the existing plan `{plan_ref}` — a subagent dispatch terminates after Phase 4 returns, so this is a
+fresh call operating on the existing plan address, not a resumed session. Re-run Phase 4 from
+scratch only when the plan's overall structure itself is wrong. Retry Phase 5 after either path.
 
 ---
 
