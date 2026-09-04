@@ -19,7 +19,7 @@ from . import rendering as _rendering
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
 from .entry_blocks import _deduplicate_timestamps, _render_entry_raw, parse_entries
 from .models import BacklogItem, GroomedData, Section, parse_issue_number
-from .parsing import extract_sections
+from .parsing import _GROOMED_DATE_RE, extract_sections
 
 __all__ = [
     "SECTION_HEADING",
@@ -37,7 +37,11 @@ __all__ = [
 
 _METADATA_BLOCK_RE = re.compile(r"<!--\s*backlog-metadata:\s*\n(.*?)\n-->", re.DOTALL)
 _METADATA_LINE_RE = re.compile(r"^(\w+):\s*(.*)$")
-_GROOMED_HEADING_RE = re.compile(r"^##\s+Groomed\s*\(([^)]*)\)")
+# Groomed heading gate/date extraction: canonical pattern lives in
+# parsing._GROOMED_DATE_RE (imported above), matched against the heading text
+# with its "## " prefix already stripped, so this module and parsing.py's
+# parse_md_body_sections (the legacy .md-file parser) can never disagree
+# about what counts as a real "## Groomed (date)" heading.
 _SUBSECTION_RE = re.compile(r"### ([^\n]+)\n([\s\S]*?)(?=\n### |\Z)")
 
 # Re-exported from rendering — canonical definition lives in rendering.SECTION_HEADING
@@ -205,17 +209,18 @@ def _parse_metadata_block(body: str) -> dict[str, str]:
     return result
 
 
-def _parse_groomed_section(heading: str, content: str) -> GroomedData:
-    """Parse a ``## Groomed (date)`` heading + body into a GroomedData model.
+def _parse_groomed_section(heading_name: str, content: str) -> GroomedData:
+    """Parse a ``Groomed (date)`` heading name + body into a GroomedData model.
 
     Args:
-        heading: Full heading string, e.g. ``"## Groomed (2026-03-01)"``.
+        heading_name: Heading text with the ``## `` prefix already stripped,
+            e.g. ``"Groomed (2026-03-01)"``.
         content: Section body text (content after the heading line).
 
     Returns:
         GroomedData with date and subsections populated.
     """
-    date_match = _GROOMED_HEADING_RE.match(heading)
+    date_match = _GROOMED_DATE_RE.match(heading_name)
     date = date_match.group(1).strip() if date_match else ""
     subsections: dict[str, str] = {}
     for sub_match in _SUBSECTION_RE.finditer(content):
@@ -279,10 +284,12 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
         # "Groomed", with no parens) -- misrouting a generic Section into
         # _parse_groomed_section and producing a GroomedData under "groomed"
         # alongside the correct "unknown__groomed" key, duplicating the section on
-        # round-trip. Matching the same pattern _parse_groomed_section itself
-        # requires (a date in parens) keeps the two checks in agreement.
-        if _GROOMED_HEADING_RE.match(heading):
-            parsed_sections["groomed"] = _parse_groomed_section(heading, content)
+        # round-trip. Sharing parsing._GROOMED_DATE_RE with parse_md_body_sections
+        # (the legacy .md-file parser, same collision class) means the two
+        # parsers can't independently drift out of agreement on what counts as
+        # a real Groomed heading.
+        if _GROOMED_DATE_RE.match(heading_name):
+            parsed_sections["groomed"] = _parse_groomed_section(heading_name, content)
             continue
 
         # Entry-bearing sections — routed through the same alias-aware resolver

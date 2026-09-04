@@ -348,6 +348,38 @@ Big scope.
     assert "Scope" in groomed.subsections
 
 
+def test_parse_md_body_sections_unregistered_groomed_heading_does_not_collide() -> None:
+    """A bare '## Groomed' heading (no date parens) is an unregistered section, not GroomedData.
+
+    Mirrors ``test_github_sync.test_parse_unregistered_groomed_heading_does_not_collide_with_groomed_section``
+    for the legacy ``.md``-body parse path: an unregistered section stored
+    under a key like ``"GROOMED"`` round-trips through ``unknown_key_to_heading``
+    to the bare display heading ``"Groomed"`` (title-cased, no date). Before
+    ``_GROOMED_DATE_RE`` required the parenthesized date group, that bare
+    heading matched and was misrouted into ``GroomedData``, colliding with a
+    real ``## Groomed (date)`` section in the same body.
+    """
+    body = """\
+## Groomed
+
+Unrelated content that happens to share the fallback heading.
+
+## Groomed (2026-01-01)
+
+### Priority
+
+High priority.
+"""
+    result = parse_md_body_sections(body)
+
+    assert "unknown__groomed" in result
+    assert isinstance(result["unknown__groomed"], Section)
+    groomed = result["groomed"]
+    assert isinstance(groomed, GroomedData)
+    assert groomed.date == "2026-01-01"
+    assert groomed.subsections.get("Priority") == "High priority."
+
+
 # ---------------------------------------------------------------------------
 # parse_md_body_sections — fenced code block guard
 # ---------------------------------------------------------------------------
