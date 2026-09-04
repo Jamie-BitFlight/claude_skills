@@ -151,6 +151,28 @@ def test_impact_radius_readers_carry_the_resources_fallback() -> None:
     )
 
 
+def test_start_md_todowrite_mandate_has_a_fallback_chain() -> None:
+    """`work/start.md` never mandates `TodoWrite` bare — a fallback chain rides with it.
+
+    `TodoWrite` doesn't exist in Codex/OpenCode, and this repo's own AGENTS.md forbids using it
+    in favor of `bd` — the skill mandating it bare is unsatisfiable by design in either context
+    (#2498 entry 3). The single remaining mention keeps a conditional phrase alongside it.
+    """
+    path = _WORKFLOWS_ROOT / "work" / "start.md"
+    text = path.read_text(encoding="utf-8")
+
+    offenders = [
+        f"{path.relative_to(_WORKFLOWS_ROOT)}:{lineno}: {line.strip()}"
+        for lineno, line in enumerate(text.splitlines(), start=1)
+        if "TodoWrite" in line and not any(phrase in line for phrase in ("if it exists", "otherwise"))
+    ]
+
+    assert not offenders, (
+        "`TodoWrite` mentioned without a fallback-chain phrase ('if it exists' / 'otherwise') on "
+        f"the same line — this is a bare cross-harness-unsatisfiable mandate again: {offenders!r}"
+    )
+
+
 def test_no_stale_dot_claude_rules_path_references() -> None:
     """Every path this repo tells an agent to load under the old `.claude/rules/` prefix is gone.
 

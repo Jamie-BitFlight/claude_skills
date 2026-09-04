@@ -77,7 +77,7 @@ What happens:
 The resulting context, architecture, and plan remain available to subsequent workflow stages and
 worktree-isolated agents through the workflow storage selected during setup.
 
-**RT-ICA Gate**: Before planning begins, Claude runs a Reverse Thinking Information Completeness Assessment. If any required information is genuinely missing (not just derivable), planning blocks and you are asked to provide it. This prevents plans built on assumptions.
+**RT-ICA Gate**: Before planning begins, Claude runs a Reverse Thinking Information Completeness Assessment — working backward from the stated goal through its prerequisite chain to classify each prerequisite as available, derivable, or missing. If any required information is genuinely missing (not just derivable), planning blocks and you are asked to provide it. This prevents plans built on assumptions.
 
 #### `/dh:implement-feature`
 

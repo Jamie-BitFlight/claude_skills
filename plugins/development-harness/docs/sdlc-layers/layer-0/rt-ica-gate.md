@@ -1,6 +1,6 @@
 # RT-ICA Gate
 
-Reverse Thinking — Information Completeness Assessment. Mandatory pre-planning checkpoint. **BLOCK** if any required condition is MISSING.
+Reverse Thinking — Information Completeness Assessment. Works backward from the stated goal through its prerequisite chain — what must exist to reach the goal, then what each of those requires — classifying each as AVAILABLE, DERIVABLE, or MISSING. Mandatory pre-planning checkpoint. **BLOCK** if any required condition is MISSING.
 
 ---
 

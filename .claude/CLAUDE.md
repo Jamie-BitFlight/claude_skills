@@ -71,7 +71,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 
 | Stage | Command | Purpose |
 |-------|---------|---------|
-| Starting complex task | `/dh:rt-ica` | High Quality Details |
+| Starting complex task | `/dh:rt-ica <#N \| goal>` | Works backward from the goal through the prerequisite chain, classifying each as available/derivable/missing, and blocks planning until nothing is missing |
 | Delegating to sub-agent | `/delegate` | Enforces delegation framework |
 | Reviewing agent output | `/hallucination-detector:hallucination-audit` | Checks hallucinations, unverified causality |
 | Claiming task complete | `/dh:verify-done` | Runs "Is It Done?" checklist |

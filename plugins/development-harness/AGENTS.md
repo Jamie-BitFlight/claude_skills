@@ -269,6 +269,7 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 - `/dh:dispatch` - Dispatch tasks to agents using teams-first parallel execution; prefer over implement-feature when milestone-scoped work needs concurrent agent dispatch
 - `/dh:dh-meta-docs` - Plugin meta-documentation
+- `/dh:dh-glossary` - One-line definitions of dh terminology (RT-ICA, ARL, SAM, S1-S7, Impact Radius) with pointers to canonical sources
 - `/dh:interop` - Cross-plugin interoperability
 - `/dh:subagent-contract` - Where a dispatched step's output goes, and how it signals state upstream
 
