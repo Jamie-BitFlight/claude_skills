@@ -8,7 +8,7 @@ A process for making changes to the groom, work, and plan workflows in the devel
 
 The dh workflows are a pipeline. Each stage file (`intake.md`, `analyze.md`, `swarm.md`, `finalize.md`) has a defined contract: it receives specific data from the prior stage and produces specific data for the next. A change that looks local to one file almost always has upstream and downstream effects — data that must be derived differently, output that must be consumed, validation gates that must be updated, or execution paths that diverge from what was described.
 
-The wave-0 research change (adding `technical-researcher` to the groom swarm) required touching `swarm.md`, `finalize.md`, and the team-mode sequence diagram. It required understanding that the team-mode path and the no-team-fallback path both needed updating. It required knowing that the Research section must be excluded from the required-sections validation gate because Wave 0 is skippable. None of this was visible from reading only the file being changed.
+The wave-0 research change (adding `technical-researcher` to the groom swarm) required touching `swarm.md`, `finalize.md`, and the Wave 0 sequence diagram. At the time, `swarm.md` still described two dispatch paths (a team-mode and a no-team fallback, later consolidated into the single wave sequence described above), and both needed updating in step. It required knowing that the Research section must be excluded from the required-sections validation gate because Wave 0 is skippable. None of this was visible from reading only the file being changed.
 
 This process makes that chain of reasoning explicit.
 
@@ -81,20 +81,16 @@ The wave-0 change required resolving all four:
 
 ---
 
-## Checking All Execution Paths
+## Checking the Dispatch Sequence
 
-The groom swarm has two execution modes:
-
-1. **Team mode** (preferred): `TeamCreate` with a sequence diagram showing agent spawn order and inter-agent messaging
-2. **No-team fallback**: Wave 1, Wave 2, Wave 3 in sequential waves
-
-**Both paths must reflect every change.** It is easy to update one and forget the other. The sequence diagram in team mode is the primary reference — if it is stale, agents following it will produce wrong output.
+The groom swarm runs as three dependency-ordered waves, each dispatched as plain `Agent()` calls
+(no team) with a Mermaid sequence diagram per wave in `swarm.md`. The sequence diagram is the
+primary reference — if it is stale, agents following it will produce wrong output.
 
 Checklist when modifying swarm.md:
-- [ ] Updated the no-team fallback wave structure
-- [ ] Updated the team-mode sequence diagram
+- [ ] Updated the wave sequence diagram(s) affected by the change
 - [ ] Verified the `## Dependencies` table if agent dependencies changed
-- [ ] Updated the `## Teammates` list if a new agent role was added
+- [ ] Updated the `## Agents` list if a new agent role was added
 
 ---
 
@@ -120,7 +116,7 @@ For Wave 0: skip when item type is `type:bug` or `type:fix`, when no technology 
 3. **Prior context read by the RT-ICA Final Pass**: add to the "Extract:" line at the start of the RT-ICA Final Pass section
 4. **Input to the groomer**: add to the groomer input list in swarm.md's Groomer prompt section
 
-The wave-0 change required all four: Research section added to optional list (with skip note), added to Extract list, added to groomer input list, and the team-mode sequence diagram updated.
+The wave-0 change required all four: Research section added to optional list (with skip note), added to Extract list, added to groomer input list, and the Wave 0 sequence diagram updated.
 
 ---
 
@@ -134,7 +130,7 @@ Before committing any workflow change:
 
 3. **Trace the skip path**: walk through what happens when your change is skipped entirely (bug/fix item, or whatever the skip condition is). Confirm the groom still completes.
 
-4. **Check both execution modes**: verify team-mode sequence diagram and no-team fallback both reflect the change.
+4. **Check the wave sequence diagrams**: verify every wave's Mermaid diagram in swarm.md reflects the change.
 
 5. **Write evals**: define structured test cases using the actual invocation format (the args the upstream caller passes), not user-facing research questions. Run with-skill vs without-skill to confirm the change adds value.
 

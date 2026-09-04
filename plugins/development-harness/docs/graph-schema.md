@@ -82,7 +82,7 @@ An agent dispatched during the workflow.
     "model": "sonnet",
     "tools": ["Read", "Grep", "Glob", "Bash", "mcp__plugin_dh_backlog__backlog_groom"],
     "skills_loaded": [],
-    "dispatch_mechanism": "TeamCreate"
+    "dispatch_mechanism": "parallel-agent"
   }
 }
 ```

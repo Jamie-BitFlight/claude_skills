@@ -89,23 +89,15 @@ If `autonomy_mode == "per_task"`:
 
 Process tasks from the ready list one at a time:
 
-- Dispatch task N via a single `Agent` call (not `TeamCreate`).
+- Dispatch task N via a single `Agent` call.
 - Complete steps 4, 4a, 4b for task N.
 - Present the per-task gate (after step 4b, described below) before dispatching task N+1.
 
 Else (`autonomy_mode` is `"full_auto"` or `"checkpoint"`):
 
-When multiple tasks are simultaneously ready (non-zero `count` with 2+ tasks in the ready list), dispatch them in parallel using `TeamCreate`:
-
-```text
-TeamCreate(team_name: "impl-{slug}")
-```
-
-The team name follows the pattern `impl-{slug}` where `{slug}` is derived from the status response's
-`feature` value. This team name is reused by `complete-implementation` for QG agent
-dispatch and is shut down in the Final Step of that skill.
-
-Spawn one teammate per ready task. When only one task is ready, a single Agent call is acceptable.
+When multiple tasks are simultaneously ready (non-zero `count` with 2+ tasks in the ready list),
+dispatch one `Agent()` call per ready task, all in parallel. When only one task is ready, dispatch
+it with a single `Agent` call the same way `per_task` mode does.
 
 For each task being dispatched:
 
@@ -184,31 +176,12 @@ response text; the dispatcher does not read it.
 
 If `artifact_read` fails or returns no content (no architect spec for this issue), skip step 4a entirely. Proportional quality gate items without an architect spec automatically skip this step.
 
-4b. Release the team
+4b. Confirm the batch is done
 
-Releasing the team happens once per team, and it happens after the batch commit in step 5 —
-never here, and never before the work it releases has been committed.
-
-Two preconditions must hold before the release is attempted:
-
-1. Every task the team owns is terminal. Read that through `sam_plan(config={"action": "status"})`,
-   never by assuming a silent teammate has finished.
-2. Every teammate has been shut down. `TeamDelete` is a release step, not a shutdown mechanism —
-   it fails while any teammate is still active, and a teammate that finished its task stays alive
-   and idle until something shuts it down. Shut each teammate down through the harness's
-   teammate-shutdown mechanism first.
-
-```text
-TeamDelete(team_name="{team_name}")
-```
-
-Treat a failed release as a release that did not happen, not as a failed run. It reports that a
-teammate is still active; wait for that teammate and retry. Never let it end the run, and never
-place it ahead of the commit for the work it releases: in `full_auto` and `checkpoint` modes the
-batch is not committed until after step 5, so a release that throws here ends the run with every
-completed task in the batch uncommitted.
-
-**Skip when**: the agents were dispatched via single `Agent` calls (not `TeamCreate`) — subagents terminate automatically when their prompt completes.
+In `per_task` mode this is a no-op: the single dispatched `Agent()` call already returned, so the
+task is terminal by construction. In `full_auto`/`checkpoint` mode, multiple agents were dispatched
+concurrently — before the batch commit, confirm every task in the batch is terminal through
+`sam_plan(config={"action": "status"})`, never by assuming a silent agent has finished.
 
 **Commit Ownership**
 
@@ -230,7 +203,7 @@ Commit responsibility depends on which execution mode is active.
   git commit -m "<type>(task-batch): {plan_ref} — {task_ids}"
   ```
 
-  Release the team only after this commit succeeds, per step 4b.
+  Confirm every task in the batch is terminal (step 4b) before this commit.
 
 In both cases, choose `<type>` to match the dominant change in the committed work (`feat`, `fix`, `docs`, `refactor`, etc.). Do NOT include `Fixes #N`, `Closes #N`, or `Resolves #N` trailers — see `start-task/SKILL.md` step 6. Issue closure is handled exclusively by `/complete-implementation`.
 

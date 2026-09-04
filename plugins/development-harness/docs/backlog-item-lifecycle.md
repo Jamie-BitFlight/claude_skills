@@ -213,9 +213,9 @@ flowchart TD
 
     subgraph P2_SWARM [Steps 4-8: Parallel Grooming Swarm]
         direction TB
-        P2_WAVE1["Wave 1 (parallel):<br>• fact-checker teammate<br>• impact-analyst teammate<br>• classifier teammate"]
-        P2_WAVE2["Wave 2 (blocked by Wave 1):<br>• rtica-assessor teammate<br>• alignment-analyst teammate"]
-        P2_WAVE3["Wave 3 (blocked by Wave 2):<br>• groomer teammate"]
+        P2_WAVE1["Wave 1 (parallel):<br>• fact-checker agent<br>• impact-analyst agent<br>• classifier agent"]
+        P2_WAVE2["Wave 2 (blocked by Wave 1):<br>• rtica-assessor agent<br>• alignment-analyst agent"]
+        P2_WAVE3["Wave 3 (blocked by Wave 2):<br>• groomer agent"]
         P2_WAVE1 --> P2_WAVE2
         P2_WAVE2 --> P2_WAVE3
     end
@@ -245,9 +245,9 @@ flowchart TD
 | P2_EXTRACT | orchestrator | logical item content | title, description, research questions, source, suggested_location | always → P2_RTICA_INIT |
 | P2_RTICA_INIT | orchestrator | extracted item details only (Wave 1 sections not yet produced) | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')` | always → P2_SCOPE |
 | P2_SCOPE | orchestrator | RT-ICA distribution (AVAILABLE/DERIVABLE/MISSING counts) | scope size (MINIMAL/NARROW/STANDARD/FULL) | always → P2_SWARM |
-| P2_WAVE1 | `fact-checker` + `impact-analyst` + `classifier` (parallel teammates) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')`, Issue Classification via `backlog_groom(section='Issue Classification')` | all complete → P2_WAVE2 |
-| P2_WAVE2 | `rtica-assessor` + `alignment-analyst` (parallel teammates) | Wave 1 outputs, item details | RT-ICA reassessment, Design Intent Alignment via `backlog_groom(section='Design Intent Alignment')` | all complete → P2_WAVE3 |
-| P2_WAVE3 | `groomer` teammate | all prior sections | Reproducibility, Priority, Impact, Benefits, Expected Behavior, AC, Files, Resources, Dependencies, Effort — each via `backlog_groom(section='{name}')` | complete → P2_RTICA_FINAL |
+| P2_WAVE1 | `fact-checker` + `impact-analyst` + `classifier` (parallel agents) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')`, Issue Classification via `backlog_groom(section='Issue Classification')` | all complete → P2_WAVE2 |
+| P2_WAVE2 | `rtica-assessor` + `alignment-analyst` (parallel agents) | Wave 1 outputs, item details | RT-ICA reassessment, Design Intent Alignment via `backlog_groom(section='Design Intent Alignment')` | all complete → P2_WAVE3 |
+| P2_WAVE3 | `groomer` agent | all prior sections | Reproducibility, Priority, Impact, Benefits, Expected Behavior, AC, Files, Resources, Dependencies, Effort — each via `backlog_groom(section='{name}')` | complete → P2_RTICA_FINAL |
 | P2_RTICA_FINAL | orchestrator or `rtica-assessor` | full swarm output, all groomed sections | final RT-ICA assessment (replaces P2_RTICA_INIT snapshot), self-resolution attempts | always → P2_DECISION |
 | P2_DECISION | orchestrator | RT-ICA final result | APPROVED or BLOCKED determination | APPROVED → P2_WRITE, BLOCKED → P2_BLOCKED |
 | P2_WRITE | `backlog_groom` MCP (multiple calls) | groomed sections content | per-section writes to logical item | always → P2_DONE |
@@ -476,7 +476,7 @@ flowchart TD
     %% Note: BLOCKED tasks also produce no ready tasks — see Gap note in Phase 5 prose
     P5_READY -->|"No ready tasks —<br>all tasks show COMPLETE"| P5_COMPLETE
     P5_READY -->|"1 task ready"| P5_DISPATCH_SINGLE["Dispatch via single Agent call<br>Skill(skill='start-task',<br>args='P{N} --task {T}')"]
-    P5_READY -->|"2+ tasks ready"| P5_DISPATCH_TEAM["TeamCreate(team_name='impl-{slug}')<br>Spawn one teammate per ready task<br>Each calls start-task"]
+    P5_READY -->|"2+ tasks ready"| P5_DISPATCH_TEAM["Parallel Agent() calls<br>One agent per ready task, no team<br>Each calls start-task"]
 
     P5_DISPATCH_SINGLE --> P5_HOOK
     P5_DISPATCH_TEAM --> P5_HOOK
@@ -505,7 +505,7 @@ flowchart TD
 | P5_STATUS | `sam_plan` MCP | plan address `P{N}` | plan status summary (per-task states) | always → P5_READY |
 | P5_READY | `sam_plan` MCP (`plan="<plan-address>", config={"action":"ready"}`) | plan address | list of ready tasks (deps resolved, not claimed) | none ready + all terminal → P5_COMPLETE, 1 ready → P5_DISPATCH_SINGLE, 2+ ready → P5_DISPATCH_TEAM |
 | P5_DISPATCH_SINGLE | orchestrator | plan address, task ID | `Skill('start-task', args)` call | always → P5_HOOK |
-| P5_DISPATCH_TEAM | orchestrator | plan address, ready task IDs | `TeamCreate` with one teammate per task, each calls `start-task` | always → P5_HOOK |
+| P5_DISPATCH_TEAM | orchestrator | plan address, ready task IDs | one `Agent()` call per ready task, dispatched in parallel, each calls `start-task` | always → P5_HOOK |
 | P5_HOOK | `task_status_hook.py` (SubagentStop) | agent completion signal, active-task context | task status → COMPLETE through configured backend | always → P5_CONCERNS |
 | P5_CONCERNS | orchestrator | agent output | concerns block presence check | concerns present → P5_LOG_CONCERNS, none → P5_BATCH_CHECK |
 | P5_LOG_CONCERNS | `backlog_groom` MCP | concerns text | concerns appended to backlog item | always → P5_BATCH_CHECK |
@@ -833,9 +833,9 @@ The GraphQL `addSubIssue` mutation is implemented in `backlog_core/gh_client.py`
 
 ### Gap 5: Compaction Recovery (Tracked: #1069)
 
-When the orchestrator runs `/dh:implement-feature` and spawns a team via `TeamCreate`, the team's state is held only in the orchestrator's context window. If auto-compaction fires, the orchestrator loses awareness of running teammates and abandons them.
+When the orchestrator runs `/dh:implement-feature` and dispatches a batch of parallel `Agent()` calls, that batch's state is held only in the orchestrator's context window. If auto-compaction fires, the orchestrator loses awareness of running dispatches and abandons them.
 
-Target fix: Write team state to beads (`bd`) after `TeamCreate`. `PreCompact` hook folds active beads into compact summary. `SessionStart` hook restores. On recovery, `bd list --status=in_progress` resumes from last known state.
+Target fix: Write dispatch state to beads (`bd`) before dispatching the batch. `PreCompact` hook folds active beads into compact summary. `SessionStart` hook restores. On recovery, `bd list --status=in_progress` resumes from last known state.
 
 ### Gap 6: Proactive Handoff Flush (Tracked: #1070)
 

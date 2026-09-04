@@ -57,7 +57,7 @@ instructions, loads skills, calls tools in order, produces outputs, hands contro
 |---|---|---|---|
 | `orchestrator` | none — session runs the step directly | n/a | step text in skill/reference file |
 | `subagent` | `Agent(subagent_type=...)` | sequential, isolated context | the step that calls Agent |
-| `team-member` | `TeamCreate(...)` | parallel with siblings | the step that calls TeamCreate + wave definition |
+| `parallel-agent` | multiple `Agent(subagent_type=...)` calls, no `team_name` | parallel with siblings | the step that dispatches the batch + wave definition |
 | `hook` | lifecycle trigger (`SubagentStop`, `PostToolUse`) | fires on event | `hooks/hooks.json` matcher |
 
 **Never default topology to `orchestrator`.** Absence is `unverified: true`.
@@ -74,20 +74,20 @@ orchestrator-span
         └─ profile_load(agent:) → specialist behavior loaded INTO same span
 ```
 
-This is distinct from groom swarm TeamCreate, which names specialists directly. The join
-must distinguish these two shapes or every task-worker span resolves to the wrong actor.
+This is distinct from the groom swarm's parallel dispatch, which names specialists directly. The
+join must distinguish these two shapes or every task-worker span resolves to the wrong actor.
 
 SOURCE: `plugins/development-harness/skills/dispatch-contract/SKILL.md`
 
 ### Conditional topology
 
 `implement-feature` branches on `autonomy_mode`: `per_task` → single `Agent`; `full_auto`
-/ `checkpoint` → `TeamCreate`. Record as:
+/ `checkpoint` → parallel `Agent()` calls, one per ready task. Record as:
 
 ```json
 "topology": {
   "conditional_on": "plan.autonomy",
-  "cases": {"per_task": "subagent", "full_auto": "team-member", "checkpoint": "team-member"},
+  "cases": {"per_task": "subagent", "full_auto": "parallel-agent", "checkpoint": "parallel-agent"},
   "source": "skills/implement-feature/SKILL.md:step 3"
 }
 ```
@@ -184,7 +184,7 @@ For each route, join B1+B2+B3 on agent name + tool name:
 
 | Overlay | Span fields used | Answers |
 |---|---|---|
-| **Actor** | `actor.topology` + `triggered_by.mechanism` | Who runs this — orchestrator, one agent, or team? |
+| **Actor** | `actor.topology` + `triggered_by.mechanism` | Who runs this — orchestrator, one agent, or a parallel batch of agents? |
 | **Instructions** | `instructions.skills_loaded` + `instructions.agent_file` | What guides this actor? |
 | **Tools** | `tool_calls[]` + backend routing | What does this call, and where does it land? |
 | **Artifacts** | `outputs[]` + `consumed_by_spans` | What is produced and who consumes it? |

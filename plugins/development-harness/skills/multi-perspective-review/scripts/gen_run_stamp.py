@@ -6,7 +6,7 @@
 
 A UTC timestamp alone only has whole-second resolution, so two review runs for
 the same review_base starting within the same second would derive the same
-review_slug and collide on TeamCreate / plan address. secrets.token_hex draws
+review_slug and collide on the plan address. secrets.token_hex draws
 from the OS CSPRNG (os.urandom) on every platform Python runs on, unlike bash's
 ${RANDOM} builtin (weak, seeded from the shell's PID and start time, so sibling
 processes launched together can draw correlated values) or piping /dev/urandom

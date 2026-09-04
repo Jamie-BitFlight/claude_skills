@@ -2,9 +2,9 @@
 
 Parallel grooming agents sized by scope sizing from `analyze.md`.
 Each agent writes to a different `section` via MCP `backlog_groom` — no clobbering.
-Each agent's section is how the others reach its findings — a teammate that must react to another's output re-reads that section rather than waiting on a message.
+Each agent's section is how the others reach its findings — an agent that must react to another's output re-reads that section rather than waiting on a message.
 
-## Teammates
+## Agents
 
 1. **impact-analyst** — Build affected systems inventory (Phase 1), run 5-question impact
    checklist per system (Phase 2). Write to `section="Impact Radius"`, leading the section with a
@@ -29,77 +29,21 @@ Each agent's section is how the others reach its findings — a teammate that mu
 
 5. **groomer** — Produce subsections: Reproducibility, Priority, Impact, Benefits, Expected
    Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. Runs AFTER all
-   other teammates complete. Write each via `section="{name}"`.
+   other agents complete. Write each via `section="{name}"`.
 
 6. **alignment-analyst** — Compare existing implementation against item design intent.
    Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment",
    leading the section with a MISSION_ALIGNED or MISSION_DIVERGENT verdict line.
 
-## Team mode (preferred)
+## Dispatch sequence
 
-```text
-TeamCreate(team_name: "groom-{item-slug}")
-```
+Each agent is a standalone `Agent()` call — no team, no `SendMessage` between
+agents. An agent that depends on another's output re-reads that agent's
+section from the item via MCP rather than waiting on a message; the
+orchestrator only needs to wait for each dispatched agent's own result
+before deciding when to spawn the next wave.
 
-Each teammate writes its section; a dependent teammate re-reads that section before finalizing. Sequence:
-
-```mermaid
-sequenceDiagram
-    participant O as Orchestrator
-    participant TR as technical-researcher
-    participant IA as impact-analyst
-    participant FC as fact-checker
-    participant RT as rtica-assessor
-    participant CL as classifier
-    participant GR as groomer
-    participant AA as alignment-analyst
-
-    Note over O,TR: Wave 0 — pre-swarm research (skip for bug/fix items)
-    O->>TR: spawn (technology, concern from RT-ICA conditions, depth, item_ref)
-    TR->>TR: run 4 angles in parallel (api-state, ecosystem-research, impact-measurement, codebase-auditor)
-    TR->>TR: internal review gate — cross-angle signals, conflict detection
-    TR->>TR: synthesis — write Research section to backlog item via backlog_groom
-    TR-->>O: STATUS: DONE (or BLOCKED — proceed without research context)
-
-    Note over O,AA: Wave 1 — parallel (fact-checker receives Research section as prior context)
-    O->>IA: spawn (item_ref)
-    O->>FC: spawn (item claims to verify, including any description Hypothesis line + Research section as prior context if available)
-    O->>RT: spawn (item_ref — waits for IA + FC)
-    O->>CL: spawn (item_ref)
-
-    IA->>IA: build systems inventory, expand via imports/docs/agents/config/CI
-    IA->>IA: write Impact Radius, leading with "SCOPE_EXPANSION: 12 systems, 2 CI workflows"
-    FC->>FC: re-read Impact Radius, add CI claims to verification list
-
-    FC->>FC: verify claims against primary sources
-    FC->>FC: write Fact-Check, recording "REFUTED: task_format.py multi-doc support"
-    RT->>RT: re-read Fact-Check, mark condition MISSING
-
-    IA->>IA: run 5-question checklist per system
-    IA->>IA: write Impact Radius section via MCP
-    O->>AA: spawn (item_ref — waits for IA)
-
-    FC->>FC: write Fact-Check section via MCP
-
-    AA->>AA: compare design intent vs implementation
-    AA->>AA: write Design Intent Alignment section via MCP
-
-    RT->>RT: assess completeness using IA + FC results
-    RT->>RT: write RT-ICA section via MCP
-
-    CL->>CL: classify + RCA if needed
-    CL->>CL: write Issue Classification section via MCP
-
-    Note over GR: unblocked after RT-ICA + Classification complete
-    GR->>GR: read all sections written by other teammates
-    GR->>GR: produce subsections, write each via MCP
-
-    O->>O: all tasks complete — shutdown team
-```
-
-## No-team fallback
-
-#### Wave 0 (pre-swarm research — runs before spawning any teammate)
+#### Wave 0 — pre-swarm research (skip for bug/fix items)
 
 Invoke the `technical-researcher` agent with the item's technology and concern.
 
@@ -109,7 +53,7 @@ Invoke the `technical-researcher` agent with the item's technology and concern.
 - `depth`: `overview` for procedural/fix items, `standard` for features and refactors, `deep` for `unbounded-design` items
 - `item_ref`: the item's `#N` reference — the agent writes the Research section directly to the backlog item
 
-When `technical-researcher` completes, the item's Research section is populated. Read it as prior context before spawning Wave 1 teammates.
+When `technical-researcher` completes, the item's Research section is populated. Read it as prior context before spawning Wave 1 agents.
 
 **If `technical-researcher` returns `STATUS: BLOCKED`** (all four angles returned only gaps): proceed to Wave 1 without research prior context — do not halt the groom.
 
@@ -118,24 +62,60 @@ When `technical-researcher` completes, the item's Research section is populated.
 - Item has no identifiable technology, library, or internal module to research
 - Item description is a pure administrative or labelling task with no research questions
 
-#### Wave 1 (parallel)
+#### Wave 1 — parallel
 
-- impact-analyst → `section="Impact Radius"`
-- fact-checker → `section="Fact-Check"` — pass Wave 0 Research section as prior context if available
-- classifier → `section="Issue Classification"`, `section="Root-Cause Analysis"`
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant IA as impact-analyst
+    participant FC as fact-checker
+    participant CL as classifier
 
-After Wave 1: read Impact Radius and Fact-Check. If scope expanded, spawn second fact-checker.
+    O->>IA: spawn (item_ref)
+    O->>FC: spawn (item claims to verify, including any description Hypothesis line + Research section as prior context if available)
+    O->>CL: spawn (item_ref)
 
-#### Wave 2 (depends on Wave 1)
+    IA->>IA: build systems inventory, expand via imports/docs/agents/config/CI
+    IA->>IA: write Impact Radius, leading with "SCOPE_EXPANSION: 12 systems, 2 CI workflows"
+    FC->>FC: re-read Impact Radius, add CI claims to verification list
 
-- rtica-assessor → `section="RT-ICA"`
-- alignment-analyst → `section="Design Intent Alignment"`
+    FC->>FC: verify claims against primary sources
+    FC->>FC: write Fact-Check, recording "REFUTED: task_format.py multi-doc support"
 
-If RT-ICA BLOCKED, stop and present MISSING conditions. Do not proceed to Wave 3.
+    IA->>IA: run 5-question checklist per system
+    IA-->>O: STATUS: DONE — Impact Radius written
+    FC-->>O: STATUS: DONE — Fact-Check written
 
-#### Wave 3 (depends on Wave 2)
+    CL->>CL: classify + RCA if needed
+    CL-->>O: STATUS: DONE — Issue Classification written
+```
 
-- groomer → all groomed subsections
+After Wave 1: read Impact Radius and Fact-Check. If scope expanded, spawn a second fact-checker.
+
+#### Wave 2 — depends on Wave 1
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant RT as rtica-assessor
+    participant AA as alignment-analyst
+
+    O->>RT: spawn (item_ref)
+    O->>AA: spawn (item_ref)
+
+    RT->>RT: re-read Fact-Check, mark condition MISSING if REFUTED
+    RT->>RT: assess completeness using Impact Radius + Fact-Check
+    RT-->>O: STATUS: DONE or BLOCKED — RT-ICA written
+
+    AA->>AA: compare design intent vs implementation
+    AA-->>O: STATUS: DONE — Design Intent Alignment written
+```
+
+If RT-ICA returns `STATUS: BLOCKED`, stop and present MISSING conditions. Do not proceed to Wave 3.
+
+#### Wave 3 — depends on Wave 2
+
+- groomer → all groomed subsections (reads every section written by prior waves)
 
 ## Impact Radius — what the impact-analyst produces
 
@@ -254,7 +234,7 @@ backlog groom \
 
 ## Groomer prompt
 
-The groomer agent receives all prior teammate output and produces groomed subsections.
+The groomer agent receives all prior agents' output and produces groomed subsections.
 
 #### Scope boundary
 
@@ -275,5 +255,5 @@ Orchestrator: before dispatching the groomer, verify your prompt names all requi
 
 ## Outputs
 
-On completion, all teammate sections are written to the item via MCP.
+On completion, all agent sections are written to the item via MCP.
 Pass to `finalize.md` for post-swarm gates and final write.

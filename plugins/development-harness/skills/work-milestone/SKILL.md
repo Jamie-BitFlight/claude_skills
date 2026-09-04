@@ -1,13 +1,13 @@
 ---
 name: work-milestone
-description: "Executes a groomed milestone with parallel kage-bunshin sessions in isolated worktrees. Use when a milestone has been groomed and /groom-milestone has produced a dispatch plan. Reads the dispatch plan, creates an integration branch, spawns one kage-bunshin (independent claude -p process) per wave item in its own worktree — each session is a full orchestrator with Agent tool and TeamCreate. Sequentially merges worktree branches, relays wave discoveries to subsequent waves, then lands the integration branch to main. Takes a milestone number as argument."
+description: "Executes a groomed milestone with parallel kage-bunshin sessions in isolated worktrees. Use when a milestone has been groomed and /groom-milestone has produced a dispatch plan. Reads the dispatch plan, creates an integration branch, spawns one kage-bunshin (independent claude -p process) per wave item in its own worktree — each session is a full orchestrator with the Agent tool. Sequentially merges worktree branches, relays wave discoveries to subsequent waves, then lands the integration branch to main. Takes a milestone number as argument."
 argument-hint: '{milestone-number}'
 user-invocable: true
 ---
 
 # /work-milestone
 
-Execute a groomed milestone. Reads the dispatch plan produced by `/groom-milestone`, creates an integration branch, spawns parallel kage-bunshin sessions (independent `claude -p` processes) per wave — each in its own worktree with full orchestrator capabilities (Agent tool, TeamCreate, all MCP servers). Sequentially merges their branches and lands the integration branch to main when all waves complete.
+Execute a groomed milestone. Reads the dispatch plan produced by `/groom-milestone`, creates an integration branch, spawns parallel kage-bunshin sessions (independent `claude -p` processes) per wave — each in its own worktree with full orchestrator capabilities (Agent tool, all MCP servers). Sequentially merges their branches and lands the integration branch to main when all waves complete.
 
 ## Entry Conditions
 
@@ -45,7 +45,7 @@ flowchart TD
 
     CreateWorktrees --> WriteLocks["Step 5b: Write Lock Files<br>For each worktree:<br>Write .claude/kage-bunshin.lock<br>(prevents recursive spawning)"]
 
-    WriteLocks --> SpawnSessions["Step 5c: Spawn Kage-Bunshin Sessions<br>For each worktree: cd into it, then:<br>claude -p --model {model} [--effort {level}]<br>--permission-mode auto --output-format json<br>'Load /dh:work-backlog-item #{issue}'<br>Each session is a FULL orchestrator —<br>has Agent tool, TeamCreate, all MCP.<br>All sessions launch as background processes."]
+    WriteLocks --> SpawnSessions["Step 5c: Spawn Kage-Bunshin Sessions<br>For each worktree: cd into it, then:<br>claude -p --model {model} [--effort {level}]<br>--permission-mode auto --output-format json<br>'Load /dh:work-backlog-item #{issue}'<br>Each session is a FULL orchestrator —<br>has the Agent tool, all MCP.<br>All sessions launch as background processes."]
 
     SpawnSessions --> WaitReturn["Step 6: Wait for All Sessions<br>Poll PIDs for exit.<br>Read result JSON from each<br>/tmp/kb-work-{issue}.json"]
 
@@ -161,7 +161,7 @@ done
 - All MCP servers (backlog, SAM, artifact registry)
 - All skills (including `/dh:work-backlog-item` which it loads and executes)
 - All agent types (it CAN and WILL spawn sub-agents as needed)
-- Full tool access (Agent, TeamCreate, Read, Write, Edit, Bash, etc.)
+- Full tool access (Agent, Read, Write, Edit, Bash, etc.)
 
 **Via self-discovery (the session does this itself):**
 
@@ -262,7 +262,7 @@ Conflict resolution agent receives both branches' diffs and resolves in-place on
 | `dispatch_wave_status` | Poll wave progress and detect stale PIDs (Step 6) |
 | `dispatch_item_status` | Called by spawned sessions to record completion or failure |
 | `git worktree add` | Create isolated worktree per wave item |
-| `claude -p` (kage-bunshin) | Spawn independent orchestrator session per item — has Agent tool, TeamCreate, all MCP |
+| `claude -p` (kage-bunshin) | Spawn independent orchestrator session per item — has the Agent tool, all MCP |
 | `backlog_view` | Read item description, AC, design decisions (used by spawned sessions) |
 | `artifact_list` | Discover plan artifacts registered for an issue (used by spawned sessions) |
 | `artifact_read` | Read plan artifact content from root worktree via MCP (used by spawned sessions) |

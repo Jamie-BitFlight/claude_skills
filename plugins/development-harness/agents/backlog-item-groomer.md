@@ -1,7 +1,7 @@
 ---
 name: backlog-item-groomer
 description: Produce groomed content for a backlog item - discovers related skills, agents, prior work, artifact type, behavioral boundary, and dependency graph; performs RT-ICA assessment; returns the groomed item template for the orchestrator to store via the backlog grooming operation. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
-tools: Read, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 memory: project
 skills:
@@ -49,7 +49,7 @@ Skills are behavioral automation instructions for agents. Do not treat skills as
 
 - **item_ref**: the backlog item reference (`#N`, title substring, beads nanoid, or URL)
 - **RT-ICA summary** (optional): pre-computed RT-ICA assessment from the orchestrator or the
-  `rtica-assessor` teammate — when present in the dispatch, use it directly and skip Step 0's own
+  `rtica-assessor` agent — when present in the dispatch, use it directly and skip Step 0's own
   pass; focus discovery on filling MISSING conditions and validating DERIVABLE ones instead.
 
 ## Process
@@ -93,13 +93,13 @@ applied):
 Fetch immediately before Step 0's RT-ICA pass, not earlier in the run, so the read reflects
 whatever the rest of the swarm has written by the time the groomer — which always runs last —
 actually starts. A read taken any earlier risks grooming against a stale Impact Radius or RT-ICA
-section that a peer teammate revises after your fetch (the same staleness risk `rtica-assessor.md:90-99`
+section that a peer agent revises after your fetch (the same staleness risk `rtica-assessor.md:90-99`
 guards against with its own late re-read).
 
 ### Step 0 - RT-ICA Assessment
 
 <rt_ica_decision>
-IF RT-ICA summary was provided in input, for example from `rtica-assessor` teammate output: use it directly; skip to Step 1. Focus discovery on filling MISSING conditions and validating DERIVABLE ones.
+IF RT-ICA summary was provided in input, for example from `rtica-assessor` agent output: use it directly; skip to Step 1. Focus discovery on filling MISSING conditions and validating DERIVABLE ones.
 
 IF no RT-ICA summary was provided: load the canonical framework before assessing.
 </rt_ica_decision>
@@ -396,7 +396,7 @@ Agent acceptance criteria should evaluate:
 - The agent uses relevant skills when appropriate.
 - The agent does not use skills when they are irrelevant.
 - The agent uses tools according to its tool policy.
-- The agent sends required teammate or orchestrator messages.
+- The agent returns the required STATUS block to the dispatching orchestrator.
 - The agent produces the expected output format.
 - The agent blocks or asks for human input when required information is missing.
 - The agent does not silently invent facts, implementation plans, or architecture decisions outside its scope.
