@@ -48,9 +48,9 @@ flowchart TD
     CommitCheck -->|"0 commits — window too narrow"| WindowFallback["WARN: No commits in window.<br>Override: Window = all history, N = 20.<br>Emit warning in report header.<br>Rerun CommitCheck (all history)."]
     WindowFallback --> ExcludeLoad
 
-    ExcludeLoad{"Load Skill-Local Exclusions<br>Read: SKILL_DIR/assets/exclude-patterns<br>File exists and is non-empty?"}
+    ExcludeLoad{"Load Skill-Local Exclusions<br>Read: ${CLAUDE_SKILL_DIR}/assets/exclude-patterns<br>File exists and has ≥1 non-blank, non-comment line?"}
     ExcludeLoad -->|"Yes"| ExcludeParse["Parse one glob pattern per line<br>Skip blank lines and # comments<br>Build EXCLUDE_PATHSPECS =<br>':(glob,exclude)PATTERN' per line"]
-    ExcludeLoad -->|"No — file missing or empty (EC-7)"| ExcludeNone["EXCLUDE_PATHSPECS = empty<br>0 patterns loaded"]
+    ExcludeLoad -->|"No — missing, or 0 non-blank/non-comment lines (EC-7)"| ExcludeNone["EXCLUDE_PATHSPECS = empty<br>0 patterns loaded"]
     ExcludeParse --> ExcludeReport["Report: 'Excluded via skill-local<br>ignore file: N patterns loaded'<br>Record N for report header"]
     ExcludeNone --> ExcludeReport
     ExcludeReport --> Phase1
@@ -101,9 +101,9 @@ Parse the file: one glob pattern per line, blank lines and lines starting with `
 ':(glob,exclude)PATTERN1' ':(glob,exclude)PATTERN2' ...
 ```
 
-Append `-- . EXCLUDE_PATHSPECS` to the end of the `git log` invocation in Pipelines 1, 2, and 7 — after all other flags, before the `|` pipe to `grep`. `:(glob,exclude)` supports `**` and standard shell-glob syntax (FNM_PATHNAME semantics — `*` does not cross a `/`, a leading `**/` matches at any depth), the closest native git mechanism to gitignore-style matching without a custom matcher. When no patterns are loaded (EC-7), omit `-- . EXCLUDE_PATHSPECS` entirely and run the pipeline unfiltered — do not pass an empty pathspec list.
+Append `-- . EXCLUDE_PATHSPECS` to the end of the `git log` invocation in Pipelines 1, 2, and 7 — after all other flags, before the `|` pipe to `grep`. `EXCLUDE_PATHSPECS` here is the already-quoted argument list built above (`':(glob,exclude)PATTERN1' ':(glob,exclude)PATTERN2' ...`), inserted as literal, individually shell-quoted tokens — never re-quoted, never expanded as an unquoted variable. Each pattern stays quoted specifically so the shell never glob-expands the `**/` in a pattern before git receives it. `:(glob,exclude)` supports `**` and standard shell-glob syntax (FNM_PATHNAME semantics — `*` does not cross a `/`, a leading `**/` matches at any depth), the closest native git mechanism to gitignore-style matching without a custom matcher. When no patterns are loaded (EC-7), omit `-- . EXCLUDE_PATHSPECS` entirely and run the pipeline unfiltered — do not pass an empty pathspec list.
 
-**Not applied to Pipelines 3, 4, 5, 6**: those pipelines operate on commits and authors (`git shortlog`, commit-count `git log` with no `--name-only`), not file paths. A pathspec exclusion on a command with no file-path output is meaningless and must not be added.
+**Not applied to Pipelines 3, 4, 5, 6**: those pipelines operate on commits and authors (`git shortlog`, commit-count `git log` with no `--name-only`), not file paths. A pathspec exclusion on a command with no file-path output is meaningless and must not be added. This also means Pipelines 3-6 are unaffected by `[target-directory]` scoping beyond `-C TARGET_DIRECTORY`'s `.git` relocation — a no-pathspec `git log`/`git shortlog` always walks the whole reachable history, so their numbers describe the whole repository even when `[target-directory]` names a subdirectory, while Pipelines 1, 2, and 7's `-- .` pathspec (added by this exclusion mechanism) does narrow those three specifically to `[target-directory]`'s own subtree. When `[target-directory]` is a subdirectory of a larger repo, Code Hotspots/Bug Magnets/Recently-Added-Files are directory-scoped while Bus Factor/Team Momentum/Firefighting remain repo-wide — note this scope difference in the `## Recommendations` section when `[target-directory]` was provided.
 
 **Phase 2 High-Risk intersection**: no separate exclusion step is needed — the intersection is computed from Pipeline 1 and Pipeline 2 output, which is already filtered.
 
@@ -254,7 +254,7 @@ commit conventions may have an under-reported High-Risk Files section. Absence o
 does not mean low risk.
 ```
 
-Set N to the count recorded in the ExcludeLoad/ExcludeReport step. When 0 patterns were loaded (EC-7 — exclude-patterns file missing or empty), the line still writes explicitly rather than being omitted: `**Exclusions**: 0 patterns loaded — no exclusions applied.`
+Set N to the count recorded in the ExcludeLoad/ExcludeReport step, including when N is 0 (EC-7 — exclude-patterns file missing or empty). The line always writes in this same form, never omitted and never reworded for the N=0 case.
 
 When warnings apply (shallow clone, window fallback), prepend them after `**Caveat**`:
 
@@ -473,13 +473,13 @@ All other sections are written normally. The report is valid and complete. The s
 
 ### EC-6: Binary or Generated Files in Hotspots
 
-**Behavior**: The skill does not filter binary or generated files from hotspot output. This is a documented limitation. The `## Recommendations` section may note that `vendor/`, `dist/`, or `node_modules/` directories appearing in hotspots indicate generated-file noise that reduces signal quality. No automatic filtering is performed.
+**Behavior**: The skill does not filter binary or generated files from hotspot output beyond the skill-local exclusions in EC-7 (mechanical manifest/lockfile churn only — see Skill-Local Exclusions above). Other generated-file noise is a documented limitation. The `## Recommendations` section may note that `vendor/`, `dist/`, or `node_modules/` directories appearing in hotspots indicate further generated-file noise that reduces signal quality.
 
 ### EC-7: Skill-Local Exclusion File Missing or Empty
 
 **Detection**: `${CLAUDE_SKILL_DIR}/assets/exclude-patterns` does not exist, or exists but contains zero non-blank, non-comment lines.
 
-**Behavior**: Degrade gracefully — do not fail. Set `EXCLUDE_PATHSPECS` to empty and omit the `-- . EXCLUDE_PATHSPECS` argument entirely from Pipelines 1, 2, and 7 (run them exactly as documented before this exclusion mechanism existed). Record 0 patterns loaded and write the explicit `**Exclusions**: 0 patterns loaded — no exclusions applied.` header line per Report Header above. This keeps the skill fully functional on an older install of this skill's assets, or if the file is intentionally emptied.
+**Behavior**: Degrade gracefully — do not fail. Set `EXCLUDE_PATHSPECS` to empty and omit the `-- . EXCLUDE_PATHSPECS` argument entirely from Pipelines 1, 2, and 7 (run them exactly as documented before this exclusion mechanism existed). Record 0 patterns loaded and write the `**Exclusions**` header line with N=0, per the Report Header template above — same template, same wording, N substituted with 0. This keeps the skill fully functional on an older install of this skill's assets, or if the file is intentionally emptied.
 
 ## Integration Contract
 
