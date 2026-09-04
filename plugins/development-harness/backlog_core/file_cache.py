@@ -436,29 +436,15 @@ class FileCache:
     def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:
         """Return every durable work-item snapshot beneath the cache root.
 
-        :meth:`_save_item_snapshot`'s temp file (``tempfile.mkstemp(...,
-        suffix=".tmp")``) never matches this method's ``*.yaml`` glob, so a
-        process killed between ``mkstemp()`` and its ``finally`` cleanup
-        (session interrupt, OOM, crash) can leave one behind without this
-        enumeration ever seeing it -- no filename heuristic is needed to
-        tell an orphan apart from a real snapshot whose key happens to look
-        similar.
-
-        A snapshot that still fails to load is skipped rather than letting
-        it take the whole batch offline -- e.g. the 0-byte body a corrupted
-        write can leave, which parses to ``None`` and fails ``BacklogItem``
-        validation; a file with unparseable YAML; a file with invalid UTF-8
-        bytes, which ``load_item``'s ``path.open(encoding="utf-8")``
-        surfaces as ``UnicodeDecodeError``; a symlink whose target resolves
-        outside the cache root, which :meth:`_snapshot_path`'s own boundary
-        check surfaces as a bare ``ValueError`` from ``Path.relative_to``;
-        or any other filesystem-level failure (``OSError`` and subclasses --
-        e.g. a directory matching ``*.yaml``, or unreadable permissions) on
-        the specific path being loaded. ``ValueError`` alone covers the
-        pydantic and Unicode cases too, since both are its subclasses. One
-        bad file is logged and skipped, mirroring the per-entry salvage
-        policy :meth:`_CacheStateStore._salvage_field` already applies to
-        the durable mutation queue.
+        An orphaned :meth:`_save_item_snapshot` temp file never reaches this
+        method at all -- see that method's own comment on why. A snapshot
+        that still fails to load (bad YAML, invalid UTF-8, a symlink
+        escaping the cache root, or any other ``OSError``) is logged and
+        skipped rather than letting it take the whole batch offline,
+        mirroring the per-entry salvage policy
+        :meth:`_CacheStateStore._salvage_field` already applies to the
+        durable mutation queue. ``ValueError`` alone covers pydantic and
+        Unicode decode failures too, since both are its subclasses.
 
         Returns:
             Ordered ``(logical_key, item)`` pairs for every snapshot that

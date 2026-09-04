@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import get_context
 from multiprocessing.synchronize import Barrier as ProcessBarrier
@@ -260,6 +261,7 @@ def test_file_cache_work_item_snapshots_skips_unreadable_path_without_crashing(t
     assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="symlink creation requires elevated privileges on Windows")
 def test_file_cache_work_item_snapshots_skips_path_escaping_cache_root_without_crashing(tmp_path: Path) -> None:
     """A path that resolves outside the cache root must not take the whole batch offline.
 
