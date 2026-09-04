@@ -21,7 +21,7 @@ from backlog_core import operations
 from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata
+from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata, Output
 from typer.testing import CliRunner
 
 from sam_schema.cli import app
@@ -82,6 +82,32 @@ class TestBacklogAddErrorContract:
 
         assert result.exit_code == 0, result.stderr
         assert json.loads(result.stdout) == {"title": "new item", "priority": "P1", "item_ref": "#123"}
+
+    def test_add_exits_nonzero_when_output_carries_a_recorded_error(self, mocker: MockerFixture) -> None:
+        """A recorded ``Output.errors`` entry (not a raised exception) still exits non-zero.
+
+        Tests: The #3182 fix's CLI half -- a GitHub issue-creation failure is reported via
+        ``out.record_error`` on an otherwise-normal ``add_item`` return (item stored
+        locally, ``item_ref`` empty), not via a raised exception. This is distinct from
+        ``test_duplicate_item_rejection_...`` above, which covers the raised-exception path.
+        How: Mock ``operations.add_item`` with a side effect that records an error on the
+        ``output`` it receives and returns a normal result mapping, matching how the real
+        function behaves.
+        Why: A caller parsing only the exit code must be able to detect this failure mode
+        without inspecting stdout.
+        """
+
+        def _fake_add_item(**kwargs: object) -> dict[str, object]:
+            output = cast("Output", kwargs["output"])
+            output.record_error("Issue creation failed: boom")
+            return {"title": "new item", "priority": "P1", "item_ref": ""}
+
+        mocker.patch("sam_schema.backlog.operations.add_item", side_effect=_fake_add_item)
+
+        result = runner.invoke(app, ["backlog", "add", "--title", "new item", "--priority", "P1"], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout) == {"title": "new item", "priority": "P1", "item_ref": ""}
 
 
 class TestBacklogViewRefreshForwarding:

@@ -74,6 +74,8 @@ def add(
     except BacklogError as exc:
         cli_output.exit_with_json_error({"error": str(exc)})
     _emit(result, output)
+    if output.errors:
+        raise typer.Exit(code=1)
 
 
 @app.command("list")

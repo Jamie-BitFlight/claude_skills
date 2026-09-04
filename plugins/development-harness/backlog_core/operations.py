@@ -1296,6 +1296,28 @@ def _pull_if_issue_selector(selector: str, repo: str, output: Output | None = No
 # ---------------------------------------------------------------------------
 
 
+def _validate_add_item_title(title: str) -> None:
+    """Raise ValidationError if title is empty or whitespace-only.
+
+    An empty title reaching ``create_issue_for_item`` hits that function's own
+    ``if not item.title: return None`` guard, which returns ``None`` without
+    raising — indistinguishable, downstream in ``_try_create_github_issue``,
+    from the tolerated GitHub-unavailable fallback. Rejecting an empty title
+    here, before any storage or issue creation is attempted, keeps that
+    guard's ``None`` return meaning only "GitHub unavailable."
+
+    Args:
+        title: Raw title value supplied by the caller.
+
+    Raises:
+        ValidationError: If title is empty or whitespace-only.
+    """
+    if title.strip():
+        return
+    msg = "Title is required and cannot be empty or whitespace-only."
+    raise ValidationError(msg)
+
+
 def _validate_add_item_priority(priority: str) -> None:
     """Raise ValidationError if priority is not an accepted value for a new item.
 
@@ -1447,10 +1469,18 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
     Args:
         item_data: Populated BacklogItem (file_path may be empty at this stage).
         repo: Repository slug (owner/name).
-        out: Output collector for warnings.
+        out: Output collector for warnings/errors.
 
     Returns:
-        Issue number on success, None when GitHub is unavailable or creation fails.
+        Issue number on success. ``None`` on two distinct conditions, both
+        recorded on ``out`` but at different severities: GitHub unavailable
+        (no token, or ``try_get_github`` could not reach/resolve the repo)
+        is the intentional local-only-create fallback (#2999) and is only a
+        warning — no GitHub attempt was actually made to fail. Issue
+        creation itself raising (``GithubException``/``BacklogError``) is a
+        genuine, actionable failure and is recorded via ``out.record_error``
+        so callers see it in the response's ``errors`` list rather than only
+        a discardable warning (#3182).
     """
     repository = try_get_github(repo)
     if repository is None:
@@ -1459,7 +1489,7 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
     try:
         return create_issue_for_item(repository, item_data, dry_run=False, output=out)
     except (GithubException, BacklogError) as e:
-        out.warn(f"  WARNING: Issue creation failed: {e}")
+        out.record_error(f"Issue creation failed: {e}")
         return None
 
 
@@ -1549,16 +1579,23 @@ def add_item(
 
     Returns:
         Dict with title, priority, logical reference, compatibility ``file_path``,
-        and ``item_ref`` (the backend issue ref, or ``""`` when creation failed or
-        was skipped). ``item_ref`` is always present: its emptiness, not its
+        ``item_ref`` (the backend issue ref, or ``""`` when creation failed or
+        was skipped), and the ``messages``/``warnings``/``errors`` lists from
+        ``Output``. ``item_ref`` is always present: its emptiness, not its
         absence, is the local-only-create signal, matching the already-persisted
         ``BacklogItem.issue`` field and the ``issue`` key that ``list_items``/
         ``view_item`` return for this same item on every later read (see
-        ``_build_list_entry`` and ``view_result_from_local_item``).
+        ``_build_list_entry`` and ``view_result_from_local_item``). The item is
+        always stored by the time this function returns normally — a non-empty
+        ``errors`` list on an integer-ID backend means a GitHub client was
+        obtained but issue creation itself failed (#3182); it does not mean the
+        item is missing, only that ``item_ref`` is empty for that reason rather
+        than the tolerated GitHub-unavailable fallback (which only warns).
 
     Raises:
-        ValidationError: If priority or type_ is not a recognized value. No
-            item is stored and no backend issue is created when raised.
+        ValidationError: If title is empty/whitespace-only, or priority or
+            type_ is not a recognized value. No item is stored and no backend
+            issue is created when raised.
         ContentUnavailableError: On a string-ID backend (beads), when the
             backend issue could not be created. ``_try_create_backend_issue_ref``
             treats creation failure as non-fatal and returns ``""``, but the
@@ -1568,6 +1605,7 @@ def add_item(
             Integer-ID backends (GitHub, sqlite, memory) do not raise this —
             their local-only fallback is unconditional.
     """
+    _validate_add_item_title(title)
     _validate_add_item_priority(priority)
     _validate_add_item_type(type_)
 
