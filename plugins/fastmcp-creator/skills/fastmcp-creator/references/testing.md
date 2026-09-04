@@ -1,4 +1,4 @@
-# FastMCP v3 Testing Reference
+# FastMCP Testing Reference
 
 How to test FastMCP v3 servers using in-memory transport and pytest — covers fixtures, assertions, mocking, and network transport testing. [1] [2] [3] [4]
 

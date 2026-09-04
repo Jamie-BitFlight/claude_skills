@@ -1,4 +1,4 @@
-# FastMCP v3 Real-World Patterns
+# FastMCP Real-World Patterns
 
 Production-proven patterns for structuring, composing, and deploying FastMCP v3 servers — covers server composition, transport bridging, development workflows, CLI integration, and community examples. [1] [2] [3] [4]
 
@@ -38,7 +38,7 @@ main.mount(auth_server, namespace="auth")
 # Tools available as: weather_get_temperature, db_query_users, auth_*
 ```
 
-RULE: Use `namespace=` parameter (not the deprecated `prefix=`). See `./migration.md` for the v2 → v3 rename.
+RULE: Use `namespace=` parameter — `prefix=` was deprecated in v3 and is removed entirely in v4 (hard error, not a warning). See `./migration.md` for the v2 → v3 rename and the v4 removal.
 
 ---
 
@@ -56,7 +56,7 @@ if __name__ == "__main__":
     proxy.run()  # runs via stdio by default
 ```
 
-CONSTRAINT: `FastMCP.as_proxy()` is deprecated in v3 — use `from fastmcp.server import create_proxy` instead.
+CONSTRAINT: `FastMCP.as_proxy()` was deprecated in v3 and is removed in v4 — use `from fastmcp.server import create_proxy` instead.
 
 ---
 

@@ -1,4 +1,4 @@
-# FastMCP v3 Server Core Reference
+# FastMCP Server Core Reference
 
 How to instantiate a FastMCP server, register tools, resources, and prompts, inject context, and manage server lifecycle. [1]
 
@@ -524,6 +524,29 @@ if __name__ == "__main__":
 [3]
 
 Supported transports: `"stdio"` (default), `"http"` (Streamable HTTP), `"sse"` (legacy, deprecated)
+
+### Rich Traceback Logging Can Mask the Real Error
+
+CONSTRAINT (stdio servers): FastMCP attaches a `RichHandler(rich_tracebacks=True)` to its logger by
+default. `rich`'s logging module lazily imports `rich.traceback` *inside* `emit()` — only when an
+exception is actually logged — so a broken or partial `rich` install turns any real tool exception
+into `ModuleNotFoundError: No module named 'rich.traceback'`, masking the actual error. This is
+dangerous for a stdio server: no human terminal reads the rendered traceback, only an agent parsing
+stderr for the real failure. If your server has no human console reader, disable it before
+importing `fastmcp`:
+
+```python
+import os
+
+os.environ.setdefault("FASTMCP_ENABLE_RICH_LOGGING", "false")
+os.environ.setdefault("FASTMCP_ENABLE_RICH_TRACEBACKS", "false")
+
+from fastmcp import FastMCP  # import after setting the env vars
+```
+
+`setdefault` means a developer can still opt back in by exporting the variable before launch. This
+applies to any FastMCP version, not just a v3→v4 upgrade — SDK v2's dependency churn is just a
+common moment to hit it, since that's exactly when a `rich` install goes partial.
 
 ### Custom HTTP Routes
 
