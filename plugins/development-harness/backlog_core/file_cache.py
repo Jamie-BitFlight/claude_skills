@@ -442,17 +442,24 @@ class FileCache:
 
         - An orphaned :meth:`_save_item_snapshot` temp file. That method's
           ``tempfile.mkstemp`` always names its temp file
-          ``suffix=".tmp.yaml"``, so it still matches this method's
-          ``*.yaml`` glob; a process killed between ``mkstemp()`` and its
-          ``finally`` cleanup (session interrupt, OOM, crash) leaves one
-          behind forever. It is excluded here by the same suffix, never a
-          real snapshot.
+          ``prefix=f".{destination.name}."`` and ``suffix=".tmp.yaml"``, so
+          it still matches this method's ``*.yaml`` glob; a process killed
+          between ``mkstemp()`` and its ``finally`` cleanup (session
+          interrupt, OOM, crash) leaves one behind forever. It is excluded
+          here by matching *both* the leading-dot ``mkstemp`` prefix and the
+          ``.tmp.yaml`` suffix -- suffix alone would also match a real
+          snapshot whose logical key happens to end in ``.tmp`` (e.g.
+          ``release-1.0.tmp`` -> ``release-1.0.tmp.yaml``), which never gets
+          a leading dot since it is written straight to ``destination``.
         - A snapshot that fails to load at all -- e.g. the 0-byte body such
           an orphaned temp file has, which parses to ``None`` and fails
-          ``BacklogItem`` validation, or a file with unparseable YAML. One
-          bad file is logged and skipped, mirroring the per-entry salvage
-          policy :meth:`_CacheStateStore._salvage_field` already applies to
-          the durable mutation queue.
+          ``BacklogItem`` validation; a file with unparseable YAML; or a
+          file with invalid UTF-8 bytes, which ``load_item``'s
+          ``path.open(encoding="utf-8")`` surfaces as ``UnicodeDecodeError``
+          rather than a YAML or validation error. One bad file is logged and
+          skipped, mirroring the per-entry salvage policy
+          :meth:`_CacheStateStore._salvage_field` already applies to the
+          durable mutation queue.
 
         Returns:
             Ordered ``(logical_key, item)`` pairs for every snapshot that
@@ -463,12 +470,12 @@ class FileCache:
             return []
         snapshots: list[tuple[str, BacklogItem]] = []
         for path in sorted(item_root.rglob("*.yaml")):
-            if path.name.endswith(".tmp.yaml"):
+            if path.name.startswith(".") and path.name.endswith(".tmp.yaml"):
                 continue
             relative = path.relative_to(item_root)
             try:
                 snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
-            except (pydantic.ValidationError, YAMLError) as exc:
+            except (pydantic.ValidationError, YAMLError, UnicodeDecodeError) as exc:
                 _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
         return snapshots
 

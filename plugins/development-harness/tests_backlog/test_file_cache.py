@@ -185,6 +185,49 @@ def test_file_cache_work_item_snapshots_excludes_orphaned_temp_file_alongside_re
     assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
 
 
+def test_file_cache_work_item_snapshots_skips_invalid_utf8_without_crashing(tmp_path: Path) -> None:
+    """A snapshot with invalid UTF-8 bytes must not take the whole batch offline.
+
+    Regression test: ``load_item`` opens snapshots with
+    ``path.open(encoding="utf-8")``, so disk corruption or a partial write
+    that leaves invalid UTF-8 bytes raises ``UnicodeDecodeError`` -- a
+    ``ValueError`` subclass, but not ``pydantic.ValidationError`` or
+    ``YAMLError`` -- which used to propagate out of the whole enumeration,
+    taking every other, perfectly good snapshot offline with it.
+    """
+    # Given: one real snapshot and one sibling with invalid UTF-8 bytes
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    (tmp_path / "items" / "issues" / "13.yaml").write_bytes(b'title: "\xff\xfe bad utf8"')
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the real item is still returned; the corrupt one is skipped, not raised
+    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+
+
+def test_file_cache_work_item_snapshots_keeps_real_snapshot_ending_in_tmp(tmp_path: Path) -> None:
+    """A real snapshot whose logical key ends in ``.tmp`` must not be mistaken for an orphan.
+
+    Regression test: the orphan filter used to match any filename ending in
+    ``.tmp.yaml``, not just files created by ``_save_item_snapshot``'s
+    ``tempfile.mkstemp`` (which always adds a leading-dot prefix). A
+    legitimate snapshot saved under a key like ``release-1.0.tmp`` was
+    silently and permanently excluded, with no warning logged, unlike the
+    corrupt-YAML path.
+    """
+    # Given: a real snapshot saved under a key that happens to end in ".tmp"
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("release-1.0.tmp", BacklogItem(title="Real item"))
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: the real item is returned, not excluded as an orphan
+    assert [(key, item.title) for key, item in snapshots] == [("release-1.0.tmp.yaml", "Real item")]
+
+
 def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:
     # Given: an opaque provider key and an item whose backend reference is meaningful
     cache = FileCache(tmp_path)
