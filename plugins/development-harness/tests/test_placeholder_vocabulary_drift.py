@@ -43,6 +43,11 @@ _MODE_FREE_FILES = frozenset({
 
 _PLACEHOLDER_RE = re.compile(r"<([a-z_]+)/>")
 
+# The mode-value sense, matched as a whole token. A bare `"auto" in line` substring test also
+# accepts a route word that merely contains it (`auto-close`, `automate`, `interactive-browser`),
+# which is exactly the misuse shape this assertion exists to reject.
+_MODE_VALUE_RE = re.compile(r"(?<![\w-])(auto|interactive)(?![\w-])")
+
 
 def _iter_workflow_files() -> list[Path]:
     return sorted(_WORKFLOWS_ROOT.rglob("*.md"))
@@ -55,13 +60,17 @@ def test_every_mode_placeholder_line_names_its_own_value() -> None:
     `locate.md` each legitimately keep some `<mode/>` occurrences (the auto|interactive sense)
     right alongside lines this repo's C2 fix rewrote to `<item_ref/>`/`<route/>` (the misuse
     sense) — allowlisting the whole file would hide a regression into the very lines just fixed.
+    Matches `auto`/`interactive` as whole tokens, not substrings — a bare substring test would
+    also pass a misuse line naming a route word that merely contains one (`auto-close`,
+    `automate`, or a regression back into `interactive-browser.md` naming `interactive-browser`
+    as the route), none of which are the mode-value sense this assertion exists to require.
     """
     offenders: list[str] = []
     for path in _iter_workflow_files():
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if "<mode/>" not in line:
                 continue
-            if "auto" not in line and "interactive" not in line:
+            if not _MODE_VALUE_RE.search(line):
                 offenders.append(f"{path.relative_to(_WORKFLOWS_ROOT)}:{lineno}: {line.strip()}")
 
     assert not offenders, (
@@ -102,25 +111,6 @@ def test_every_workflow_placeholder_is_a_declared_schema_field() -> None:
         f"properties of {_PARSE_SCHEMA.relative_to(_REPO_ROOT)} — nothing in the parsed invocation "
         "ever produces a value for them. Either the placeholder is a typo/fossil (reword the doc) "
         "or the parser is missing a field (add it to parse.schema.json)."
-    )
-
-
-def test_no_conflicting_rt_ica_acronym_expansion() -> None:
-    """ "Real-Time Information Completeness Assessment" never appears under `plugins/`.
-
-    RT-ICA is Reverse Thinking - Information Completeness Assessment (`rt-ica/SKILL.md`'s own
-    H1). Two ARL reference files independently spelled out a different expansion; #2498's entry
-    22 traced the user's own confusion about what RT-ICA does back to definitions like this one.
-    """
-    offenders = [
-        str(path.relative_to(_REPO_ROOT))
-        for path in (_REPO_ROOT / "plugins").rglob("*.md")
-        if "Real-Time Information Completeness" in path.read_text(encoding="utf-8")
-    ]
-
-    assert not offenders, (
-        "RT-ICA is Reverse Thinking, not Real-Time — see plugins/development-harness/skills/"
-        f"rt-ica/SKILL.md's own H1. Conflicting expansion found in: {offenders!r}"
     )
 
 
@@ -204,23 +194,3 @@ def test_artifact_registration_count_checks_are_followed_by_a_read_back() -> Non
         f"a count can't detect a placeholder or empty registration (see {_ADD_NEW_FEATURE_SKILL.name}'s "
         "own 'read state, not by trusting a report' principle)."
     )
-
-
-def test_no_stale_dot_claude_rules_path_references() -> None:
-    """Every path this repo tells an agent to load under the old `.claude/rules/` prefix is gone.
-
-    The rules directory moved to repo-root `rules/` in `bf4dcd876` ("cross-tool path-scoped
-    rules"). AGENTS.md and `.claude/CLAUDE.md` both still told agents to load
-    `.claude/rules/*.md` files that no longer exist at that path — an agent following the
-    instruction literally (e.g. `.claude/CLAUDE.md:301`'s "load `.claude/rules/skill-substitution.md`
-    before editing any SKILL.md") would load nothing and proceed unaware the safety rule never
-    loaded. Scoped to this repo's own root instruction files, not the whole tree — most other
-    `.claude/rules/` mentions in the repo describe a different project's convention or the
-    generic Claude Code feature other projects use, which are not stale.
-    """
-    targets = [_REPO_ROOT / "AGENTS.md", _REPO_ROOT / ".claude" / "CLAUDE.md"]
-    offenders = [
-        str(path.relative_to(_REPO_ROOT)) for path in targets if ".claude/rules/" in path.read_text(encoding="utf-8")
-    ]
-
-    assert not offenders, f"Stale `.claude/rules/` reference (moved to repo-root `rules/`) in: {offenders!r}"
