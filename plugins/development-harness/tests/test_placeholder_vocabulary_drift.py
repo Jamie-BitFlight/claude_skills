@@ -28,6 +28,7 @@ _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 _REPO_ROOT = _PLUGIN_ROOT.parent.parent
 _WORKFLOWS_ROOT = _PLUGIN_ROOT / "skills" / "work-backlog-item" / "references" / "workflows"
 _PARSE_SCHEMA = _PLUGIN_ROOT / "skills" / "work-backlog-item" / "scripts" / "parser" / "parse.schema.json"
+_ADD_NEW_FEATURE_SKILL = _PLUGIN_ROOT / "skills" / "add-new-feature" / "SKILL.md"
 
 # Files that never legitimately carry the `<mode/>` placeholder after the C2 rename: the
 # no-argument path and every route-word trigger use `<item_ref/>`/`<route/>`/plain prose instead.
@@ -170,6 +171,36 @@ def test_start_md_todowrite_mandate_has_a_fallback_chain() -> None:
     assert not offenders, (
         "`TodoWrite` mentioned without a fallback-chain phrase ('if it exists' / 'otherwise') on "
         f"the same line — this is a bare cross-harness-unsatisfiable mandate again: {offenders!r}"
+    )
+
+
+def test_artifact_registration_count_checks_are_followed_by_a_read_back() -> None:
+    """Each `artifact list --artifact-type X` count check is followed by a content read-back.
+
+    A count of 1 does not prove the content is real — entry 15 found `artifact_register` storing
+    the literal string `$(cat ...)` as content, invisible to a count-only check. Structural check
+    only: the next `artifact read` call for the same `--artifact-type` value must appear within
+    the following 20 lines of `add-new-feature/SKILL.md`, not exact prose — the three sites use
+    slightly different wording.
+    """
+    text = _ADD_NEW_FEATURE_SKILL.read_text(encoding="utf-8")
+    lines = text.splitlines()
+
+    count_check_re = re.compile(r"artifact list --item-id \{issue\} --artifact-type (\S+)")
+    offenders: list[str] = []
+    for lineno, line in enumerate(lines):
+        match = count_check_re.search(line)
+        if not match:
+            continue
+        artifact_type = match.group(1)
+        window = "\n".join(lines[lineno : lineno + 20])
+        if f"artifact read --item-id {{issue}} --artifact-type {artifact_type}" not in window:
+            offenders.append(f"line {lineno + 1} (--artifact-type {artifact_type})")
+
+    assert not offenders, (
+        f"Count-only registration check(s) with no read-back within 20 lines: {offenders!r} — "
+        f"a count can't detect a placeholder or empty registration (see {_ADD_NEW_FEATURE_SKILL.name}'s "
+        "own 'read state, not by trusting a report' principle)."
     )
 
 

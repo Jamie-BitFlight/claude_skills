@@ -7,6 +7,7 @@ Post-swarm gates and final write. Runs after `swarm.md` completes.
 - [RT-ICA Final Pass](#rt-ica-final-pass) — re-assess conditions, self-resolve, write final report
 - [Output Validation Gate](#output-validation-gate) — verify required sections before write
 - [Hypothesis Resolution](#hypothesis-resolution) — rewrite a resolved creation-time hypothesis marker
+- [Canonical Write-Back](#canonical-write-back) — a correction rewrites the section it corrects, not a side section
 - [Write Groomed Content](#write-groomed-content) — batch or incremental write with `mark_groomed=True`
 - [Terminal States](#terminal-states) — Groomed, Blocked, Skipped, Drift
 
@@ -233,6 +234,19 @@ mcp__plugin_dh_backlog__backlog_update(selector='{item_ref}', description='{desc
 
 3. `--quick` items never reach this step — `--quick` skips grooming entirely, so a hypothesis
    written there is never resolved. Accepted scope limitation, not a bug.
+
+## Canonical Write-Back
+
+The Hypothesis Resolution rule above generalizes: when a correction contradicts a groomed
+section or `description`, rewrite that section in place — as Hypothesis Resolution rewrites
+`description` rather than appending a note elsewhere. Append to a side section only when the
+canonical section cannot be edited directly. #2498 hit this three times (entries 7 and 19):
+corrections landed in Dependencies/Concerns instead of the Implementation Plan section they
+corrected, so every later pass re-discovered the same stale facts. This rule applies to backlog
+sections and registered artifacts; it does not apply to SAM task bodies, which keep the
+append-amendment pattern until `set_fields_json`'s replace-not-merge behavior on list fields is
+fixed (see entries 24-25) — rewriting a SAM task body in place today risks silently dropping the
+rest of an unrelated list field in the same write.
 
 ## Write Groomed Content
 
