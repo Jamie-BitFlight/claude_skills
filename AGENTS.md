@@ -27,8 +27,8 @@ with its own MCP servers (`backlog_core/`, `sam_schema/`), agents, and skills. I
 Backlog backend for this checkout: **GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`).
 This repo does not use Beads (`bd`) for task tracking. **Never run `bd init` or `bd setup` at the
 repo root.** If a Beads integration block reappears in this file, delete it — it does not describe
-this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for how
-backend selection and the `backlog_*`/`sam_*` MCP tools actually work.
+this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for the
+backend abstraction's Protocol architecture when extending or modifying `dh`'s backend code.
 
 ## Environment Setup (Required First)
 
