@@ -193,7 +193,11 @@ def _make_directory_matching_glob(issues_dir: Path) -> None:
 
 
 def _make_symlink_escaping_cache_root(issues_dir: Path) -> None:
-    outside_target = issues_dir.parent.parent.parent / "outside.yaml"
+    # The boundary _snapshot_path() enforces is root/"items", not root itself, so a
+    # target under root but outside root/"items" already escapes it -- and staying
+    # under root keeps this file inside pytest's per-test tmp_path sandbox, not the
+    # shared per-session temp root a level higher.
+    outside_target = issues_dir.parent.parent / "outside.yaml"
     outside_target.write_text("title: escaped")
     (issues_dir / "13.yaml").symlink_to(outside_target)
 
