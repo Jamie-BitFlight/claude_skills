@@ -6,7 +6,7 @@ Read [scope.md](./scope.md) before proceeding. All work actions operate within t
 
 **At workflow start, create a TodoWrite checklist using the NUMBERED CHECKLIST for your mode (below the routing diagram) before executing any step. Use the numbered checklist items as the TodoWrite entries — not the Mermaid step names, which are summaries only.**
 
-The numbered checklist to use depends on `<mode/>`:
+The numbered checklist to use depends on whether `<mode/>` is `auto` or `interactive`:
 
 ```mermaid
 flowchart TD
@@ -89,7 +89,7 @@ and identify the last error state?
 
 | Input | Source | Required |
 |---|---|---|
-| <item_ref/> | Backlog item — `#N` format, bare number, URL, or title substring | Depends on <mode/> |
+| <item_ref/> | Backlog item — `#N` format, bare number, URL, or title substring | Depends on whether <mode/> is auto or interactive |
 | <mode/> | `auto` or `interactive` (default: `interactive`) | No |
 | <user_text/> | Additional context from the user, if any | No |
 

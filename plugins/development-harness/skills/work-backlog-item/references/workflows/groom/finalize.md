@@ -317,7 +317,7 @@ mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', c
 #### Handoff
 
 After grooming completes, the item is ready for SAM planning. The caller
-(`work-backlog-item`) routes to the planning phase based on user request or <mode/>.
+(`work-backlog-item`) routes to the planning phase based on user request or whether <mode/> is auto.
 
 ## Terminal States
 

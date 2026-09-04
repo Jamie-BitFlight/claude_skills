@@ -1,6 +1,6 @@
 # Quick Mode (Step Q)
 
-**Trigger:** <mode/> is `--quick`. Skips grooming, RT-ICA, and SAM planning. For one-file fixes, broken links, and typo patches where full pipeline overhead is disproportionate.
+**Trigger:** <route/> is `--quick`. Skips grooming, RT-ICA, and SAM planning. For one-file fixes, broken links, and typo patches where full pipeline overhead is disproportionate.
 
 **Why skipping grooming is safe here**: a task and plan normally require gathering real detail —
 scope, where the problem occurs, whether it's even true — before they exist. `--quick` skips

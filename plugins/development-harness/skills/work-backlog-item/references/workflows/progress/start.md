@@ -1,6 +1,6 @@
 # Progress Report (Step P)
 
-**Trigger:** <mode/> is `progress`.
+**Trigger:** <route/> is `progress`.
 
 1. Call `backlog_list()` to retrieve all open items. Count items by priority (P0, P1, P2, Ideas) and status from the returned `items` list. Each entry has `priority`, `status`, `title`, `issue`, `milestone`, and `groomed` fields.
 

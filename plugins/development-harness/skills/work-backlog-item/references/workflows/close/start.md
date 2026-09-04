@@ -1,6 +1,6 @@
 # Close / Resolve Procedure (Phase 5)
 
-**Trigger:** <mode/> is `close` or `resolve`.
+**Trigger:** <route/> is `close` or `resolve`.
 
 - `close`: <item_ref/>+ = title, `#N`, number, or URL → dismiss without completion (reason required)
 - `resolve`: <item_ref/>+ = title, `#N`, number, or URL → mark DONE with evidence trail (summary required)

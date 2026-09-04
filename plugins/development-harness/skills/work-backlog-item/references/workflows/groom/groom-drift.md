@@ -67,6 +67,7 @@ Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 1. Call `backlog view --selector "{title}"`.
 2. Extract file paths from groomed sections:
    - `sections["Impact Radius"]` — file paths under Code, Documentation, Configuration/CI
+   - `sections["Resources"]` — fallback for older grooming templates that wrote file lists here instead of Impact Radius; use only when `sections["Impact Radius"]` is absent or empty
    - `sections["Files"]` — explicit file paths
    - `sections["Output / Evidence"]` — cited file paths
 3. Use `groomed_date` from input.
