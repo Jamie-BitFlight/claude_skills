@@ -61,7 +61,11 @@ flowchart TD
 
 **Success:** `backlog_update` returns success, plan field set to `P{id}`.
 
-**Partial success:** Plan not found after full search — warning logged, Step 4.4 proceeds.
+**Partial success:** Plan not found after full search — warning logged, Step 4.4 proceeds. This is
+the never-existed case (a plan was just created here and can't yet be found by search) — a
+different starting condition from an item that already has a `**Plan**:` field pointing at a plan
+that is unreachable from this host. See [locate.md](./locate.md)'s "If the plan is reported
+unresolvable" branch for that case.
 
 **On failure:** If `backlog_update` returns error, report BLOCKED with error message — plan link is mandatory for dispatch.
 

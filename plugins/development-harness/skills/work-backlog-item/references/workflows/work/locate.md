@@ -44,4 +44,11 @@ If the item already has a `**Plan**:` field, use the plan address as-is (the ful
 Skill(skill: "dh:implement-feature", args: "{plan_address}")
 ```
 
+**If the plan is reported unresolvable** (a "Plan not found" result rather than plan content —
+this happens when the plan was created on another host and is not reachable from this one): state
+clearly that the plan will need to be regenerated on this host to continue. In auto mode, proceed
+to regenerate the plan as if the item had no plan field. In interactive mode, stop after stating
+that the local plan is missing, offer to recreate it as the next step, and wait for the user's
+response before proceeding.
+
 After extracting fields, proceed to `validate.md` (Step 2.1) before continuing.
