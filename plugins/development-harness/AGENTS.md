@@ -55,7 +55,7 @@ handling, and the per-family (`github`/`sqlite`/`memory`/`beads`) storage contra
 
 Agents address plans and tasks logically (`P{id}/T{M}`) through `sam_plan`, `sam_task`, or the
 grouped DH CLI adapter. Physical paths, cache records, provider IDs, and wire formats are backend
-internals. Use `sam_active_task` for session-scoped execution context.
+internals. `sam_active_task` tracks session-scoped execution context.
 
 Load `dh:dh-meta-docs` for the artifact conventions.
 
@@ -101,12 +101,10 @@ authoritative flag mapping.
 
 **Artifact types and registering agents:**
 
-This table is the complete registry of document-artifact types, held in agreement with every
-shipped `artifact_register` call by `tests/test_artifact_type_ownership_drift.py`. Every
-`artifact_register` call — MCP tool or `artifact register` CLI — must match a `(Type, Registering
-agents)` pair listed here. Add the row before writing the call. The `Registering agents` column
-holds the value each call passes as `agent`; the `Gate-read` column marks the types whose read
-result decides a workflow branch.
+This table is the complete registry of document-artifact types. Every `artifact_register` call — MCP
+tool or `artifact register` CLI — must match a `(Type, Registering agents)` pair listed here. Add the
+row before writing the call. The `Registering agents` column holds the value each call passes as
+`agent`; the `Gate-read` column marks the types whose read result decides a workflow branch.
 
 | Type | Registering agents | Gate-read | Notes |
 |---|---|---|---|
@@ -149,9 +147,12 @@ only the logical plan association on the owning work item. Never duplicate plan 
 `artifact_read` for document artifacts and `sam_plan` for plans instead of using filesystem access.
 The configured backend resolves content for every worktree.
 
-Load the `dh:create-artifact` skill for worked per-type registration examples and the MCP-native
-rule (agents store content via `artifact_register`/`sam_plan`; the `Write` tool is for
-repo-relative deliverables only).
+**MCP-native rule for agents:** Agents store document artifacts via `artifact_register` with
+`content=` and store plans through `sam_plan`. The configured backend owns persistence and retrieval.
+The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation
+files committed to the repo).
+
+Load the `dh:create-artifact` skill for worked per-type registration examples.
 
 **Prohibited patterns — do not write these in agent instructions or tool calls:**
 
@@ -315,24 +316,6 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 - `@dh:task-worker` - Blank-canvas SAM task executor dispatched in place of a generic agent; loads specialist profiles through each task's `agent:` field
 - `@dh:backlog-item-groomer` - Groom a backlog item with RT-ICA assessment and resource map
-
----
-
-## When to Use
-
-Activate this plugin when:
-
-- Starting feature development in any language project
-- Planning an implementation that needs structured decomposition
-- Running the full development workflow from discovery through verification
-- Working in a multi-language project where process should be consistent
-- Needing human touchpoint decisions based on constraint analysis rather than arbitrary gates
-
-Do NOT use when:
-
-- Making a quick fix that does not need staged planning
-- Working on documentation-only changes
-- The language plugin already provides its own complete workflow (check for flow override in manifest)
 
 ---
 
