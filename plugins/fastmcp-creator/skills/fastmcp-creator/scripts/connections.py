@@ -6,11 +6,12 @@ from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from typing import TYPE_CHECKING, Any, Self
 
+import httpx2
 from anthropic.types import ToolParam
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -95,7 +96,7 @@ class MCPConnection(ABC):
             raise RuntimeError("No active session. Use async with context.")
         response = await self.session.list_tools()
         return [
-            ToolParam(name=tool.name, description=tool.description or "", input_schema=tool.inputSchema)
+            ToolParam(name=tool.name, description=tool.description or "", input_schema=tool.input_schema)
             for tool in response.tools
         ]
 
@@ -198,7 +199,8 @@ class MCPConnectionHTTP(MCPConnection):
         Returns:
             Async context manager for HTTP transport.
         """
-        return streamablehttp_client(url=self.url, headers=self.headers)
+        http_client = httpx2.AsyncClient(headers=self.headers) if self.headers else None
+        return streamable_http_client(url=self.url, http_client=http_client)
 
 
 def create_connection(
